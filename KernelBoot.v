@@ -147,9 +147,7 @@ Section ForwardAUIPC.
     exec (fetch tt) s0 = Some (F_Base w, s0).
   Hypothesis Hdec_gen : forall s0 : mstate,
     exec (ext_decode w) s0 = Some (UTYPE (imm, Regidx i, AUIPC), s0).
-  Hypothesis Hsi_gen : forall s0 : mstate,
-    register_lookup cur_privilege s0.(sregs) = Machine ->
-    exec (should_inc_minstret Machine) s0 = Some (b, s0).
+  Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
   Definition sAa : mstate := set_reg s (R_bool minstret_increment) b.
   Definition sXa : mstate :=
@@ -224,7 +222,7 @@ Section ForwardAUIPC.
     (* the generic try_step wrapper. *)
     apply (exec_riscv_step_ADD s sXa w b pc).
     - exact Lpriv.
-    - apply Hsi_gen; exact Lpriv.
+    - exact Hsi_s.
     - exact LhsA.
     - exact Hha.
     - (* hart_state at sXa = HART_ACTIVE tt *)
@@ -347,9 +345,7 @@ Section ForwardLD.
   Hypothesis Hdec_gen : forall s0 : mstate,
     exec (ext_decode w) s0
       = Some (LOAD (imm, Regidx irs1, Regidx ird, false, 8), s0).
-  Hypothesis Hsi_gen : forall s0 : mstate,
-    register_lookup cur_privilege s0.(sregs) = Machine ->
-    exec (should_inc_minstret Machine) s0 = Some (b, s0).
+  Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
   (* The execute clause at the post-fetch state s_pc = set_reg (set_reg s
      minstret_increment b) nextPC (pc+4).  Discharged in wp_kernel_first_two
      via the PROVEN exec_execute_LOAD_8 (no longer the over-strong forall-s0). *)
@@ -416,7 +412,7 @@ Section ForwardLD.
                LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecA I). }
     apply (exec_riscv_step_ADD s sXl w b pc).
     - exact Lpriv.
-    - apply Hsi_gen; exact Lpriv.
+    - exact Hsi_s.
     - exact LhsA.
     - exact Hha.
     - unfold sXl, sAl; cbn zeta. trans_mi. trans_mi. trans_mi. exact Lhs.
@@ -476,44 +472,51 @@ Section KernelBootWP.
   (* ---------------------------------------------------------------------- *)
   Lemma wp_step_auipc (pc : mword 64) (w_a : mword 32) (imm_a : mword 20)
       (i_a : mword 5) (b1 : bool) (sp0a npc0a mst0a mstatus0a : mword 64)
+      (mc : mword 32) (mcfg : mword 64)
       (mi0a : bool) (elp0a : mword 1) E (Φ : mval -> iProp Σ) :
     uint i_a = 2 ->
     (forall s0, register_lookup PC s0.(sregs) = pc ->
        register_lookup cur_privilege s0.(sregs) = Machine ->
        exec (fetch tt) s0 = Some (F_Base w_a, s0)) ->
     (forall s0, exec (ext_decode w_a) s0 = Some (UTYPE (imm_a, Regidx i_a, AUIPC), s0)) ->
-    (forall s0, register_lookup cur_privilege s0.(sregs) = Machine ->
-       exec (should_inc_minstret Machine) s0 = Some (b1, s0)) ->
+    (* should_inc is now DETERMINED by the mcountinhibit/minstretcfg cells: *)
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+              (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0a) ('b"1") = false ->
     eq_vec elp0a (landing_pad_bits_backwards LP_EXPECTED) = false ->
     PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ nextPC ↦ᵣ npc0a -∗
     (R_bool minstret_increment) ↦ᵣ mi0a -∗ minstret ↦ᵣ mst0a -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
-    elp ↦ᵣ elp0a -∗
+    elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (add_vec pc (auipc_off imm_a)) -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0a 1 else mst0a) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
-        elp ↦ᵣ elp0a -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+        elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (Hia Hfa Hda Hsa HmIE Help) "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hcont".
+    iIntros (Hia Hfa Hda Hb1 HmIE Help) "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hcont".
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpc")   as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hhs")   as %Lhs.
-    iDestruct (reg_valid with "Hreg Hmdl")  as %Lmdl.
-    iDestruct (reg_valid with "Hreg Hms")   as %Lms.
-    iDestruct (reg_valid with "Hreg Hmst")  as %Lmst.
-    iDestruct (reg_valid with "Hreg Help")  as %Lelp.
+    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
+    iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
+    iDestruct (reg_valid with "Hreg Help")   as %Lelp.
+    iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
+    iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
+    { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iExists (sFca s pc imm_a b1 mst0a). iSplitR.
     { iPureIntro.
-      rewrite <- (sFa_eq s pc imm_a b1 Hsa mst0a Lmst Lpc).
-      apply (forward_exec_auipc s w_a pc imm_a i_a b1 Hia Hfa Hda Hsa Lpc Lpriv Lhs Lmdl).
+      rewrite <- (sFa_eq s pc imm_a b1 Hsi_s mst0a Lmst Lpc).
+      apply (forward_exec_auipc s w_a pc imm_a i_a b1 Hia Hfa Hda Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
     iIntros "!>".
@@ -525,9 +528,9 @@ Section KernelBootWP.
     unfold sFca, base_upd_a. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg").
     - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg").
   Qed.
 
   (* ---------------------------------------------------------------------- *)
@@ -537,6 +540,7 @@ Section KernelBootWP.
   Lemma wp_step_ld (pc : mword 64) (w_l : mword 32) (imm_l : mword 12)
       (i_l : mword 5) (b1 : bool) (region : PMA_Region) (v : bv 64)
       (sp0a npc0a mst0a mstatus0a : mword 64)
+      (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
       (pmar0 : list PMA_Region) (mi0a : bool) (elp0a : mword 1)
       E (Φ : mval -> iProp Σ) :
@@ -550,8 +554,9 @@ Section KernelBootWP.
        register_lookup cur_privilege s0.(sregs) = Machine ->
        exec (fetch tt) s0 = Some (F_Base w_l, s0)) ->
     (forall s0, exec (ext_decode w_l) s0 = Some (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8), s0)) ->
-    (forall s0, register_lookup cur_privilege s0.(sregs) = Machine ->
-       exec (should_inc_minstret Machine) s0 = Some (b1, s0)) ->
+    (* should_inc determined by the mcountinhibit/minstretcfg cells: *)
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+              (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0a) ('b"1") = false ->
     eq_vec elp0a (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0a) ('b"1") = false ->
@@ -570,6 +575,7 @@ Section KernelBootWP.
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
     elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
+    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2) -∗
@@ -578,24 +584,29 @@ Section KernelBootWP.
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
         elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
+        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea a8 pa data2 Hil Hfl Hdl Hsl HmIE Help HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh.
-    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hbytes Hcont".
+    intros offset ea a8 pa data2 Hil Hfl Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh.
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes Hcont".
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpc")   as %Lpc.
-    iDestruct (reg_valid with "Hreg Hx2")   as %Lx2.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hhs")   as %Lhs.
-    iDestruct (reg_valid with "Hreg Hmdl")  as %Lmdl.
-    iDestruct (reg_valid with "Hreg Hms")   as %Lms.
-    iDestruct (reg_valid with "Hreg Hmst")  as %Lmst.
-    iDestruct (reg_valid with "Hreg Help")  as %Lelp.
-    iDestruct (reg_valid with "Hreg Hsec")  as %Lsec.
-    iDestruct (reg_valid with "Hreg Hpmpc") as %Lpmpc.
-    iDestruct (reg_valid with "Hreg Hpma")  as %Lpma.
+    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid with "Hreg Hx2")    as %Lx2.
+    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
+    iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
+    iDestruct (reg_valid with "Hreg Help")   as %Lelp.
+    iDestruct (reg_valid with "Hreg Hsec")   as %Lsec.
+    iDestruct (reg_valid with "Hreg Hpmpc")  as %Lpmpc.
+    iDestruct (reg_valid with "Hreg Hpma")   as %Lpma.
+    iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
+    iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
+    { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j)⌝)%I as %Hbytesf.
     { iIntros (j Hj).
       assert (Hj' : (j < 8)%nat) by lia.
@@ -633,8 +644,8 @@ Section KernelBootWP.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iExists (sFcl s pc data2 b1 mst0a). iSplitR.
     { iPureIntro.
-      rewrite <- (sFl_eq s pc imm_l i_l i_l data2 b1 Hsl Hexec_spc mst0a Lmst).
-      apply (forward_exec_ld s w_l pc imm_l i_l i_l data2 b1 Hil Hfl Hdl Hsl Hexec_spc Lpc Lpriv Lhs Lmdl).
+      rewrite <- (sFl_eq s pc imm_l i_l i_l data2 b1 Hsi_s Hexec_spc mst0a Lmst).
+      apply (forward_exec_ld s w_l pc imm_l i_l i_l data2 b1 Hil Hfl Hdl Hsi_s Hexec_spc Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
     iIntros "!>".
@@ -646,9 +657,9 @@ Section KernelBootWP.
     unfold sFcl, base_upd_l. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hbytes").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
     - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hbytes").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
   Qed.
 
   (* ====================================================================== *)
@@ -671,32 +682,33 @@ Section KernelBootWP.
   (*   admitted for now.                                                      *)
   (* ====================================================================== *)
   Lemma wp_kernel_first_two
-      (w_a : mword 32) (imm_a : mword 20) (i_a : mword 5) (b_a : bool)
-      (w_l : mword 32) (imm_l : mword 12) (i_l : mword 5) (b_l : bool)
+      (w_a : mword 32) (imm_a : mword 20) (i_a : mword 5)
+      (w_l : mword 32) (imm_l : mword 12) (i_l : mword 5)
       (region : PMA_Region) (v : bv 64)
+      (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       E (Φ : mval -> iProp Σ) :
+    (* `should_inc` for both steps is DETERMINED by the mcountinhibit/minstretcfg
+       cells (owned below) — no per-step exec-hypothesis is needed. *)
+    let bb     := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+                       (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
     let sp1    := regval_into_reg (add_vec kpc0 (auipc_off imm_a)) in
     let offl   := sign_extend' 64 imm_l in
     let eal    := add_vec sp1 offl in
     let a8l    := zero_extend' 64 (subrange_vec_dec eal (xlen - 0 - 1) 0) in
     let pal    := zero_extend' 64 (add_vec_int a8l (0 * 8)) in
     let data2l := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v in
-    let mst1   := if b_a then add_vec_int mst0 1 else mst0 in
+    let mst1   := if bb then add_vec_int mst0 1 else mst0 in
     uint i_a = 2 ->
     (forall s0, register_lookup PC s0.(sregs) = kpc0 ->
        register_lookup cur_privilege s0.(sregs) = Machine ->
        exec (fetch tt) s0 = Some (F_Base w_a, s0)) ->
     (forall s0, exec (ext_decode w_a) s0 = Some (UTYPE (imm_a, Regidx i_a, AUIPC), s0)) ->
-    (forall s0, register_lookup cur_privilege s0.(sregs) = Machine ->
-       exec (should_inc_minstret Machine) s0 = Some (b_a, s0)) ->
     uint i_l = 2 ->
     (forall s0, register_lookup PC s0.(sregs) = kpc1 ->
        register_lookup cur_privilege s0.(sregs) = Machine ->
        exec (fetch tt) s0 = Some (F_Base w_l, s0)) ->
     (forall s0, exec (ext_decode w_l) s0 = Some (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8), s0)) ->
-    (forall s0, register_lookup cur_privilege s0.(sregs) = Machine ->
-       exec (should_inc_minstret Machine) s0 = Some (b_l, s0)) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -715,35 +727,37 @@ Section KernelBootWP.
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
+    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
     ▷ ( PC ↦ᵣ kpc2 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2l) -∗
-        nextPC ↦ᵣ kpc2 -∗ (R_bool minstret_increment) ↦ᵣ b_l -∗
-        minstret ↦ᵣ (if b_l then add_vec_int mst1 1 else mst1) -∗
+        nextPC ↦ᵣ kpc2 -∗ (R_bool minstret_increment) ↦ᵣ bb -∗
+        minstret ↦ᵣ (if bb then add_vec_int mst1 1 else mst1) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
+        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros sp1 offl eal a8l pal data2l mst1
-      Hia Hfa Hda Hsa Hil Hfl Hdl Hsl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh.
-    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hbytes Hcont".
-    (* Step 1: auipc.  *)
-    iApply (wp_step_auipc kpc0 w_a imm_a i_a b_a sp0 kpc0 mst0 mstatus0 mi0 elp0 E Φ
-              Hia Hfa Hda Hsa HmIE Hlp
-              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help").
-    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help".
+    intros bb sp1 offl eal a8l pal data2l mst1
+      Hia Hfa Hda Hil Hfl Hdl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh.
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes Hcont".
+    (* Step 1: auipc.  b1 := bb, determined by the owned mcountinhibit/minstretcfg. *)
+    iApply (wp_step_auipc kpc0 w_a imm_a i_a bb sp0 kpc0 mst0 mstatus0 mc mcfg mi0 elp0 E Φ
+              Hia Hfa Hda eq_refl HmIE Hlp
+              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg").
+    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg".
     replace (add_vec_int kpc0 4) with kpc1 by (vm_compute; reflexivity).
     (* Step 2: ld.  base register x2 holds sp1 = the auipc result. *)
-    iApply (wp_step_ld kpc1 w_l imm_l i_l b_l region v sp1 kpc1 mst1 mstatus0
-              mseccfg0 pmpcfg0 pmar0 b_a elp0 E Φ
-              Hil Hfl Hdl Hsl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh
-              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hbytes").
-    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hbytes".
+    iApply (wp_step_ld kpc1 w_l imm_l i_l bb region v sp1 kpc1 mst1 mstatus0 mc mcfg
+              mseccfg0 pmpcfg0 pmar0 bb elp0 E Φ
+              Hil Hfl Hdl eq_refl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh
+              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
+    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes".
     replace (add_vec_int kpc1 4) with kpc2 by (vm_compute; reflexivity).
-    iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hbytes").
+    iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
   Qed.
 
 End KernelBootWP.

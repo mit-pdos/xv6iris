@@ -53,6 +53,29 @@ Lemma autocast_id (m : Z) (x : mword m) : autocast x = x.
 Proof. apply autocast_refl. Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* should_inc_minstret is state-pure: its result is fully determined by    *)
+(* the mcountinhibit and minstretcfg cells.  Owning those two CSRs thus     *)
+(* discharges the `should_inc` exec-condition (no `forall s0` needed).      *)
+(* ---------------------------------------------------------------------- *)
+Lemma exec_should_inc_M (mc : mword 32) (mcfg : mword 64) s :
+  register_lookup mcountinhibit s.(sregs) = mc ->
+  register_lookup minstretcfg s.(sregs) = mcfg ->
+  exec (should_inc_minstret Machine) s
+    = Some (andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+                 (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")), s).
+Proof.
+  intros Hmc Hmcfg. unfold should_inc_minstret.
+  assert (HA : exec ((read_reg mcountinhibit : M (mword 32)) >>=
+                     (fun w__0 => returnM (eq_vec (_get_Counterin_IR w__0) ('b"0")))) s
+               = Some (eq_vec (_get_Counterin_IR mc) ('b"0"), s)).
+  { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcountinhibit s)). rewrite Hmc. apply exec_returnm. }
+  rewrite (exec_and_boolM_Some _ _ _ _ _ HA).
+  destruct (eq_vec (_get_Counterin_IR mc) ('b"0")) eqn:Ea; cbn [andb].
+  - rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg minstretcfg s)). rewrite Hmcfg. apply exec_returnm.
+  - reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* Leaf 2: rX / rX_bits read leaf for x2 (sp), mirroring run_rX_x10.        *)
 (* ---------------------------------------------------------------------- *)
 Lemma rX_x2 : rX (Regno 2) = Defs.read_reg (R_bitvector_64 x2).
