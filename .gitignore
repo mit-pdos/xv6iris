@@ -1,0 +1,11 @@
+/_opam
+*.vo
+*.vos
+*.vok
+CoqMakefile
+CoqMakefile.conf
+.CoqMakefile.d
+.*.aux
+*.glob
+*.log
+.*.cache
