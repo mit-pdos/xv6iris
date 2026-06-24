@@ -47,6 +47,26 @@ Definition kpc2 : mword 64 := mword_of_int (kentry + 8).    (* 0x80000008 *)
 (* auipc sp,0xa writes sp := pc + (0xa << 12) = 0x80000000 + 0xa000. *)
 Definition sp_auipc : mword 64 := mword_of_int 0x8000a000.
 
+(* ---------------------------------------------------------------------- *)
+(* The kernel TEXT image, from the dumper's [KernelInstrs.kernel_instrs].  *)
+(* ---------------------------------------------------------------------- *)
+
+(* The first two instructions, read off the image by index (auipc; ld).    *)
+Definition kdefault : KernelInstrs.kinstr := KernelInstrs.MkKInstr 0 0 0 "".
+Definition kinstr0 : KernelInstrs.kinstr := nth 0 KernelInstrs.kernel_instrs kdefault.
+Definition kinstr1 : KernelInstrs.kinstr := nth 1 KernelInstrs.kernel_instrs kdefault.
+
+(* [kernel_instrs] starts with exactly these two (computed off the image). *)
+Lemma kernel_instrs_cons2 :
+  KernelInstrs.kernel_instrs = kinstr0 :: kinstr1 :: drop 2 KernelInstrs.kernel_instrs.
+Proof.
+  transitivity (app (take 2 KernelInstrs.kernel_instrs) (drop 2 KernelInstrs.kernel_instrs)).
+  { symmetry. apply take_drop. }
+  replace (take 2 KernelInstrs.kernel_instrs)
+    with (cons kinstr0 (cons kinstr1 nil)) by (vm_compute; reflexivity).
+  reflexivity.
+Qed.
+
 Section KernelBootWP.
   Context `{!riscvGS Σ}.
 
@@ -57,6 +77,71 @@ Section KernelBootWP.
      left abstract here (it depends on the kernel's data/relocations, which
      `forward_exec_ld` below will read out of the owned memory bytes). *)
   Context (gotval mstF : mword 64) (miF : bool).
+
+  (* ---- the kernel TEXT image as a separation-logic predicate ---- *)
+  (* One instruction resident at its ELF address: its [ki_width/8] bytes (read
+     in little-endian exactly as Sail fetches them) live in physical memory at
+     the fetch-translation of [ki_addr].  The encoding [ki_enc] is taken as a
+     32-bit word; for 16-bit (RVC) instructions only bytes 0..1 are asserted. *)
+  Definition kinstr_bytes (k : KernelInstrs.kinstr) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 (KernelInstrs.ki_width k / 8),
+      (pa_add (fetch_pa (mword_of_int (KernelInstrs.ki_addr k))) j)
+        ↦ₘ nth_byte (mword_of_int (KernelInstrs.ki_enc k) : mword 32) j)%I.
+
+  (* The whole text section is exactly the bytes of every dumped instruction. *)
+  Definition kernel_text : iProp Σ :=
+    ([∗ list] k ∈ KernelInstrs.kernel_instrs, kinstr_bytes k)%I.
+
+  (* The bytes of the first two instructions, in the per-opcode WPs' form. *)
+  Definition auipc_bytes : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_auipc j)%I.
+  Definition ld_bytes : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_ld j)%I.
+  (* The remaining text (everything after the first two instructions), kept
+     FOLDED so [kernel_instrs] is only ever exposed inside [kernel_text]. *)
+  Definition kernel_text_tail : iProp Σ :=
+    ([∗ list] k ∈ drop 2 KernelInstrs.kernel_instrs, kinstr_bytes k)%I.
+
+  (* [kinstr_bytes] of the first two instructions IS the WP byte-ownership form
+     (the ELF address/encoding/width compute to kpc0/w_auipc and kpc1/w_ld). *)
+  Lemma E_auipc : kinstr_bytes kinstr0 = auipc_bytes.
+  Proof.
+    rewrite /kinstr_bytes /auipc_bytes.
+    replace (KernelInstrs.ki_width kinstr0) with 32%nat by (vm_compute; reflexivity).
+    replace (KernelInstrs.ki_addr kinstr0) with (0x80000000)%Z by (vm_compute; reflexivity).
+    replace (KernelInstrs.ki_enc kinstr0) with (0xa117)%Z by (vm_compute; reflexivity).
+    reflexivity.
+  Qed.
+  Lemma E_ld : kinstr_bytes kinstr1 = ld_bytes.
+  Proof.
+    rewrite /kinstr_bytes /ld_bytes.
+    replace (KernelInstrs.ki_width kinstr1) with 32%nat by (vm_compute; reflexivity).
+    replace (KernelInstrs.ki_addr kinstr1) with (0x80000004)%Z by (vm_compute; reflexivity).
+    replace (KernelInstrs.ki_enc kinstr1) with (0x1d813103)%Z by (vm_compute; reflexivity).
+    reflexivity.
+  Qed.
+
+  Lemma kernel_text_split : kernel_text ⊢ auipc_bytes ∗ ld_bytes ∗ kernel_text_tail.
+  Proof.
+    rewrite /kernel_text {1}kernel_instrs_cons2 big_sepL_cons big_sepL_cons
+            E_auipc E_ld -/kernel_text_tail.
+    iIntros "(H0 & H1 & Hr)". iFrame.
+  Qed.
+  Lemma kernel_text_combine : auipc_bytes ∗ ld_bytes ∗ kernel_text_tail ⊢ kernel_text.
+  Proof.
+    rewrite /kernel_text {1}kernel_instrs_cons2 big_sepL_cons big_sepL_cons
+            E_auipc E_ld -/kernel_text_tail.
+    iIntros "(H0 & H1 & Hr)". iFrame.
+  Qed.
+
+  (* The first two instructions' bytes (WP form) + a wand to restore the whole
+     image (fetch never mutates memory). *)
+  Lemma kernel_text_first_two :
+    kernel_text ⊢ auipc_bytes ∗ ld_bytes ∗ (auipc_bytes -∗ ld_bytes -∗ kernel_text).
+  Proof.
+    iIntros "Ht". iDestruct (kernel_text_split with "Ht") as "(H0 & H1 & Hr)".
+    iFrame "H0 H1". iIntros "H0 H1". iApply kernel_text_combine. iFrame.
+  Qed.
 
   (* ---------------------------------------------------------------------- *)
   (* Single-step WP for `auipc rd,imm` (rd=x2), via wp_exec_step +           *)
@@ -118,8 +203,8 @@ Section KernelBootWP.
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_auipc j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_ld j) -∗
+    (* the ENTIRE kernel text image, exactly as loaded from the ELF (dumper). *)
+    kernel_text -∗
     ▷ ( PC ↦ᵣ kpc2 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2l) -∗
         nextPC ↦ᵣ kpc2 -∗ (R_bool minstret_increment) ↦ᵣ bb -∗
@@ -129,8 +214,7 @@ Section KernelBootWP.
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_auipc j) -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_ld j) -∗
+        kernel_text -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -138,7 +222,11 @@ Section KernelBootWP.
       Hmatchfa Hexecfa Halignfa Hbit0fa Hbit1fa Hvalignfa
       Hmatchfl Hexecfl Halignfl Hbit0fl Hbit1fl Hvalignfl Hpmpf
       HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread.
-    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesa Hibytesl Hcont".
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext Hcont".
+    (* extract the two instruction byte-blocks from the whole-image predicate;
+       [Hrestore] puts them back (fetch leaves memory unchanged). *)
+    iDestruct (kernel_text_first_two with "Htext") as "(Hibytesa & Hibytesl & Hrestore)".
+    iEval (rewrite /auipc_bytes) in "Hibytesa". iEval (rewrite /ld_bytes) in "Hibytesl".
     (* Step 1: auipc.  uint i_auipc = 2 and isRVC are now concrete facts; decode is
        discharged by [decode_auipc].  Owns the auipc bytes + fetch CSRs. *)
     iApply (wp_step_auipc kpc0 w_auipc imm_auipc i_auipc bb sp0 kpc0 mst0 mstatus0 mc mcfg
@@ -158,7 +246,9 @@ Section KernelBootWP.
               with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
     iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl".
     replace (add_vec_int kpc1 4) with kpc2 by (vm_compute; reflexivity).
-    iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesa Hibytesl").
+    (* reassemble the whole-image predicate from the (unchanged) instruction bytes *)
+    iDestruct ("Hrestore" with "Hibytesa Hibytesl") as "Htext".
+    iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
   Qed.
 
 End KernelBootWP.
