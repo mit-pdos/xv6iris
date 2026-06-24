@@ -143,6 +143,25 @@ Section KernelBootWP.
     iFrame "H0 H1". iIntros "H0 H1". iApply kernel_text_combine. iFrame.
   Qed.
 
+  (* ---- byte-level view of the image (for cross-boundary fetch windows) ---- *)
+  (* [instr_byte_pairs k] : the (address, byte) pairs of one instruction. *)
+  Definition instr_byte_pairs (k : KernelInstrs.kinstr) : list (Arch.pa * bv 8) :=
+    map (fun j => (pa_add (fetch_pa (mword_of_int (KernelInstrs.ki_addr k))) j,
+                   nth_byte (mword_of_int (KernelInstrs.ki_enc k) : mword 32) j))
+        (seq 0 (KernelInstrs.ki_width k / 8)).
+  Definition kernel_byte_map : list (Arch.pa * bv 8) :=
+    KernelInstrs.kernel_instrs ≫= instr_byte_pairs.
+  Definition kernel_image : iProp Σ :=
+    ([∗ list] ab ∈ kernel_byte_map, ab.1 ↦ₘ ab.2)%I.
+
+  (* The byte-level image is exactly the per-instruction image. *)
+  Lemma kernel_image_eq : kernel_image ⊣⊢ kernel_text.
+  Proof.
+    rewrite /kernel_image /kernel_byte_map big_sepL_bind /kernel_text.
+    apply big_sepL_proper; intros ? k ?.
+    rewrite /instr_byte_pairs /kinstr_bytes big_sepL_fmap. done.
+  Qed.
+
   (* ---------------------------------------------------------------------- *)
   (* Single-step WP for `auipc rd,imm` (rd=x2), via wp_exec_step +           *)
   (* forward_exec_auipc + sFa_eq.  Mirror of wp_add_real_final.              *)

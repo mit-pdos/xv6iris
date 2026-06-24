@@ -391,7 +391,6 @@ Section FetchExec.
   Hypothesis Hbit0 : neq_vec (access_vec_dec pc 0) ('b"0") = false.
   Hypothesis Hbit1 : neq_vec (access_vec_dec pc 1) ('b"0") = false.
   Hypothesis Hvalign : is_aligned_vaddr (Virtaddr pc) 4 = true.
-  Hypothesis HnotRVC : isRVC (subrange_vec_dec w 15 0) = false.
 
   (* fetch_bytes assembly: the two liftR sub-computations [translateAddr] and
      [mem_read] are PROVEN above (exec_translateAddr_identity / exec_mem_read_fetch),
@@ -433,6 +432,8 @@ Section FetchExec.
      Ext_Zca short-circuited and Ext_Ziccif=true, isRVC=false).  Given
      exec_fetch_bytes_4 + run_fetch_F_Base, this closes via the execR plumbing or
      run_to_exec; left as the precise residue. *)
+  Hypothesis HnotRVC : isRVC (subrange_vec_dec w 15 0) = false.
+
   Lemma exec_fetch_done : exec (fetch tt) s = Some (F_Base w, s).
   Proof using All.
     assert (HrdPC : exec (Defs.read_reg PC) s = Some (pc, s)).
