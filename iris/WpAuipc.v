@@ -59,6 +59,7 @@ Section ForwardAUIPC.
     exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_Base w, set_reg s (R_bool minstret_increment) b).
   Hypothesis Hdec_gen : forall s0 : mstate,
+    register_lookup cur_privilege (sregs s0) = Machine ->
     exec (ext_decode w) s0 = Some (UTYPE (imm, Regidx i, AUIPC), s0).
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
@@ -114,7 +115,7 @@ Section ForwardAUIPC.
     assert (HfetchA : exec (fetch tt) sAa = Some (F_Base w, sAa))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAa = Some (UTYPE (imm, Regidx i, AUIPC), sAa))
-      by apply Hdec_gen.
+      by (apply Hdec_gen; exact LprivA).
     (* execute leaf at s_pc = set_reg sAa nextPC (pc+4). *)
     pose (s_pc := set_reg sAa nextPC (add_vec_int pc 4)).
     assert (HpcPCpc : register_lookup PC s_pc.(sregs) = pc).
@@ -198,7 +199,8 @@ Section StepAUIPC.
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w_a 15 0) = false ->
-    (forall s0, exec (ext_decode w_a) s0 = Some (UTYPE (imm_a, Regidx i_a, AUIPC), s0)) ->
+    (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
+       exec (ext_decode w_a) s0 = Some (UTYPE (imm_a, Regidx i_a, AUIPC), s0)) ->
     (* should_inc is now DETERMINED by the mcountinhibit/minstretcfg cells: *)
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->

@@ -497,6 +497,7 @@ Section ForwardLD.
     exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_Base w, set_reg s (R_bool minstret_increment) b).
   Hypothesis Hdec_gen : forall s0 : mstate,
+    register_lookup cur_privilege (sregs s0) = Machine ->
     exec (ext_decode w) s0
       = Some (LOAD (imm, Regidx irs1, Regidx ird, false, 8), s0).
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
@@ -552,7 +553,7 @@ Section ForwardLD.
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAl
               = Some (LOAD (imm, Regidx irs1, Regidx ird, false, 8), sAl))
-      by apply Hdec_gen.
+      by (apply Hdec_gen; exact LprivA).
     pose (s_pc := set_reg sAl nextPC (add_vec_int pc 4)).
     assert (LpcAA : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc. trans_mi. exact LpcA. }
@@ -630,7 +631,8 @@ Section StepLD.
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w_l 15 0) = false ->
-    (forall s0, exec (ext_decode w_l) s0 = Some (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8), s0)) ->
+    (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
+       exec (ext_decode w_l) s0 = Some (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8), s0)) ->
     (* should_inc determined by the mcountinhibit/minstretcfg cells: *)
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->

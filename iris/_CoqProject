@@ -12,4 +12,5 @@ WpAdd.v
 WpAuipc.v
 WpLoad.v
 WpFetch.v
+WpDecode.v
 KernelBoot.v

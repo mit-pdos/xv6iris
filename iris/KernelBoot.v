@@ -10,7 +10,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpAuipc WpLoad.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpAuipc WpLoad WpDecode.
 From Kernel Require KernelInstrs KernelData KernelSyms.
 Local Open Scope Z_scope.
 
@@ -35,10 +35,9 @@ Lemma kernel_first_two_encs :
     (List.nth_error KernelInstrs.kernel_instrs_chunk0 1) = Some 0x1d813103.
 Proof. split; reflexivity. Qed.
 
-(* The instruction words handed to the Sail decoder (little-endian integer
-   exactly as [ki_enc]). *)
-Definition w_auipc : mword 32 := mword_of_int 0xa117.       (* auipc sp,0xa     *)
-Definition w_ld    : mword 32 := mword_of_int 0x1d813103.   (* ld sp,472(sp)    *)
+(* The instruction words handed to the Sail decoder ([w_auipc]/[w_ld], with the
+   decoded fields [imm_auipc]/[i_auipc]/[imm_ld]/[i_ld] and the fully-discharged
+   decode lemmas [decode_auipc]/[decode_ld]) live in WpDecode. *)
 
 (* Program counters across the two-instruction window (both are 4-byte). *)
 Definition kpc0 : mword 64 := mword_of_int  kentry.         (* 0x80000000 *)
@@ -63,9 +62,11 @@ Section KernelBootWP.
   (* Single-step WP for `auipc rd,imm` (rd=x2), via wp_exec_step +           *)
   (* forward_exec_auipc + sFa_eq.  Mirror of wp_add_real_final.              *)
 
+  (* The instruction words [w_auipc]/[w_ld] and decoded fields are now CONCRETE
+     (from WpDecode), and the two decode side-conditions are DISCHARGED here via
+     [decode_auipc]/[decode_ld] — so this top-level theorem carries NO decode
+     hypothesis at all. *)
   Lemma wp_kernel_first_two
-      (w_a : mword 32) (imm_a : mword 20) (i_a : mword 5)
-      (w_l : mword 32) (imm_l : mword 12) (i_l : mword 5)
       (region region_fa region_fl : PMA_Region) (v : bv 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -74,36 +75,30 @@ Section KernelBootWP.
        cells (owned below) — no per-step exec-hypothesis is needed. *)
     let bb     := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                        (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
-    let sp1    := regval_into_reg (add_vec kpc0 (auipc_off imm_a)) in
-    let offl   := sign_extend' 64 imm_l in
+    let sp1    := regval_into_reg (add_vec kpc0 (auipc_off imm_auipc)) in
+    let offl   := sign_extend' 64 imm_ld in
     let eal    := add_vec sp1 offl in
     let a8l    := zero_extend' 64 (subrange_vec_dec eal (xlen - 0 - 1) 0) in
     let pal    := zero_extend' 64 (add_vec_int a8l (0 * 8)) in
     let data2l := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v in
     let mst1   := if bb then add_vec_int mst0 1 else mst0 in
-    uint i_a = 2 ->
-    (* auipc fetch side-conditions (instruction word [w_a] at [fetch_pa kpc0]) *)
+    (* auipc fetch side-conditions (instruction word [w_auipc] at [fetch_pa kpc0]) *)
     matching_pma_region pmar0 (Physaddr (fetch_pa kpc0)) 4 = Some region_fa ->
     (override_PMA (PMA_Region_attributes region_fa) PBMT_PMA).(PMA_executable) = true ->
     is_aligned_paddr (Physaddr (fetch_pa kpc0)) 4 = true ->
     neq_vec (access_vec_dec kpc0 0) ('b"0") = false ->
     neq_vec (access_vec_dec kpc0 1) ('b"0") = false ->
     is_aligned_vaddr (Virtaddr kpc0) 4 = true ->
-    isRVC (subrange_vec_dec w_a 15 0) = false ->
-    (forall s0, exec (ext_decode w_a) s0 = Some (UTYPE (imm_a, Regidx i_a, AUIPC), s0)) ->
-    uint i_l = 2 ->
-    (* ld fetch side-conditions (instruction word [w_l] at [fetch_pa kpc1]) *)
+    (* ld fetch side-conditions (instruction word [w_ld] at [fetch_pa kpc1]) *)
     matching_pma_region pmar0 (Physaddr (fetch_pa kpc1)) 4 = Some region_fl ->
     (override_PMA (PMA_Region_attributes region_fl) PBMT_PMA).(PMA_executable) = true ->
     is_aligned_paddr (Physaddr (fetch_pa kpc1)) 4 = true ->
     neq_vec (access_vec_dec kpc1 0) ('b"0") = false ->
     neq_vec (access_vec_dec kpc1 1) ('b"0") = false ->
     is_aligned_vaddr (Virtaddr kpc1) 4 = true ->
-    isRVC (subrange_vec_dec w_l 15 0) = false ->
     (* the shared PMP-off fact (used by both fetch discharges) *)
     (forall i, pmpAddrMatchType_encdec_backwards
        (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
-    (forall s0, exec (ext_decode w_l) s0 = Some (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8), s0)) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -123,8 +118,8 @@ Section KernelBootWP.
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_a j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_l j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_auipc j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_ld j) -∗
     ▷ ( PC ↦ᵣ kpc2 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2l) -∗
         nextPC ↦ᵣ kpc2 -∗ (R_bool minstret_increment) ↦ᵣ bb -∗
@@ -134,29 +129,31 @@ Section KernelBootWP.
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_a j) -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_l j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_auipc j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_ld j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros bb sp1 offl eal a8l pal data2l mst1
-      Hia Hmatchfa Hexecfa Halignfa Hbit0fa Hbit1fa Hvalignfa HnotRVCfa Hda
-      Hil Hmatchfl Hexecfl Halignfl Hbit0fl Hbit1fl Hvalignfl HnotRVCfl Hpmpf Hdl
+      Hmatchfa Hexecfa Halignfa Hbit0fa Hbit1fa Hvalignfa
+      Hmatchfl Hexecfl Halignfl Hbit0fl Hbit1fl Hvalignfl Hpmpf
       HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread.
     iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesa Hibytesl Hcont".
-    (* Step 1: auipc.  b1 := bb, determined by the owned mcountinhibit/minstretcfg.
-       Owns the auipc instruction bytes + fetch CSRs (pmpcfg_n/pma_regions/htif). *)
-    iApply (wp_step_auipc kpc0 w_a imm_a i_a bb sp0 kpc0 mst0 mstatus0 mc mcfg
+    (* Step 1: auipc.  uint i_auipc = 2 and isRVC are now concrete facts; decode is
+       discharged by [decode_auipc].  Owns the auipc bytes + fetch CSRs. *)
+    iApply (wp_step_auipc kpc0 w_auipc imm_auipc i_auipc bb sp0 kpc0 mst0 mstatus0 mc mcfg
               region_fa pmpcfg0 pmar0 mi0 elp0 E Φ
-              Hia Hmatchfa Hexecfa Hpmpf Halignfa Hbit0fa Hbit1fa Hvalignfa HnotRVCfa Hda eq_refl HmIE Hlp
+              ltac:(vm_compute; reflexivity) Hmatchfa Hexecfa Hpmpf Halignfa Hbit0fa Hbit1fa Hvalignfa
+              ltac:(vm_compute; reflexivity) decode_auipc eq_refl HmIE Hlp
               with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa").
     iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa".
     replace (add_vec_int kpc0 4) with kpc1 by (vm_compute; reflexivity).
-    (* Step 2: ld.  base register x2 holds sp1 = the auipc result.  Owns the ld
-       instruction bytes at [fetch_pa kpc1] (distinct from the 8 data bytes). *)
-    iApply (wp_step_ld kpc1 w_l imm_l i_l bb region region_fl v sp1 kpc1 mst1 mstatus0 mc mcfg
+    (* Step 2: ld.  base register x2 holds sp1 = the auipc result.  decode is
+       discharged by [decode_ld].  Owns the ld bytes at [fetch_pa kpc1]. *)
+    iApply (wp_step_ld kpc1 w_ld imm_ld i_ld bb region region_fl v sp1 kpc1 mst1 mstatus0 mc mcfg
               mseccfg0 pmpcfg0 pmar0 bb elp0 E Φ
-              Hil Hmatchfl Hexecfl Hpmpf Halignfl Hbit0fl Hbit1fl Hvalignfl HnotRVCfl Hdl eq_refl
+              ltac:(vm_compute; reflexivity) Hmatchfl Hexecfl Hpmpf Halignfl Hbit0fl Hbit1fl Hvalignfl
+              ltac:(vm_compute; reflexivity) decode_ld eq_refl
               HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread
               with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
     iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl".

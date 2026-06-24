@@ -45,7 +45,8 @@ xv6rocq/
 │   ├── WpAuipc.v              #   the `auipc` opcode WP (wp_step_auipc)
 │   ├── WpLoad.v               #   the `ld`   opcode WP (8-byte data load, wp_step_ld)
 │   ├── WpFetch.v              #   separation-logic fetch lemma (fetch_from_pts: own bytes -> F_Base w)
-│   ├── KernelBoot.v           #   top: the two-instruction kernel WP (wp_kernel_first_two)
+│   ├── WpDecode.v             #   concrete decode lemmas (decode_auipc / decode_ld: encdec_backwards stepped)
+│   ├── KernelBoot.v           #   top: the two-instruction kernel WP (wp_kernel_first_two), no fetch/decode hyps
 │   └── _CoqProject
 ├── Makefile                   # top-level build (this file's "Build" section)
 └── rocq/                      # (legacy) earlier KernelInstrs/SailBridge experiment
