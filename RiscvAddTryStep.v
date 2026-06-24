@@ -485,26 +485,6 @@ Proof. intros s. unfold Defs.bind0. rewrite exec_bind. by destruct (exec m s) as
 Lemma exec_returnm {X} (x : X) s : exec (Defs.returnm x) s = Some (x, s).
 Proof. reflexivity. Qed.
 
-(* ---------------------------------------------------------------------- *)
-(* 3. hcycle_of_exec: a single [exec riscv_step s = Some (tt, s2)] fact,    *)
-(*    plus the post-properties of [s2], discharges BOTH conjuncts of the    *)
-(*    [Hcycle] hypothesis of wp_add_real (reducibility from the forward run, *)
-(*    the forall-next-state from uniqueness).  This is the determinism      *)
-(*    bridge that removes Hcycle.                                            *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma hcycle_of_exec (s s2 : mstate) (POST : mstate -> Prop) :
-  exec riscv_step s = Some (tt, s2) -> POST s2 ->
-  (exists s2', run riscv_step s tt s2')
-  /\ (forall s2' u, run riscv_step s u s2' -> POST s2').
-Proof.
-  intros Hexec Hpost.
-  destruct (exec_run_det _ _ _ _ Hexec) as [Hrun Huniq].
-  split.
-  - exists s2. exact Hrun.
-  - intros s2' u Hr. destruct (Huniq _ _ Hr) as [_ ->]. exact Hpost.
-Qed.
-
 (* ===== RiscvModelWPclose ===== *)
 (* ====================================================================== *)
 (* RiscvModelWPclose.v                                                     *)
@@ -725,63 +705,6 @@ Lemma run_returnM {X} (x0 : X) s y s' :
   run (returnM x0) s y s' <-> (y = x0 /\ s' = s).
 Proof. unfold returnM. apply run_ret. Qed.
 
-(* ---------------------------------------------------------------------- *)
-(* wp_add THROUGH the real try_step.                                       *)
-(*                                                                         *)
-(* The operational behaviour of one [try_step] cycle on an ADD is supplied *)
-(* as the explicit hypotheses [Hred] (the step is enabled) and [Hstep]     *)
-(* (its effect on the owned cells).  These two hypotheses ARE the remaining *)
-(* frontier: discharging them is the admit-free symbolic reduction of      *)
-(*   try_step -> run_hart_active (MR early-return monad, via               *)
-(*   catch_early_return) -> fetch -> currentlyEnabled (Acc recursion) ->   *)
-(*   execute (RTYPE .. RISCV_ADD),                                          *)
-(* for which the [run_bind]/[run_read_reg]/[run_write_reg]/[run_bind0]      *)
-(* lemmas above are the compositional substrate.  When proven they         *)
-(* instantiate [vsum := a + b] and [pcnext := pc + 4].                      *)
-(*                                                                         *)
-(* Everything BELOW the hypotheses is intended to be admit-free: the WP is  *)
-(* obtained from [Hred]/[Hstep] via [wp_lift_step] + the [reg_valid]/       *)
-(* [reg_update] bridge.  The proof is left as the single [Admitted] of this *)
-(* file pending completion of the Iris plumbing.                            *)
-(* ---------------------------------------------------------------------- *)
-
-Section AddWP.
-  Context `{!riscvGS Σ}.
-
-  Lemma wp_add
-      (rd rs1 rs2 : register_bitvector_64) (a b vrd vsum pcnext pc : mword 64)
-      E (Φ : mval -> iProp Σ)
-      (Hred : forall s1,
-         register_lookup (R_bitvector_64 rs1) s1.(sregs) = a ->
-         register_lookup (R_bitvector_64 rs2) s1.(sregs) = b ->
-         register_lookup (R_bitvector_64 PC)  s1.(sregs) = pc ->
-         exists s', run riscv_step s1 tt s')
-      (Hstep : forall s1 s',
-         register_lookup (R_bitvector_64 rs1) s1.(sregs) = a ->
-         register_lookup (R_bitvector_64 rs2) s1.(sregs) = b ->
-         register_lookup (R_bitvector_64 PC)  s1.(sregs) = pc ->
-         run riscv_step s1 tt s' ->
-         register_lookup (R_bitvector_64 rd) s'.(sregs) = vsum /\
-         register_lookup (R_bitvector_64 PC) s'.(sregs) = pcnext /\
-         s'.(mem) = s1.(mem)) :
-      R_bitvector_64 rd  ↦ᵣ vrd -∗
-      R_bitvector_64 rs1 ↦ᵣ a -∗
-      R_bitvector_64 rs2 ↦ᵣ b -∗
-      R_bitvector_64 PC  ↦ᵣ pc -∗
-      ▷ (R_bitvector_64 rd  ↦ᵣ vsum -∗
-         R_bitvector_64 PC  ↦ᵣ pcnext -∗
-         R_bitvector_64 rs1 ↦ᵣ a -∗
-         R_bitvector_64 rs2 ↦ᵣ b -∗
-         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    (* FRONTIER: walk one try_step via run_bind + run_read_reg/run_write_reg,
-       using reg_valid to read the owned cells and reg_update to write rd/PC,
-       discharging reducibility from Hred and the post-state from Hstep. *)
-  Admitted.
-
-End AddWP.
-
 (* ===== RiscvModelMR ===== *)
 (* ====================================================================== *)
 (* RiscvModelMR.v  —  the MR (early-return) monad bridge.                   *)
@@ -855,17 +778,11 @@ Fixpoint runR {R X} (m : Defs.monadR R exception X)
 
 (* ---- cheap (convertibility) laws ------------------------------------- *)
 
-Lemma runR_ret {R X} (x0 : X) s res s' :
-  runR (R:=R) (Defs.returnR R x0) s res s' <-> (res = inr x0 /\ s' = s).
-Proof. apply iff_refl. Qed.
 
 Lemma runR_returnR {R X} (x0 : X) s res s' :
   runR (returnR R x0 : Defs.monadR R exception X) s res s' <-> (res = inr x0 /\ s' = s).
 Proof. apply iff_refl. Qed.
 
-Lemma runR_early_return {R X} (r : R) s res s' :
-  runR (Defs.early_return r : Defs.monadR R exception X) s res s' <-> (res = inl r /\ s' = s).
-Proof. apply iff_refl. Qed.
 
 (* ---- liftR: a lifted base computation never early-returns; its [runR]   *)
 (*      coincides with [run] of the base computation (result tagged inr).  *)
@@ -972,38 +889,6 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* Demonstration: the three lemmas compose on the early-return SHAPE that  *)
-(* run_hart_active is built from --- [catch_early_return (liftR m1 >>=     *)
-(* fun _ => early_return r0)] --- reducing it to a base-monad [run] of m1  *)
-(* followed by the early return.  This is exactly how run_hart_active's    *)
-(* outer structure steps; the leaves still opaque (dispatchInterrupt,      *)
-(* fetch, currentlyEnabled, execute) become base-[run] obligations via     *)
-(* runR_liftR --- the precise NEXT blocker.                                *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma demo_early_return_compose
-    (m1 : M (mword 64)) (r0 : Step) s (x : Step) s' :
-  run (Defs.catch_early_return
-         (Defs.bind (Defs.liftR (R:=Step) m1)
-                    (fun _ : mword 64 => Defs.early_return r0)))
-      s x s' <->
-  (exists v s1, run m1 s v s1 /\ x = r0 /\ s' = s1).
-Proof.
-  rewrite run_catch_early_return. split.
-  - intros [H | H]; apply runR_bind in H;
-      destruct H as [ (r & _ & Hlift) | (a & s1 & Hlift & Her) ].
-    + apply runR_liftR in Hlift. destruct Hlift as (v & Hc & _). discriminate Hc.
-    + apply runR_liftR in Hlift. destruct Hlift as (v & Heq & Hrun).
-      apply runR_early_return in Her. destruct Her as [Hx Hs].
-      injection Heq as Heq. injection Hx as Hx. rewrite <- Heq in Hrun.
-      exists a, s1. split; [exact Hrun | split; [exact Hx | exact Hs]].
-    + apply runR_liftR in Hlift. destruct Hlift as (v & Hc & _). discriminate Hc.
-    + apply runR_early_return in Her. destruct Her as [Hc _]. discriminate Hc.
-  - intros (v & s1 & Hrun & Hx & Hs). subst x s'.
-    left. apply runR_bind. right. exists v, s1. split.
-    + apply runR_liftR. exists v. split; [reflexivity | exact Hrun].
-    + apply runR_early_return. split; reflexivity.
-Qed.
 
 (* ===== RiscvModelEnabled ===== *)
 (* ===================================================================== *)
@@ -1016,18 +901,6 @@ Qed.
 
 (* `hartSupports Ext_Zca` is a leaf (statically `returnM true`); it runs
    through one Acc-unfold + the reclimit guard to the concrete bool `true`. *)
-Lemma run_hartSupports_Zca s : run (hartSupports Ext_Zca) s true s.
-Proof.
-  unfold hartSupports.
-  destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports].
-  unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Zca) 0) with true by reflexivity.
-  cbn match.
-  apply run_bind. exists eq_refl, s. split.
-  - apply run_ret. split; reflexivity.
-  - apply run_returnM. split; reflexivity.
-Qed.
 
 (* ===== RiscvModelExecute ===== *)
 (* ===================================================================== *)
@@ -1130,8 +1003,6 @@ Lemma rX_x11 : rX (Regno 11) = Defs.read_reg (R_bitvector_64 x11).
 Proof. reflexivity. Qed.
 (* wX threads the value through [regval_into_reg] (= identity on mword 64, but
    kept symbolic here since it does not auto-reduce under conversion). *)
-Lemma regval_into_reg_id (v : mword 64) : regval_into_reg v = v.
-Proof. unfold regval_into_reg. reflexivity. Qed.
 
 (* run versions: register reads are state-pure, writes go via set_reg. *)
 Lemma run_rX_x10 s :
@@ -1722,11 +1593,6 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Lemma exec_is_landing_pad_false s :
-  eq_vec (register_lookup elp s.(sregs))
-         (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  exec (is_landing_pad_expected tt) s = Some (false, s).
-Proof. intros H. rewrite exec_is_landing_pad. rewrite H. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Structural reduction: exec (run_hart_active 0) s = Some (.., s_final),    *)
@@ -1784,9 +1650,6 @@ Section HartActiveProgress.
     destruct resf; cbn in Hnotexec; try contradiction;
       cbn match; rewrite execR_returnR; cbn match; rewrite execR_returnR; reflexivity.
   Qed.
-
-  Corollary Hne_of_leaves : exec (run_hart_active 0) s <> None.
-  Proof using All. rewrite exec_hart_active_progress. discriminate. Qed.
 
 End HartActiveProgress.
 
@@ -2504,37 +2367,6 @@ Qed.
 (*    plain (aq=rl=res=false) read.                                        *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_checked_mem_read_ram
-    (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
-    (priv : Privilege) (addr : mword 64) (w : bv 32) s :
-  run (pmpCheck (Physaddr addr) 4 access priv) s None s ->
-  run (pmaCheck (Physaddr addr) 4 access pbmt false) s None s ->
-  run (within_clint (Physaddr addr) 4) s false s ->
-  run (within_sig (Physaddr addr) 4) s false s ->
-  run (within_htif_readable (Physaddr addr) 4) s false s ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exists value : mword (8 * 4),
-    run (checked_mem_read access pbmt priv (Physaddr addr) 4 false false false false)
-        s (Ok (value, default_meta)) s.
-Proof.
-  intros Hpmp Hpma Hc Hsig Hh Hbytes.
-  destruct (run_read_ram_plain_4 addr w s Hbytes) as [value Hread].
-  exists value.
-  unfold checked_mem_read.
-  (* phys_access_check -> None ; the [match None] head converts to the None-arm *)
-  apply (proj2 (run_bind _ _ _ _ _)). exists None, s. split.
-  { apply run_phys_access_check_none; assumption. }
-  (* within_mmio_readable -> false ; the [if false] converts to the else-arm *)
-  apply (proj2 (run_bind _ _ _ _ _)). exists false, s. split.
-  { apply run_within_mmio_readable_false; assumption. }
-  (* read_kind_of_flags false false false -> Read_plain *)
-  apply (proj2 (run_bind _ _ _ _ _)). exists Read_plain, s. split.
-  { unfold read_kind_of_flags. apply (proj2 (run_returnM _ _ _ _)). split; reflexivity. }
-  (* read_ram Read_plain ... -> (value, default_meta) *)
-  apply (proj2 (run_bind _ _ _ _ _)). exists (value, default_meta), s. split; [exact Hread|].
-  apply (proj2 (run_returnM _ _ _ _)). split; reflexivity.
-Qed.
 
 (* ===== RiscvModelFetchF ===== *)
 (* ====================================================================== *)
@@ -2851,35 +2683,8 @@ Print Assumptions run_fetch_F_Base.
 Import Defs.
 
 
-(* A [read_reg r >>= (fun w => returnM (g w))] computation is state-preserving. *)
-Lemma run_read_then_pure_sp {Y} (r : register) (g : type_of_register r -> Y) s :
-  exists y, run (Defs.bind (Defs.read_reg r) (fun w => Defs.returnm (g w))) s y s.
-Proof.
-  exists (g (register_lookup r s.(sregs))).
-  apply (proj2 (run_bind _ _ _ _ _)).
-  exists (register_lookup r s.(sregs)), s.
-  split; [ exact (run_read_reg_fwd r s) | apply run_returnM_fwd ].
-Qed.
-
-(* [and_boolM] of two state-preserving bools is state-preserving. *)
-Lemma run_and_boolM_sp (l r : M bool) s :
-  (exists bl, run l s bl s) -> (exists br, run r s br s) ->
-  exists b, run (and_boolM l r) s b s.
-Proof.
-  intros [bl Hl] [br Hr].
-  exists (if bl then br else false).
-  apply (proj2 (run_and_boolM _ _ _ _ _)).
-  exists bl, s. split; [ exact Hl | ].
-  destruct bl; [ exact Hr | split; reflexivity ].
-Qed.
 
 (* should_inc_minstret is state-preserving (its value feeds minstret bookkeeping). *)
-Lemma run_should_inc_minstret_sp s priv :
-  exists b, run (should_inc_minstret priv) s b s.
-Proof.
-  unfold should_inc_minstret.
-  apply run_and_boolM_sp; apply run_read_then_pure_sp.
-Qed.
 
 (* dispatchInterrupt yields None when no interrupt is pending. *)
 Lemma run_dispatchInterrupt_none s priv :
@@ -3140,135 +2945,6 @@ Section ADDfinal.
 
 End ADDfinal.
 
-(* ===== RiscvModelChooseFree ===== *)
-(* ====================================================================== *)
-(* RiscvModelChooseFree.v                                                  *)
-(*                                                                         *)
-(* A general `choose_free` bridge that discharges `Hne` (exec-progress of  *)
-(* run_hart_active) WITHOUT per-leaf exec-mirrors:                         *)
-(*   choose_free m  ->  run m s x sP  ->  exec m s = Some (x, sP).          *)
-(* choose_free is the structural property: no Choose/fail outcome is        *)
-(* ever reached (precondition-free).  Combined with the proven run-fact     *)
-(* run_hart_active_ADD it gives `exec (run_hart_active 0) s = Some (...)`.  *)
-(* ====================================================================== *)
-
-
-
-
-(* ---------------------------------------------------------------------- *)
-(* 1. choose_free: structural "no Choose / fail outcome reachable".        *)
-(*    Mirrors `exec`'s match; the recursing arms quantify over ALL         *)
-(*    continuation inputs (so it is precondition-free), the Choose/        *)
-(*    GenericFail/Discard/ExtraOutcome catch-all is False.                 *)
-(* ---------------------------------------------------------------------- *)
-
-Fixpoint choose_free {X} (m : M X) {struct m} : Prop :=
-  match m with
-  | Interface.Ret _ => True
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M X) -> Prop with
-       | Interface.RegRead r _ => fun k => forall x, choose_free (k x)
-       | Interface.RegWrite r _ v => fun k => forall x, choose_free (k x)
-       | Interface.MemRead n req => fun k => forall x, choose_free (k x)
-       | Interface.MemWrite n req => fun k => forall x, choose_free (k x)
-       | Interface.InstrAnnounce _   => fun k => forall x, choose_free (k x)
-       | Interface.BranchAnnounce _ _=> fun k => forall x, choose_free (k x)
-       | Interface.Barrier _         => fun k => forall x, choose_free (k x)
-       | Interface.CacheOp _         => fun k => forall x, choose_free (k x)
-       | Interface.TlbOp _           => fun k => forall x, choose_free (k x)
-       | Interface.TakeException _   => fun k => forall x, choose_free (k x)
-       | Interface.ReturnException _ => fun k => forall x, choose_free (k x)
-       | Interface.TranslationStart _=> fun k => forall x, choose_free (k x)
-       | Interface.TranslationEnd _  => fun k => forall x, choose_free (k x)
-       | Interface.CycleCount        => fun k => forall x, choose_free (k x)
-       | Interface.Message _         => fun k => forall x, choose_free (k x)
-       | Interface.GetCycleCount     => fun k => forall x, choose_free (k x)
-       | _ => fun _ => False
-       end) k
-  end.
-
-(* ---------------------------------------------------------------------- *)
-(* 2. read_bytes is non-None when every byte is present.                   *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma read_bytes_ne mm pa n (w : bv (8 * n)) :
-  (forall j : nat, (N.of_nat j < n)%N ->
-     mm !! RiscvModelBytes.pa_add pa j = Some (RiscvModelBytes.nth_byte w j)) ->
-  read_bytes mm pa n <> None.
-Proof.
-  intros Hb. unfold read_bytes.
-  case_match eqn:Hm.
-  - congruence.
-  - exfalso.
-    apply mapM_None_1, Exists_exists in Hm.
-    destruct Hm as (j & Hj & Hnone).
-    apply in_seq in Hj.
-    assert (Hjn : (N.of_nat j < n)%N) by lia.
-    rewrite (Hb j Hjn) in Hnone. congruence.
-Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 3. cf_ne: choose_free + run ==> exec is non-None.                       *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma cf_ne {X} (m : M X) :
-  forall s x s', choose_free m -> run m s x s' -> exec m s <> None.
-Proof.
-  induction m as [y|T oc k IH]; intros s x s' Hcf Hrun; simpl in *.
-  - discriminate.
-  - destruct oc; simpl in Hcf, Hrun |- *; try contradiction;
-      (* deterministic single-continuation arms (incl. RegRead/RegWrite/
-         MemWrite/GetCycleCount/announce): same continuation, apply IH *)
-      try (eapply IH; [apply Hcf | exact Hrun]).
-    (* only MemRead remains (it case-splits on read_bytes) *)
-    destruct Hrun as (w & Hbytes & Hrun).
-    destruct (read_bytes (mem s) (Interface.ReadReq.pa t) n) as [w0|] eqn:Hrb.
-    + (* w0 = w from the byte facts (pa_add/nth_byte: Lang vs Bytes are defeq) *)
-      assert (Hweq : w0 = w).
-      { apply bv_eq_of_bytes. intros j Hj.
-        pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
-        pose proof (Hbytes j Hj) as Hw.
-        change (RiscvModelBytes.pa_add ?a ?b) with (pa_add a b) in H0.
-        rewrite Hw in H0. apply Some_inj in H0.
-        symmetry; exact H0. }
-      rewrite Hweq. eapply IH; [apply Hcf | exact Hrun].
-    + exfalso. eapply (read_bytes_ne _ _ _ w); [exact Hbytes | exact Hrb].
-Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 4. cf_bridge: choose_free + run ==> exec = Some (the unique value).     *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma cf_bridge {X} (m : M X) s x s' :
-  choose_free m -> run m s x s' -> exec m s = Some (x, s').
-Proof.
-  intros Hcf Hrun.
-  destruct (exec m s) as [[x'' s'']|] eqn:He.
-  - destruct (exec_run_det _ _ _ _ He) as [_ Huniq].
-    destruct (Huniq _ _ Hrun) as [-> ->]. reflexivity.
-  - exfalso. eapply cf_ne; [exact Hcf | exact Hrun | exact He].
-Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 5. choose_free preservation toolkit (reusable).                         *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma cf_returnm {X} (x : X) : choose_free (Defs.returnm x).
-Proof. exact I. Qed.
-
-Lemma cf_bind {X Y} (m : M X) (f : X -> M Y) :
-  choose_free m -> (forall y, choose_free (f y)) -> choose_free (Defs.bind m f).
-Proof.
-  revert f. induction m as [y|T oc k IH]; intros f Hm Hf; simpl in *.
-  - exact (Hf y).
-  - destruct oc; simpl in Hm |- *; try contradiction;
-      (intros z; eapply IH; [apply Hm | exact Hf]).
-Qed.
-
-Lemma cf_bind0 {X} (m : M unit) (n : M X) :
-  choose_free m -> choose_free n -> choose_free (Defs.bind0 m n).
-Proof. intros Hm Hn. apply cf_bind; [exact Hm | intros _; exact Hn]. Qed.
-
 (* ===== RiscvModelFetchExec ===== *)
 (* ====================================================================== *)
 (* RiscvModelFetchExec.v                                                   *)
@@ -3309,6 +2985,24 @@ Lemma exec_MemRead {X} (n : N) (req : Interface.ReadReq.t n)
     | None => None
     end.
 Proof. reflexivity. Qed.
+
+(* read_bytes is non-None when all n bytes are present (was previously
+   located among the now-removed choose_free helpers). *)
+Lemma read_bytes_ne mm pa n (w : bv (8 * n)) :
+  (forall j : nat, (N.of_nat j < n)%N ->
+     mm !! RiscvModelBytes.pa_add pa j = Some (RiscvModelBytes.nth_byte w j)) ->
+  read_bytes mm pa n <> None.
+Proof.
+  intros Hb. unfold read_bytes.
+  case_match eqn:Hm.
+  - congruence.
+  - exfalso.
+    apply mapM_None_1, Exists_exists in Hm.
+    destruct Hm as (j & Hj & Hnone).
+    apply in_seq in Hj.
+    assert (Hjn : (N.of_nat j < n)%N) by lia.
+    rewrite (Hb j Hjn) in Hnone. congruence.
+Qed.
 
 (* read_ram (4 bytes present) reduces -- via the run-fact + read_bytes <> None. *)
 Lemma exec_read_ram_plain_4 (addr : mword 64) (w : bv 32) s :
@@ -3696,9 +3390,6 @@ Definition ramRegion : PMA_Region :=
           PMA_supports_pte_write := true |};
      PMA_Region_include_in_device_tree := false |}.
 
-Lemma ramRegion_executable (pbmt : page_based_mem_type) :
-  (override_PMA (PMA_Region_attributes ramRegion) pbmt).(PMA_executable) = true.
-Proof. destruct pbmt; vm_compute; reflexivity. Qed.
 
 (* matching_pma_region for the single-region list, given range_subset. *)
 Lemma run_pma_match_ram (addr : mword 64) s :
@@ -3888,14 +3579,9 @@ Section FinalWP.
                       (add_vec_int (register_lookup minstret (sT s).(sregs)) 1)
          else sT s.
 
-  (* run fetch/decode (for run_hart_active_ADD) -- conditioned/decode-wall. *)
-  Hypothesis Hfetch_gen : forall s : mstate,
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    run (fetch tt) s (F_Base w) s.
-  Hypothesis Hdec_gen : forall s : mstate,
-    run (ext_decode w) s (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) s.
-  (* exec fetch/decode (for exec_hart_active_done) -- conditioned/decode-wall. *)
+  (* fetch/decode facts, stated once at the EXEC level; the relational [run]
+     twins needed by run_hart_active_ADD are derived on the spot via
+     [exec_run_det] (exec = Some -> run), so no separate run hypotheses. *)
   Hypothesis Hfetch_exec_gen : forall s : mstate,
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
@@ -3952,8 +3638,11 @@ Section FinalWP.
       - unfold sA; trans_mi; exact Lpriv.
       - unfold sA; trans_mi; exact Lpc.
       - unfold sA; trans_mi; exact Lelp.
-      - apply Hfetch_gen; [ unfold sA; trans_mi; exact Lpc | unfold sA; trans_mi; exact Lpriv ].
-      - apply Hdec_gen. }
+      - apply (proj1 (exec_run_det _ _ _ _
+                 (Hfetch_exec_gen (sA s)
+                    ltac:(unfold sA; trans_mi; exact Lpc)
+                    ltac:(unfold sA; trans_mi; exact Lpriv)))).
+      - apply (proj1 (exec_run_det _ _ _ _ (Hdec_exec_gen (sA s)))). }
     apply (exec_riscv_step_ADD s (sX s) w b pc).
     - exact Lpriv.
     - apply Hsi_gen; exact Lpriv.
