@@ -1,0 +1,167 @@
+(* RiscvPtsto.v -- riscvGS, register/memory points-to, the regstate/heap bridge. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import gen_heap.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes.
+Require Import RiscvLang.
+Local Open Scope Z_scope.
+
+(* ===== RiscvModelIris ===== *)
+(* ====================================================================== *)
+(* RiscvModelIris.v                                                        *)
+(*                                                                         *)
+(* LAYER 2: the Iris program-logic layer over RiscvModelLang.v.            *)
+(*                                                                         *)
+(*   - register & memory [gen_heap]s, with points-to [r |->r v] / [a|->m b]*)
+(*   - state_interp that BRIDGES the model's [regstate] to per-register    *)
+(*     points-to via an existential register map + an agreement invariant  *)
+(*     (axiom-free: existT injectivity goes through Eqdep_dec, register     *)
+(*      has decidable equality; no Finite/UIP needed).                     *)
+(*   - the two bridge lemmas [reg_valid] / [reg_update] and a memory read  *)
+(*     lemma [mem_valid].                                                   *)
+(*                                                                         *)
+(* The WP for ADD *through* [try_step] (symbolic unfolding of fetch/decode/*)
+(* execute/currentlyEnabled) is the next milestone; this file provides the *)
+(* ghost-state foundation it will rest on.                                 *)
+(* ====================================================================== *)
+
+
+
+
+(* ---------------------------------------------------------------------- *)
+(* 0. Two small facts about the model's [register_beq] and [existT].       *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma register_beq_true (k r : register) : register_beq k r = true -> k = r.
+Proof.
+  destruct k, r; simpl; intro E; try discriminate;
+    f_equal; autorewrite with register_beq_iffs in E; exact E.
+Qed.
+
+Lemma register_beq_false (k r : register) : k <> r -> register_beq k r = false.
+Proof.
+  intros Hne. destruct (register_beq k r) eqn:E; [|reflexivity].
+  exfalso. apply Hne. by apply register_beq_true.
+Qed.
+
+(* existT injectivity on the (decidable) index type [register]: axiom-free. *)
+Lemma reg_existT_inj (r : register) (v v' : type_of_register r) :
+  existT r v = existT r v' -> v = v'.
+Proof.
+  apply (inj_pair2_eq_dec register (fun x y => decide (x = y))).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 1. Ghost state: a register heap (dependent values) and a memory heap.   *)
+(* ---------------------------------------------------------------------- *)
+
+Class riscvGS (Σ : gFunctors) := RiscvGS {
+  riscv_invGS :: invGS Σ;
+  riscv_regGS :: gen_heapGS register (sigT type_of_register) Σ;
+  riscv_memGS :: gen_heapGS Arch.pa (bv 8) Σ;
+}.
+
+(* register points-to: [r |->r v] owns register [r] holding [v]. *)
+Definition reg_pointsto `{!riscvGS Σ} (r : register) (dq : dfrac)
+    (v : type_of_register r) : iProp Σ :=
+  pointsto (L:=register) (V:=sigT type_of_register) r dq (existT r v).
+
+Notation "r ↦ᵣ{ dq } v" := (reg_pointsto r dq v)
+  (at level 20, dq custom dfrac at level 1, format "r  ↦ᵣ{ dq }  v") : bi_scope.
+Notation "r ↦ᵣ v" := (reg_pointsto r (DfracOwn 1) v)
+  (at level 20, format "r  ↦ᵣ  v") : bi_scope.
+(* A physical byte address lies in "real" RAM iff it is outside the platform
+   MMIO ranges.  We capture the two PURE (state-independent) ranges checked by
+   the model's [within_clint]/[within_sig]: an access fully inside one of those
+   ranges is treated as MMIO.  Owning a memory points-to will require the byte
+   to be RAM, which discharges [within_clint]/[within_sig] (see
+   [within_clint_false]/[within_sig_false]).  ([within_htif] depends on the
+   [htif_tohost_base] register, not the address, so it is handled separately by
+   owning that register.) *)
+Definition not_in_clint (a : Arch.pa) : Prop :=
+  (uint a < uint plat_clint_base \/ uint plat_clint_base + uint plat_clint_size <= uint a)%Z.
+Definition not_in_sig (a : Arch.pa) : Prop :=
+  (uint a < uint plat_sig_base \/ uint plat_sig_base + uint plat_sig_size <= uint a)%Z.
+Definition addr_is_ram (a : Arch.pa) : Prop := not_in_clint a /\ not_in_sig a.
+
+(* memory points-to: owns byte [a |-> v] AND records that [a] is real RAM. *)
+Definition mem_pointsto `{!riscvGS Σ} (a : Arch.pa) (v : bv 8) : iProp Σ :=
+  (pointsto (L:=Arch.pa) (V:=bv 8) a (DfracOwn 1) v ∗ ⌜addr_is_ram a⌝)%I.
+Notation "a ↦ₘ v" := (mem_pointsto a v)
+  (at level 20, format "a  ↦ₘ  v") : bi_scope.
+
+(* ---------------------------------------------------------------------- *)
+(* 2. The bridge: an existential register map agreeing with [regstate].    *)
+(* ---------------------------------------------------------------------- *)
+
+Definition reg_agree (m : gmap register (sigT type_of_register))
+    (rs : regstate) : Prop :=
+  forall r dv, m !! r = Some dv -> dv = existT r (register_lookup r rs).
+
+Definition reg_interp `{!riscvGS Σ} (rs : regstate) : iProp Σ :=
+  (∃ m, gen_heap_interp m ∗ ⌜reg_agree m rs⌝)%I.
+
+(* ---------------------------------------------------------------------- *)
+(* 3. irisGS instance: state_interp = (register bridge) * (memory heap).   *)
+(* ---------------------------------------------------------------------- *)
+
+Global Program Instance riscv_irisGS `{!riscvGS Σ} : irisGS riscv_lang Σ := {
+  iris_invGS := riscv_invGS;
+  state_interp s _ _ _ := (reg_interp s.(sregs) ∗ gen_heap_interp s.(mem))%I;
+  fork_post _ := True%I;
+  num_laters_per_step _ := 0%nat;
+}.
+Next Obligation. intros. iIntros "H". by iModIntro. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4. Bridge lemmas.                                                       *)
+(* ---------------------------------------------------------------------- *)
+
+Section Bridge.
+  Context `{!riscvGS Σ}.
+
+  (* reading a register cell agrees with the model's [register_lookup]. *)
+  Lemma reg_valid rs r v :
+    reg_interp rs -∗ r ↦ᵣ v -∗ ⌜register_lookup r rs = v⌝.
+  Proof.
+    rewrite /reg_pointsto /reg_interp.
+    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
+    iDestruct (gen_heap_valid with "Hm Hr") as %Hlk.
+    iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
+  Qed.
+
+  (* writing a register cell tracks the model's [register_set]. *)
+  Lemma reg_update rs r v v' :
+    reg_interp rs -∗ r ↦ᵣ v ==∗
+      reg_interp (register_set r v' rs) ∗ r ↦ᵣ v'.
+  Proof.
+    rewrite /reg_pointsto /reg_interp.
+    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
+    iMod (gen_heap_update _ r _ (existT r v') with "Hm Hr") as "[Hm $]".
+    iModIntro. iExists (<[r := existT r v']> m). iFrame "Hm".
+    iPureIntro. intros k dv Hk.
+    destruct (decide (k = r)) as [->|Hne].
+    - rewrite lookup_insert in Hk. injection Hk as <-.
+      by rewrite register_lookup_set.
+    - rewrite lookup_insert_ne in Hk; [|done].
+      rewrite (Hag k dv Hk).
+      by rewrite (irrelevant_register_set k r rs v' (register_beq_false k r Hne)).
+  Qed.
+
+  (* reading a memory byte agrees with the byte heap. *)
+  Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a b :
+    gen_heap_interp mm -∗ a ↦ₘ b -∗ ⌜mm !! a = Some b⌝.
+  Proof.
+    iIntros "Hm [Ha _]". by iDestruct (gen_heap_valid with "Hm Ha") as %?.
+  Qed.
+
+  (* owning a memory byte certifies its address is real RAM (not MMIO). *)
+  Lemma mem_ram a b : a ↦ₘ b -∗ ⌜addr_is_ram a⌝.
+  Proof. by iIntros "[_ %H]". Qed.
+
+End Bridge.
+

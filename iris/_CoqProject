@@ -1,0 +1,14 @@
+-R . xv6iris
+-R /shared/xv6rocq/model-xv6iris Riscv
+-R /shared/xv6rocq/kernel-rocq Kernel
+RiscvModelBytes.v
+RiscvLang.v
+RiscvPtsto.v
+RiscvExec.v
+RiscvExtras.v
+RiscvTryStep.v
+RiscvFetchExec.v
+WpAdd.v
+WpAuipc.v
+WpLoad.v
+KernelBoot.v

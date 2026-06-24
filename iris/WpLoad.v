@@ -1,132 +1,19 @@
-(* ====================================================================== *)
-(* LoadProof.v -- DEV: proving the 8-byte execute_LOAD reduction            *)
-(* (the `Hexecload_gen` frontier of forward_exec_ld).                       *)
-(* Built bottom-up; inspected interactively with coqtop (fast: .vo load ~1s)*)
-(*                                                                         *)
-(* PROVEN LEAVES (this file, compiles green):                               *)
-(*   - rX_x2 / run_rX_x2 / exec_rX_x2 / exec_rX_bits_x2  (read sp)          *)
-(*   - exec_ext_data_get_addr_x2  (vaddr = X(sp)+offset)                    *)
-(*   - exec_effectivePrivilege_load  (= Machine, given MPRV=0)             *)
-(*   - exec_split_misaligned_aligned (= (1,8) for 8-aligned vaddr)         *)
-(*   - misaligned_order_1           (= (0,0,step))                          *)
-(*                                                                         *)
-(* REMAINING FRONTIER (heavy; see notes at end):                            *)
-(*   - get_pmlen (Load Data) Machine = 0   (needs PMM-config bits = 0)      *)
-(*   - transform_effective_address = identity (assemble above + Bare +     *)
-(*     pm_transform_PA at pmlen=0); get_transformed_data_addr              *)
-(*   - translateAddr (Load Data) identity   (Load-access twin of fetch's)  *)
-(*   - 8-byte mem_read / checked_mem_read / read_ram (= read_bytes _ 8)     *)
-(*   - untilMT one-iteration reduction (Acc (Zwf 0), like currentlyEnabled) *)
-(*     + update_subrange_vec_dec dependent width (mword 8*1*8 = mword 64)   *)
-(*   - assemble vmem_read_addr -> vmem_read (double catch_early_return/MR)  *)
-(*     -> execute_LOAD; then wire into forward_exec_ld (memory ownership).  *)
-(* ====================================================================== *)
-From Stdlib Require Import Lia.
-From stdpp Require Import gmap list bitvector.definitions bitvector.tactics.
+(* WpLoad.v -- the LOAD opcode: 8-byte data-memory reductions (vmem_read via the
+   untilMT loop), exec_execute_LOAD_8, forward_exec_ld, wp_step_ld. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap.
 From iris.program_logic Require Import language weakestpre lifting.
-Require Import RiscvModelBytes.
-Require Import RiscvAddTryStep.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-
+Require Import RiscvModelBytes.
+Require Import SailStdpp.Base SailStdpp.TypeCasts.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* NOTE: extend_value false data (width 8) = sign_extend' 64 data; we carry  *)
-(* it verbatim in the conclusion (no need to simplify to `data`).            *)
-
-(* ---------------------------------------------------------------------- *)
-(* bv/MachineWord identity lemmas. mword n = bv (Z_idx n) and to_word/      *)
-(* get_word are the identity, so these reduce to stdpp bv facts: cbv        *)
-(* through the coercions, then bv lemmas.                                   *)
-(* ---------------------------------------------------------------------- *)
-Lemma zero_extend'_id (a : mword 64) : zero_extend' 64 a = a.
-Proof.
-  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec to_word get_word
-       MachineWord.MachineWord.zero_extend].
-  apply bv_eq. rewrite bv_zero_extend_unsigned. reflexivity. lia.
-Qed.
-
-Lemma autocast_id (m : Z) (x : mword m) : autocast x = x.
-Proof. apply autocast_refl. Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* should_inc_minstret is state-pure: its result is fully determined by    *)
-(* the mcountinhibit and minstretcfg cells.  Owning those two CSRs thus     *)
-(* discharges the `should_inc` exec-condition (no `forall s0` needed).      *)
-(* ---------------------------------------------------------------------- *)
-Lemma exec_should_inc_M (mc : mword 32) (mcfg : mword 64) s :
-  register_lookup mcountinhibit s.(sregs) = mc ->
-  register_lookup minstretcfg s.(sregs) = mcfg ->
-  exec (should_inc_minstret Machine) s
-    = Some (andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
-                 (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")), s).
-Proof.
-  intros Hmc Hmcfg. unfold should_inc_minstret.
-  assert (HA : exec ((read_reg mcountinhibit : M (mword 32)) >>=
-                     (fun w__0 => returnM (eq_vec (_get_Counterin_IR w__0) ('b"0")))) s
-               = Some (eq_vec (_get_Counterin_IR mc) ('b"0"), s)).
-  { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcountinhibit s)). rewrite Hmc. apply exec_returnm. }
-  rewrite (exec_and_boolM_Some _ _ _ _ _ HA).
-  destruct (eq_vec (_get_Counterin_IR mc) ('b"0")) eqn:Ea; cbn [andb].
-  - rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg minstretcfg s)). rewrite Hmcfg. apply exec_returnm.
-  - reflexivity.
-Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* MMIO-range discharge: an access whose base address is RAM (outside the  *)
-(* CLINT/SIG ranges) is not "within" them.  Owning a memory byte at that    *)
-(* address (via the RAM-constrained `↦ₘ`, lemma `mem_ram`) supplies         *)
-(* `not_in_clint`/`not_in_sig`.  within_htif depends on the                 *)
-(* `htif_tohost_base` register, discharged by owning it `= None`.           *)
-(* ---------------------------------------------------------------------- *)
-Lemma within_clint_false (a : Arch.pa) (w : Z) s :
-  not_in_clint a -> (0 < w)%Z -> exec (within_clint (Physaddr a) w) s = Some (false, s).
-Proof.
-  intros Hnc Hw. unfold within_clint, plat_have_clint, __id. cbn [Riscv.rv64d.not negb].
-  assert (Hf : (uint plat_clint_base <=? uint a) &&
-               (uint a + w <=? uint plat_clint_base + uint plat_clint_size) = false).
-  { destruct Hnc as [H|H]; [apply andb_false_intro1|apply andb_false_intro2]; apply Z.leb_gt; lia. }
-  rewrite Hf. apply exec_returnm.
-Qed.
-
-Lemma within_sig_false (a : Arch.pa) (w : Z) s :
-  not_in_sig a -> (0 < w)%Z -> exec (within_sig (Physaddr a) w) s = Some (false, s).
-Proof.
-  intros Hns Hw. unfold within_sig, plat_have_sig, __id. cbn [Riscv.rv64d.not negb].
-  assert (Hf : (uint plat_sig_base <=? uint a) &&
-               (uint a + w <=? uint plat_sig_base + uint plat_sig_size) = false).
-  { destruct Hns as [H|H]; [apply andb_false_intro1|apply andb_false_intro2]; apply Z.leb_gt; lia. }
-  rewrite Hf. apply exec_returnm.
-Qed.
-
-Lemma within_htif_false (a : Arch.pa) (w : Z) s :
-  register_lookup htif_tohost_base s.(sregs) = None ->
-  exec (within_htif_readable (Physaddr a) w) s = Some (false, s).
-Proof.
-  intro Hn. unfold within_htif_readable, within_htif_writable.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg htif_tohost_base s)).
-  rewrite Hn. cbn match. apply exec_returnm.
-Qed.
-
-(* add_vec_int a 0 = a : the j=0 byte of an access sits at the access base. *)
-Lemma avi0 (a : mword 64) : add_vec_int a 0 = a.
-Proof.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-         SailStdpp.Values.with_word, mword_of_int,
-         MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
-  apply bv_eq. rewrite bv_add_unsigned Z_to_bv_unsigned.
-  rewrite bv_wrap_0 Z.add_0_r. apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
-
-Lemma pa_add_0 (a : Arch.pa) : pa_add a 0 = a.
-Proof. unfold pa_add. change (Z.of_nat 0) with 0%Z. apply avi0. Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* Leaf 2: rX / rX_bits read leaf for x2 (sp), mirroring run_rX_x10.        *)
-(* ---------------------------------------------------------------------- *)
 Lemma rX_x2 : rX (Regno 2) = Defs.read_reg (R_bitvector_64 x2).
 Proof. reflexivity. Qed.
 
@@ -553,3 +440,309 @@ Proof.
   reflexivity.
 Qed.
 End VR.
+
+(* ---- exec_execute_LOAD_8 + forward_exec_ld (moved from KernelBoot) ---- *)
+Section ExecLoad.
+Variable i : mword 5.
+Variable imm : mword 12.
+Variable v : bv 64.
+Variable region : PMA_Region.
+Variable s : mstate.
+Let offset := sign_extend' 64 imm.
+Let ea := add_vec (register_lookup (R_bitvector_64 x2) s.(sregs)) offset.
+Let a8 := zero_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
+Let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)).
+Let data2 : mword (8*1*8) :=
+  update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v.
+Hypothesis Hi : uint i = 2.
+Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Machine.
+Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
+Hypothesis Hpmm : pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))) = PMM_Disabled.
+Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 8 = true.
+Hypothesis Hpmp : forall j, pmpAddrMatchType_encdec_backwards
+   (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) j)) = OFF.
+Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 8 = Some region.
+Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 8 = true.
+Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.
+Hypothesis Hc : exec (within_clint (Physaddr pa) 8) s = Some (false, s).
+Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
+Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
+Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
+
+Lemma exec_execute_LOAD_8 :
+  exec (execute (LOAD (imm, Regidx i, Regidx i, false, 8))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s (R_bitvector_64 x2) (regval_into_reg (extend_value false data2))).
+Proof.
+  change (execute (LOAD (imm, Regidx i, Regidx i, false, 8)))
+    with (execute_LOAD imm (Regidx i) (Regidx i) false 8).
+  unfold execute_LOAD.
+  replace (8 <=? xlen_bytes) with true by (vm_compute; reflexivity).
+  assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (exec_bind_Some _ _ _ _ _ Hass).
+  rewrite (exec_bind_Some _ _ _ _ _
+    (exec_vmem_read_8 i offset v region s Hi Hcp Hmprv Hpmm Halign Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hbytes)).
+  cbn match.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_x2 i s (extend_value false data2) Hi)).
+  apply exec_returnM.
+Qed.
+End ExecLoad.
+
+Section ForwardLD.
+  Context (s : mstate) (w : mword 32) (pc : mword 64) (imm : mword 12)
+          (irs1 ird : mword 5) (data : mword 64) (b : bool).
+
+  Hypothesis Hi : uint ird = 2.
+  Hypothesis Hfetch_gen : forall s0 : mstate,
+    register_lookup PC s0.(sregs) = pc ->
+    register_lookup cur_privilege s0.(sregs) = Machine ->
+    exec (fetch tt) s0 = Some (F_Base w, s0).
+  Hypothesis Hdec_gen : forall s0 : mstate,
+    exec (ext_decode w) s0
+      = Some (LOAD (imm, Regidx irs1, Regidx ird, false, 8), s0).
+  Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
+  (* The execute clause at the post-fetch state s_pc = set_reg (set_reg s
+     minstret_increment b) nextPC (pc+4).  Discharged in wp_kernel_first_two
+     via the PROVEN exec_execute_LOAD_8 (no longer the over-strong forall-s0). *)
+  Hypothesis Hexec_spc :
+    exec (execute (LOAD (imm, Regidx irs1, Regidx ird, false, 8)))
+         (set_reg (set_reg s (R_bool minstret_increment) b) nextPC (add_vec_int pc 4))
+    = Some (RETIRE_SUCCESS,
+            set_reg (set_reg (set_reg s (R_bool minstret_increment) b) nextPC (add_vec_int pc 4))
+                    (R_bitvector_64 x2) (regval_into_reg (extend_value false data))).
+
+  Definition sAl : mstate := set_reg s (R_bool minstret_increment) b.
+  Definition sXl : mstate :=
+    set_reg (set_reg sAl nextPC (add_vec_int pc 4)) (R_bitvector_64 x2)
+            (regval_into_reg (extend_value false data)).
+  Definition sTl : mstate := set_reg sXl PC (register_lookup nextPC sXl.(sregs)).
+  Definition sFl : mstate :=
+    if b then set_reg sTl minstret
+                  (add_vec_int (register_lookup minstret sTl.(sregs)) 1)
+         else sTl.
+
+  Lemma forward_exec_ld :
+    register_lookup PC s.(sregs) = pc ->
+    register_lookup cur_privilege s.(sregs) = Machine ->
+    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
+    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
+           ('b"1") = false ->
+    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    exec riscv_step s = Some (tt, sFl).
+  Proof using All.
+    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp.
+    assert (LpcA  : register_lookup PC sAl.(sregs) = pc).
+    { unfold sAl. trans_mi. exact Lpc. }
+    assert (LprivA: register_lookup cur_privilege sAl.(sregs) = Machine).
+    { unfold sAl. trans_mi. exact Lpriv. }
+    assert (LhsA  : register_lookup hart_state sAl.(sregs) = HART_ACTIVE tt).
+    { unfold sAl. trans_mi. exact Lhs. }
+    assert (LmidA : register_lookup (R_bitvector_64 mideleg) sAl.(sregs) = zeros' 64).
+    { unfold sAl. trans_mi. exact Lmideleg. }
+    assert (LmIEA : eq_vec (_get_Mstatus_MIE
+              (register_lookup (R_bitvector_64 mstatus) sAl.(sregs))) ('b"1") = false).
+    { unfold sAl. trans_mi. exact LmIE. }
+    assert (LelpA : eq_vec (register_lookup elp sAl.(sregs))
+              (landing_pad_bits_backwards LP_EXPECTED) = false).
+    { unfold sAl. trans_mi. exact Lelp. }
+    assert (HdispA : exec (dispatchInterrupt Machine) sAl = Some (None, sAl)).
+    { apply exec_dispatchInterrupt_none.
+      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) LmidA LmIEA). }
+    assert (HfetchA : exec (fetch tt) sAl = Some (F_Base w, sAl))
+      by (apply Hfetch_gen; assumption).
+    assert (HdecA : exec (ext_decode w) sAl
+              = Some (LOAD (imm, Regidx irs1, Regidx ird, false, 8), sAl))
+      by apply Hdec_gen.
+    pose (s_pc := set_reg sAl nextPC (add_vec_int pc 4)).
+    assert (LpcAA : register_lookup PC s_pc.(sregs) = pc).
+    { unfold s_pc. trans_mi. exact LpcA. }
+    assert (HexecA : exec (execute (LOAD (imm, Regidx irs1, Regidx ird, false, 8))) s_pc
+              = Some (RETIRE_SUCCESS, sXl)).
+    { unfold sXl, s_pc, sAl. exact Hexec_spc. }
+    assert (Hha : exec (run_hart_active 0) sAl
+              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXl)).
+    { exact (exec_hart_active_progress sAl sAl sXl sAl w
+               (LOAD (imm, Regidx irs1, Regidx ird, false, 8)) pc RETIRE_SUCCESS
+               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecA I). }
+    apply (exec_riscv_step_ADD s sXl w b pc).
+    - exact Lpriv.
+    - exact Hsi_s.
+    - exact LhsA.
+    - exact Hha.
+    - unfold sXl, sAl; cbn zeta. trans_mi. trans_mi. trans_mi. exact Lhs.
+    - unfold sXl, sAl; cbn zeta. trans_mi. trans_mi.
+      rewrite register_lookup_set. reflexivity.
+    - reflexivity.
+  Qed.
+
+  (* clean-form post-state for the ld step (x2 value already concrete). *)
+  Variable mst0 : mword 64.
+  Hypothesis Lmst_l : register_lookup minstret s.(sregs) = mst0.
+
+  Definition base_upd_l : mstate :=
+    set_reg (set_reg (set_reg (set_reg s (R_bool minstret_increment) b)
+                              nextPC (add_vec_int pc 4))
+                     (R_bitvector_64 x2) (regval_into_reg (extend_value false data)))
+            PC (add_vec_int pc 4).
+  Definition sFcl : mstate :=
+    if b then set_reg base_upd_l minstret (add_vec_int mst0 1)
+         else base_upd_l.
+
+  Ltac tmissl := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
+
+  Lemma sFl_eq : sFl = sFcl.
+  Proof.
+    assert (Enpc : register_lookup nextPC sXl.(sregs) = add_vec_int pc 4).
+    { unfold sXl; unfold set_reg; cbn [sregs]. tmissl.
+      rewrite register_lookup_set. reflexivity. }
+    assert (HsT : sTl = base_upd_l).
+    { unfold sTl. rewrite Enpc. unfold sXl, sAl, base_upd_l. reflexivity. }
+    unfold sFl, sFcl. rewrite HsT. destruct b; [|reflexivity].
+    assert (Emst : register_lookup minstret base_upd_l.(sregs) = register_lookup minstret s.(sregs)).
+    { unfold base_upd_l, set_reg; cbn [sregs]. tmissl. tmissl. tmissl. tmissl. reflexivity. }
+    rewrite Emst Lmst_l. reflexivity.
+  Qed.
+
+End ForwardLD.
+
+Section StepLD.
+  Context `{!riscvGS Σ}.
+  Lemma wp_step_ld (pc : mword 64) (w_l : mword 32) (imm_l : mword 12)
+      (i_l : mword 5) (b1 : bool) (region : PMA_Region) (v : bv 64)
+      (sp0a npc0a mst0a mstatus0a : mword 64)
+      (mc : mword 32) (mcfg : mword 64)
+      (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
+      (pmar0 : list PMA_Region) (mi0a : bool) (elp0a : mword 1)
+      E (Φ : mval -> iProp Σ) :
+    let offset := sign_extend' 64 imm_l in
+    let ea := add_vec sp0a offset in
+    let a8 := zero_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+    let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)) in
+    let data2 := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v in
+    uint i_l = 2 ->
+    (forall s0, register_lookup PC s0.(sregs) = pc ->
+       register_lookup cur_privilege s0.(sregs) = Machine ->
+       exec (fetch tt) s0 = Some (F_Base w_l, s0)) ->
+    (forall s0, exec (ext_decode w_l) s0 = Some (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8), s0)) ->
+    (* should_inc determined by the mcountinhibit/minstretcfg cells: *)
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+              (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
+    eq_vec (_get_Mstatus_MIE mstatus0a) ('b"1") = false ->
+    eq_vec elp0a (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0a) ('b"1") = false ->
+    pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
+    is_aligned_vaddr (Virtaddr a8) 8 = true ->
+    (forall j, pmpAddrMatchType_encdec_backwards
+       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 j)) = OFF) ->
+    matching_pma_region pmar0 (Physaddr pa) 8 = Some region ->
+    is_aligned_paddr (Physaddr pa) 8 = true ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true ->
+    (* within_clint/within_sig are now discharged from the RAM-constrained bytes,
+       and within_htif from the owned [htif_tohost_base |-> None] below. *)
+    PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ nextPC ↦ᵣ npc0a -∗
+    (R_bool minstret_increment) ↦ᵣ mi0a -∗ minstret ↦ᵣ mst0a -∗
+    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
+    elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
+    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
+    ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
+        (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2) -∗
+        nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0a 1 else mst0a) -∗
+        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
+        elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
+        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros offset ea a8 pa data2 Hil Hfl Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread.
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hcont".
+    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid with "Hreg Hx2")    as %Lx2.
+    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
+    iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
+    iDestruct (reg_valid with "Hreg Help")   as %Lelp.
+    iDestruct (reg_valid with "Hreg Hsec")   as %Lsec.
+    iDestruct (reg_valid with "Hreg Hpmpc")  as %Lpmpc.
+    iDestruct (reg_valid with "Hreg Hpma")   as %Lpma.
+    iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
+    iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    iDestruct (reg_valid with "Hreg Hhtif")  as %Lhtif.
+    assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
+    { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
+    iAssert (⌜forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j)⌝)%I as %Hbytesf.
+    { iIntros (j Hj).
+      assert (Hj' : (j < 8)%nat) by lia.
+      iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+      { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
+      iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+    (* the access base [pa] is real RAM: read it off the j=0 byte. *)
+    iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    set (s_pc := set_reg (set_reg s (R_bool minstret_increment) b1) nextPC (add_vec_int pc 4)).
+    assert (Lx2p : register_lookup (R_bitvector_64 x2) s_pc.(sregs) = sp0a).
+    { unfold s_pc; trans_mi; trans_mi; exact Lx2. }
+    assert (Lprivp : register_lookup cur_privilege s_pc.(sregs) = Machine).
+    { unfold s_pc; trans_mi; trans_mi; exact Lpriv. }
+    assert (Lmsp : register_lookup mstatus s_pc.(sregs) = mstatus0a).
+    { unfold s_pc; trans_mi; trans_mi; exact Lms. }
+    assert (Lsecp : register_lookup mseccfg s_pc.(sregs) = mseccfg0).
+    { unfold s_pc; trans_mi; trans_mi; exact Lsec. }
+    assert (Lpmpcp : register_lookup pmpcfg_n s_pc.(sregs) = pmpcfg0).
+    { unfold s_pc; trans_mi; trans_mi; exact Lpmpc. }
+    assert (Lpmap : register_lookup pma_regions s_pc.(sregs) = pmar0).
+    { unfold s_pc; trans_mi; trans_mi; exact Lpma. }
+    assert (Lhtifp : register_lookup htif_tohost_base s_pc.(sregs) = None).
+    { unfold s_pc; trans_mi; trans_mi; exact Lhtif. }
+    (* discharge the MMIO-range checks: clint/sig from [pa] being RAM, htif
+       from [htif_tohost_base = None]. *)
+    pose proof (within_clint_false pa 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false pa 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_htif_false pa 8 s_pc Lhtifp) as Hwh.
+    assert (Hexec_spc :
+      exec (execute (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8))) s_pc
+      = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 x2) (regval_into_reg (extend_value false data2)))).
+    { apply (exec_execute_LOAD_8 i_l imm_l v region s_pc Hil Lprivp).
+      - rewrite Lmsp. exact HMPRV.
+      - rewrite Lsecp. exact Hpmm.
+      - rewrite Lx2p. exact Halign.
+      - intro j. rewrite Lpmpcp. exact (Hpmp j).
+      - rewrite Lpmap Lx2p. exact Hmatch.
+      - rewrite Lx2p. exact Hpalign.
+      - exact Hread.
+      - rewrite Lx2p. apply Hwc.
+      - rewrite Lx2p. apply Hws.
+      - rewrite Lx2p. apply Hwh.
+      - intros j Hj. rewrite Lx2p. exact (Hbytesf j Hj). }
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iExists (sFcl s pc data2 b1 mst0a). iSplitR.
+    { iPureIntro.
+      rewrite <- (sFl_eq s pc imm_l i_l i_l data2 b1 Hsi_s Hexec_spc mst0a Lmst).
+      apply (forward_exec_ld s w_l pc imm_l i_l i_l data2 b1 Hil Hfl Hdl Hsi_s Hexec_spc Lpc Lpriv Lhs Lmdl).
+      - rewrite Lms. exact HmIE.
+      - rewrite Lelp. exact Help. }
+    iIntros "!>".
+    iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ (R_bitvector_64 x2) _ (regval_into_reg (extend_value false data2))
+            with "Hreg Hx2") as "[Hreg Hx2]".
+    iMod (reg_update _ PC _ (add_vec_int pc 4) with "Hreg Hpc") as "[Hreg Hpc]".
+    unfold sFcl, base_upd_l. destruct b1.
+    - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes").
+    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes").
+  Qed.
+
+End StepLD.

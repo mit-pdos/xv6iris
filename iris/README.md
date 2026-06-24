@@ -8,17 +8,27 @@ PC, one step writes `a0+a1` to `a2` and advances the PC by 4.
 
 ## Files
 
+The development is split into focused modules (compiled in this dependency
+order; `make proofs` computes the order automatically from `_CoqProject`):
+
 | File | What it is |
 |---|---|
-| **`RiscvAddTryStep.v`** | The entire development, consolidated into one file: the Iris `language` over the real Sail monad, the program-logic layer (`gen_heap` register/memory points-to + the `regstate`↔points-to bridge), the relational interpreter `run` and its functional twin `exec`, the determinism bridge + reusable `wp_exec_step`, the full reduction of `try_step` (fetch incl. address translation / the PMP loop / PMA / MMIO / multi-byte read, `currentlyEnabled`, `execute`, and the `minstret`/`hart_state`/`tick_pc` wrapper), and the capstone WPs. |
-| **`RiscvModelBytes.v`** | A small **iris-free** bitvector/byte-arithmetic prelude (`read_bytes`, `assemble_bytes`, `bv_eq_of_bytes`, `pa_add`, `nth_byte`, …). It is kept separate **on purpose**: it uses vanilla Coq `rewrite … by …`, which `ssreflect` — pulled in transitively by `iris` — forbids. `RiscvAddTryStep.v` imports it. |
-| **`KernelBoot.v`** | Imports the real xv6 kernel image (the dumped `Kernel.*` modules) and **proves `wp_kernel_first_two`** — a weakest-precondition for executing the kernel's **first two instructions** (`auipc sp,0xa`; `ld sp,472(sp)`) through the real `try_step`: owning the booting-Machine state with PC at the entry point (and the 8 data bytes the `ld` reads), two `Loop` steps leave PC at entry+8 and `sp` holding the loaded value. The entry address and both encodings are checked against the dump. Built from the proven single-step rules `wp_step_auipc` and `wp_step_ld` (each `wp_exec_step` + `forward_exec_auipc`/`forward_exec_ld`), and `exec_execute_LOAD_8` (the full 8-byte `ld` execute). `Print Assumptions wp_kernel_first_two` = **exactly the 5 model platform axioms**; **zero `Admitted`**. The `should_inc_minstret` `exec`-conditions have been **discharged** — instead of assuming them, the theorem owns the `mcountinhibit`/`minstretcfg` cells and the retired-instruction-counter behaviour `b` is *computed* from them (`exec_should_inc_M`). The surviving hypotheses are the legitimate frontier — the two decode walls (`encdec_backwards` for AUIPC/LOAD), the fetch facts, and the `ld`'s memory/PMA/PMP/MPRV/PMM boot conditions — exactly the kind of hypotheses the proven ADD `wp_add_real_final` carries. |
-| **`LoadProof.v`** | The machine-checked 8-byte `ld` data-memory path that `KernelBoot.v` builds on (23 lemmas): the doubleword `read_ram`/`pmaCheck`(readable)/`checked_mem_read`/`mem_read` chain, `translateAddr` for `Load Data`, the `transform_effective_address`/`get_pmlen` address transform, the `vmem_read_addr`/`vmem_read` reduction through the model's **`untilMT` byte-loop** (via `execR_untilMT_1`, an axiom-free `Acc (Zwf 0)` unfolding like `currentlyEnabled`), and the `mword`/`bv` identity lemmas (`zero_extend'_id`, `autocast_id` — `mword n = bv (Z_idx n)`, so these reduce to stdpp `bv` facts). |
+| **`RiscvModelBytes.v`** | An **iris-free** bitvector/byte-arithmetic prelude (`read_bytes`, `assemble_bytes`, `bv_eq_of_bytes`, `pa_add`, `nth_byte`, …). Kept separate **on purpose**: it uses vanilla Coq `rewrite … by …`, which `ssreflect` (pulled in by `iris`) forbids. |
+| **`RiscvLang.v`** | The Iris `language` over the real Sail monad: the machine state `mstate`, the one-program expression `Loop`, `prim_step`, and `riscv_lang`. |
+| **`RiscvPtsto.v`** | The program-logic / points-to layer: `riscvGS`, register points-to `↦ᵣ`, the **RAM-constrained** memory points-to `↦ₘ` (bundles `⌜addr_is_ram a⌝` = the byte is outside the CLINT/SIG ranges), the `regstate`↔points-to bridge (`reg_valid`/`reg_update`/`mem_valid`/`mem_ram`), and the `irisGS` state interpretation. |
+| **`RiscvExec.v`** | The exec bridges: the relational interpreter `run` and its functional twin `exec`, the determinism bridge (`exec_run_det`/`run_to_exec`), the reusable one-step rule `wp_exec_step`, and the `bind`/`bind0`/leaf reduction lemmas (incl. the `Base`/`TypeCasts` import boundary). |
+| **`RiscvExtras.v`** | Additional reduction helpers shared by the `try_step` machinery (boolean-monad combinators, register/exec leaves). |
+| **`RiscvTryStep.v`** | The common `try_step` reduction machinery used by every opcode: `fetch` (address translation, the PMP loop, PMA, multi-byte read), `currentlyEnabled` (the `Acc` recursion), the MR / early-return monad, the pending-interrupt keystone, and the `minstret`/`hart_state`/`tick_pc` wrapper — plus the `add` datapath reductions interleaved here. |
+| **`RiscvFetchExec.v`** | The functional `exec`-level fetch (`exec_fetch_done`) and the conditioned progress fact `exec_hart_active_done`. |
+| **`WpAdd.v`** | The **`add`** opcode WP: `forward_exec_final` + the capstone `wp_add_real_final` (`add a2,a0,a1` through one real `try_step`, exactly the 5 model axioms). |
+| **`WpAuipc.v`** | The **`auipc`** opcode WP: `exec_execute_UTYPE_AUIPC`, `forward_exec_auipc`, and the single-step rule `wp_step_auipc`. |
+| **`WpLoad.v`** | The **`ld`** opcode WP: the 8-byte data-memory path (the doubleword `read_ram`/`pmaCheck`/`mem_read` chain, `translateAddr` for `Load Data`, the address transform, and `vmem_read` through the model's **`untilMT` byte-loop** via `execR_untilMT_1`), the `mword`/`bv` identity lemmas, `exec_execute_LOAD_8`, `forward_exec_ld`, and `wp_step_ld`. |
+| **`KernelBoot.v`** | The top: imports the real xv6 kernel image (the dumped `Kernel.*` modules) and **proves `wp_kernel_first_two`** — a WP for executing the kernel's **first two instructions** (`auipc sp,0xa`; `ld sp,472(sp)`) through the real `try_step`. Owning the booting-Machine state with PC at the entry point (and the 8 `ld` data bytes), two `Loop` steps leave PC at entry+8 and `sp` holding the loaded value. Built from `wp_step_auipc` + `wp_step_ld`. `Print Assumptions wp_kernel_first_two` = **exactly the 5 model platform axioms**; **zero `Admitted`**. Two families of `exec`-conditions are **discharged** into initial-state ownership: `should_inc_minstret` (owns `mcountinhibit`/`minstretcfg`; the counter flag is computed) and the MMIO checks (`within_clint`/`within_sig` from the RAM-constrained `↦ₘ` bytes; `within_htif` from an owned `htif_tohost_base ↦ᵣ None`). The surviving hypotheses are the legitimate frontier — the two decode walls (`encdec_backwards`), the fetch facts, and the `ld`'s PMA/PMP/MPRV/PMM/alignment boot conditions. |
 | `model-xv6iris/` | The generated Sail RISC-V model (`Riscv.rv64d` / `rv64d_types`), a separate compiled dependency (≈43k generated lines — not inlinable). |
 | `kernel-rocq/` | The dumped xv6 kernel image (`Kernel.KernelInstrs` / `KernelData` / `KernelSyms`), produced by `tools/dump_kernel.py`; a separate compiled dependency consumed by `KernelBoot.v`. |
 | `archive/` | The original ~35-file modular development this was consolidated from, plus dead-ends (the mock `RiscvIris*`, superseded `ADDwp*`/`WPAdd`, the abandoned `ChooseFree2`/`Step`). Kept for reference; not needed to build. |
 
-## The main results (in `RiscvAddTryStep.v`)
+## The main results (in `WpAdd.v` and `KernelBoot.v`)
 
 - **`wp_add_real_final`** — the capstone weakest-precondition. Owning the
   booting-Machine-mode machine state as points-to (the GPRs `a0`/`a1`/`a2`,
@@ -67,25 +77,41 @@ it.
 
 ## Building
 
+From the **repository root** (`/shared/xv6rocq`):
+
 ```sh
-eval $(opam env --switch=/shared/xv6rocq)        # Rocq 9.0.1 + coq-iris 4.4.0 + coq-sail-stdpp 0.20.1
-cd /shared/xv6rocq/iris
-coqc -R . xv6iris -R /shared/xv6rocq/model-xv6iris Riscv RiscvModelBytes.v
-coqc -R . xv6iris -R /shared/xv6rocq/model-xv6iris Riscv RiscvAddTryStep.v
+make            # build the model, dump the kernel, and compile all proofs
+make proofs     # just the Iris proofs (iris/) + their dependencies
 ```
 
-(The model in `model-xv6iris/` must already be compiled against the same switch;
-see the project root for how it was generated from the Sail sources.)
+`make` runs every Rocq command inside the project-local opam switch
+(Rocq 9.0.1 + coq-iris 4.4.0 + coq-sail-stdpp 0.20.1), so you do **not** need to
+`eval $(opam env …)` first. Dependency order within `iris/` is computed
+automatically by `coq_makefile` from `iris/_CoqProject`. See the **root
+`README.md` → Build** for the full pipeline (Sail model, xv6 kernel, dumper) and
+for regenerating the Sail model.
 
-## Consolidation note
+To compile a single file by hand:
 
-This was assembled from a modular development (now in `archive/`). The merge had
-to respect two import-scope subtleties that the per-file structure handled
-implicitly, both documented inline near the top of `RiscvAddTryStep.v`:
+```sh
+eval $(opam env --switch=/shared/xv6rocq)
+cd iris
+coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel <File>.v
+```
+
+## Module-structure note
+
+The files above are organized so each respects two import-scope subtleties (the
+same ones that once forced a single-file consolidation):
 1. `mstate.mem`'s `Countable Arch.pa` must agree with `RiscvModelBytes`'s
-   `read_bytes` (stdpp's `bv_countable`), so `SailStdpp.Base`/`TypeCasts` and the
-   model are (re-)imported **after** the `Lang`/`Iris`/`Exec` sections, not at the
-   top — and `SailStdpp.Values` is not imported at all (it provides competing
+   `read_bytes` (stdpp's `bv_countable`). So the "front" modules
+   (`RiscvLang`, `RiscvPtsto`, and the early part of `RiscvExec`) import **neither**
+   `SailStdpp.Base`/`TypeCasts` **nor** `SailStdpp.Values`; the modules from
+   `RiscvExec`'s `Base`/`TypeCasts` boundary onward import `Base`/`TypeCasts` and
+   then **re-import the model** (so the model's `read_kind` shadows `Base`'s).
+   `SailStdpp.Values` is never imported (it provides competing
    `Countable`/`read_kind`/`Forall2_length` homonyms).
-2. No global `Set Default Proof Using "Type"` — some sections use bare `Proof.`
-   and rely on Coq generalizing over the section hypotheses actually used.
+2. No global `Set Default Proof Using "Type"` — some lemmas use bare `Proof.` and
+   rely on Coq generalizing over the section hypotheses actually used.
+
+(`archive/` holds the original ~35-file development this layout descends from.)

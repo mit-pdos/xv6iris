@@ -1,0 +1,353 @@
+(* RiscvExec.v -- the run/exec interpreters, determinism bridge, wp_exec_step. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import gen_heap.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto.
+Local Open Scope Z_scope.
+
+(* ===== RiscvModelExec ===== *)
+(* ====================================================================== *)
+(* RiscvModelExec.v                                                        *)
+(*                                                                         *)
+(* A functional partial interpreter [exec] mirroring the relational [run] *)
+(* of RiscvModelLang, plus the DETERMINISM bridge:                         *)
+(*   exec m s = Some (x,s')  ->  run m s x s'  /\  run m s is unique.      *)
+(* From that, a single reusable WP rule [wp_exec_step]: a deterministic    *)
+(* op whose [exec] yields [Some (tt, s')] gives a WP step, with NO         *)
+(* per-instruction determinism reasoning (the unique-run discharges        *)
+(* wp_lift_step's "forall next-state" obligation).                         *)
+(*                                                                         *)
+(* [run]/[prim_step]/RiscvModelLang are UNCHANGED; [exec] is auxiliary.    *)
+(*                                                                         *)
+(* The pure byte/bitvector arithmetic ([read_bytes], [read_bytes_spec],    *)
+(* [bv_eq_of_bytes], ...) lives in RiscvModelBytes.v, which is iris-free    *)
+(* so that vanilla Coq [rewrite ... by ...] / comma-chained rewrites work   *)
+(* there.  RiscvModelBytes re-defines [pa_add]/[nth_byte] with the *same*   *)
+(* bodies as RiscvModelLang's, so they are definitionally convertible and   *)
+(* the lemmas below relate to [run] by conversion (no extra bridging).      *)
+(* ====================================================================== *)
+
+
+
+Local Open Scope Z_scope.
+
+(* ---------------------------------------------------------------------- *)
+(* 1. exec: the functional partial interpreter (mirrors run).              *)
+(* ---------------------------------------------------------------------- *)
+
+Fixpoint exec {X} (m : M X) (s : mstate) {struct m} : option (X * mstate) :=
+  match m with
+  | Interface.Ret y => Some (y, s)
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T -> M X) -> option (X * mstate) with
+       | Interface.RegRead r _ => fun k => exec (k (register_lookup r s.(sregs))) s
+       | Interface.RegWrite r _ v => fun k => exec (k tt) (set_reg s r v)
+       | Interface.MemRead n req => fun k =>
+           match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+           | Some w => exec (k (inl (w, None))) s
+           | None => None
+           end
+       | Interface.MemWrite n req => fun k =>
+           exec (k (inl None))
+                (set_mem s (Interface.WriteReq.pa req)
+                           (bv_extract 0 8 (Interface.WriteReq.value req)))
+       | Interface.InstrAnnounce _   => fun k => exec (k tt) s
+       | Interface.BranchAnnounce _ _=> fun k => exec (k tt) s
+       | Interface.Barrier _         => fun k => exec (k tt) s
+       | Interface.CacheOp _         => fun k => exec (k tt) s
+       | Interface.TlbOp _           => fun k => exec (k tt) s
+       | Interface.TakeException _   => fun k => exec (k tt) s
+       | Interface.ReturnException _ => fun k => exec (k tt) s
+       | Interface.TranslationStart _=> fun k => exec (k tt) s
+       | Interface.TranslationEnd _  => fun k => exec (k tt) s
+       | Interface.CycleCount        => fun k => exec (k tt) s
+       | Interface.Message _         => fun k => exec (k tt) s
+       | Interface.GetCycleCount     => fun k => exec (k 0%Z) s
+       | _ => fun _ => None   (* Choose / GenericFail / Discard / ExtraOutcome: stuck *)
+       end) k
+  end.
+
+(* ---------------------------------------------------------------------- *)
+(* 2. Determinism bridge: exec success => the unique run.                  *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma exec_run_det {X} (m : M X) :
+  forall s x s', exec m s = Some (x, s') ->
+    run m s x s' /\ (forall y s2, run m s y s2 -> y = x /\ s2 = s').
+Proof.
+  induction m as [y|T oc k IH]; intros s x s' Hexec.
+  - (* Ret *) simpl in Hexec. injection Hexec as <- <-. simpl. split.
+    + done.
+    + intros y2 s2 [<- <-]. done.
+  - (* Next *) destruct oc; simpl in Hexec; try discriminate;
+      (* handle the deterministic non-memory branches uniformly *)
+      try (split;
+           [ apply (proj1 (IH _ _ _ _ Hexec))
+           | intros y2 s2 Hr; simpl in Hr; exact (proj2 (IH _ _ _ _ Hexec) _ _ Hr) ]).
+    + (* MemRead *)
+      destruct (read_bytes s.(mem) _ _) as [w0|] eqn:Hrb;
+        [|discriminate].
+      destruct (IH (inl (w0, None)) s x s' Hexec) as [Hrun0 Huniq0].
+      split.
+      * simpl. exists w0. split; [|exact Hrun0].
+        intros j Hj. apply (read_bytes_spec _ _ _ _ Hrb j Hj).
+      * intros y2 s2 Hr. simpl in Hr. destruct Hr as (w & Hbytes & Hrun).
+        assert (Hweq : w = w0).
+        { apply bv_eq_of_bytes. intros j Hj.
+          pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
+          pose proof (Hbytes j Hj) as Hw.
+          rewrite Hw in H0. apply Some_inj in H0. exact H0. }
+        subst w. exact (Huniq0 _ _ Hrun).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 3. The reusable WP rule for deterministic ops.                          *)
+(* ---------------------------------------------------------------------- *)
+
+Section WPExec.
+  Context `{!riscvGS Σ}.
+
+  Lemma wp_exec_step E Φ :
+    (∀ σ ns κs nt, state_interp σ ns κs nt ={E,∅}=∗
+       ∃ σ', ⌜exec riscv_step σ = Some (tt, σ')⌝ ∗
+          ▷ (|={∅,E}=> state_interp σ' (S ns) κs nt ∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))
+    ⊢ WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros "H".
+    iApply wp_lift_step; first done.
+    iIntros (σ ns κ κs nt) "Hσ".
+    iMod ("H" with "Hσ") as (σ') "[%Hexec H]".
+    pose proof (exec_run_det _ _ _ _ Hexec) as [Hrun Huniq].
+    iModIntro. iSplitR.
+    { iPureIntro. exists [], Loop, σ', []. red.
+      split; [done|]. split; [done|]. split; [done|]. split; [done|].
+      exists tt. exact Hrun. }
+    iIntros (e2 σ2 efs Hstep) "!>".
+    destruct Hstep as (_ & -> & _ & -> & u & Hr2).
+    destruct (Huniq _ _ Hr2) as [_ ->].
+    iMod "H" as "[$ $]". iIntros "_ !>". done.
+  Qed.
+
+End WPExec.
+
+(* Now that the Lang/Iris/Exec sections (which must share stdpp's bv_countable   *)
+(* with RiscvModelBytes for [mstate.mem]) are defined, bring in the model's      *)
+(* Base/Values/TypeCasts for the remaining proof sections.                        *)
+Require Import SailStdpp.Base SailStdpp.TypeCasts.
+(* Re-import the model AFTER Base so the model's names (read_kind/Read_plain/…)  *)
+(* win over SailStdpp's homonyms for the sections below — matching the original  *)
+(* per-file import order (model imported last).  mstate.mem's type is already    *)
+(* fixed (bv_countable) from the Lang section above, so this does not retype it.  *)
+Require Import Riscv.rv64d_types Riscv.rv64d.
+
+(* ===== RiscvModelExecClose ===== *)
+(* ====================================================================== *)
+(* RiscvModelExecClose.v                                                   *)
+(*                                                                         *)
+(* Close the ADD weakest-precondition via the deterministic-step route:    *)
+(* prove [exec riscv_step s = Some (tt, s_final)] and apply [wp_exec_step]  *)
+(* (no Hcycle, no per-instruction determinism).                            *)
+(* ====================================================================== *)
+
+
+
+
+Local Open Scope Z_scope.
+
+(* ---------------------------------------------------------------------- *)
+(* 1. run_to_exec: a proven [run]-fact becomes an [exec]-fact, given that  *)
+(*    exec makes progress (does not hit Choose/fail).  Free corollary of   *)
+(*    exec_run_det.                                                         *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma run_to_exec {X} (m : M X) (s : mstate) (x : X) (s' : mstate) :
+  run m s x s' -> exec m s <> None -> exec m s = Some (x, s').
+Proof.
+  intros Hrun Hne.
+  destruct (exec m s) as [[x'' s'']|] eqn:He; [|exfalso; by apply Hne].
+  destruct (exec_run_det _ _ _ _ He) as [_ Huniq].
+  destruct (Huniq _ _ Hrun) as [-> ->]. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 2. exec_bind: the option-monad functional equation for exec over bind.  *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma bind_Ret {X Y} (y : X) (f : X -> M Y) :
+  Defs.bind (Interface.Ret y) f = f y.
+Proof. reflexivity. Qed.
+
+Lemma bind_Next {X Y T} (oc : Interface.outcome (fun _ => exception) T)
+      (k : T -> M X) (f : X -> M Y) :
+  Defs.bind (Interface.Next oc k) f = Interface.Next oc (fun z => Defs.bind (k z) f).
+Proof. reflexivity. Qed.
+
+Lemma exec_bind {X Y} (m : M X) (f : X -> M Y) :
+  forall s, exec (Defs.bind m f) s
+          = match exec m s with
+            | Some (x, s1) => exec (f x) s1
+            | None => None
+            end.
+Proof.
+  induction m as [y | T oc k IH]; intros s.
+  - rewrite bind_Ret. reflexivity.
+  - rewrite bind_Next. destruct oc; cbn [exec];
+      try (apply IH); try reflexivity;
+      (* only MemRead remains *)
+      destruct (read_bytes _ _ _) as [w|]; [apply IH | reflexivity].
+Qed.
+
+Lemma exec_bind0 {Y} (m : M unit) (n : M Y) :
+  forall s, exec (Defs.bind0 m n) s
+          = match exec m s with Some (_, s1) => exec n s1 | None => None end.
+Proof. intros s. unfold Defs.bind0. rewrite exec_bind. by destruct (exec m s) as [[??]|]. Qed.
+
+Lemma exec_returnm {X} (x : X) s : exec (Defs.returnm x) s = Some (x, s).
+Proof. reflexivity. Qed.
+
+(* ===== RiscvModelWPclose ===== *)
+(* ====================================================================== *)
+(* RiscvModelWPclose.v                                                     *)
+(*                                                                         *)
+(* Close exec_riscv_step_ADD (the try_step wrapper around the proven       *)
+(* exec_hart_active reduction, done FUNCTIONALLY via exec_bind) and        *)
+(* wp_add_real_closed (via wp_exec_step) -- no Hcycle, no per-instruction  *)
+(* determinism.                                                            *)
+(* ====================================================================== *)
+
+
+
+Local Open Scope Z_scope.
+
+(* ---------------------------------------------------------------------- *)
+(* Rewrite-friendly exec-bind: collapse the [match exec m s with ...] when *)
+(* the head's exec result is known.                                        *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma exec_bind_Some {X Y} (m : M X) (f : X -> M Y) s v st :
+  exec m s = Some (v, st) -> exec (Defs.bind m f) s = exec (f v) st.
+Proof. intros H. rewrite exec_bind H. reflexivity. Qed.
+
+Lemma exec_bind0_Some {Y} (m : M unit) (n : M Y) s u st :
+  exec m s = Some (u, st) -> exec (Defs.bind0 m n) s = exec n st.
+Proof. intros H. rewrite exec_bind0 H. reflexivity. Qed.
+
+(* exec-leaves (functional twins of run_read_reg / run_write_reg). *)
+Lemma exec_read_reg (r : register) s :
+  exec (Defs.read_reg r : M _) s = Some (register_lookup r s.(sregs), s).
+Proof. reflexivity. Qed.
+
+Lemma exec_write_reg (r : register) (v : type_of_register r) s :
+  exec (Defs.write_reg r v : M _) s = Some (tt, set_reg s r v).
+Proof. reflexivity. Qed.
+
+(* tick_pc copies nextPC -> PC; value is pc_write_callback _ = tt. *)
+Lemma exec_tick_pc s :
+  exec (tick_pc tt) s = Some (tt, set_reg s PC (register_lookup nextPC s.(sregs))).
+Proof.
+  unfold tick_pc.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg PC _ s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC _)).
+  reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* exec_riscv_step_ADD: thread the try_step wrapper around the hart-active *)
+(* reduction (Hha), FUNCTIONALLY via exec_bind.  s_final is explicit.      *)
+(* ---------------------------------------------------------------------- *)
+
+Section StepADD.
+  Context (s s_exec : mstate) (w : mword 32) (b : bool) (pc : mword 64).
+
+  Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
+  Hypothesis Hsi   : exec (should_inc_minstret Machine) s = Some (b, s).
+  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
+  Hypothesis Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hha :
+    exec (run_hart_active 0) s_a
+      = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), s_exec).
+  Hypothesis Hhart_exec : register_lookup hart_state s_exec.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hmi_exec :
+    register_lookup (R_bool minstret_increment) s_exec.(sregs) = b.
+  Hypothesis Hrvfi : get_config_rvfi tt = false.
+
+  Let s_tick : mstate := set_reg s_exec PC (register_lookup nextPC s_exec.(sregs)).
+  Let s_final : mstate :=
+    if b then set_reg s_tick minstret
+                      (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
+         else s_tick.
+
+  Lemma exec_riscv_step_ADD : exec riscv_step s = Some (tt, s_final).
+  Proof using All.
+    unfold riscv_step.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (try_step 0 false) s = Some (false, s_final))).
+    { reflexivity. }
+    (* now prove exec (try_step 0 false) s = Some (false, s_final) *)
+    unfold try_step.
+    cbn [ext_pre_step_hook].
+    (* read cur_privilege *)
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    cbn beta. rewrite Hpriv.
+    (* should_inc_minstret Machine -> b *)
+    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
+    (* write minstret_increment b >> read hart_state *)
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)).
+    cbn beta. rewrite Hhart_a. cbn beta iota.
+    (* run_hart_active 0 -> Step_Execute (RETIRE_SUCCESS, _), s_exec *)
+    rewrite (exec_bind_Some _ _ _ _ _ Hha). cbn beta.
+    unfold RETIRE_SUCCESS. cbn beta iota.
+    (* try_step TAIL: BODY = bind (bind0 ARM (read hart_state)) (fun w10 => MATCH10). *)
+    (* Step A: exec (bind0 ARM (read hart_state)) s_exec = Some (HART_ACTIVE tt, s_exec). *)
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind0_Some.
+        2:{ (* exec ARM s_exec = Some(tt, s_exec) *)
+            erewrite exec_bind_Some.
+            2:{ apply exec_read_reg. }
+            rewrite Hhart_exec. unfold Defs.assert_exp. cbn [hart_is_active].
+            reflexivity. }
+        (* exec (read hart_state) s_exec = Some(HART_ACTIVE tt, s_exec) *)
+        apply exec_read_reg. }
+    rewrite Hhart_exec. cbn beta iota.
+    (* REST10 = bind0 (tick_pc) (bind (and_boolM (returnM true)(read mi)) (fun w12 => TAIL2)) *)
+    erewrite exec_bind0_Some.
+    2:{ apply exec_tick_pc. }
+    erewrite exec_bind_Some.
+    2:{ unfold Defs.and_boolM.
+        erewrite exec_bind_Some.
+        2:{ reflexivity. }
+        cbn beta iota. apply (exec_read_reg minstret_increment). }
+    rewrite Hrvfi.
+    replace (register_lookup minstret_increment
+               (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs))
+      with b.
+    2:{ unfold set_reg; cbn [sregs].
+        rewrite irrelevant_register_set;
+          [ (exact Hmi_exec || (symmetry; exact Hmi_exec)) | reflexivity ]. }
+    unfold s_final, s_tick.
+    destruct b.
+    - (* b = true: minstret += 1 *)
+      erewrite exec_bind0_Some.
+      2:{ erewrite exec_bind0_Some.
+          2:{ erewrite exec_bind_Some.
+              2:{ apply (exec_read_reg minstret). }
+              apply exec_write_reg. }
+          cbn beta iota. reflexivity. }
+      reflexivity.
+    - (* b = false *)
+      erewrite exec_bind0_Some.
+      2:{ erewrite exec_bind0_Some.
+          2:{ cbn beta iota. reflexivity. }
+          cbn beta iota. reflexivity. }
+      reflexivity.
+  Qed.
+
+End StepADD.
+
