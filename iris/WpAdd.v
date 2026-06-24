@@ -279,7 +279,9 @@ Section FinalWP.
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b s
                  Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
-    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    (* [apply empty_subseteq] not [set_solver]: the latter runs set_unfold over the
+       whole context and blows up on heavy hypotheses (see WpLoad.v). *)
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
     iExists (sFc s). iSplitR.
     { iPureIntro. rewrite <- (sF_eq s Lx10 Lx11 Lmst).
       apply forward_exec_final; try assumption.

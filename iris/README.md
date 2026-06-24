@@ -88,9 +88,21 @@ make proofs     # just the Iris proofs (iris/) + their dependencies
 `make` runs every Rocq command inside the project-local opam switch
 (Rocq 9.0.1 + coq-iris 4.4.0 + coq-sail-stdpp 0.20.1), so you do **not** need to
 `eval $(opam env …)` first. Dependency order within `iris/` is computed
-automatically by `coq_makefile` from `iris/_CoqProject`. See the **root
+automatically by `coq_makefile` from `iris/_CoqProject`, and each Coq sub-make
+runs with `-j$(JOBS)` (defaults to `nproc`; override with e.g. `make JOBS=1
+proofs` to force serial). A clean `make proofs` takes **~30 s**. See the **root
 `README.md` → Build** for the full pipeline (Sail model, xv6 kernel, dumper) and
 for regenerating the Sail model.
+
+> **Build-perf note.** `WpLoad.v` once took ~23 min to compile — traced (via
+> `coqc -time`) to a single `iApply fupd_mask_intro; [set_solver|]`. The mask
+> side-goal is the trivial `∅ ⊆ E`, but `set_solver` runs `set_unfold` over the
+> whole context, and `wp_step_ld`'s context holds `Hexec_spc` whose type embeds
+> the dependent-width `update_subrange_vec_dec`/`extend_value` term — normalizing
+> it cost the 23 min. Discharging the mask with `apply empty_subseteq` (which
+> never touches the context) cut that one step from 1383.6 s to 0.03 s. **Never
+> use bare `set_solver` for a trivial subset/mask goal when heavy generated Sail
+> terms are in scope.**
 
 To compile a single file by hand:
 

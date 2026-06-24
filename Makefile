@@ -24,6 +24,12 @@ RUN     := opam exec --switch=$(SWITCH) --
 PYTHON  ?= python3
 OBJDUMP ?= riscv64-linux-gnu-objdump
 
+# Parallel compilation: each Coq sub-make (coq_makefile) is run with -j$(JOBS).
+# coq_makefile computes the dependency order, so independent files (e.g. the
+# WpAdd/WpAuipc/WpLoad/WpFetch siblings) compile concurrently.  Override with
+# e.g.  make JOBS=4 proofs   (JOBS=1 forces a serial build).
+JOBS ?= $(shell nproc 2>/dev/null || echo 4)
+
 MODEL := model-xv6iris
 KDUMP := kernel-rocq
 IRIS  := iris
@@ -40,7 +46,7 @@ all: proofs
 $(MODEL)/CoqMakefile: $(MODEL)/_CoqProject
 	cd $(MODEL) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 model: $(MODEL)/CoqMakefile
-	$(RUN) $(MAKE) -C $(MODEL) -f CoqMakefile
+	$(RUN) $(MAKE) -C $(MODEL) -f CoqMakefile -j$(JOBS)
 
 # ---- 2. xv6 kernel ELF (disassembled into Rocq by the dumper) ----
 kernel: $(KERNEL_ELF)
@@ -57,14 +63,14 @@ $(KDUMP)/KernelSyms.v:   $(KERNEL_ELF) tools/dump_kernel.py
 $(KDUMP)/CoqMakefile: $(KDUMP)/_CoqProject
 	cd $(KDUMP) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 kernel-rocq: $(KDUMP_SRCS) $(KDUMP)/CoqMakefile
-	$(RUN) $(MAKE) -C $(KDUMP) -f CoqMakefile
+	$(RUN) $(MAKE) -C $(KDUMP) -f CoqMakefile -j$(JOBS)
 dump: kernel-rocq
 
 # ---- 4. The Iris proofs (depend on the model and the kernel dump) ----
 $(IRIS)/CoqMakefile: $(IRIS)/_CoqProject
 	cd $(IRIS) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 proofs: model kernel-rocq $(IRIS)/CoqMakefile
-	$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile
+	$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile -j$(JOBS)
 
 # ---- cleaning ----
 clean-proofs:

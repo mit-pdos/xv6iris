@@ -737,7 +737,11 @@ Section StepLD.
       - rewrite Lx2p. apply Hws.
       - rewrite Lx2p. apply Hwh.
       - intros j Hj. rewrite Lx2p. exact (Hbytesf j Hj). }
-    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    (* discharge the [∅ ⊆ E] mask goal with [apply empty_subseteq], NOT [set_solver]:
+       [set_solver] runs [set_unfold] over the whole context, and [Hexec_spc]'s type
+       embeds the dependent-width [update_subrange_vec_dec]/[extend_value] term, whose
+       normalization costs ~23 min. [empty_subseteq] never touches the context. *)
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
     iExists (sFcl s pc data2 b1 mst0a). iSplitR.
     { iPureIntro.
       rewrite <- (sFl_eq s w_l pc imm_l i_l i_l data2 b1 Hfetch_at Hsi_s Hexec_spc mst0a Lmst).

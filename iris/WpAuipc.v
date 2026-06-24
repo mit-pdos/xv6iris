@@ -241,7 +241,9 @@ Section StepAUIPC.
     iDestruct (fetch_from_pts_minstret pc w_a region_f pmpcfg0 pmar0 b1 s
                  Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
-    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    (* [apply empty_subseteq] not [set_solver]: the latter runs set_unfold over the
+       whole context and blows up on heavy hypotheses (see WpLoad.v). *)
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
     iExists (sFca s pc imm_a b1 mst0a). iSplitR.
     { iPureIntro.
       rewrite <- (sFa_eq s w_a pc imm_a b1 Hfetch_at Hsi_s mst0a Lmst Lpc).
