@@ -217,7 +217,24 @@ Notation "r ↦ᵣ{ dq } v" := (reg_pointsto r dq v)
   (at level 20, dq custom dfrac at level 1, format "r  ↦ᵣ{ dq }  v") : bi_scope.
 Notation "r ↦ᵣ v" := (reg_pointsto r (DfracOwn 1) v)
   (at level 20, format "r  ↦ᵣ  v") : bi_scope.
-Notation "a ↦ₘ v" := (pointsto (L:=Arch.pa) (V:=bv 8) a (DfracOwn 1) v)
+(* A physical byte address lies in "real" RAM iff it is outside the platform
+   MMIO ranges.  We capture the two PURE (state-independent) ranges checked by
+   the model's [within_clint]/[within_sig]: an access fully inside one of those
+   ranges is treated as MMIO.  Owning a memory points-to will require the byte
+   to be RAM, which discharges [within_clint]/[within_sig] (see
+   [within_clint_false]/[within_sig_false]).  ([within_htif] depends on the
+   [htif_tohost_base] register, not the address, so it is handled separately by
+   owning that register.) *)
+Definition not_in_clint (a : Arch.pa) : Prop :=
+  (uint a < uint plat_clint_base \/ uint plat_clint_base + uint plat_clint_size <= uint a)%Z.
+Definition not_in_sig (a : Arch.pa) : Prop :=
+  (uint a < uint plat_sig_base \/ uint plat_sig_base + uint plat_sig_size <= uint a)%Z.
+Definition addr_is_ram (a : Arch.pa) : Prop := not_in_clint a /\ not_in_sig a.
+
+(* memory points-to: owns byte [a |-> v] AND records that [a] is real RAM. *)
+Definition mem_pointsto `{!riscvGS Σ} (a : Arch.pa) (v : bv 8) : iProp Σ :=
+  (pointsto (L:=Arch.pa) (V:=bv 8) a (DfracOwn 1) v ∗ ⌜addr_is_ram a⌝)%I.
+Notation "a ↦ₘ v" := (mem_pointsto a v)
   (at level 20, format "a  ↦ₘ  v") : bi_scope.
 
 (* ---------------------------------------------------------------------- *)
@@ -281,7 +298,13 @@ Section Bridge.
   (* reading a memory byte agrees with the byte heap. *)
   Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a b :
     gen_heap_interp mm -∗ a ↦ₘ b -∗ ⌜mm !! a = Some b⌝.
-  Proof. iIntros "Hm Ha". by iDestruct (gen_heap_valid with "Hm Ha") as %?. Qed.
+  Proof.
+    iIntros "Hm [Ha _]". by iDestruct (gen_heap_valid with "Hm Ha") as %?.
+  Qed.
+
+  (* owning a memory byte certifies its address is real RAM (not MMIO). *)
+  Lemma mem_ram a b : a ↦ₘ b -∗ ⌜addr_is_ram a⌝.
+  Proof. by iIntros "[_ %H]". Qed.
 
 End Bridge.
 

@@ -567,15 +567,14 @@ Section KernelBootWP.
     matching_pma_region pmar0 (Physaddr pa) 8 = Some region ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true ->
-    (forall s', exec (within_clint (Physaddr pa) 8) s' = Some (false, s')) ->
-    (forall s', exec (within_sig (Physaddr pa) 8) s' = Some (false, s')) ->
-    (forall s', exec (within_htif_readable (Physaddr pa) 8) s' = Some (false, s')) ->
+    (* within_clint/within_sig are now discharged from the RAM-constrained bytes,
+       and within_htif from the owned [htif_tohost_base |-> None] below. *)
     PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ nextPC ↦ᵣ npc0a -∗
     (R_bool minstret_increment) ↦ᵣ mi0a -∗ minstret ↦ᵣ mst0a -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
     elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2) -∗
@@ -584,13 +583,13 @@ Section KernelBootWP.
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
         elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea a8 pa data2 Hil Hfl Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh.
-    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes Hcont".
+    intros offset ea a8 pa data2 Hil Hfl Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread.
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hcont".
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hx2")    as %Lx2.
@@ -605,6 +604,7 @@ Section KernelBootWP.
     iDestruct (reg_valid with "Hreg Hpma")   as %Lpma.
     iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    iDestruct (reg_valid with "Hreg Hhtif")  as %Lhtif.
     assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j)⌝)%I as %Hbytesf.
@@ -613,6 +613,11 @@ Section KernelBootWP.
       iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
       iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+    (* the access base [pa] is real RAM: read it off the j=0 byte. *)
+    iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     set (s_pc := set_reg (set_reg s (R_bool minstret_increment) b1) nextPC (add_vec_int pc 4)).
     assert (Lx2p : register_lookup (R_bitvector_64 x2) s_pc.(sregs) = sp0a).
     { unfold s_pc; trans_mi; trans_mi; exact Lx2. }
@@ -626,6 +631,13 @@ Section KernelBootWP.
     { unfold s_pc; trans_mi; trans_mi; exact Lpmpc. }
     assert (Lpmap : register_lookup pma_regions s_pc.(sregs) = pmar0).
     { unfold s_pc; trans_mi; trans_mi; exact Lpma. }
+    assert (Lhtifp : register_lookup htif_tohost_base s_pc.(sregs) = None).
+    { unfold s_pc; trans_mi; trans_mi; exact Lhtif. }
+    (* discharge the MMIO-range checks: clint/sig from [pa] being RAM, htif
+       from [htif_tohost_base = None]. *)
+    pose proof (within_clint_false pa 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false pa 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_htif_false pa 8 s_pc Lhtifp) as Hwh.
     assert (Hexec_spc :
       exec (execute (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8))) s_pc
       = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 x2) (regval_into_reg (extend_value false data2)))).
@@ -657,9 +669,9 @@ Section KernelBootWP.
     unfold sFcl, base_upd_l. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes").
     - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes").
   Qed.
 
   (* ====================================================================== *)
@@ -719,15 +731,14 @@ Section KernelBootWP.
     matching_pma_region pmar0 (Physaddr pal) 8 = Some region ->
     is_aligned_paddr (Physaddr pal) 8 = true ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true ->
-    (forall s', exec (within_clint (Physaddr pal) 8) s' = Some (false, s')) ->
-    (forall s', exec (within_sig (Physaddr pal) 8) s' = Some (false, s')) ->
-    (forall s', exec (within_htif_readable (Physaddr pal) 8) s' = Some (false, s')) ->
+    (* within_clint/within_sig discharged from the RAM bytes; within_htif from
+       the owned [htif_tohost_base |-> None]. *)
     PC ↦ᵣ kpc0 -∗ (R_bitvector_64 x2) ↦ᵣ sp0 -∗ nextPC ↦ᵣ kpc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
     ▷ ( PC ↦ᵣ kpc2 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2l) -∗
@@ -736,14 +747,14 @@ Section KernelBootWP.
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros bb sp1 offl eal a8l pal data2l mst1
-      Hia Hfa Hda Hil Hfl Hdl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh.
-    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes Hcont".
+      Hia Hfa Hda Hil Hfl Hdl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread.
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hcont".
     (* Step 1: auipc.  b1 := bb, determined by the owned mcountinhibit/minstretcfg. *)
     iApply (wp_step_auipc kpc0 w_a imm_a i_a bb sp0 kpc0 mst0 mstatus0 mc mcfg mi0 elp0 E Φ
               Hia Hfa Hda eq_refl HmIE Hlp
@@ -753,11 +764,11 @@ Section KernelBootWP.
     (* Step 2: ld.  base register x2 holds sp1 = the auipc result. *)
     iApply (wp_step_ld kpc1 w_l imm_l i_l bb region v sp1 kpc1 mst1 mstatus0 mc mcfg
               mseccfg0 pmpcfg0 pmar0 bb elp0 E Φ
-              Hil Hfl Hdl eq_refl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread Hwc Hws Hwh
-              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
-    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes".
+              Hil Hfl Hdl eq_refl HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread
+              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes").
+    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes".
     replace (add_vec_int kpc1 4) with kpc2 by (vm_compute; reflexivity).
-    iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hbytes").
+    iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes").
   Qed.
 
 End KernelBootWP.
