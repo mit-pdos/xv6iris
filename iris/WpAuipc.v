@@ -9,7 +9,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -55,10 +55,9 @@ Section ForwardAUIPC.
           (i : mword 5) (b : bool).
 
   Hypothesis Hi : uint i = 2.
-  Hypothesis Hfetch_gen : forall s0 : mstate,
-    register_lookup PC s0.(sregs) = pc ->
-    register_lookup cur_privilege s0.(sregs) = Machine ->
-    exec (fetch tt) s0 = Some (F_Base w, s0).
+  Hypothesis Hfetch_at :
+    exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
+      = Some (F_Base w, set_reg s (R_bool minstret_increment) b).
   Hypothesis Hdec_gen : forall s0 : mstate,
     exec (ext_decode w) s0 = Some (UTYPE (imm, Regidx i, AUIPC), s0).
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
@@ -113,7 +112,7 @@ Section ForwardAUIPC.
       apply (exec_getPendingSet_machine_none sAa _ (exec_currentlyEnabled_S sAa) LmidA LmIEA). }
     (* fetch / decode at sAa (state-preserving). *)
     assert (HfetchA : exec (fetch tt) sAa = Some (F_Base w, sAa))
-      by (apply Hfetch_gen; assumption).
+      by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAa = Some (UTYPE (imm, Regidx i, AUIPC), sAa))
       by apply Hdec_gen.
     (* execute leaf at s_pc = set_reg sAa nextPC (pc+4). *)
@@ -186,11 +185,19 @@ Section StepAUIPC.
   Lemma wp_step_auipc (pc : mword 64) (w_a : mword 32) (imm_a : mword 20)
       (i_a : mword 5) (b1 : bool) (sp0a npc0a mst0a mstatus0a : mword 64)
       (mc : mword 32) (mcfg : mword 64)
+      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0a : bool) (elp0a : mword 1) E (Φ : mval -> iProp Σ) :
     uint i_a = 2 ->
-    (forall s0, register_lookup PC s0.(sregs) = pc ->
-       register_lookup cur_privilege s0.(sregs) = Machine ->
-       exec (fetch tt) s0 = Some (F_Base w_a, s0)) ->
+    (* the eight pure fetch side-conditions of [fetch_from_pts_minstret] *)
+    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
+    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
+    (forall i, pmpAddrMatchType_encdec_backwards
+       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
+    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
+    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    isRVC (subrange_vec_dec w_a 15 0) = false ->
     (forall s0, exec (ext_decode w_a) s0 = Some (UTYPE (imm_a, Regidx i_a, AUIPC), s0)) ->
     (* should_inc is now DETERMINED by the mcountinhibit/minstretcfg cells: *)
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -202,6 +209,8 @@ Section StepAUIPC.
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
     elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_a j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (add_vec pc (auipc_off imm_a)) -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
@@ -209,10 +218,13 @@ Section StepAUIPC.
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
         elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_a j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (Hia Hfa Hda Hb1 HmIE Help) "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hcont".
+    iIntros (Hia Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hda Hb1 HmIE Help)
+      "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
@@ -225,11 +237,15 @@ Section StepAUIPC.
     iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
     assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
+    (* derive the state-specific fetch fact from the owned instruction bytes *)
+    iDestruct (fetch_from_pts_minstret pc w_a region_f pmpcfg0 pmar0 b1 s
+                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iExists (sFca s pc imm_a b1 mst0a). iSplitR.
     { iPureIntro.
-      rewrite <- (sFa_eq s pc imm_a b1 Hsi_s mst0a Lmst Lpc).
-      apply (forward_exec_auipc s w_a pc imm_a i_a b1 Hia Hfa Hda Hsi_s Lpc Lpriv Lhs Lmdl).
+      rewrite <- (sFa_eq s w_a pc imm_a b1 Hfetch_at Hsi_s mst0a Lmst Lpc).
+      apply (forward_exec_auipc s w_a pc imm_a i_a b1 Hia Hfetch_at Hda Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
     iIntros "!>".
@@ -241,9 +257,9 @@ Section StepAUIPC.
     unfold sFca, base_upd_a. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
     - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg").
+      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 
   (* ---------------------------------------------------------------------- *)

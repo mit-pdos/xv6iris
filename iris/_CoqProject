@@ -11,4 +11,5 @@ RiscvFetchExec.v
 WpAdd.v
 WpAuipc.v
 WpLoad.v
+WpFetch.v
 KernelBoot.v

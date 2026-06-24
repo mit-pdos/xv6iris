@@ -9,7 +9,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpFetch.
 Local Open Scope Z_scope.
 
 (* ===== RiscvModelFinalWP ===== *)
@@ -108,10 +108,6 @@ Section FinalWP.
   (* fetch/decode facts, stated once at the EXEC level; the relational [run]
      twins needed by run_hart_active_ADD are derived on the spot via
      [exec_run_det] (exec = Some -> run), so no separate run hypotheses. *)
-  Hypothesis Hfetch_exec_gen : forall s : mstate,
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    exec (fetch tt) s = Some (F_Base w, s).
   Hypothesis Hdec_exec_gen : forall s : mstate,
     exec (ext_decode w) s = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD), s).
   Hypothesis Hsi_gen : forall s : mstate,
@@ -123,6 +119,7 @@ Section FinalWP.
   Hypothesis Hrvfi : get_config_rvfi tt = false.
 
   Lemma forward_exec_final (s : mstate) :
+    exec (fetch tt) (sA s) = Some (F_Base w, sA s) ->
     register_lookup (R_bitvector_64 x10) s.(sregs) = a0 ->
     register_lookup (R_bitvector_64 x11) s.(sregs) = a1 ->
     register_lookup PC s.(sregs) = pc ->
@@ -135,7 +132,7 @@ Section FinalWP.
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     exec riscv_step s = Some (tt, sF s).
   Proof using All.
-    intros Lx10 Lx11 Lpc Lmst Lpriv Lhs Lmideleg LmIE Lelp.
+    intros Hfetch_at Lx10 Lx11 Lpc Lmst Lpriv Lhs Lmideleg LmIE Lelp.
     (* Hne at sA s via exec_hart_active_done. *)
     assert (Hne_at : exec (run_hart_active 0) (sA s) <> None).
     { apply (exec_hart_active_done (sA s) pc w rs1 rs2 rd
@@ -148,7 +145,7 @@ Section FinalWP.
       - apply exec_currentlyEnabled_S.
       - unfold sA; trans_mi; exact Lmideleg.
       - unfold sA; trans_mi; exact LmIE.
-      - apply Hfetch_exec_gen; [ unfold sA; trans_mi; exact Lpc | unfold sA; trans_mi; exact Lpriv ].
+      - exact Hfetch_at.
       - apply Hdec_exec_gen.
       - unfold sA; trans_mi; exact Lelp. }
     (* Hpend at sA s via the keystone. *)
@@ -164,10 +161,7 @@ Section FinalWP.
       - unfold sA; trans_mi; exact Lpriv.
       - unfold sA; trans_mi; exact Lpc.
       - unfold sA; trans_mi; exact Lelp.
-      - apply (proj1 (exec_run_det _ _ _ _
-                 (Hfetch_exec_gen (sA s)
-                    ltac:(unfold sA; trans_mi; exact Lpc)
-                    ltac:(unfold sA; trans_mi; exact Lpriv)))).
+      - apply (proj1 (exec_run_det _ _ _ _ Hfetch_at)).
       - apply (proj1 (exec_run_det _ _ _ _ (Hdec_exec_gen (sA s)))). }
     apply (exec_riscv_step_ADD s (sX s) w b pc).
     - exact Lpriv.
@@ -221,9 +215,21 @@ Section FinalWP.
   Qed.
 
   Lemma wp_add_real_final
-      (mstatus0 : mword 64) (elp0 : mword 1) E (Φ : mval -> iProp Σ) :
+      (mstatus0 : mword 64) (elp0 : mword 1)
+      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      E (Φ : mval -> iProp Σ) :
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    (* the eight pure fetch side-conditions of [fetch_from_pts_minstret] *)
+    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
+    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
+    (forall i, pmpAddrMatchType_encdec_backwards
+       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
+    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
+    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
     (R_bitvector_64 x10) ↦ᵣ a0 -∗
     (R_bitvector_64 x11) ↦ᵣ a1 -∗
     (R_bitvector_64 x12) ↦ᵣ v2old -∗
@@ -236,6 +242,8 @@ Section FinalWP.
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗
     (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
     ▷ ( (R_bitvector_64 x10) ↦ᵣ a0 -∗
         (R_bitvector_64 x11) ↦ᵣ a1 -∗
         (R_bitvector_64 x12) ↦ᵣ (add_vec a0 a1) -∗
@@ -248,11 +256,13 @@ Section FinalWP.
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗
         (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof using All.
-    iIntros (HmIE0 Help0)
-      "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hcont".
+    iIntros (HmIE0 Help0 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
+      "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hpmpc Hpma Hhtif Hibytes Hcont".
     iApply wp_exec_step.
     iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hx10")  as %Lx10.
@@ -264,6 +274,11 @@ Section FinalWP.
     iDestruct (reg_valid with "Hreg Hmdl")  as %Lmdl.
     iDestruct (reg_valid with "Hreg Hmst'") as %Lmst2.
     iDestruct (reg_valid with "Hreg Help")  as %Lelp.
+    (* derive the state-specific fetch fact from the owned instruction bytes;
+       [forward_exec_final] needs it at [sA s = set_reg s minstret_increment b]. *)
+    iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b s
+                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
     iExists (sFc s). iSplitR.
     { iPureIntro. rewrite <- (sF_eq s Lx10 Lx11 Lmst).
@@ -280,10 +295,10 @@ Section FinalWP.
     - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help").
+      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hpmpc Hpma Hhtif Hibytes").
     - iMod "Hclose" as "_". iModIntro.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help").
+      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hpmpc Hpma Hhtif Hibytes").
   Qed.
 
 End FinalWP.

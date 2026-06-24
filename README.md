@@ -44,6 +44,7 @@ xv6rocq/
 │   ├── WpAdd.v                #   the `add`  opcode WP (wp_add_real_final)
 │   ├── WpAuipc.v              #   the `auipc` opcode WP (wp_step_auipc)
 │   ├── WpLoad.v               #   the `ld`   opcode WP (8-byte data load, wp_step_ld)
+│   ├── WpFetch.v              #   separation-logic fetch lemma (fetch_from_pts: own bytes -> F_Base w)
 │   ├── KernelBoot.v           #   top: the two-instruction kernel WP (wp_kernel_first_two)
 │   └── _CoqProject
 ├── Makefile                   # top-level build (this file's "Build" section)
