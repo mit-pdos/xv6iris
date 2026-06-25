@@ -10,7 +10,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpAuipc WpLoad WpFetch WpDecode WpEntry.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpAuipc WpLoad WpFetch WpDecode WpEntry WpGpr.
 From Kernel Require KernelInstrs KernelData KernelSyms.
 Local Open Scope Z_scope.
 
@@ -467,6 +467,7 @@ Section KernelBootWP.
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (x1_0 x10_0 x11_0 mhartid0 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64))
       E (Φ : mval -> iProp Σ) :
     let bb     := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                        (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
@@ -493,6 +494,8 @@ Section KernelBootWP.
     let m7     := bump m6 in
     let x1j    := regval_into_reg (add_vec_int kpc7 4) in
     let m8     := bump m7 in
+    m !! x1 = Some x1_0 -> m !! x2 = Some sp0 ->
+    m !! x10 = Some x10_0 -> m !! x11 = Some x11_0 ->
     (* the PMA configuration grants R/W/X to all of memory (every fetch + the ld). *)
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
@@ -504,8 +507,7 @@ Section KernelBootWP.
     is_aligned_paddr (Physaddr pal) 8 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_M misa0) ('b"1") = true ->
-    PC ↦ᵣ kpc0 -∗ (R_bitvector_64 x1) ↦ᵣ x1_0 -∗ (R_bitvector_64 x2) ↦ᵣ sp0 -∗
-    (R_bitvector_64 x10) ↦ᵣ x10_0 -∗ (R_bitvector_64 x11) ↦ᵣ x11_0 -∗
+    PC ↦ᵣ kpc0 -∗ gpr_file m -∗
     mhartid ↦ᵣ mhartid0 -∗ misa ↦ᵣ misa0 -∗
     nextPC ↦ᵣ kpc0 -∗ (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -514,8 +516,8 @@ Section KernelBootWP.
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
     kernel_text -∗
-    ▷ ( PC ↦ᵣ kstart -∗ (R_bitvector_64 x1) ↦ᵣ x1j -∗ (R_bitvector_64 x2) ↦ᵣ x2add -∗
-        (R_bitvector_64 x10) ↦ᵣ x10m -∗ (R_bitvector_64 x11) ↦ᵣ x11a -∗
+    ▷ ( PC ↦ᵣ kstart -∗
+        gpr_file (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))) -∗
         mhartid ↦ᵣ mhartid0 -∗ misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ kstart -∗ (R_bool minstret_increment) ↦ᵣ bb -∗ minstret ↦ᵣ m8 -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -529,8 +531,17 @@ Section KernelBootWP.
   Proof.
     intros bb bump sp1 offl eal a8l pal data2l mst1 x2ld m2 x10l m3 x11c m4 x11a m5
       x10m m6 x2add m7 x1j m8
-      Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpalal HmisaC HmisaM.
-    iIntros "Hpc Hx1 Hx2 Hx10 Hx11 Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext Hcont".
+      Hm1 Hm2 Hm10 Hm11 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpalal HmisaC HmisaM.
+    iIntros "Hpc Hgpr Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext Hcont".
+    (* decompose the GPR file into the four registers _entry touches + residual *)
+    iEval (rewrite /gpr_file) in "Hgpr".
+    assert (Hd2  : delete x1 m !! x2 = Some sp0) by (by rewrite lookup_delete_ne).
+    assert (Hd10 : delete x2 (delete x1 m) !! x10 = Some x10_0) by (by rewrite !lookup_delete_ne).
+    assert (Hd11 : delete x10 (delete x2 (delete x1 m)) !! x11 = Some x11_0) by (by rewrite !lookup_delete_ne).
+    iDestruct (big_sepM_delete _ m x1 x1_0 Hm1 with "Hgpr") as "[Hx1 Hgpr]".
+    iDestruct (big_sepM_delete _ _ x2 sp0 Hd2 with "Hgpr") as "[Hx2 Hgpr]".
+    iDestruct (big_sepM_delete _ _ x10 x10_0 Hd10 with "Hgpr") as "[Hx10 Hgpr]".
+    iDestruct (big_sepM_delete _ _ x11 x11_0 Hd11 with "Hgpr") as "[Hx11 Hgpr]".
     (* ---- steps 0,1: auipc; ld via wp_kernel_first_two ---- *)
     iApply (wp_kernel_first_two v mc mcfg mseccfg0 pmpcfg0 pmar0 E Φ
               Hpmaall
@@ -624,7 +635,34 @@ Section KernelBootWP.
     replace (add_vec kpc7 (sign_extend' 64 imm_jal)) with kstart by (vm_compute; reflexivity).
     (* ---- reassemble kernel_text and finish ---- *)
     iDestruct (ktext_join with "[$H0 $H1 $H2 $H3 $H4 $H5 $H6 $H7 $Htail]") as "Htext".
-    iApply ("Hcont" with "Hpc Hx1 Hx2 Hx10 Hx11 Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
+    (* recompose the GPR file with the four updated registers *)
+    iAssert (gpr_file (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))))
+      with "[Hx1 Hx2 Hx10 Hx11 Hgpr]" as "Hgpr".
+    { rewrite /gpr_file.
+      assert (Hu1 : <[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m))) !! x1 = Some x1j)
+        by (by simplify_map_eq).
+      assert (Hu2 : delete x1 (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))) !! x2 = Some x2add)
+        by (by simplify_map_eq).
+      assert (Hu10 : delete x2 (delete x1 (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m))))) !! x10 = Some x10m)
+        by (by simplify_map_eq).
+      assert (Hu11 : delete x10 (delete x2 (delete x1 (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))))) !! x11 = Some x11a)
+        by (by simplify_map_eq).
+      rewrite (big_sepM_delete _ _ x1 x1j Hu1).
+      rewrite (big_sepM_delete _ _ x2 x2add Hu2).
+      rewrite (big_sepM_delete _ _ x10 x10m Hu10).
+      rewrite (big_sepM_delete _ _ x11 x11a Hu11).
+      iFrame "Hx1 Hx2 Hx10 Hx11".
+      replace (delete x11 (delete x10 (delete x2 (delete x1
+                (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m))))))))
+         with (delete x11 (delete x10 (delete x2 (delete x1 m)))).
+      { iExact "Hgpr". }
+      apply map_eq; intros k.
+      destruct (decide (k = x1))  as [->|?]; [by simplify_map_eq|].
+      destruct (decide (k = x2))  as [->|?]; [by simplify_map_eq|].
+      destruct (decide (k = x10)) as [->|?]; [by simplify_map_eq|].
+      destruct (decide (k = x11)) as [->|?]; [by simplify_map_eq|].
+      by simplify_map_eq. }
+    iApply ("Hcont" with "Hpc Hgpr Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
   Qed.
 
 End KernelBootWP.
