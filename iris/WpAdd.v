@@ -216,15 +216,13 @@ Section FinalWP.
 
   Lemma wp_add_real_final
       (mstatus0 : mword 64) (elp0 : mword 1)
-      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       E (Φ : mval -> iProp Σ) :
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    (* the eight pure fetch side-conditions of [fetch_from_pts_minstret] *)
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
-    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    (* the pure fetch side-conditions of [fetch_from_pts_minstret] *)
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
@@ -261,8 +259,9 @@ Section FinalWP.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof using All.
-    iIntros (HmIE0 Help0 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
+    iIntros (HmIE0 Help0 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
       "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step.
     iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hx10")  as %Lx10.

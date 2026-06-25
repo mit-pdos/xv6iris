@@ -1453,8 +1453,7 @@ Section WpFetchRVC.
       (b : bool) (s : mstate) :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
@@ -1558,13 +1557,11 @@ Section StepLUI.
   Lemma wp_step_lui (pc : mword 64) (w : mword 32)
       (b1 : bool) (x10_0 npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
     subrange_vec_dec w 15 0 = h_lui ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
-    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
@@ -1595,8 +1592,9 @@ Section StepLUI.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsub Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
+    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
       "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
@@ -1687,13 +1685,11 @@ Section StepADD.
   Lemma wp_step_add (pc : mword 64) (w : mword 32)
       (b1 : bool) (sp_in a0_in npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
     subrange_vec_dec w 15 0 = h_add ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
-    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
@@ -1726,8 +1722,9 @@ Section StepADD.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsub Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
+    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
       "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hx2")    as %Lx2.
@@ -1828,12 +1825,10 @@ Section StepMUL.
   Lemma wp_step_mul (pc : mword 64)
       (b1 : bool) (a0_in a1_in npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
-    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
@@ -1869,8 +1864,9 @@ Section StepMUL.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hb1 HmIE Help Hmisa)
       "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hx10")   as %Lx10.
@@ -2176,8 +2172,7 @@ Section WpFetchRVC2.
       (b : bool) (misa0 : mword 64) (s : mstate) :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 2 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = true ->
@@ -2297,12 +2292,10 @@ Section StepADDI.
   Lemma wp_step_addi (pc : mword 64)
       (b1 : bool) (a1_in npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 2 = Some region_f ->
-    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = true ->
@@ -2334,8 +2327,9 @@ Section StepADDI.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
       "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hx11")   as %Lx11.
@@ -2506,8 +2500,7 @@ Section WpFetchFBase2SL.
     matching_pma_region pmar0 (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = Some regh ->
     (override_PMA (PMA_Region_attributes regl) PBMT_PMA).(PMA_executable) = true ->
     (override_PMA (PMA_Region_attributes regh) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
     is_aligned_paddr (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
@@ -2655,14 +2648,10 @@ Section StepCSRR.
   Lemma wp_step_csrr (pc : mword 64)
       (b1 : bool) (mhartid_in x11_0 npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (regl regh : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 2 = Some regl ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = Some regh ->
-    (override_PMA (PMA_Region_attributes regl) PBMT_PMA).(PMA_executable) = true ->
-    (override_PMA (PMA_Region_attributes regh) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
     is_aligned_paddr (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
@@ -2697,8 +2686,10 @@ Section StepCSRR.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hml Hmh Hxl Hxh Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hb1 HmIE Help Hmisa)
       "Hpc Hx11 Hmhart Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 2) as (regl & Hml & Hxl & _ & _).
+    destruct (Hpmaall (fetch_pa (add_vec_int pc 2)) 2) as (regh & Hmh & Hxh & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hmhart") as %Lmhart.
@@ -2808,14 +2799,10 @@ Section StepJAL2.
   Lemma wp_step_jal (pc : mword 64)
       (b1 : bool) (x1_0 npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (regl regh : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 2 = Some regl ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = Some regh ->
-    (override_PMA (PMA_Region_attributes regl) PBMT_PMA).(PMA_executable) = true ->
-    (override_PMA (PMA_Region_attributes regh) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
     is_aligned_paddr (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
@@ -2852,8 +2839,10 @@ Section StepJAL2.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hml Hmh Hxl Hxh Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hal0 Hal1 Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hal0 Hal1 Hb1 HmIE Help Hmisa)
       "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 2) as (regl & Hml & Hxl & _ & _).
+    destruct (Hpmaall (fetch_pa (add_vec_int pc 2)) 2) as (regh & Hmh & Hxh & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.

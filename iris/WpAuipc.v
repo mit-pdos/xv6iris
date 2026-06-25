@@ -186,14 +186,12 @@ Section StepAUIPC.
   Lemma wp_step_auipc (pc : mword 64) (w_a : mword 32) (imm_a : mword 20)
       (i_a : mword 5) (b1 : bool) (sp0a npc0a mst0a mstatus0a : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (region_f : PMA_Region) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0a : bool) (elp0a : mword 1) E (Φ : mval -> iProp Σ) :
     uint i_a = 2 ->
-    (* the eight pure fetch side-conditions of [fetch_from_pts_minstret] *)
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
-    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    (* the pure fetch side-conditions of [fetch_from_pts_minstret] *)
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
@@ -225,8 +223,9 @@ Section StepAUIPC.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (Hia Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hda Hb1 HmIE Help)
+    iIntros (Hia Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hda Hb1 HmIE Help)
       "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.

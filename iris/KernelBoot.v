@@ -201,7 +201,7 @@ Section KernelBootWP.
      [decode_auipc]/[decode_ld] — so this top-level theorem carries NO decode
      hypothesis at all. *)
   Lemma wp_kernel_first_two
-      (region region_fa region_fl : PMA_Region) (v : bv 64)
+      (v : bv 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       E (Φ : mval -> iProp Σ) :
@@ -216,33 +216,27 @@ Section KernelBootWP.
     let pal    := zero_extend' 64 (add_vec_int a8l (0 * 8)) in
     let data2l := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v in
     let mst1   := if bb then add_vec_int mst0 1 else mst0 in
+    (* the PMA configuration grants R/W/X to all of memory *)
+    pma_allows_all pmar0 ->
     (* auipc fetch side-conditions (instruction word [w_auipc] at [fetch_pa kpc0]) *)
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc0)) 4 = Some region_fa ->
-    (override_PMA (PMA_Region_attributes region_fa) PBMT_PMA).(PMA_executable) = true ->
     is_aligned_paddr (Physaddr (fetch_pa kpc0)) 4 = true ->
     neq_vec (access_vec_dec kpc0 0) ('b"0") = false ->
     neq_vec (access_vec_dec kpc0 1) ('b"0") = false ->
     is_aligned_vaddr (Virtaddr kpc0) 4 = true ->
     (* ld fetch side-conditions (instruction word [w_ld] at [fetch_pa kpc1]) *)
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc1)) 4 = Some region_fl ->
-    (override_PMA (PMA_Region_attributes region_fl) PBMT_PMA).(PMA_executable) = true ->
     is_aligned_paddr (Physaddr (fetch_pa kpc1)) 4 = true ->
     neq_vec (access_vec_dec kpc1 0) ('b"0") = false ->
     neq_vec (access_vec_dec kpc1 1) ('b"0") = false ->
     is_aligned_vaddr (Virtaddr kpc1) 4 = true ->
     (* the shared PMP-off fact (used by both fetch discharges) *)
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8l) 8 = true ->
-    (forall j, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 j)) = OFF) ->
-    matching_pma_region pmar0 (Physaddr pal) 8 = Some region ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr pal) 8 = true ->
-    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true ->
     (* within_clint/within_sig discharged from the RAM bytes; within_htif from
        the owned [htif_tohost_base |-> None]. *)
     PC ↦ᵣ kpc0 -∗ (R_bitvector_64 x2) ↦ᵣ sp0 -∗ nextPC ↦ᵣ kpc0 -∗
@@ -268,9 +262,9 @@ Section KernelBootWP.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros bb sp1 offl eal a8l pal data2l mst1
-      Hmatchfa Hexecfa Halignfa Hbit0fa Hbit1fa Hvalignfa
-      Hmatchfl Hexecfl Halignfl Hbit0fl Hbit1fl Hvalignfl Hpmpf
-      HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread.
+      Hpmaall Halignfa Hbit0fa Hbit1fa Hvalignfa
+      Halignfl Hbit0fl Hbit1fl Hvalignfl Hpmpf
+      HmIE Hlp HMPRV Hpmm Halign Hpmp Hpalign.
     iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext Hcont".
     (* extract the two instruction byte-blocks from the whole-image predicate;
        [Hrestore] puts them back (fetch leaves memory unchanged). *)
@@ -279,19 +273,19 @@ Section KernelBootWP.
     (* Step 1: auipc.  uint i_auipc = 2 and isRVC are now concrete facts; decode is
        discharged by [decode_auipc].  Owns the auipc bytes + fetch CSRs. *)
     iApply (wp_step_auipc kpc0 w_auipc imm_auipc i_auipc bb sp0 kpc0 mst0 mstatus0 mc mcfg
-              region_fa pmpcfg0 pmar0 mi0 elp0 E Φ
-              ltac:(vm_compute; reflexivity) Hmatchfa Hexecfa Hpmpf Halignfa Hbit0fa Hbit1fa Hvalignfa
+              pmpcfg0 pmar0 mi0 elp0 E Φ
+              ltac:(vm_compute; reflexivity) Hpmaall Hpmpf Halignfa Hbit0fa Hbit1fa Hvalignfa
               ltac:(vm_compute; reflexivity) decode_auipc eq_refl HmIE Hlp
               with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa").
     iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa".
     replace (add_vec_int kpc0 4) with kpc1 by (vm_compute; reflexivity).
     (* Step 2: ld.  base register x2 holds sp1 = the auipc result.  decode is
        discharged by [decode_ld].  Owns the ld bytes at [fetch_pa kpc1]. *)
-    iApply (wp_step_ld kpc1 w_ld imm_ld i_ld bb region region_fl v sp1 kpc1 mst1 mstatus0 mc mcfg
+    iApply (wp_step_ld kpc1 w_ld imm_ld i_ld bb v sp1 kpc1 mst1 mstatus0 mc mcfg
               mseccfg0 pmpcfg0 pmar0 bb elp0 E Φ
-              ltac:(vm_compute; reflexivity) Hmatchfl Hexecfl Hpmpf Halignfl Hbit0fl Hbit1fl Hvalignfl
+              ltac:(vm_compute; reflexivity) Hpmaall Hpmpf Halignfl Hbit0fl Hbit1fl Hvalignfl
               ltac:(vm_compute; reflexivity) decode_ld eq_refl
-              HmIE Hlp HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread
+              HmIE Hlp HMPRV Hpmm Halign Hpmp Hpalign
               with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
     iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl".
     replace (add_vec_int kpc1 4) with kpc2 by (vm_compute; reflexivity).
@@ -469,10 +463,9 @@ Section KernelBootWP.
   (* chains lui, csrr, addi, mul, add, jal.  PC ends at kstart (= start).     *)
   (* ====================================================================== *)
   Lemma wp_kernel_entry
-      (region region_fa region_fl : PMA_Region) (v : bv 64)
+      (v : bv 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (rg : PMA_Region)
       (x1_0 x10_0 x11_0 mhartid0 misa0 : mword 64)
       E (Φ : mval -> iProp Σ) :
     let bb     := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -500,31 +493,15 @@ Section KernelBootWP.
     let m7     := bump m6 in
     let x1j    := regval_into_reg (add_vec_int kpc7 4) in
     let m8     := bump m7 in
-    (* fetch side-conditions for auipc/ld (kpc0/kpc1) and the ld load. *)
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc0)) 4 = Some region_fa ->
-    (override_PMA (PMA_Region_attributes region_fa) PBMT_PMA).(PMA_executable) = true ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc1)) 4 = Some region_fl ->
-    (override_PMA (PMA_Region_attributes region_fl) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    (* the PMA configuration grants R/W/X to all of memory (every fetch + the ld). *)
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8l) 8 = true ->
-    matching_pma_region pmar0 (Physaddr pal) 8 = Some region ->
     is_aligned_paddr (Physaddr pal) 8 = true ->
-    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true ->
-    (* fetch side-conditions for lui..jal: one shared text region [rg]. *)
-    (override_PMA (PMA_Region_attributes rg) PBMT_PMA).(PMA_executable) = true ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc2)) 4 = Some rg ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc3)) 2 = Some rg ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa (add_vec_int kpc3 2))) 2 = Some rg ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc4)) 2 = Some rg ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc5)) 4 = Some rg ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc6)) 4 = Some rg ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa kpc7)) 2 = Some rg ->
-    matching_pma_region pmar0 (Physaddr (fetch_pa (add_vec_int kpc7 2))) 2 = Some rg ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_M misa0) ('b"1") = true ->
     PC ↦ᵣ kpc0 -∗ (R_bitvector_64 x1) ↦ᵣ x1_0 -∗ (R_bitvector_64 x2) ↦ᵣ sp0 -∗
@@ -552,16 +529,16 @@ Section KernelBootWP.
   Proof.
     intros bb bump sp1 offl eal a8l pal data2l mst1 x2ld m2 x10l m3 x11c m4 x11a m5
       x10m m6 x2add m7 x1j m8
-      Hmfa Hxfa Hmfl Hxfl Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hmpal Hpalal Hrd
-      Hxrg Hm2 Hm3 Hm3h Hm4 Hm5 Hm6 Hm7 Hm7h HmisaC HmisaM.
+      Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpalal HmisaC HmisaM.
     iIntros "Hpc Hx1 Hx2 Hx10 Hx11 Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext Hcont".
     (* ---- steps 0,1: auipc; ld via wp_kernel_first_two ---- *)
-    iApply (wp_kernel_first_two region region_fa region_fl v mc mcfg mseccfg0 pmpcfg0 pmar0 E Φ
-              Hmfa Hxfa ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+    iApply (wp_kernel_first_two v mc mcfg mseccfg0 pmpcfg0 pmar0 E Φ
+              Hpmaall
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              Hmfl Hxfl ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpmpf Hmpal Hpalal Hrd
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpmpf Hpalal
               with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
     iNext.
     iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext".
@@ -569,8 +546,8 @@ Section KernelBootWP.
     iDestruct (ktext_split with "Htext") as "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & Htail)".
     (* ---- step 2: lui a0,0x1  (RVC, 4-aligned, window spans into csrr) ---- *)
     iDestruct (lui_split with "[$H2 $H3]") as "(Hlui & Hrem)".
-    iApply (wp_step_lui kpc2 w_lui4 bb x10_0 kpc2 m2 mstatus0 misa0 mc mcfg rg pmpcfg0 pmar0 bb elp0 E Φ
-              ltac:(apply bv_eq; vm_compute; reflexivity) Hm2 Hxrg Hpmpf
+    iApply (wp_step_lui kpc2 w_lui4 bb x10_0 kpc2 m2 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
+              ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaC
@@ -581,8 +558,8 @@ Section KernelBootWP.
     replace (add_vec_int kpc2 2) with kpc3 by (vm_compute; reflexivity).
     (* ---- step 3: csrr a1,mhartid  (32-bit, 2-aligned) ---- *)
     iDestruct (csrr_get with "H3") as "H3".
-    iApply (wp_step_csrr kpc3 bb mhartid0 x11_0 kpc3 m3 mstatus0 misa0 mc mcfg rg rg pmpcfg0 pmar0 bb elp0 E Φ
-              Hm3 Hm3h Hxrg Hxrg Hpmpf
+    iApply (wp_step_csrr kpc3 bb mhartid0 x11_0 kpc3 m3 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
+              Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -595,8 +572,8 @@ Section KernelBootWP.
     replace (add_vec_int kpc3 4) with kpc4 by (vm_compute; reflexivity).
     (* ---- step 4: addi a1,a1,1  (RVC, 2-aligned) ---- *)
     iDestruct (addi_get with "H4") as "H4".
-    iApply (wp_step_addi kpc4 bb x11c kpc4 m4 mstatus0 misa0 mc mcfg rg pmpcfg0 pmar0 bb elp0 E Φ
-              Hm4 Hxrg Hpmpf
+    iApply (wp_step_addi kpc4 bb x11c kpc4 m4 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
+              Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaC
@@ -607,8 +584,8 @@ Section KernelBootWP.
     replace (add_vec_int kpc4 2) with kpc5 by (vm_compute; reflexivity).
     (* ---- step 5: mul a0,a0,a1  (32-bit, 4-aligned, M-ext) ---- *)
     iDestruct (mul_get with "H5") as "H5".
-    iApply (wp_step_mul kpc5 bb x10l x11a kpc5 m5 mstatus0 misa0 mc mcfg rg pmpcfg0 pmar0 bb elp0 E Φ
-              Hm5 Hxrg Hpmpf
+    iApply (wp_step_mul kpc5 bb x10l x11a kpc5 m5 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
+              Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -620,8 +597,8 @@ Section KernelBootWP.
     replace (add_vec_int kpc5 4) with kpc6 by (vm_compute; reflexivity).
     (* ---- step 6: add sp,sp,a0  (RVC, 4-aligned, window spans into jal) ---- *)
     iDestruct (add_split with "[$H6 $H7]") as "(Hadd & Hrem)".
-    iApply (wp_step_add kpc6 w_add4 bb x2ld x10m kpc6 m6 mstatus0 misa0 mc mcfg rg pmpcfg0 pmar0 bb elp0 E Φ
-              ltac:(apply bv_eq; vm_compute; reflexivity) Hm6 Hxrg Hpmpf
+    iApply (wp_step_add kpc6 w_add4 bb x2ld x10m kpc6 m6 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
+              ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaC
@@ -632,8 +609,8 @@ Section KernelBootWP.
     replace (add_vec_int kpc6 2) with kpc7 by (vm_compute; reflexivity).
     (* ---- step 7: jal start  (32-bit, 2-aligned) -- the jump to start ---- *)
     iDestruct (jal_get with "H7") as "H7".
-    iApply (wp_step_jal kpc7 bb x1_0 kpc7 m7 mstatus0 misa0 mc mcfg rg rg pmpcfg0 pmar0 bb elp0 E Φ
-              Hm7 Hm7h Hxrg Hxrg Hpmpf
+    iApply (wp_step_jal kpc7 bb x1_0 kpc7 m7 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
+              Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

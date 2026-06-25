@@ -12,6 +12,33 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
 Local Open Scope Z_scope.
 
+(* ====================================================================== *)
+(* The PMP configuration used throughout the boot WPs: every PMP entry is  *)
+(* OFF (disabled).  With no entry matching any address, PMP imposes no      *)
+(* restriction, so in M-mode every access (R/W/X) to all of physical       *)
+(* memory is granted.  This single predicate replaces the per-lemma        *)
+(* "all entries OFF" side-condition.                                       *)
+(* ====================================================================== *)
+Definition pmp_allows_all (cfg : type_of_register pmpcfg_n) : Prop :=
+  forall i, pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg i)) = OFF.
+
+(* ====================================================================== *)
+(* The PMA configuration used throughout the boot WPs: a single region     *)
+(* covering ALL of physical memory with full R/W/X access.  For every      *)
+(* address [a] and access width [n], some region matches and (under the     *)
+(* boot PBMT_PMA) is executable, readable, and writable.  This single       *)
+(* predicate replaces the per-instruction [matching_pma_region]/            *)
+(* [PMA_executable]/[PMA_readable] side-conditions and the explicit region  *)
+(* parameters.                                                              *)
+(* ====================================================================== *)
+Definition pma_allows_all (regions : list PMA_Region) : Prop :=
+  forall (a : mword 64) (n : Z),
+    exists r,
+      matching_pma_region regions (Physaddr a) n = Some r /\
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_executable) = true /\
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_readable) = true /\
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true.
+
 (* ===== RiscvModelADDfinal ===== *)
 (* ====================================================================== *)
 (* RiscvModelADDfinal.v                                                    *)

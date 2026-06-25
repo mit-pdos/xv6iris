@@ -46,8 +46,7 @@ Section WpFetch.
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     (* PMP: every entry is OFF *)
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pmp_allows_all pmpcfg0 ->
     (* geometric facts about the concrete pc / w (they compute at kernel PCs) *)
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
@@ -117,8 +116,7 @@ Section WpFetch.
       (b : bool) (s : mstate) :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->

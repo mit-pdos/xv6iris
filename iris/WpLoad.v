@@ -609,7 +609,7 @@ End ForwardLD.
 Section StepLD.
   Context `{!riscvGS Σ}.
   Lemma wp_step_ld (pc : mword 64) (w_l : mword 32) (imm_l : mword 12)
-      (i_l : mword 5) (b1 : bool) (region region_f : PMA_Region) (v : bv 64)
+      (i_l : mword 5) (b1 : bool) (v : bv 64)
       (sp0a npc0a mst0a mstatus0a : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
@@ -621,11 +621,9 @@ Section StepLD.
     let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)) in
     let data2 := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v in
     uint i_l = 2 ->
-    (* the eight pure fetch side-conditions of [fetch_from_pts_minstret] *)
-    matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region_f ->
-    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
-    (forall i, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 i)) = OFF) ->
+    (* the pure fetch + load side-conditions; PMA covers all of memory *)
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
     neq_vec (access_vec_dec pc 0) ('b"0") = false ->
     neq_vec (access_vec_dec pc 1) ('b"0") = false ->
@@ -641,11 +639,8 @@ Section StepLD.
     eq_vec (_get_Mstatus_MPRV mstatus0a) ('b"1") = false ->
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8) 8 = true ->
-    (forall j, pmpAddrMatchType_encdec_backwards
-       (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 j)) = OFF) ->
-    matching_pma_region pmar0 (Physaddr pa) 8 = Some region ->
+    pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
-    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true ->
     (* within_clint/within_sig are now discharged from the RAM-constrained bytes,
        and within_htif from the owned [htif_tohost_base |-> None] below. *)
     PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ nextPC ↦ᵣ npc0a -∗
@@ -669,8 +664,10 @@ Section StepLD.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea a8 pa data2 Hil Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
-      Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpmp Hmatch Hpalign Hread.
+    intros offset ea a8 pa data2 Hil Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+      Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpmp Hpalign.
+    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
+    destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
     iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
