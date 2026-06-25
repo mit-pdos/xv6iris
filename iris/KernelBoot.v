@@ -457,6 +457,20 @@ Section KernelBootWP.
   Proof. rewrite E_addi addi_win_eq. done. Qed.
 
 
+  (* Cheap discharge of GPR-file map lookups/equalities: [simplify_map_eq] is
+     catastrophically slow here because deciding (in)equality of the 38-constructor
+     [register_bitvector_64] keys spawns thousands of expensive [discriminate]s.
+     We instead drive the lookups with explicit [lookup_insert]/[lookup_delete]
+     rewrites, discharging the few key disequalities directly. *)
+  Ltac gpr_ne := by first [ discriminate | assumption | (symmetry; assumption) ].
+  Ltac gpr_map :=
+    repeat first
+      [ reflexivity
+      | rewrite lookup_delete_ne; [| gpr_ne]
+      | rewrite lookup_insert_ne; [| gpr_ne]
+      | rewrite lookup_delete
+      | rewrite lookup_insert ].
+
   (* ====================================================================== *)
   (* wp_kernel_entry: the whole _entry routine (8 instructions) up to and    *)
   (* INCLUDING `jal start`.  Reuses wp_kernel_first_two for auipc;ld, then    *)
@@ -640,13 +654,13 @@ Section KernelBootWP.
       with "[Hx1 Hx2 Hx10 Hx11 Hgpr]" as "Hgpr".
     { rewrite /gpr_file.
       assert (Hu1 : <[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m))) !! x1 = Some x1j)
-        by (by simplify_map_eq).
+        by gpr_map.
       assert (Hu2 : delete x1 (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))) !! x2 = Some x2add)
-        by (by simplify_map_eq).
+        by gpr_map.
       assert (Hu10 : delete x2 (delete x1 (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m))))) !! x10 = Some x10m)
-        by (by simplify_map_eq).
+        by gpr_map.
       assert (Hu11 : delete x10 (delete x2 (delete x1 (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))))) !! x11 = Some x11a)
-        by (by simplify_map_eq).
+        by gpr_map.
       rewrite (big_sepM_delete _ _ x1 x1j Hu1).
       rewrite (big_sepM_delete _ _ x2 x2add Hu2).
       rewrite (big_sepM_delete _ _ x10 x10m Hu10).
@@ -657,11 +671,11 @@ Section KernelBootWP.
          with (delete x11 (delete x10 (delete x2 (delete x1 m)))).
       { iExact "Hgpr". }
       apply map_eq; intros k.
-      destruct (decide (k = x1))  as [->|?]; [by simplify_map_eq|].
-      destruct (decide (k = x2))  as [->|?]; [by simplify_map_eq|].
-      destruct (decide (k = x10)) as [->|?]; [by simplify_map_eq|].
-      destruct (decide (k = x11)) as [->|?]; [by simplify_map_eq|].
-      by simplify_map_eq. }
+      destruct (decide (k = x1))  as [->|n1];  [ gpr_map |].
+      destruct (decide (k = x2))  as [->|n2];  [ gpr_map |].
+      destruct (decide (k = x10)) as [->|n10]; [ gpr_map |].
+      destruct (decide (k = x11)) as [->|n11]; [ gpr_map |].
+      gpr_map. }
     iApply ("Hcont" with "Hpc Hgpr Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
   Qed.
 
