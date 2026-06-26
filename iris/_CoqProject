@@ -29,4 +29,5 @@ WpGprCsrw.v
 WpGprMret.v
 WpGprMretWp.v
 WpGprCsrrAny.v
+WpRvc.v
 KernelBoot.v
