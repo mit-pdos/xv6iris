@@ -9,3 +9,4 @@ CoqMakefile.conf
 *.glob
 *.log
 .*.cache
+/xv6-riscv

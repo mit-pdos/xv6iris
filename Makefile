@@ -51,6 +51,7 @@ model: $(MODEL)/CoqMakefile
 # ---- 2. xv6 kernel ELF (disassembled into Rocq by the dumper) ----
 kernel: $(KERNEL_ELF)
 $(KERNEL_ELF):
+	test -d xv6-riscv || git clone https://github.com/mit-pdos/xv6-riscv
 	$(MAKE) -C xv6-riscv kernel/kernel
 
 # ---- 3. Dump the kernel image into Rocq and compile it ----
