@@ -13,7 +13,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpFetch WpDecode WpEntry WpGpr WpRvc WpGprCsrrAny WpAlu2 WpGprCsrw KernelBoot.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpFetch WpDecode WpEntry WpGpr WpRvc WpGprCsrrAny WpAlu2 WpGprCsrw WpGprAddi WpGprLui KernelBoot.
 Local Open Scope Z_scope.
 
 Section StartText.
@@ -1702,6 +1702,478 @@ Section StartText.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
     iDestruct (csrw41_put with "Hwin") as "H41".
     iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H41").
+  Qed.
+
+  (* ===== idx 43: addi a5,a5,-502 (32-bit ITYPE, 4-aligned -> wp_addi_gpr) ===== *)
+  Definition w_addi43 : mword 32 := mword_of_int 0xe0a78793.
+  Definition imm_addi43 : mword 12 := subrange_vec_dec w_addi43 31 20.
+  Definition rs1_addi43 : mword 5 := autocast (subrange_vec_dec (subrange_vec_dec w_addi43 19 15) (regidx_bit_width - 1) 0).
+  Definition rd_addi43 : mword 5 := autocast (subrange_vec_dec (subrange_vec_dec w_addi43 11 7) (regidx_bit_width - 1) 0).
+  Lemma decode_addi43 s :
+    register_lookup cur_privilege (sregs s) = Machine ->
+    exec (ext_decode w_addi43) s = Some (ITYPE (imm_addi43, Regidx rs1_addi43, Regidx rd_addi43, ADDI), s).
+  Proof.
+    intro Hpriv. unfold imm_addi43, rs1_addi43, rd_addi43, w_addi43.
+    unfold ext_decode, encdec_backwards. cbv beta. cbn zeta.
+    skip_pure_clause. skip_pure_clause.
+    match goal with |- context[eq_vec (mword_of_int 0xe0a78793) ?c] =>
+      replace (eq_vec (mword_of_int 0xe0a78793 : mword 32) c) with false by (vm_compute; reflexivity) end.
+    match goal with |- context[eq_vec (subrange_vec_dec (mword_of_int 0xe0a78793) 11 0) ?c] =>
+      replace (eq_vec (subrange_vec_dec (mword_of_int 0xe0a78793 : mword 32) 11 0) c) with false by (vm_compute; reflexivity) end.
+    assert (HA1 : exec (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM false)) s = Some (false, s)).
+    { destruct (exec_cE_pause s) as [bp Hbp].
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hbp). destruct bp; [apply exec_returnm | reflexivity]. }
+    rewrite (exec_bind_Some _ _ _ _ _ HA1). cbn match. rewrite exec_bind.
+    assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s = Some (false, s)).
+    { destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz].
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz). destruct bz; [apply exec_returnm | reflexivity]. }
+    rewrite (exec_bind_Some _ _ _ _ _ HA2). cbn match.
+    match goal with |- context[if ?g then _ else returnM None] =>
+      replace g with false by (vm_compute; reflexivity) end.
+    cbn match. rewrite (exec_returnM (@None instruction) s). cbn match.
+    repeat skip_pure_clause.
+    match goal with |- context[if ?g then _ else returnM None] =>
+      replace g with true by (vm_compute; reflexivity) end.
+    cbn match. rewrite exec_bind.
+    assert (Hr1 : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0xe0a78793 : mword 32) 19 15)) s
+        = Some (Regidx (autocast (subrange_vec_dec (subrange_vec_dec (mword_of_int 0xe0a78793 : mword 32) 19 15) (regidx_bit_width - 1) 0)), s)).
+    { unfold encdec_reg_backwards.
+      match goal with |- context[if ?g then returnM (Regidx ?x) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
+    assert (Hiop : exec (encdec_iop_backwards (subrange_vec_dec (mword_of_int 0xe0a78793 : mword 32) 14 12)) s = Some (ADDI, s)).
+    { unfold encdec_iop_backwards.
+      replace (eq_vec (subrange_vec_dec (mword_of_int 0xe0a78793 : mword 32) 14 12) ('b"000")) with true by (vm_compute; reflexivity).
+      cbn match. apply exec_returnM. }
+    assert (Hr2 : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0xe0a78793 : mword 32) 11 7)) s
+        = Some (Regidx (autocast (subrange_vec_dec (subrange_vec_dec (mword_of_int 0xe0a78793 : mword 32) 11 7) (regidx_bit_width - 1) 0)), s)).
+    { unfold encdec_reg_backwards.
+      match goal with |- context[if ?g then returnM (Regidx ?x) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hr1). rewrite (exec_bind_Some _ _ _ _ _ Hiop).
+    rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn match.
+    rewrite (exec_returnM _ s). cbn match. apply exec_returnM.
+  Qed.
+  Definition kpc43 : mword 64 := mword_of_int (kentry + 0x7c).
+  Definition addi43_win : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc43) j) ↦ₘ nth_byte w_addi43 j)%I.
+  Lemma addi43_get : kinstr_bytes (skinstr 43) ⊢ addi43_win.
+  Proof. rewrite /addi43_win /w_addi43. rewrite (E_skinstr 43 (kentry + 0x7c) 0xe0a78793 32 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). done. Qed.
+  Lemma addi43_put : addi43_win ⊢ kinstr_bytes (skinstr 43).
+  Proof. rewrite /addi43_win /w_addi43. rewrite (E_skinstr 43 (kentry + 0x7c) 0xe0a78793 32 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). done. Qed.
+
+  Lemma wp_start_step43
+      (m : gmap register_bitvector_64 (mword 64)) (va vd misa0 : mword 64)
+      (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+    uint rs1_addi43 <> 0 -> uint rd_addi43 <> 0 ->
+    m !! gpr_of_Z (uint rs1_addi43) = Some va ->
+    m !! gpr_of_Z (uint rd_addi43) = Some vd ->
+    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
+    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    PC ↦ᵣ kpc43 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
+    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    kinstr_bytes (skinstr 43) -∗
+    ▷ ( PC ↦ᵣ add_vec_int kpc43 4 -∗
+        gpr_file (<[gpr_of_Z (uint rd_addi43) := regval_into_reg (add_vec va (sign_extend' 64 imm_addi43))]> m) -∗
+        nextPC ↦ᵣ add_vec_int kpc43 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        kinstr_bytes (skinstr 43) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    iIntros (Hr1n Hrdn Hr1 Hd Hpmaall Hpmpf Hb1 HmIE Help)
+      "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H43 Hcont".
+    iDestruct (addi43_get with "H43") as "Hwin".
+    iApply (wp_addi_gpr kpc43 w_addi43 rs1_addi43 rd_addi43 imm_addi43 m va vd
+              b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
+              Hr1n Hrdn Hr1 Hd Hpmaall Hpmpf
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) decode_addi43 Hb1 HmIE Help
+              with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
+    iNext.
+    iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
+    iDestruct (addi43_put with "Hwin") as "H43".
+    iApply ("Hcont" with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H43").
+  Qed.
+
+  (* ===== idx 47: lui a5,0x10 (RVC C_LUI, 2-aligned -> wp_clui_gpr base) ===== *)
+  Definition h_clui47 : mword 16 := mword_of_int 0x67c1.
+  Definition imm_clui47 : mword 6 := concat_vec (subrange_vec_dec h_clui47 12 12) (subrange_vec_dec h_clui47 6 2).
+  Definition rd5_clui47 : mword 5 := autocast (T := mword) (subrange_vec_dec (subrange_vec_dec h_clui47 11 7) (regidx_bit_width - 1) 0).
+  Lemma decode_clui47 s :
+    eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed h_clui47) s = Some (C_LUI (imm_clui47, Regidx rd5_clui47), s).
+  Proof.
+    intro HmisaC. unfold imm_clui47, rd5_clui47, h_clui47.
+    unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
+    skip_pure_clause. repeat (walk s HmisaC).
+    assert (Hrd : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0x67c1 : mword 16) 11 7)) s
+                = Some (Regidx (autocast (T := mword)
+                          (subrange_vec_dec (subrange_vec_dec (mword_of_int 0x67c1 : mword 16) 11 7) (Z.sub regidx_bit_width 1) 0)), s)).
+    { unfold encdec_reg_backwards.
+      match goal with |- context[if ?g then returnM (Regidx _) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
+    match goal with |- context[if ?g then _ else returnM None] => replace g with true by (vm_compute; reflexivity) end.
+    cbn match. rewrite exec_bind. rewrite (exec_bind_Some _ _ _ _ _ Hrd). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca))) s = Some (true, s))).
+    2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
+        apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
+        apply (exec_currentlyEnabled_Zca s HmisaC). }
+    cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
+  Definition kpc47 : mword 64 := mword_of_int (kentry + 0x8a).
+  Definition clui47_win32 : iProp Σ :=
+    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa kpc47) j) ↦ₘ nth_byte (mword_of_int 0x67c1 : mword 32) j)%I.
+  Definition clui47_win : iProp Σ :=
+    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa kpc47) j) ↦ₘ nth_byte h_clui47 j)%I.
+  Lemma E_clui47 : kinstr_bytes (skinstr 47) = clui47_win32.
+  Proof. rewrite (E_skinstr 47 (kentry + 0x8a) 0x67c1 16 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). reflexivity. Qed.
+  Lemma clui47_win_eq : clui47_win32 ⊣⊢ clui47_win.
+  Proof.
+    rewrite /clui47_win32 /clui47_win. apply big_sepL_proper. intros k y Hy.
+    apply lookup_seq in Hy as [-> Hlt].
+    assert (Hb : nth_byte (mword_of_int 0x67c1 : mword 32) (0 + k)%nat = nth_byte h_clui47 (0 + k)%nat).
+    { destruct k as [|[|k]]; [ apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia ]. }
+    rewrite Hb. done.
+  Qed.
+  Lemma clui47_get : kinstr_bytes (skinstr 47) ⊢ clui47_win.
+  Proof. rewrite E_clui47 clui47_win_eq. done. Qed.
+  Lemma clui47_put : clui47_win ⊢ kinstr_bytes (skinstr 47).
+  Proof. rewrite E_clui47 clui47_win_eq. done. Qed.
+
+  Lemma wp_start_step47
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+    uint rd5_clui47 <> 0 ->
+    m !! gpr_of_Z (uint rd5_clui47) = Some vd ->
+    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
+    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    PC ↦ᵣ kpc47 -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    kinstr_bytes (skinstr 47) -∗
+    ▷ ( PC ↦ᵣ add_vec_int kpc47 2 -∗
+        gpr_file (<[gpr_of_Z (uint rd5_clui47) := regval_into_reg (WpGprLui.luival (sign_extend' 20 imm_clui47))]> m) -∗
+        misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int kpc47 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        kinstr_bytes (skinstr 47) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    iIntros (Hrd Hd Hpmaall Hpmpf Hmisa Hb1 HmIE Help)
+      "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H47 Hcont".
+    iDestruct (clui47_get with "H47") as "Hwin".
+    iApply (wp_clui_gpr kpc47 h_clui47 rd5_clui47 imm_clui47 m vd misa0
+              b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
+              Hrd Hd Hpmaall Hpmpf
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) Hmisa decode_clui47 Hb1 HmIE Help
+              with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
+    iNext.
+    iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
+    iDestruct (clui47_put with "Hwin") as "H47".
+    iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H47").
+  Qed.
+
+  Ltac csrw_prefix s Hpriv whex :=
+    unfold ext_decode, encdec_backwards; cbv beta; cbn zeta;
+    skip_pure_clause; skip_pure_clause;
+    match goal with |- context[eq_vec (mword_of_int whex) ?c] =>
+      replace (eq_vec (mword_of_int whex : mword 32) c) with false by (vm_compute; reflexivity) end;
+    match goal with |- context[eq_vec (subrange_vec_dec (mword_of_int whex) 11 0) ?c] =>
+      replace (eq_vec (subrange_vec_dec (mword_of_int whex : mword 32) 11 0) c) with false by (vm_compute; reflexivity) end;
+    let HA1 := fresh in assert (HA1 : exec (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM false)) s = Some (false, s)) by
+      (let bp := fresh in let Hbp := fresh in destruct (exec_cE_pause s) as [bp Hbp];
+       rewrite (exec_and_boolM_Some _ _ _ _ _ Hbp); destruct bp; [apply exec_returnm | reflexivity]);
+    rewrite (exec_bind_Some _ _ _ _ _ HA1); cbn match; clear HA1; rewrite exec_bind;
+    let HA2 := fresh in assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s = Some (false, s)) by
+      (let bz := fresh in let Hbz := fresh in destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz];
+       rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz); destruct bz; [apply exec_returnm | reflexivity]);
+    rewrite (exec_bind_Some _ _ _ _ _ HA2); cbn match; clear HA2;
+    match goal with |- context[if ?g then _ else returnM None] => replace g with false by (vm_compute; reflexivity) end;
+    cbn match; rewrite (exec_returnM (@None instruction) s); cbn match;
+    repeat skip_pure_clause.
+  Ltac csrw_body whex :=
+    match goal with |- context[if ?g then _ else returnM None] => replace g with true by (vm_compute; reflexivity) end;
+    cbn match; rewrite exec_bind.
+
+  (* ===== idx 44: csrw mepc,a5 (32-bit CSRRW, 4-aligned) ===== *)
+  Definition w_csrw44 : mword 32 := mword_of_int 0x34179073.
+  Definition rs1_csrw44 : mword 5 := autocast (subrange_vec_dec (subrange_vec_dec w_csrw44 19 15) (regidx_bit_width - 1) 0).
+  Lemma decode_csrw44 s :
+    register_lookup cur_privilege (sregs s) = Machine ->
+    exec (ext_decode w_csrw44) s = Some (CSRReg (csr_mepc, Regidx rs1_csrw44, zreg, CSRRW), s).
+  Proof.
+    intro Hpriv. unfold rs1_csrw44, w_csrw44.
+    csrw_prefix s Hpriv 0x34179073. csrw_body 0x34179073.
+    assert (Hr1 : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0x34179073 : mword 32) 19 15)) s
+        = Some (Regidx (autocast (subrange_vec_dec (subrange_vec_dec (mword_of_int 0x34179073 : mword 32) 19 15) (regidx_bit_width - 1) 0)), s)).
+    { unfold encdec_reg_backwards. match goal with |- context[if ?g then returnM (Regidx ?x) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
+    assert (Hcsrop : exec (encdec_csrop_backwards (subrange_vec_dec (mword_of_int 0x34179073 : mword 32) 13 12)) s = Some (CSRRW, s)).
+    { unfold encdec_csrop_backwards. replace (eq_vec (subrange_vec_dec (mword_of_int 0x34179073 : mword 32) 13 12) ('b"01")) with true by (vm_compute; reflexivity). cbn match. apply exec_returnM. }
+    assert (Hr2 : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0x34179073 : mword 32) 11 7)) s = Some (zreg, s)).
+    { unfold encdec_reg_backwards. match goal with |- context[if ?g then returnM (Regidx ?x) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match.
+      match goal with |- context[returnM (Regidx ?x)] => replace (Regidx x) with zreg by (unfold zreg; f_equal; apply bv_eq; vm_compute; reflexivity) end. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hr1). rewrite (exec_bind_Some _ _ _ _ _ Hcsrop). rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Zicsr s)). rewrite (exec_returnM _ s). cbn match.
+    replace (subrange_vec_dec (mword_of_int 0x34179073 : mword 32) 31 20) with (mword_of_int 0x341 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
+    apply exec_returnM.
+  Qed.
+  Definition kpc44 : mword 64 := mword_of_int (kentry + 0x80).
+  Definition csrw44_win : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc44) j) ↦ₘ nth_byte w_csrw44 j)%I.
+  Lemma csrw44_get : kinstr_bytes (skinstr 44) ⊢ csrw44_win.
+  Proof. rewrite /csrw44_win /w_csrw44. rewrite (E_skinstr 44 (kentry + 0x80) 0x34179073 32 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). done. Qed.
+  Lemma csrw44_put : csrw44_win ⊢ kinstr_bytes (skinstr 44).
+  Proof. rewrite /csrw44_win /w_csrw44. rewrite (E_skinstr 44 (kentry + 0x80) 0x34179073 32 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). done. Qed.
+
+  Lemma wp_start_step44
+      (m : gmap register_bitvector_64 (mword 64)) (vrs1 mepc0 : mword 64)
+      (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+    m !! gpr_of_Z (uint rs1_csrw44) = Some vrs1 ->
+    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
+    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    PC ↦ᵣ kpc44 -∗ gpr_file m -∗ mepc ↦ᵣ mepc0 -∗ nextPC ↦ᵣ npc0 -∗
+    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    kinstr_bytes (skinstr 44) -∗
+    ▷ ( PC ↦ᵣ add_vec_int kpc44 4 -∗ gpr_file m -∗ mepc ↦ᵣ mepc_val vrs1 -∗
+        nextPC ↦ᵣ add_vec_int kpc44 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        kinstr_bytes (skinstr 44) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    iIntros (Hm Hpmaall Hpmpf Hb1 HmIE Help)
+      "Hpc Hfile Hmepc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H44 Hcont".
+    iDestruct (csrw44_get with "H44") as "Hwin".
+    iApply (wp_csrw_mepc_gpr kpc44 w_csrw44 rs1_csrw44 m vrs1 mepc0
+              b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
+              ltac:(vm_compute; discriminate) Hm Hpmaall Hpmpf
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) decode_csrw44 Hb1 HmIE Help
+              with "Hpc Hfile Hmepc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
+    iNext.
+    iIntros "Hpc Hfile Hmepc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
+    iDestruct (csrw44_put with "Hwin") as "H44".
+    iApply ("Hcont" with "Hpc Hfile Hmepc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H44").
+  Qed.
+
+  (* ===== idx 45: li a5,0 (RVC C_LI, 4-aligned, spans into 32-bit idx 46) ===== *)
+  Definition h_cli45 : mword 16 := mword_of_int 0x4781.
+  Definition imm_cli45 : mword 6 := concat_vec (subrange_vec_dec h_cli45 12 12) (subrange_vec_dec h_cli45 6 2).
+  Definition rd5_cli45 : mword 5 := autocast (T := mword) (subrange_vec_dec (subrange_vec_dec h_cli45 11 7) (regidx_bit_width - 1) 0).
+  Lemma decode_cli45 s :
+    eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed h_cli45) s = Some (C_LI (imm_cli45, Regidx rd5_cli45), s).
+  Proof.
+    intro HmisaC. unfold imm_cli45, rd5_cli45, h_cli45.
+    unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
+    skip_pure_clause. repeat (walk s HmisaC).
+    assert (Hrd : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0x4781 : mword 16) 11 7)) s
+                = Some (Regidx (autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (mword_of_int 0x4781 : mword 16) 11 7) (Z.sub regidx_bit_width 1) 0)), s)).
+    { unfold encdec_reg_backwards. match goal with |- context[if ?g then returnM (Regidx _) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
+    match goal with |- context[if ?g then _ else returnM None] => replace g with true by (vm_compute; reflexivity) end.
+    cbn match. rewrite exec_bind. rewrite (exec_bind_Some _ _ _ _ _ Hrd). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Zca s HmisaC)).
+    cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
+  Definition kpc45 : mword 64 := mword_of_int (kentry + 0x84).
+  Definition kpc46 : mword 64 := mword_of_int (kentry + 0x86).
+  Definition w_cli45 : mword 32 := mword_of_int 0x90734781.
+  Definition w_csrw46 : mword 32 := mword_of_int 0x18079073.
+  Definition cli45_win : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc45) j) ↦ₘ nth_byte w_cli45 j)%I.
+  Definition cli45_pairs : list (Arch.pa * bv 8) :=
+    map (fun j => (pa_add (fetch_pa kpc45) j, nth_byte w_cli45 j)) (seq 0 4).
+  Definition rem45_pairs : list (Arch.pa * bv 8) :=
+    map (fun j => (pa_add (fetch_pa kpc46) j, nth_byte w_csrw46 j)) (seq 2 2).
+  Definition rem45 : iProp Σ := ([∗ list] ab ∈ rem45_pairs, ab.1 ↦ₘ ab.2)%I.
+  Lemma cli45_regroup :
+    (kinstr_bytes (skinstr 45) ∗ kinstr_bytes (skinstr 46)) ⊣⊢ (cli45_win ∗ rem45).
+  Proof.
+    rewrite (kinstr_bytes_pairs (skinstr 45)) (kinstr_bytes_pairs (skinstr 46)).
+    rewrite /cli45_win (win_pairs kpc45 w_cli45 4) /rem45 -!big_sepL_app.
+    replace (app (instr_byte_pairs (skinstr 45)) (instr_byte_pairs (skinstr 46)))
+      with (app cli45_pairs rem45_pairs)
+      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
+    reflexivity.
+  Qed.
+  Lemma cli45_split : (kinstr_bytes (skinstr 45) ∗ kinstr_bytes (skinstr 46)) ⊢ cli45_win ∗ rem45.
+  Proof. rewrite cli45_regroup. done. Qed.
+  Lemma cli45_join : (cli45_win ∗ rem45) ⊢ kinstr_bytes (skinstr 45) ∗ kinstr_bytes (skinstr 46).
+  Proof. rewrite cli45_regroup. done. Qed.
+  Lemma decode_cli45_w s :
+    eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (subrange_vec_dec w_cli45 15 0)) s = Some (C_LI (imm_cli45, Regidx rd5_cli45), s).
+  Proof. intro H. replace (subrange_vec_dec w_cli45 15 0) with h_cli45 by (apply bv_eq; vm_compute; reflexivity). apply decode_cli45, H. Qed.
+
+  Lemma wp_start_step45
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+    uint rd5_cli45 <> 0 ->
+    m !! gpr_of_Z (uint rd5_cli45) = Some vd ->
+    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
+    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    PC ↦ᵣ kpc45 -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    kinstr_bytes (skinstr 45) -∗ kinstr_bytes (skinstr 46) -∗
+    ▷ ( PC ↦ᵣ add_vec_int kpc45 2 -∗
+        gpr_file (<[gpr_of_Z (uint rd5_cli45) := regval_into_reg (cli_wval imm_cli45)]> m) -∗
+        misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int kpc45 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        kinstr_bytes (skinstr 45) -∗ kinstr_bytes (skinstr 46) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    iIntros (Hrd Hd Hpmaall Hpmpf Hmisa Hb1 HmIE Help)
+      "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H45 H46 Hcont".
+    iDestruct (cli45_split with "[$H45 $H46]") as "(Hwin & Hrem)".
+    iApply (wp_cli_gpr_4 kpc45 w_cli45 rd5_cli45 imm_cli45 m vd misa0
+              b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
+              Hrd Hd Hpmaall Hpmpf
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) Hmisa decode_cli45_w Hb1 HmIE Help
+              with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
+    iNext.
+    iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
+    iDestruct (cli45_join with "[$Hwin $Hrem]") as "[H45 H46]".
+    iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H45 H46").
+  Qed.
+
+
+  (* ---- idx 46, addr 0x80000086: "csrw satp,a5" (32-bit CSRRW, 2-aligned ->
+     wp_csrw_satp_gpr_2).  Reuses csrw_prefix; needs misa.S/C + mstatus.SXL=10;
+     byte-split/addr hyps concrete.  Tight seq 0 4 window.  (w_csrw46 already
+     defined in the idx-45 block as the spanning remainder's word.) ---- *)
+  Definition rs1_csrw46 : mword 5 := autocast (subrange_vec_dec (subrange_vec_dec w_csrw46 19 15) (regidx_bit_width - 1) 0).
+  Lemma decode_csrw46 s :
+    register_lookup cur_privilege (sregs s) = Machine ->
+    exec (ext_decode w_csrw46) s = Some (CSRReg (csr_satp, Regidx rs1_csrw46, zreg, CSRRW), s).
+  Proof.
+    intro Hpriv. unfold rs1_csrw46, w_csrw46.
+    csrw_prefix s Hpriv 0x18079073.
+    match goal with |- context[if ?g then _ else returnM None] => replace g with true by (vm_compute; reflexivity) end.
+    cbn match. rewrite exec_bind.
+    assert (Hr1 : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0x18079073 : mword 32) 19 15)) s
+        = Some (Regidx (autocast (subrange_vec_dec (subrange_vec_dec (mword_of_int 0x18079073 : mword 32) 19 15) (regidx_bit_width - 1) 0)), s)).
+    { unfold encdec_reg_backwards. match goal with |- context[if ?g then returnM (Regidx ?x) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
+    assert (Hcsrop : exec (encdec_csrop_backwards (subrange_vec_dec (mword_of_int 0x18079073 : mword 32) 13 12)) s = Some (CSRRW, s)).
+    { unfold encdec_csrop_backwards. replace (eq_vec (subrange_vec_dec (mword_of_int 0x18079073 : mword 32) 13 12) ('b"01")) with true by (vm_compute; reflexivity). cbn match. apply exec_returnM. }
+    assert (Hr2 : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0x18079073 : mword 32) 11 7)) s = Some (zreg, s)).
+    { unfold encdec_reg_backwards. match goal with |- context[if ?g then returnM (Regidx ?x) else _] => replace g with true by (vm_compute; reflexivity) end. cbn match.
+      match goal with |- context[returnM (Regidx ?x)] => replace (Regidx x) with zreg by (unfold zreg; f_equal; apply bv_eq; vm_compute; reflexivity) end. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hr1). rewrite (exec_bind_Some _ _ _ _ _ Hcsrop). rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Zicsr s)). rewrite (exec_returnM _ s). cbn match.
+    replace (subrange_vec_dec (mword_of_int 0x18079073 : mword 32) 31 20) with (mword_of_int 0x180 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
+    apply exec_returnM.
+  Qed.
+  Definition csrw46_win : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc46) j) ↦ₘ nth_byte w_csrw46 j)%I.
+  Lemma csrw46_get : kinstr_bytes (skinstr 46) ⊢ csrw46_win.
+  Proof. rewrite /csrw46_win /w_csrw46. rewrite (E_skinstr 46 (kentry + 0x86) 0x18079073 32 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). done. Qed.
+  Lemma csrw46_put : csrw46_win ⊢ kinstr_bytes (skinstr 46).
+  Proof. rewrite /csrw46_win /w_csrw46. rewrite (E_skinstr 46 (kentry + 0x86) 0x18079073 32 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). done. Qed.
+
+  Lemma wp_start_step46
+      (m : gmap register_bitvector_64 (mword 64)) (vrs1 misa0 mstatus0 satp0 : mword 64)
+      (b1 : bool) (npc0 mst0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+    m !! gpr_of_Z (uint rs1_csrw46) = Some vrs1 ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
+    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    PC ↦ᵣ kpc46 -∗ gpr_file m -∗ satp ↦ᵣ satp0 -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    kinstr_bytes (skinstr 46) -∗
+    ▷ ( PC ↦ᵣ add_vec_int kpc46 4 -∗ gpr_file m -∗ satp ↦ᵣ satp_legalized satp0 vrs1 -∗ misa ↦ᵣ misa0 -∗
+        nextPC ↦ᵣ add_vec_int kpc46 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        kinstr_bytes (skinstr 46) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    iIntros (Hm HS HSXL HC Hpmaall Hpmpf Hb1 HmIE Help)
+      "Hpc Hfile Hsatp Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H46 Hcont".
+    iDestruct (csrw46_get with "H46") as "Hwin".
+    iApply (wp_csrw_satp_gpr_2 kpc46 w_csrw46 rs1_csrw46 m vrs1 misa0 mstatus0 satp0
+              b1 npc0 mst0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
+              ltac:(vm_compute; discriminate) Hm HS HSXL Hpmaall Hpmpf
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
+              ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
+              ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
+              HC decode_csrw46 Hb1 HmIE Help
+              with "Hpc Hfile Hsatp Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
+    iNext.
+    iIntros "Hpc Hfile Hsatp Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
+    iDestruct (csrw46_put with "Hwin") as "H46".
+    iApply ("Hcont" with "Hpc Hfile Hsatp Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H46").
   Qed.
 
 End StartText.
