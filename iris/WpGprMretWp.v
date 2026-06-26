@@ -102,13 +102,13 @@ Section ForwardMRET.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     exec riscv_step s = Some (tt, sFm).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp.
+    intros Lpc Lpriv Lhs LS LmIE Lelp.
     assert (LpcA  : register_lookup PC sAm.(sregs) = pc).
     { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lpc | vm_compute; reflexivity ]. }
@@ -118,9 +118,9 @@ Section ForwardMRET.
     assert (LhsA  : register_lookup hart_state sAm.(sregs) = HART_ACTIVE tt).
     { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) sAm.(sregs) = zeros' 64).
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAm.(sregs))) ('b"1") = true).
     { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lmideleg | vm_compute; reflexivity ]. }
+        [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE
               (register_lookup (R_bitvector_64 mstatus) sAm.(sregs))) ('b"1") = false).
     { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
@@ -131,7 +131,7 @@ Section ForwardMRET.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAm = Some (None, sAm)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAm = Some (F_Base w_mret, sAm))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_mret) sAm = Some (MRET tt, sAm))
@@ -243,7 +243,7 @@ Section StepMRET.
   End CleanMRET.
 
   Lemma wp_mret (pc : mword 64) (newpriv : Privilege) (lpe : bool)
-      (b1 : bool) (npc0 mst0 mstatus0 misa0 mepc0 : mword 64)
+      (b1 : bool) (npc0 mst0 mstatus0 misa0 mepc0 mdv0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
@@ -257,6 +257,7 @@ Section StepMRET.
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     privLevel_bits_forwards
@@ -266,7 +267,7 @@ Section StepMRET.
     PC ↦ᵣ pc -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     misa ↦ᵣ misa0 -∗ mepc ↦ᵣ mepc0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -275,7 +276,7 @@ Section StepMRET.
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ newpriv -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
         (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus0 -∗
         misa ↦ᵣ misa0 -∗ mepc ↦ᵣ mepc0 -∗
         elp ↦ᵣ celpv lpe mstatus0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
@@ -284,7 +285,7 @@ Section StepMRET.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmu Hmc Hnp Hnpm Hlpe)
+    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help HS Hmu Hmc Hnp Hnpm Hlpe)
       "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -330,7 +331,7 @@ Section StepMRET.
       - exact Lpc.
       - exact Lpriv.
       - exact Lhs.
-      - exact Lmdl.
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
     iIntros "!>".

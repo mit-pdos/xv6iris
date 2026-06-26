@@ -381,6 +381,7 @@ Section StartText.
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
@@ -405,15 +406,15 @@ Section StartText.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hmd Hpmaall Hpmpf Hmisa Hb1 HmIE Help)
+    iIntros (Hmd Hpmaall Hpmpf Hmisa HmisaS Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H30 H31 Hcont".
     iDestruct (caddi30_split with "[$H30 $H31]") as "Hwin".
-    iApply (wp_caddi_gpr_4 kstart w_caddi30 rd_caddi30 imm_caddi30 m vsp misa0
+    iApply (wp_caddi_gpr_4 kstart w_caddi30 rd_caddi30 imm_caddi30 m vsp misa0 (zeros' 64)
               b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
               ltac:(vm_compute; discriminate) Hmd Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) Hmisa decode_caddi30_w Hb1 HmIE Help
+              ltac:(vm_compute; reflexivity) Hmisa HmisaS decode_caddi30_w Hb1 HmIE Help
               with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
     iNext.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
@@ -518,6 +519,7 @@ Section StartText.
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
@@ -546,15 +548,15 @@ Section StartText.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros imm_l offset ea a8 pa Hmsp Hmra Hpmaall Hpmpf Hmisa Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa.
+    intros imm_l offset ea a8 pa Hmsp Hmra Hpmaall Hpmpf Hmisa HmisaS Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hmem H31 Hcont".
     iDestruct (csdsp31_get with "H31") as "Hwin".
-    iApply (wp_csdsp kpc31 h_csdsp31 uimm_csdsp31 rs2_csdsp31 m vsp vra misa0
+    iApply (wp_csdsp kpc31 h_csdsp31 uimm_csdsp31 rs2_csdsp31 m vsp vra misa0 (zeros' 64)
               b1 vold npc0 mst0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
               ltac:(vm_compute; discriminate) Hmsp Hmra Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) Hmisa decode_csdsp31 Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa
+              ltac:(vm_compute; reflexivity) Hmisa HmisaS decode_csdsp31 Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa
               with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hmem Hwin").
     iNext.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hmem Hwin".
@@ -651,6 +653,7 @@ Section StartText.
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
@@ -679,15 +682,15 @@ Section StartText.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros imm_l offset ea a8 pa Hmsp Hms0 Hpmaall Hpmpf Hmisa Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa.
+    intros imm_l offset ea a8 pa Hmsp Hms0 Hpmaall Hpmpf Hmisa HmisaS Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hmem H32 H33 Hcont".
     iDestruct (csdsp32_split with "[$H32 $H33]") as "Hwin".
-    iApply (wp_csdsp_4 kpc32 w_csdsp32 uimm_csdsp32 rs2_csdsp32 m vsp vs0 misa0
+    iApply (wp_csdsp_4 kpc32 w_csdsp32 uimm_csdsp32 rs2_csdsp32 m vsp vs0 misa0 (zeros' 64)
               b1 vold npc0 mst0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
               ltac:(vm_compute; discriminate) Hmsp Hms0 Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) Hmisa decode_csdsp32_w Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa
+              ltac:(vm_compute; reflexivity) Hmisa HmisaS decode_csdsp32_w Hb1 HmIE Help HMPRV Hpmm Ha8 Hpa
               with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hmem Hwin").
     iNext.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hmem Hwin".
@@ -769,6 +772,7 @@ Section StartText.
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
@@ -793,15 +797,15 @@ Section StartText.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsp Hd Hpmaall Hpmpf Hmisa Hb1 HmIE Help)
+    iIntros (Hsp Hd Hpmaall Hpmpf Hmisa HmisaS Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H33 Hcont".
     iDestruct (caddi4spn33_get with "H33") as "Hwin".
     iApply (wp_caddi4spn_gpr kpc33 h_caddi4spn33 nzimm_caddi4spn33 crdc_caddi4spn33 rd_caddi4spn33
-              m vsp vd misa0 b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
+              m vsp vd misa0 (zeros' 64) b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hsp Hd Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) Hmisa decode_caddi4spn33 Hb1 HmIE Help
+              ltac:(vm_compute; reflexivity) Hmisa HmisaS decode_caddi4spn33 Hb1 HmIE Help
               with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
     iNext.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
@@ -904,17 +908,18 @@ Section StartText.
   Qed.
 
   Lemma wp_start_step34
-      (m : gmap register_bitvector_64 (mword 64)) (vd : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
     m !! gpr_of_Z (uint rd_csrr34) = Some vd ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    PC ↦ᵣ kpc34 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
+    PC ↦ᵣ kpc34 -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
@@ -923,6 +928,7 @@ Section StartText.
     kinstr_bytes (skinstr 34) -∗
     ▷ ( PC ↦ᵣ add_vec_int kpc34 4 -∗
         gpr_file (<[gpr_of_Z (uint rd_csrr34) := regval_into_reg (subrange_vec_dec mstatus0 (Z.sub xlen 1) 0)]> m) -∗
+        misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int kpc34 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -933,21 +939,21 @@ Section StartText.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hd Hpmaall Hpmpf Hb1 HmIE Help)
-      "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H34 Hcont".
+    iIntros (Hd HmisaS Hpmaall Hpmpf Hb1 HmIE Help)
+      "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H34 Hcont".
     iDestruct (csrr34_get with "H34") as "Hwin".
     iApply (wp_csrr_mstatus_gpr kpc34 w_csrr34 rs1_csrr34 rd_csrr34 m vd
-              b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
+              b1 npc0 mst0 mstatus0 misa0 (zeros' 64) mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              Hd Hpmaall Hpmpf
+              Hd HmisaS Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) decode_csrr34 Hb1 HmIE Help
-              with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
+              with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
     iNext.
-    iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
+    iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".
     iDestruct (csrr34_put with "Hwin") as "H34".
-    iApply ("Hcont" with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H34").
+    iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H34").
   Qed.
 
   (* ---- idx 35, addr 0x80000064: "lui a4,0xffffe" (C_LUI, 4-aligned).  Its
@@ -1001,6 +1007,7 @@ Section StartText.
     m !! gpr_of_Z (uint rd5_clui35) = Some vd ->
     pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -1023,15 +1030,15 @@ Section StartText.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hd Hpmaall Hpmpf Hmisa Hb1 HmIE Help)
+    iIntros (Hrd Hd Hpmaall Hpmpf Hmisa HmisaS Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H35 H36 Hcont".
     iDestruct (lui35_split with "[$H35 $H36]") as "(Hwin & Hrem)".
-    iApply (wp_clui_gpr_4 kpc35 w_clui35 rd5_clui35 imm_clui35 m vd misa0
+    iApply (wp_clui_gpr_4 kpc35 w_clui35 rd5_clui35 imm_clui35 m vd misa0 (zeros' 64)
               b1 npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Phi
               Hrd Hd Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) Hmisa decode_clui35_w Hb1 HmIE Help
+              ltac:(vm_compute; reflexivity) Hmisa HmisaS decode_clui35_w Hb1 HmIE Help
               with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin").
     iNext.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hwin".

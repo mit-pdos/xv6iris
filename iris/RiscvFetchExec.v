@@ -633,7 +633,7 @@ Section HneClosed.
   (* dispatchInterrupt leaf, via the getPendingSet keystone. *)
   Let Hdisp : exec (dispatchInterrupt Machine) s = Some (None, s) :=
     exec_dispatchInterrupt_none s
-      (exec_getPendingSet_machine_none s cES HecES Hmideleg HmIE).
+      (exec_getPendingSet_machine_none s cES HecES (or_intror Hmideleg) HmIE).
 
   (* the execute leaf at s_pc := set_reg s nextPC (pc+4). *)
   Let Hexec :

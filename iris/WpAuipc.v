@@ -78,13 +78,13 @@ Section ForwardAUIPC.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     exec riscv_step s = Some (tt, sFa).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp.
+    intros Lpc Lpriv Lhs LS LmIE Lelp.
     (* booting-config reads transfer through the minstret_increment write. *)
     assert (LpcA  : register_lookup PC sAa.(sregs) = pc).
     { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
@@ -95,9 +95,9 @@ Section ForwardAUIPC.
     assert (LhsA  : register_lookup hart_state sAa.(sregs) = HART_ACTIVE tt).
     { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) sAa.(sregs) = zeros' 64).
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAa.(sregs))) ('b"1") = true).
     { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lmideleg | vm_compute; reflexivity ]. }
+        [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE
               (register_lookup (R_bitvector_64 mstatus) sAa.(sregs))) ('b"1") = false).
     { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
@@ -110,7 +110,7 @@ Section ForwardAUIPC.
        currentlyEnabled Ext_S reduces for any state (exec_currentlyEnabled_S). *)
     assert (HdispA : exec (dispatchInterrupt Machine) sAa = Some (None, sAa)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAa _ (exec_currentlyEnabled_S sAa) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAa _ (exec_currentlyEnabled_S sAa) (or_introl LSA) LmIEA). }
     (* fetch / decode at sAa (state-preserving). *)
     assert (HfetchA : exec (fetch tt) sAa = Some (F_Base w, sAa))
       by exact Hfetch_at.
@@ -184,11 +184,12 @@ End ForwardAUIPC.
 Section StepAUIPC.
   Context `{!riscvGS Σ}.
   Lemma wp_step_auipc (pc : mword 64) (w_a : mword 32) (imm_a : mword 20)
-      (i_a : mword 5) (b1 : bool) (sp0a npc0a mst0a mstatus0a : mword 64)
+      (i_a : mword 5) (b1 : bool) (sp0a npc0a mst0a mstatus0a misa0 mdv0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (mi0a : bool) (elp0a : mword 1) E (Φ : mval -> iProp Σ) :
     uint i_a = 2 ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (* the pure fetch side-conditions of [fetch_from_pts_minstret] *)
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
@@ -204,27 +205,28 @@ Section StepAUIPC.
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0a) ('b"1") = false ->
     eq_vec elp0a (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ nextPC ↦ᵣ npc0a -∗
+    PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0a -∗
     (R_bool minstret_increment) ↦ᵣ mi0a -∗ minstret ↦ᵣ mst0a -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
     elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_a j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (add_vec pc (auipc_off imm_a)) -∗
+        misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0a 1 else mst0a) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
         elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_a j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (Hia Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hda Hb1 HmIE Help)
-      "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (Hia HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hda Hb1 HmIE Help)
+      "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
@@ -236,6 +238,7 @@ Section StepAUIPC.
     iDestruct (reg_valid with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
     assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     (* derive the state-specific fetch fact from the owned instruction bytes *)
@@ -248,7 +251,8 @@ Section StepAUIPC.
     iExists (sFca s pc imm_a b1 mst0a). iSplitR.
     { iPureIntro.
       rewrite <- (sFa_eq s w_a pc imm_a b1 Hfetch_at Hsi_s mst0a Lmst Lpc).
-      apply (forward_exec_auipc s w_a pc imm_a i_a b1 Hia Hfetch_at Hda Hsi_s Lpc Lpriv Lhs Lmdl).
+      apply (forward_exec_auipc s w_a pc imm_a i_a b1 Hia Hfetch_at Hda Hsi_s Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
     iIntros "!>".
@@ -260,9 +264,9 @@ Section StepAUIPC.
     unfold sFca, base_upd_a. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
     - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 
   (* ---------------------------------------------------------------------- *)

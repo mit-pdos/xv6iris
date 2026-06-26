@@ -66,21 +66,21 @@ Section ForwardCliGpr.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFl).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa.
+    intros Lpc Lpriv Lhs LS LmIE Lelp Lmisa.
     assert (LpcA  : register_lookup PC sAl.(sregs) = pc).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege sAl.(sregs) = Machine).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
     assert (LhsA  : register_lookup hart_state sAl.(sregs) = HART_ACTIVE tt).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) sAl.(sregs) = zeros' 64).
-    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmideleg | vm_compute; reflexivity ]. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAl.(sregs))) ('b"1") = true).
+    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) sAl.(sregs))) ('b"1") = false).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LmIE | vm_compute; reflexivity ]. }
     assert (LelpA : eq_vec (register_lookup elp sAl.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false).
@@ -89,7 +89,7 @@ Section ForwardCliGpr.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAl = Some (None, sAl)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAl = Some (F_RVC w16, sAl)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) sAl = Some (C_LI (imm6, Regidx rd), sAl))
       by (apply Hcdec; exact LmisaA).
@@ -158,7 +158,7 @@ End CleanCliGpr.
 Section WpCliGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cli_gpr (pc : mword 64) (w16 : mword 16) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -173,6 +173,7 @@ Section WpCliGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_LI (imm6, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -182,7 +183,7 @@ Section WpCliGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -191,14 +192,14 @@ Section WpCliGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -224,7 +225,8 @@ Section WpCliGpr.
     { iPureIntro.
       rewrite <- (sFl_eq s pc b1 rd imm6 mst0 Lpc Lmst).
       apply (forward_exec_cli_gpr s pc b1 w16 rd imm6 Hfetch_at Hsi_s Hrd Hdec
-               Lpc Lpriv Lhs Lmdl).
+               Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -285,21 +287,21 @@ Section ForwardCaddiGpr.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFa).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa.
+    intros Lpc Lpriv Lhs LS LmIE Lelp Lmisa.
     assert (LpcA  : register_lookup PC (sAl s b).(sregs) = pc).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege (sAl s b).(sregs) = Machine).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
     assert (LhsA  : register_lookup hart_state (sAl s b).(sregs) = HART_ACTIVE tt).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) (sAl s b).(sregs) = zeros' 64).
-    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmideleg | vm_compute; reflexivity ]. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa (sAl s b).(sregs))) ('b"1") = true).
+    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) (sAl s b).(sregs))) ('b"1") = false).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LmIE | vm_compute; reflexivity ]. }
     assert (LelpA : eq_vec (register_lookup elp (sAl s b).(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false).
@@ -308,7 +310,7 @@ Section ForwardCaddiGpr.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (C_ADDI (imm6, Regidx rd), (sAl s b)))
       by (apply Hcdec; exact LmisaA).
@@ -372,7 +374,7 @@ End CleanCaddiGpr.
 Section WpCaddiGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_caddi_gpr (pc : mword 64) (w16 : mword 16) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -387,6 +389,7 @@ Section WpCaddiGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_ADDI (imm6, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -396,7 +399,7 @@ Section WpCaddiGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -406,14 +409,14 @@ Section WpCaddiGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -443,7 +446,8 @@ Section WpCaddiGpr.
     { iPureIntro.
       rewrite <- (sFa_eq s pc b1 rd imm6 mst0 Lpc Lmst).
       apply (forward_exec_caddi_gpr s pc b1 w16 rd imm6 Hfetch_at Hsi_s Hrd Hdec
-               Lpc Lpriv Lhs Lmdl).
+               Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -498,21 +502,21 @@ Section ForwardRvcGprWrite.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFg).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa.
+    intros Lpc Lpriv Lhs LS LmIE Lelp Lmisa.
     assert (LpcA  : register_lookup PC (sAl s b).(sregs) = pc).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege (sAl s b).(sregs) = Machine).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
     assert (LhsA  : register_lookup hart_state (sAl s b).(sregs) = HART_ACTIVE tt).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) (sAl s b).(sregs) = zeros' 64).
-    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmideleg | vm_compute; reflexivity ]. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa (sAl s b).(sregs))) ('b"1") = true).
+    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) (sAl s b).(sregs))) ('b"1") = false).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LmIE | vm_compute; reflexivity ]. }
     assert (LelpA : eq_vec (register_lookup elp (sAl s b).(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false).
@@ -521,7 +525,7 @@ Section ForwardRvcGprWrite.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (cinstr, (sAl s b)))
       by (apply Hcdec; exact LmisaA).
@@ -578,7 +582,7 @@ End CleanRvcGprWrite.
 Section WpCluiGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_clui_gpr (pc : mword 64) (w16 : mword 16) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -593,6 +597,7 @@ Section WpCluiGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_LUI (imm6, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -602,7 +607,7 @@ Section WpCluiGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -611,14 +616,14 @@ Section WpCluiGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -653,7 +658,8 @@ Section WpCluiGpr.
       rewrite <- (sFg_eq s pc b1 rd (luival (sign_extend' 20 imm6)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_LUI (imm6, Regidx rd))
                (UTYPE (sign_extend' 20 imm6, Regidx rd, LUI)) rd (luival (sign_extend' 20 imm6))
-               Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -698,7 +704,7 @@ Qed.
 Section WpCsrliGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_csrli_gpr (pc : mword 64) (w16 : mword 16) (shamt : mword 6) (crsd : cregidx) (rsd : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vsd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -714,6 +720,7 @@ Section WpCsrliGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_SRLI (shamt, crsd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -723,7 +730,7 @@ Section WpCsrliGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -732,14 +739,14 @@ Section WpCsrliGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hcrsd Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hcrsd Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -777,7 +784,8 @@ Section WpCsrliGpr.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_srli_val rsd shamt (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_SRLI (shamt, crsd))
                (SHIFTIOP (shamt, creg2reg_idx crsd, creg2reg_idx crsd, SRLI)) rsd
-               (gpr_srli_val rsd shamt (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_srli_val rsd shamt (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -822,7 +830,7 @@ Qed.
 Section WpCmvGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cmv_gpr (pc : mword 64) (w16 : mword 16) (rd rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vd vs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd vs2 misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -838,6 +846,7 @@ Section WpCmvGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_MV (Regidx rd, Regidx rs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -847,7 +856,7 @@ Section WpCmvGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -856,14 +865,14 @@ Section WpCmvGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hrs2 Hms2 Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hrs2 Hms2 Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -904,7 +913,8 @@ Section WpCmvGpr.
       rewrite <- (sFg_eq s pc b1 rd (gpr_rd_val rs2 cli_rs1 (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_MV (Regidx rd, Regidx rs2))
                (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) rd
-               (gpr_rd_val rs2 cli_rs1 (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_rd_val rs2 cli_rs1 (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -955,7 +965,7 @@ Proof. unfold execute. cbn match. unfold execute_C_ADDI4SPN, caddi4spn_imm. cbn 
 Section WpCaddi16spGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_caddi16sp_gpr (pc : mword 64) (w16 : mword 16) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vsp misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsp misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -969,6 +979,7 @@ Section WpCaddi16spGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_ADDI16SP imm6, s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -978,7 +989,7 @@ Section WpCaddi16spGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -988,14 +999,14 @@ Section WpCaddi16spGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hmsp Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hmsp Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1035,7 +1046,8 @@ Section WpCaddi16spGpr.
       rewrite <- (sFg_eq s pc b1 csp_rs1 (gpr_addi_val csp_rs1 (caddi16sp_imm imm6) (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_ADDI16SP imm6)
                (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) csp_rs1
-               (gpr_addi_val csp_rs1 (caddi16sp_imm imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_addi_val csp_rs1 (caddi16sp_imm imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -1060,7 +1072,7 @@ End WpCaddi16spGpr.
 Section WpCaddi4spnGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_caddi4spn_gpr (pc : mword 64) (w16 : mword 16) (nzimm : mword 8) (crdc : cregidx) (rd : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vsp vd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsp vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1077,6 +1089,7 @@ Section WpCaddi4spnGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_ADDI4SPN (crdc, nzimm), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1086,7 +1099,7 @@ Section WpCaddi4spnGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -1096,14 +1109,14 @@ Section WpCaddi4spnGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hcrdc Hrd Hmsp Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hcrdc Hrd Hmsp Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1143,7 +1156,8 @@ Section WpCaddi4spnGpr.
       rewrite <- (sFg_eq s pc b1 rd (gpr_addi_val csp_rs1 (caddi4spn_imm nzimm) (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_ADDI4SPN (crdc, nzimm))
                (ITYPE (caddi4spn_imm nzimm, sp, creg2reg_idx crdc, ADDI)) rd
-               (gpr_addi_val csp_rs1 (caddi4spn_imm nzimm) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_addi_val csp_rs1 (caddi4spn_imm nzimm) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -1189,7 +1203,7 @@ Qed.
 Section WpCslliGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cslli_gpr (pc : mword 64) (w16 : mword 16) (shamt : mword 6) (rsd : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vsd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1204,6 +1218,7 @@ Section WpCslliGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_SLLI (shamt, Regidx rsd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1213,7 +1228,7 @@ Section WpCslliGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -1222,14 +1237,14 @@ Section WpCslliGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1267,7 +1282,8 @@ Section WpCslliGpr.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_slli_val rsd shamt (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_SLLI (shamt, Regidx rsd))
                (SHIFTIOP (shamt, Regidx rsd, Regidx rsd, SLLI)) rsd
-               (gpr_slli_val rsd shamt (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_slli_val rsd shamt (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -1307,7 +1323,7 @@ Qed.
 Section WpCaddGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cadd_gpr (pc : mword 64) (w16 : mword 16) (rsd rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1323,6 +1339,7 @@ Section WpCaddGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_ADD (Regidx rsd, Regidx rs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1332,7 +1349,7 @@ Section WpCaddGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -1341,14 +1358,14 @@ Section WpCaddGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1391,7 +1408,8 @@ Section WpCaddGpr.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_rd_val rs2 rsd (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_ADD (Regidx rsd, Regidx rs2))
                (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, ADD)) rsd
-               (gpr_rd_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_rd_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -1434,7 +1452,7 @@ Qed.
 Section WpCorGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cor_gpr (pc : mword 64) (w16 : mword 16) (crsd crs2 : cregidx) (rsd rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1451,6 +1469,7 @@ Section WpCorGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_OR (crsd, crs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1460,7 +1479,7 @@ Section WpCorGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -1469,14 +1488,14 @@ Section WpCorGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hcrsd Hcrs2 Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hcrsd Hcrs2 Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1519,7 +1538,8 @@ Section WpCorGpr.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_or_val rs2 rsd (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_OR (crsd, crs2))
                (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, OR)) rsd
-               (gpr_or_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_or_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -1554,7 +1574,7 @@ Section WpCldGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cld_gpr (pc : mword 64) (w16 : mword 16) (uimm : mword 5) (crsc crdc : cregidx)
       (rs1 rd : mword 5) (m : gmap register_bitvector_64 (mword 64))
-      (vrs1 vd misa0 : mword 64) (b1 : bool) (v : bv 64)
+      (vrs1 vd misa0 mdv0 : mword 64) (b1 : bool) (v : bv 64)
       (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
@@ -1578,6 +1598,7 @@ Section WpCldGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_LD (uimm, crsc, crdc), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1591,7 +1612,7 @@ Section WpCldGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
@@ -1601,7 +1622,7 @@ Section WpCldGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
@@ -1610,7 +1631,7 @@ Section WpCldGpr.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros imm_l offset ea a8 pa data2 Hcrsc Hcrdc Hrs1 Hrd Hmrs1 Hmrd Hpmaall Hpmpf Halignf Hbit0f Hbit1f
-      Hvalignf HisRVC Hmisa Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
+      Hvalignf HisRVC Hmisa HS Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
@@ -1689,7 +1710,8 @@ Section WpCldGpr.
       rewrite <- (sFg_eq s pc b1 rd (extend_value false data2) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_LD (uimm, crsc, crdc))
                (LOAD (imm_l, Regidx rs1, Regidx rd, false, 8)) rd
-               (extend_value false data2) Hfetch_at Hsi_s Hdl Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (extend_value false data2) Hfetch_at Hsi_s Hdl Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -1742,7 +1764,7 @@ Section ForwardCretJalr.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -1750,15 +1772,15 @@ Section ForwardCretJalr.
     bit_to_bool (access_vec_dec cret_tgt 1) = false ->
     exec riscv_step s = Some (tt, sFcr).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa Halign Hbit1.
+    intros Lpc Lpriv Lhs LS LmIE Lelp Lmisa Halign Hbit1.
     assert (LpcA  : register_lookup PC (sAl s b).(sregs) = pc).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege (sAl s b).(sregs) = Machine).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
     assert (LhsA  : register_lookup hart_state (sAl s b).(sregs) = HART_ACTIVE tt).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) (sAl s b).(sregs) = zeros' 64).
-    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmideleg | vm_compute; reflexivity ]. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa (sAl s b).(sregs))) ('b"1") = true).
+    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) (sAl s b).(sregs))) ('b"1") = false).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LmIE | vm_compute; reflexivity ]. }
     assert (LelpA : eq_vec (register_lookup elp (sAl s b).(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false).
@@ -1767,7 +1789,7 @@ Section ForwardCretJalr.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (C_JR (Regidx ra), (sAl s b)))
       by (apply Hcdec; exact LmisaA).
@@ -1829,7 +1851,7 @@ Proof. intro L. unfold cret_tgt. rewrite L. reflexivity. Qed.
 Section WpCretGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cret (pc : mword 64) (w16 : mword 16) (ra : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vra misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vra misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 mseccfg0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1846,6 +1868,7 @@ Section WpCretGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_JR (Regidx ra), s0)) ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
@@ -1857,7 +1880,7 @@ Section WpCretGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     mseccfg ↦ᵣ mseccfg0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -1866,7 +1889,7 @@ Section WpCretGpr.
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         mseccfg ↦ᵣ mseccfg0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -1874,7 +1897,7 @@ Section WpCretGpr.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (tgt Hra Hmra Hmlpe Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hal0 Hal1 Hb1 HmIE Help)
+    iIntros (tgt Hra Hmra Hmlpe Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hal0 Hal1 Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1906,7 +1929,8 @@ Section WpCretGpr.
     iExists (sFccr s pc b1 ra mst0). iSplitR.
     { iPureIntro.
       rewrite <- (sFcr_eq s pc b1 ra mst0 Lmst).
-      apply (forward_exec_cret s pc b1 w16 ra Hfetch_at Hsi_s Hra Hdec Hmlpe_s Lpc Lpriv Lhs Lmdl).
+      apply (forward_exec_cret s pc b1 w16 ra Hfetch_at Hsi_s Hra Hdec Hmlpe_s Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa.
@@ -1956,7 +1980,7 @@ Section ForwardRvcStep.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -1964,15 +1988,15 @@ Section ForwardRvcStep.
     = Some (tt, if b then set_reg (set_reg sX PC (add_vec_int pc 2)) minstret (add_vec_int mst0 1)
                      else set_reg sX PC (add_vec_int pc 2)).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa.
+    intros Lpc Lpriv Lhs LS LmIE Lelp Lmisa.
     assert (LpcA  : register_lookup PC (sAl s b).(sregs) = pc).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege (sAl s b).(sregs) = Machine).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
     assert (LhsA  : register_lookup hart_state (sAl s b).(sregs) = HART_ACTIVE tt).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) (sAl s b).(sregs) = zeros' 64).
-    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmideleg | vm_compute; reflexivity ]. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa (sAl s b).(sregs))) ('b"1") = true).
+    { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) (sAl s b).(sregs))) ('b"1") = false).
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LmIE | vm_compute; reflexivity ]. }
     assert (LelpA : eq_vec (register_lookup elp (sAl s b).(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false).
@@ -1981,7 +2005,7 @@ Section ForwardRvcStep.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (cinstr, (sAl s b)))
       by (apply Hcdec; exact LmisaA).
@@ -2009,7 +2033,7 @@ Proof. unfold execute. cbn match. unfold execute_C_SDSP. cbn zeta. apply exec_re
 Section WpCsdspGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_csdsp (pc : mword 64) (w16 : mword 16) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vsp vrs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsp vrs2 misa0 mdv0 : mword 64)
       (b1 : bool) (vold : bv 64) (npc0 mst0 mstatus0 mseccfg0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2030,6 +2054,7 @@ Section WpCsdspGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_SDSP (uimm, Regidx rs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2043,7 +2068,7 @@ Section WpCsdspGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
@@ -2052,7 +2077,7 @@ Section WpCsdspGpr.
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vrs2 j) -∗
@@ -2061,7 +2086,7 @@ Section WpCsdspGpr.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros imm_l offset ea a8 pa Hrs2 Hmsp Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f
-      Hvalignf HisRVC Hmisa Hds Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
+      Hvalignf HisRVC Hmisa HS Hds Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & _ & Hwrite).
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
@@ -2144,7 +2169,8 @@ Section WpCsdspGpr.
     { iPureIntro.
       apply (forward_exec_rvc_step s pc b1 w16 (C_SDSP (uimm, Regidx rs2))
                (STORE (imm_l, Regidx rs2, Regidx csp_rs1, 8)) sX mst0
-               Hfetch_at Hsi_s Hds Hcexec1 Hcexec2 HhartX HmiX Hnpc_sX Hmst_sX Lpc Lpriv Lhs Lmdl).
+               Hfetch_at Hsi_s Hds Hcexec1 Hcexec2 HhartX HmiX Hnpc_sX Hmst_sX Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2170,7 +2196,7 @@ End WpCsdspGpr.
 Section WpCliGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_cli_gpr_4 (pc : mword 64) (w : mword 32) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2185,6 +2211,7 @@ Section WpCliGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_LI (imm6, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2194,7 +2221,7 @@ Section WpCliGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -2203,14 +2230,14 @@ Section WpCliGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2236,7 +2263,8 @@ Section WpCliGpr4.
     { iPureIntro.
       rewrite <- (sFl_eq s pc b1 rd imm6 mst0 Lpc Lmst).
       apply (forward_exec_cli_gpr s pc b1 (subrange_vec_dec w 15 0) rd imm6 Hfetch_at Hsi_s Hrd Hdec
-               Lpc Lpriv Lhs Lmdl).
+               Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2261,7 +2289,7 @@ End WpCliGpr4.
 Section WpCaddiGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_caddi_gpr_4 (pc : mword 64) (w : mword 32) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2276,6 +2304,7 @@ Section WpCaddiGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_ADDI (imm6, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2285,7 +2314,7 @@ Section WpCaddiGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -2295,14 +2324,14 @@ Section WpCaddiGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2332,7 +2361,8 @@ Section WpCaddiGpr4.
     { iPureIntro.
       rewrite <- (sFa_eq s pc b1 rd imm6 mst0 Lpc Lmst).
       apply (forward_exec_caddi_gpr s pc b1 (subrange_vec_dec w 15 0) rd imm6 Hfetch_at Hsi_s Hrd Hdec
-               Lpc Lpriv Lhs Lmdl).
+               Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2357,7 +2387,7 @@ End WpCaddiGpr4.
 Section WpCluiGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_clui_gpr_4 (pc : mword 64) (w : mword 32) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2372,6 +2402,7 @@ Section WpCluiGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_LUI (imm6, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2381,7 +2412,7 @@ Section WpCluiGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -2390,14 +2421,14 @@ Section WpCluiGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2432,7 +2463,8 @@ Section WpCluiGpr4.
       rewrite <- (sFg_eq s pc b1 rd (luival (sign_extend' 20 imm6)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 (subrange_vec_dec w 15 0) (C_LUI (imm6, Regidx rd))
                (UTYPE (sign_extend' 20 imm6, Regidx rd, LUI)) rd (luival (sign_extend' 20 imm6))
-               Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2455,7 +2487,7 @@ End WpCluiGpr4.
 Section WpCaddGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_cadd_gpr_4 (pc : mword 64) (w : mword 32) (rsd rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2471,6 +2503,7 @@ Section WpCaddGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_ADD (Regidx rsd, Regidx rs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2480,7 +2513,7 @@ Section WpCaddGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -2489,14 +2522,14 @@ Section WpCaddGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2539,7 +2572,8 @@ Section WpCaddGpr4.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_rd_val rs2 rsd (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 (subrange_vec_dec w 15 0) (C_ADD (Regidx rsd, Regidx rs2))
                (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, ADD)) rsd
-               (gpr_rd_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_rd_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2567,7 +2601,7 @@ End WpCaddGpr4.
 Section WpCsrliGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_csrli_gpr_4 (pc : mword 64) (w : mword 32) (shamt : mword 6) (crsd : cregidx) (rsd : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vsd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2583,6 +2617,7 @@ Section WpCsrliGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_SRLI (shamt, crsd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2592,7 +2627,7 @@ Section WpCsrliGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -2601,14 +2636,14 @@ Section WpCsrliGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hcrsd Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hcrsd Hrd Hmd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2646,7 +2681,8 @@ Section WpCsrliGpr4.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_srli_val rsd shamt (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 (subrange_vec_dec w 15 0) (C_SRLI (shamt, crsd))
                (SHIFTIOP (shamt, creg2reg_idx crsd, creg2reg_idx crsd, SRLI)) rsd
-               (gpr_srli_val rsd shamt (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_srli_val rsd shamt (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2670,7 +2706,7 @@ End WpCsrliGpr4.
 Section WpCaddi16spGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_caddi16sp_gpr_4 (pc : mword 64) (w : mword 32) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vsp misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsp misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2684,6 +2720,7 @@ Section WpCaddi16spGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_ADDI16SP imm6, s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2693,7 +2730,7 @@ Section WpCaddi16spGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -2703,14 +2740,14 @@ Section WpCaddi16spGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hmsp Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hmsp Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2750,7 +2787,8 @@ Section WpCaddi16spGpr4.
       rewrite <- (sFg_eq s pc b1 csp_rs1 (gpr_addi_val csp_rs1 (caddi16sp_imm imm6) (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 (subrange_vec_dec w 15 0) (C_ADDI16SP imm6)
                (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) csp_rs1
-               (gpr_addi_val csp_rs1 (caddi16sp_imm imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_addi_val csp_rs1 (caddi16sp_imm imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2774,7 +2812,7 @@ End WpCaddi16spGpr4.
 Section WpCorGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_cor_gpr_4 (pc : mword 64) (w : mword 32) (crsd crs2 : cregidx) (rsd rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2791,6 +2829,7 @@ Section WpCorGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_OR (crsd, crs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2800,7 +2839,7 @@ Section WpCorGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -2809,14 +2848,14 @@ Section WpCorGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hcrsd Hcrs2 Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hcrsd Hcrs2 Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2859,7 +2898,8 @@ Section WpCorGpr4.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_or_val rs2 rsd (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 (subrange_vec_dec w 15 0) (C_OR (crsd, crs2))
                (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, OR)) rsd
-               (gpr_or_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_or_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -2883,7 +2923,7 @@ End WpCorGpr4.
 Section WpCsdspGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_csdsp_4 (pc : mword 64) (w : mword 32) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vsp vrs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vsp vrs2 misa0 mdv0 : mword 64)
       (b1 : bool) (vold : bv 64) (npc0 mst0 mstatus0 mseccfg0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -2904,6 +2944,7 @@ Section WpCsdspGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_SDSP (uimm, Regidx rs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -2917,7 +2958,7 @@ Section WpCsdspGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
@@ -2926,7 +2967,7 @@ Section WpCsdspGpr4.
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vrs2 j) -∗
@@ -2935,7 +2976,7 @@ Section WpCsdspGpr4.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros imm_l offset ea a8 pa Hrs2 Hmsp Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f
-      Hvalignf HisRVC Hmisa Hds Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
+      Hvalignf HisRVC Hmisa HS Hds Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & _ & Hwrite).
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
@@ -3018,7 +3059,8 @@ Section WpCsdspGpr4.
     { iPureIntro.
       apply (forward_exec_rvc_step s pc b1 (subrange_vec_dec w 15 0) (C_SDSP (uimm, Regidx rs2))
                (STORE (imm_l, Regidx rs2, Regidx csp_rs1, 8)) sX mst0
-               Hfetch_at Hsi_s Hds Hcexec1 Hcexec2 HhartX HmiX Hnpc_sX Hmst_sX Lpc Lpriv Lhs Lmdl).
+               Hfetch_at Hsi_s Hds Hcexec1 Hcexec2 HhartX HmiX Hnpc_sX Hmst_sX Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -3059,7 +3101,7 @@ Qed.
 Section WpCandGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cand_gpr (pc : mword 64) (w16 : mword 16) (crsd crs2 : cregidx) (rsd rs2 : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrsd vrs2 misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -3076,6 +3118,7 @@ Section WpCandGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_AND (crsd, crs2), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -3085,7 +3128,7 @@ Section WpCandGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -3094,14 +3137,14 @@ Section WpCandGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hcrsd Hcrs2 Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hcrsd Hcrs2 Hrd Hrs2 Hmrd Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -3144,7 +3187,8 @@ Section WpCandGpr.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_and_val rs2 rsd (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_AND (crsd, crs2))
                (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, AND)) rsd
-               (gpr_and_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_and_val rs2 rsd (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -3179,7 +3223,7 @@ Section WpCldspGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_cldsp_gpr (pc : mword 64) (w16 : mword 16) (uimm : mword 6)
       (rd : mword 5) (m : gmap register_bitvector_64 (mword 64))
-      (vrs1 vd misa0 : mword 64) (b1 : bool) (v : bv 64)
+      (vrs1 vd misa0 mdv0 : mword 64) (b1 : bool) (v : bv 64)
       (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
@@ -3202,6 +3246,7 @@ Section WpCldspGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_LDSP (uimm, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -3215,7 +3260,7 @@ Section WpCldspGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
@@ -3225,7 +3270,7 @@ Section WpCldspGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
@@ -3234,7 +3279,7 @@ Section WpCldspGpr.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros imm_l offset ea a8 pa data2 Hrs1 Hrd Hmrs1 Hmrd Hpmaall Hpmpf Halignf Hbit0f Hbit1f
-      Hvalignf HisRVC Hmisa Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
+      Hvalignf HisRVC Hmisa HS Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
@@ -3313,7 +3358,8 @@ Section WpCldspGpr.
       rewrite <- (sFg_eq s pc b1 rd (extend_value false data2) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_LDSP (uimm, Regidx rd))
                (LOAD (imm_l, Regidx csp_rs1, Regidx rd, false, 8)) rd
-               (extend_value false data2) Hfetch_at Hsi_s Hdl Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (extend_value false data2) Hfetch_at Hsi_s Hdl Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -3338,7 +3384,7 @@ Section WpCldspGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_cldsp_gpr_4 (pc : mword 64) (w : mword 32) (uimm : mword 6)
       (rd : mword 5) (m : gmap register_bitvector_64 (mword 64))
-      (vrs1 vd misa0 : mword 64) (b1 : bool) (v : bv 64)
+      (vrs1 vd misa0 mdv0 : mword 64) (b1 : bool) (v : bv 64)
       (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
@@ -3361,6 +3407,7 @@ Section WpCldspGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_LDSP (uimm, Regidx rd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -3374,7 +3421,7 @@ Section WpCldspGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
@@ -3384,7 +3431,7 @@ Section WpCldspGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
@@ -3393,7 +3440,7 @@ Section WpCldspGpr4.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros imm_l offset ea a8 pa data2 Hrs1 Hrd Hmrs1 Hmrd Hpmaall Hpmpf Halignf Hbit0f Hbit1f
-      Hvalignf HisRVC Hmisa Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
+      Hvalignf HisRVC Hmisa HS Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
@@ -3472,7 +3519,8 @@ Section WpCldspGpr4.
       rewrite <- (sFg_eq s pc b1 rd (extend_value false data2) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 (subrange_vec_dec w 15 0) (C_LDSP (uimm, Regidx rd))
                (LOAD (imm_l, Regidx csp_rs1, Regidx rd, false, 8)) rd
-               (extend_value false data2) Hfetch_at Hsi_s Hdl Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (extend_value false data2) Hfetch_at Hsi_s Hdl Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -3519,7 +3567,7 @@ Qed.
 Section WpCaddiwGpr.
   Context `{!riscvGS Σ}.
   Lemma wp_caddiw_gpr (pc : mword 64) (w16 : mword 16) (rsd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vrsd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrsd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -3534,6 +3582,7 @@ Section WpCaddiwGpr.
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     isRVC w16 = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w16) s0 = Some (C_ADDIW (imm6, Regidx rsd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -3543,7 +3592,7 @@ Section WpCaddiwGpr.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
@@ -3552,14 +3601,14 @@ Section WpCaddiwGpr.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmrd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmrd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -3597,7 +3646,8 @@ Section WpCaddiwGpr.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_addiw_val rsd (sign_extend' 12 imm6) (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 w16 (C_ADDIW (imm6, Regidx rsd))
                (ADDIW (sign_extend' 12 imm6, Regidx rsd, Regidx rsd)) rsd
-               (gpr_addiw_val rsd (sign_extend' 12 imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_addiw_val rsd (sign_extend' 12 imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }
@@ -3622,7 +3672,7 @@ End WpCaddiwGpr.
 Section WpCaddiwGpr4.
   Context `{!riscvGS Σ}.
   Lemma wp_caddiw_gpr_4 (pc : mword 64) (w : mword 32) (rsd : mword 5) (imm6 : mword 6)
-      (m : gmap register_bitvector_64 (mword 64)) (vrsd misa0 : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrsd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -3637,6 +3687,7 @@ Section WpCaddiwGpr4.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_ADDIW (imm6, Regidx rsd), s0)) ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -3646,7 +3697,7 @@ Section WpCaddiwGpr4.
     PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -3655,14 +3706,14 @@ Section WpCaddiwGpr4.
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmrd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa Hdec Hb1 HmIE Help)
+    iIntros (Hrd Hmrd Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HisRVC Hmisa HS Hdec Hb1 HmIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -3700,7 +3751,8 @@ Section WpCaddiwGpr4.
       rewrite <- (sFg_eq s pc b1 rsd (gpr_addiw_val rsd (sign_extend' 12 imm6) (s_pcl s pc b1)) mst0 Lpc Lmst).
       apply (forward_exec_rvc_gpr_write s pc b1 (subrange_vec_dec w 15 0) (C_ADDIW (imm6, Regidx rsd))
                (ADDIW (sign_extend' 12 imm6, Regidx rsd, Regidx rsd)) rsd
-               (gpr_addiw_val rsd (sign_extend' 12 imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs Lmdl).
+               (gpr_addiw_val rsd (sign_extend' 12 imm6) (s_pcl s pc b1)) Hfetch_at Hsi_s Hdec Hcexec1 Hcexec2 Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa. }

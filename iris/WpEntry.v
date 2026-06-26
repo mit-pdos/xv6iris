@@ -454,7 +454,7 @@ Section ForwardLUI.
     { unfold sAlu, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAlu = Some (None, sAlu)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAlu _ (exec_currentlyEnabled_S sAlu) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAlu _ (exec_currentlyEnabled_S sAlu) (or_intror LmidA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAlu = Some (F_RVC h_lui, sAlu)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed h_lui) sAlu = Some (C_LUI (imm_clui, rd_clui), sAlu))
       by (apply decode_C_lui; exact LmisaA).
@@ -579,7 +579,7 @@ Section ForwardADD.
     { unfold sAad, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAad = Some (None, sAad)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAad _ (exec_currentlyEnabled_S sAad) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAad _ (exec_currentlyEnabled_S sAad) (or_intror LmidA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAad = Some (F_RVC h_add, sAad)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed h_add) sAad = Some (C_ADD (rsd_cadd, rs2_cadd), sAad))
       by (apply decode_C_ADD; exact LmisaA).
@@ -782,7 +782,7 @@ Section ForwardJAL.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAj = Some (None, sAj)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAj _ (exec_currentlyEnabled_S sAj) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAj _ (exec_currentlyEnabled_S sAj) (or_intror LmidA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAj = Some (F_Base w_jal, sAj))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_jal) sAj = Some (JAL (imm_jal, Regidx i_jal), sAj))
@@ -1008,7 +1008,7 @@ Section ForwardMUL.
         [ exact LmisaM | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAm = Some (None, sAm)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) (or_intror LmidA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAm = Some (F_Base w_mul, sAm))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_mul) sAm
@@ -1410,7 +1410,7 @@ Section ForwardADDI.
     { unfold sAai, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAai = Some (None, sAai)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAai _ (exec_currentlyEnabled_S sAai) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAai _ (exec_currentlyEnabled_S sAai) (or_intror LmidA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAai = Some (F_RVC h_addi, sAai)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed h_addi) sAai = Some (C_ADDI (imm_caddi, rsd_caddi), sAai))
       by (apply decode_C_ADDI; exact LmisaA).
@@ -2128,7 +2128,7 @@ Section ForwardCSRR.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAc = Some (None, sAc)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAc _ (exec_currentlyEnabled_S sAc) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAc _ (exec_currentlyEnabled_S sAc) (or_intror LmidA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAc = Some (F_Base w_csrr, sAc))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_csrr) sAc

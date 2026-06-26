@@ -81,7 +81,7 @@ Section ForwardAuipcGpr.
     { unfold sAg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAg = Some (None, sAg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAg _ (exec_currentlyEnabled_S sAg) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAg _ (exec_currentlyEnabled_S sAg) (or_intror LmidA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAg = Some (F_Base w, sAg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAg = Some (UTYPE (imm, Regidx rd, AUIPC), sAg)) by (apply Hdec; exact LprivA).
     assert (HexecG : exec (execute (UTYPE (imm, Regidx rd, AUIPC))) s_pcg' = Some (RETIRE_SUCCESS, sXg)).
@@ -959,56 +959,67 @@ Section WpStartChain.
   Definition scaddiw_imm (w : mword 16) : mword 6 :=
     concat_vec (subrange_vec_dec w 12 12) (subrange_vec_dec w 6 2).
 
-  (* C_LUI concrete decode: body = and_boolM(neq rd sp)(and_boolM(neq imm 0)(cE Zca)). *)
-  Lemma decode_clui_c (w : mword 16) s :
-    eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed w) s = Some (C_LUI (sclui_imm w, Regidx (sreg117 w)), s).
+  Lemma decode_s35 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed sw35) s = Some (C_LUI (sclui_imm sw35, Regidx (sreg117 sw35)), s).
   Proof.
-    intro HmisaC. unfold sclui_imm, sreg117.
-    reg_step Hr w 11 7 s.
-    open_rvc s HmisaC.
+    intro HmisaC. unfold sclui_imm, sreg117. reg_step Hr sw35 11 7 s. open_rvc s HmisaC.
     rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _)
-                            (currentlyEnabled Ext_Zca))) s = Some (true, s))).
+    rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca))) s = Some (true, s))).
+    2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
+        apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
+        apply exec_currentlyEnabled_Zca; exact HmisaC. }
+    cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
+  Lemma decode_s38 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed sw38) s = Some (C_LUI (sclui_imm sw38, Regidx (sreg117 sw38)), s).
+  Proof.
+    intro HmisaC. unfold sclui_imm, sreg117. reg_step Hr sw38 11 7 s. open_rvc s HmisaC.
+    rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca))) s = Some (true, s))).
+    2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
+        apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
+        apply exec_currentlyEnabled_Zca; exact HmisaC. }
+    cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
+  Lemma decode_s47 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed sw47) s = Some (C_LUI (sclui_imm sw47, Regidx (sreg117 sw47)), s).
+  Proof.
+    intro HmisaC. unfold sclui_imm, sreg117. reg_step Hr sw47 11 7 s. open_rvc s HmisaC.
+    rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca))) s = Some (true, s))).
     2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
         apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
         apply exec_currentlyEnabled_Zca; exact HmisaC. }
     cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
   Qed.
 
-  Lemma decode_s35 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed sw35) s = Some (C_LUI (sclui_imm sw35, Regidx (sreg117 sw35)), s).
-  Proof. apply decode_clui_c. Qed.
-  Lemma decode_s38 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed sw38) s = Some (C_LUI (sclui_imm sw38, Regidx (sreg117 sw38)), s).
-  Proof. apply decode_clui_c. Qed.
-  Lemma decode_s47 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed sw47) s = Some (C_LUI (sclui_imm sw47, Regidx (sreg117 sw47)), s).
-  Proof. apply decode_clui_c. Qed.
-
-  (* C_LI concrete: body = currentlyEnabled Zca (after encdec_reg). *)
-  Lemma decode_cli_c (w : mword 16) s :
-    eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed w) s = Some (C_LI (scli_imm w, Regidx (sreg117 w)), s).
+  Lemma decode_s45 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed sw45) s = Some (C_LI (scli_imm sw45, Regidx (sreg117 sw45)), s).
   Proof.
-    intro HmisaC. unfold scli_imm, sreg117.
-    reg_step Hr w 11 7 s.
-    open_rvc s HmisaC.
+    intro HmisaC. unfold scli_imm, sreg117. reg_step Hr sw45 11 7 s. open_rvc s HmisaC.
     rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
     rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (currentlyEnabled Ext_Zca) s = Some (true, s))).
     2:{ apply (exec_currentlyEnabled_Zca s HmisaC). }
     cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
   Qed.
-  Lemma decode_s45 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed sw45) s = Some (C_LI (scli_imm sw45, Regidx (sreg117 sw45)), s).
-  Proof. apply decode_cli_c. Qed.
   Lemma decode_s54 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed sw54) s = Some (C_LI (scli_imm sw54, Regidx (sreg117 sw54)), s).
-  Proof. apply decode_cli_c. Qed.
+  Proof.
+    intro HmisaC. unfold scli_imm, sreg117. reg_step Hr sw54 11 7 s. open_rvc s HmisaC.
+    rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (currentlyEnabled Ext_Zca) s = Some (true, s))).
+    2:{ apply (exec_currentlyEnabled_Zca s HmisaC). }
+    cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
   Lemma decode_s57 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed sw57) s = Some (C_LI (scli_imm sw57, Regidx (sreg117 sw57)), s).
-  Proof. apply decode_cli_c. Qed.
+  Proof.
+    intro HmisaC. unfold scli_imm, sreg117. reg_step Hr sw57 11 7 s. open_rvc s HmisaC.
+    rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (currentlyEnabled Ext_Zca) s = Some (true, s))).
+    2:{ apply (exec_currentlyEnabled_Zca s HmisaC). }
+    cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
 
   (* C_ADDI concrete (idx 48, 0x17fd): like decode9. *)
   Lemma decode_s48 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -1069,6 +1080,13 @@ Section WpStartChain.
     cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
   Qed.
 
+  (* helper: and_boolM (returnM false) m short-circuits to false. *)
+  Lemma exec_andM_lfalse (m : M bool) s : exec (Defs.and_boolM (returnM false) m) s = Some (false, s).
+  Proof.
+    unfold Defs.and_boolM. rewrite (exec_bind_Some _ _ _ false s (exec_returnM false s)).
+    cbn match. apply exec_returnM.
+  Qed.
+
   (* C_ADDIW (idx 61, 0x2781): rsd=encdec_reg(11:7), imm6.  Must skip the C_JAL
      clause (guard and_boolM(returnM(xlen=?32))(cE Zca) -> false), then C_ADDIW
      body = and_boolM(returnM(xlen=?64))(cE Zca). *)
@@ -1077,13 +1095,48 @@ Section WpStartChain.
   Proof.
     intro HmisaC. unfold scaddiw_imm, sreg117.
     reg_step Hr sw61 11 7 s.
-    open_rvc s HmisaC.
+    unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
+    skip_pure_clause. repeat (dstep s HmisaC).
+    (* now at the C_JAL clause: guard and_boolM (returnM false) (cE Zca) -> false. *)
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_andM_lfalse (currentlyEnabled Ext_Zca) s)). cbn match.
+    repeat (dstep s HmisaC).
+    match goal with |- context[if ?g then _ else returnM None] =>
+      replace g with true by (vm_compute; reflexivity) end.
+    cbn match. rewrite exec_bind.
     rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
     rewrite (exec_bind_Some _ _ _ _ _
               (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
     2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
         apply exec_currentlyEnabled_Zca; exact HmisaC. }
     cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
+
+  (* reverse of chain_text_split: reassemble kernel_text from the windows. *)
+  Lemma chain_text_combine :
+    (chain_prefix ∗
+      kinstr_bytes (skinstr 9) ∗ kinstr_bytes (skinstr 10) ∗ kinstr_bytes (skinstr 11) ∗
+      kinstr_bytes (skinstr 12) ∗ kinstr_bytes (skinstr 13) ∗ kinstr_bytes (skinstr 14) ∗
+      kinstr_bytes (skinstr 15) ∗ kinstr_bytes (skinstr 16) ∗ kinstr_bytes (skinstr 17) ∗
+      kinstr_bytes (skinstr 18) ∗ kinstr_bytes (skinstr 19) ∗ kinstr_bytes (skinstr 20) ∗
+      kinstr_bytes (skinstr 21) ∗ kinstr_bytes (skinstr 22) ∗ kinstr_bytes (skinstr 23) ∗
+      kinstr_bytes (skinstr 24) ∗ kinstr_bytes (skinstr 25) ∗ kinstr_bytes (skinstr 26) ∗
+      kinstr_bytes (skinstr 27) ∗ kinstr_bytes (skinstr 28) ∗ kinstr_bytes (skinstr 29) ∗
+      kinstr_bytes (skinstr 30) ∗ kinstr_bytes (skinstr 31) ∗ kinstr_bytes (skinstr 32) ∗
+      kinstr_bytes (skinstr 33) ∗ kinstr_bytes (skinstr 34) ∗ kinstr_bytes (skinstr 35) ∗
+      kinstr_bytes (skinstr 36) ∗ kinstr_bytes (skinstr 37) ∗ kinstr_bytes (skinstr 38) ∗
+      kinstr_bytes (skinstr 39) ∗ kinstr_bytes (skinstr 40) ∗ kinstr_bytes (skinstr 41) ∗
+      kinstr_bytes (skinstr 42) ∗ kinstr_bytes (skinstr 43) ∗ kinstr_bytes (skinstr 44) ∗
+      kinstr_bytes (skinstr 45) ∗ kinstr_bytes (skinstr 46) ∗ kinstr_bytes (skinstr 47) ∗
+      kinstr_bytes (skinstr 48) ∗ kinstr_bytes (skinstr 49) ∗ kinstr_bytes (skinstr 50) ∗
+      kinstr_bytes (skinstr 51) ∗ kinstr_bytes (skinstr 52) ∗ kinstr_bytes (skinstr 53) ∗
+      kinstr_bytes (skinstr 54) ∗ kinstr_bytes (skinstr 55) ∗ kinstr_bytes (skinstr 56) ∗
+      kinstr_bytes (skinstr 57) ∗ kinstr_bytes (skinstr 58) ∗ kinstr_bytes (skinstr 59) ∗
+      kinstr_bytes (skinstr 60) ∗ kinstr_bytes (skinstr 61) ∗ kinstr_bytes (skinstr 62) ∗
+      kinstr_bytes (skinstr 63) ∗ chain_tail) ⊢ kernel_text.
+  Proof.
+    rewrite /kernel_text {1}chain_instrs_decomp big_sepL_app.
+    rewrite 55!big_sepL_cons -/chain_prefix -/chain_tail.
+    iIntros "H". iExact "H".
   Qed.
 
   (* per-chunk instruction-window bundles (kernel text is never modified). *)
@@ -1101,12 +1154,12 @@ Section WpStartChain.
      kinstr_bytes (skinstr 27) ∗ kinstr_bytes (skinstr 28) ∗ kinstr_bytes (skinstr 29))%I.
 
   (* The resources whose VALUES are invariant across all of timerinit. *)
-  Definition ti_ctx (misa0 mstatus0 mseccfg0 : mword 64)
+  Definition ti_ctx (misa0 mstatus0 mseccfg0 mdv0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (elp0 : mword 1) : iProp Σ :=
     (misa ↦ᵣ misa0 ∗ cur_privilege ↦ᵣ Machine ∗ hart_state ↦ᵣ HART_ACTIVE tt ∗
-     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 ∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 ∗
+     (R_bitvector_64 mideleg) ↦ᵣ mdv0 ∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 ∗
      elp ↦ᵣ elp0 ∗ mseccfg ↦ᵣ mseccfg0 ∗ mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
      pmpcfg_n ↦ᵣ pmpcfg0 ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None)%I.
 
@@ -1118,7 +1171,7 @@ Section WpStartChain.
       (sp0 vra vs0 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1145,20 +1198,21 @@ Section WpStartChain.
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     is_aligned_vaddr (Virtaddr a8_ra) 8 = true -> is_aligned_paddr (Physaddr pa_ra) 8 = true ->
     is_aligned_vaddr (Virtaddr a8_s0) 8 = true -> is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     PC ↦ᵣ tpc9 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vold_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vold_s0 j) -∗
     Kc1 -∗
     ▷ ( PC ↦ᵣ tpc14 -∗ gpr_file mout -∗ nextPC ↦ᵣ tpc14 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump (bump mst0)))) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-        ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+        ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vra j) -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vs0 j) -∗
         Kc1 -∗
@@ -1166,7 +1220,7 @@ Section WpStartChain.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros b1 bump sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 mout.
-    intros Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaU Ha8ra Hpara Ha8s0 Hpas0.
+    intros Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 HK".
     iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
     iDestruct "HK" as "(K9 & K10 & K11 & K12 & K13)".
@@ -1175,11 +1229,11 @@ Section WpStartChain.
     iDestruct (bi.equiv_entails_1_1 _ _ regroup9 with "[$K9 $K10]") as "W9".
     assert (Hrd9 : m !! gpr_of_Z (uint rd9) = Some sp0)
       by (replace (uint rd9) with 2 by (vm_compute; reflexivity); exact Hm2).
-    iApply (wp_caddi_gpr_4 tpc9 w4_9 rd9 imm9 m sp0 misa0 b1
+    iApply (wp_caddi_gpr_4 tpc9 w4_9 rd9 imm9 m sp0 misa0 mdv0 b1
               npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Φ
               ltac:(vm_compute; discriminate) Hrd9 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode4_9 eq_refl HmIE Hlp
+              HmisaC HmisaS decode4_9 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W9").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W9".
@@ -1195,12 +1249,12 @@ Section WpStartChain.
     { unfold m10. replace (uint rs2_10) with 1 by (vm_compute; reflexivity).
       replace (uint rd9) with 2 by (vm_compute; reflexivity).
       rewrite lookup_insert_ne; [exact Hm1 | discriminate]. }
-    iApply (wp_csdsp tpc10 w10 uimm10 rs2_10 m10 sp1 vra misa0 b1 vold_ra
+    iApply (wp_csdsp tpc10 w10 uimm10 rs2_10 m10 sp1 vra misa0 mdv0 b1 vold_ra
               tpc10 (bump mst0) mstatus0 mseccfg0
               mc mcfg pmpcfg0 pmar0 b1 elp0 E Φ
               ltac:(vm_compute; discriminate) Hsp10 Hra10 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode10 eq_refl HmIE Hlp HMPRV Hpmm Ha8ra Hpara
+              HmisaC HmisaS decode10 eq_refl HmIE Hlp HMPRV Hpmm Ha8ra Hpara
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstkra K10").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstkra K10".
@@ -1214,12 +1268,12 @@ Section WpStartChain.
     { unfold m10. replace (uint rs2_11) with 8 by (vm_compute; reflexivity).
       replace (uint rd9) with 2 by (vm_compute; reflexivity).
       rewrite lookup_insert_ne; [exact Hm8 | discriminate]. }
-    iApply (wp_csdsp_4 tpc11 w4_11 uimm11 rs2_11 m10 sp1 vs0 misa0 b1 vold_s0
+    iApply (wp_csdsp_4 tpc11 w4_11 uimm11 rs2_11 m10 sp1 vs0 misa0 mdv0 b1 vold_s0
               _ _ mstatus0 mseccfg0
               mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Hsp11 Hs011 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode4_11 eq_refl HmIE Hlp HMPRV Hpmm Ha8s0 Hpas0
+              HmisaC HmisaS decode4_11 eq_refl HmIE Hlp HMPRV Hpmm Ha8s0 Hpas0
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstks0 W11").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstks0 W11".
@@ -1234,11 +1288,11 @@ Section WpStartChain.
     { unfold m10. replace (uint r_s0) with 8 by (vm_compute; reflexivity).
       replace (uint rd9) with 2 by (vm_compute; reflexivity).
       rewrite lookup_insert_ne; [exact Hm8 | discriminate]. }
-    iApply (wp_caddi4spn_gpr tpc12 w12 nzimm12 crdc12 r_s0 m10 sp1 vs0 misa0 b1
+    iApply (wp_caddi4spn_gpr tpc12 w12 nzimm12 crdc12 r_s0 m10 sp1 vs0 misa0 mdv0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vmc) ltac:(vm_compute; discriminate) Hsp12 Hs012 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode12 eq_refl HmIE Hlp
+              HmisaC HmisaS decode12 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K12").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K12".
@@ -1253,8 +1307,8 @@ Section WpStartChain.
       rewrite lookup_insert_ne; [| discriminate].
       rewrite lookup_insert_ne; [| discriminate]. exact Hm15. }
     iApply (wp_csrr_menvcfg_gpr tpc13 w13 rs1z13 rd13 m12 va5 b1
-              _ _ mstatus0 misa0 menvcfg0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
-              ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) Ha513 HmisaU Hpmaall Hpmpf
+              _ _ mstatus0 misa0 menvcfg0 mdv0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
+              ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) Ha513 HmisaU HmisaS Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               decode13 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hmenv Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K13").
@@ -1284,7 +1338,7 @@ Section WpStartChain.
       (va4 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1309,12 +1363,12 @@ Section WpStartChain.
     PC ↦ᵣ tpc14 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
     Kc2 -∗
     ▷ ( PC ↦ᵣ tpc19 -∗ gpr_file mout -∗ nextPC ↦ᵣ tpc19 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump (bump mst0)))) -∗
         menvcfg ↦ᵣ menvcfg_legalized menvcfg0 va5' -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-        ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+        ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
         Kc2 -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -1329,11 +1383,11 @@ Section WpStartChain.
     iDestruct (bi.equiv_entails_1_1 _ _ regroup14 with "[$K14 $K15]") as "W14".
     assert (Ha414 : m !! gpr_of_Z (uint rd14) = Some va4)
       by (replace (uint rd14) with 14 by (vm_compute; reflexivity); exact Hm14).
-    iApply (wp_cli_gpr_4 tpc14 w4_14 rd14 imm14 m va4 misa0 b1
+    iApply (wp_cli_gpr_4 tpc14 w4_14 rd14 imm14 m va4 misa0 mdv0 b1
               npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Φ
               ltac:(vm_compute; discriminate) Ha414 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode4_14 eq_refl HmIE Hlp
+              HmisaC HmisaS decode4_14 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W14").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W14".
@@ -1345,11 +1399,11 @@ Section WpStartChain.
     assert (Ha415 : m14 !! gpr_of_Z (uint rsd15) = Some (cli_wval imm14)).
     { unfold m14. replace (uint rsd15) with 14 by (vm_compute; reflexivity).
       replace (uint rd14) with 14 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
-    iApply (wp_cslli_gpr tpc15 w15 shamt15 rsd15 m14 (cli_wval imm14) misa0 b1
+    iApply (wp_cslli_gpr tpc15 w15 shamt15 rsd15 m14 (cli_wval imm14) misa0 mdv0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Ha415 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode15 eq_refl HmIE Hlp
+              HmisaC HmisaS decode15 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K15").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K15".
@@ -1366,12 +1420,12 @@ Section WpStartChain.
     assert (Ha416 : m15 !! gpr_of_Z (uint r_a4) = Some va4').
     { unfold m15, va4'. replace (uint r_a4) with 14 by (vm_compute; reflexivity).
       replace (uint rsd15) with 14 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
-    iApply (wp_cor_gpr_4 tpc16 w4_16 crsd16 crs2_16 r_a5 r_a4 m15 va5 va4' misa0 b1
+    iApply (wp_cor_gpr_4 tpc16 w4_16 crsd16 crs2_16 r_a5 r_a4 m15 va5 va4' misa0 mdv0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               Ha516 Ha416 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode4_16 eq_refl HmIE Hlp
+              HmisaC HmisaS decode4_16 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W16").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W16".
@@ -1383,7 +1437,7 @@ Section WpStartChain.
     assert (Ha517 : m16 !! gpr_of_Z (uint rs1_17) = Some (or_vec va5 va4')).
     { unfold m16. replace (uint rs1_17) with 15 by (vm_compute; reflexivity).
       replace (uint r_a5) with 15 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
-    iApply (wp_csrw_menvcfg_gpr_2 tpc17 w17 rs1_17 m16 (or_vec va5 va4') misa0 mstatus0 menvcfg0 b1
+    iApply (wp_csrw_menvcfg_gpr_2 tpc17 w17 rs1_17 m16 (or_vec va5 va4') misa0 mstatus0 menvcfg0 mdv0 b1
               _ _ mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Ha517 HmisaS HmisaU Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
@@ -1402,8 +1456,8 @@ Section WpStartChain.
     { unfold m16. replace (uint rd18) with 15 by (vm_compute; reflexivity).
       replace (uint r_a5) with 15 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
     iApply (wp_csrr_mcounteren_gpr_2 tpc18 w18 rs1z18 rd18 m16 (or_vec va5 va4') b1
-              _ _ mstatus0 misa0 mcounteren0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
-              ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) Ha518 HmisaU Hpmaall Hpmpf
+              _ _ mstatus0 misa0 mdv0 mcounteren0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
+              ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) Ha518 HmisaU HmisaS Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
@@ -1435,7 +1489,7 @@ Section WpStartChain.
       (va4 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1454,24 +1508,25 @@ Section WpStartChain.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     PC ↦ᵣ tpc19 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
     Kc3 -∗
     ▷ ( PC ↦ᵣ tpc24 -∗ gpr_file mout -∗ nextPC ↦ᵣ tpc24 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump (bump mst0)))) -∗
         menvcfg ↦ᵣ menvcfg0 -∗
         mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (or_vec va5 (sign_extend' 64 (subrange_vec_dec w19 31 20))) -∗
         mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-        ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+        ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
         Kc3 -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros b1 bump va4lui mout.
-    intros Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaU.
+    intros Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx HK".
     iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
     iDestruct "HK" as "(K19 & K20 & K21 & K22 & K23)".
@@ -1482,14 +1537,14 @@ Section WpStartChain.
       by (replace (uint rs1_19) with 15 by (vm_compute; reflexivity); exact Hm15).
     assert (Hard19 : m !! gpr_of_Z (uint rd19) = Some va5)
       by (replace (uint rd19) with 15 by (vm_compute; reflexivity); exact Hm15).
-    iApply (wp_ori_gpr_2 tpc19 w19 rs1_19 rd19 (subrange_vec_dec w19 31 20) m va5 va5 misa0 b1
+    iApply (wp_ori_gpr_2 tpc19 w19 rs1_19 rd19 (subrange_vec_dec w19 31 20) m va5 va5 misa0 mdv0 b1
               npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Φ
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha519 Hard19 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
-              HmisaC decode19 eq_refl HmIE Hlp
+              HmisaC HmisaS decode19 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K19").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K19".
@@ -1501,9 +1556,9 @@ Section WpStartChain.
     assert (Ha520 : m19 !! gpr_of_Z (uint rs1_20) = Some va5_2).
     { unfold m19, va5_2. replace (uint rs1_20) with 15 by (vm_compute; reflexivity).
       replace (uint rd19) with 15 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
-    iApply (wp_csrw_mcounteren_gpr_2 tpc20 w20 rs1_20 m19 va5_2 misa0 mcounteren0 b1
+    iApply (wp_csrw_mcounteren_gpr_2 tpc20 w20 rs1_20 m19 va5_2 misa0 mdv0 mcounteren0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
-              ltac:(vm_compute; discriminate) Ha520 HmisaU Hpmaall Hpmpf
+              ltac:(vm_compute; discriminate) Ha520 HmisaS HmisaU Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
@@ -1519,8 +1574,8 @@ Section WpStartChain.
     { unfold m19, va5_2. replace (uint rd21) with 15 by (vm_compute; reflexivity).
       replace (uint rd19) with 15 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
     iApply (wp_csrr_time_gpr_2 tpc21 w21 rs1z21 rd21 m19 va5_2 b1
-              _ _ mstatus0 misa0 mtime0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
-              ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) Ha521 Hpmaall Hpmpf
+              _ _ mstatus0 misa0 mtime0 mdv0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
+              ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) Ha521 HmisaS Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
@@ -1539,14 +1594,14 @@ Section WpStartChain.
       replace (uint rd19) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert_ne; [| discriminate].
       rewrite lookup_insert_ne; [exact Hm14 | discriminate]. }
-    iApply (wp_lui_gpr_2 tpc22 w22 rd22 (subrange_vec_dec w22 31 12) m21 va4 misa0 b1
+    iApply (wp_lui_gpr_2 tpc22 w22 rd22 (subrange_vec_dec w22 31 12) m21 va4 misa0 mdv0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Ha422 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
-              HmisaC decode22 eq_refl HmIE Hlp
+              HmisaC HmisaS decode22 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K22").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K22".
@@ -1560,14 +1615,14 @@ Section WpStartChain.
     assert (Hard23 : m22 !! gpr_of_Z (uint rd23) = Some va4lui).
     { unfold m22, va4lui. replace (uint rd23) with 14 by (vm_compute; reflexivity).
       replace (uint rd22) with 14 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
-    iApply (wp_addi_gpr_2 tpc23 w23 rs1_23 rd23 (subrange_vec_dec w23 31 20) m22 va4lui va4lui misa0 b1
+    iApply (wp_addi_gpr_2 tpc23 w23 rs1_23 rd23 (subrange_vec_dec w23 31 20) m22 va4lui va4lui misa0 mdv0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha523 Hard23 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
               ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
-              HmisaC decode23 eq_refl HmIE Hlp
+              HmisaC HmisaS decode23 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K23").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K23".
@@ -1598,7 +1653,7 @@ Section WpStartChain.
       (vsp vra0 vs00 va4 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1631,11 +1686,19 @@ Section WpStartChain.
     PC ↦ᵣ tpc24 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vstk_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vstk_s0 j) -∗
     Kc4 -∗
-    ▷ ( PC ↦ᵣ tgt -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ ( PC ↦ᵣ tgt -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ⌝) -∗ nextPC ↦ᵣ tgt -∗
+        (R_bool minstret_increment) ↦ᵣ b1 -∗
+        (∃ mstf : mword 64, minstret ↦ᵣ mstf) -∗
+        menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗
+        (∃ stf : mword 64, stimecmp ↦ᵣ stf) -∗
+        ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vstk_ra j) -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vstk_s0 j) -∗
+        Kc4 -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros b1 imm_ra pa_ra a8_ra imm_s0 pa_s0 a8_s0 vra_ld tgt.
@@ -1650,11 +1713,11 @@ Section WpStartChain.
       by (replace (uint rsd24) with 15 by (vm_compute; reflexivity); exact Hm15).
     assert (Ha424 : m !! gpr_of_Z (uint rs2_24) = Some va4)
       by (replace (uint rs2_24) with 14 by (vm_compute; reflexivity); exact Hm14).
-    iApply (wp_cadd_gpr tpc24 w24 rsd24 rs2_24 m va5 va4 misa0 b1
+    iApply (wp_cadd_gpr tpc24 w24 rsd24 rs2_24 m va5 va4 misa0 mdv0 b1
               npc0 mst0 mstatus0 mc mcfg pmpcfg0 pmar0 mi0 elp0 E Φ
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha524 Ha424 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode24 eq_refl HmIE Hlp
+              HmisaC HmisaS decode24 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K24").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K24".
@@ -1665,7 +1728,7 @@ Section WpStartChain.
     assert (Ha525 : m24 !! gpr_of_Z (uint rs1_25) = Some (add_vec va5 va4)).
     { unfold m24. replace (uint rs1_25) with 15 by (vm_compute; reflexivity).
       replace (uint rsd24) with 15 by (vm_compute; reflexivity). rewrite lookup_insert. reflexivity. }
-    iApply (wp_csrw_stimecmp_gpr tpc25 w25 rs1_25 m24 (add_vec va5 va4) misa0 mstatus0 stimecmp0 b1
+    iApply (wp_csrw_stimecmp_gpr tpc25 w25 rs1_25 m24 (add_vec va5 va4) misa0 mstatus0 stimecmp0 mdv0 b1
               _ _ mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Ha525 HmisaS Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
@@ -1685,11 +1748,11 @@ Section WpStartChain.
     { unfold m24. replace (uint rd26) with 1 by (vm_compute; reflexivity).
       replace (uint rsd24) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert_ne; [exact Hm1 | discriminate]. }
-    iApply (wp_cldsp_gpr_4 tpc26 w4_26 uimm10 rd26 m24 vsp vra0 misa0 b1 vstk_ra
+    iApply (wp_cldsp_gpr_4 tpc26 w4_26 uimm10 rd26 m24 vsp vra0 misa0 mdv0 b1 vstk_ra
               _ _ mstatus0 mc mcfg mseccfg0 pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hsp26 Hra26 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC ltac:(rewrite <- Huimm26; exact decode4_26) eq_refl HmIE Hlp HMPRV Hpmm Ha8ra Hpara
+              HmisaC HmisaS ltac:(rewrite <- Huimm26; exact decode4_26) eq_refl HmIE Hlp HMPRV Hpmm Ha8ra Hpara
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstkra W26").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstkra W26".
@@ -1711,11 +1774,11 @@ Section WpStartChain.
       replace (uint rsd24) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert_ne; [| discriminate].
       rewrite lookup_insert_ne; [exact Hm8 | discriminate]. }
-    iApply (wp_cldsp_gpr tpc27 w27 uimm11 rd27 m26 vsp vs00 misa0 b1 vstk_s0
+    iApply (wp_cldsp_gpr tpc27 w27 uimm11 rd27 m26 vsp vs00 misa0 mdv0 b1 vstk_s0
               _ _ mstatus0 mc mcfg mseccfg0 pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hsp27 Hs027 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC ltac:(rewrite <- Huimm27; exact decode27) eq_refl HmIE Hlp HMPRV Hpmm Ha8s0 Hpas0
+              HmisaC HmisaS ltac:(rewrite <- Huimm27; exact decode27) eq_refl HmIE Hlp HMPRV Hpmm Ha8s0 Hpas0
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstks0 K27").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstks0 K27".
@@ -1731,11 +1794,11 @@ Section WpStartChain.
       rewrite lookup_insert_ne; [| discriminate].
       rewrite lookup_insert_ne; [| discriminate].
       rewrite lookup_insert_ne; [exact Hm2 | discriminate]. }
-    iApply (wp_caddi_gpr_4 tpc28 w4_28 rd28 imm28 m27 vsp misa0 b1
+    iApply (wp_caddi_gpr_4 tpc28 w4_28 rd28 imm28 m27 vsp misa0 mdv0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Hsp28 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode4_28 eq_refl HmIE Hlp
+              HmisaC HmisaS decode4_28 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W28").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W28".
@@ -1752,22 +1815,46 @@ Section WpStartChain.
       rewrite lookup_insert_ne; [| discriminate].
       rewrite lookup_insert_ne; [| discriminate].
       rewrite lookup_insert. reflexivity. }
-    iApply (wp_cret tpc29 w29 ra29 m28 vra_ld misa0 b1
+    iApply (wp_cret tpc29 w29 ra29 m28 vra_ld misa0 mdv0 b1
               _ _ mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Hra29 Hmlpe Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC decode29 Hcal0 Hcal1 eq_refl HmIE Hlp
+              HmisaC HmisaS decode29 Hcal0 Hcal1 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K29").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K29".
-    iApply ("Hcont" with "Hpc").
+    (* convert window-form bytes (K24,K25,K27,K29) back to kinstr_bytes for Kc4 *)
+    iEval (rewrite (EW 24 16%nat 2%nat (kentry + 0x4a) 0x97ba tpc24 w24 ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(reflexivity)
+                      ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|exfalso;lia]))) in "K24".
+    iEval (rewrite (EW 25 32%nat 4%nat (kentry + 0x4c) 0x14d79073 tpc25 w25 ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(reflexivity)
+                      ltac:(intros j Hj; destruct j as [|[|[|[|j]]]]; [apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|exfalso;lia]))) in "K25".
+    iEval (rewrite (EW 27 16%nat 2%nat (kentry + 0x52) 0x6402 tpc27 w27 ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(reflexivity)
+                      ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|exfalso;lia]))) in "K27".
+    iEval (rewrite (EW 29 16%nat 2%nat (kentry + 0x56) 0x8082 tpc29 w29 ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(reflexivity)
+                      ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|exfalso;lia]))) in "K29".
+    iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi [Hmst] Hmenv Hmcen Hmtime [Hstc]
+              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]
+              Hstkra Hstks0 [$K24 $K25 $K26 $K27 $K28 $K29]").
+    { (* x15 (a5) present in m28 (last written by idx 24 c.add) *)
+      iExists _. iFrame "Hfile". iPureIntro. unfold m28, m27, m26, m24.
+      replace (uint rd28) with 2 by (vm_compute; reflexivity).
+      replace (uint rd27) with 8 by (vm_compute; reflexivity).
+      replace (uint rd26) with 1 by (vm_compute; reflexivity).
+      replace (uint rsd24) with 15 by (vm_compute; reflexivity).
+      rewrite lookup_insert_ne; [| discriminate].
+      rewrite lookup_insert_ne; [| discriminate].
+      rewrite lookup_insert_ne; [| discriminate].
+      rewrite lookup_insert. eexists; reflexivity. }
+    { iExists _. iFrame "Hmst". }
+    { iExists _. iFrame "Hstc". }
+    { iFrame. }
   Qed.
 
   Lemma wp_timerinit
       (sp0 vra vs0 va4 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 : mword 64)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -1818,7 +1905,7 @@ Section WpStartChain.
     PC ↦ᵣ tpc9 -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ tpc9 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
@@ -1826,13 +1913,24 @@ Section WpStartChain.
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vold_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vold_s0 j) -∗
     kernel_text -∗
-    (* continuation receives PC = the c.ret target (the loaded return address). *)
-    ▷ ( PC ↦ᵣ update_vec_dec
-                 (add_vec
-                    (regval_into_reg (extend_value false
-                       (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vra)))
-                    (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0")
-        -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    (* continuation receives PC = the c.ret target (the loaded return address),
+       kernel_text back, AND the full machine state so the caller can continue.
+       The final register file is existentially quantified (its a4/a5 are clobbered
+       and ra/s0/sp restored), exposing only that x15 (a5) is still present — which
+       is all the START tail needs (it overwrites a5 then reads it). *)
+    ▷ ( PC ↦ᵣ tgt
+        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ⌝)
+        -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ tgt
+        -∗ (R_bool minstret_increment) ↦ᵣ
+             (andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+                   (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")))
+        -∗ (∃ mstf : mword 64, minstret ↦ᵣ mstf)
+        -∗ cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt
+        -∗ (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0
+        -∗ elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0
+        -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg
+        -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None
+        -∗ kernel_text -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros sp1 bump imm_ra ea_ra a8_ra pa_ra imm_s0 ea_s0 a8_s0 pa_s0.
@@ -1843,15 +1941,15 @@ Section WpStartChain.
                     (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0"))).
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmenv Hmcen Hmtime Hstc
              Hmcinh Hmcfg Hpmpc Hpma Hhtif Hstkra Hstks0 Htext Hcont".
-    iAssert (ti_ctx misa0 mstatus0 mseccfg0 mc mcfg pmpcfg0 pmar0 elp0)
+    iAssert (ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0)
       with "[Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]" as "Hctx".
     { iFrame. }
     iDestruct (chain_text_split with "Htext") as
       "(Hpre & K9 & K10 & K11 & K12 & K13 & K14 & K15 & K16 & K17 & K18 & K19 & K20 & K21 & K22 & K23 & K24 & K25 & K26 & K27 & K28 & K29 & Krest)".
     (* ---- chunk c1 (idx 9-13) ---- *)
-    iApply (wp_ti_c1 sp0 vra vs0 va5 m mst0 tpc9 mi0 misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0
+    iApply (wp_ti_c1 sp0 vra vs0 va5 m mst0 tpc9 mi0 misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0
               mcounteren0 mc mcfg pmpcfg0 pmar0 elp0 vold_ra vold_s0 E Φ
-              Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaU Ha8ra Hpara Ha8s0 Hpas0
+              Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 [$K9 $K10 $K11 $K12 $K13]").
     iNext.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 HK1".
@@ -1868,7 +1966,7 @@ Section WpStartChain.
     iDestruct "HK1" as "(K9 & K10 & K11 & K12 & K13)".
     (* ---- chunk c2 (idx 14-18) ---- *)
     iApply (wp_ti_c2 va4 (regval_into_reg (subrange_vec_dec menvcfg0 (Z.sub xlen 1) 0)) m1
-              _ tpc14 b1 misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0
+              _ tpc14 b1 misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0
               mcounteren0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               Hc2_a4 Hc2_a5 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx [$K14 $K15 $K16 $K17 $K18]").
@@ -1893,9 +1991,9 @@ Section WpStartChain.
     iApply (wp_ti_c3 va4_c2 (regval_into_reg (zero_extend' 64 mcounteren0)) m2
               _ tpc19 b1 misa0 mstatus0 mseccfg0
               (menvcfg_legalized menvcfg0 (regval_into_reg (or_vec va5_c2_in va4_c2)))
-              mtime0 stimecmp0
+              mtime0 stimecmp0 mdv0
               mcounteren0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
-              Hc3_a4 Hc3_a5 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaU
+              Hc3_a4 Hc3_a5 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx [$K19 $K20 $K21 $K22 $K23]").
     iNext.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx HK3".
@@ -1938,14 +2036,26 @@ Section WpStartChain.
               (regval_into_reg (subrange_vec_dec mtime0 (Z.sub xlen 1) 0)) m3
               _ tpc24 b1 misa0 mstatus0 mseccfg0
               (menvcfg_legalized menvcfg0 (regval_into_reg (or_vec va5_c2_in va4_c2)))
-              mtime0 stimecmp0
+              mtime0 stimecmp0 mdv0
               (legalize_mcounteren mcounteren0 (or_vec va5_c2_in' (sign_extend' 64 (subrange_vec_dec w19 31 20))))
               mc mcfg pmpcfg0 pmar0 elp0 vra vs0 E Φ
               Hc4_ra Hc4_sp Hc4_s0 Hc4_a4 Hc4_a5 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS
               ltac:(exact Ha8ra) ltac:(exact Hpara) ltac:(exact Ha8s0) ltac:(exact Hpas0)
               ltac:(exact Hcal0) ltac:(exact Hcal1)
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 [$K24 $K25 $K26 $K27 $K28 $K29]").
-    iApply "Hcont".
+    iNext.
+    iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 (K24 & K25 & K26 & K27 & K28 & K29)".
+    iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
+    (* reconstruct kernel_text from all the windows + prefix + tail *)
+    iAssert kernel_text with "[Hpre K9 K10 K11 K12 K13 K14 K15 K16 K17 K18 K19 K20 K21 K22 K23 K24 K25 K26 K27 K28 K29 Krest]" as "Htext".
+    { iApply chain_text_combine.
+      iFrame "Hpre K9 K10 K11 K12 K13 K14 K15 K16 K17 K18 K19 K20 K21 K22 K23 K24 K25 K26 K27 K28 K29".
+      unfold chain_tail.
+      iDestruct "Krest" as "(K30 & K31 & K32 & K33 & K34 & K35 & K36 & K37 & K38 & K39 & K40 & K41 & K42 & K43 & K44 & K45 & K46 & K47 & K48 & K49 & K50 & K51 & K52 & K53 & K54 & K55 & K56 & K57 & K58 & K59 & K60 & K61 & K62 & K63 & Ktail)".
+      iFrame. }
+    (* c4 already exposes the existential gpr_file (x15 present) and existential
+       minstret; pass them straight through. *)
+    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif Htext").
   Qed.
 
 End WpStartChain.

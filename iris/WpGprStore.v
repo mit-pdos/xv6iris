@@ -517,21 +517,21 @@ Section ForwardSDg.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     exec riscv_step s = Some (tt, sFsg).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp.
+    intros Lpc Lpriv Lhs LS LmIE Lelp.
     assert (LpcA  : register_lookup PC sAsg.(sregs) = pc).
     { unfold sAsg. trans_mi. exact Lpc. }
     assert (LprivA: register_lookup cur_privilege sAsg.(sregs) = Machine).
     { unfold sAsg. trans_mi. exact Lpriv. }
     assert (LhsA  : register_lookup hart_state sAsg.(sregs) = HART_ACTIVE tt).
     { unfold sAsg. trans_mi. exact Lhs. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) sAsg.(sregs) = zeros' 64).
-    { unfold sAsg. trans_mi. exact Lmideleg. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAsg.(sregs))) ('b"1") = true).
+    { unfold sAsg. trans_mi. exact LS. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE
               (register_lookup (R_bitvector_64 mstatus) sAsg.(sregs))) ('b"1") = false).
     { unfold sAsg. trans_mi. exact LmIE. }
@@ -540,7 +540,7 @@ Section ForwardSDg.
     { unfold sAsg. trans_mi. exact Lelp. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAsg = Some (None, sAsg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAsg _ (exec_currentlyEnabled_S sAsg) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sAsg _ (exec_currentlyEnabled_S sAsg) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sAsg = Some (F_Base w, sAsg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAsg
               = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), sAsg))
@@ -628,7 +628,7 @@ Section WpStoreGpr.
 
   Lemma wp_store_gpr (pc : mword 64) (w_s : mword 32) (imm_s : mword 12)
       (rs1 rs2 : mword 5) (m : gmap register_bitvector_64 (mword 64))
-      (vrs1 vrs2 : mword 64) (b1 : bool) (vold : bv 64)
+      (vrs1 vrs2 misa0 mdv0 : mword 64) (b1 : bool) (vold : bv 64)
       (npc0a mst0a mstatus0a : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
@@ -641,6 +641,7 @@ Section WpStoreGpr.
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     m !! gpr_of_Z (uint rs1) = Some vrs1 ->
     m !! gpr_of_Z (uint rs2) = Some vrs2 ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
@@ -658,20 +659,21 @@ Section WpStoreGpr.
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8) 8 = true ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
-    PC ↦ᵣ pc -∗ gpr_file m -∗ nextPC ↦ᵣ npc0a -∗
+    PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0a -∗
     (R_bool minstret_increment) ↦ᵣ mi0a -∗ minstret ↦ᵣ mst0a -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
     elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_s j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file m -∗
+        misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0a 1 else mst0a) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
         elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vrs2 j) -∗
@@ -679,16 +681,17 @@ Section WpStoreGpr.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea a8 pa Hrs1 Hrs2 Hmrs1 Hmrs2 Hpmaall Hpmpf Halignf Hbit0f Hbit1f
+    intros offset ea a8 pa Hrs1 Hrs2 Hmrs1 Hmrs2 HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f
       Hvalignf HnotRVCf Hds Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & _ & Hwrite).
-    iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
+    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
     iDestruct (reg_valid with "Hreg Hms")    as %Lms.
     iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid with "Hreg Help")   as %Lelp.
@@ -750,7 +753,8 @@ Section WpStoreGpr.
       assert (Hsxs : s_x.(sregs) = (s_pcg s pc b1).(sregs)) by reflexivity.
       rewrite <- (sFs_eq s s_x w_s pc b1 Hsxs Hfetch_at Hsi_s mst0a Lmst).
       apply (forward_exec_sd_gpr s s_x w_s pc imm_s rs1 rs2 b1 Hsxs Hfetch_at Hds Hsi_s Hexec_spc
-               Lpc Lpriv Lhs Lmdl).
+               Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
     iIntros "!>".
@@ -762,10 +766,10 @@ Section WpStoreGpr.
     - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro.
       unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
+      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
     - iMod "Hclose" as "_". iModIntro.
       unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
+      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
   Qed.
 End WpStoreGpr.
 

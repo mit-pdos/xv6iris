@@ -126,43 +126,46 @@ Section FinalWP.
     register_lookup minstret s.(sregs) = mst0 ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     exec riscv_step s = Some (tt, sF s).
   Proof using All.
-    intros Hfetch_at Lx10 Lx11 Lpc Lmst Lpriv Lhs Lmideleg LmIE Lelp.
-    (* Hne at sA s via exec_hart_active_done. *)
-    assert (Hne_at : exec (run_hart_active 0) (sA s) <> None).
-    { apply (exec_hart_active_done (sA s) pc w rs1 rs2 rd
-               (eq_vec (_get_Misa_S (register_lookup misa (sA s).(sregs))) ('b"1"))).
-      - exact Hrs1.
-      - exact Hrs2.
-      - exact Hrd.
-      - unfold sA; trans_mi; exact Lpriv.
-      - unfold sA; trans_mi; exact Lpc.
-      - apply exec_currentlyEnabled_S.
-      - unfold sA; trans_mi; exact Lmideleg.
-      - unfold sA; trans_mi; exact LmIE.
-      - exact Hfetch_at.
-      - apply Hdec_exec_gen.
-      - unfold sA; trans_mi; exact Lelp. }
-    (* Hpend at sA s via the keystone. *)
-    assert (HpendA : run (getPendingSet Machine) (sA s) None (sA s)).
-    { apply (run_getPendingSet_machine_none (sA s) _ (run_currentlyEnabled_S (sA s))).
-      - unfold sA. trans_mi. exact Lmideleg.
-      - unfold sA. trans_mi. exact LmIE. }
-    (* Hha at sA s via exec_hart_active_ADD, with Hne supplied by exec_hart_active_done. *)
+    intros Hfetch_at Lx10 Lx11 Lpc Lmst Lpriv Lhs LS LmIE Lelp.
+    (* dispatchInterrupt -> None at sA s via the misa.S keystone (mideleg-agnostic). *)
+    assert (HdispA : exec (dispatchInterrupt Machine) (sA s) = Some (None, sA s)).
+    { apply exec_dispatchInterrupt_none.
+      assert (LSA : eq_vec (_get_Misa_S (register_lookup misa (sA s).(sregs))) ('b"1") = true)
+        by (unfold sA; trans_mi; exact LS).
+      assert (LmIEA : eq_vec (_get_Mstatus_MIE
+                (register_lookup (R_bitvector_64 mstatus) (sA s).(sregs))) ('b"1") = false)
+        by (unfold sA; trans_mi; exact LmIE).
+      apply (exec_getPendingSet_machine_none (sA s) _ (exec_currentlyEnabled_S (sA s)) (or_introl LSA) LmIEA). }
+    (* Hha at sA s via exec_hart_active_progress (no Hne precondition, mideleg-free). *)
     assert (Hha : exec (run_hart_active 0) (sA s)
                   = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sX s)).
     { unfold sX.
-      apply (exec_hart_active_ADD (sA s) w pc rs2 rs1 rd); try assumption.
-      - unfold sA; trans_mi; exact Lpriv.
-      - unfold sA; trans_mi; exact Lpc.
-      - unfold sA; trans_mi; exact Lelp.
-      - apply (proj1 (exec_run_det _ _ _ _ Hfetch_at)).
-      - apply (proj1 (exec_run_det _ _ _ _ (Hdec_exec_gen (sA s)))). }
+      assert (HdecA : exec (ext_decode w) (sA s)
+                = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD), sA s))
+        by exact (Hdec_exec_gen (sA s)).
+      assert (HexecA : exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))
+                (set_reg (sA s) nextPC (add_vec_int pc 4))
+              = Some (RETIRE_SUCCESS,
+                      set_reg (set_reg (sA s) nextPC (add_vec_int pc 4)) (R_bitvector_64 x12)
+                        (regval_into_reg
+                           (add_vec (register_lookup (R_bitvector_64 x10)
+                                       (set_reg (sA s) nextPC (add_vec_int pc 4)).(sregs))
+                                    (register_lookup (R_bitvector_64 x11)
+                                       (set_reg (sA s) nextPC (add_vec_int pc 4)).(sregs)))))).
+      { change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))
+          with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) ADD).
+        exact (exec_execute_ADD rd rs1 rs2 _ Hrs1 Hrs2 Hrd). }
+      exact (exec_hart_active_progress (sA s) (sA s) _ (sA s) w
+               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) pc RETIRE_SUCCESS
+               ltac:(unfold sA; trans_mi; exact Lpriv) HdispA Hfetch_at HdecA
+               ltac:(unfold sA; trans_mi; exact Lelp) ltac:(reflexivity)
+               ltac:(unfold sA; trans_mi; exact Lpc) HexecA I). }
     apply (exec_riscv_step_ADD s (sX s) w b pc).
     - exact Lpriv.
     - apply Hsi_gen; exact Lpriv.
@@ -215,9 +218,10 @@ Section FinalWP.
   Qed.
 
   Lemma wp_add_real_final
-      (mstatus0 : mword 64) (elp0 : mword 1)
+      (mstatus0 misa0 mdv0 : mword 64) (elp0 : mword 1)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       E (Φ : mval -> iProp Σ) :
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     (* the pure fetch side-conditions of [fetch_from_pts_minstret] *)
@@ -237,8 +241,9 @@ Section FinalWP.
     minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
     (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
@@ -251,16 +256,17 @@ Section FinalWP.
         minstret ↦ᵣ mst_final -∗
         cur_privilege ↦ᵣ Machine -∗
         hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
         (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof using All.
-    iIntros (HmIE0 Help0 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
-      "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HS0 HmIE0 Help0 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
+      "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step.
     iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -272,6 +278,7 @@ Section FinalWP.
     iDestruct (reg_valid with "Hreg Hhs")   as %Lhs.
     iDestruct (reg_valid with "Hreg Hmdl")  as %Lmdl.
     iDestruct (reg_valid with "Hreg Hmst'") as %Lmst2.
+    iDestruct (reg_valid with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid with "Hreg Help")  as %Lelp.
     (* derive the state-specific fetch fact from the owned instruction bytes;
        [forward_exec_final] needs it at [sA s = set_reg s minstret_increment b]. *)
@@ -284,6 +291,7 @@ Section FinalWP.
     iExists (sFc s). iSplitR.
     { iPureIntro. rewrite <- (sF_eq s Lx10 Lx11 Lmst).
       apply forward_exec_final; try assumption.
+      - rewrite Lmisa. exact HS0.
       - rewrite Lmst2. exact HmIE0.
       - rewrite Lelp. exact Help0. }
     iIntros "!>".
@@ -296,10 +304,10 @@ Section FinalWP.
     - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hpmpc Hpma Hhtif Hibytes").
+      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes").
     - iMod "Hclose" as "_". iModIntro.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Help Hpmpc Hpma Hhtif Hibytes").
+      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes").
   Qed.
 
 End FinalWP.

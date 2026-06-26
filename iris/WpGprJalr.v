@@ -98,29 +98,29 @@ Section ForwardJALRg.
     register_lookup PC s.(sregs) = pc ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (access_vec_dec jrtgt 0) ('b"0") = true ->
     bit_to_bool (access_vec_dec jrtgt 1) = false ->
     exec riscv_step s = Some (tt, sFrg).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Halign Hbit1.
+    intros Lpc Lpriv Lhs LS LmIE Lelp Halign Hbit1.
     assert (LpcA  : register_lookup PC sArg.(sregs) = pc).
     { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege sArg.(sregs) = Machine).
     { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
     assert (LhsA  : register_lookup hart_state sArg.(sregs) = HART_ACTIVE tt).
     { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) sArg.(sregs) = zeros' 64).
-    { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmideleg | vm_compute; reflexivity ]. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sArg.(sregs))) ('b"1") = true).
+    { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) sArg.(sregs))) ('b"1") = false).
     { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LmIE | vm_compute; reflexivity ]. }
     assert (LelpA : eq_vec (register_lookup elp sArg.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false).
     { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sArg = Some (None, sArg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sArg _ (exec_currentlyEnabled_S sArg) LmidA LmIEA). }
+      apply (exec_getPendingSet_machine_none sArg _ (exec_currentlyEnabled_S sArg) (or_introl LSA) LmIEA). }
     assert (HfetchA : exec (fetch tt) sArg = Some (F_Base w, sArg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sArg = Some (JALR (imm, Regidx rs1, Regidx rd), sArg))
       by (apply Hdec; exact LprivA).
@@ -234,7 +234,7 @@ Section WpJalrGpr.
   Context `{!riscvGS Σ}.
 
   Lemma wp_jalr_gpr (pc : mword 64) (w : mword 32) (imm : mword 12) (rs1 rd : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (vrs1 vd : mword 64)
+      (m : gmap register_bitvector_64 (mword 64)) (vrs1 vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 mseccfg0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -242,6 +242,7 @@ Section WpJalrGpr.
     uint rs1 <> 0 -> uint rd <> 0 ->
     m !! gpr_of_Z (uint rs1) = Some vrs1 ->
     m !! gpr_of_Z (uint rd) = Some vd ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
@@ -258,21 +259,22 @@ Section WpJalrGpr.
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    PC ↦ᵣ pc -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
+    PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     mseccfg ↦ᵣ mseccfg0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
     ▷ ( PC ↦ᵣ update_vec_dec (add_vec vrs1 (sign_extend' 64 imm)) 0 ('b"0") -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (add_vec_int pc 4)]> m) -∗
+        misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ update_vec_dec (add_vec vrs1 (sign_extend' 64 imm)) 0 ('b"0") -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         mseccfg ↦ᵣ mseccfg0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -280,14 +282,15 @@ Section WpJalrGpr.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrs1 Hrd Hmrs1 Hmd Hmlpe Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hal0 Hal1 Hb1 HmIE Help)
-      "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (Hrs1 Hrd Hmrs1 Hmd HS Hmlpe Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hal0 Hal1 Hb1 HmIE Help)
+      "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
     iDestruct (reg_valid with "Hreg Hms")    as %Lms.
     iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid with "Hreg Help")   as %Lelp.
@@ -309,7 +312,8 @@ Section WpJalrGpr.
     { iPureIntro.
       rewrite <- (sFj_eq_jalr s pc b1 imm rs1 rd mst0 Lpc Lmst).
       apply (forward_exec_jalr_gpr s pc b1 w imm rs1 rd Hfetch_at Hsi_s Hrs1 Hrd Hdec
-               ltac:(rewrite Lsec; exact Hmlpe) Lpc Lpriv Lhs Lmdl).
+               ltac:(rewrite Lsec; exact Hmlpe) Lpc Lpriv Lhs).
+      - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Hjt. exact Hal0.
@@ -327,9 +331,9 @@ Section WpJalrGpr.
     unfold sFcjr, base_upd_jr. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
     - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsec Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End WpJalrGpr.
 
