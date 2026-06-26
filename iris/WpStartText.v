@@ -217,4 +217,69 @@ Section StartText.
     iIntros "($ & H)". iFrame.
   Qed.
 
+  (* ====================================================================== *)
+  (* Compressed-decode lemmas for start's RVC instructions.                  *)
+  (* The compressed decoder [encdec_compressed_backwards] is a long nested   *)
+  (* chain of clauses, each either a pure pattern guard or a                 *)
+  (* [and_boolM (currentlyEnabled Ext_Zca) (returnM guard)] (C-ext gated).   *)
+  (* [walk] traverses the non-matching clauses (skipping each via the cE-Zca *)
+  (* helper / false pure-guard / collapsing the [bind (returnM None) match]  *)
+  (* join) and stalls at the matching clause, where the guard is true.       *)
+  (* ====================================================================== *)
+  Ltac walk s HmisaC :=
+    first
+    [ rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) s)); cbn match
+    | match goal with
+      | |- context[Defs.bind (Defs.and_boolM (currentlyEnabled Ext_Zca) (returnM ?pat)) _] =>
+          rewrite (exec_bind_Some _ _ _ _ _
+                     (exec_cezca_false s pat HmisaC ltac:(vm_compute; reflexivity)));
+          cbn match
+      end
+    | match goal with |- context[if ?g then _ else returnM None] =>
+        replace g with false by (vm_compute; reflexivity) end; cbn match
+    | match goal with |- context[if ?g then _ else _] =>
+        replace g with false by (vm_compute; reflexivity) end; cbn match ].
+
+  (* idx 30, addr 0x80000058: "addi sp,sp,-16".  enc 0x1141 has funct3 = 000,
+     op = 01, so it is the compressed C_ADDI (sp, -16) -- NOT C_ADDI16SP
+     (funct3 011).  Decodes to C_ADDI (imm, sp). *)
+  Definition h_caddi30 : mword 16 := mword_of_int 0x1141.
+  Definition imm_caddi30 : mword 6 :=
+    concat_vec (subrange_vec_dec h_caddi30 12 12) (subrange_vec_dec h_caddi30 6 2).
+  Definition rd_caddi30 : mword 5 :=
+    autocast (subrange_vec_dec (subrange_vec_dec h_caddi30 11 7) (regidx_bit_width - 1) 0).
+
+  Lemma decode_caddi30 s :
+    eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed h_caddi30) s = Some (C_ADDI (imm_caddi30, Regidx rd_caddi30), s).
+  Proof.
+    intro HmisaC. unfold imm_caddi30, rd_caddi30, h_caddi30.
+    unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
+    skip_pure_clause.
+    repeat (walk s HmisaC).
+    (* C_ADDI clause: outer pure guard true, then encdec_reg + and_boolM(returnM neq)(cE Zca) *)
+    assert (Hrd : exec (encdec_reg_backwards (subrange_vec_dec (mword_of_int 0x1141 : mword 16) 11 7)) s
+                = Some (Regidx (autocast (T := mword)
+                          (subrange_vec_dec (subrange_vec_dec (mword_of_int 0x1141 : mword 16) 11 7)
+                             (Z.sub regidx_bit_width 1) 0)), s)).
+    { unfold encdec_reg_backwards.
+      match goal with |- context[if ?g then returnM (Regidx _) else _] =>
+        replace g with true by (vm_compute; reflexivity) end.
+      cbn match. apply exec_returnM. }
+    match goal with |- context[if ?g then _ else returnM None] =>
+      replace g with true by (vm_compute; reflexivity) end.
+    cbn match.
+    rewrite exec_bind.
+    rewrite (exec_bind_Some _ _ _ _ _ Hrd). cbn beta.
+    match goal with
+    | |- context[Defs.and_boolM (returnM ?g) (currentlyEnabled Ext_Zca)] =>
+        rewrite (exec_bind_Some _ _ _ _ _
+                  (exec_andM_true (returnM g) (currentlyEnabled Ext_Zca) s
+                     (exec_returnM_true g s ltac:(vm_compute; reflexivity))
+                     (exec_currentlyEnabled_Zca s HmisaC)))
+    end.
+    cbn beta iota.
+    rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  Qed.
+
 End StartText.
