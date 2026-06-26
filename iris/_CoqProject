@@ -33,3 +33,4 @@ WpRvc.v
 WpAlu2.v
 KernelBoot.v
 WpStartText.v
+WpStartChain.v
