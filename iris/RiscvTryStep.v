@@ -139,8 +139,9 @@ Fixpoint runR {R X} (m : Defs.monadR R exception X)
        | Interface.MemWrite n req =>
            fun k =>
              runR (k (inl None))
-                  (set_mem s (Interface.WriteReq.pa req)
-                             (bv_extract 0 8 (Interface.WriteReq.value req))) res s'
+                  (MState s.(sregs)
+                     (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                  (Interface.WriteReq.value req))) res s'
        | Interface.InstrAnnounce _    => fun k => runR (k tt) s res s'
        | Interface.BranchAnnounce _ _ => fun k => runR (k tt) s res s'
        | Interface.Barrier _          => fun k => runR (k tt) s res s'
@@ -769,8 +770,9 @@ Fixpoint execR {R X} (m : Defs.monadR R exception X)
        | Interface.MemWrite n req =>
            fun k =>
              execR (k (inl None))
-                   (set_mem s (Interface.WriteReq.pa req)
-                              (bv_extract 0 8 (Interface.WriteReq.value req)))
+                   (MState s.(sregs)
+                      (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                   (Interface.WriteReq.value req)))
        | Interface.InstrAnnounce _    => fun k => execR (k tt) s
        | Interface.BranchAnnounce _ _ => fun k => execR (k tt) s
        | Interface.Barrier _          => fun k => execR (k tt) s

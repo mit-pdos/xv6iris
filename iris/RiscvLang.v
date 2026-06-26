@@ -99,8 +99,9 @@ Fixpoint run {X} (m : M X) (s : mstate) (x : X) (s' : mstate) {struct m} : Prop 
        | Interface.MemWrite n req =>
            fun k =>
              run (k (inl None))
-                 (set_mem s (Interface.WriteReq.pa req)
-                            (bv_extract 0 8 (Interface.WriteReq.value req))) x s'
+                 (MState s.(sregs)
+                    (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                 (Interface.WriteReq.value req))) x s'
        (* trace / announce outcomes: state no-ops *)
        | Interface.InstrAnnounce _   => fun k => run (k tt) s x s'
        | Interface.BranchAnnounce _ _=> fun k => run (k tt) s x s'

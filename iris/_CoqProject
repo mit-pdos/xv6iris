@@ -21,4 +21,12 @@ WpGprAddi.v
 WpGprMul.v
 WpGprCsrr.v
 WpGprJal.v
+WpGprLogic.v
+WpGprShift.v
+WpGprJalr.v
+WpGprStore.v
+WpGprCsrw.v
+WpGprMret.v
+WpGprMretWp.v
+WpGprCsrrAny.v
 KernelBoot.v

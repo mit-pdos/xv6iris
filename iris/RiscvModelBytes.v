@@ -169,3 +169,13 @@ Proof.
   replace (Z.of_N (8 * N.of_nat j)) with (8 * Z.of_nat j) by (rewrite N2Z.inj_mul; lia).
   rewrite Hbyte, Hbb. reflexivity.
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* write_bytes: the dual of read_bytes -- store the [n] little-endian      *)
+(* bytes of [v] at [pa..pa+n).  Used by the MemWrite case of the           *)
+(* interpreters so that multi-byte stores (e.g. [sd], width 8) are         *)
+(* faithful (the previous handler wrote only byte 0).                       *)
+(* ---------------------------------------------------------------------- *)
+Definition write_bytes {w : N} (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N) (v : bv w)
+  : gmap Arch.pa (bv 8) :=
+  foldr (fun j acc => <[ pa_add pa j := nth_byte v j ]> acc) mm (seq 0 (N.to_nat n)).

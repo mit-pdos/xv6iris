@@ -54,8 +54,9 @@ Fixpoint exec {X} (m : M X) (s : mstate) {struct m} : option (X * mstate) :=
            end
        | Interface.MemWrite n req => fun k =>
            exec (k (inl None))
-                (set_mem s (Interface.WriteReq.pa req)
-                           (bv_extract 0 8 (Interface.WriteReq.value req)))
+                (MState s.(sregs)
+                   (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                (Interface.WriteReq.value req)))
        | Interface.InstrAnnounce _   => fun k => exec (k tt) s
        | Interface.BranchAnnounce _ _=> fun k => exec (k tt) s
        | Interface.Barrier _         => fun k => exec (k tt) s
