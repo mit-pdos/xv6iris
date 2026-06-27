@@ -133,7 +133,7 @@ Section WpKernelMret.
   (* idx 60: csrr a5,mhartid -> CSRReg CSRRS. *)
   Lemma decode_s60 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw60) s = Some (CSRReg (subrange_vec_dec sw60 31 20, Regidx (scsr_rs1z sw60), Regidx (scsr_rd sw60), CSRRS), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw60 s Hpriv. csr_body sw60 s CSRRS. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 61: c.addiw a5 -> C_ADDIW. *)
   Lemma decode_s61 s : eq_vec (_get_Misa_C (register_lookup misa (sregs s))) ('b"1") = true ->

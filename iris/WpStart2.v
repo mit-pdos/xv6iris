@@ -161,7 +161,7 @@ Section WpStart2.
   Lemma decode_s34 s :
     register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw34) s = Some (CSRReg (subrange_vec_dec sw34 31 20, Regidx srs1z34, Regidx srd34, CSRRS), s).
-  Proof. intro Hpriv. unfold srs1z34, srd34. csr_prefix sw34 s Hpriv. csr_body sw34 s CSRRS. Qed.
+  Proof. intro Hpriv. unfold srs1z34, srd34. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 42: auipc a5  enc 0x00001797 -> UTYPE (imm, rd, AUIPC). *)
   Definition sw42 : mword 32 := mword_of_int 0x00001797.
@@ -210,61 +210,61 @@ Section WpStart2.
   Definition sw41 : mword 32 := mword_of_int 0x30079073.
   Lemma decode_s41 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw41) s = Some (CSRReg (subrange_vec_dec sw41 31 20, Regidx (scsr_rs1z sw41), Regidx (scsr_rd sw41), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw41 s Hpriv. csr_body sw41 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 44: csrw mepc,a5  0x34179073 -> CSRRW. *)
   Definition sw44 : mword 32 := mword_of_int 0x34179073.
   Lemma decode_s44 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw44) s = Some (CSRReg (subrange_vec_dec sw44 31 20, Regidx (scsr_rs1z sw44), Regidx (scsr_rd sw44), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw44 s Hpriv. csr_body sw44 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 46: csrw satp,a5  0x18079073 -> CSRRW. *)
   Definition sw46 : mword 32 := mword_of_int 0x18079073.
   Lemma decode_s46 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw46) s = Some (CSRReg (subrange_vec_dec sw46 31 20, Regidx (scsr_rs1z sw46), Regidx (scsr_rd sw46), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw46 s Hpriv. csr_body sw46 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 49: csrw medeleg,a5  0x30279073 -> CSRRW. *)
   Definition sw49 : mword 32 := mword_of_int 0x30279073.
   Lemma decode_s49 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw49) s = Some (CSRReg (subrange_vec_dec sw49 31 20, Regidx (scsr_rs1z sw49), Regidx (scsr_rd sw49), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw49 s Hpriv. csr_body sw49 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 50: csrw mideleg,a5  0x30379073 -> CSRRW. *)
   Definition sw50 : mword 32 := mword_of_int 0x30379073.
   Lemma decode_s50 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw50) s = Some (CSRReg (subrange_vec_dec sw50 31 20, Regidx (scsr_rs1z sw50), Regidx (scsr_rd sw50), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw50 s Hpriv. csr_body sw50 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 51: csrr a5,sie  0x104027f3 -> CSRRS. *)
   Definition sw51 : mword 32 := mword_of_int 0x104027f3.
   Lemma decode_s51 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw51) s = Some (CSRReg (subrange_vec_dec sw51 31 20, Regidx (scsr_rs1z sw51), Regidx (scsr_rd sw51), CSRRS), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw51 s Hpriv. csr_body sw51 s CSRRS. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 53: csrw sie,a5  0x10479073 -> CSRRW. *)
   Definition sw53 : mword 32 := mword_of_int 0x10479073.
   Lemma decode_s53 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw53) s = Some (CSRReg (subrange_vec_dec sw53 31 20, Regidx (scsr_rs1z sw53), Regidx (scsr_rd sw53), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw53 s Hpriv. csr_body sw53 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 56: csrw pmpaddr0,a5  0x3b079073 -> CSRRW. *)
   Definition sw56 : mword 32 := mword_of_int 0x3b079073.
   Lemma decode_s56 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw56) s = Some (CSRReg (subrange_vec_dec sw56 31 20, Regidx (scsr_rs1z sw56), Regidx (scsr_rd sw56), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw56 s Hpriv. csr_body sw56 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 58: csrw pmpcfg0,a5  0x3a079073 -> CSRRW. *)
   Definition sw58 : mword 32 := mword_of_int 0x3a079073.
   Lemma decode_s58 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw58) s = Some (CSRReg (subrange_vec_dec sw58 31 20, Regidx (scsr_rs1z sw58), Regidx (scsr_rd sw58), CSRRW), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw58 s Hpriv. csr_body sw58 s CSRRW. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 60: csrr a5,mhartid  0xf14027f3 -> CSRRS. *)
   Definition sw60 : mword 32 := mword_of_int 0xf14027f3.
   Lemma decode_s60 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw60) s = Some (CSRReg (subrange_vec_dec sw60 31 20, Regidx (scsr_rs1z sw60), Regidx (scsr_rd sw60), CSRRS), s).
-  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. csr_prefix sw60 s Hpriv. csr_body sw60 s CSRRS. Qed.
+  Proof. intro Hpriv. unfold scsr_rs1z, scsr_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* --- ITYPE decodes (addi / ori). --- *)
   Definition sit_rs1 (w : mword 32) : mword 5 := autocast (subrange_vec_dec (subrange_vec_dec w 19 15) (regidx_bit_width - 1) 0).
@@ -274,25 +274,25 @@ Section WpStart2.
   Definition sw36 : mword 32 := mword_of_int 0x7ff70713.
   Lemma decode_s36 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw36) s = Some (ITYPE (subrange_vec_dec sw36 31 20, Regidx (sit_rs1 sw36), Regidx (sit_rd sw36), ADDI), s).
-  Proof. intro Hpriv. unfold sit_rs1, sit_rd. csr_prefix sw36 s Hpriv. itype_body sw36 s ADDI. Qed.
+  Proof. intro Hpriv. unfold sit_rs1, sit_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 39: addi a4,a4,...  0x80070713 -> ITYPE ADDI. *)
   Definition sw39 : mword 32 := mword_of_int 0x80070713.
   Lemma decode_s39 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw39) s = Some (ITYPE (subrange_vec_dec sw39 31 20, Regidx (sit_rs1 sw39), Regidx (sit_rd sw39), ADDI), s).
-  Proof. intro Hpriv. unfold sit_rs1, sit_rd. csr_prefix sw39 s Hpriv. itype_body sw39 s ADDI. Qed.
+  Proof. intro Hpriv. unfold sit_rs1, sit_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 43: addi a5,a5,...  0xe0a78793 -> ITYPE ADDI. *)
   Definition sw43 : mword 32 := mword_of_int 0xe0a78793.
   Lemma decode_s43 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw43) s = Some (ITYPE (subrange_vec_dec sw43 31 20, Regidx (sit_rs1 sw43), Regidx (sit_rd sw43), ADDI), s).
-  Proof. intro Hpriv. unfold sit_rs1, sit_rd. csr_prefix sw43 s Hpriv. itype_body sw43 s ADDI. Qed.
+  Proof. intro Hpriv. unfold sit_rs1, sit_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 52: ori a5,a5,...  0x2207e793 -> ITYPE ORI. *)
   Definition sw52 : mword 32 := mword_of_int 0x2207e793.
   Lemma decode_s52 s : register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode sw52) s = Some (ITYPE (subrange_vec_dec sw52 31 20, Regidx (sit_rs1 sw52), Regidx (sit_rd sw52), ORI), s).
-  Proof. intro Hpriv. unfold sit_rs1, sit_rd. csr_prefix sw52 s Hpriv. itype_body sw52 s ORI. Qed.
+  Proof. intro Hpriv. unfold sit_rs1, sit_rd. decode_pause_prefix s Hpriv. decode_finish s. Qed.
 
   (* idx 59: jal ra,timerinit  0xf6dff0ef -> JAL (imm, rd=ra). *)
   Definition sw59 : mword 32 := mword_of_int 0xf6dff0ef.

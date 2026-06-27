@@ -105,6 +105,30 @@ for regenerating the Sail model.
 > use bare `set_solver` for a trivial subset/mask goal when heavy generated Sail
 > terms are in scope.**
 
+> **Build-perf note (decode/dispatch walks).** Stepping a concrete instruction
+> through one of the model's giant nested-`if` decision trees — the ~4000-clause
+> `ext_decode` or the ~90-way `read_CSR`/`write_CSR` CSR-address dispatch — must
+> *not* be done with the naive
+> `repeat (match goal with |- context[if ?g then _ else _] => replace g with false
+> by (vm_compute; reflexivity) end; cbn match)`.
+> That idiom is **O(#clauses²)**: each iteration re-scans the whole (huge) goal for
+> `context[…]` and then `cbn match`-traverses it. Two cheaper shapes:
+> * **Peel at the head, no scan.** `exec_if_false_g : g = false → exec (if g then A
+>   else B) s = exec B s` lets `repeat (erewrite exec_if_false_g by (vm_compute;
+>   reflexivity))` drop one guard per step with no goal-wide `context` match and no
+>   `cbn match`. Used for the `write_CSR`/`read_CSR` walks (`WpGprCsrw`, `drive_csr`
+>   in `WpGprCsrrAny`); `WpGprCsrw` 105 s → 82 s.
+> * **Collapse a read-free tail in ONE `vm_compute`.** Once the *gated* prefix
+>   (`currentlyEnabled` PAUSE/Zicfilp, which read state) is peeled by
+>   `decode_pause_prefix`, the rest of a CSR/ITYPE decode is a pure function of the
+>   concrete word, so `decode_finish` (vm-compute the decoder term + `change_no_check`
+>   splice + closing `vm_compute`) finishes it whole. Replacing the old
+>   `csr_prefix … ; csr_body/itype_body …` clause-walk pairs (≈8.5 s each, 24 sites)
+>   with `decode_pause_prefix s Hpriv. decode_finish s.` (≈1.8 s each) cut
+>   **`WpStart2` 184 s → 87 s, `WpStartChain` 187 s → 140 s**. (`Zicsr` is pure-true
+>   in this model, so it survives the `vm_compute`; only the `Zihintpause`/`Zicfilp`/
+>   `Zca` gates — which read `misa`/privilege — must be peeled by hand first.)
+
 To compile a single file by hand:
 
 ```sh
