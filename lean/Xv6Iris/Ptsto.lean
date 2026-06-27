@@ -85,6 +85,70 @@ theorem reg_valid {σ : DState} {r : DemoReg} {dq v} :
   ipureintro
   rw [← Hag r]; exact Hlk
 
+/-- Updating `r ↦ᵣ v₁` to `r ↦ᵣ v₂` updates the state interpretation to
+`σ.setReg r v₂` — the write bridge (analog of Rocq `reg_update`). -/
+theorem reg_update {σ : DState} {r : DemoReg} {v₁ v₂ : BitVec 64} :
+    (stateInterpDef σ : IProp GF) ∗ regPt r (.own 1) v₁ ⊢
+      |==> (stateInterpDef (σ.setReg r v₂) ∗ regPt r (.own 1) v₂) := by
+  unfold stateInterpDef regPt
+  iintro ⟨⟨%rm, Hi, %Hag⟩, Hr⟩
+  imod genHeap_update (v₂ := v₂) $$ [$Hi $Hr] with ⟨Hi, Hr⟩
+  imodintro
+  iframe Hr
+  iexists _
+  iframe Hi
+  ipureintro
+  intro r'
+  rw [Std.LawfulPartialMap.get?_insert (M := RegF)]
+  by_cases hrr : r = r'
+  · subst hrr; simp [MState.setReg]
+  · have h1 : regAddr r ≠ regAddr r' := fun h => hrr (regAddr_injective h)
+    rw [if_neg h1]
+    simp only [MState.setReg]
+    rw [dif_neg (fun h => hrr h.symm)]
+    exact Hag r'
+
+/-! ## The one-step WP rule (analog of Rocq `wp_exec_step` + `wp_step_*`) -/
+
+open Iris.ProgramLogic Language.Notation
+
+/-- Owning `PC ↦ᵣ pc`, one `Loop` step advances `PC` to `pc+4` and hands the
+updated ownership to the continuation. The first real WP about the demo machine,
+built on `wp_lift_step` + the `exec_step` reduction + the `reg_*` bridge. -/
+theorem wp_demo_step {s : Stuckness} {E : CoPset} {Φ : Empty → IProp GF} {pc : BitVec 64} :
+    DemoReg.PC ↦ᵣ pc -∗ ▷ (DemoReg.PC ↦ᵣ (pc + 4) -∗ WP RiscvExpr.Loop @ s; E {{ Φ }})
+      -∗ WP RiscvExpr.Loop @ s; E {{ Φ }} := by
+  iintro HPC Hcont
+  iapply wp_lift_step (e₁ := RiscvExpr.Loop) rfl
+  iintro %σ₁ %ns %obs %obs' %nt Hσ
+  ihave %Hpc : ⌜σ₁.regs DemoReg.PC = some pc⌝ $$ [Hσ HPC]
+  · ihave >%H := reg_valid $$ [$Hσ $HPC]
+    itrivial
+  iapply fupd_mask_intro Std.LawfulSet.empty_subset
+  iintro Hclose
+  isplitr
+  · ipureintro
+    have Hstep : PrimStep.primStep (RiscvExpr.Loop, σ₁) ([] : List Empty)
+        (RiscvExpr.Loop, σ₁.setReg DemoReg.PC (pc + 4), []) :=
+      ⟨rfl, rfl, rfl, rfl, (), exec_step Hpc⟩
+    cases s <;> first
+      | exact ⟨_, _, _, _, Hstep⟩
+      | trivial
+  inext
+  iintro %e₂ %σ₂ %eₜ %Hstep Hcred
+  obtain ⟨_, rfl, rfl, rfl, r, Hex⟩ := Hstep
+  have Hσ₂ : σ₂ = σ₁.setReg DemoReg.PC (pc + 4) :=
+    congrArg Prod.snd (Option.some.inj (Hex.symm.trans (exec_step (σ := σ₁) Hpc)))
+  subst Hσ₂
+  imod Hclose
+  imod reg_update (v₂ := pc + 4) $$ [$Hσ $HPC] with ⟨Hσ', HPC'⟩
+  imodintro
+  iframe Hσ'
+  isplitl [Hcont HPC']
+  · iapply Hcont $$ HPC'
+  · simp only [Algebra.BigOpL.bigOpL_nil]
+    itrivial
+
 end
 
 end Xv6Iris.Demo

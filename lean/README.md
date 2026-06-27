@@ -25,21 +25,28 @@ on top of [iris-lean](https://github.com/leanprover-community/iris-lean).
   - `Xv6Iris/Lang.lean` — the iris-lean `Language`/`PrimStep`/`ToVal` instance on
     a concrete demo machine (`Loop`, `Val = Empty`, step = `PC := PC+4`), i.e. the
     operational semantics plugged into iris-lean's program logic.
-  - `Xv6Iris/Ptsto.lean` — the ghost-state layer: a register `gen_heap`, `↦ᵣ`
-    points-to, the agreement-bridge `stateInterp` (`∃ rm, genHeapInterp rm ∗
-    ⌜regAgree rm σ.regs⌝`, Rocq's `reg_interp` pattern), the `StateInterp` +
-    `IrisGS_gen` instances, and the read-bridge lemma **`reg_valid`** (proved via
-    `genHeap_valid` + agreement).
+  - `Xv6Iris/Ptsto.lean` — the ghost-state + program-logic layer: a register
+    `gen_heap`, `↦ᵣ` points-to, the agreement-bridge `stateInterp` (`∃ rm,
+    genHeapInterp rm ∗ ⌜regAgree rm σ.regs⌝`, Rocq's `reg_interp` pattern), the
+    `StateInterp` + `IrisGS_gen` instances, the bridge lemmas **`reg_valid`**
+    (read) and **`reg_update`** (write), and **`wp_demo_step`** — the first real
+    weakest-precondition: owning `PC ↦ᵣ pc`, one `Loop` step advances `PC` to
+    `pc+4` and hands the updated ownership to the continuation. Built on
+    `wp_lift_step` + the `exec_step` reduction (in `Lang.lean`) + `reg_update`.
+    Analog of Rocq's `wp_exec_step` + the per-opcode `wp_step_*`. **Zero `sorry`.**
 
-  Two iris-lean specifics learned: (1) registers are keyed by `Nat` via an
-  injective `regAddr` because a custom enum key lacks the `LawfulFiniteMap`
-  (`Ord`/`TransOrd`/`LawfulEqOrd`) instances; (2) a *second* `gen_heap` (byte
-  memory) must use a **distinct key type** — `genHeapGS`'s `V` is an `outParam`,
-  so two heaps over the same key type are ambiguous to instance resolution.
+  iris-lean specifics learned (saved to memory): registers are keyed by `Nat` via
+  an injective `regAddr` (a custom enum key lacks `LawfulFiniteMap` =
+  `Ord`/`TransOrd`/`LawfulEqOrd`); a *second* `gen_heap` (byte memory) must use a
+  **distinct key type** (`genHeapGS`'s `V` is an `outParam`); the WP-mode proof
+  needs `wp_lift_step rfl`, `fupd_mask_intro … ; Hclose`, `inext`, `imod … $$
+  [$h …] with ⟨…⟩` (no parens around the `$$` application), `isplitl [h …]` to
+  route hypotheses, and `simp [Algebra.BigOpL.bigOpL_nil]` to clear the empty
+  fork list; bupd goals need parenthesizing (`|==> (A ∗ B)`).
 
-  Next increment: `reg_update` (write bridge; needs map `get?_insert` lemmas +
-  `regAddr` injectivity) and **`wp_step`** — the one-step WP rule (analog of Rocq
-  `wp_exec_step`) via `wp_lift_step`, then a first real WP about the demo step.
+  Next increment: generalize the demo to the *real* model (swap `DemoReg`/`step`
+  for the generated `Register`/`try_step` once the lean-sail fork lands), add the
+  byte-memory heap (distinct key type), and build per-opcode WPs.
 
 ### The one external dependency to resolve — RESOLVED to a path
 

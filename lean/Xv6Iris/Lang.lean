@@ -59,6 +59,12 @@ instance : PrimStep RiscvExpr DState (List Empty) where
 instance : Language RiscvExpr DState Empty Empty where
   val_stuck _ := rfl
 
+/-- Pure reduction of the demo step: reading `PC = pc`, one step sets `PC := pc+4`.
+The analog of the per-opcode `forward_exec_*` reductions in the Rocq dev. -/
+theorem exec_step {σ : DState} {pc : BitVec 64} (H : σ.regs DemoReg.PC = some pc) :
+    exec step σ = some ((), σ.setReg DemoReg.PC (pc + 4)) := by
+  simp only [step, readReg, writeReg, bind, Mon.bind, exec, H]
+
 /-- Sanity check: a `Loop` step is exactly one `exec step`. -/
 theorem primStep_iff {σ σ' : DState} :
     PrimStep.primStep (RiscvExpr.Loop, σ) ([] : List Empty) (RiscvExpr.Loop, σ', [])
