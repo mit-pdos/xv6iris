@@ -1,0 +1,73 @@
+name: CI
+
+# Builds the Sail-generated Rocq model (model-xv6iris/), the checked-in kernel
+# dump (kernel-rocq/), and the Iris proofs (iris/).
+#
+# It deliberately does NOT:
+#   * build the xv6 kernel ELF (the `xv6-riscv/` tree is .gitignored / absent),
+#   * regenerate kernel-rocq/KernelInstrs.v (or the sibling KernelData/KernelSyms),
+#   * regenerate the Sail model .v files (needs the `sail` compiler).
+# The .v files for all three are checked in; CI only (re)compiles them to .vo.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to a branch cancels any in-flight run for that branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Creates a project-local opam switch in $GITHUB_WORKSPACE/_opam and loads
+      # its environment, so plain `opam exec -- …` targets that switch.
+      - name: Set up OCaml / opam
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          opam-repositories: |
+            coq-released: https://coq.inria.fr/opam/released
+            default: https://opam.ocaml.org
+
+      # Pinned to match the development switch (Rocq 9.0.1, Iris 4.4.0, Sail
+      # support 0.20.1).  The leaf packages pull in coq-stdpp transitively, but
+      # we pin them too for a reproducible solve.
+      - name: Install Rocq / Iris / Sail toolchain
+        run: |
+          opam install -y \
+            coq.9.0.1 \
+            coq-iris.4.4.0 \
+            coq-stdpp.1.12.0 \
+            coq-stdpp-bitvector.1.12.0 \
+            coq-sail-stdpp.0.20.1
+
+      # ---- 1. Sail-generated Coq model (model-xv6iris/) ----
+      # `make model` only depends on the model's _CoqProject — no ELF, no Sail.
+      - name: Build Sail model (model-xv6iris/)
+        run: make SWITCH="$GITHUB_WORKSPACE" model
+
+      # ---- 2. Kernel dump (kernel-rocq/) ----
+      # Generate the CoqMakefile from the checked-in _CoqProject, then run it
+      # directly.  This skips the top-level `kernel-rocq` target, whose .v rules
+      # depend on the (absent) kernel ELF and would otherwise clone+build xv6 and
+      # regenerate KernelInstrs.v.
+      - name: Compile kernel dump (kernel-rocq/, no ELF rebuild / no regen)
+        run: |
+          make SWITCH="$GITHUB_WORKSPACE" kernel-rocq/CoqMakefile
+          opam exec -- make -C kernel-rocq -f CoqMakefile -j"$(nproc)"
+
+      # ---- 3. Iris proofs (iris/) ----
+      # Built directly (not via `make proofs`) for the same reason: `proofs`
+      # depends on the `kernel-rocq` target which pulls in the kernel ELF.  The
+      # model and kernel-rocq .vo from the previous steps are on disk already.
+      - name: Build Iris proofs (iris/)
+        run: |
+          make SWITCH="$GITHUB_WORKSPACE" iris/CoqMakefile
+          opam exec -- make -C iris -f CoqMakefile -j"$(nproc)"
