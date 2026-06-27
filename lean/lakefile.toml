@@ -1,0 +1,13 @@
+name = "xv6iris"
+defaultTargets = ["Xv6Iris"]
+
+# iris-lean lives in the `Iris/` subdirectory of the upstream monorepo.
+# Pinned to a known-good rev on toolchain v4.31.0 (see lean-toolchain).
+[[require]]
+name = "iris"
+git = "https://github.com/leanprover-community/iris-lean"
+rev = "3877dbeccd1b0545c5be7ef73318e8c86acf79ab"
+subDir = "Iris"
+
+[[lean_lib]]
+name = "Xv6Iris"
