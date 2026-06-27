@@ -482,7 +482,7 @@ Section WpStart2.
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                      (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
-    let bump := fun (x : mword 64) => if b1 then add_vec_int x 1 else x in
+    let bump := mbump b1 in
     let sp1  := add_vec sp0 (sign_extend' 64 (sign_extend' 12 imm9)) in
     let imm_ra := zero_extend' 12 (concat_vec uimm10 ('b"000")) in
     let pa_ra  := zero_extend' 64 (add_vec_int (zero_extend' 64 (subrange_vec_dec (add_vec sp1 (sign_extend' 64 imm_ra)) (xlen - 0 - 1) 0)) (0 * 8)) in
@@ -620,9 +620,9 @@ Section WpStart2.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc34 4) with spc35 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
-    iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc
               [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]
-              Hstkra Hstks0").
+              Hstkra Hstks0")).
     { unfold mout, m32, m30. iExact "Hfile". }
     { iFrame. }
   Qed.
@@ -647,7 +647,7 @@ Section WpStart2.
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                      (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
-    let bump := fun (x : mword 64) => if b1 then add_vec_int x 1 else x in
+    let bump := mbump b1 in
     let va4_35 := WpGprLui.luival (sign_extend' 20 (sclui_imm sw35)) in
     let va4_36 := add_vec va4_35 (sign_extend' 64 (subrange_vec_dec sw36 31 20)) in
     let va5_37 := and_vec va5 va4_36 in
@@ -807,8 +807,8 @@ Section WpStart2.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc40 2) with spc41 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
-    iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc
-              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]").
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc
+              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]")).
     { unfold mout, m39, m38, m37, m36, m35. iExact "Hfile". }
     { iFrame. }
   Qed.
@@ -830,7 +830,7 @@ Section WpStart2.
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                      (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
-    let bump := fun (x : mword 64) => if b1 then add_vec_int x 1 else x in
+    let bump := mbump b1 in
     let mstatus1 := mstatus_legalized mstatus0 va5 in
     let va5_42 := add_vec spc42 (auipc_off (subrange_vec_dec sw42 31 12)) in
     let va5_43 := add_vec va5_42 (sign_extend' 64 (subrange_vec_dec sw43 31 20)) in
@@ -966,8 +966,8 @@ Section WpStart2.
     iIntros "Hpc Hfile Hsatp Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc46 4) with spc47 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
-    iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp
-              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]").
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp
+              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]")).
     { unfold mout, m43, m42. iExact "Hfile". }
     { iFrame. }
   Qed.
@@ -993,7 +993,7 @@ Section WpStart2.
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                      (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
-    let bump := fun (x : mword 64) => if b1 then add_vec_int x 1 else x in
+    let bump := mbump b1 in
     let va5_47 := WpGprLui.luival (sign_extend' 20 (sclui_imm sw47)) in
     let va5_48 := add_vec va5_47 (sign_extend' 64 (sign_extend' 12 (scli_imm sw48))) in
     let mout := <[gpr_of_Z (uint (sreg117 sw48)) := regval_into_reg va5_48]>
@@ -1095,7 +1095,7 @@ Section WpStart2.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc50 4) with spc51 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
-    iApply ("Hcont" with "Hpc [Hfile] Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmede Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif").
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmede Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif")).
     { unfold mout, m48, m47. iExact "Hfile". }
   Qed.
 
@@ -1115,7 +1115,7 @@ Section WpStart2.
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                      (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
-    let bump := fun (x : mword 64) => if b1 then add_vec_int x 1 else x in
+    let bump := mbump b1 in
     let va5_51 := lower_mie mie0 mdv0 in
     let va5_52 := or_vec va5_51 (sign_extend' 64 (subrange_vec_dec sw52 31 20)) in
     let va5_54 := cli_wval (scli_imm sw54) in
@@ -1290,8 +1290,8 @@ Section WpStart2.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc58 4) with spc59 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
-    iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmie Hpmpa
-              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]").
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmie Hpmpa
+              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]")).
     { unfold mout, m57, m55, m54, m52, m51. iExact "Hfile". }
     { iFrame. }
   Qed.
@@ -1427,8 +1427,8 @@ Section WpStart2.
                         (regval_into_reg (add_vec_int spc59 4)))))
                   (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0"))
       with spc60 by (apply bv_eq; vm_compute; reflexivity).
-    iApply ("Hcont" with "Hpc Hfile Hmisa Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec
-              Hmcinh Hmcfg Hpmpc Hpma Hhtif H").
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc Hfile Hmisa Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec
+              Hmcinh Hmcfg Hpmpc Hpma Hhtif H")).
   Qed.
 
 End WpStart2.

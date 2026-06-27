@@ -155,3 +155,15 @@ Lemma exec_wX_bits_x2 (i : mword 5) s (v : mword 64) :
   uint i = 2 ->
   exec (wX_bits (Regidx i) v) s = Some (tt, set_reg s (R_bitvector_64 x2) (regval_into_reg v)).
 Proof. intro H. unfold wX_bits; cbn match. rewrite H. apply exec_wX_x2. Qed.
+
+(* Single SHARED, OPAQUE minstret bump.  The chunk WPs thread [minstret] through
+   ~20 bumps; written inline as [fun x => if b then add_vec_int x 1 else x] the
+   term is EXPONENTIAL -- [x] occurs in BOTH if-branches, so [bump^N] expands to
+   2^N nodes once iApply beta/zeta-reduces it, which made the composer's
+   [iApply (wp_ti_c3 ...)] blow up to ~83s.  As one OPAQUE constant [mbump b],
+   [mbump b (mbump b (... x))] stays a LINEAR chain (c3 iApply: 83s -> 0.17s). *)
+Definition mbump (b : bool) (x : mword 64) : mword 64 :=
+  if b then add_vec_int x 1 else x.
+Lemma mbump_eq (b : bool) (x : mword 64) : mbump b x = if b then add_vec_int x 1 else x.
+Proof. reflexivity. Qed.
+Global Opaque mbump.

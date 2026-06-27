@@ -147,8 +147,8 @@ Section WpStart3.
     iNext.
     iIntros "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     (* kernel_text is duplicable -> the persistent #H is still here. *)
-    iApply ("Hcont" with "Hpc Hnpc [Hfile] Hmisa Hmhartid Hmi [Hmst] Hpriv Hhs Hmdl Hms Hmepc
-              Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif H").
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc Hnpc [Hfile] Hmisa Hmhartid Hmi [Hmst] Hpriv Hhs Hmdl Hms Hmepc
+              Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif H")).
     { iExists _. iFrame "Hfile". }
     { iExists _. iFrame "Hmst". }
   Qed.
