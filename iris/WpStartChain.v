@@ -782,75 +782,58 @@ Section WpStartChain.
     ([∗ list] ab ∈ map (fun j => (pa_add (fetch_pa npc) j, nth_byte (mword_of_int enc : mword 32) j)) (seq 2 2),
        ab.1 ↦ₘ□ ab.2)%I.
 
+  (* The 2 [kinstr_bytes_pairs] setoid-rewrites cost ~8s each and are IDENTICAL
+     across every regroup lemma; factor them into ONE generic lemma so each
+     concrete regroup is just [apply] + a [vm_compute] byte-list equality. *)
+  Ltac regroup_bytes := vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity)).
+
+  Lemma regroup_gen (k1 k2 : KernelInstrs.kinstr) (pc : mword 64) (w : mword 32) :
+    app (instr_byte_pairs k1) (instr_byte_pairs k2)
+      = map (fun j => (pa_add (fetch_pa pc) j, nth_byte w j)) (seq 0 4) ->
+    (kinstr_bytes k1 ∗ kinstr_bytes k2) ⊣⊢ twin4 pc w.
+  Proof.
+    intro HL.
+    rewrite (kinstr_bytes_pairs k1) (kinstr_bytes_pairs k2).
+    rewrite /twin4 (win_pairs pc w 4) -!big_sepL_app HL. reflexivity.
+  Qed.
+
+  Lemma regroup_gen_trem (k1 k2 : KernelInstrs.kinstr) (pc npc : mword 64) (w : mword 32) (enc : Z) :
+    app (instr_byte_pairs k1) (instr_byte_pairs k2)
+      = app (map (fun j => (pa_add (fetch_pa pc) j, nth_byte w j)) (seq 0 4))
+            (map (fun j => (pa_add (fetch_pa npc) j, nth_byte (mword_of_int enc : mword 32) j)) (seq 2 2)) ->
+    (kinstr_bytes k1 ∗ kinstr_bytes k2) ⊣⊢ (twin4 pc w ∗ trem npc enc).
+  Proof.
+    intro HL.
+    rewrite (kinstr_bytes_pairs k1) (kinstr_bytes_pairs k2).
+    rewrite /twin4 (win_pairs pc w 4) /trem -!big_sepL_app HL. reflexivity.
+  Qed.
+
   (* For idx 9,11,14,26,28 the next instruction is RVC (2 bytes) so the 4-byte
      window covers BOTH instructions exactly (no remainder). *)
   Lemma regroup9 :
     (kinstr_bytes (skinstr 9) ∗ kinstr_bytes (skinstr 10)) ⊣⊢ twin4 tpc9 w4_9.
-  Proof.
-    rewrite (kinstr_bytes_pairs (skinstr 9)) (kinstr_bytes_pairs (skinstr 10)).
-    rewrite /twin4 (win_pairs tpc9 w4_9 4) -!big_sepL_app.
-    replace (app (instr_byte_pairs (skinstr 9)) (instr_byte_pairs (skinstr 10)))
-      with (map (fun j => (pa_add (fetch_pa tpc9) j, nth_byte w4_9 j)) (seq 0 4))
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
-  Qed.
+  Proof. apply regroup_gen. regroup_bytes. Qed.
 
   Lemma regroup11 :
     (kinstr_bytes (skinstr 11) ∗ kinstr_bytes (skinstr 12)) ⊣⊢ twin4 tpc11 w4_11.
-  Proof.
-    rewrite (kinstr_bytes_pairs (skinstr 11)) (kinstr_bytes_pairs (skinstr 12)).
-    rewrite /twin4 (win_pairs tpc11 w4_11 4) -!big_sepL_app.
-    replace (app (instr_byte_pairs (skinstr 11)) (instr_byte_pairs (skinstr 12)))
-      with (map (fun j => (pa_add (fetch_pa tpc11) j, nth_byte w4_11 j)) (seq 0 4))
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
-  Qed.
+  Proof. apply regroup_gen. regroup_bytes. Qed.
 
   Lemma regroup14 :
     (kinstr_bytes (skinstr 14) ∗ kinstr_bytes (skinstr 15)) ⊣⊢ twin4 tpc14 w4_14.
-  Proof.
-    rewrite (kinstr_bytes_pairs (skinstr 14)) (kinstr_bytes_pairs (skinstr 15)).
-    rewrite /twin4 (win_pairs tpc14 w4_14 4) -!big_sepL_app.
-    replace (app (instr_byte_pairs (skinstr 14)) (instr_byte_pairs (skinstr 15)))
-      with (map (fun j => (pa_add (fetch_pa tpc14) j, nth_byte w4_14 j)) (seq 0 4))
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
-  Qed.
+  Proof. apply regroup_gen. regroup_bytes. Qed.
 
   (* idx 16's next (idx 17) is 32-bit, so 2 bytes remain. *)
   Lemma regroup16 :
     (kinstr_bytes (skinstr 16) ∗ kinstr_bytes (skinstr 17)) ⊣⊢ (twin4 tpc16 w4_16 ∗ trem tpc17 0x30a79073).
-  Proof.
-    rewrite (kinstr_bytes_pairs (skinstr 16)) (kinstr_bytes_pairs (skinstr 17)).
-    rewrite /twin4 (win_pairs tpc16 w4_16 4) /trem -!big_sepL_app.
-    replace (app (instr_byte_pairs (skinstr 16)) (instr_byte_pairs (skinstr 17)))
-      with (app (map (fun j => (pa_add (fetch_pa tpc16) j, nth_byte w4_16 j)) (seq 0 4))
-                (map (fun j => (pa_add (fetch_pa tpc17) j, nth_byte (mword_of_int 0x30a79073 : mword 32) j)) (seq 2 2)))
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
-  Qed.
+  Proof. apply regroup_gen_trem. regroup_bytes. Qed.
 
   Lemma regroup26 :
     (kinstr_bytes (skinstr 26) ∗ kinstr_bytes (skinstr 27)) ⊣⊢ twin4 tpc26 w4_26.
-  Proof.
-    rewrite (kinstr_bytes_pairs (skinstr 26)) (kinstr_bytes_pairs (skinstr 27)).
-    rewrite /twin4 (win_pairs tpc26 w4_26 4) -!big_sepL_app.
-    replace (app (instr_byte_pairs (skinstr 26)) (instr_byte_pairs (skinstr 27)))
-      with (map (fun j => (pa_add (fetch_pa tpc26) j, nth_byte w4_26 j)) (seq 0 4))
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
-  Qed.
+  Proof. apply regroup_gen. regroup_bytes. Qed.
 
   Lemma regroup28 :
     (kinstr_bytes (skinstr 28) ∗ kinstr_bytes (skinstr 29)) ⊣⊢ twin4 tpc28 w4_28.
-  Proof.
-    rewrite (kinstr_bytes_pairs (skinstr 28)) (kinstr_bytes_pairs (skinstr 29)).
-    rewrite /twin4 (win_pairs tpc28 w4_28 4) -!big_sepL_app.
-    replace (app (instr_byte_pairs (skinstr 28)) (instr_byte_pairs (skinstr 29)))
-      with (map (fun j => (pa_add (fetch_pa tpc28) j, nth_byte w4_28 j)) (seq 0 4))
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
-  Qed.
+  Proof. apply regroup_gen. regroup_bytes. Qed.
 
   (* decode lemmas for the combined 4-byte words: the decoder sees only the low
      16 bits (= the RVC instr), so reduce to the 2-byte decode lemmas. *)
