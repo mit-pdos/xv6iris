@@ -76,6 +76,22 @@ Ltac skip_pure_clause :=
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) _));
   cbn match.
 
+(* [decode_finish s]: for an instruction that is NOT extension-gated, the
+   remaining decoder is a read-free pure function of the (concrete) word, so a
+   single reduction collapses ALL of its clause guards at once -- replacing the
+   O(#clauses^2) goal re-traversal of a clause-by-clause [repeat skip_pure_clause]
+   walk (e.g. decode_ld 6.5s -> ~0s).  We first [vm_compute] the decoder term [d]
+   in isolation and splice it back ([change_no_check] is sound: [r] is by
+   construction the vm-normal form of [d]); pre-normalizing the small term makes
+   the closing [vm_compute] cheap.  The [try] lets it also work when the goal
+   isn't yet in [exec d s] head form (then the closing reduction does it all). *)
+Ltac decode_finish s :=
+  try (match goal with
+       | |- exec ?d s = _ =>
+           let r := eval vm_compute in d in change_no_check (exec d s) with (exec r s)
+       end);
+  vm_compute; reflexivity.
+
 Definition imm_auipc : mword 20 := subrange_vec_dec w_auipc 31 12.
 Definition i_auipc : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_auipc 11 7) (regidx_bit_width - 1) 0).
@@ -106,27 +122,8 @@ Proof.
   { destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz].
     rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz). destruct bz; [apply exec_returnm | reflexivity]. }
   rewrite (exec_bind_Some _ _ _ _ _ HA2). cbn match.
-  (* UTYPE pure guard = true *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  (* UTYPE body: encdec_reg_backwards then encdec_uop_backwards *)
-  unfold encdec_reg_backwards.
-  match goal with |- context[if ?g then returnM (Regidx ?x) else _] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn match.
-  unfold encdec_uop_backwards.
-  match goal with |- context[if ?g then returnM LUI else _] =>
-    replace g with false by (vm_compute; reflexivity) end.
-  match goal with |- context[if ?g then returnM AUIPC else _] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn match.
-  (* body fully reduced to [returnM (Some (UTYPE ...))]; collapse the two matches *)
-  match goal with |- context[exec (returnM ?x) s] => rewrite (exec_returnM x s) end.
-  cbn match. cbn match.
-  apply exec_returnM.
+  (* AUIPC (UTYPE) is not extension-gated: collapse the read-free remainder. *)
+  decode_finish s.
 Qed.
 
 Definition w_ld : mword 32 := mword_of_int 0x1d813103.
@@ -172,21 +169,6 @@ Proof.
   cbn match.
   match goal with |- context[exec (returnM ?x) s] => rewrite (exec_returnM x s) end.
   cbn match. cbn match.
-  repeat skip_pure_clause.
-  (* LOAD clause: guard true *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  unfold encdec_reg_backwards.
-  match goal with |- context[if ?g then returnM (Regidx ?x) else _] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn match.
-  (* body collapsed to [returnM (LOAD ...)]; normalize fields to the expected form *)
-  match goal with
-  | |- context[exec (returnM (LOAD (_, Regidx ?rs1, Regidx ?rd, ?u, ?wd))) s] =>
-      replace rs1 with rd by (vm_compute; reflexivity);
-      replace u with false by (vm_compute; reflexivity);
-      replace wd with 8 by (vm_compute; reflexivity)
-  end.
-  apply exec_returnM.
+  (* LOAD is not extension-gated: collapse the read-free remainder in one pass. *)
+  decode_finish s.
 Qed.
