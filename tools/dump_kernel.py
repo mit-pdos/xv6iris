@@ -549,6 +549,29 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     # lookups are unaffected.
     w(f"Global Typeclasses Opaque {name}.")
     w("")
+    # Auxiliary per-instruction DECODE-INDEX metadata: just (address, width-bits,
+    # encoding) per instruction, NO asm, so the flat list elaborates without
+    # chunking.  This is NOT the byte-storage format (that is the per-byte
+    # [kernel_bytes] above, which owns every byte); it only lets a proof name the
+    # i-th instruction so it can pick the right decode lemma + fetch window.  The
+    # window bytes themselves are still extracted per-byte via [kernel_window].
+    w("Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.")
+    w("")
+    cur_label2 = None
+    w("Definition kernel_instrs : list kinstr := [")
+    first2 = True
+    for it in items:
+        if isinstance(it, Label):
+            cur_label2 = it
+            continue
+        if cur_label2 is not None:
+            w(f"  (* <{cur_label2.name}> @ 0x{cur_label2.addr:x} *)")
+            cur_label2 = None
+        sep = "  " if first2 else "; "
+        first2 = False
+        w(f"{sep}MkKInstr (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z")
+    w("].")
+    w("")
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:

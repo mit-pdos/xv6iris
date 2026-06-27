@@ -1118,33 +1118,7 @@ Section WpStartChain.
     cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
   Qed.
 
-  (* reverse of chain_text_split: reassemble kernel_text from the windows. *)
-  Lemma chain_text_combine :
-    (chain_prefix ∗
-      kinstr_bytes (skinstr 9) ∗ kinstr_bytes (skinstr 10) ∗ kinstr_bytes (skinstr 11) ∗
-      kinstr_bytes (skinstr 12) ∗ kinstr_bytes (skinstr 13) ∗ kinstr_bytes (skinstr 14) ∗
-      kinstr_bytes (skinstr 15) ∗ kinstr_bytes (skinstr 16) ∗ kinstr_bytes (skinstr 17) ∗
-      kinstr_bytes (skinstr 18) ∗ kinstr_bytes (skinstr 19) ∗ kinstr_bytes (skinstr 20) ∗
-      kinstr_bytes (skinstr 21) ∗ kinstr_bytes (skinstr 22) ∗ kinstr_bytes (skinstr 23) ∗
-      kinstr_bytes (skinstr 24) ∗ kinstr_bytes (skinstr 25) ∗ kinstr_bytes (skinstr 26) ∗
-      kinstr_bytes (skinstr 27) ∗ kinstr_bytes (skinstr 28) ∗ kinstr_bytes (skinstr 29) ∗
-      kinstr_bytes (skinstr 30) ∗ kinstr_bytes (skinstr 31) ∗ kinstr_bytes (skinstr 32) ∗
-      kinstr_bytes (skinstr 33) ∗ kinstr_bytes (skinstr 34) ∗ kinstr_bytes (skinstr 35) ∗
-      kinstr_bytes (skinstr 36) ∗ kinstr_bytes (skinstr 37) ∗ kinstr_bytes (skinstr 38) ∗
-      kinstr_bytes (skinstr 39) ∗ kinstr_bytes (skinstr 40) ∗ kinstr_bytes (skinstr 41) ∗
-      kinstr_bytes (skinstr 42) ∗ kinstr_bytes (skinstr 43) ∗ kinstr_bytes (skinstr 44) ∗
-      kinstr_bytes (skinstr 45) ∗ kinstr_bytes (skinstr 46) ∗ kinstr_bytes (skinstr 47) ∗
-      kinstr_bytes (skinstr 48) ∗ kinstr_bytes (skinstr 49) ∗ kinstr_bytes (skinstr 50) ∗
-      kinstr_bytes (skinstr 51) ∗ kinstr_bytes (skinstr 52) ∗ kinstr_bytes (skinstr 53) ∗
-      kinstr_bytes (skinstr 54) ∗ kinstr_bytes (skinstr 55) ∗ kinstr_bytes (skinstr 56) ∗
-      kinstr_bytes (skinstr 57) ∗ kinstr_bytes (skinstr 58) ∗ kinstr_bytes (skinstr 59) ∗
-      kinstr_bytes (skinstr 60) ∗ kinstr_bytes (skinstr 61) ∗ kinstr_bytes (skinstr 62) ∗
-      kinstr_bytes (skinstr 63) ∗ chain_tail) ⊢ kernel_text.
-  Proof.
-    rewrite /kernel_text {1}chain_instrs_decomp big_sepL_app.
-    rewrite 55!big_sepL_cons -/chain_prefix -/chain_tail.
-    iIntros "H". iExact "H".
-  Qed.
+  (* chain_text_combine is provided by WpStartText on the per-byte foundation. *)
 
   (* per-chunk instruction-window bundles (kernel text is never modified). *)
   Definition Kc1 : iProp Σ :=

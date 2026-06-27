@@ -32,4 +32,8 @@ WpGprCsrrAny.v
 WpRvc.v
 WpAlu2.v
 KernelBoot.v
+WpStartText.v
+WpStartChain.v
+WpStart2.v
+WpStart3.v
 WpKernelMret.v
