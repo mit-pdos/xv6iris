@@ -24,7 +24,7 @@ Section StartText.
   Context `{!riscvGS Σ}.
 
   Definition kdefault : kinstr := MkKInstr 0 0 0.
-  Definition skinstr (i : nat) : kinstr := default kdefault (kernel_instrs !! Z.of_nat i).
+  Definition skinstr (i : Z) : kinstr := default kdefault (kernel_instrs !! i).
 
   (* per-opcode fetch-window of one instruction (per-byte addresses, persistent). *)
   Definition kinstr_bytes (k : kinstr) : iProp Σ :=
@@ -48,7 +48,7 @@ Section StartText.
   Proof. rewrite big_sepL_fmap. done. Qed.
 
   (* kinstr_bytes IS the window form, so E_skinstr is reflexivity given the fields. *)
-  Lemma E_skinstr (i : nat) (addr enc : Z) (width : nat) :
+  Lemma E_skinstr (i : Z) (addr enc : Z) (width : nat) :
     ki_addr (skinstr i) = addr -> ki_enc (skinstr i) = enc -> ki_width (skinstr i) = width ->
     kinstr_bytes (skinstr i) =
       ([∗ list] j ∈ seq 0 (width / 8),
@@ -67,15 +67,6 @@ Section StartText.
               (ki_width i / 8) Hb with "H").
   Qed.
 
-  Ltac sg i :=
-    let Hb := fresh "Hb" in
-    assert (Hb : forall j, (j < ki_width (skinstr i) / 8)%nat ->
-              kernel_bytes !! (ki_addr (skinstr i) + Z.of_nat j)%Z
-                = Some (nth_byte (mword_of_int (ki_enc (skinstr i)) : mword 32) j))
-      by (intros j Hj; vm_compute in Hj;
-          do 4 (destruct j as [|j];
-            [first [vm_compute; f_equal; apply bv_eq; reflexivity | exfalso; lia]|]); lia);
-    iApply (skinstr_get_aux (skinstr i) Hb with "H").
 
   (* No chain_text_split/start_text_split: extract each window per-instruction
      at point of use with the [sg] tactic (kernel_text is duplicable). *)
@@ -102,3 +93,15 @@ Section StartText.
         replace g with false by (vm_compute; reflexivity) end; cbn match ].
 
 End StartText.
+
+(* point-of-use window extractor (top level so it is visible to importers). *)
+Ltac sg i :=
+  let Hb := fresh "Hb" in
+  assert (Hb : forall j, (j < ki_width (skinstr i) / 8)%nat ->
+            kernel_bytes !! (ki_addr (skinstr i) + Z.of_nat j)%Z
+              = Some (nth_byte (mword_of_int (ki_enc (skinstr i)) : mword 32) j))
+    by (intros j Hj; vm_compute in Hj;
+        do 4 (destruct j as [|j];
+          [first [vm_compute; f_equal; apply bv_eq; reflexivity | exfalso; lia]|]); lia);
+  iApply (skinstr_get_aux (skinstr i) Hb with "H").
+

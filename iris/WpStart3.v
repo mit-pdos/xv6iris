@@ -76,12 +76,11 @@ Section WpStart3.
     intros b1 Hf15 Hf4 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe.
     destruct Hf4 as [vtp Hf4].
     iIntros "Hpc Hfile Hmisa Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc
-             Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif Htext".
+             Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif #H".
     iIntros "Hcont".
-    iDestruct (chain_text_split with "Htext") as
-      "(Hpre & K9 & K10 & K11 & K12 & K13 & K14 & K15 & K16 & K17 & K18 & K19 & K20 & K21 & K22 & K23 & K24 & K25 & K26 & K27 & K28 & K29 & K30 & K31 & K32 & K33 & K34 & K35 & K36 & K37 & K38 & K39 & K40 & K41 & K42 & K43 & K44 & K45 & K46 & K47 & K48 & K49 & K50 & K51 & K52 & K53 & K54 & K55 & K56 & K57 & K58 & K59 & K60 & K61 & K62 & K63 & Ktail)".
-    (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4) ---- *)
+    (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4); kernel_text duplicable ---- *)
     destruct Hf15 as [va5_60 Hf15].
+    iAssert (kinstr_bytes (skinstr 60)) as "#K60". { sg 60. }
     iEval (rewrite (E_skinstr 60 (kentry + 0xb4) 0xf14027f3 32%nat ltac:(vmc) ltac:(vmc) ltac:(vmc))) in "K60".
     iApply (wp_csrr_gpr spc60 sw60 (scsr_rd sw60) mfin va5_60 mhartid0 misa0 mdv0 b1
               _ mst0 mstatus0 mc mcfg pmpcfg0 pmar0 b1 elp0 E Φ
@@ -94,11 +93,13 @@ Section WpStart3.
               eq_refl HmIE Hlp
               with "Hpc Hfile Hmhartid Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K60").
     iNext.
-    iIntros "Hpc Hfile Hmhartid Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K60".
+    iIntros "Hpc Hfile Hmhartid Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc60 4) with spc61 by (vm_compute; reflexivity).
     set (m60 := <[gpr_of_Z (uint (scsr_rd sw60)) := regval_into_reg mhartid0]> mfin).
-    (* ---- idx 61: c.addiw a5 (4-aligned RVC at spc61=0xb8, regroup with 62) ---- *)
-    iDestruct (bi.equiv_entails_1_1 _ _ sregroup61 with "[$K61 $K62]") as "W61".
+    (* ---- idx 61: c.addiw a5 (4-byte window from skinstr 61 ++ 62) ---- *)
+    iAssert (kinstr_bytes (skinstr 61)) as "#K61". { sg 61. }
+    iAssert (kinstr_bytes (skinstr 62)) as "#K62". { sg 62. }
+    iDestruct (bi.equiv_entails_1_1 _ _ sregroup61 with "[$K61 $K62]") as "#W61".
     assert (Ha561 : m60 !! gpr_of_Z (uint (sreg117 sw61)) = Some (regval_into_reg mhartid0)).
     { unfold m60. replace (uint (sreg117 sw61)) with 15 by (vm_compute; reflexivity).
       replace (uint (scsr_rd sw60)) with 15 by (vm_compute; reflexivity).
@@ -110,10 +111,9 @@ Section WpStart3.
               HmisaC HmisaS decode4_s61 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W61").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W61".
+    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc61 2) with spc62 by (vm_compute; reflexivity).
     set (m61 := <[gpr_of_Z (uint (sreg117 sw61)) := regval_into_reg (caddiw_wval (scaddiw_imm sw61) (regval_into_reg mhartid0))]> m60).
-    iDestruct (bi.equiv_entails_1_2 _ _ sregroup61 with "W61") as "(K61 & K62)".
     iEval (rewrite (E_skinstr 62 (kentry + 0xba) 0x823e 16%nat ltac:(vmc) ltac:(vmc) ltac:(vmc))) in "K62".
     (* ---- idx 62: c.mv tp,a5 (2-aligned at spc62=0xba) ---- *)
     assert (Ha562 : m61 !! gpr_of_Z (uint (sreg62 sw62)) = Some (regval_into_reg (caddiw_wval (scaddiw_imm sw61) (regval_into_reg mhartid0)))).
@@ -131,9 +131,10 @@ Section WpStart3.
               HmisaC HmisaS decode_s62 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K62").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K62".
+    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc62 2) with spc63 by (vm_compute; reflexivity).
     (* ---- idx 63: MRET (4-aligned at spc63=0xbc).  Drops gpr_file (not needed). ---- *)
+    iAssert (kinstr_bytes (skinstr 63)) as "#K63". { sg 63. }
     iEval (rewrite (E_skinstr 63 (kentry + 0xbc) 0x30200073 32%nat ltac:(vmc) ltac:(vmc) ltac:(vmc))) in "K63".
     (* K63 is now [∗list seq 0 4] nth_byte (mword_of_int 0x30200073 : mword 32) at
        fetch_pa (mword_of_int (kentry+0xbc)) = fetch_pa spc63 = wp_mret's window
@@ -144,18 +145,10 @@ Section WpStart3.
               eq_refl HmIE Hlp HmisaS HmisaU HmisaC Hnp Hnpm Hlpe
               with "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K63").
     iNext.
-    iIntros "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K63".
-    (* rebuild kernel_text *)
-    iEval (rewrite (EW 60 32%nat 4%nat (kentry + 0xb4) 0xf14027f3 spc60 sw60 ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(reflexivity)
-                      ltac:(intros j Hj; destruct j as [|[|[|[|j]]]]; [apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|exfalso;lia]))) in "K60".
-    iEval (rewrite (EW 62 16%nat 2%nat (kentry + 0xba) 0x823e spc62 sw62 ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(reflexivity)
-                      ltac:(intros j Hj; destruct j as [|[|j]]; [apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|exfalso;lia]))) in "K62".
-    iEval (rewrite (EW 63 32%nat 4%nat (kentry + 0xbc) 0x30200073 spc63 w_mret ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(reflexivity)
-                      ltac:(intros j Hj; destruct j as [|[|[|[|j]]]]; [apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|apply bv_eq;vm_compute;reflexivity|exfalso;lia]))) in "K63".
-    iAssert kernel_text with "[Hpre K9 K10 K11 K12 K13 K14 K15 K16 K17 K18 K19 K20 K21 K22 K23 K24 K25 K26 K27 K28 K29 K30 K31 K32 K33 K34 K35 K36 K37 K38 K39 K40 K41 K42 K43 K44 K45 K46 K47 K48 K49 K50 K51 K52 K53 K54 K55 K56 K57 K58 K59 K60 K61 K62 K63 Ktail]" as "Htext".
-    { iApply chain_text_combine. unfold chain_tail. iFrame. }
+    iIntros "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    (* kernel_text is duplicable -> the persistent #H is still here. *)
     iApply ("Hcont" with "Hpc Hnpc [Hfile] Hmisa Hmhartid Hmi [Hmst] Hpriv Hhs Hmdl Hms Hmepc
-              Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif Htext").
+              Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif H").
     { iExists _. iFrame "Hfile". }
     { iExists _. iFrame "Hmst". }
   Qed.
