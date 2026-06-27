@@ -31715,3 +31715,5 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 
 (* Total bytes = 23268 (from 8423 instructions); keys are byte
    addresses, so [kernel_bytes !! addr] yields that byte. *)
+
+Global Typeclasses Opaque kernel_bytes.

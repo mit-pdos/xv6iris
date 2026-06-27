@@ -544,6 +544,13 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     w(f"(* Total bytes = {nbytes} (from {n} instructions); keys are byte")
     w(f"   addresses, so [{name} !! addr] yields that byte. *)")
     w("")
+    # CRITICAL for build speed: keep typeclass resolution from ever unfolding this
+    # giant map.  Without this, resolving e.g. [Persistent ([∗ map] .. kernel_bytes ..)]
+    # forces the 20k-entry [list_to_map] and takes ~2 MINUTES per resolution; with it,
+    # ~0ms.  [vm_compute]/[reflexivity] still unfold it (they ignore this), so byte
+    # lookups are unaffected.
+    w(f"Global Typeclasses Opaque {name}.")
+    w("")
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
