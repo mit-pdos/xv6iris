@@ -246,7 +246,7 @@ Section StepMRET.
       (b1 : bool) (npc0 mst0 mstatus0 misa0 mepc0 mdv0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
@@ -271,7 +271,7 @@ Section StepMRET.
     misa ↦ᵣ misa0 -∗ mepc ↦ᵣ mepc0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_mret j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_mret j) -∗
     ▷ ( PC ↦ᵣ ctgt mepc0 -∗ nextPC ↦ᵣ ctgt mepc0 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
@@ -281,7 +281,7 @@ Section StepMRET.
         misa ↦ᵣ misa0 -∗ mepc ↦ᵣ mepc0 -∗
         elp ↦ᵣ celpv lpe mstatus0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_mret j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_mret j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.

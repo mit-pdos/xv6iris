@@ -187,7 +187,7 @@ Section StepAUIPC.
       (i_a : mword 5) (b1 : bool) (sp0a npc0a mst0a mstatus0a misa0 mdv0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0a : bool) (elp0a : mword 1) E (Φ : mval -> iProp Σ) :
+      (mi0a : bool) (elp0a : mword 1) E {dq : dfrac} (Φ : mval -> iProp Σ) :
     uint i_a = 2 ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (* the pure fetch side-conditions of [fetch_from_pts_minstret] *)
@@ -211,7 +211,7 @@ Section StepAUIPC.
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
     elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_a j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_a j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (add_vec pc (auipc_off imm_a)) -∗
         misa ↦ᵣ misa0 -∗
@@ -221,7 +221,7 @@ Section StepAUIPC.
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
         elp ↦ᵣ elp0a -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_a j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_a j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.

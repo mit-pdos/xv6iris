@@ -1450,7 +1450,7 @@ Section WpFetchRVC.
   Lemma fetch_from_pts_minstret_RVC4
       (pc : mword 64) (w : mword 32) (region : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (b : bool) (s : mstate) :
+      (b : bool) (s : mstate) {dq : dfrac} :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     pmp_allows_all pmpcfg0 ->
@@ -1466,7 +1466,7 @@ Section WpFetchRVC.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pma_regions ↦ᵣ pmar0 -∗
     htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_RVC (subrange_vec_dec w 15 0), set_reg s (R_bool minstret_increment) b) ⌝.
   Proof.
@@ -1558,7 +1558,7 @@ Section StepLUI.
       (b1 : bool) (x10_0 npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     subrange_vec_dec w 15 0 = h_lui ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
@@ -1578,7 +1578,7 @@ Section StepLUI.
     misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
         (R_bitvector_64 x10) ↦ᵣ regval_into_reg luival -∗
         nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
@@ -1588,7 +1588,7 @@ Section StepLUI.
         misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -1686,7 +1686,7 @@ Section StepADD.
       (b1 : bool) (sp_in a0_in npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     subrange_vec_dec w 15 0 = h_add ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
@@ -1707,7 +1707,7 @@ Section StepADD.
     misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (add_vec sp_in a0_in) -∗
         (R_bitvector_64 x10) ↦ᵣ a0_in -∗
@@ -1718,7 +1718,7 @@ Section StepADD.
         misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -1826,7 +1826,7 @@ Section StepMUL.
       (b1 : bool) (a0_in a1_in npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
@@ -1847,7 +1847,7 @@ Section StepMUL.
     misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_mul j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_mul j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x10) ↦ᵣ regval_into_reg
           (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
@@ -1860,7 +1860,7 @@ Section StepMUL.
         misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_mul j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_mul j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -2169,7 +2169,7 @@ Section WpFetchRVC2.
   Lemma fetch_from_pts_minstret_RVC2
       (pc : mword 64) (w : mword 16) (region : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (b : bool) (misa0 : mword 64) (s : mstate) :
+      (b : bool) (misa0 : mword 64) (s : mstate) {dq : dfrac} :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 2 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     pmp_allows_all pmpcfg0 ->
@@ -2187,7 +2187,7 @@ Section WpFetchRVC2.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pma_regions ↦ᵣ pmar0 -∗
     htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_RVC w, set_reg s (R_bool minstret_increment) b) ⌝.
   Proof.
@@ -2293,7 +2293,7 @@ Section StepADDI.
       (b1 : bool) (a1_in npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
@@ -2312,7 +2312,7 @@ Section StepADDI.
     misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte h_addi j) -∗
+    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte h_addi j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
         (R_bitvector_64 x11) ↦ᵣ regval_into_reg
           (add_vec a1_in (sign_extend' 64 (sign_extend' 12 imm_caddi))) -∗
@@ -2323,7 +2323,7 @@ Section StepADDI.
         misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte h_addi j) -∗
+        ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte h_addi j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -2495,7 +2495,7 @@ Section WpFetchFBase2SL.
   Lemma fetch_from_pts_minstret_2
       (pc : mword 64) (w : mword 32) (regl regh : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (b : bool) (s : mstate) :
+      (b : bool) (s : mstate) {dq : dfrac} :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 2 = Some regl ->
     matching_pma_region pmar0 (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = Some regh ->
     (override_PMA (PMA_Region_attributes regl) PBMT_PMA).(PMA_executable) = true ->
@@ -2523,7 +2523,7 @@ Section WpFetchFBase2SL.
     pma_regions ↦ᵣ pmar0 -∗
     htif_tohost_base ↦ᵣ None -∗
     misa ↦ᵣ register_lookup misa s.(sregs) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_Base w, set_reg s (R_bool minstret_increment) b) ⌝.
   Proof.
@@ -2649,7 +2649,7 @@ Section StepCSRR.
       (b1 : bool) (mhartid_in x11_0 npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
@@ -2672,7 +2672,7 @@ Section StepCSRR.
     misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_csrr j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_csrr j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x11) ↦ᵣ regval_into_reg mhartid_in -∗ mhartid ↦ᵣ mhartid_in -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
@@ -2682,7 +2682,7 @@ Section StepCSRR.
         misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_csrr j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_csrr j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -2800,7 +2800,7 @@ Section StepJAL2.
       (b1 : bool) (x1_0 npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
@@ -2824,7 +2824,7 @@ Section StepJAL2.
     misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_jal j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_jal j) -∗
     ▷ ( PC ↦ᵣ add_vec pc (sign_extend' 64 imm_jal) -∗
         (R_bitvector_64 x1) ↦ᵣ regval_into_reg (add_vec_int pc 4) -∗
         nextPC ↦ᵣ add_vec pc (sign_extend' 64 imm_jal) -∗
@@ -2835,7 +2835,7 @@ Section StepJAL2.
         misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_jal j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_jal j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.

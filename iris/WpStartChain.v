@@ -148,7 +148,7 @@ Section WpStartChain.
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     uint rd <> 0 ->
     m !! gpr_of_Z (uint rd) = Some vd ->
     pma_allows_all pmar0 ->
@@ -170,7 +170,7 @@ Section WpStartChain.
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (add_vec pc (auipc_off imm))]> m) -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
@@ -179,7 +179,7 @@ Section WpStartChain.
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -770,10 +770,10 @@ Section WpStartChain.
   (* generic 4-byte window at fetch_pa pc and the "remaining high 2 bytes" of
      the next instruction at fetch_pa npc. *)
   Definition twin4 (pc : mword 64) (w : mword 32) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ□ nth_byte w j)%I.
   Definition trem (npc : mword 64) (enc : Z) : iProp Σ :=
     ([∗ list] ab ∈ map (fun j => (pa_add (fetch_pa npc) j, nth_byte (mword_of_int enc : mword 32) j)) (seq 2 2),
-       ab.1 ↦ₘ ab.2)%I.
+       ab.1 ↦ₘ□ ab.2)%I.
 
   (* For idx 9,11,14,26,28 the next instruction is RVC (2 bytes) so the 4-byte
      window covers BOTH instructions exactly (no remainder). *)
@@ -915,7 +915,7 @@ Section WpStartChain.
     (W / 8)%nat = n ->
     pc = mword_of_int addr ->
     (forall j : nat, (j < n)%nat -> nth_byte wW j = nth_byte (mword_of_int enc : mword 32) j) ->
-    ([∗ list] j ∈ seq 0 n, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte wW j)%I
+    ([∗ list] j ∈ seq 0 n, (pa_add (fetch_pa pc) j) ↦ₘ□ nth_byte wW j)%I
       ⊣⊢ kinstr_bytes (skinstr i).
   Proof.
     intros Ha He Hw Hn Hpc Hnb.

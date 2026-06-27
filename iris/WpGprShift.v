@@ -208,7 +208,7 @@ Section Wp_slli.
       (m : gmap register_bitvector_64 (mword 64)) (va vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     uint rs1 <> 0 -> uint rd <> 0 ->
     m !! gpr_of_Z (uint rs1) = Some va ->
     m !! gpr_of_Z (uint rd) = Some vd ->
@@ -230,7 +230,7 @@ Section Wp_slli.
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (shift_bits_left va (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
         misa ↦ᵣ misa0 -∗
@@ -240,7 +240,7 @@ Section Wp_slli.
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -405,7 +405,7 @@ Section Wp_srli.
       (m : gmap register_bitvector_64 (mword 64)) (va vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     uint rs1 <> 0 -> uint rd <> 0 ->
     m !! gpr_of_Z (uint rs1) = Some va ->
     m !! gpr_of_Z (uint rd) = Some vd ->
@@ -427,7 +427,7 @@ Section Wp_srli.
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (shift_bits_right va (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
         misa ↦ᵣ misa0 -∗
@@ -437,7 +437,7 @@ Section Wp_srli.
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
@@ -602,7 +602,7 @@ Section Wp_addiw.
       (m : gmap register_bitvector_64 (mword 64)) (va vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
     uint rs1 <> 0 -> uint rd <> 0 ->
     m !! gpr_of_Z (uint rs1) = Some va ->
     m !! gpr_of_Z (uint rd) = Some vd ->
@@ -624,7 +624,7 @@ Section Wp_addiw.
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec va (sign_extend' 64 immv)) 31 0))]> m) -∗
         misa ↦ᵣ misa0 -∗
@@ -634,7 +634,7 @@ Section Wp_addiw.
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.

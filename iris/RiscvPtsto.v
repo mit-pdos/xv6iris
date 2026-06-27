@@ -88,10 +88,19 @@ Definition not_in_sig (a : Arch.pa) : Prop :=
   (uint a < uint plat_sig_base \/ uint plat_sig_base + uint plat_sig_size <= uint a)%Z.
 Definition addr_is_ram (a : Arch.pa) : Prop := not_in_clint a /\ not_in_sig a.
 
-(* memory points-to: owns byte [a |-> v] AND records that [a] is real RAM. *)
-Definition mem_pointsto `{!riscvGS Σ} (a : Arch.pa) (v : bv 8) : iProp Σ :=
-  (pointsto (L:=Arch.pa) (V:=bv 8) a (DfracOwn 1) v ∗ ⌜addr_is_ram a⌝)%I.
-Notation "a ↦ₘ v" := (mem_pointsto a v)
+(* memory points-to: owns byte [a |-> v] at fraction [dq] AND records that [a]
+   is real RAM.  [dq] is a [dfrac]: [DfracOwn 1] = full (writable) ownership,
+   [DfracDiscarded] = persistent/duplicable read-only ownership (used for the
+   immutable kernel code, so [kernel_text] need not be borrowed and returned). *)
+Definition mem_pointsto `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
+  (pointsto (L:=Arch.pa) (V:=bv 8) a dq v ∗ ⌜addr_is_ram a⌝)%I.
+Notation "a ↦ₘ{ dq } v" := (mem_pointsto a dq v)
+  (at level 20, format "a  ↦ₘ{ dq }  v") : bi_scope.
+(* discarded (persistent, duplicable) read-only ownership. *)
+Notation "a ↦ₘ□ v" := (mem_pointsto a DfracDiscarded v)
+  (at level 20, format "a  ↦ₘ□  v") : bi_scope.
+(* default: full (writable) ownership. *)
+Notation "a ↦ₘ v" := (mem_pointsto a (DfracOwn 1) v)
   (at level 20, format "a  ↦ₘ  v") : bi_scope.
 
 (* ---------------------------------------------------------------------- *)
@@ -152,16 +161,33 @@ Section Bridge.
       by rewrite (irrelevant_register_set k r rs v' (register_beq_false k r Hne)).
   Qed.
 
-  (* reading a memory byte agrees with the byte heap. *)
-  Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a b :
-    gen_heap_interp mm -∗ a ↦ₘ b -∗ ⌜mm !! a = Some b⌝.
+  (* reading a memory byte (at ANY fraction) agrees with the byte heap. *)
+  Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a dq b :
+    gen_heap_interp mm -∗ a ↦ₘ{dq} b -∗ ⌜mm !! a = Some b⌝.
   Proof.
     iIntros "Hm [Ha _]". by iDestruct (gen_heap_valid with "Hm Ha") as %?.
   Qed.
 
-  (* owning a memory byte certifies its address is real RAM (not MMIO). *)
-  Lemma mem_ram a b : a ↦ₘ b -∗ ⌜addr_is_ram a⌝.
+  (* owning a memory byte (at ANY fraction) certifies its address is real RAM. *)
+  Lemma mem_ram a dq b : a ↦ₘ{dq} b -∗ ⌜addr_is_ram a⌝.
   Proof. by iIntros "[_ %H]". Qed.
+
+  (* a discarded (read-only) memory byte is persistent — hence FREELY duplicable.
+     This is what makes [kernel_text] (built from [↦ₘ□] code bytes) duplicable. *)
+  Global Instance mem_pointsto_discarded_persistent a b :
+    Persistent (a ↦ₘ□ b).
+  Proof. rewrite /mem_pointsto. apply _. Qed.
+
+  (* discard the fraction: turn any memory byte into the persistent read-only one. *)
+  Lemma mem_pointsto_persist a dq b : a ↦ₘ{dq} b ==∗ a ↦ₘ□ b.
+  Proof.
+    iIntros "[Ha %Hr]". iMod (pointsto_persist with "Ha") as "Ha".
+    iModIntro. by iFrame.
+  Qed.
+
+  (* a persistent (discarded) byte can be handed out repeatedly. *)
+  Lemma mem_pointsto_dup a b : a ↦ₘ□ b -∗ a ↦ₘ□ b ∗ a ↦ₘ□ b.
+  Proof. iIntros "#H". by iSplitR. Qed.
 
 End Bridge.
 

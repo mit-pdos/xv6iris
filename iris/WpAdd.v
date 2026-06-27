@@ -220,7 +220,7 @@ Section FinalWP.
   Lemma wp_add_real_final
       (mstatus0 misa0 mdv0 : mword 64) (elp0 : mword 1)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      E (Φ : mval -> iProp Σ) :
+      E {dq : dfrac} (Φ : mval -> iProp Σ) :
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -246,7 +246,7 @@ Section FinalWP.
     misa ↦ᵣ misa0 -∗
     elp ↦ᵣ elp0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( (R_bitvector_64 x10) ↦ᵣ a0 -∗
         (R_bitvector_64 x11) ↦ᵣ a1 -∗
         (R_bitvector_64 x12) ↦ᵣ (add_vec a0 a1) -∗
@@ -261,7 +261,7 @@ Section FinalWP.
         misa ↦ᵣ misa0 -∗
         elp ↦ᵣ elp0 -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof using All.

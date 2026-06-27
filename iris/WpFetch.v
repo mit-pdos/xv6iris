@@ -113,7 +113,7 @@ Section WpFetch.
   Lemma fetch_from_pts_minstret
       (pc : mword 64) (w : mword 32) (region : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (b : bool) (s : mstate) :
+      (b : bool) (s : mstate) {dq : dfrac} :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     pmp_allows_all pmpcfg0 ->
@@ -129,7 +129,7 @@ Section WpFetch.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pma_regions ↦ᵣ pmar0 -∗
     htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_Base w, set_reg s (R_bool minstret_increment) b) ⌝.
   Proof.

@@ -633,7 +633,7 @@ Section WpStoreGpr.
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
       (pmar0 : list PMA_Region) (mi0a : bool) (elp0a : mword 1)
-      E (Φ : mval -> iProp Σ) :
+      E {dq : dfrac} (Φ : mval -> iProp Σ) :
     let offset := sign_extend' 64 imm_s in
     let ea := add_vec vrs1 offset in
     let a8 := zero_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -666,7 +666,7 @@ Section WpStoreGpr.
     elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
     mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_s j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_s j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file m -∗
         misa ↦ᵣ misa0 -∗
@@ -677,7 +677,7 @@ Section WpStoreGpr.
         elp ↦ᵣ elp0a -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
         mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vrs2 j) -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w_s j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_s j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.

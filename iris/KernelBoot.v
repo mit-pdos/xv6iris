@@ -116,17 +116,29 @@ Section KernelBootWP.
   Definition kinstr_bytes (k : KernelInstrs.kinstr) : iProp Σ :=
     ([∗ list] j ∈ seq 0 (KernelInstrs.ki_width k / 8),
       (pa_add (fetch_pa (mword_of_int (KernelInstrs.ki_addr k))) j)
-        ↦ₘ nth_byte (mword_of_int (KernelInstrs.ki_enc k) : mword 32) j)%I.
+        ↦ₘ□ nth_byte (mword_of_int (KernelInstrs.ki_enc k) : mword 32) j)%I.
+
+  (* The kernel code points-to facts are DfracDiscarded, hence persistent and
+     duplicable: no need to borrow instruction bytes from [kernel_text] and
+     return them — a window can be extracted while [kernel_text] stays intact. *)
+  Global Instance kinstr_bytes_persistent k : Persistent (kinstr_bytes k).
+  Proof. apply _. Qed.
 
   (* The whole text section is exactly the bytes of every dumped instruction. *)
   Definition kernel_text : iProp Σ :=
     ([∗ list] k ∈ KernelInstrs.kernel_instrs, kinstr_bytes k)%I.
 
+  Global Instance kernel_text_persistent : Persistent kernel_text.
+  Proof. apply _. Qed.
+
+  Lemma kernel_text_dup : kernel_text -∗ kernel_text ∗ kernel_text.
+  Proof. iIntros "#H". iSplit; iApply "H". Qed.
+
   (* The bytes of the first two instructions, in the per-opcode WPs' form. *)
   Definition auipc_bytes : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ nth_byte w_auipc j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ□ nth_byte w_auipc j)%I.
   Definition ld_bytes : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ nth_byte w_ld j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ□ nth_byte w_ld j)%I.
   (* The remaining text (everything after the first two instructions), kept
      FOLDED so [kernel_instrs] is only ever exposed inside [kernel_text]. *)
   Definition kernel_text_tail : iProp Σ :=
@@ -182,7 +194,7 @@ Section KernelBootWP.
   Definition kernel_byte_map : list (Arch.pa * bv 8) :=
     KernelInstrs.kernel_instrs ≫= instr_byte_pairs.
   Definition kernel_image : iProp Σ :=
-    ([∗ list] ab ∈ kernel_byte_map, ab.1 ↦ₘ ab.2)%I.
+    ([∗ list] ab ∈ kernel_byte_map, ab.1 ↦ₘ□ ab.2)%I.
 
   (* The byte-level image is exactly the per-instruction image. *)
   Lemma kernel_image_eq : kernel_image ⊣⊢ kernel_text.
@@ -267,10 +279,11 @@ Section KernelBootWP.
       Hpmaall HmisaS Halignfa Hbit0fa Hbit1fa Hvalignfa
       Halignfl Hbit0fl Hbit1fl Hvalignfl Hpmpf
       HmIE Hlp HMPRV Hpmm Halign Hpmp Hpalign.
-    iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext Hcont".
-    (* extract the two instruction byte-blocks from the whole-image predicate;
-       [Hrestore] puts them back (fetch leaves memory unchanged). *)
-    iDestruct (kernel_text_first_two with "Htext") as "(Hibytesa & Hibytesl & Hrestore)".
+    iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes #Htext Hcont".
+    (* [kernel_text] is now persistent (DfracDiscarded code points-to), so we just
+       PERSIST it and EXTRACT persistent copies of the two instruction windows; no
+       borrow-and-return is needed — [kernel_text] is never consumed. *)
+    iDestruct (kernel_text_split with "Htext") as "#(Hibytesa & Hibytesl & _)".
     iEval (rewrite /auipc_bytes) in "Hibytesa". iEval (rewrite /ld_bytes) in "Hibytesl".
     (* Step 1: auipc.  uint i_auipc = 2 and isRVC are now concrete facts; decode is
        discharged by [decode_auipc].  Owns the auipc bytes + fetch CSRs. *)
@@ -279,7 +292,7 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity) HmisaS Hpmaall Hpmpf Halignfa Hbit0fa Hbit1fa Hvalignfa
               ltac:(vm_compute; reflexivity) decode_auipc eq_refl HmIE Hlp
               with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa").
-    iNext. iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa".
+    iNext. iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc0 4) with kpc1 by (vm_compute; reflexivity).
     (* Step 2: ld.  base register x2 holds sp1 = the auipc result.  decode is
        discharged by [decode_ld].  Owns the ld bytes at [fetch_pa kpc1]. *)
@@ -289,26 +302,25 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity) decode_ld eq_refl
               HmIE Hlp HMPRV Hpmm Halign Hpmp Hpalign
               with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
-    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl".
+    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes _".
     replace (add_vec_int kpc1 4) with kpc2 by (vm_compute; reflexivity).
-    (* reassemble the whole-image predicate from the (unchanged) instruction bytes *)
-    iDestruct ("Hrestore" with "Hibytesa Hibytesl") as "Htext".
+    (* [kernel_text] (persistent) was never consumed — hand it straight back. *)
     iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
   Qed.
 
   (* ---- per-instruction fetch-window reshaping (bytes 2..7) ---- *)
   (* Non-spanning windows: the fetch reads exactly the instruction's own bytes. *)
   Definition csrr_win : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc3) j) ↦ₘ nth_byte w_csrr j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc3) j) ↦ₘ□ nth_byte w_csrr j)%I.
   Definition mul_win : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc5) j) ↦ₘ nth_byte w_mul j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc5) j) ↦ₘ□ nth_byte w_mul j)%I.
   Definition jal_win : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc7) j) ↦ₘ nth_byte w_jal j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc7) j) ↦ₘ□ nth_byte w_jal j)%I.
   Definition addi_win : iProp Σ :=
     ([∗ list] j ∈ seq 0 2,
-       (pa_add (fetch_pa kpc4) j) ↦ₘ nth_byte (mword_of_int 0x585 : mword 32) j)%I.
+       (pa_add (fetch_pa kpc4) j) ↦ₘ□ nth_byte (mword_of_int 0x585 : mword 32) j)%I.
   Definition haddi_win : iProp Σ :=
-    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa kpc4) j) ↦ₘ nth_byte h_addi j)%I.
+    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa kpc4) j) ↦ₘ□ nth_byte h_addi j)%I.
 
   Lemma E_csrr : kinstr_bytes kinstr3 = csrr_win.
   Proof.
@@ -358,19 +370,19 @@ Section KernelBootWP.
      instruction's 2 bytes plus the next instruction's first 2 bytes.  We regroup
      via the flat (addr,byte) pair form and concrete list equality. *)
   Lemma kinstr_bytes_pairs (k : KernelInstrs.kinstr) :
-    kinstr_bytes k ⊣⊢ ([∗ list] ab ∈ instr_byte_pairs k, ab.1 ↦ₘ ab.2).
+    kinstr_bytes k ⊣⊢ ([∗ list] ab ∈ instr_byte_pairs k, ab.1 ↦ₘ□ ab.2).
   Proof. rewrite /kinstr_bytes /instr_byte_pairs big_sepL_fmap. done. Qed.
 
   Lemma win_pairs (pc : mword 64) (w : mword 32) (n : nat) :
-    ([∗ list] j ∈ seq 0 n, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) ⊣⊢
+    ([∗ list] j ∈ seq 0 n, (pa_add (fetch_pa pc) j) ↦ₘ□ nth_byte w j) ⊣⊢
     ([∗ list] ab ∈ map (fun j => (pa_add (fetch_pa pc) j, nth_byte w j)) (seq 0 n),
-       ab.1 ↦ₘ ab.2).
+       ab.1 ↦ₘ□ ab.2).
   Proof. rewrite big_sepL_fmap. done. Qed.
 
   Definition lui_win : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc2) j) ↦ₘ nth_byte w_lui4 j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc2) j) ↦ₘ□ nth_byte w_lui4 j)%I.
   Definition add_win : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc6) j) ↦ₘ nth_byte w_add4 j)%I.
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc6) j) ↦ₘ□ nth_byte w_add4 j)%I.
   Definition lui_pairs : list (Arch.pa * bv 8) :=
     map (fun j => (pa_add (fetch_pa kpc2) j, nth_byte w_lui4 j)) (seq 0 4).
   Definition add_pairs : list (Arch.pa * bv 8) :=
@@ -379,8 +391,8 @@ Section KernelBootWP.
     map (fun j => (pa_add (fetch_pa kpc3) j, nth_byte w_csrr j)) (seq 2 2).
   Definition rem_add_pairs : list (Arch.pa * bv 8) :=
     map (fun j => (pa_add (fetch_pa kpc7) j, nth_byte w_jal j)) (seq 2 2).
-  Definition rem_lui : iProp Σ := ([∗ list] ab ∈ rem_lui_pairs, ab.1 ↦ₘ ab.2)%I.
-  Definition rem_add : iProp Σ := ([∗ list] ab ∈ rem_add_pairs, ab.1 ↦ₘ ab.2)%I.
+  Definition rem_lui : iProp Σ := ([∗ list] ab ∈ rem_lui_pairs, ab.1 ↦ₘ□ ab.2)%I.
+  Definition rem_add : iProp Σ := ([∗ list] ab ∈ rem_add_pairs, ab.1 ↦ₘ□ ab.2)%I.
 
   Lemma lui_regroup :
     (kinstr_bytes kinstr2 ∗ kinstr_bytes kinstr3) ⊣⊢ (lui_win ∗ rem_lui).
@@ -569,11 +581,13 @@ Section KernelBootWP.
               Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpmpf Hpalal
               with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
     iNext.
-    iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext".
-    (* now PC = kpc2; peel the 8 instruction byte-blocks from kernel_text *)
-    iDestruct (ktext_split with "Htext") as "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & Htail)".
+    iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes #Htext".
+    (* now PC = kpc2.  [kernel_text] is persistent: peel PERSISTENT copies of the 8
+       instruction byte-blocks — [kernel_text] (Htext) is never consumed, so there
+       is nothing to rejoin at the end. *)
+    iDestruct (ktext_split with "Htext") as "#(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & Htail)".
     (* ---- step 2: lui a0,0x1  (RVC, 4-aligned, window spans into csrr) ---- *)
-    iDestruct (lui_split with "[$H2 $H3]") as "(Hlui & Hrem)".
+    iDestruct (lui_split with "[$H2 $H3]") as "#(Hlui & Hrem)".
     iApply (wp_step_lui kpc2 w_lui4 bb x10_0 kpc2 m2 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -581,11 +595,10 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaC
               with "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hlui").
     iNext.
-    iIntros "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hlui".
-    iDestruct (lui_join with "[$Hlui $Hrem]") as "(H2 & H3)".
+    iIntros "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc2 2) with kpc3 by (vm_compute; reflexivity).
     (* ---- step 3: csrr a1,mhartid  (32-bit, 2-aligned) ---- *)
-    iDestruct (csrr_get with "H3") as "H3".
+    iDestruct (csrr_get with "H3") as "#Hcsrr".
     iApply (wp_step_csrr kpc3 bb mhartid0 x11_0 kpc3 m3 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -593,38 +606,35 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               eq_refl HmIE Hlp HmisaC
-              with "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H3").
+              with "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hcsrr").
     iNext.
-    iIntros "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H3".
-    iDestruct (csrr_put with "H3") as "H3".
+    iIntros "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc3 4) with kpc4 by (vm_compute; reflexivity).
     (* ---- step 4: addi a1,a1,1  (RVC, 2-aligned) ---- *)
-    iDestruct (addi_get with "H4") as "H4".
+    iDestruct (addi_get with "H4") as "#Haddi".
     iApply (wp_step_addi kpc4 bb x11c kpc4 m4 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaC
-              with "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H4").
+              with "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Haddi").
     iNext.
-    iIntros "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H4".
-    iDestruct (addi_put with "H4") as "H4".
+    iIntros "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc4 2) with kpc5 by (vm_compute; reflexivity).
     (* ---- step 5: mul a0,a0,a1  (32-bit, 4-aligned, M-ext) ---- *)
-    iDestruct (mul_get with "H5") as "H5".
+    iDestruct (mul_get with "H5") as "#Hmul".
     iApply (wp_step_mul kpc5 bb x10l x11a kpc5 m5 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaM
-              with "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H5").
+              with "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hmul").
     iNext.
-    iIntros "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H5".
-    iDestruct (mul_put with "H5") as "H5".
+    iIntros "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc5 4) with kpc6 by (vm_compute; reflexivity).
     (* ---- step 6: add sp,sp,a0  (RVC, 4-aligned, window spans into jal) ---- *)
-    iDestruct (add_split with "[$H6 $H7]") as "(Hadd & Hrem)".
+    iDestruct (add_split with "[$H6 $H7]") as "#(Hadd & Hrem2)".
     iApply (wp_step_add kpc6 w_add4 bb x2ld x10m kpc6 m6 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -632,11 +642,10 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaC
               with "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hadd").
     iNext.
-    iIntros "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hadd".
-    iDestruct (add_join with "[$Hadd $Hrem]") as "(H6 & H7)".
+    iIntros "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc6 2) with kpc7 by (vm_compute; reflexivity).
     (* ---- step 7: jal start  (32-bit, 2-aligned) -- the jump to start ---- *)
-    iDestruct (jal_get with "H7") as "H7".
+    iDestruct (jal_get with "H7") as "#Hjal".
     iApply (wp_step_jal kpc7 bb x1_0 kpc7 m7 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -645,13 +654,11 @@ Section KernelBootWP.
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaC
-              with "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H7").
+              with "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hjal").
     iNext.
-    iIntros "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif H7".
-    iDestruct (jal_put with "H7") as "H7".
+    iIntros "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec kpc7 (sign_extend' 64 imm_jal)) with kstart by (vm_compute; reflexivity).
-    (* ---- reassemble kernel_text and finish ---- *)
-    iDestruct (ktext_join with "[$H0 $H1 $H2 $H3 $H4 $H5 $H6 $H7 $Htail]") as "Htext".
+    (* [kernel_text] (persistent) was never consumed — no reassembly needed. *)
     (* recompose the GPR file with the four updated registers *)
     iAssert (gpr_file (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))))
       with "[Hx1 Hx2 Hx10 Hx11 Hgpr]" as "Hgpr".
