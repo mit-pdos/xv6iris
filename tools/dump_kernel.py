@@ -518,9 +518,7 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     w(f"   Address range: 0x{lo:x} .. 0x{hi:x}                              *)")
     w("(* ------------------------------------------------------------------ *)")
     w("")
-    # Plain Require (no "From Coq"/"From Stdlib" prefix) so the file compiles on
-    # both Coq 8.x and Rocq 9.x without hitting the deprecated-prefix warning.
-    w("Require Import List ZArith.")
+    w("From Stdlib Require Import List ZArith.")
     w("From stdpp Require Import gmap.")
     w("From stdpp.bitvector Require Import definitions.")
     w("Import ListNotations.")
@@ -594,7 +592,7 @@ def emit_rocq_data(items: list[object], out_path: str, kernel: str,
     w("   Per-byte [gmap], same shape as [kernel_bytes] for the code.        *)")
     w("(* ------------------------------------------------------------------ *)")
     w("")
-    w("Require Import List ZArith.")
+    w("From Stdlib Require Import List ZArith.")
     w("From stdpp Require Import gmap.")
     w("From stdpp.bitvector Require Import definitions.")
     w("Import ListNotations.")
@@ -656,7 +654,7 @@ def emit_rocq_syms(items: list[object], out_path: str, kernel: str,
     w("   returns the address (0 if unknown).                                *)")
     w("(* ------------------------------------------------------------------ *)")
     w("")
-    w("Require Import ZArith String.")
+    w("From Stdlib Require Import ZArith String.")
     w("From stdpp Require Import gmap strings.")
     w("")
     w("(* Symbol table as a name-keyed [gmap].  ONE flat [list_to_map] (no chunking;")
