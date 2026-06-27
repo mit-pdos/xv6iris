@@ -110,7 +110,7 @@ Section ForwardAUIPC.
        currentlyEnabled Ext_S reduces for any state (exec_currentlyEnabled_S). *)
     assert (HdispA : exec (dispatchInterrupt Machine) sAa = Some (None, sAa)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAa _ (exec_currentlyEnabled_S sAa) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAa _ (exec_currentlyEnabled_S sAa) LSA LmIEA). }
     (* fetch / decode at sAa (state-preserving). *)
     assert (HfetchA : exec (fetch tt) sAa = Some (F_Base w, sAa))
       by exact Hfetch_at.

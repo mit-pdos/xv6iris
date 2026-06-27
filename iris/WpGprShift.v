@@ -153,7 +153,7 @@ Section Forward_slli.
     { unfold sA_slli, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sA_slli = Some (None, sA_slli)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sA_slli _ (exec_currentlyEnabled_S sA_slli) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sA_slli _ (exec_currentlyEnabled_S sA_slli) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sA_slli = Some (F_Base w, sA_slli)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sA_slli = Some (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI), sA_slli)) by (apply Hdec; exact LprivA).
     assert (HexecG : exec (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))) s_pc_slli = Some (RETIRE_SUCCESS, sX_slli)).
@@ -350,7 +350,7 @@ Section Forward_srli.
     { unfold sA_srli, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sA_srli = Some (None, sA_srli)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sA_srli _ (exec_currentlyEnabled_S sA_srli) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sA_srli _ (exec_currentlyEnabled_S sA_srli) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sA_srli = Some (F_Base w, sA_srli)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sA_srli = Some (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI), sA_srli)) by (apply Hdec; exact LprivA).
     assert (HexecG : exec (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))) s_pc_srli = Some (RETIRE_SUCCESS, sX_srli)).
@@ -547,7 +547,7 @@ Section Forward_addiw.
     { unfold sA_addiw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sA_addiw = Some (None, sA_addiw)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sA_addiw _ (exec_currentlyEnabled_S sA_addiw) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sA_addiw _ (exec_currentlyEnabled_S sA_addiw) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sA_addiw = Some (F_Base w, sA_addiw)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sA_addiw = Some (ADDIW (immv, Regidx rs1, Regidx rd), sA_addiw)) by (apply Hdec; exact LprivA).
     assert (HexecG : exec (execute (ADDIW (immv, Regidx rs1, Regidx rd))) s_pc_addiw = Some (RETIRE_SUCCESS, sX_addiw)).

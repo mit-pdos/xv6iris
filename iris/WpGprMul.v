@@ -113,7 +113,7 @@ Section ForwardMulGpr.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAmg = Some (None, sAmg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAmg _ (exec_currentlyEnabled_S sAmg) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAmg _ (exec_currentlyEnabled_S sAmg) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAmg = Some (F_Base w, sAmg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAmg
               = Some (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul), sAmg))

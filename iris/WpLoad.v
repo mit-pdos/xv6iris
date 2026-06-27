@@ -526,12 +526,13 @@ Section ForwardLD.
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
     register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     exec riscv_step s = Some (tt, sFl).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp.
+    intros Lpc Lpriv Lhs Lmideleg LS LmIE Lelp.
     assert (LpcA  : register_lookup PC sAl.(sregs) = pc).
     { unfold sAl. trans_mi. exact Lpc. }
     assert (LprivA: register_lookup cur_privilege sAl.(sregs) = Machine).
@@ -540,6 +541,8 @@ Section ForwardLD.
     { unfold sAl. trans_mi. exact Lhs. }
     assert (LmidA : register_lookup (R_bitvector_64 mideleg) sAl.(sregs) = zeros' 64).
     { unfold sAl. trans_mi. exact Lmideleg. }
+    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAl.(sregs))) ('b"1") = true).
+    { unfold sAl. trans_mi. exact LS. }
     assert (LmIEA : eq_vec (_get_Mstatus_MIE
               (register_lookup (R_bitvector_64 mstatus) sAl.(sregs))) ('b"1") = false).
     { unfold sAl. trans_mi. exact LmIE. }
@@ -548,7 +551,7 @@ Section ForwardLD.
     { unfold sAl. trans_mi. exact Lelp. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAl = Some (None, sAl)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) (or_intror LmidA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAl = Some (F_Base w, sAl))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAl
@@ -610,7 +613,7 @@ Section StepLD.
   Context `{!riscvGS Σ}.
   Lemma wp_step_ld (pc : mword 64) (w_l : mword 32) (imm_l : mword 12)
       (i_l : mword 5) (b1 : bool) (v : bv 64)
-      (sp0a npc0a mst0a mstatus0a : mword 64)
+      (sp0a npc0a mst0a mstatus0a misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
       (pmar0 : list PMA_Region) (mi0a : bool) (elp0a : mword 1)
@@ -636,6 +639,7 @@ Section StepLD.
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0a) ('b"1") = false ->
     eq_vec elp0a (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Mstatus_MPRV mstatus0a) ('b"1") = false ->
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8) 8 = true ->
@@ -643,7 +647,7 @@ Section StepLD.
     is_aligned_paddr (Physaddr pa) 8 = true ->
     (* within_clint/within_sig are now discharged from the RAM-constrained bytes,
        and within_htif from the owned [htif_tohost_base |-> None] below. *)
-    PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ nextPC ↦ᵣ npc0a -∗
+    PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp0a -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0a -∗
     (R_bool minstret_increment) ↦ᵣ mi0a -∗ minstret ↦ᵣ mst0a -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
@@ -653,6 +657,7 @@ Section StepLD.
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_l j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2) -∗
+        misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0a 1 else mst0a) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -665,12 +670,13 @@ Section StepLD.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros offset ea a8 pa data2 Hil Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
-      Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpmp Hpalign.
+      Hdl Hb1 HmIE Help HmisaS HMPRV Hpmm Halign Hpmp Hpalign.
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
-    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
+    iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
     iDestruct (reg_valid with "Hreg Hx2")    as %Lx2.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
@@ -745,6 +751,7 @@ Section StepLD.
     { iPureIntro.
       rewrite <- (sFl_eq s w_l pc imm_l i_l i_l data2 b1 Hfetch_at Hsi_s Hexec_spc mst0a Lmst).
       apply (forward_exec_ld s w_l pc imm_l i_l i_l data2 b1 Hil Hfetch_at Hdl Hsi_s Hexec_spc Lpc Lpriv Lhs Lmdl).
+      - rewrite Lmisa. exact HmisaS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
     iIntros "!>".
@@ -756,9 +763,9 @@ Section StepLD.
     unfold sFcl, base_upd_l. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int mst0a 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
+      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
     - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
+      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
   Qed.
 
 End StepLD.

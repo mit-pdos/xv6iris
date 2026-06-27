@@ -87,7 +87,7 @@ Section ForwardJALg.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAjg = Some (None, sAjg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAjg _ (exec_currentlyEnabled_S sAjg) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAjg _ (exec_currentlyEnabled_S sAjg) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAjg = Some (F_Base w, sAjg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAjg = Some (JAL (imm, Regidx rd), sAjg))
       by (apply Hdec; exact LprivA).

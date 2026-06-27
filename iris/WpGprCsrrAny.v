@@ -158,7 +158,7 @@ Section ForwardCsrrMstatus.
     { unfold sAm0, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAm0 = Some (None, sAm0)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAm0 _ (exec_currentlyEnabled_S sAm0) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAm0 _ (exec_currentlyEnabled_S sAm0) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAm0 = Some (F_Base w, sAm0)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAm0 = Some (CSRReg (csr_mstatus, Regidx rs1z, Regidx rd, CSRRS), sAm0))
       by (apply Hdec; exact LprivA).
@@ -515,7 +515,7 @@ Section GenericForwardCsrr.
     { unfold sAg0, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAg0 = Some (None, sAg0)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAg0 _ (exec_currentlyEnabled_S sAg0) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAg0 _ (exec_currentlyEnabled_S sAg0) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAg0 = Some (F_Base w, sAg0)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAg0 = Some (CSRReg (csr, Regidx rs1z, Regidx rd, CSRRS), sAg0))
       by (apply Hdec; exact LprivA).

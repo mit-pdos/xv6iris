@@ -435,9 +435,10 @@ Section ForwardLUI.
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFlu).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa.
+    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa LS.
     assert (LpcA  : register_lookup PC sAlu.(sregs) = pc).
     { unfold sAlu, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege sAlu.(sregs) = Machine).
@@ -452,9 +453,11 @@ Section ForwardLUI.
     { unfold sAlu, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (LmisaA : eq_vec (_get_Misa_C (register_lookup misa sAlu.(sregs))) ('b"1") = true).
     { unfold sAlu, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
+    assert (LmisaSA : eq_vec (_get_Misa_S (register_lookup misa sAlu.(sregs))) ('b"1") = true).
+    { unfold sAlu, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAlu = Some (None, sAlu)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAlu _ (exec_currentlyEnabled_S sAlu) (or_intror LmidA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAlu _ (exec_currentlyEnabled_S sAlu) LmisaSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAlu = Some (F_RVC h_lui, sAlu)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed h_lui) sAlu = Some (C_LUI (imm_clui, rd_clui), sAlu))
       by (apply decode_C_lui; exact LmisaA).
@@ -560,9 +563,10 @@ Section ForwardADD.
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFad).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa.
+    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa LS.
     assert (LpcA  : register_lookup PC sAad.(sregs) = pc).
     { unfold sAad, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege sAad.(sregs) = Machine).
@@ -577,9 +581,11 @@ Section ForwardADD.
     { unfold sAad, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (LmisaA : eq_vec (_get_Misa_C (register_lookup misa sAad.(sregs))) ('b"1") = true).
     { unfold sAad, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
+    assert (LmisaSA : eq_vec (_get_Misa_S (register_lookup misa sAad.(sregs))) ('b"1") = true).
+    { unfold sAad, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAad = Some (None, sAad)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAad _ (exec_currentlyEnabled_S sAad) (or_intror LmidA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAad _ (exec_currentlyEnabled_S sAad) LmisaSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAad = Some (F_RVC h_add, sAad)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed h_add) sAad = Some (C_ADD (rsd_cadd, rs2_cadd), sAad))
       by (apply decode_C_ADD; exact LmisaA).
@@ -755,11 +761,12 @@ Section ForwardJAL.
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     eq_vec (access_vec_dec jtgt 0) ('b"0") = true ->
     bit_to_bool (access_vec_dec jtgt 1) = false ->
     exec riscv_step s = Some (tt, sFj).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Halign Hbit1.
+    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp LS Halign Hbit1.
     assert (LpcA  : register_lookup PC sAj.(sregs) = pc).
     { unfold sAj, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lpc | vm_compute; reflexivity ]. }
@@ -780,9 +787,12 @@ Section ForwardJAL.
               (landing_pad_bits_backwards LP_EXPECTED) = false).
     { unfold sAj, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lelp | vm_compute; reflexivity ]. }
+    assert (LmisaSA : eq_vec (_get_Misa_S (register_lookup misa sAj.(sregs))) ('b"1") = true).
+    { unfold sAj, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
+        [ exact LS | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAj = Some (None, sAj)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAj _ (exec_currentlyEnabled_S sAj) (or_intror LmidA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAj _ (exec_currentlyEnabled_S sAj) LmisaSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAj = Some (F_Base w_jal, sAj))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_jal) sAj = Some (JAL (imm_jal, Regidx i_jal), sAj))
@@ -980,9 +990,10 @@ Section ForwardMUL.
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_M (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFm).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp LmisaM.
+    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp LmisaM LS.
     assert (LpcA  : register_lookup PC sAm.(sregs) = pc).
     { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lpc | vm_compute; reflexivity ]. }
@@ -1006,9 +1017,12 @@ Section ForwardMUL.
     assert (LmisaMA : eq_vec (_get_Misa_M (register_lookup misa sAm.(sregs))) ('b"1") = true).
     { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact LmisaM | vm_compute; reflexivity ]. }
+    assert (LmisaSA : eq_vec (_get_Misa_S (register_lookup misa sAm.(sregs))) ('b"1") = true).
+    { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
+        [ exact LS | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAm = Some (None, sAm)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) (or_intror LmidA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) LmisaSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAm = Some (F_Base w_mul, sAm))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_mul) sAm
@@ -1391,9 +1405,10 @@ Section ForwardADDI.
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs))) ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFai).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa.
+    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp Lmisa LS.
     assert (LpcA  : register_lookup PC sAai.(sregs) = pc).
     { unfold sAai, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege sAai.(sregs) = Machine).
@@ -1408,9 +1423,11 @@ Section ForwardADDI.
     { unfold sAai, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (LmisaA : eq_vec (_get_Misa_C (register_lookup misa sAai.(sregs))) ('b"1") = true).
     { unfold sAai, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
+    assert (LmisaSA : eq_vec (_get_Misa_S (register_lookup misa sAai.(sregs))) ('b"1") = true).
+    { unfold sAai, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact LS | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAai = Some (None, sAai)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAai _ (exec_currentlyEnabled_S sAai) (or_intror LmidA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAai _ (exec_currentlyEnabled_S sAai) LmisaSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAai = Some (F_RVC h_addi, sAai)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed h_addi) sAai = Some (C_ADDI (imm_caddi, rsd_caddi), sAai))
       by (apply decode_C_ADDI; exact LmisaA).
@@ -1571,6 +1588,7 @@ Section StepLUI.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ pc -∗ (R_bitvector_64 x10) ↦ᵣ x10_0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -1592,7 +1610,7 @@ Section StepLUI.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
+    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
       "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1620,7 +1638,8 @@ Section StepLUI.
       apply (forward_exec_lui s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
-      - rewrite Lmisa. exact Hmisa. }
+      - rewrite Lmisa. exact Hmisa.
+      - rewrite Lmisa. exact HmisaS. }
     iIntros "!>".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -1699,6 +1718,7 @@ Section StepADD.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp_in -∗ (R_bitvector_64 x10) ↦ᵣ a0_in -∗
     nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
@@ -1722,7 +1742,7 @@ Section StepADD.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
+    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
       "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1753,7 +1773,8 @@ Section StepADD.
       apply (forward_exec_add s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
-      - rewrite Lmisa. exact Hmisa. }
+      - rewrite Lmisa. exact Hmisa.
+      - rewrite Lmisa. exact HmisaS. }
     iIntros "!>".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -1839,6 +1860,7 @@ Section StepMUL.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_M misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ pc -∗ (R_bitvector_64 x10) ↦ᵣ a0_in -∗ (R_bitvector_64 x11) ↦ᵣ a1_in -∗
     nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
@@ -1864,7 +1886,7 @@ Section StepMUL.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hb1 HmIE Help Hmisa HmisaS)
       "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -1895,7 +1917,8 @@ Section StepMUL.
       apply (forward_exec_mul s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
-      - rewrite Lmisa. exact Hmisa. }
+      - rewrite Lmisa. exact Hmisa.
+      - rewrite Lmisa. exact HmisaS. }
     iIntros "!>".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -2103,9 +2126,10 @@ Section ForwardCSRR.
     eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
            ('b"1") = false ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec riscv_step s = Some (tt, sFc).
   Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp.
+    intros Lpc Lpriv Lhs Lmideleg LmIE Lelp LS.
     assert (LpcA  : register_lookup PC sAc.(sregs) = pc).
     { unfold sAc, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lpc | vm_compute; reflexivity ]. }
@@ -2126,9 +2150,12 @@ Section ForwardCSRR.
               (landing_pad_bits_backwards LP_EXPECTED) = false).
     { unfold sAc, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
         [ exact Lelp | vm_compute; reflexivity ]. }
+    assert (LmisaSA : eq_vec (_get_Misa_S (register_lookup misa sAc.(sregs))) ('b"1") = true).
+    { unfold sAc, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
+        [ exact LS | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAc = Some (None, sAc)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAc _ (exec_currentlyEnabled_S sAc) (or_intror LmidA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAc _ (exec_currentlyEnabled_S sAc) LmisaSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAc = Some (F_Base w_csrr, sAc))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_csrr) sAc
@@ -2305,6 +2332,7 @@ Section StepADDI.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ pc -∗ (R_bitvector_64 x11) ↦ᵣ a1_in -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -2327,7 +2355,7 @@ Section StepADDI.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
       "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
@@ -2357,7 +2385,8 @@ Section StepADDI.
       apply (forward_exec_addi s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
-      - rewrite Lmisa. exact Hmisa. }
+      - rewrite Lmisa. exact Hmisa.
+      - rewrite Lmisa. exact HmisaS. }
     iIntros "!>".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -2664,6 +2693,7 @@ Section StepCSRR.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ pc -∗ (R_bitvector_64 x11) ↦ᵣ x11_0 -∗ mhartid ↦ᵣ mhartid_in -∗
     nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
@@ -2686,7 +2716,7 @@ Section StepCSRR.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hb1 HmIE Help Hmisa HmisaS)
       "Hpc Hx11 Hmhart Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (regl & Hml & Hxl & _ & _).
     destruct (Hpmaall (fetch_pa (add_vec_int pc 2)) 2) as (regh & Hmh & Hxh & _ & _).
@@ -2722,7 +2752,8 @@ Section StepCSRR.
       rewrite <- (sFc_eq s pc b1 mst0 Lpc Lmst).
       apply (forward_exec_csrr s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
-      - rewrite Lelp. exact Help. }
+      - rewrite Lelp. exact Help.
+      - rewrite Lmisa. exact HmisaS. }
     iIntros "!>".
     iEval (rewrite Lmisa) in "Hmisa'".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
@@ -2817,6 +2848,7 @@ Section StepJAL2.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ pc -∗ (R_bitvector_64 x1) ↦ᵣ x1_0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -2839,7 +2871,7 @@ Section StepJAL2.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hal0 Hal1 Hb1 HmIE Help Hmisa)
+    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hal0 Hal1 Hb1 HmIE Help Hmisa HmisaS)
       "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (regl & Hml & Hxl & _ & _).
     destruct (Hpmaall (fetch_pa (add_vec_int pc 2)) 2) as (regh & Hmh & Hxh & _ & _).
@@ -2875,6 +2907,7 @@ Section StepJAL2.
       apply (forward_exec_jal s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
+      - rewrite Lmisa. exact HmisaS.
       - rewrite Hjt. exact Hal0.
       - rewrite Hjt. exact Hal1. }
     iIntros "!>".

@@ -343,7 +343,7 @@ Section ForwardCsrwMedeleg.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAcw = Some (None, sAcw)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAcw _ (exec_currentlyEnabled_S sAcw) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAcw _ (exec_currentlyEnabled_S sAcw) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAcw = Some (F_Base w, sAcw)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAcw = Some (CSRReg (csr_medeleg, Regidx rs1, zreg, CSRRW), sAcw))
       by (apply Hdec; exact LprivA).
@@ -585,7 +585,7 @@ Section ForwardCsrwMcounteren.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_mcounteren, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -861,7 +861,7 @@ Section ForwardCsrwMepc.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_mepc, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -1096,7 +1096,7 @@ Section ForwardCsrwMscratch.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_mscratch, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -1435,7 +1435,7 @@ Section ForwardCsrwMideleg.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_mideleg, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -1717,7 +1717,7 @@ Section ForwardCsrwSie.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_sie, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -2180,7 +2180,7 @@ Section ForwardCsrwMstatus.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -2607,7 +2607,7 @@ Section ForwardCsrwSatp.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -2958,7 +2958,7 @@ Section ForwardCsrwPmpaddr0.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_pmpaddr0, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -3362,7 +3362,7 @@ Section ForwardCsrwPmpcfg0.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -4433,7 +4433,7 @@ Section ForwardCsrwMenvcfg.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_menvcfg, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).
@@ -4743,7 +4743,7 @@ Section ForwardCsrwStimecmp.
     { unfold sAcw, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lelp | vm_compute; reflexivity]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAcw s b) = Some (None, (sAcw s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAcw s b) _ (exec_currentlyEnabled_S (sAcw s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAcw s b) = Some (F_Base w, (sAcw s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) (sAcw s b) = Some (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW), (sAcw s b)))
       by (apply Hdec; exact LprivA).

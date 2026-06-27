@@ -540,7 +540,7 @@ Section ForwardSDg.
     { unfold sAsg. trans_mi. exact Lelp. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAsg = Some (None, sAsg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAsg _ (exec_currentlyEnabled_S sAsg) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAsg _ (exec_currentlyEnabled_S sAsg) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAsg = Some (F_Base w, sAsg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAsg
               = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), sAsg))

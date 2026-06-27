@@ -132,7 +132,7 @@ Section ForwardCsrrGpr.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAcg = Some (None, sAcg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAcg _ (exec_currentlyEnabled_S sAcg) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAcg _ (exec_currentlyEnabled_S sAcg) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAcg = Some (F_Base w, sAcg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAcg
               = Some (CSRReg (csr_csrr, Regidx i_rs1_csrr, Regidx rd, CSRRS), sAcg))

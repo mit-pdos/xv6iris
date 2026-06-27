@@ -141,7 +141,7 @@ Section FinalWP.
       assert (LmIEA : eq_vec (_get_Mstatus_MIE
                 (register_lookup (R_bitvector_64 mstatus) (sA s).(sregs))) ('b"1") = false)
         by (unfold sA; trans_mi; exact LmIE).
-      apply (exec_getPendingSet_machine_none (sA s) _ (exec_currentlyEnabled_S (sA s)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sA s) _ (exec_currentlyEnabled_S (sA s)) LSA LmIEA). }
     (* Hha at sA s via exec_hart_active_progress (no Hne precondition, mideleg-free). *)
     assert (Hha : exec (run_hart_active 0) (sA s)
                   = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sX s)).

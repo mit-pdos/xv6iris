@@ -1288,7 +1288,8 @@ Qed.
 Section ExecPending.
   Context (s : mstate) (cES : bool).
   Hypothesis HecES : exec (currentlyEnabled Ext_S) s = Some (cES, s).
-  Hypothesis Hguard : cES = true \/ register_lookup mideleg s.(sregs) = zeros' 64.
+  (* S-extension always enabled on the targeted CPUs (see Section Pending). *)
+  Hypothesis HcEStrue : cES = true.
   Hypothesis HmIE :
     eq_vec (_get_Mstatus_MIE (register_lookup mstatus s.(sregs))) ('b"1") = false.
 
@@ -1298,13 +1299,8 @@ Section ExecPending.
                       (fun w1 : mword 64 => returnM (eq_vec w1 (zeros' 64))))) s
       = Some (true, s).
   Proof using All.
-    rewrite (exec_or_boolM_Some _ _ _ _ _ HecES). destruct cES; [reflexivity|].
-    destruct Hguard as [Hc | Hmideleg]; [discriminate Hc|].
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
-    rewrite Hmideleg.
-    replace (eq_vec (zeros' 64) (zeros' 64)) with true
-      by (symmetry; apply eq_vec_true_iff; reflexivity).
-    apply exec_returnm.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ HecES).
+    destruct cES; [reflexivity | discriminate HcEStrue].
   Qed.
 
   Lemma exec_ext_int_some :

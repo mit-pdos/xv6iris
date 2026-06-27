@@ -153,7 +153,7 @@ Section ForwardAddGpr.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAg = Some (None, sAg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAg _ (exec_currentlyEnabled_S sAg) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAg _ (exec_currentlyEnabled_S sAg) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAg = Some (F_Base w, sAg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAg
               = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD), sAg))

@@ -290,13 +290,13 @@ Section KernelBootWP.
     replace (add_vec_int kpc0 4) with kpc1 by (vm_compute; reflexivity).
     (* Step 2: ld.  base register x2 holds sp1 = the auipc result.  decode is
        discharged by [decode_ld].  Owns the ld bytes at [fetch_pa kpc1]. *)
-    iApply (wp_step_ld kpc1 w_ld imm_ld i_ld bb v sp1 kpc1 mst1 mstatus0 mc mcfg
+    iApply (wp_step_ld kpc1 w_ld imm_ld i_ld bb v sp1 kpc1 mst1 mstatus0 misa0 mc mcfg
               mseccfg0 pmpcfg0 pmar0 bb elp0 E Φ
               ltac:(vm_compute; reflexivity) Hpmaall Hpmpf Halignfl Hbit0fl Hbit1fl Hvalignfl
               ltac:(vm_compute; reflexivity) decode_ld eq_refl
-              HmIE Hlp HMPRV Hpmm Halign Hpmp Hpalign
-              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
-    iNext. iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes _".
+              HmIE Hlp HmisaS HMPRV Hpmm Halign Hpmp Hpalign
+              with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
+    iNext. iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes _".
     replace (add_vec_int kpc1 4) with kpc2 by (vm_compute; reflexivity).
     (* [kernel_text] (persistent) was never consumed — hand it straight back. *)
     iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
@@ -567,7 +567,7 @@ Section KernelBootWP.
               ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              eq_refl HmIE Hlp HmisaC
+              eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hlui").
     iNext.
     iIntros "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
@@ -580,7 +580,7 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
-              eq_refl HmIE Hlp HmisaC
+              eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hcsrr").
     iNext.
     iIntros "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
@@ -591,7 +591,7 @@ Section KernelBootWP.
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              eq_refl HmIE Hlp HmisaC
+              eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Haddi").
     iNext.
     iIntros "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
@@ -603,7 +603,7 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              eq_refl HmIE Hlp HmisaM
+              eq_refl HmIE Hlp HmisaM HmisaS
               with "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hmul").
     iNext.
     iIntros "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
@@ -614,7 +614,7 @@ Section KernelBootWP.
               ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              eq_refl HmIE Hlp HmisaC
+              eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hadd").
     iNext.
     iIntros "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
@@ -628,7 +628,7 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity)
               ltac:(intros j Hj; destruct j as [|[|j]]; [vm_compute; reflexivity | vm_compute; reflexivity | exfalso; lia])
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              eq_refl HmIE Hlp HmisaC
+              eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hjal").
     iNext.
     iIntros "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".

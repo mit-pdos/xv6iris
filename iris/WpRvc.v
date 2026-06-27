@@ -89,7 +89,7 @@ Section ForwardCliGpr.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAl = Some (None, sAl)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAl = Some (F_RVC w16, sAl)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) sAl = Some (C_LI (imm6, Regidx rd), sAl))
       by (apply Hcdec; exact LmisaA).
@@ -310,7 +310,7 @@ Section ForwardCaddiGpr.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (C_ADDI (imm6, Regidx rd), (sAl s b)))
       by (apply Hcdec; exact LmisaA).
@@ -525,7 +525,7 @@ Section ForwardRvcGprWrite.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (cinstr, (sAl s b)))
       by (apply Hcdec; exact LmisaA).
@@ -1789,7 +1789,7 @@ Section ForwardCretJalr.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (C_JR (Regidx ra), (sAl s b)))
       by (apply Hcdec; exact LmisaA).
@@ -2005,7 +2005,7 @@ Section ForwardRvcStep.
     { unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) (sAl s b) = Some (None, (sAl s b))).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none (sAl s b) _ (exec_currentlyEnabled_S (sAl s b)) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) (sAl s b) = Some (F_RVC w16, (sAl s b))) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode_compressed w16) (sAl s b) = Some (cinstr, (sAl s b)))
       by (apply Hcdec; exact LmisaA).

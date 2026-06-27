@@ -610,8 +610,7 @@ Section HneClosed.
   Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
   Hypothesis HpcS  : register_lookup (R_bitvector_64 PC) s.(sregs) = pc.
   Hypothesis HecES : exec (currentlyEnabled Ext_S) s = Some (cES, s).
-  Hypothesis Hmideleg :
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64.
+  Hypothesis HcEStrue : cES = true.
   Hypothesis HmIE :
     eq_vec (_get_Mstatus_MIE
               (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
@@ -633,7 +632,7 @@ Section HneClosed.
   (* dispatchInterrupt leaf, via the getPendingSet keystone. *)
   Let Hdisp : exec (dispatchInterrupt Machine) s = Some (None, s) :=
     exec_dispatchInterrupt_none s
-      (exec_getPendingSet_machine_none s cES HecES (or_intror Hmideleg) HmIE).
+      (exec_getPendingSet_machine_none s cES HecES HcEStrue HmIE).
 
   (* the execute leaf at s_pc := set_reg s nextPC (pc+4). *)
   Let Hexec :

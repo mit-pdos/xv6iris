@@ -120,7 +120,7 @@ Section ForwardJALRg.
     { unfold sArg, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sArg = Some (None, sArg)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sArg _ (exec_currentlyEnabled_S sArg) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sArg _ (exec_currentlyEnabled_S sArg) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sArg = Some (F_Base w, sArg)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sArg = Some (JALR (imm, Regidx rs1, Regidx rd), sArg))
       by (apply Hdec; exact LprivA).

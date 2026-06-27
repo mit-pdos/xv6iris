@@ -111,7 +111,7 @@ Section ForwardOrGpr.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAor = Some (None, sAor)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAor _ (exec_currentlyEnabled_S sAor) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAor _ (exec_currentlyEnabled_S sAor) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAor = Some (F_Base w, sAor)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAor
               = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR), sAor))
@@ -386,7 +386,7 @@ Section ForwardAndGpr.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAand = Some (None, sAand)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAand _ (exec_currentlyEnabled_S sAand) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAand _ (exec_currentlyEnabled_S sAand) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAand = Some (F_Base w, sAand)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAand
               = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND), sAand))
@@ -672,7 +672,7 @@ Section ForwardOriGpr.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAori = Some (None, sAori)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAori _ (exec_currentlyEnabled_S sAori) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAori _ (exec_currentlyEnabled_S sAori) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAori = Some (F_Base w, sAori)) by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w) sAori
               = Some (ITYPE (imm, Regidx rs1, Regidx rd, ORI), sAori))

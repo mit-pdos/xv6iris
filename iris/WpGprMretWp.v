@@ -131,7 +131,7 @@ Section ForwardMRET.
         [ exact Lelp | vm_compute; reflexivity ]. }
     assert (HdispA : exec (dispatchInterrupt Machine) sAm = Some (None, sAm)).
     { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) (or_introl LSA) LmIEA). }
+      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) LSA LmIEA). }
     assert (HfetchA : exec (fetch tt) sAm = Some (F_Base w_mret, sAm))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_mret) sAm = Some (MRET tt, sAm))
