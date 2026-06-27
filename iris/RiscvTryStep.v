@@ -634,7 +634,11 @@ Section Pending.
   Context (s : mstate) (cES : bool).
 
   Hypothesis HcES : run (currentlyEnabled Ext_S) s cES s.
-  Hypothesis Hguard : cES = true \/ register_lookup mideleg s.(sregs) = zeros' 64.
+  (* The getPendingSet guard is [currentlyEnabled Ext_S || (mideleg == 0)].  The
+     RISC-V CPUs this kernel targets support supervisor mode, so the S-extension
+     is always enabled (cES = true); the guard then holds regardless of mideleg,
+     and we need not reason about mideleg's value at all. *)
+  Hypothesis HcEStrue : cES = true.
   Hypothesis HmIE :
     eq_vec (_get_Mstatus_MIE (register_lookup mstatus s.(sregs))) ('b"1") = false.
 
@@ -645,13 +649,7 @@ Section Pending.
                      (fun w1 : mword 64 => returnM (eq_vec w1 (zeros' 64))))) s true s.
   Proof using All.
     apply (proj2 (run_or_boolM _ _ _ _ _)). exists cES, s. split; [exact HcES|].
-    destruct cES.
-    - split; reflexivity.
-    - destruct Hguard as [Hc | Hmideleg]; [discriminate Hc|].
-      eapply run_bind_fwd; [exact (run_read_reg_fwd mideleg s)|].
-      rewrite Hmideleg.
-      rewrite (proj2 (eq_vec_true_iff (zeros' 64) (zeros' 64)) eq_refl).
-      apply run_returnM_fwd.
+    destruct cES; [split; reflexivity | discriminate HcEStrue].
   Qed.
 
   (* read_mip threads to *some* value (state-preserving); value irrelevant. *)

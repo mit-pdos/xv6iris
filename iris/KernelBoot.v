@@ -178,12 +178,6 @@ Section KernelBootWP.
 
   (* The first two instructions' bytes (WP form) + a wand to restore the whole
      image (fetch never mutates memory). *)
-  Lemma kernel_text_first_two :
-    kernel_text ⊢ auipc_bytes ∗ ld_bytes ∗ (auipc_bytes -∗ ld_bytes -∗ kernel_text).
-  Proof.
-    iIntros "Ht". iDestruct (kernel_text_split with "Ht") as "(H0 & H1 & Hr)".
-    iFrame "H0 H1". iIntros "H0 H1". iApply kernel_text_combine. iFrame.
-  Qed.
 
   (* ---- byte-level view of the image (for cross-boundary fetch windows) ---- *)
   (* [instr_byte_pairs k] : the (address, byte) pairs of one instruction. *)
@@ -436,38 +430,19 @@ Section KernelBootWP.
       kinstr_bytes kinstr3 ∗ kinstr_bytes kinstr4 ∗ kinstr_bytes kinstr5 ∗
       kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7 ∗ ktail8.
   Proof. rewrite kernel_text_eq8. done. Qed.
-  Lemma ktext_join :
-    (kinstr_bytes kinstr0 ∗ kinstr_bytes kinstr1 ∗ kinstr_bytes kinstr2 ∗
-     kinstr_bytes kinstr3 ∗ kinstr_bytes kinstr4 ∗ kinstr_bytes kinstr5 ∗
-     kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7 ∗ ktail8) ⊢ kernel_text.
-  Proof. rewrite kernel_text_eq8. done. Qed.
   Lemma lui_split :
     (kinstr_bytes kinstr2 ∗ kinstr_bytes kinstr3) ⊢ lui_win ∗ rem_lui.
-  Proof. rewrite lui_regroup. done. Qed.
-  Lemma lui_join :
-    (lui_win ∗ rem_lui) ⊢ kinstr_bytes kinstr2 ∗ kinstr_bytes kinstr3.
   Proof. rewrite lui_regroup. done. Qed.
   Lemma add_split :
     (kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7) ⊢ add_win ∗ rem_add.
   Proof. rewrite add_regroup. done. Qed.
-  Lemma add_join :
-    (add_win ∗ rem_add) ⊢ kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7.
-  Proof. rewrite add_regroup. done. Qed.
   Lemma csrr_get : kinstr_bytes kinstr3 ⊢ csrr_win.
-  Proof. rewrite E_csrr. done. Qed.
-  Lemma csrr_put : csrr_win ⊢ kinstr_bytes kinstr3.
   Proof. rewrite E_csrr. done. Qed.
   Lemma mul_get : kinstr_bytes kinstr5 ⊢ mul_win.
   Proof. rewrite E_mul. done. Qed.
-  Lemma mul_put : mul_win ⊢ kinstr_bytes kinstr5.
-  Proof. rewrite E_mul. done. Qed.
   Lemma jal_get : kinstr_bytes kinstr7 ⊢ jal_win.
   Proof. rewrite E_jal. done. Qed.
-  Lemma jal_put : jal_win ⊢ kinstr_bytes kinstr7.
-  Proof. rewrite E_jal. done. Qed.
   Lemma addi_get : kinstr_bytes kinstr4 ⊢ haddi_win.
-  Proof. rewrite E_addi addi_win_eq. done. Qed.
-  Lemma addi_put : haddi_win ⊢ kinstr_bytes kinstr4.
   Proof. rewrite E_addi addi_win_eq. done. Qed.
 
 
