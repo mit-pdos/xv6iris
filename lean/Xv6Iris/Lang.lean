@@ -36,10 +36,13 @@ inductive DemoExn
 
 abbrev DState := MState DemoReg DemoRT
 
-/-- The machine step (stands in for the model's `try_step 0 false`): `PC := PC+4`. -/
+/-- The machine step (stands in for the model's `try_step 0 false`): advance
+`PC := PC+4` and write byte `7` to memory address `0` (so one step touches *both*
+the register and memory heaps — exercising loads/stores end to end). -/
 def step : Mon DemoReg DemoRT DemoExn Unit := do
   let pc ← readReg DemoReg.PC
   writeReg DemoReg.PC (pc + 4)
+  writeByte 0 7#8
 
 /-! ## The one-expression language -/
 
@@ -59,11 +62,12 @@ instance : PrimStep RiscvExpr DState (List Empty) where
 instance : Language RiscvExpr DState Empty Empty where
   val_stuck _ := rfl
 
-/-- Pure reduction of the demo step: reading `PC = pc`, one step sets `PC := pc+4`.
-The analog of the per-opcode `forward_exec_*` reductions in the Rocq dev. -/
+/-- Pure reduction of the demo step: reading `PC = pc`, one step sets `PC := pc+4`
+and writes byte `7` at address `0`. Analog of the per-opcode `forward_exec_*`
+reductions in the Rocq dev. -/
 theorem exec_step {σ : DState} {pc : BitVec 64} (H : σ.regs DemoReg.PC = some pc) :
-    exec step σ = some ((), σ.setReg DemoReg.PC (pc + 4)) := by
-  simp only [step, readReg, writeReg, bind, Mon.bind, exec, H]
+    exec step σ = some ((), (σ.setReg DemoReg.PC (pc + 4)).setMem 0 7#8) := by
+  simp only [step, readReg, writeReg, writeByte, bind, Mon.bind, exec, H]
 
 /-- Sanity check: a `Loop` step is exactly one `exec step`. -/
 theorem primStep_iff {σ σ' : DState} :

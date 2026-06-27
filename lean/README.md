@@ -44,9 +44,36 @@ on top of [iris-lean](https://github.com/leanprover-community/iris-lean).
   route hypotheses, and `simp [Algebra.BigOpL.bigOpL_nil]` to clear the empty
   fork list; bupd goals need parenthesizing (`|==> (A ∗ B)`).
 
+  Also proved: **`wp_two_steps`** — the WP *composes* (two `Loop` steps advance
+  `PC` by 8, threading register ownership through each `▷`). This is the shape of
+  Rocq's `wp_kernel_first_two` boot capstone.
+
+  **Two heaps now work (memory heap solved).** `Ptsto.lean` carries *both* a
+  register `gen_heap` (`DemoReg ↦ᵣ BitVec 64`, keyed by a dedicated `RegLoc`
+  `Int`-wrapper à la iris-lean `Loc`) and a byte-memory `gen_heap` (`Nat ↦ₘ
+  BitVec 8`), with `stateInterp = ∃ rm mm, genHeapInterp rm ∗ genHeapInterp mm ∗
+  ⌜regAgree⌝ ∗ ⌜memAgree⌝` and all four bridges proved: `reg_valid`/`reg_update`
+  and **`mem_valid`/`mem_update`**.
+
+  The obstacle was that iris-lean's `genHeapGS L V GF H` has *all four* params as
+  `outParam`s, so two ambient heap instances are indistinguishable to resolution.
+  Solution: name the GS instance (`[D : DemoGS …]`) and pass the heap explicitly
+  as `(G := D.reg)` / `(G := D.mem)` to `genHeapInterp`/`pointsTo` (named binder),
+  and bridge the `genHeap_valid`/`_update` lemmas — which use an *anonymous*
+  instance binder — with thin wrappers `genHeap_valid_at`/`genHeap_update_at` that
+  take the heap as an explicit argument; the wrapper *statement* (using `==∗` and
+  `(G := G)`) pins the instance by unification rather than resolution.
+
+  The demo `step` now touches *both* heaps (`PC := PC+4`; write byte `7` at
+  address `0`), and **`wp_demo_step`** owns + updates both: `PC ↦ᵣ pc ∗ 0 ↦ₘ b`
+  before, `PC ↦ᵣ (pc+4) ∗ 0 ↦ₘ 7` after — threading `reg_update` *and*
+  `mem_update` through one `wp_lift_step`. `wp_two_steps` likewise composes two
+  such steps over both heaps. So the memory `gen_heap` is exercised end to end
+  inside a real weakest-precondition, not just at the bridge-lemma level.
+
   Next increment: generalize the demo to the *real* model (swap `DemoReg`/`step`
-  for the generated `Register`/`try_step` once the lean-sail fork lands), add the
-  byte-memory heap (distinct key type), and build per-opcode WPs.
+  for the generated `Register`/`try_step` once the lean-sail fork lands); build
+  per-opcode WPs; a concrete `BundledGFunctors` + adequacy (WP → safety).
 
 ### The one external dependency to resolve — RESOLVED to a path
 
