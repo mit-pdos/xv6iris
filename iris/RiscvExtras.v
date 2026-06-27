@@ -97,6 +97,31 @@ Qed.
 Lemma pa_add_0 (a : Arch.pa) : pa_add a 0 = a.
 Proof. unfold pa_add. change (Z.of_nat 0) with 0%Z. apply avi0. Qed.
 
+(* add_vec_int (mword_of_int A) k = mword_of_int (A + k) : the model's mword
+   addition agrees with Z addition (everything reduces mod 2^64). *)
+Lemma avi_mword (A k : Z) :
+  add_vec_int (mword_of_int A : mword 64) k = mword_of_int (A + k).
+Proof.
+  unfold add_vec_int, add_vec, mword_of_int, Operators_mwords.word_binop,
+    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  apply bv_eq. rewrite bv_add_unsigned !Z_to_bv_unsigned.
+  unfold bv_wrap. rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r. reflexivity.
+Qed.
+
+(* fetch_pa is the identity on 64-bit physical addresses (M-mode, no paging). *)
+Lemma fetch_pa_id (pc : mword 64) : fetch_pa pc = pc.
+Proof. unfold fetch_pa. cbn [bits_of_virtaddr]. apply zero_extend'_id. Qed.
+
+(* THE BRIDGE: the j-th byte of the fetch window for the instruction at byte
+   address [A] is the physical byte address [A + j].  This is what lets a
+   per-byte image (keyed by absolute byte address) feed the WP fetch windows,
+   which are phrased as [pa_add (fetch_pa pc) j]. *)
+Lemma pa_add_fetch_mword (A : Z) (j : nat) :
+  pa_add (fetch_pa (mword_of_int A)) j = mword_of_int (A + Z.of_nat j).
+Proof. unfold pa_add. rewrite fetch_pa_id. apply avi_mword. Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* Leaf 2: rX / rX_bits read leaf for x2 (sp), mirroring run_rX_x10.        *)
 

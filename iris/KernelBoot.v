@@ -11,7 +11,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpAuipc WpLoad WpFetch WpDecode WpEntry WpGpr.
-From Kernel Require KernelInstrs KernelData KernelSyms.
+From Kernel Require KernelInstrs KernelSyms.
 Local Open Scope Z_scope.
 
 (* ---- the kernel image, imported from the dump ---- *)
@@ -24,16 +24,6 @@ Definition kentry : Z := 0x80000000.
 
 Lemma kentry_is_entry : KernelSyms.sym "_entry"%string = kentry.
 Proof. vm_compute. reflexivity. Qed.
-
-(* The first two instruction encodings, read straight off the dumped image
-   (head of chunk 0).  [option_map ki_enc (nth_error _ i)] avoids forcing the
-   8423-element tail, so these check by [reflexivity]. *)
-Lemma kernel_first_two_encs :
-  option_map KernelInstrs.ki_enc
-    (List.nth_error KernelInstrs.kernel_instrs_chunk0 0) = Some 0xa117 /\
-  option_map KernelInstrs.ki_enc
-    (List.nth_error KernelInstrs.kernel_instrs_chunk0 1) = Some 0x1d813103.
-Proof. split; reflexivity. Qed.
 
 (* The instruction words handed to the Sail decoder ([w_auipc]/[w_ld], with the
    decoded fields [imm_auipc]/[i_auipc]/[imm_ld]/[i_ld] and the fully-discharged
@@ -54,48 +44,15 @@ Definition kstart : mword 64 := mword_of_int (kentry + 0x58). (* 0x80000058 star
 Definition sp_auipc : mword 64 := mword_of_int 0x8000a000.
 
 (* ---------------------------------------------------------------------- *)
-(* The kernel TEXT image, from the dumper's [KernelInstrs.kernel_instrs].  *)
+(* The kernel TEXT image, from the dumper's per-byte [KernelInstrs.kernel_bytes]. *)
 (* ---------------------------------------------------------------------- *)
 
-(* The first two instructions, read off the image by index (auipc; ld).    *)
-Definition kdefault : KernelInstrs.kinstr := KernelInstrs.MkKInstr 0 0 0 "".
-Definition kinstr0 : KernelInstrs.kinstr := nth 0 KernelInstrs.kernel_instrs kdefault.
-Definition kinstr1 : KernelInstrs.kinstr := nth 1 KernelInstrs.kernel_instrs kdefault.
-Definition kinstr2 : KernelInstrs.kinstr := nth 2 KernelInstrs.kernel_instrs kdefault.
-Definition kinstr3 : KernelInstrs.kinstr := nth 3 KernelInstrs.kernel_instrs kdefault.
-Definition kinstr4 : KernelInstrs.kinstr := nth 4 KernelInstrs.kernel_instrs kdefault.
-Definition kinstr5 : KernelInstrs.kinstr := nth 5 KernelInstrs.kernel_instrs kdefault.
-Definition kinstr6 : KernelInstrs.kinstr := nth 6 KernelInstrs.kernel_instrs kdefault.
-Definition kinstr7 : KernelInstrs.kinstr := nth 7 KernelInstrs.kernel_instrs kdefault.
-
-Lemma kernel_instrs_cons8 :
-  KernelInstrs.kernel_instrs =
-    kinstr0 :: kinstr1 :: kinstr2 :: kinstr3 :: kinstr4 :: kinstr5 :: kinstr6 :: kinstr7
-      :: drop 8 KernelInstrs.kernel_instrs.
-Proof.
-  transitivity (app (take 8 KernelInstrs.kernel_instrs) (drop 8 KernelInstrs.kernel_instrs)).
-  { symmetry. apply take_drop. }
-  replace (take 8 KernelInstrs.kernel_instrs)
-    with (kinstr0 :: kinstr1 :: kinstr2 :: kinstr3 :: kinstr4 :: kinstr5 :: kinstr6 :: kinstr7 :: nil)
-    by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
-
 (* The two cross-boundary RVC fetch windows (low 16 = the RVC instr, high 16 =
-   the next instruction's low 16 bits, as the 4-byte fetch reads them). *)
+   the next instruction's low 16 bits, as the 4-byte fetch reads them).  With
+   a per-byte image these are no longer special: a 4-byte window at a 2-aligned
+   RVC PC is just four consecutive byte lookups (see [kernel_window]). *)
 Definition w_lui4 : mword 32 := mword_of_int 0x25f36505.  (* lui 0x6505 | csrr-lo 0x25f3 *)
 Definition w_add4 : mword 32 := mword_of_int 0x00ef912a.  (* add 0x912a | jal-lo  0x00ef  *)
-
-(* [kernel_instrs] starts with exactly these two (computed off the image). *)
-Lemma kernel_instrs_cons2 :
-  KernelInstrs.kernel_instrs = kinstr0 :: kinstr1 :: drop 2 KernelInstrs.kernel_instrs.
-Proof.
-  transitivity (app (take 2 KernelInstrs.kernel_instrs) (drop 2 KernelInstrs.kernel_instrs)).
-  { symmetry. apply take_drop. }
-  replace (take 2 KernelInstrs.kernel_instrs)
-    with (cons kinstr0 (cons kinstr1 nil)) by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
 
 Section KernelBootWP.
   Context `{!riscvGS Σ}.
@@ -109,24 +66,13 @@ Section KernelBootWP.
   Context (gotval mstF : mword 64) (miF : bool).
 
   (* ---- the kernel TEXT image as a separation-logic predicate ---- *)
-  (* One instruction resident at its ELF address: its [ki_width/8] bytes (read
-     in little-endian exactly as Sail fetches them) live in physical memory at
-     the fetch-translation of [ki_addr].  The encoding [ki_enc] is taken as a
-     32-bit word; for 16-bit (RVC) instructions only bytes 0..1 are asserted. *)
-  Definition kinstr_bytes (k : KernelInstrs.kinstr) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 (KernelInstrs.ki_width k / 8),
-      (pa_add (fetch_pa (mword_of_int (KernelInstrs.ki_addr k))) j)
-        ↦ₘ□ nth_byte (mword_of_int (KernelInstrs.ki_enc k) : mword 32) j)%I.
-
-  (* The kernel code points-to facts are DfracDiscarded, hence persistent and
-     duplicable: no need to borrow instruction bytes from [kernel_text] and
-     return them — a window can be extracted while [kernel_text] stays intact. *)
-  Global Instance kinstr_bytes_persistent k : Persistent (kinstr_bytes k).
-  Proof. apply _. Qed.
-
-  (* The whole text section is exactly the bytes of every dumped instruction. *)
+  (* The image is the dumper's PER-BYTE map [KernelInstrs.kernel_bytes] (byte
+     address -> byte value), each byte resident at its physical address.  The
+     code points-to facts are DfracDiscarded (`↦ₘ□`), hence persistent and
+     duplicable: a fetch window can be extracted while [kernel_text] stays
+     intact — no borrow/return. *)
   Definition kernel_text : iProp Σ :=
-    ([∗ list] k ∈ KernelInstrs.kernel_instrs, kinstr_bytes k)%I.
+    ([∗ map] a↦b ∈ KernelInstrs.kernel_bytes, (mword_of_int a : Arch.pa) ↦ₘ□ b)%I.
 
   Global Instance kernel_text_persistent : Persistent kernel_text.
   Proof. apply _. Qed.
@@ -134,68 +80,49 @@ Section KernelBootWP.
   Lemma kernel_text_dup : kernel_text -∗ kernel_text ∗ kernel_text.
   Proof. iIntros "#H". iSplit; iApply "H". Qed.
 
-  (* The bytes of the first two instructions, in the per-opcode WPs' form. *)
+  (* THE window extractor: for the instruction word [w] of width [W] bytes at
+     byte address [A], its fetch window (in every per-opcode WP's form,
+     [pa_add (fetch_pa pc) j ↦ₘ□ nth_byte w j]) is recovered from [kernel_text]
+     by looking up the [W] consecutive bytes [A .. A+W-1].  The byte-equality
+     side condition [Hbytes] (each stored byte = the j-th byte of [w]) is
+     discharged at the call site by [vm_compute] over the concrete image.  This
+     ONE lemma replaces all the per-instruction E_*/win/regroup/split machinery
+     — 2-vs-4-byte and cross-boundary windows are all just consecutive lookups. *)
+  Lemma kernel_window {wd : Z} (A : Z) (w : mword wd) (W : nat) :
+    (forall j, (j < W)%nat ->
+       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j)) ->
+    kernel_text -∗
+    ([∗ list] j ∈ seq 0 W, (pa_add (fetch_pa (mword_of_int A)) j) ↦ₘ□ nth_byte w j).
+  Proof.
+    iIntros (Hbytes) "#Ht". iApply big_sepL_intro. iIntros "!>" (k j Hk).
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt]. simpl.
+    rewrite pa_add_fetch_mword.
+    iApply (big_sepM_lookup _ _ (A + Z.of_nat k)%Z (nth_byte w k) with "Ht").
+    apply Hbytes. exact Hlt.
+  Qed.
+
+  (* The per-instruction fetch windows of _entry (in the per-opcode WPs' form).
+     [w_lui4]/[w_add4] are the 4-byte words read by the fetch at the two RVC
+     instructions [lui]/[add] (the RVC's 2 bytes + the next instruction's first
+     2), recovered uniformly via [kernel_window] just like the aligned ones. *)
   Definition auipc_bytes : iProp Σ :=
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc0) j) ↦ₘ□ nth_byte w_auipc j)%I.
   Definition ld_bytes : iProp Σ :=
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc1) j) ↦ₘ□ nth_byte w_ld j)%I.
-  (* The remaining text (everything after the first two instructions), kept
-     FOLDED so [kernel_instrs] is only ever exposed inside [kernel_text]. *)
-  Definition kernel_text_tail : iProp Σ :=
-    ([∗ list] k ∈ drop 2 KernelInstrs.kernel_instrs, kinstr_bytes k)%I.
 
-  (* [kinstr_bytes] of the first two instructions IS the WP byte-ownership form
-     (the ELF address/encoding/width compute to kpc0/w_auipc and kpc1/w_ld). *)
-  Lemma E_auipc : kinstr_bytes kinstr0 = auipc_bytes.
+  (* Discharge the [kernel_window] byte side condition for a window of [n] bytes
+     (each [destruct]-branch is a single concrete byte equality, closed by
+     [vm_compute] + [bv_eq] since stored bytes and [nth_byte] agree only up to
+     the [bv] well-formedness proof). *)
+  Lemma auipc_get : kernel_text -∗ auipc_bytes.
   Proof.
-    rewrite /kinstr_bytes /auipc_bytes.
-    replace (KernelInstrs.ki_width kinstr0) with 32%nat by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_addr kinstr0) with (0x80000000)%Z by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_enc kinstr0) with (0xa117)%Z by (vm_compute; reflexivity).
-    reflexivity.
+    iIntros "H". rewrite /auipc_bytes /kpc0 /kentry.
+    iApply (kernel_window 0x80000000 w_auipc 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
   Qed.
-  Lemma E_ld : kinstr_bytes kinstr1 = ld_bytes.
+  Lemma ld_get : kernel_text -∗ ld_bytes.
   Proof.
-    rewrite /kinstr_bytes /ld_bytes.
-    replace (KernelInstrs.ki_width kinstr1) with 32%nat by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_addr kinstr1) with (0x80000004)%Z by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_enc kinstr1) with (0x1d813103)%Z by (vm_compute; reflexivity).
-    reflexivity.
-  Qed.
-
-  Lemma kernel_text_split : kernel_text ⊢ auipc_bytes ∗ ld_bytes ∗ kernel_text_tail.
-  Proof.
-    rewrite /kernel_text {1}kernel_instrs_cons2 big_sepL_cons big_sepL_cons
-            E_auipc E_ld -/kernel_text_tail.
-    iIntros "(H0 & H1 & Hr)". iFrame.
-  Qed.
-  Lemma kernel_text_combine : auipc_bytes ∗ ld_bytes ∗ kernel_text_tail ⊢ kernel_text.
-  Proof.
-    rewrite /kernel_text {1}kernel_instrs_cons2 big_sepL_cons big_sepL_cons
-            E_auipc E_ld -/kernel_text_tail.
-    iIntros "(H0 & H1 & Hr)". iFrame.
-  Qed.
-
-  (* The first two instructions' bytes (WP form) + a wand to restore the whole
-     image (fetch never mutates memory). *)
-
-  (* ---- byte-level view of the image (for cross-boundary fetch windows) ---- *)
-  (* [instr_byte_pairs k] : the (address, byte) pairs of one instruction. *)
-  Definition instr_byte_pairs (k : KernelInstrs.kinstr) : list (Arch.pa * bv 8) :=
-    map (fun j => (pa_add (fetch_pa (mword_of_int (KernelInstrs.ki_addr k))) j,
-                   nth_byte (mword_of_int (KernelInstrs.ki_enc k) : mword 32) j))
-        (seq 0 (KernelInstrs.ki_width k / 8)).
-  Definition kernel_byte_map : list (Arch.pa * bv 8) :=
-    KernelInstrs.kernel_instrs ≫= instr_byte_pairs.
-  Definition kernel_image : iProp Σ :=
-    ([∗ list] ab ∈ kernel_byte_map, ab.1 ↦ₘ□ ab.2)%I.
-
-  (* The byte-level image is exactly the per-instruction image. *)
-  Lemma kernel_image_eq : kernel_image ⊣⊢ kernel_text.
-  Proof.
-    rewrite /kernel_image /kernel_byte_map big_sepL_bind /kernel_text.
-    apply big_sepL_proper; intros ? k ?.
-    rewrite /instr_byte_pairs /kinstr_bytes big_sepL_fmap. done.
+    iIntros "H". rewrite /ld_bytes /kpc1 /kentry.
+    iApply (kernel_window (0x80000000 + 4) w_ld 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
   Qed.
 
   (* ---------------------------------------------------------------------- *)
@@ -277,7 +204,8 @@ Section KernelBootWP.
     (* [kernel_text] is now persistent (DfracDiscarded code points-to), so we just
        PERSIST it and EXTRACT persistent copies of the two instruction windows; no
        borrow-and-return is needed — [kernel_text] is never consumed. *)
-    iDestruct (kernel_text_split with "Htext") as "#(Hibytesa & Hibytesl & _)".
+    iDestruct (auipc_get with "Htext") as "#Hibytesa".
+    iDestruct (ld_get with "Htext") as "#Hibytesl".
     iEval (rewrite /auipc_bytes) in "Hibytesa". iEval (rewrite /ld_bytes) in "Hibytesl".
     (* Step 1: auipc.  uint i_auipc = 2 and isRVC are now concrete facts; decode is
        discharged by [decode_auipc].  Owns the auipc bytes + fetch CSRs. *)
@@ -302,148 +230,54 @@ Section KernelBootWP.
     iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
   Qed.
 
-  (* ---- per-instruction fetch-window reshaping (bytes 2..7) ---- *)
-  (* Non-spanning windows: the fetch reads exactly the instruction's own bytes. *)
+  (* ---- per-instruction fetch windows of _entry (bytes 2..7) ----
+     Each window — aligned ([csrr]/[mul]/[jal]/[addi]) or 4-byte-at-2-aligned-RVC
+     ([lui]/[add], whose fetch reads the RVC's 2 bytes + the next instr's first 2)
+     — is recovered UNIFORMLY from [kernel_text] by [kernel_window]: there is no
+     longer any cross-boundary "regroup", index counting, or leftover [rem_*]. *)
   Definition csrr_win : iProp Σ :=
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc3) j) ↦ₘ□ nth_byte w_csrr j)%I.
   Definition mul_win : iProp Σ :=
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc5) j) ↦ₘ□ nth_byte w_mul j)%I.
   Definition jal_win : iProp Σ :=
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc7) j) ↦ₘ□ nth_byte w_jal j)%I.
-  Definition addi_win : iProp Σ :=
-    ([∗ list] j ∈ seq 0 2,
-       (pa_add (fetch_pa kpc4) j) ↦ₘ□ nth_byte (mword_of_int 0x585 : mword 32) j)%I.
   Definition haddi_win : iProp Σ :=
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa kpc4) j) ↦ₘ□ nth_byte h_addi j)%I.
-
-  Lemma E_csrr : kinstr_bytes kinstr3 = csrr_win.
-  Proof.
-    rewrite /kinstr_bytes /csrr_win.
-    replace (KernelInstrs.ki_width kinstr3) with 32%nat by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_addr kinstr3) with (0x8000000a)%Z by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_enc kinstr3) with (0xf14025f3)%Z by (vm_compute; reflexivity).
-    reflexivity.
-  Qed.
-  Lemma E_mul : kinstr_bytes kinstr5 = mul_win.
-  Proof.
-    rewrite /kinstr_bytes /mul_win.
-    replace (KernelInstrs.ki_width kinstr5) with 32%nat by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_addr kinstr5) with (0x80000010)%Z by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_enc kinstr5) with (0x2b50533)%Z by (vm_compute; reflexivity).
-    reflexivity.
-  Qed.
-  Lemma E_jal : kinstr_bytes kinstr7 = jal_win.
-  Proof.
-    rewrite /kinstr_bytes /jal_win.
-    replace (KernelInstrs.ki_width kinstr7) with 32%nat by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_addr kinstr7) with (0x80000016)%Z by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_enc kinstr7) with (0x42000ef)%Z by (vm_compute; reflexivity).
-    reflexivity.
-  Qed.
-  Lemma E_addi : kinstr_bytes kinstr4 = addi_win.
-  Proof.
-    rewrite /kinstr_bytes /addi_win.
-    replace (KernelInstrs.ki_width kinstr4) with 16%nat by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_addr kinstr4) with (kentry + 0xe)%Z by (vm_compute; reflexivity).
-    replace (KernelInstrs.ki_enc kinstr4) with (0x585)%Z by (vm_compute; reflexivity).
-    reflexivity.
-  Qed.
-  Lemma addi_win_eq : addi_win ⊣⊢ haddi_win.
-  Proof.
-    rewrite /addi_win /haddi_win. apply big_sepL_proper. intros k y Hy.
-    apply lookup_seq in Hy as [-> Hlt].
-    assert (Hb : nth_byte (mword_of_int 0x585 : mword 32) (0 + k)%nat = nth_byte h_addi (0 + k)%nat).
-    { destruct k as [|[|k]];
-        [ apply bv_eq; vm_compute; reflexivity
-        | apply bv_eq; vm_compute; reflexivity
-        | exfalso; lia ]. }
-    rewrite Hb. done.
-  Qed.
-
-  (* Spanning windows (lui@kpc2, add@kpc6): the 4-byte fetch reads the RVC
-     instruction's 2 bytes plus the next instruction's first 2 bytes.  We regroup
-     via the flat (addr,byte) pair form and concrete list equality. *)
-  Lemma kinstr_bytes_pairs (k : KernelInstrs.kinstr) :
-    kinstr_bytes k ⊣⊢ ([∗ list] ab ∈ instr_byte_pairs k, ab.1 ↦ₘ□ ab.2).
-  Proof. rewrite /kinstr_bytes /instr_byte_pairs big_sepL_fmap. done. Qed.
-
-  Lemma win_pairs (pc : mword 64) (w : mword 32) (n : nat) :
-    ([∗ list] j ∈ seq 0 n, (pa_add (fetch_pa pc) j) ↦ₘ□ nth_byte w j) ⊣⊢
-    ([∗ list] ab ∈ map (fun j => (pa_add (fetch_pa pc) j, nth_byte w j)) (seq 0 n),
-       ab.1 ↦ₘ□ ab.2).
-  Proof. rewrite big_sepL_fmap. done. Qed.
-
   Definition lui_win : iProp Σ :=
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc2) j) ↦ₘ□ nth_byte w_lui4 j)%I.
   Definition add_win : iProp Σ :=
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa kpc6) j) ↦ₘ□ nth_byte w_add4 j)%I.
-  Definition lui_pairs : list (Arch.pa * bv 8) :=
-    map (fun j => (pa_add (fetch_pa kpc2) j, nth_byte w_lui4 j)) (seq 0 4).
-  Definition add_pairs : list (Arch.pa * bv 8) :=
-    map (fun j => (pa_add (fetch_pa kpc6) j, nth_byte w_add4 j)) (seq 0 4).
-  Definition rem_lui_pairs : list (Arch.pa * bv 8) :=
-    map (fun j => (pa_add (fetch_pa kpc3) j, nth_byte w_csrr j)) (seq 2 2).
-  Definition rem_add_pairs : list (Arch.pa * bv 8) :=
-    map (fun j => (pa_add (fetch_pa kpc7) j, nth_byte w_jal j)) (seq 2 2).
-  Definition rem_lui : iProp Σ := ([∗ list] ab ∈ rem_lui_pairs, ab.1 ↦ₘ□ ab.2)%I.
-  Definition rem_add : iProp Σ := ([∗ list] ab ∈ rem_add_pairs, ab.1 ↦ₘ□ ab.2)%I.
 
-  Lemma lui_regroup :
-    (kinstr_bytes kinstr2 ∗ kinstr_bytes kinstr3) ⊣⊢ (lui_win ∗ rem_lui).
+  Lemma lui_get : kernel_text -∗ lui_win.
   Proof.
-    rewrite (kinstr_bytes_pairs kinstr2) (kinstr_bytes_pairs kinstr3).
-    rewrite /lui_win (win_pairs kpc2 w_lui4 4) /rem_lui -!big_sepL_app.
-    replace (app (instr_byte_pairs kinstr2) (instr_byte_pairs kinstr3))
-      with (app lui_pairs rem_lui_pairs)
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
+    iIntros "H". rewrite /lui_win /kpc2 /kentry.
+    iApply (kernel_window (0x80000000 + 8) w_lui4 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
   Qed.
-
-  Lemma add_regroup :
-    (kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7) ⊣⊢ (add_win ∗ rem_add).
+  Lemma csrr_get : kernel_text -∗ csrr_win.
   Proof.
-    rewrite (kinstr_bytes_pairs kinstr6) (kinstr_bytes_pairs kinstr7).
-    rewrite /add_win (win_pairs kpc6 w_add4 4) /rem_add -!big_sepL_app.
-    replace (app (instr_byte_pairs kinstr6) (instr_byte_pairs kinstr7))
-      with (app add_pairs rem_add_pairs)
-      by (vm_compute; repeat (f_equal; try (apply bv_eq; vm_compute; reflexivity))).
-    reflexivity.
+    iIntros "H". rewrite /csrr_win /kpc3 /kentry.
+    iApply (kernel_window (0x80000000 + 0xa) w_csrr 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
   Qed.
-
-  Definition ktail8 : iProp Σ :=
-    ([∗ list] k ∈ drop 8 KernelInstrs.kernel_instrs, kinstr_bytes k)%I.
-  Lemma kernel_text_eq8 :
-    kernel_text ⊣⊢
-      kinstr_bytes kinstr0 ∗ kinstr_bytes kinstr1 ∗ kinstr_bytes kinstr2 ∗
-      kinstr_bytes kinstr3 ∗ kinstr_bytes kinstr4 ∗ kinstr_bytes kinstr5 ∗
-      kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7 ∗ ktail8.
+  Lemma addi_get : kernel_text -∗ haddi_win.
   Proof.
-    rewrite /kernel_text {1}kernel_instrs_cons8.
-    rewrite big_sepL_cons big_sepL_cons big_sepL_cons big_sepL_cons
-            big_sepL_cons big_sepL_cons big_sepL_cons big_sepL_cons.
-    rewrite -/ktail8. done.
+    iIntros "H". rewrite /haddi_win /kpc4 /kentry.
+    iApply (kernel_window (0x80000000 + 0xe) h_addi 2 ltac:(intros j Hj; do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
   Qed.
-
-  Lemma ktext_split :
-    kernel_text ⊢
-      kinstr_bytes kinstr0 ∗ kinstr_bytes kinstr1 ∗ kinstr_bytes kinstr2 ∗
-      kinstr_bytes kinstr3 ∗ kinstr_bytes kinstr4 ∗ kinstr_bytes kinstr5 ∗
-      kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7 ∗ ktail8.
-  Proof. rewrite kernel_text_eq8. done. Qed.
-  Lemma lui_split :
-    (kinstr_bytes kinstr2 ∗ kinstr_bytes kinstr3) ⊢ lui_win ∗ rem_lui.
-  Proof. rewrite lui_regroup. done. Qed.
-  Lemma add_split :
-    (kinstr_bytes kinstr6 ∗ kinstr_bytes kinstr7) ⊢ add_win ∗ rem_add.
-  Proof. rewrite add_regroup. done. Qed.
-  Lemma csrr_get : kinstr_bytes kinstr3 ⊢ csrr_win.
-  Proof. rewrite E_csrr. done. Qed.
-  Lemma mul_get : kinstr_bytes kinstr5 ⊢ mul_win.
-  Proof. rewrite E_mul. done. Qed.
-  Lemma jal_get : kinstr_bytes kinstr7 ⊢ jal_win.
-  Proof. rewrite E_jal. done. Qed.
-  Lemma addi_get : kinstr_bytes kinstr4 ⊢ haddi_win.
-  Proof. rewrite E_addi addi_win_eq. done. Qed.
+  Lemma mul_get : kernel_text -∗ mul_win.
+  Proof.
+    iIntros "H". rewrite /mul_win /kpc5 /kentry.
+    iApply (kernel_window (0x80000000 + 0x10) w_mul 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+  Qed.
+  Lemma add_get : kernel_text -∗ add_win.
+  Proof.
+    iIntros "H". rewrite /add_win /kpc6 /kentry.
+    iApply (kernel_window (0x80000000 + 0x14) w_add4 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+  Qed.
+  Lemma jal_get : kernel_text -∗ jal_win.
+  Proof.
+    iIntros "H". rewrite /jal_win /kpc7 /kentry.
+    iApply (kernel_window (0x80000000 + 0x16) w_jal 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+  Qed.
 
 
   (* Cheap discharge of GPR-file map lookups/equalities: [simplify_map_eq] is
@@ -557,12 +391,11 @@ Section KernelBootWP.
               with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
     iNext.
     iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes #Htext".
-    (* now PC = kpc2.  [kernel_text] is persistent: peel PERSISTENT copies of the 8
-       instruction byte-blocks — [kernel_text] (Htext) is never consumed, so there
-       is nothing to rejoin at the end. *)
-    iDestruct (ktext_split with "Htext") as "#(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & Htail)".
+    (* now PC = kpc2.  [kernel_text] is persistent: extract each instruction's
+       fetch window directly by address via [kernel_window] (the X_get lemmas) —
+       [kernel_text] (Htext) is never consumed, so there is nothing to rejoin. *)
     (* ---- step 2: lui a0,0x1  (RVC, 4-aligned, window spans into csrr) ---- *)
-    iDestruct (lui_split with "[$H2 $H3]") as "#(Hlui & Hrem)".
+    iDestruct (lui_get with "Htext") as "#Hlui".
     iApply (wp_step_lui kpc2 w_lui4 bb x10_0 kpc2 m2 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -573,7 +406,7 @@ Section KernelBootWP.
     iIntros "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc2 2) with kpc3 by (vm_compute; reflexivity).
     (* ---- step 3: csrr a1,mhartid  (32-bit, 2-aligned) ---- *)
-    iDestruct (csrr_get with "H3") as "#Hcsrr".
+    iDestruct (csrr_get with "Htext") as "#Hcsrr".
     iApply (wp_step_csrr kpc3 bb mhartid0 x11_0 kpc3 m3 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -586,7 +419,7 @@ Section KernelBootWP.
     iIntros "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc3 4) with kpc4 by (vm_compute; reflexivity).
     (* ---- step 4: addi a1,a1,1  (RVC, 2-aligned) ---- *)
-    iDestruct (addi_get with "H4") as "#Haddi".
+    iDestruct (addi_get with "Htext") as "#Haddi".
     iApply (wp_step_addi kpc4 bb x11c kpc4 m4 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -597,7 +430,7 @@ Section KernelBootWP.
     iIntros "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc4 2) with kpc5 by (vm_compute; reflexivity).
     (* ---- step 5: mul a0,a0,a1  (32-bit, 4-aligned, M-ext) ---- *)
-    iDestruct (mul_get with "H5") as "#Hmul".
+    iDestruct (mul_get with "Htext") as "#Hmul".
     iApply (wp_step_mul kpc5 bb x10l x11a kpc5 m5 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -609,7 +442,7 @@ Section KernelBootWP.
     iIntros "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc5 4) with kpc6 by (vm_compute; reflexivity).
     (* ---- step 6: add sp,sp,a0  (RVC, 4-aligned, window spans into jal) ---- *)
-    iDestruct (add_split with "[$H6 $H7]") as "#(Hadd & Hrem2)".
+    iDestruct (add_get with "Htext") as "#Hadd".
     iApply (wp_step_add kpc6 w_add4 bb x2ld x10m kpc6 m6 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -620,7 +453,7 @@ Section KernelBootWP.
     iIntros "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int kpc6 2) with kpc7 by (vm_compute; reflexivity).
     (* ---- step 7: jal start  (32-bit, 2-aligned) -- the jump to start ---- *)
-    iDestruct (jal_get with "H7") as "#Hjal".
+    iDestruct (jal_get with "Htext") as "#Hjal".
     iApply (wp_step_jal kpc7 bb x1_0 kpc7 m7 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 bb elp0 E Φ
               Hpmaall Hpmpf
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
