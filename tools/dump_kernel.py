@@ -557,9 +557,13 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     # window bytes themselves are still extracted per-byte via [kernel_window].
     w("Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.")
     w("")
+    w("(* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup")
+    w("   of the i-th instruction.  [Typeclasses Opaque] so resolution never forces")
+    w("   the map (cf. kernel_bytes). *)")
     cur_label2 = None
-    w("Definition kernel_instrs : list kinstr := [")
+    w("Definition kernel_instrs : gmap nat kinstr := list_to_map [")
     first2 = True
+    insn_idx = 0
     for it in items:
         if isinstance(it, Label):
             cur_label2 = it
@@ -569,8 +573,11 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
             cur_label2 = None
         sep = "  " if first2 else "; "
         first2 = False
-        w(f"{sep}MkKInstr (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z")
+        w(f"{sep}({insn_idx}%nat, MkKInstr (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z)")
+        insn_idx += 1
     w("].")
+    w("")
+    w("Global Typeclasses Opaque kernel_instrs.")
     w("")
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
