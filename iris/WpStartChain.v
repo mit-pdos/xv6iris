@@ -13,7 +13,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpFetch WpDecode WpEntry WpGpr WpRvc WpAlu2 WpGprCsrrAny WpGprCsrw KernelBoot WpStartText.
-Require Import WpAdd WpAuipc WpGprLui WpGprAddi WpGprLogic WpGprJal WpGprCsrr WpGprMretWp.
+Require Import WpAdd WpAuipc WpGprLui WpGprCsrr.
 From Kernel Require Import KernelInstrs.
 Local Open Scope Z_scope.
 

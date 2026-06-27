@@ -11,8 +11,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpFetch WpDecode WpEntry WpGpr WpRvc WpAlu2 WpGprCsrrAny WpGprCsrw KernelBoot WpStartText.
-Require Import WpAdd WpAuipc WpGprLui WpGprAddi WpGprLogic WpGprJal WpGprCsrr WpGprMretWp.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpEntry WpGpr WpRvc KernelBoot WpStartText.
+Require Import WpGprCsrr WpGprMretWp.
 Require Import WpStartChain WpStart2.
 From Kernel Require Import KernelInstrs.
 Local Open Scope Z_scope.
