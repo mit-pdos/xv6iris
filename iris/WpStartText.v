@@ -24,7 +24,7 @@ Section StartText.
   Context `{!riscvGS Σ}.
 
   Definition kdefault : kinstr := MkKInstr 0 0 0.
-  Definition skinstr (i : nat) : kinstr := nth i kernel_instrs kdefault.
+  Definition skinstr (i : nat) : kinstr := default kdefault (kernel_instrs !! Z.of_nat i).
 
   (* per-opcode fetch-window of one instruction (per-byte addresses, persistent). *)
   Definition kinstr_bytes (k : kinstr) : iProp Σ :=
@@ -56,15 +56,15 @@ Section StartText.
   Proof. intros <- <- <-. reflexivity. Qed.
 
   (* extract one instruction's window from the persistent per-byte kernel_text. *)
-  Lemma skinstr_get_aux (i : nat) :
-    (forall j, (j < ki_width (skinstr i) / 8)%nat ->
-       kernel_bytes !! (ki_addr (skinstr i) + Z.of_nat j)%Z
-         = Some (nth_byte (mword_of_int (ki_enc (skinstr i)) : mword 32) j)) ->
-    kernel_text -∗ kinstr_bytes (skinstr i).
+  Lemma skinstr_get_aux (i : kinstr) :
+    (forall j, (j < ki_width i / 8)%nat ->
+       kernel_bytes !! (ki_addr i + Z.of_nat j)%Z
+         = Some (nth_byte (mword_of_int (ki_enc i) : mword 32) j)) ->
+    kernel_text -∗ kinstr_bytes i.
   Proof.
     intros Hb. iIntros "H". unfold kinstr_bytes.
-    iApply (kernel_window (ki_addr (skinstr i)) (mword_of_int (ki_enc (skinstr i)) : mword 32)
-              (ki_width (skinstr i) / 8) Hb with "H").
+    iApply (kernel_window (ki_addr i) (mword_of_int (ki_enc i) : mword 32)
+              (ki_width i / 8) Hb with "H").
   Qed.
 
   Ltac sg i :=
@@ -75,251 +75,10 @@ Section StartText.
       by (intros j Hj; vm_compute in Hj;
           do 4 (destruct j as [|j];
             [first [vm_compute; f_equal; apply bv_eq; reflexivity | exfalso; lia]|]); lia);
-    iApply (skinstr_get_aux i Hb with "H").
+    iApply (skinstr_get_aux (skinstr i) Hb with "H").
 
-  Definition chain_prefix : iProp Σ := emp%I.
-  Definition chain_tail : iProp Σ := kernel_text.
-  Definition start_prefix : iProp Σ := emp%I.
-  Definition start_tail : iProp Σ := kernel_text.
-
-  Lemma chain_text_split :
-    kernel_text ⊢ chain_prefix ∗
-      kinstr_bytes (skinstr 9) ∗
-      kinstr_bytes (skinstr 10) ∗
-      kinstr_bytes (skinstr 11) ∗
-      kinstr_bytes (skinstr 12) ∗
-      kinstr_bytes (skinstr 13) ∗
-      kinstr_bytes (skinstr 14) ∗
-      kinstr_bytes (skinstr 15) ∗
-      kinstr_bytes (skinstr 16) ∗
-      kinstr_bytes (skinstr 17) ∗
-      kinstr_bytes (skinstr 18) ∗
-      kinstr_bytes (skinstr 19) ∗
-      kinstr_bytes (skinstr 20) ∗
-      kinstr_bytes (skinstr 21) ∗
-      kinstr_bytes (skinstr 22) ∗
-      kinstr_bytes (skinstr 23) ∗
-      kinstr_bytes (skinstr 24) ∗
-      kinstr_bytes (skinstr 25) ∗
-      kinstr_bytes (skinstr 26) ∗
-      kinstr_bytes (skinstr 27) ∗
-      kinstr_bytes (skinstr 28) ∗
-      kinstr_bytes (skinstr 29) ∗
-      kinstr_bytes (skinstr 30) ∗
-      kinstr_bytes (skinstr 31) ∗
-      kinstr_bytes (skinstr 32) ∗
-      kinstr_bytes (skinstr 33) ∗
-      kinstr_bytes (skinstr 34) ∗
-      kinstr_bytes (skinstr 35) ∗
-      kinstr_bytes (skinstr 36) ∗
-      kinstr_bytes (skinstr 37) ∗
-      kinstr_bytes (skinstr 38) ∗
-      kinstr_bytes (skinstr 39) ∗
-      kinstr_bytes (skinstr 40) ∗
-      kinstr_bytes (skinstr 41) ∗
-      kinstr_bytes (skinstr 42) ∗
-      kinstr_bytes (skinstr 43) ∗
-      kinstr_bytes (skinstr 44) ∗
-      kinstr_bytes (skinstr 45) ∗
-      kinstr_bytes (skinstr 46) ∗
-      kinstr_bytes (skinstr 47) ∗
-      kinstr_bytes (skinstr 48) ∗
-      kinstr_bytes (skinstr 49) ∗
-      kinstr_bytes (skinstr 50) ∗
-      kinstr_bytes (skinstr 51) ∗
-      kinstr_bytes (skinstr 52) ∗
-      kinstr_bytes (skinstr 53) ∗
-      kinstr_bytes (skinstr 54) ∗
-      kinstr_bytes (skinstr 55) ∗
-      kinstr_bytes (skinstr 56) ∗
-      kinstr_bytes (skinstr 57) ∗
-      kinstr_bytes (skinstr 58) ∗
-      kinstr_bytes (skinstr 59) ∗
-      kinstr_bytes (skinstr 60) ∗
-      kinstr_bytes (skinstr 61) ∗
-      kinstr_bytes (skinstr 62) ∗
-      kinstr_bytes (skinstr 63) ∗ chain_tail.
-  Proof.
-    iIntros "#H". rewrite /chain_prefix /chain_tail. iSplitR; first done.
-    iSplitR; [sg 9%nat |
-    iSplitR; [sg 10%nat |
-    iSplitR; [sg 11%nat |
-    iSplitR; [sg 12%nat |
-    iSplitR; [sg 13%nat |
-    iSplitR; [sg 14%nat |
-    iSplitR; [sg 15%nat |
-    iSplitR; [sg 16%nat |
-    iSplitR; [sg 17%nat |
-    iSplitR; [sg 18%nat |
-    iSplitR; [sg 19%nat |
-    iSplitR; [sg 20%nat |
-    iSplitR; [sg 21%nat |
-    iSplitR; [sg 22%nat |
-    iSplitR; [sg 23%nat |
-    iSplitR; [sg 24%nat |
-    iSplitR; [sg 25%nat |
-    iSplitR; [sg 26%nat |
-    iSplitR; [sg 27%nat |
-    iSplitR; [sg 28%nat |
-    iSplitR; [sg 29%nat |
-    iSplitR; [sg 30%nat |
-    iSplitR; [sg 31%nat |
-    iSplitR; [sg 32%nat |
-    iSplitR; [sg 33%nat |
-    iSplitR; [sg 34%nat |
-    iSplitR; [sg 35%nat |
-    iSplitR; [sg 36%nat |
-    iSplitR; [sg 37%nat |
-    iSplitR; [sg 38%nat |
-    iSplitR; [sg 39%nat |
-    iSplitR; [sg 40%nat |
-    iSplitR; [sg 41%nat |
-    iSplitR; [sg 42%nat |
-    iSplitR; [sg 43%nat |
-    iSplitR; [sg 44%nat |
-    iSplitR; [sg 45%nat |
-    iSplitR; [sg 46%nat |
-    iSplitR; [sg 47%nat |
-    iSplitR; [sg 48%nat |
-    iSplitR; [sg 49%nat |
-    iSplitR; [sg 50%nat |
-    iSplitR; [sg 51%nat |
-    iSplitR; [sg 52%nat |
-    iSplitR; [sg 53%nat |
-    iSplitR; [sg 54%nat |
-    iSplitR; [sg 55%nat |
-    iSplitR; [sg 56%nat |
-    iSplitR; [sg 57%nat |
-    iSplitR; [sg 58%nat |
-    iSplitR; [sg 59%nat |
-    iSplitR; [sg 60%nat |
-    iSplitR; [sg 61%nat |
-    iSplitR; [sg 62%nat |
-    iSplitR; [sg 63%nat |
-    iApply "H"
-    ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
-  Qed.
-  Lemma chain_text_combine :
-    chain_prefix ∗ kinstr_bytes (skinstr 9) ∗
-      kinstr_bytes (skinstr 10) ∗
-      kinstr_bytes (skinstr 11) ∗
-      kinstr_bytes (skinstr 12) ∗
-      kinstr_bytes (skinstr 13) ∗
-      kinstr_bytes (skinstr 14) ∗
-      kinstr_bytes (skinstr 15) ∗
-      kinstr_bytes (skinstr 16) ∗
-      kinstr_bytes (skinstr 17) ∗
-      kinstr_bytes (skinstr 18) ∗
-      kinstr_bytes (skinstr 19) ∗
-      kinstr_bytes (skinstr 20) ∗
-      kinstr_bytes (skinstr 21) ∗
-      kinstr_bytes (skinstr 22) ∗
-      kinstr_bytes (skinstr 23) ∗
-      kinstr_bytes (skinstr 24) ∗
-      kinstr_bytes (skinstr 25) ∗
-      kinstr_bytes (skinstr 26) ∗
-      kinstr_bytes (skinstr 27) ∗
-      kinstr_bytes (skinstr 28) ∗
-      kinstr_bytes (skinstr 29) ∗
-      kinstr_bytes (skinstr 30) ∗
-      kinstr_bytes (skinstr 31) ∗
-      kinstr_bytes (skinstr 32) ∗
-      kinstr_bytes (skinstr 33) ∗
-      kinstr_bytes (skinstr 34) ∗
-      kinstr_bytes (skinstr 35) ∗
-      kinstr_bytes (skinstr 36) ∗
-      kinstr_bytes (skinstr 37) ∗
-      kinstr_bytes (skinstr 38) ∗
-      kinstr_bytes (skinstr 39) ∗
-      kinstr_bytes (skinstr 40) ∗
-      kinstr_bytes (skinstr 41) ∗
-      kinstr_bytes (skinstr 42) ∗
-      kinstr_bytes (skinstr 43) ∗
-      kinstr_bytes (skinstr 44) ∗
-      kinstr_bytes (skinstr 45) ∗
-      kinstr_bytes (skinstr 46) ∗
-      kinstr_bytes (skinstr 47) ∗
-      kinstr_bytes (skinstr 48) ∗
-      kinstr_bytes (skinstr 49) ∗
-      kinstr_bytes (skinstr 50) ∗
-      kinstr_bytes (skinstr 51) ∗
-      kinstr_bytes (skinstr 52) ∗
-      kinstr_bytes (skinstr 53) ∗
-      kinstr_bytes (skinstr 54) ∗
-      kinstr_bytes (skinstr 55) ∗
-      kinstr_bytes (skinstr 56) ∗
-      kinstr_bytes (skinstr 57) ∗
-      kinstr_bytes (skinstr 58) ∗
-      kinstr_bytes (skinstr 59) ∗
-      kinstr_bytes (skinstr 60) ∗
-      kinstr_bytes (skinstr 61) ∗
-      kinstr_bytes (skinstr 62) ∗
-      kinstr_bytes (skinstr 63) ∗ chain_tail ⊢ kernel_text.
-  Proof. iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H)". iApply "H". Qed.
-
-  Lemma start_text_split :
-    kernel_text ⊢ start_prefix ∗
-      kinstr_bytes (skinstr 30) ∗
-      kinstr_bytes (skinstr 31) ∗
-      kinstr_bytes (skinstr 32) ∗
-      kinstr_bytes (skinstr 33) ∗
-      kinstr_bytes (skinstr 34) ∗
-      kinstr_bytes (skinstr 35) ∗
-      kinstr_bytes (skinstr 36) ∗
-      kinstr_bytes (skinstr 37) ∗
-      kinstr_bytes (skinstr 38) ∗
-      kinstr_bytes (skinstr 39) ∗
-      kinstr_bytes (skinstr 40) ∗
-      kinstr_bytes (skinstr 41) ∗
-      kinstr_bytes (skinstr 42) ∗
-      kinstr_bytes (skinstr 43) ∗
-      kinstr_bytes (skinstr 44) ∗
-      kinstr_bytes (skinstr 45) ∗
-      kinstr_bytes (skinstr 46) ∗
-      kinstr_bytes (skinstr 47) ∗ start_tail.
-  Proof.
-    iIntros "#H". rewrite /start_prefix /start_tail. iSplitR; first done.
-    iSplitR; [sg 30%nat |
-    iSplitR; [sg 31%nat |
-    iSplitR; [sg 32%nat |
-    iSplitR; [sg 33%nat |
-    iSplitR; [sg 34%nat |
-    iSplitR; [sg 35%nat |
-    iSplitR; [sg 36%nat |
-    iSplitR; [sg 37%nat |
-    iSplitR; [sg 38%nat |
-    iSplitR; [sg 39%nat |
-    iSplitR; [sg 40%nat |
-    iSplitR; [sg 41%nat |
-    iSplitR; [sg 42%nat |
-    iSplitR; [sg 43%nat |
-    iSplitR; [sg 44%nat |
-    iSplitR; [sg 45%nat |
-    iSplitR; [sg 46%nat |
-    iSplitR; [sg 47%nat |
-    iApply "H"
-    ]]]]]]]]]]]]]]]]]].
-  Qed.
-  Lemma start_text_combine :
-    start_prefix ∗ kinstr_bytes (skinstr 30) ∗
-      kinstr_bytes (skinstr 31) ∗
-      kinstr_bytes (skinstr 32) ∗
-      kinstr_bytes (skinstr 33) ∗
-      kinstr_bytes (skinstr 34) ∗
-      kinstr_bytes (skinstr 35) ∗
-      kinstr_bytes (skinstr 36) ∗
-      kinstr_bytes (skinstr 37) ∗
-      kinstr_bytes (skinstr 38) ∗
-      kinstr_bytes (skinstr 39) ∗
-      kinstr_bytes (skinstr 40) ∗
-      kinstr_bytes (skinstr 41) ∗
-      kinstr_bytes (skinstr 42) ∗
-      kinstr_bytes (skinstr 43) ∗
-      kinstr_bytes (skinstr 44) ∗
-      kinstr_bytes (skinstr 45) ∗
-      kinstr_bytes (skinstr 46) ∗
-      kinstr_bytes (skinstr 47) ∗ start_tail ⊢ kernel_text.
-  Proof. iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H)". iApply "H". Qed.
+  (* No chain_text_split/start_text_split: extract each window per-instruction
+     at point of use with the [sg] tactic (kernel_text is duplicable). *)
 
   Definition swin32 (addr enc : Z) : iProp Σ :=
     ([∗ list] j ∈ seq 0 4,

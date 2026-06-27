@@ -561,7 +561,7 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     w("   of the i-th instruction.  [Typeclasses Opaque] so resolution never forces")
     w("   the map (cf. kernel_bytes). *)")
     cur_label2 = None
-    w("Definition kernel_instrs : gmap nat kinstr := list_to_map [")
+    w("Definition kernel_instrs : gmap Z kinstr := list_to_map [")
     first2 = True
     insn_idx = 0
     for it in items:
@@ -573,7 +573,7 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
             cur_label2 = None
         sep = "  " if first2 else "; "
         first2 = False
-        w(f"{sep}({insn_idx}%nat, MkKInstr (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z)")
+        w(f"{sep}(({insn_idx})%Z, MkKInstr (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z)")
         insn_idx += 1
     w("].")
     w("")
