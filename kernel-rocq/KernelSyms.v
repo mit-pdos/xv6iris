@@ -5,7 +5,7 @@
    returns the address (0 if unknown).                                *)
 (* ------------------------------------------------------------------ *)
 
-Require Import ZArith String.
+From Stdlib Require Import ZArith String.
 From stdpp Require Import gmap strings.
 
 (* Symbol table as a name-keyed [gmap].  ONE flat [list_to_map] (no chunking;

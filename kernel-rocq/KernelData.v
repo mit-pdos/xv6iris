@@ -5,7 +5,7 @@
    Per-byte [gmap], same shape as [kernel_bytes] for the code.        *)
 (* ------------------------------------------------------------------ *)
 
-Require Import List ZArith.
+From Stdlib Require Import List ZArith.
 From stdpp Require Import gmap.
 From stdpp.bitvector Require Import definitions.
 Import ListNotations.

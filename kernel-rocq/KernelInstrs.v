@@ -6,7 +6,7 @@
    Address range: 0x80000000 .. 0x80006120                              *)
 (* ------------------------------------------------------------------ *)
 
-Require Import List ZArith.
+From Stdlib Require Import List ZArith.
 From stdpp Require Import gmap.
 From stdpp.bitvector Require Import definitions.
 Import ListNotations.
