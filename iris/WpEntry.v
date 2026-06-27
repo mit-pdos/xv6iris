@@ -236,7 +236,8 @@ Proof. reflexivity. Qed.
 (* walk one non-matching level of the nested compressed-decode tree. *)
 Ltac cstep s HmisaC :=
   first
-  [ match goal with
+  [ erewrite skip_clause_head by (vm_compute; reflexivity)
+  | match goal with
     | |- context[Defs.bind (Defs.and_boolM (currentlyEnabled Ext_Zca) (returnM ?pat)) _] =>
         rewrite (exec_bind_Some _ _ _ _ _
                    (exec_cezca_false s pat HmisaC ltac:(vm_compute; reflexivity)));
