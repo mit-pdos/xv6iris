@@ -14,6 +14,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpFetch WpDecode WpEntry WpGpr WpRvc WpAlu2 WpGprCsrrAny WpGprCsrw KernelBoot WpStartText.
 Require Import WpAdd WpAuipc WpGprLui WpGprAddi WpGprLogic WpGprJal WpGprCsrr WpGprMretWp.
 Require Import WpStartChain WpStart2.
+From Kernel Require Import KernelInstrs.
 Local Open Scope Z_scope.
 
 Section WpStart3.
@@ -81,7 +82,7 @@ Section WpStart3.
     (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4); kernel_text duplicable ---- *)
     destruct Hf15 as [va5_60 Hf15].
     iAssert (kinstr_bytes (skinstr 60)) as "#K60". { sg 60. }
-    iEval (rewrite (E_skinstr 60 (kentry + 0xb4) 0xf14027f3 32%nat ltac:(vmc) ltac:(vmc) ltac:(vmc))) in "K60".
+    assert (Hk_a : ki_addr (skinstr 60) = (kentry + 0xb4)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 60) = 0xf14027f3) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 60) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 60) (kentry + 0xb4) 0xf14027f3 Hk_a Hk_e Hk_w with "K60") as "#W60"; clear Hk_a Hk_e Hk_w.
     iApply (wp_csrr_gpr spc60 sw60 (scsr_rd sw60) mfin va5_60 mhartid0 misa0 mdv0 b1
               _ mst0 mstatus0 mc mcfg pmpcfg0 pmar0 b1 elp0 E Φ
               ltac:(vm_compute; discriminate) Hf15 HmisaS Hpmaall Hpmpf
@@ -91,7 +92,7 @@ Section WpStart3.
                     replace (scsr_rs1z sw60) with i_rs1_csrr by (vm_compute; reflexivity);
                     exact (decode_s60 s0 Hpriv))
               eq_refl HmIE Hlp
-              with "Hpc Hfile Hmhartid Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K60").
+              with "Hpc Hfile Hmhartid Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W60").
     iNext.
     iIntros "Hpc Hfile Hmhartid Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc60 4) with spc61 by (vm_compute; reflexivity).
@@ -99,22 +100,22 @@ Section WpStart3.
     (* ---- idx 61: c.addiw a5 (4-byte window from skinstr 61 ++ 62) ---- *)
     iAssert (kinstr_bytes (skinstr 61)) as "#K61". { sg 61. }
     iAssert (kinstr_bytes (skinstr 62)) as "#K62". { sg 62. }
-    iDestruct (bi.equiv_entails_1_1 _ _ sregroup61 with "[$K61 $K62]") as "#W61".
+    assert (Hk_a : ki_addr (skinstr 61) = kentry + 0xb8) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 61) = 0x2781) by (vm_compute; reflexivity); iDestruct (kinstr_rvc4 (skinstr 61) (kentry + 0xb8) (0x2781) Hk_a Hk_e with "K61") as (wr_s61) "[%Hsub_s61 #W61]"; clear Hk_a Hk_e.
     assert (Ha561 : m60 !! gpr_of_Z (uint (sreg117 sw61)) = Some (regval_into_reg mhartid0)).
     { unfold m60. replace (uint (sreg117 sw61)) with 15 by (vm_compute; reflexivity).
       replace (uint (scsr_rd sw60)) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert. reflexivity. }
-    iApply (wp_caddiw_gpr_4 spc61 w4_s61 (sreg117 sw61) (scaddiw_imm sw61) m60 (regval_into_reg mhartid0) misa0 mdv0 b1
+    iApply (wp_caddiw_gpr_4 spc61 wr_s61 (sreg117 sw61) (scaddiw_imm sw61) m60 (regval_into_reg mhartid0) misa0 mdv0 b1
               _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Ha561 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
-              HmisaC HmisaS decode4_s61 eq_refl HmIE Hlp
+              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s61; vm_compute; reflexivity)
+              HmisaC HmisaS (decode4_s61 wr_s61 Hsub_s61) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W61").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc61 2) with spc62 by (vm_compute; reflexivity).
     set (m61 := <[gpr_of_Z (uint (sreg117 sw61)) := regval_into_reg (caddiw_wval (scaddiw_imm sw61) (regval_into_reg mhartid0))]> m60).
-    iEval (rewrite (E_skinstr 62 (kentry + 0xba) 0x823e 16%nat ltac:(vmc) ltac:(vmc) ltac:(vmc))) in "K62".
+    assert (Hk_a : ki_addr (skinstr 62) = (kentry + 0xba)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 62) = 0x823e) by (vm_compute; reflexivity); assert (Hk_w : (2 <= ki_width (skinstr 62) / 8)%nat) by (vm_compute; lia); iDestruct (kinstr_window16 (skinstr 62) (kentry + 0xba) 0x823e Hk_a Hk_e Hk_w with "K62") as "#W62"; clear Hk_a Hk_e Hk_w.
     (* ---- idx 62: c.mv tp,a5 (2-aligned at spc62=0xba) ---- *)
     assert (Ha562 : m61 !! gpr_of_Z (uint (sreg62 sw62)) = Some (regval_into_reg (caddiw_wval (scaddiw_imm sw61) (regval_into_reg mhartid0)))).
     { unfold m61. replace (uint (sreg62 sw62)) with 15 by (vm_compute; reflexivity).
@@ -129,13 +130,13 @@ Section WpStart3.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha562 Htp62 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               HmisaC HmisaS decode_s62 eq_refl HmIE Hlp
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K62").
+              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W62").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     replace (add_vec_int spc62 2) with spc63 by (vm_compute; reflexivity).
     (* ---- idx 63: MRET (4-aligned at spc63=0xbc).  Drops gpr_file (not needed). ---- *)
     iAssert (kinstr_bytes (skinstr 63)) as "#K63". { sg 63. }
-    iEval (rewrite (E_skinstr 63 (kentry + 0xbc) 0x30200073 32%nat ltac:(vmc) ltac:(vmc) ltac:(vmc))) in "K63".
+    assert (Hk_a : ki_addr (skinstr 63) = (kentry + 0xbc)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 63) = 0x30200073) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 63) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 63) (kentry + 0xbc) 0x30200073 Hk_a Hk_e Hk_w with "K63") as "#W63"; clear Hk_a Hk_e Hk_w.
     (* K63 is now [∗list seq 0 4] nth_byte (mword_of_int 0x30200073 : mword 32) at
        fetch_pa (mword_of_int (kentry+0xbc)) = fetch_pa spc63 = wp_mret's window
        (w_mret = mword_of_int 0x30200073). *)
@@ -143,7 +144,7 @@ Section WpStart3.
               mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               Hpmaall Hpmpf ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               eq_refl HmIE Hlp HmisaS HmisaU HmisaC Hnp Hnpm Hlpe
-              with "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K63").
+              with "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W63").
     iNext.
     iIntros "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
     (* kernel_text is duplicable -> the persistent #H is still here. *)
