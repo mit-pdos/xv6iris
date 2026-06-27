@@ -1,0 +1,38 @@
+# Build for the Lean (iris-lean) port. The upstream Sail RISC-V model is pulled
+# in as a build step (tools/fetch-model.sh) rather than vendored, and patched to
+# build against the free-monad fork of lean-sail in vendor/lean-sail.
+#
+#   make            == make build (fetch the model, then compile everything)
+#   make model      fetch + patch the upstream model into .model/ (idempotent)
+#   make build      make model, then `lake build`
+#   make iris       build only the Iris layer (no model fetch needed)
+#   make model-lib  compile the pulled-in model itself (~172k lines, slow)
+#   make clean-model  remove the pulled-in model (.model/)
+
+.PHONY: all build model iris model-lib clean-model
+
+all: build
+
+model:
+	tools/fetch-model.sh
+
+build: model
+	lake build
+	lake build Xv6Iris.Model
+
+# The Iris development layer on its own (model resolved lazily; not compiled
+# unless a file imports it).
+iris:
+	lake build Xv6Iris
+
+# The real-machine layer: the Iris Language over the generated model's `try_step`
+# (non-module; imports the model, so this triggers the model build).
+real: model
+	lake build Xv6Iris.Model
+
+# Force-compile the pulled-in generated model (the heavy 172k-line build).
+model-lib: model
+	lake build Lean_RV64D
+
+clean-model:
+	rm -rf .model

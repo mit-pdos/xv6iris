@@ -75,7 +75,62 @@ on top of [iris-lean](https://github.com/leanprover-community/iris-lean).
   for the generated `Register`/`try_step` once the lean-sail fork lands); build
   per-opcode WPs; a concrete `BundledGFunctors` + adequacy (WP → safety).
 
-### The one external dependency to resolve — RESOLVED to a path
+### The lean-sail free-monad fork — DONE ✅ (the real model type-checks)
+
+The fork is built and **the entire 172k-line generated RISC-V model type-checks
+against the free/interaction monad** (130 lake jobs, zero errors — including
+`try_step`, the decoder `ext_decode`, `execute`, `fetch`). `SailM` is now the free
+`Mon`, so `try_step : SailM Bool` is an interaction-monad program whose
+`readByte`/`writeByte` effects are interposable (MMIO + multi-HART ready).
+
+The forked lean-sail is vendored at `lean/vendor/lean-sail/` (a copy of lean-sail
+with the monad core swapped — see `Sail/Sail.lean`; BitVec/IntRange/Attr and all
+types kept verbatim). It builds on **both v4.29 and v4.31**. What changed:
+- `PreSailM := EStateM …` → a polynomial free monad (`Outcome`/`Mon`/total-
+  structural `bind`), same as `Xv6Iris/SailMonad.lean`. `PreSailM RT _c ue := Mon …`.
+- Only ~13 base primitives rewritten (reg/mem reads-writes → `.vis` effects;
+  throw/tryCatch; choose; cycle/print → no-ops; `main` stub). Everything else is
+  monad-generic and unchanged.
+- Added `Mon.run` — a *second*, concrete executable interpreter (against
+  `SequentialState`) so the model's lone EStateM-specific helper (`unwrapValue`)
+  works. The free monad admits many interpreters; the Iris layer uses another.
+
+The **only** model change (otherwise 100% unchanged): one line in
+`Specialization.lean` `unwrapValue` (`x.run default` → `x.run (c :=
+trivialChoiceSource) default`, since the free `Mon.run` needs `c` pinned).
+
+The upstream model is **pulled in as a build step**, not vendored:
+`tools/fetch-model.sh` (run via `make model`) clones the pinned upstream model
+into `.model/` (git-ignored) and applies three tiny patches (toolchain → v4.31;
+require the forked Sail; the one `unwrapValue` line). `lean/lakefile.toml` then
+`require`s `Sail` (`vendor/lean-sail`) and `Lean_RV64D` (`.model/…`). Workflow:
+
+```sh
+cd lean
+make model     # pull + patch the upstream model (once)
+make iris      # build the Iris layer (model resolved lazily, not compiled)
+make model-lib # compile the pulled-in 172k-line model (slow; proven to pass)
+```
+
+`import Sail` then exposes the free monad (`PreSail.Mon`, `Mon.run`).
+
+The Iris layer now **drives the real `try_step`** — `Xv6Iris/Model.lean`
+(`make real`) defines `riscv_step := Mon.bind (LeanRV64D.Functions.try_step 0
+false) …` over the generated model's interaction monad, the interpreter
+(`exec`/`run` + `run_deterministic`) over the real `Register`/`MState`, and the
+iris-lean `Language` instance over it. `#print axioms riscv_step` shows the
+model's platform axioms (`riscv_*ToF*`, `valid_reservation`, …) — i.e. it really
+is the generated `try_step`. (Architecture note: the generated model is
+*non-module* Lean and a `module` file can't import one, so the model-facing layer
+— `Model.lean` — is non-module; it imports iris-lean (module) + the model
+(non-module), which works. The earlier demo files stay module-system.)
+
+Remaining: the points-to / `stateInterp` / WP over the real `Register` (dependent
+`RegisterType` ⇒ a sigma-keyed `gen_heap`), then per-opcode WPs (reducing the real
+`try_step`/decoder for concrete kernel instructions — the "decode wall"). (See
+memory `lean-sail-free-monad-fork`.)
+
+### (Historical) the external dependency — how the path was found
 
 The free/interaction-monad decision means we need the RISC-V model **in**
 interaction-monad form. Investigation of the Sail compiler's Lean backend

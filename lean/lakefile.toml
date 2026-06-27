@@ -9,5 +9,16 @@ git = "https://github.com/leanprover-community/iris-lean"
 rev = "3877dbeccd1b0545c5be7ef73318e8c86acf79ab"
 subDir = "Iris"
 
+# The free-monad fork of lean-sail (vendored, small) and the upstream generated
+# RISC-V model (pulled in by `tools/fetch-model.sh` into `.model/`, not vendored).
+# Run `make model` (or `tools/fetch-model.sh`) once before building.
+[[require]]
+name = "Sail"
+path = "vendor/lean-sail"
+
+[[require]]
+name = "Lean_RV64D"
+path = ".model/sail-riscv-lean"
+
 [[lean_lib]]
 name = "Xv6Iris"

@@ -1,0 +1,6 @@
+name = "lean-sail"
+defaultTargets = ["Sail"]
+
+[[lean_lib]]
+name = "Sail"
+leanOptions.weak.linter.style.nameCheck = false
