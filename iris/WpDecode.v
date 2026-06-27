@@ -67,14 +67,33 @@ Qed.
 
 Definition w_auipc : mword 32 := mword_of_int 0xa117.
 
+(* Head-only clause skip: when the head decoder clause's guard is concretely
+   false, drop that clause AND its [match]-on-None continuation in ONE rewrite,
+   WITHOUT traversing the ~4000-clause tail.  This collapses the O(#clauses^2)
+   cost of a [repeat skip_pure_clause] walk (which re-[cbn]s / re-[context]-
+   matches the whole remaining decoder per clause) down to O(#clauses).
+   The resulting goal [exec REST s = _] is definitionally identical to what the
+   old context-based [skip_pure_clause] produced, so it is a drop-in. *)
+Lemma skip_clause_head (c : M (option instruction)) (g : bool) (REST : M instruction) s :
+  g = false ->
+  exec (Defs.bind (if g then c else returnM None)
+          (fun w => match w with Some r => returnM r | None => REST end)) s
+    = exec REST s.
+Proof.
+  intros ->.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) s)). reflexivity.
+Qed.
+
 Ltac skip_pure_clause :=
-  match goal with
-  | |- context[if ?g then _ else returnM None] =>
-      replace g with false by (vm_compute; reflexivity)
-  end;
-  cbn match;
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) _));
-  cbn match.
+  first
+  [ erewrite skip_clause_head by (vm_compute; reflexivity)
+  | match goal with
+    | |- context[if ?g then _ else returnM None] =>
+        replace g with false by (vm_compute; reflexivity)
+    end;
+    cbn match;
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) _));
+    cbn match ].
 
 (* [decode_finish s]: for an instruction that is NOT extension-gated, the
    remaining decoder is a read-free pure function of the (concrete) word, so a
