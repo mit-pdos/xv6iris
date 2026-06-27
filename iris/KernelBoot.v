@@ -77,6 +77,13 @@ Section KernelBootWP.
   Global Instance kernel_text_persistent : Persistent kernel_text.
   Proof. apply _. Qed.
 
+  (* Keep typeclass resolution (Frame/IntoWand/... in iApply/iIntros/iFrame)
+     from unfolding [kernel_text] into its 23K-entry [big_sepM] over
+     [kernel_bytes] -- otherwise every chunk's [iApply (... with "Htext")]
+     pays a huge TC search (cf. the [kernel_bytes] opacity fix).  Unification
+     can still see through it where a proof genuinely needs the [big_sepM]. *)
+  Global Typeclasses Opaque kernel_text.
+
   Lemma kernel_text_dup : kernel_text -∗ kernel_text ∗ kernel_text.
   Proof. iIntros "#H". iSplit; iApply "H". Qed.
 
