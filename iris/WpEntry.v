@@ -233,6 +233,21 @@ Proof. reflexivity. Qed.
 Lemma exec_if_false {X} (A B : M X) s : exec (if false then A else B) s = exec B s.
 Proof. reflexivity. Qed.
 
+(* HEAD-position guarded if-elimination, for walking a deep nested-if decision
+   tree (e.g. [read_CSR]/[write_CSR]'s ~90-way CSR-address dispatch).  The
+   obvious idiom
+     [repeat (match goal with |- context[if ?g then _ else _] =>
+              replace g with false by (vm_compute; reflexivity) end; cbn match)]
+   is O(#clauses^2): every iteration re-scans the whole (huge) goal for [context]
+   and then [cbn match]-traverses it.  Rewriting at the HEAD instead
+     [repeat (erewrite exec_if_false_g by (vm_compute; reflexivity))]
+   peels one guard per step with no goal-wide scan and no [cbn match], leaving the
+   goal in the same shape (the matching [if g then _ else _] at head).  See the
+   "Build-perf note" in README.md. *)
+Lemma exec_if_false_g {X} (g : bool) (A B : M X) s :
+  g = false -> exec (if g then A else B) s = exec B s.
+Proof. intros ->. reflexivity. Qed.
+
 (* walk one non-matching level of the nested compressed-decode tree. *)
 Ltac cstep s HmisaC :=
   first

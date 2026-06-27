@@ -318,16 +318,23 @@ End WpCsrrMstatus.
    conversion at Qed (>3 min EACH for the read_CSR guard chains — the cause of the
    ~12min compile); `replace ... by (vm_compute; reflexivity)` emits a vm-cast the
    kernel checks with the bytecode machine (0.09s).  See iris-build-perf CASE 4. *)
+(* Walk the [read_CSR] dispatch.  The common case is a non-matching guard, which
+   we peel at the goal HEAD via [exec_if_false_g] (from WpEntry): no goal-wide
+   [context] scan, no [cbn match] traversal of the huge term — see the README
+   "Build-perf note".  The fallback branch is the original idiom, run only for the
+   (few) [true] guards / any inner ifs, so behaviour is unchanged. *)
 Ltac drive_csr :=
   unfold read_CSR;
-  repeat (match goal with
-          | |- context[if ?g then _ else _] =>
-              let v := eval vm_compute in g in
-              lazymatch v with
-              | true  => replace g with true by (vm_compute; reflexivity)
-              | false => replace g with false by (vm_compute; reflexivity)
-              end
-          end; cbn match).
+  repeat first
+    [ erewrite exec_if_false_g by (vm_compute; reflexivity)
+    | match goal with
+      | |- context[if ?g then _ else _] =>
+          let v := eval vm_compute in g in
+          lazymatch v with
+          | true  => replace g with true by (vm_compute; reflexivity)
+          | false => replace g with false by (vm_compute; reflexivity)
+          end
+      end; cbn match ].
 
 Lemma exec_read_CSR_menvcfg s :
   exec (read_CSR (Ox"30A")) s
