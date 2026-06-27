@@ -28,6 +28,8 @@ jobs:
 
       # Creates a project-local opam switch in $GITHUB_WORKSPACE/_opam and loads
       # its environment, so plain `opam exec -- …` targets that switch.
+      # (setup-ocaml's own cache only covers the bare compiler switch, since it
+      # runs before the `opam install` below — hence the explicit cache step.)
       - name: Set up OCaml / opam
         uses: ocaml/setup-ocaml@v3
         with:
@@ -36,17 +38,23 @@ jobs:
             coq-released: https://coq.inria.fr/opam/released
             default: https://opam.ocaml.org
 
+      # Cache the whole built switch (Rocq + Iris + Sail support take many
+      # minutes to compile).  Keyed on the OS, compiler, and the pinned package
+      # list — editing .github/coq-deps.txt busts the cache; the restore-keys
+      # let an older switch be reused and reconciled by `opam install` on a miss.
+      - name: Cache opam switch
+        uses: actions/cache@v4
+        with:
+          path: _opam
+          key: ${{ runner.os }}-opam-5.3-${{ hashFiles('.github/coq-deps.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-opam-5.3-
+
       # Pinned to match the development switch (Rocq 9.0.1, Iris 4.4.0, Sail
       # support 0.20.1).  The leaf packages pull in coq-stdpp transitively, but
-      # we pin them too for a reproducible solve.
+      # we pin them too for a reproducible solve.  No-op on a cache hit.
       - name: Install Rocq / Iris / Sail toolchain
-        run: |
-          opam install -y \
-            coq.9.0.1 \
-            coq-iris.4.4.0 \
-            coq-stdpp.1.12.0 \
-            coq-stdpp-bitvector.1.12.0 \
-            coq-sail-stdpp.0.20.1
+        run: opam install -y $(cat .github/coq-deps.txt)
 
       # ---- 1. Sail-generated Coq model (model-xv6iris/) ----
       # `make model` only depends on the model's _CoqProject — no ELF, no Sail.
