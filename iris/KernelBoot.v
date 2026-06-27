@@ -117,12 +117,14 @@ Section KernelBootWP.
   Lemma auipc_get : kernel_text -∗ auipc_bytes.
   Proof.
     iIntros "H". rewrite /auipc_bytes /kpc0 /kentry.
-    iApply (kernel_window 0x80000000 w_auipc 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window 0x80000000 w_auipc 4 with "H").
+    intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
   Lemma ld_get : kernel_text -∗ ld_bytes.
   Proof.
     iIntros "H". rewrite /ld_bytes /kpc1 /kentry.
-    iApply (kernel_window (0x80000000 + 4) w_ld 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window (0x80000000 + 4) w_ld 4 with "H").
+    intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
 
   (* ---------------------------------------------------------------------- *)
@@ -251,32 +253,38 @@ Section KernelBootWP.
   Lemma lui_get : kernel_text -∗ lui_win.
   Proof.
     iIntros "H". rewrite /lui_win /kpc2 /kentry.
-    iApply (kernel_window (0x80000000 + 8) w_lui4 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window (0x80000000 + 8) w_lui4 4 with "H").
+    intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
   Lemma csrr_get : kernel_text -∗ csrr_win.
   Proof.
     iIntros "H". rewrite /csrr_win /kpc3 /kentry.
-    iApply (kernel_window (0x80000000 + 0xa) w_csrr 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window (0x80000000 + 0xa) w_csrr 4 with "H").
+    intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
   Lemma addi_get : kernel_text -∗ haddi_win.
   Proof.
     iIntros "H". rewrite /haddi_win /kpc4 /kentry.
-    iApply (kernel_window (0x80000000 + 0xe) h_addi 2 ltac:(intros j Hj; do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window (0x80000000 + 0xe) h_addi 2 with "H").
+    intros j Hj; do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
   Lemma mul_get : kernel_text -∗ mul_win.
   Proof.
     iIntros "H". rewrite /mul_win /kpc5 /kentry.
-    iApply (kernel_window (0x80000000 + 0x10) w_mul 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window (0x80000000 + 0x10) w_mul 4 with "H").
+    intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
   Lemma add_get : kernel_text -∗ add_win.
   Proof.
     iIntros "H". rewrite /add_win /kpc6 /kentry.
-    iApply (kernel_window (0x80000000 + 0x14) w_add4 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window (0x80000000 + 0x14) w_add4 4 with "H").
+    intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
   Lemma jal_get : kernel_text -∗ jal_win.
   Proof.
     iIntros "H". rewrite /jal_win /kpc7 /kentry.
-    iApply (kernel_window (0x80000000 + 0x16) w_jal 4 ltac:(intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia) with "H").
+    iApply (kernel_window (0x80000000 + 0x16) w_jal 4 with "H").
+    intros j Hj; do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia.
   Qed.
 
 
