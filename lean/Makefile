@@ -56,3 +56,12 @@ kernel-wp: model
 kernel-entry: model
 	lake build Xv6Iris.RealPtsto
 	lake env lean --tstack=64000000 Xv6Iris/KernelEntry.lean
+
+# The kernel's start() through mret (54 instructions incl. timerinit + the
+# Machine->Supervisor transition to main): both operationally (start_to_main) and
+# as a WP over the program logic (wp_start_to_main), the latter via the
+# whole-machine-state engine in KernelMain (wp_run). Very heavy operational
+# reduction (~55 try_steps) — several minutes, big stack.
+kernel-start: model
+	lake build Xv6Iris.KernelMain
+	lake env lean --tstack=64000000 Xv6Iris/KernelStart.lean
