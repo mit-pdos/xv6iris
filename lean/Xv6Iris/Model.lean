@@ -32,6 +32,7 @@ noncomputable def riscv_step : Mon Register RegisterType exception Unit :=
   Mon.bind (LeanRV64D.Functions.try_step 0 false) (fun _ => Mon.pure ())
 
 /-- Machine state: the real register file (dependent `RegisterType`) + byte memory. -/
+@[ext]
 structure MState where
   regs : (r : Register) → Option (RegisterType r)
   mem : Nat → Option (BitVec 8)

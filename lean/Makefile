@@ -36,3 +36,15 @@ model-lib: model
 
 clean-model:
 	rm -rf .model
+
+# Verify the xv6 kernel's first two instructions on the real model (kernel
+# reduction of try_step ×2; needs a large interpreter stack).
+kernel-first-two: model
+	lake env lean --tstack=16000000 Xv6Iris/KernelFirstTwo.lean
+
+# The same result encoded as a weakest-precondition over the program logic
+# (wp_kernel_first_two), built on wp_lift_step + the reg points-to bridges and the
+# kernel-reduction step lemmas. Large interpreter stack as above.
+kernel-wp: model
+	lake build Xv6Iris.RealPtsto
+	lake env lean --tstack=16000000 Xv6Iris/KernelWP.lean
