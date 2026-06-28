@@ -39,6 +39,35 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_readable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true.
 
+(* ====================================================================== *)
+(* hw_config: the immutable hardware configuration the boot relies on,      *)
+(* bundled into ONE *persistent* proposition.  These registers are never    *)
+(* written by the boot, so they are owned PERSISTENTLY ([↦ᵣ□]): a WP that   *)
+(* only READS them takes [hw_config] in its precondition and -- because it   *)
+(* is [Persistent] -- need neither thread a fresh copy nor RETURN it in its  *)
+(* continuation.  This replaces, on every WP, the cluster of per-register    *)
+(* points-to facts (misa / mseccfg / mcountinhibit / minstretcfg /          *)
+(* pma_regions / htif_tohost_base) AND the [pma_allows_all] / [_get_Misa_S]  *)
+(* side-conditions with a single hypothesis.                                 *)
+(*   NB the *mutable* config (pmpcfg_n, mstatus, mie, elp, pmpaddr, ...) is  *)
+(*   NOT here: those genuinely change during boot and stay linearly threaded.*)
+(* ====================================================================== *)
+Section HwConfig.
+  Context `{!riscvGS Σ}.
+
+  Definition hw_config (misa0 mseccfg0 : mword 64) (mc : mword 32)
+      (mcfg : mword 64) (pmar0 : list PMA_Region) : iProp Σ :=
+    (misa ↦ᵣ□ misa0 ∗ mseccfg ↦ᵣ□ mseccfg0 ∗
+     mcountinhibit ↦ᵣ□ mc ∗ minstretcfg ↦ᵣ□ mcfg ∗
+     pma_regions ↦ᵣ□ pmar0 ∗ htif_tohost_base ↦ᵣ□ None ∗
+     ⌜ eq_vec (_get_Misa_S misa0) ('b"1") = true ⌝ ∗
+     ⌜ pma_allows_all pmar0 ⌝)%I.
+
+  Global Instance hw_config_persistent misa0 mseccfg0 mc mcfg pmar0 :
+    Persistent (hw_config misa0 mseccfg0 mc mcfg pmar0).
+  Proof. apply _. Qed.
+End HwConfig.
+
 (* ===== RiscvModelADDfinal ===== *)
 (* ====================================================================== *)
 (* RiscvModelADDfinal.v                                                    *)

@@ -74,6 +74,12 @@ Notation "r ↦ᵣ{ dq } v" := (reg_pointsto r dq v)
   (at level 20, dq custom dfrac at level 1, format "r  ↦ᵣ{ dq }  v") : bi_scope.
 Notation "r ↦ᵣ v" := (reg_pointsto r (DfracOwn 1) v)
   (at level 20, format "r  ↦ᵣ  v") : bi_scope.
+(* discarded (persistent, duplicable) read-only register ownership.  Used for the
+   configuration registers (misa, mseccfg, the PMP/PMA config, the HTIF base, ...)
+   that the boot sequence never writes: once persisted they need not be threaded
+   through (or returned by) every WP -- see [hw_config] in RiscvFetchExec.v. *)
+Notation "r ↦ᵣ□ v" := (reg_pointsto r DfracDiscarded v)
+  (at level 20, format "r  ↦ᵣ□  v") : bi_scope.
 (* A physical byte address lies in "real" RAM iff it is outside the platform
    MMIO ranges.  We capture the two PURE (state-independent) ranges checked by
    the model's [within_clint]/[within_sig]: an access fully inside one of those
@@ -160,6 +166,27 @@ Section Bridge.
       rewrite (Hag k dv Hk).
       by rewrite (irrelevant_register_set k r rs v' (register_beq_false k r Hne)).
   Qed.
+
+  (* reading a register cell at ANY fraction -- in particular a persistent
+     [r ↦ᵣ□ v].  ([reg_valid] is the [DfracOwn 1] special case.) *)
+  Lemma reg_valid_dq rs r dq v :
+    reg_interp rs -∗ reg_pointsto r dq v -∗ ⌜register_lookup r rs = v⌝.
+  Proof.
+    rewrite /reg_pointsto /reg_interp.
+    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
+    iDestruct (gen_heap_valid with "Hm Hr") as %Hlk.
+    iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
+  Qed.
+
+  (* a discarded (read-only) register cell is persistent -- hence duplicable and
+     never consumed, so a WP that only READS it need neither take a fresh copy nor
+     hand one back. *)
+  Global Instance reg_pointsto_discarded_persistent r v : Persistent (r ↦ᵣ□ v).
+  Proof. rewrite /reg_pointsto. apply _. Qed.
+
+  (* discard the fraction: turn an owned register cell into the persistent one. *)
+  Lemma reg_pointsto_persist r dq v : reg_pointsto r dq v ==∗ r ↦ᵣ□ v.
+  Proof. rewrite /reg_pointsto. iIntros "Hr". by iMod (pointsto_persist with "Hr"). Qed.
 
   (* reading a memory byte (at ANY fraction) agrees with the byte heap. *)
   Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a dq b :

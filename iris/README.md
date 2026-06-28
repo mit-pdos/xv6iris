@@ -161,6 +161,32 @@ for regenerating the Sail model.
 > keeps its clause-by-clause `cstep`. Always run a new walk tactic under a
 > `timeout`.)
 
+> **Build-perf note (bundle the immutable config into one persistent fact —
+> `hw_config`).** Every WP threads a cluster of *configuration-register* points-to
+> facts that never change (misa, mseccfg, the counter config, the PMA regions, the
+> HTIF base, …) plus their well-formedness side-conditions (`pma_allows_all`,
+> `_get_Misa_S`). Carried per-register and *re-listed in every continuation*, this
+> bloats every WP statement and feeds the per-step Qed conversion cost. Foundation
+> (built, validated): the boot never writes these, so own them **persistently**
+> via `r ↦ᵣ□ v` (`RiscvPtsto.v`: `reg_pointsto_persist`, `reg_valid_dq`, the
+> `Persistent` instance — mirroring `↦ₘ□`) and bundle them in one persistent
+> proposition **`hw_config misa0 mseccfg0 mc mcfg pmar0`** (`RiscvFetchExec.v`),
+> which subsumes the `pma_allows_all`/`_get_Misa_S` macros. Because it is
+> `Persistent`, a WP that only *reads* config takes `hw_config` in its precondition
+> and **need not return it** — config drops out of every continuation entirely.
+> (Reads are non-destructive — `iDestruct … as %` keeps the resource — so the only
+> reason config was re-listed in continuations was the linear `↦ᵣ`; persistence
+> removes it.) `fetch_from_pts_minstret` (the shared fetch helper) is already made
+> dfrac-generic so persistent config can flow through it. The mutable config
+> (pmpcfg_n, mstatus, mie, elp, pmpaddr, …) genuinely changes and stays linearly
+> threaded. ROLLOUT (pending — it is all-or-nothing: a WP whose precondition
+> changes cascades to every caller up to the boot, and persistence can't hide
+> behind a compat shim): (1) at the boot, `reg_pointsto_persist` the immutable
+> registers once and assemble `hw_config`; (2) replace, in every per-opcode WP and
+> the start-chain WPs, the config points-to cluster + props with a single
+> `hw_config …` precondition (unpack with `iDestruct "Hhw" as "#(…)"`, read via
+> `reg_valid_dq`), and delete them from the continuation.
+
 To compile a single file by hand:
 
 ```sh

@@ -113,7 +113,7 @@ Section WpFetch.
   Lemma fetch_from_pts_minstret
       (pc : mword 64) (w : mword 32) (region : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (b : bool) (s : mstate) {dq : dfrac} :
+      (b : bool) (s : mstate) {dq : dfrac} {dqp dqa dqh : dfrac} :
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     pmp_allows_all pmpcfg0 ->
@@ -126,9 +126,9 @@ Section WpFetch.
     gen_heap_interp s.(mem) -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ Machine -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    pma_regions ↦ᵣ pmar0 -∗
-    htif_tohost_base ↦ᵣ None -∗
+    reg_pointsto pmpcfg_n dqp pmpcfg0 -∗
+    reg_pointsto pma_regions dqa pmar0 -∗
+    reg_pointsto htif_tohost_base dqh None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_Base w, set_reg s (R_bool minstret_increment) b) ⌝.
@@ -137,9 +137,9 @@ Section WpFetch.
             "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hbytes".
     iDestruct (reg_valid with "Hreg Hpc")   as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hpmpc") as %Lpmpc.
-    iDestruct (reg_valid with "Hreg Hpma")  as %Lpma.
-    iDestruct (reg_valid with "Hreg Hhtif") as %Lhtif.
+    iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
+    iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
+    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
                s.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbytesf.
     { iIntros (j Hj). assert (Hj' : (j < 4)%nat) by lia.
