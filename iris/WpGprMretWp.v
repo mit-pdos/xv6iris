@@ -181,6 +181,7 @@ End ForwardMRET.
 (* ====================================================================== *)
 Section StepMRET.
   Context `{!riscvGS Σ}.
+  Context {dqc : dfrac}.
 
   (* Clean MRET post-state in terms of the OWNED register values             *)
   (* (mstatus0, mepc0, elp0), parameterised so the WP can hand them back.     *)
@@ -268,9 +269,9 @@ Section StepMRET.
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    misa ↦ᵣ misa0 -∗ mepc ↦ᵣ mepc0 -∗
-    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    reg_pointsto misa dqc misa0 -∗ mepc ↦ᵣ mepc0 -∗
+    elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_mret j) -∗
     ▷ ( PC ↦ᵣ ctgt mepc0 -∗ nextPC ↦ᵣ ctgt mepc0 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗
@@ -278,9 +279,9 @@ Section StepMRET.
         cur_privilege ↦ᵣ newpriv -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
         (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus0 -∗
-        misa ↦ᵣ misa0 -∗ mepc ↦ᵣ mepc0 -∗
-        elp ↦ᵣ celpv lpe mstatus0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        reg_pointsto misa dqc misa0 -∗ mepc ↦ᵣ mepc0 -∗
+        elp ↦ᵣ celpv lpe mstatus0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_mret j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
@@ -289,17 +290,17 @@ Section StepMRET.
       "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
-    iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
-    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
-    iDestruct (reg_valid with "Hreg Help")   as %Lelp.
-    iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
-    iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
-    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
-    iDestruct (reg_valid with "Hreg Hmepc")  as %Lmepc.
+    iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
+    iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
+    iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
+    iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
+    iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
+    iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Hmepc")  as %Lmepc.
     assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     iDestruct (fetch_from_pts_minstret pc w_mret region_f pmpcfg0 pmar0 b1 s

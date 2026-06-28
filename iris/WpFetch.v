@@ -9,7 +9,7 @@
 (* both supplies fetch's per-byte memory reads (via `mem_valid`) AND, since *)
 (* `↦ₘ` is RAM-constrained, discharges the `within_clint`/`within_sig`      *)
 (* MMIO checks (via `mem_ram`); `within_htif` is discharged from an owned   *)
-(* `htif_tohost_base ↦ᵣ None`.  Intended to be plugged into the per-opcode  *)
+(* `reg_pointsto htif_tohost_base dqc None`.  Intended to be plugged into the per-opcode  *)
 (* WPs (replacing their abstract fetch hypotheses) later.                   *)
 (* ====================================================================== *)
 From Stdlib Require Import Eqdep_dec ZArith Lia.
@@ -27,6 +27,7 @@ Local Open Scope Z_scope.
 
 Section WpFetch.
   Context `{!riscvGS Σ}.
+  Context {dqc : dfrac}.
 
   (* ====================================================================== *)
   (* fetch_from_pts                                                          *)
@@ -60,18 +61,18 @@ Section WpFetch.
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ Machine -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    pma_regions ↦ᵣ pmar0 -∗
-    htif_tohost_base ↦ᵣ None -∗
+    reg_pointsto pma_regions dqc pmar0 -∗
+    reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
     ⌜ exec (fetch tt) s = Some (F_Base w, s) ⌝.
   Proof.
     iIntros (Hmatch0 Hexec Hpmp0 Halign Hbit0 Hbit1 Hvalign HnotRVC)
             "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hbytes".
-    iDestruct (reg_valid with "Hreg Hpc")   as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hpmpc") as %Lpmpc.
-    iDestruct (reg_valid with "Hreg Hpma")  as %Lpma.
-    iDestruct (reg_valid with "Hreg Hhtif") as %Lhtif.
+    iDestruct (reg_valid_dq with "Hreg Hpc")   as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
+    iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
+    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     (* the four per-byte memory reads, borrowed from the owned big-op *)
     iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
                s.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbytesf.
@@ -135,8 +136,8 @@ Section WpFetch.
   Proof.
     iIntros (Hmatch0 Hexec Hpmp0 Halign Hbit0 Hbit1 Hvalign HnotRVC)
             "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hbytes".
-    iDestruct (reg_valid with "Hreg Hpc")   as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hpc")   as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.

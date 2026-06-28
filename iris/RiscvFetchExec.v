@@ -61,6 +61,8 @@ Section HwConfig.
      mcountinhibit ↦ᵣ□ mc ∗ minstretcfg ↦ᵣ□ mcfg ∗
      pma_regions ↦ᵣ□ pmar0 ∗ htif_tohost_base ↦ᵣ□ None ∗
      ⌜ eq_vec (_get_Misa_S misa0) ('b"1") = true ⌝ ∗
+     ⌜ eq_vec (_get_Misa_C misa0) ('b"1") = true ⌝ ∗
+     ⌜ eq_vec (_get_Misa_U misa0) ('b"1") = true ⌝ ∗
      ⌜ pma_allows_all pmar0 ⌝)%I.
 
   Global Instance hw_config_persistent misa0 mseccfg0 mc mcfg pmar0 :

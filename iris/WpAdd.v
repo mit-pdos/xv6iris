@@ -88,6 +88,7 @@ Ltac trans_mi := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
 Section FinalWP.
   Context `{!riscvGS Σ}.
+  Context {dqc : dfrac}.
   Context (b : bool) (pc a0 a1 mst0 npc v2old : mword 64) (mi0 : bool)
           (w : mword 32) (rs2 rs1 rd : mword 5).
 
@@ -243,9 +244,9 @@ Section FinalWP.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
     (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    misa ↦ᵣ misa0 -∗
+    reg_pointsto misa dqc misa0 -∗
     elp ↦ᵣ elp0 -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( (R_bitvector_64 x10) ↦ᵣ a0 -∗
         (R_bitvector_64 x11) ↦ᵣ a1 -∗
@@ -258,9 +259,9 @@ Section FinalWP.
         hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
         (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-        misa ↦ᵣ misa0 -∗
+        reg_pointsto misa dqc misa0 -∗
         elp ↦ᵣ elp0 -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -270,16 +271,16 @@ Section FinalWP.
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step.
     iIntros (s ns κs nt) "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hx10")  as %Lx10.
-    iDestruct (reg_valid with "Hreg Hx11")  as %Lx11.
-    iDestruct (reg_valid with "Hreg Hpc")   as %Lpc.
-    iDestruct (reg_valid with "Hreg Hmst")  as %Lmst.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hhs")   as %Lhs.
-    iDestruct (reg_valid with "Hreg Hmdl")  as %Lmdl.
-    iDestruct (reg_valid with "Hreg Hmst'") as %Lmst2.
-    iDestruct (reg_valid with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid with "Hreg Help")  as %Lelp.
+    iDestruct (reg_valid_dq with "Hreg Hx10")  as %Lx10.
+    iDestruct (reg_valid_dq with "Hreg Hx11")  as %Lx11.
+    iDestruct (reg_valid_dq with "Hreg Hpc")   as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hmst")  as %Lmst.
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hhs")   as %Lhs.
+    iDestruct (reg_valid_dq with "Hreg Hmdl")  as %Lmdl.
+    iDestruct (reg_valid_dq with "Hreg Hmst'") as %Lmst2.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Help")  as %Lelp.
     (* derive the state-specific fetch fact from the owned instruction bytes;
        [forward_exec_final] needs it at [sA s = set_reg s minstret_increment b]. *)
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b s

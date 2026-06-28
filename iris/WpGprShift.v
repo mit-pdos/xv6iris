@@ -204,6 +204,7 @@ End Clean_slli.
 
 Section Wp_slli.
   Context `{!riscvGS Σ}.
+  Context {dqc : dfrac}.
   Lemma wp_slli_gpr (pc : mword 64) (w : mword 32) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap register_bitvector_64 (mword 64)) (va vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
@@ -224,22 +225,22 @@ Section Wp_slli.
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    PC ↦ᵣ pc -∗ gpr_file m -∗ reg_pointsto misa dqc misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (shift_bits_left va (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
-        misa ↦ᵣ misa0 -∗
+        reg_pointsto misa dqc misa0 -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
@@ -248,18 +249,18 @@ Section Wp_slli.
       "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (st ns κs nt) "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
-    iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
-    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
-    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
-    iDestruct (reg_valid with "Hreg Help")   as %Lelp.
-    iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
-    iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
+    iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
+    iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
+    iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
+    iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfile") as "[Hr1c Hfb1]".
-    iDestruct (reg_valid with "Hreg Hr1c") as %Lrs1.
+    iDestruct (reg_valid_dq with "Hreg Hr1c") as %Lrs1.
     iDestruct ("Hfb1" with "Hr1c") as "Hfile".
     assert (Hsi_s : exec (should_inc_minstret Machine) st = Some (b1, st)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg st Lmc Lmcfg). }
@@ -401,6 +402,7 @@ End Clean_srli.
 
 Section Wp_srli.
   Context `{!riscvGS Σ}.
+  Context {dqc : dfrac}.
   Lemma wp_srli_gpr (pc : mword 64) (w : mword 32) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap register_bitvector_64 (mword 64)) (va vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
@@ -421,22 +423,22 @@ Section Wp_srli.
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    PC ↦ᵣ pc -∗ gpr_file m -∗ reg_pointsto misa dqc misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (shift_bits_right va (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
-        misa ↦ᵣ misa0 -∗
+        reg_pointsto misa dqc misa0 -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
@@ -445,18 +447,18 @@ Section Wp_srli.
       "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (st ns κs nt) "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
-    iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
-    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
-    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
-    iDestruct (reg_valid with "Hreg Help")   as %Lelp.
-    iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
-    iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
+    iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
+    iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
+    iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
+    iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfile") as "[Hr1c Hfb1]".
-    iDestruct (reg_valid with "Hreg Hr1c") as %Lrs1.
+    iDestruct (reg_valid_dq with "Hreg Hr1c") as %Lrs1.
     iDestruct ("Hfb1" with "Hr1c") as "Hfile".
     assert (Hsi_s : exec (should_inc_minstret Machine) st = Some (b1, st)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg st Lmc Lmcfg). }
@@ -598,6 +600,7 @@ End Clean_addiw.
 
 Section Wp_addiw.
   Context `{!riscvGS Σ}.
+  Context {dqc : dfrac}.
   Lemma wp_addiw_gpr (pc : mword 64) (w : mword 32) (rs1 rd : mword 5) (immv : mword 12)
       (m : gmap register_bitvector_64 (mword 64)) (va vd misa0 mdv0 : mword 64)
       (b1 : bool) (npc0 mst0 mstatus0 : mword 64) (mc : mword 32) (mcfg : mword 64)
@@ -618,22 +621,22 @@ Section Wp_addiw.
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    PC ↦ᵣ pc -∗ gpr_file m -∗ reg_pointsto misa dqc misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec va (sign_extend' 64 immv)) 31 0))]> m) -∗
-        misa ↦ᵣ misa0 -∗
+        reg_pointsto misa dqc misa0 -∗
         nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
@@ -642,18 +645,18 @@ Section Wp_addiw.
       "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply wp_exec_step. iIntros (st ns κs nt) "[Hreg Hmem]".
-    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
-    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hhs")    as %Lhs.
-    iDestruct (reg_valid with "Hreg Hmdl")   as %Lmdl.
-    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
-    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid with "Hreg Hmst")   as %Lmst.
-    iDestruct (reg_valid with "Hreg Help")   as %Lelp.
-    iDestruct (reg_valid with "Hreg Hmcinh") as %Lmc.
-    iDestruct (reg_valid with "Hreg Hmcfg")  as %Lmcfg.
+    iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
+    iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
+    iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
+    iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
+    iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
+    iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfile") as "[Hr1c Hfb1]".
-    iDestruct (reg_valid with "Hreg Hr1c") as %Lrs1.
+    iDestruct (reg_valid_dq with "Hreg Hr1c") as %Lrs1.
     iDestruct ("Hfb1" with "Hr1c") as "Hfile".
     assert (Hsi_s : exec (should_inc_minstret Machine) st = Some (b1, st)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg st Lmc Lmcfg). }
@@ -692,18 +695,19 @@ End Wp_addiw.
 (* Demonstrations: ONE lemma per type serves many register operands. *)
 Section WpGprShiftDemo.
   Context `{!riscvGS Σ}.
+  Context {dqc : dfrac}.
   Definition wp_slli_x5_x6  (pc : mword 64) (w : mword 32) (sh : mword 6) :=
-    wp_slli_gpr pc w (mword_of_int 6) (mword_of_int 5) sh.    (* slli x5, x6, sh *)
+    wp_slli_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 6) (mword_of_int 5) sh.    (* slli x5, x6, sh *)
   Definition wp_slli_x28_x1 (pc : mword 64) (w : mword 32) (sh : mword 6) :=
-    wp_slli_gpr pc w (mword_of_int 1) (mword_of_int 28) sh.   (* slli x28, x1, sh *)
+    wp_slli_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 1) (mword_of_int 28) sh.   (* slli x28, x1, sh *)
   Definition wp_srli_x5_x6  (pc : mword 64) (w : mword 32) (sh : mword 6) :=
-    wp_srli_gpr pc w (mword_of_int 6) (mword_of_int 5) sh.
+    wp_srli_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 6) (mword_of_int 5) sh.
   Definition wp_srli_x28_x1 (pc : mword 64) (w : mword 32) (sh : mword 6) :=
-    wp_srli_gpr pc w (mword_of_int 1) (mword_of_int 28) sh.
+    wp_srli_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 1) (mword_of_int 28) sh.
   Definition wp_sextw_x15_x15 (pc : mword 64) (w : mword 32) :=
-    wp_addiw_gpr pc w (mword_of_int 15) (mword_of_int 15) (mword_of_int 0).  (* sext.w x15,x15 *)
+    wp_addiw_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 15) (mword_of_int 15) (mword_of_int 0).  (* sext.w x15,x15 *)
   Definition wp_addiw_x5_x6 (pc : mword 64) (w : mword 32) (imm : mword 12) :=
-    wp_addiw_gpr pc w (mword_of_int 6) (mword_of_int 5) imm.
+    wp_addiw_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 6) (mword_of_int 5) imm.
   Goal gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6
     /\ gpr_of_Z (uint (mword_of_int 15 : mword 5)) = x15
     /\ uint (mword_of_int 28 : mword 5) <> 0.

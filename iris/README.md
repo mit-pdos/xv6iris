@@ -179,13 +179,22 @@ for regenerating the Sail model.
 > removes it.) `fetch_from_pts_minstret` (the shared fetch helper) is already made
 > dfrac-generic so persistent config can flow through it. The mutable config
 > (pmpcfg_n, mstatus, mie, elp, pmpaddr, …) genuinely changes and stays linearly
-> threaded. ROLLOUT (pending — it is all-or-nothing: a WP whose precondition
-> changes cascades to every caller up to the boot, and persistence can't hide
-> behind a compat shim): (1) at the boot, `reg_pointsto_persist` the immutable
-> registers once and assemble `hw_config`; (2) replace, in every per-opcode WP and
-> the start-chain WPs, the config points-to cluster + props with a single
-> `hw_config …` precondition (unpack with `iDestruct "Hhw" as "#(…)"`, read via
-> `reg_valid_dq`), and delete them from the continuation.
+> threaded. ROLLOUT (green-incremental, three phases — a WP that drops config from
+> its postcondition forces every caller up to a no-caller "top" to change in the
+> same commit, so we stage it):
+> * **Phase A** — make the shared *leaf* per-opcode WPs **dfrac-generic** in the
+>   config registers (`reg_pointsto X dqc v` + `reg_valid_dq`). Backward-compatible
+>   (existing callers unify `dqc := DfracOwn 1`), so the build stays green; this
+>   merely lets a leaf also accept *persistent* config.
+> * **Phase B** — convert each top-unit (a no-caller top theorem + its exclusive
+>   chain WPs) to take `hw_config` and **drop config from its own postcondition**,
+>   passing persistent config down to the (dfrac-generic) leaves. Tops have no
+>   callers, so each unit is independent and the build returns to green after it.
+>   Establish persistence once per top via `reg_pointsto_persist`.
+> * **Phase C** — once *all* top-units are converted (so no caller ever needs
+>   config back from a leaf), switch each shared leaf to a `hw_config` precondition
+>   and **drop config from the leaf postconditions** too. Now config is threaded
+>   nowhere and returned nowhere.
 
 To compile a single file by hand:
 
