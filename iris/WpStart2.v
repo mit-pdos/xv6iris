@@ -1281,6 +1281,7 @@ Section WpStart2.
     m !! gpr_of_Z 8 = Some vs0 ->
     m !! gpr_of_Z 14 = Some va4 ->
     m !! gpr_of_Z 15 = Some va5 ->
+    is_Some (m !! gpr_of_Z 4) ->
     pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -1309,7 +1310,7 @@ Section WpStart2.
        clobbered a4/a5; its CSR writes menvcfg/mcounteren/stimecmp are consumed).
        The gpr_file is existential (x15/a5 present) since a5 is clobbered. *)
     ▷ ( PC ↦ᵣ spc60
-        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ⌝)
+        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ⌝)
         -∗ misa ↦ᵣ misa0 -∗ mhartid ↦ᵣ mhartid0 -∗ nextPC ↦ᵣ spc60
         -∗ (R_bool minstret_increment) ↦ᵣ b1
         -∗ (∃ mstf : mword 64, minstret ↦ᵣ mstf)
@@ -1322,7 +1323,7 @@ Section WpStart2.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros b1 sp1 imm_ra pa_ra a8_ra imm_s0 pa_s0 a8_s0 vra vra_ld tgt mti_def.
-    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
+    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmenv Hmcen Hmtime Hstc Hmhartid
              Hmcinh Hmcfg Hpmpc Hpma Hhtif Hstkra Hstks0 #H Hcont".
     (* ---- idx 59: jal ra, timerinit (kernel_text duplicable: split off K59 here) ---- *)
@@ -1357,10 +1358,12 @@ Section WpStart2.
       by (unfold mti_def; rewrite lookup_insert_ne; [exact Hm14 | vm_compute; discriminate]).
     assert (Lti15 : mti_def !! gpr_of_Z 15 = Some va5)
       by (unfold mti_def; rewrite lookup_insert_ne; [exact Hm15 | vm_compute; discriminate]).
+    assert (Lti4 : is_Some (mti_def !! gpr_of_Z 4))
+      by (unfold mti_def; rewrite lookup_insert_ne; [exact Hm4 | vm_compute; discriminate]).
     iApply (wp_timerinit sp0 vra vs0 va4 va5 mti_def
               _ misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0
               mcounteren0 mc mcfg pmpcfg0 pmar0 b1 elp0 vold_ra vold_s0 E Φ
-              Lti1 Lti2 Lti8 Lti14 Lti15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU
+              Lti1 Lti2 Lti8 Lti14 Lti15 Lti4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU
               Ha8ra Hpara Ha8s0 Hpas0
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmenv Hmcen Hmtime Hstc

@@ -1553,6 +1553,7 @@ Section WpStartChain.
     let tgt := update_vec_dec (add_vec vra_ld (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0") in
     m !! gpr_of_Z 1 = Some vra0 -> m !! gpr_of_Z 2 = Some vsp ->
     m !! gpr_of_Z 8 = Some vs00 -> m !! gpr_of_Z 14 = Some va4 -> m !! gpr_of_Z 15 = Some va5 ->
+    is_Some (m !! gpr_of_Z 4) ->
     pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -1572,7 +1573,7 @@ Section WpStartChain.
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vstk_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vstk_s0 j) -∗
     kernel_text -∗
-    ▷ ( PC ↦ᵣ tgt -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ⌝) -∗ nextPC ↦ᵣ tgt -∗
+    ▷ ( PC ↦ᵣ tgt -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ⌝) -∗ nextPC ↦ᵣ tgt -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         (∃ mstf : mword 64, minstret ↦ᵣ mstf) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗
@@ -1584,7 +1585,7 @@ Section WpStartChain.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros b1 imm_ra pa_ra a8_ra imm_s0 pa_s0 a8_s0 vra_ld tgt.
-    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS Ha8ra Hpara Ha8s0 Hpas0 Hcal0 Hcal1.
+    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS Ha8ra Hpara Ha8s0 Hpas0 Hcal0 Hcal1.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 #H".
     iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
     iIntros "Hcont".
@@ -1712,16 +1713,22 @@ Section WpStartChain.
     with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi [Hmst] Hmenv Hmcen Hmtime [Hstc]
               [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]
               Hstkra Hstks0")).
-    { (* x15 (a5) present in m28 (last written by idx 24 c.add) *)
+    { (* x15 (a5) present (idx 24 c.add); x4 (tp) untouched -> from input Hm4 *)
       iExists _. iFrame "Hfile". iPureIntro. unfold m28, m27, m26, m24.
       replace (uint rd28) with 2 by (vm_compute; reflexivity).
       replace (uint rd27) with 8 by (vm_compute; reflexivity).
       replace (uint rd26) with 1 by (vm_compute; reflexivity).
       replace (uint rsd24) with 15 by (vm_compute; reflexivity).
-      rewrite lookup_insert_ne; [| discriminate].
-      rewrite lookup_insert_ne; [| discriminate].
-      rewrite lookup_insert_ne; [| discriminate].
-      rewrite lookup_insert. eexists; reflexivity. }
+      split.
+      - rewrite lookup_insert_ne; [| discriminate].
+        rewrite lookup_insert_ne; [| discriminate].
+        rewrite lookup_insert_ne; [| discriminate].
+        rewrite lookup_insert. eexists; reflexivity.
+      - rewrite lookup_insert_ne; [| discriminate].
+        rewrite lookup_insert_ne; [| discriminate].
+        rewrite lookup_insert_ne; [| discriminate].
+        rewrite lookup_insert_ne; [| discriminate].
+        exact Hm4. }
     { iExists _. iFrame "Hmst". }
     { iExists _. iFrame "Hstc". }
     { iFrame. }
@@ -1758,6 +1765,7 @@ Section WpStartChain.
     m !! gpr_of_Z 8 = Some vs0 ->
     m !! gpr_of_Z 14 = Some va4 ->
     m !! gpr_of_Z 15 = Some va5 ->
+    is_Some (m !! gpr_of_Z 4) ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
@@ -1795,7 +1803,7 @@ Section WpStartChain.
        and ra/s0/sp restored), exposing only that x15 (a5) is still present — which
        is all the START tail needs (it overwrites a5 then reads it). *)
     ▷ ( PC ↦ᵣ tgt
-        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ⌝)
+        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ⌝)
         -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ tgt
         -∗ (R_bool minstret_increment) ↦ᵣ
              (andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1810,7 +1818,7 @@ Section WpStartChain.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros sp1 bump imm_ra ea_ra a8_ra pa_ra imm_s0 ea_s0 a8_s0 pa_s0.
-    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU
+    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU
       Ha8ra Hpara Ha8s0 Hpas0.
     intros vra_ld tgt Hcal0 Hcal1.
     set (b1 := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1900,6 +1908,12 @@ Section WpStartChain.
       change (uint rsd15) with 14. change (uint rd14) with 14. change (uint rd13) with 15.
       change (uint r_s0) with 8. change (uint rd9) with 2.
       do 9 (rewrite lookup_insert_ne; [| discriminate]). rewrite lookup_insert. reflexivity. }
+    assert (Hc4_4 : is_Some (m3 !! gpr_of_Z 4)).
+    { unfold m3, m2, m1. change (uint rd23) with 14. change (uint rd22) with 14. change (uint rd21) with 15.
+      change (uint rd19) with 15. change (uint rd18) with 15. change (uint r_a5) with 15.
+      change (uint rsd15) with 14. change (uint rd14) with 14. change (uint rd13) with 15.
+      change (uint r_s0) with 8. change (uint rd9) with 2.
+      do 11 (rewrite lookup_insert_ne; [| discriminate]). exact Hm4. }
     (* ---- chunk c4 (idx 24-29) ---- *)
     iApply (wp_ti_c4 (regval_into_reg sp1) vra
               (regval_into_reg (add_vec sp1 (sign_extend' 64 (caddi4spn_imm nzimm12))))
@@ -1910,7 +1924,7 @@ Section WpStartChain.
               mtime0 stimecmp0 mdv0
               (legalize_mcounteren mcounteren0 (or_vec va5_c2_in' (sign_extend' 64 (subrange_vec_dec w19 31 20))))
               mc mcfg pmpcfg0 pmar0 elp0 vra vs0 E Φ
-              Hc4_ra Hc4_sp Hc4_s0 Hc4_a4 Hc4_a5 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS
+              Hc4_ra Hc4_sp Hc4_s0 Hc4_a4 Hc4_a5 Hc4_4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS
               ltac:(exact Ha8ra) ltac:(exact Hpara) ltac:(exact Ha8s0) ltac:(exact Hpas0)
               ltac:(exact Hcal0) ltac:(exact Hcal1)
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 HtextP").
