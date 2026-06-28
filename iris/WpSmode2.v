@@ -216,4 +216,145 @@ End ForwardRvcGprWrite_gen.
       iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hibytes").
   Qed.
 
+  Lemma gpr_addi_val_self_file (s : mstate) (pc : mword 64) (b : bool) (rd : mword 5) (imm : mword 12) (va : mword 64) :
+    uint rd <> 0 ->
+    register_lookup (R_bitvector_64 (gpr_of_Z (uint rd))) s.(sregs) = va ->
+    gpr_addi_val rd imm (s_pcl s pc b) = add_vec va (sign_extend' 64 imm).
+  Proof.
+    intros H1 Lva.
+    rewrite (gpr_addi_val_lookup rd imm (s_pcl s pc b) H1).
+    unfold s_pcl, sAl. unfold set_reg; cbn [sregs].
+    do 2 gpr_trans. rewrite Lva. reflexivity.
+  Qed.
+
+
+  (* Generic Supervisor-mode WP for an RVC ADDI-family self-write (rs1 = rd):
+     c.addi / c.addi16sp / ... — any compressed instr that ExecuteAs-expands to
+     ITYPE (imm12, rd, rd, ADDI).  Generalises wp_smode_caddi to an arbitrary
+     12-bit immediate, reusing the generic forward engine. *)
+  Lemma wp_smode_addi (pc : mword 64) (w16 : mword 16)
+      (cinstr : instruction) (rd : mword 5) (imm12 : mword 12)
+      (m : gmap register_bitvector_64 (mword 64)) (vd misa0 mdv0 mstatus0 satp0 mie_v : mword 64)
+      (b1 : bool) (npc0 mst0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (pmar0 : list PMA_Region) (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    uint rd <> 0 ->
+    m !! gpr_of_Z (uint rd) = Some vd ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4) ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    pma_allows_all pmar0 ->
+    pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
+      (uint (fetch_pa pc)) (uint (to_bits 64 2)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
+    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
+    neq_vec (access_vec_dec pc 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
+    isRVC w16 = true ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
+       exec (ext_decode_compressed w16) s0 = Some (cinstr, s0)) ->
+    (forall s0, exec (execute cinstr) s0
+       = Some (ExecuteAs (ITYPE (imm12, Regidx rd, Regidx rd, ADDI)), s0)) ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+              (eq_vec (counter_priv_filter_bit mcfg Supervisor) ('b"0")) ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
+    mie ↦ᵣ mie_v -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w16 j) -∗
+    ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
+        gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (add_vec vd (sign_extend' 64 imm12))]> m) -∗
+        misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
+        mie ↦ᵣ mie_v -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w16 j) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    iIntros (Hrd Hmd HsatpM HSXL Hpmaall HA0 Hord0 Hrange0 HX0 Halignf Hbit0f Hbit1f Hvalignf
+             HisRVC HmisaC HmisaS Hdec Hcexec1 Hb1 Hmie_mdl HSIE Help)
+      "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
+    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iDestruct (reg_valid with "Hreg Hpc")      as %Lpc.
+    iDestruct (reg_valid with "Hreg Hpriv")    as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hhs")      as %Lhs.
+    iDestruct (reg_valid with "Hreg Hmdl")     as %Lmdl.
+    iDestruct (reg_valid with "Hreg Hms")      as %Lms.
+    iDestruct (reg_valid with "Hreg Hmst")     as %Lmst.
+    iDestruct (reg_valid with "Hreg Hsatp")    as %Lsatp.
+    iDestruct (reg_valid with "Hreg Hmie")     as %Lmie.
+    iDestruct (reg_valid with "Hreg Help'")    as %Lelp.
+    iDestruct (reg_valid with "Hreg Hmcinh")   as %Lmc.
+    iDestruct (reg_valid with "Hreg Hmcfg")    as %Lmcfg.
+    iDestruct (reg_valid with "Hreg Hmisa'")   as %Lmisa.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmd with "Hfile") as "[Hrdc1 Hfb]".
+    iDestruct (reg_valid with "Hreg Hrdc1") as %Lrd.
+    iDestruct ("Hfb" with "Hrdc1") as "Hfile".
+    assert (Hsi_s : exec (should_inc_minstret Supervisor) s = Some (b1, s)).
+    { rewrite Hb1. apply (exec_should_inc_S mc mcfg Supervisor s Lmc Lmcfg). }
+    iDestruct (fetch_from_pts_minstret_RVC2_S pc satp0 mstatus0 w16 region_f pmpcfg0 pmpaddr00 pmar0 b1 misa0 s
+                 Hmatchf Hexecf HSXL HsatpM HA0 Hord0 Hrange0 HX0 Halignf Hbit0f Hbit1f Hvalignf HmisaC HisRVC
+                 with "Hreg Hmem Hpc Hpriv Hmisa' Hms Hsatp Hpmpc Hpmpaddr Hpma Hhtif Hibytes") as %Hfetch_at.
+    assert (Hdisp : exec (dispatchInterrupt Supervisor) (sAl s b1) = Some (None, sAl s b1)).
+    { apply exec_dispatchInterrupt_none_S.
+      apply (exec_getPendingSet_supervisor_none (sAl s b1) mie_v mdv0 mstatus0).
+      - rewrite (exec_currentlyEnabled_S (sAl s b1)).
+        replace (register_lookup misa (sAl s b1).(sregs)) with misa0.
+        2:{ unfold sAl, set_reg; cbn [sregs].
+            rewrite irrelevant_register_set; [symmetry; exact Lmisa | vm_compute; reflexivity]. }
+        rewrite HmisaS. reflexivity.
+      - unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmie | vm_compute; reflexivity].
+      - unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmdl | vm_compute; reflexivity].
+      - unfold sAl, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lms | vm_compute; reflexivity].
+      - exact Hmie_mdl.
+      - exact HSIE. }
+    assert (Hcexec2' : exec (execute (ITYPE (imm12, Regidx rd, Regidx rd, ADDI))) (s_pcl s pc b1)
+                       = Some (RETIRE_SUCCESS, set_reg (s_pcl s pc b1)
+                                 (R_bitvector_64 (gpr_of_Z (uint rd)))
+                                 (regval_into_reg (add_vec vd (sign_extend' 64 imm12))))).
+    { rewrite (exec_execute_ITYPE_ADDI_gpr rd rd imm12 (s_pcl s pc b1)).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      rewrite (gpr_addi_val_self_file s pc b1 rd imm12 vd Hrd Lrd). reflexivity. }
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
+    iExists (WpRvc.sFcg s pc b1 rd (add_vec vd (sign_extend' 64 imm12)) mst0). iSplitR.
+    { iPureIntro.
+      rewrite <- (WpRvc.sFg_eq s pc b1 rd (add_vec vd (sign_extend' 64 imm12)) mst0 Lpc Lmst).
+      apply (forward_exec_rvc_gpr_write_gen Supervisor s pc b1 w16 cinstr
+               (ITYPE (imm12, Regidx rd, Regidx rd, ADDI)) rd (add_vec vd (sign_extend' 64 imm12))
+               Hfetch_at Hsi_s Hdec (Hcexec1 (s_pcl s pc b1)) Hcexec2' Lpc Lpriv Hdisp Lhs).
+      - rewrite Lmisa. exact HmisaS.
+      - rewrite Lelp. exact Help.
+      - rewrite Lmisa. exact HmisaC. }
+    iIntros "!>".
+    iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfile") as "[Hrdc Hfins]".
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+            (regval_into_reg (add_vec vd (sign_extend' 64 imm12))) with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iMod (reg_update _ PC _ (add_vec_int pc 2) with "Hreg Hpc") as "[Hreg Hpc]".
+    iDestruct ("Hfins" $! (regval_into_reg (add_vec vd (sign_extend' 64 imm12))) with "Hrdc") as "Hfile".
+    unfold WpRvc.sFcg, WpRvc.base_upd_g. destruct b1.
+    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hibytes").
+    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hibytes").
+  Qed.
+
 End S2.
