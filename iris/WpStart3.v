@@ -267,8 +267,7 @@ Section WpStart3.
        [satp_legalized satp0 va5_45] (va5_45 = 0, MODE = Bare); pmpcfg = pmpcfg1.
        Only the gpr_file (a4/a5 clobbered), minstret, and pmpaddr stay existential;
        the gpr_file exposes that x2 (sp) is present. *)
-    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64)) (mstf : mword 64)
-            (pmpaddrf : type_of_register pmpaddr_n),
+    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64)) (mstf : mword 64),
           PC ↦ᵣ ctgt (mepc_val va5_43) ∗ nextPC ↦ᵣ ctgt (mepc_val va5_43) ∗
           gpr_file mf ∗ ⌜ is_Some (mf !! gpr_of_Z 2) ⌝ ∗ misa ↦ᵣ misa0 ∗ mhartid ↦ᵣ mhartid0 ∗
           (R_bool minstret_increment) ↦ᵣ b1 ∗ minstret ↦ᵣ mstf ∗
@@ -276,7 +275,8 @@ Section WpStart3.
           (R_bitvector_64 mideleg) ↦ᵣ mdv0 ∗ (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus1 ∗ mepc ↦ᵣ mepc_val va5_43 ∗
           satp ↦ᵣ satp_legalized satp0 va5_45 ∗
           elp ↦ᵣ celpv lpe mstatus1 ∗ mseccfg ↦ᵣ mseccfg0 ∗ mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
-          pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmpaddrf ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
+          pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmp0_newaddr pmpcfg0 pmpaddr00 va5_55 ∗
+          mie ↦ᵣ sie_new_mie mie0 mdv0 va5_52 ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
         -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }} ) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -395,7 +395,7 @@ Section WpStart3.
     iIntros "Hpc Hnpc Hfile Hmisa Hmhartid Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif Hktx2".
     iDestruct "Hfile" as (mf2) "[Hfile %Hf2sp]". iDestruct "Hmst" as (mstf1) "Hmst".
     iApply "Hcont".
-    iExists mf2, mstf1, _.
+    iExists mf2, mstf1.
     iFrame. iPureIntro. split; [exact Hf2sp | exact Hnpm].
   Qed.
 
@@ -516,8 +516,7 @@ Section WpStart3.
        satp written Bare (satp_legalized satp0 va5_45, va5_45 = 0); only gpr_file
        (clobbered a4/a5), minstret and pmpaddr stay existential, with x2 (sp) shown
        present so the first S-mode instruction (c.addi sp,sp,-16) can chain. *)
-    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64)) (mstf : mword 64)
-            (pmpaddrf : type_of_register pmpaddr_n),
+    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64)) (mstf : mword 64),
           PC ↦ᵣ ctgt (mepc_val va5_43) ∗ nextPC ↦ᵣ ctgt (mepc_val va5_43) ∗
           gpr_file mf ∗ ⌜ is_Some (mf !! gpr_of_Z 2) ⌝ ∗ misa ↦ᵣ misa0 ∗ mhartid ↦ᵣ mhartid0 ∗
           (R_bool minstret_increment) ↦ᵣ bb ∗ minstret ↦ᵣ mstf ∗
@@ -525,7 +524,8 @@ Section WpStart3.
           (R_bitvector_64 mideleg) ↦ᵣ mdv0 ∗ (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus1 ∗ mepc ↦ᵣ mepc_val va5_43 ∗
           satp ↦ᵣ satp_legalized satp0 va5_45 ∗
           elp ↦ᵣ celpv lpe mstatus1 ∗ mseccfg ↦ᵣ mseccfg0 ∗ mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
-          pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmpaddrf ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
+          pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmp0_newaddr pmpcfg0 pmpaddr00 va5_55 ∗
+          mie ↦ᵣ sie_new_mie mie0 mdv0 va5_52 ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
         -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }} ) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
