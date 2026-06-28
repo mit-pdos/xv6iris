@@ -127,7 +127,7 @@ Section WpSmode.
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} {dqc : dfrac} (Phi : mval -> iProp Σ) :
     uint rd <> 0 ->
     m !! gpr_of_Z (uint rd) = Some vd ->
     (* the hart is NOT in Machine mode (it is in Supervisor after the MRET) *)
@@ -151,24 +151,24 @@ Section WpSmode.
               (eq_vec (counter_priv_filter_bit mcfg priv) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    PC ↦ᵣ pc -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    PC ↦ᵣ pc -∗ gpr_file m -∗ reg_pointsto misa dqc misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ priv -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     satp ↦ᵣ satp0 -∗
-    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w16 j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
         gpr_file (<[gpr_of_Z (uint rd) :=
                      regval_into_reg (add_vec vd (sign_extend' 64 (sign_extend' 12 imm6)))]> m) -∗
-        misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
+        reg_pointsto misa dqc misa0 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ priv -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         satp ↦ᵣ satp0 -∗
-        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w16 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
@@ -299,12 +299,12 @@ Section WpSmode.
          exec (ext_decode_compressed (mword_of_int 0x1141 : mword 16)) s0
            = Some (C_ADDI (imm6, Regidx rd), s0)) ->
       PC ↦ᵣ kpc0 -∗ gpr_file m -∗
-      mhartid ↦ᵣ mhartid0 -∗ misa ↦ᵣ misa0 -∗
+      mhartid ↦ᵣ mhartid0 -∗
       nextPC ↦ᵣ kpc0 -∗ (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
       cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
       (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-      elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-      mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
+      elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
       ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
       menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
       mepc ↦ᵣ mepc0 -∗ satp ↦ᵣ satp0 -∗ medeleg ↦ᵣ medeleg0 -∗ mie ↦ᵣ mie0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
@@ -317,13 +317,12 @@ Section WpSmode.
               (pmpaddrf : type_of_register pmpaddr_n),
             PC ↦ᵣ add_vec_int (mword_of_int 0x80000e82) 2 ∗
             nextPC ↦ᵣ add_vec_int (mword_of_int 0x80000e82) 2 ∗
-            gpr_file mf' ∗ misa ↦ᵣ misa0 ∗
+            gpr_file mf' ∗
             (R_bool minstret_increment) ↦ᵣ b1s ∗ minstret ↦ᵣ mstf' ∗
             cur_privilege ↦ᵣ newpriv ∗ hart_state ↦ᵣ HART_ACTIVE tt ∗
             (R_bitvector_64 mideleg) ↦ᵣ mdv0 ∗ (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus1 ∗
             satp ↦ᵣ satp_legalized satp0 va5_45 ∗ elp ↦ᵣ celpv lpe mstatus1 ∗
-            mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
-            pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmpaddrf ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None)
+            pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmpaddrf)
           -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }} ) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -334,8 +333,11 @@ Section WpSmode.
     intros Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall HmisaC HmisaM HmisaS HmisaU
            HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
            Hrd2 Hb1s Hsatp_bare Hmie_s Help_s Hdec.
-    iIntros "Hpc Hfile Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes
+    iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes
              Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hstkra Hstks0 Htra Htrs0 HK Hcont".
+    iDestruct "Hhw" as "#Hhwb".
+    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0)%I as "#Hhw". { iExact "Hhwb". }
+    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     (* ---- run the whole boot path up to and including the MRET ---- *)
     iApply (wp_kernel v sp0b mst0 mstatus0 mi0 elp0 mc mcfg mseccfg0 pmpcfg0 pmar0
               x1_0 x10_0 x11_0 mhartid0 misa0 m menvcfg0 mtime0 stimecmp0 mepc0 satp0 medeleg0 mie0
@@ -343,12 +345,12 @@ Section WpSmode.
               Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall
               HmisaC HmisaM HmisaS HmisaU HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1
               Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
-              with "Hpc Hfile Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif
+              with "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw
                     Hbytes Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hstkra Hstks0 Htra Htrs0 HK").
     iNext.
     iDestruct 1 as (mf mstf pmpaddrf)
-      "(Hpc & Hnpc & Hfile & %Hsp & Hmisa & Hmh & Hmi & Hmst & Hpriv & %Hnpriv & Hhs & Hmdl & Hms & Hmepc &
-        Hsatp & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpmpaddr & Hpma & Hhtif & H)".
+      "(Hpc & Hnpc & Hfile & %Hsp & Hmh & Hmi & Hmst & Hpriv & %Hnpriv & Hhs & Hmdl & Hms & Hmepc &
+        Hsatp & Help & Hpmpc & Hpmpaddr & H)".
     (* PC = ctgt (mepc_val va5_43) = 0x80000e82 = <main> *)
     assert (Hpceq : ctgt (mepc_val va5_43) = (mword_of_int 0x80000e82 : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -364,7 +366,7 @@ Section WpSmode.
     iApply (wp_smode_caddi (mword_of_int 0x80000e82) (mword_of_int 0x1141 : mword 16) rd imm6
               mf vd misa0 mdv0 (cms5 mstatus1) (satp_legalized satp0 va5_45) newpriv b1s
               (mword_of_int 0x80000e82) mstf mc mcfg pmpcfg1 pmpaddrf pmar0 bb (celpv lpe mstatus1)
-              E (dq := DfracDiscarded) Φ
+              E (dq := DfracDiscarded) (dqc := DfracDiscarded) Φ
               ltac:(rewrite Hrd2; discriminate)
               ltac:(rewrite Hrd2; exact Hsp)
               Hnpriv Hsatp_bare Hpmaall

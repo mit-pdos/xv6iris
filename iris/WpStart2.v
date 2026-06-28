@@ -477,7 +477,9 @@ Section WpStart2.
     intros b1 bump sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 mout.
     intros Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 #H".
-    iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
+    iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
+    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     (* idx 30: C_ADDI sp,sp,-16 (4-byte window from skinstr 30 ++ 31) *)
     iAssert (kinstr_bytes (skinstr 30)) as "#K30". { sg 30. }
@@ -492,7 +494,7 @@ Section WpStart2.
               HmisaC HmisaS (decode4_s30 wr_s30 Hsub_s30) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W30").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc30 2) with spc31 by (vm_compute; reflexivity).
     assert (Hk_a : ki_addr (skinstr 31) = (kentry + 0x5a)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 31) = 0xe406) by (vm_compute; reflexivity); assert (Hk_w : (2 <= ki_width (skinstr 31) / 8)%nat) by (vm_compute; lia); iDestruct (kinstr_window16 (skinstr 31) (kentry + 0x5a) 0xe406 Hk_a Hk_e Hk_w with "K31") as "#W31"; clear Hk_a Hk_e Hk_w.
     (* idx 31: c.sdsp ra,8(sp) *)
@@ -512,7 +514,7 @@ Section WpStart2.
               HmisaC HmisaS decode10 eq_refl HmIE Hlp HMPRV Hpmm Ha8ra Hpara
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstkra W31").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstkra _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ Hpmpc _ _ _ _ Hstkra _".
     replace (add_vec_int spc31 2) with spc32 by (vm_compute; reflexivity).
     (* idx 32: c.sdsp s0,0(sp) (4-byte window from skinstr 32 ++ 33) *)
     iAssert (kinstr_bytes (skinstr 32)) as "#K32". { sg 32. }
@@ -533,7 +535,7 @@ Section WpStart2.
               HmisaC HmisaS (decode4_s32 wr_s32 Hsub_s32) eq_refl HmIE Hlp HMPRV Hpmm Ha8s0 Hpas0
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstks0 W32").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstks0 _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ Hpmpc _ _ _ _ Hstks0 _".
     replace (add_vec_int spc32 2) with spc33 by (vm_compute; reflexivity).
     assert (Hk_a : ki_addr (skinstr 33) = (kentry + 0x5e)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 33) = 0x0800) by (vm_compute; reflexivity); assert (Hk_w : (2 <= ki_width (skinstr 33) / 8)%nat) by (vm_compute; lia); iDestruct (kinstr_window16 (skinstr 33) (kentry + 0x5e) 0x0800 Hk_a Hk_e Hk_w with "K33") as "#W33"; clear Hk_a Hk_e Hk_w.
     (* idx 33: c.addi4spn s0,sp,16 *)
@@ -551,7 +553,7 @@ Section WpStart2.
               HmisaC HmisaS decode12 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W33").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc33 2) with spc34 by (vm_compute; reflexivity).
     set (m32 := <[gpr_of_Z (uint r_s0) := regval_into_reg (add_vec sp1 (sign_extend' 64 (caddi4spn_imm nzimm12)))]> m30).
     iAssert (kinstr_bytes (skinstr 34)) as "#K34". { sg 34. }
@@ -570,14 +572,14 @@ Section WpStart2.
               decode_s34 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W34").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc34 4) with spc35 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
     with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc
-              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]
+              [Hhw Hpriv Hhs Hmdl Hms Help Hpmpc]
               Hstkra Hstks0")).
     { unfold mout, m32, m30. iExact "Hfile". }
-    { iFrame. }
+    { rewrite /ti_ctx. iFrame "Hhw". iFrame. }
   Qed.
 
   (* ===================================================================== *)
@@ -634,7 +636,9 @@ Section WpStart2.
     intros b1 bump va4_35 va4_36 va5_37 va4_38 va4_39 va5_40 mout.
     intros Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx #H".
-    iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
+    iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
+    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     (* idx 35: C_LUI a4 (4-byte window from skinstr 35 ++ 36; idx 36 is 32-bit, 2 bytes remain) *)
     iAssert (kinstr_bytes (skinstr 35)) as "#K35". { sg 35. }
@@ -649,7 +653,7 @@ Section WpStart2.
               HmisaC HmisaS (decode4_s35 wr_s35 Hsub_s35) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W35").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc35 2) with spc36 by (vm_compute; reflexivity).
     set (m35 := <[gpr_of_Z (uint (sreg117 sw35)) := regval_into_reg va4_35]> m).
     assert (Hk_a : ki_addr (skinstr 36) = (kentry + 0x66)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 36) = 0x7ff70713) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 36) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 36) (kentry + 0x66) 0x7ff70713 Hk_a Hk_e Hk_w with "K36") as "#W36"; clear Hk_a Hk_e Hk_w.
@@ -670,7 +674,7 @@ Section WpStart2.
               HmisaC HmisaS decode_s36 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W36").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc36 4) with spc37 by (vm_compute; reflexivity).
     set (m36 := <[gpr_of_Z (uint (sit_rd sw36)) := regval_into_reg va4_36]> m35).
     iAssert (kinstr_bytes (skinstr 37)) as "#K37". { sg 37. }
@@ -692,7 +696,7 @@ Section WpStart2.
               HmisaC HmisaS decode_s37 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W37").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc37 2) with spc38 by (vm_compute; reflexivity).
     set (m37 := <[gpr_of_Z (uint r_a5) := regval_into_reg va5_37]> m36).
     (* idx 38: C_LUI a4 (4-byte window from skinstr 38 ++ 39; idx 39 is 32-bit, 2 bytes remain) *)
@@ -711,7 +715,7 @@ Section WpStart2.
               HmisaC HmisaS (decode4_s38 wr_s38 Hsub_s38) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W38").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc38 2) with spc39 by (vm_compute; reflexivity).
     set (m38 := <[gpr_of_Z (uint (sreg117 sw38)) := regval_into_reg va4_38]> m37).
     assert (Hk_a : ki_addr (skinstr 39) = (kentry + 0x6e)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 39) = 0x80070713) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 39) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 39) (kentry + 0x6e) 0x80070713 Hk_a Hk_e Hk_w with "K39") as "#W39"; clear Hk_a Hk_e Hk_w.
@@ -732,7 +736,7 @@ Section WpStart2.
               HmisaC HmisaS decode_s39 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W39").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc39 4) with spc40 by (vm_compute; reflexivity).
     set (m39 := <[gpr_of_Z (uint (sit_rd sw39)) := regval_into_reg va4_39]> m38).
     iAssert (kinstr_bytes (skinstr 40)) as "#K40". { sg 40. }
@@ -755,13 +759,13 @@ Section WpStart2.
               HmisaC HmisaS decode16 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W40").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc40 2) with spc41 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
     with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc
-              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]")).
+              [Hhw Hpriv Hhs Hmdl Hms Help Hpmpc]")).
     { unfold mout, m39, m38, m37, m36, m35. iExact "Hfile". }
-    { iFrame. }
+    { rewrite /ti_ctx. iFrame "Hhw". iFrame. }
   Qed.
 
   (* ===================================================================== *)
@@ -816,7 +820,9 @@ Section WpStart2.
     intros b1 bump mstatus1 va5_42 va5_43 va5_45 mout.
     intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU HmIE1 HSXL1.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hctx #H".
-    iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
+    iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
+    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 41)) as "#K41". { sg 41. }
     assert (Hk_a : ki_addr (skinstr 41) = (kentry + 0x74)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 41) = 0x30079073) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 41) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 41) (kentry + 0x74) 0x30079073 Hk_a Hk_e Hk_w with "K41") as "#W41"; clear Hk_a Hk_e Hk_w.
@@ -830,21 +836,21 @@ Section WpStart2.
               decode_s41 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W41").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc41 4) with spc42 by (vm_compute; reflexivity).
     iAssert (kinstr_bytes (skinstr 42)) as "#K42". { sg 42. }
     assert (Hk_a : ki_addr (skinstr 42) = (kentry + 0x78)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 42) = 0x00001797) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 42) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 42) (kentry + 0x78) 0x00001797 Hk_a Hk_e Hk_w with "K42") as "#W42"; clear Hk_a Hk_e Hk_w.
     (* idx 42: auipc a5 *)
     assert (Ha542 : m !! gpr_of_Z (uint srd42) = Some va5)
       by (replace (uint srd42) with 15 by (vm_compute; reflexivity); exact Hm15).
-    iApply (wp_auipc_gpr spc42 sw42 srd42 (subrange_vec_dec sw42 31 12) m va5 b1
+    iApply (wp_auipc_gpr (dqc := DfracDiscarded) spc42 sw42 srd42 (subrange_vec_dec sw42 31 12) m va5 b1
               _ _ mstatus1 misa0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
               ltac:(vm_compute; discriminate) Ha542 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               decode_s42 eq_refl HmIE1 Hlp HmisaS
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W42").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc42 4) with spc43 by (vm_compute; reflexivity).
     set (m42 := <[gpr_of_Z (uint srd42) := regval_into_reg va5_42]> m).
     iAssert (kinstr_bytes (skinstr 43)) as "#K43". { sg 43. }
@@ -863,7 +869,7 @@ Section WpStart2.
               decode_s43 eq_refl HmIE1 Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W43").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc43 4) with spc44 by (vm_compute; reflexivity).
     set (m43 := <[gpr_of_Z (uint (sit_rd sw43)) := regval_into_reg va5_43]> m42).
     iAssert (kinstr_bytes (skinstr 44)) as "#K44". { sg 44. }
@@ -879,7 +885,7 @@ Section WpStart2.
               decode_s44 eq_refl HmIE1 Hlp
               with "Hpc Hfile Hmepc Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W44").
     iNext.
-    iIntros "Hpc Hfile Hmepc Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile Hmepc _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc44 4) with spc45 by (vm_compute; reflexivity).
     iAssert (kinstr_bytes (skinstr 45)) as "#K45". { sg 45. }
     iAssert (kinstr_bytes (skinstr 46)) as "#K46". { sg 46. }
@@ -895,7 +901,7 @@ Section WpStart2.
               HmisaC HmisaS (decode4_s45 wr_s45 Hsub_s45) eq_refl HmIE1 Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W45").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc45 2) with spc46 by (vm_compute; reflexivity).
     set (m45 := <[gpr_of_Z (uint (sreg117 sw45)) := regval_into_reg va5_45]> m43).
     assert (Hk_a : ki_addr (skinstr 46) = (kentry + 0x86)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 46) = 0x18079073) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 46) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 46) (kentry + 0x86) 0x18079073 Hk_a Hk_e Hk_w with "K46") as "#W46"; clear Hk_a Hk_e Hk_w.
@@ -913,13 +919,13 @@ Section WpStart2.
               HmisaC decode_s46 eq_refl HmIE1 Hlp
               with "Hpc Hfile Hsatp Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W46").
     iNext.
-    iIntros "Hpc Hfile Hsatp Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile Hsatp _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc46 4) with spc47 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
     with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp
-              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]")).
+              [Hhw Hpriv Hhs Hmdl Hms Help Hpmpc]")).
     { unfold mout, m43, m42. iExact "Hfile". }
-    { iFrame. }
+    { rewrite /ti_ctx. iFrame "Hhw". iFrame. }
   Qed.
 
   (* ===================================================================== *)
@@ -959,22 +965,24 @@ Section WpStart2.
     medeleg ↦ᵣ medeleg0 -∗
     ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
     kernel_text -∗
-    ▷ ( PC ↦ᵣ spc51 -∗ gpr_file mout -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ spc51 -∗
+    ▷ ( PC ↦ᵣ spc51 -∗ gpr_file mout -∗ nextPC ↦ᵣ spc51 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump mst0))) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (* *** mideleg is now NONZERO (0x2222) — blocks all further WPs *** *)
         (R_bitvector_64 mideleg) ↦ᵣ mideleg_legalized (zeros' 64) va5_48 -∗
         (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         medeleg ↦ᵣ legalize_medeleg medeleg0 va5_48 -∗
-        elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        elp ↦ᵣ elp0 -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros b1 bump va5_47 va5_48 mout.
     intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmede Hctx #H".
-    iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
+    iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
+    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 47)) as "#K47". { sg 47. }
     assert (Hk_a : ki_addr (skinstr 47) = (kentry + 0x8a)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 47) = 0x67c1) by (vm_compute; reflexivity); assert (Hk_w : (2 <= ki_width (skinstr 47) / 8)%nat) by (vm_compute; lia); iDestruct (kinstr_window16 (skinstr 47) (kentry + 0x8a) 0x67c1 Hk_a Hk_e Hk_w with "K47") as "#W47"; clear Hk_a Hk_e Hk_w.
@@ -988,7 +996,7 @@ Section WpStart2.
               HmisaC HmisaS decode_s47 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W47").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc47 2) with spc48 by (vm_compute; reflexivity).
     set (m47 := <[gpr_of_Z (uint (sreg117 sw47)) := regval_into_reg va5_47]> m).
     (* idx 48: C_ADDI a5 (4-byte window from skinstr 48 ++ 49; idx 49 is 32-bit, 2 bytes remain) *)
@@ -1005,7 +1013,7 @@ Section WpStart2.
               HmisaC HmisaS (decode4_s48 wr_s48 Hsub_s48) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W48").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc48 2) with spc49 by (vm_compute; reflexivity).
     set (m48 := <[gpr_of_Z (uint (sreg117 sw48)) := regval_into_reg va5_48]> m47).
     assert (Hk_a : ki_addr (skinstr 49) = (kentry + 0x8e)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 49) = 0x30279073) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 49) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 49) (kentry + 0x8e) 0x30279073 Hk_a Hk_e Hk_w with "K49") as "#W49"; clear Hk_a Hk_e Hk_w.
@@ -1023,7 +1031,7 @@ Section WpStart2.
               HmisaC decode_s49 eq_refl HmIE Hlp
               with "Hpc Hfile Hmede Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W49").
     iNext.
-    iIntros "Hpc Hfile Hmede Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile Hmede _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc49 4) with spc50 by (vm_compute; reflexivity).
     iAssert (kinstr_bytes (skinstr 50)) as "#K50". { sg 50. }
     assert (Hk_a : ki_addr (skinstr 50) = (kentry + 0x92)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 50) = 0x30379073) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 50) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 50) (kentry + 0x92) 0x30379073 Hk_a Hk_e Hk_w with "K50") as "#W50"; clear Hk_a Hk_e Hk_w.
@@ -1041,10 +1049,10 @@ Section WpStart2.
               HmisaC decode_s50 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W50").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc50 4) with spc51 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
-    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmede Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif")).
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmede Help Hpmpc")).
     { unfold mout, m48, m47. iExact "Hfile". }
   Qed.
 
@@ -1096,7 +1104,9 @@ Section WpStart2.
     intros b1 bump va5_51 va5_52 va5_54 va5_55 va5_57 mout.
     intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmie Hpmpa Hctx #H".
-    iDestruct "Hctx" as "(Hmisa & Hpriv & Hhs & Hmdl & Hms & Help & Hsec & Hmcinh & Hmcfg & Hpmpc & Hpma & Hhtif)".
+    iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
+    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 51)) as "#K51". { sg 51. }
     assert (Hk_a : ki_addr (skinstr 51) = (kentry + 0x96)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 51) = 0x104027f3) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 51) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 51) (kentry + 0x96) 0x104027f3 Hk_a Hk_e Hk_w with "K51") as "#W51"; clear Hk_a Hk_e Hk_w.
@@ -1113,7 +1123,7 @@ Section WpStart2.
               HmisaC decode_s51 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hmie Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W51").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hmie Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hmie Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc51 4) with spc52 by (vm_compute; reflexivity).
     set (m51 := <[gpr_of_Z (uint (scsr_rd sw51)) := regval_into_reg va5_51]> m).
     iAssert (kinstr_bytes (skinstr 52)) as "#K52". { sg 52. }
@@ -1135,7 +1145,7 @@ Section WpStart2.
               HmisaC HmisaS decode_s52 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W52").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc52 4) with spc53 by (vm_compute; reflexivity).
     set (m52 := <[gpr_of_Z (uint (sit_rd sw52)) := regval_into_reg va5_52]> m51).
     iAssert (kinstr_bytes (skinstr 53)) as "#K53". { sg 53. }
@@ -1154,7 +1164,7 @@ Section WpStart2.
               HmisaC decode_s53 eq_refl HmIE Hlp
               with "Hpc Hfile Hmie Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W53").
     iNext.
-    iIntros "Hpc Hfile Hmie Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile Hmie _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc53 4) with spc54 by (vm_compute; reflexivity).
     iAssert (kinstr_bytes (skinstr 54)) as "#K54". { sg 54. }
     assert (Hk_a : ki_addr (skinstr 54) = (kentry + 0xa2)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 54) = 0x57fd) by (vm_compute; reflexivity); assert (Hk_w : (2 <= ki_width (skinstr 54) / 8)%nat) by (vm_compute; lia); iDestruct (kinstr_window16 (skinstr 54) (kentry + 0xa2) 0x57fd Hk_a Hk_e Hk_w with "K54") as "#W54"; clear Hk_a Hk_e Hk_w.
@@ -1169,7 +1179,7 @@ Section WpStart2.
               HmisaC HmisaS decode_s54 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W54").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc54 2) with spc55 by (vm_compute; reflexivity).
     set (m54 := <[gpr_of_Z (uint (sreg117 sw54)) := regval_into_reg va5_54]> m52).
     (* idx 55: c.srli a5 (4-byte window from skinstr 55 ++ 56; idx 56 is 32-bit, 2 bytes remain) *)
@@ -1186,7 +1196,7 @@ Section WpStart2.
               HmisaC HmisaS (decode4_s55 wr_s55 Hsub_s55) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W55").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc55 2) with spc56 by (vm_compute; reflexivity).
     set (m55 := <[gpr_of_Z (uint r_a5) := regval_into_reg va5_55]> m54).
     assert (Hk_a : ki_addr (skinstr 56) = (kentry + 0xa6)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 56) = 0x3b079073) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 56) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 56) (kentry + 0xa6) 0x3b079073 Hk_a Hk_e Hk_w with "K56") as "#W56"; clear Hk_a Hk_e Hk_w.
@@ -1204,7 +1214,7 @@ Section WpStart2.
               HmisaC decode_s56 eq_refl HmIE Hlp
               with "Hpc Hfile Hpmpa Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W56").
     iNext.
-    iIntros "Hpc Hfile Hpmpa Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile Hpmpa _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc56 4) with spc57 by (vm_compute; reflexivity).
     iAssert (kinstr_bytes (skinstr 57)) as "#K57". { sg 57. }
     assert (Hk_a : ki_addr (skinstr 57) = (kentry + 0xaa)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 57) = 0x47bd) by (vm_compute; reflexivity); assert (Hk_w : (2 <= ki_width (skinstr 57) / 8)%nat) by (vm_compute; lia); iDestruct (kinstr_window16 (skinstr 57) (kentry + 0xaa) 0x47bd Hk_a Hk_e Hk_w with "K57") as "#W57"; clear Hk_a Hk_e Hk_w.
@@ -1219,7 +1229,7 @@ Section WpStart2.
               HmisaC HmisaS decode_s57 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W57").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc57 2) with spc58 by (vm_compute; reflexivity).
     set (m57 := <[gpr_of_Z (uint (sreg117 sw57)) := regval_into_reg va5_57]> m55).
     iAssert (kinstr_bytes (skinstr 58)) as "#K58". { sg 58. }
@@ -1235,13 +1245,13 @@ Section WpStart2.
               decode_s58 eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W58").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc58 4) with spc59 by (vm_compute; reflexivity).
     (* kernel_text is duplicable: no reassembly, no window-return. *)
     with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc [Hfile] Hnpc Hmi Hmst Hmie Hpmpa
-              [Hmisa Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif]")).
+              [Hhw Hpriv Hhs Hmdl Hms Help Hpmpc]")).
     { unfold mout, m57, m55, m54, m52, m51. iExact "Hfile". }
-    { iFrame. }
+    { rewrite /ti_ctx. iFrame "Hhw". iFrame. }
   Qed.
 
   (* ===================================================================== *)
@@ -1293,15 +1303,15 @@ Section WpStart2.
     eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     is_aligned_vaddr (Virtaddr a8_ra) 8 = true -> is_aligned_paddr (Physaddr pa_ra) 8 = true ->
     is_aligned_vaddr (Virtaddr a8_s0) 8 = true -> is_aligned_paddr (Physaddr pa_s0) 8 = true ->
-    PC ↦ᵣ spc59 -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    PC ↦ᵣ spc59 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗
+    elp ↦ᵣ elp0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
     mhartid ↦ᵣ mhartid0 -∗
-    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vold_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vold_s0 j) -∗
     kernel_text -∗
@@ -1311,21 +1321,23 @@ Section WpStart2.
        The gpr_file is existential (x15/a5 present) since a5 is clobbered. *)
     ▷ ( PC ↦ᵣ spc60
         -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ∧ is_Some (mfin !! gpr_of_Z 2) ⌝)
-        -∗ misa ↦ᵣ misa0 -∗ mhartid ↦ᵣ mhartid0 -∗ nextPC ↦ᵣ spc60
+        -∗ mhartid ↦ᵣ mhartid0 -∗ nextPC ↦ᵣ spc60
         -∗ (R_bool minstret_increment) ↦ᵣ b1
         -∗ (∃ mstf : mword 64, minstret ↦ᵣ mstf)
         -∗ cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt
         -∗ (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0
-        -∗ elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0
-        -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg
-        -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None
+        -∗ elp ↦ᵣ elp0
+        -∗ pmpcfg_n ↦ᵣ pmpcfg0
         -∗ kernel_text -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros b1 sp1 imm_ra pa_ra a8_ra imm_s0 pa_s0 a8_s0 vra vra_ld tgt mti_def.
     intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmenv Hmcen Hmtime Hstc Hmhartid
-             Hmcinh Hmcfg Hpmpc Hpma Hhtif Hstkra Hstks0 #H Hcont".
+    iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmenv Hmcen Hmtime Hstc Hmhartid
+             Hpmpc Hhw Hstkra Hstks0 #H Hcont".
+    iDestruct "Hhw" as "#Hhwb".
+    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0)%I as "#Hhw". { iExact "Hhwb". }
+    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     (* ---- idx 59: jal ra, timerinit (kernel_text duplicable: split off K59 here) ---- *)
     iAssert (kinstr_bytes (skinstr 59)) as "#K59". { sg 59. }
     assert (Hk_a : ki_addr (skinstr 59) = (kentry + 0xb0)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 59) = 0xf6dff0ef) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 59) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 59) (kentry + 0xb0) 0xf6dff0ef Hk_a Hk_e Hk_w with "K59") as "#W59"; clear Hk_a Hk_e Hk_w.
@@ -1338,7 +1350,7 @@ Section WpStart2.
               decode_s59 ltac:(vmc) ltac:(vm_compute; reflexivity) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W59").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     (* PC is now the jal target = tpc9 = 0x8000001c; nextPC too.  ra := 0xb4. *)
     replace (add_vec spc59 (sign_extend' 64 sjal_imm)) with tpc9 by (apply bv_eq; vm_compute; reflexivity).
     (* kernel_text is duplicable -> #Htext is still in context. *)
@@ -1366,10 +1378,10 @@ Section WpStart2.
               Lti1 Lti2 Lti8 Lti14 Lti15 Lti4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU
               Ha8ra Hpara Ha8s0 Hpas0
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmenv Hmcen Hmtime Hstc
-                    Hmcinh Hmcfg Hpmpc Hpma Hhtif Hstkra Hstks0 H").
+              with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmenv Hmcen Hmtime Hstc
+                    Hpmpc Hhw Hstkra Hstks0 H").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc _".
     (* PC is now timerinit's return target tgt = the loaded ra = 0xb4 = spc60. *)
     replace (update_vec_dec
                (add_vec
@@ -1378,8 +1390,7 @@ Section WpStart2.
                         (regval_into_reg (add_vec_int spc59 4)))))
                   (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0"))
       with spc60 by (apply bv_eq; vm_compute; reflexivity).
-    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc Hfile Hmisa Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec
-              Hmcinh Hmcfg Hpmpc Hpma Hhtif H")).
+    with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc Hfile Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc H")).
   Qed.
 
 End WpStart2.

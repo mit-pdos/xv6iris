@@ -63,6 +63,7 @@ Section HwConfig.
      ⌜ eq_vec (_get_Misa_S misa0) ('b"1") = true ⌝ ∗
      ⌜ eq_vec (_get_Misa_C misa0) ('b"1") = true ⌝ ∗
      ⌜ eq_vec (_get_Misa_U misa0) ('b"1") = true ⌝ ∗
+     ⌜ eq_vec (_get_Misa_M misa0) ('b"1") = true ⌝ ∗
      ⌜ pma_allows_all pmar0 ⌝)%I.
 
   Global Instance hw_config_persistent misa0 mseccfg0 mc mcfg pmar0 :

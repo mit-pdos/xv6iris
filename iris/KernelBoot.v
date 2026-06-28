@@ -158,9 +158,6 @@ Section KernelBootWP.
     let pal    := zero_extend' 64 (add_vec_int a8l (0 * 8)) in
     let data2l := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v in
     let mst1   := if bb then add_vec_int mst0 1 else mst0 in
-    (* the PMA configuration grants R/W/X to all of memory *)
-    pma_allows_all pmar0 ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     (* auipc fetch side-conditions (instruction word [w_auipc] at [fetch_pa kpc0]) *)
     is_aligned_paddr (Physaddr (fetch_pa kpc0)) 4 = true ->
     neq_vec (access_vec_dec kpc0 0) ('b"0") = false ->
@@ -182,34 +179,33 @@ Section KernelBootWP.
     is_aligned_paddr (Physaddr pal) 8 = true ->
     (* within_clint/within_sig discharged from the RAM bytes; within_htif from
        the owned [htif_tohost_base |-> None]. *)
-    PC ↦ᵣ kpc0 -∗ (R_bitvector_64 x2) ↦ᵣ sp0 -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ kpc0 -∗
+    PC ↦ᵣ kpc0 -∗ (R_bitvector_64 x2) ↦ᵣ sp0 -∗ nextPC ↦ᵣ kpc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
+    elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
     (* the ENTIRE kernel text image, exactly as loaded from the ELF (dumper). *)
     kernel_text -∗
     ▷ ( PC ↦ᵣ kpc2 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2l) -∗
-        misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ kpc2 -∗ (R_bool minstret_increment) ↦ᵣ bb -∗
         minstret ↦ᵣ (if bb then add_vec_int mst1 1 else mst1) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-        elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
+        elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
         kernel_text -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros bb sp1 offl eal a8l pal data2l mst1
-      Hpmaall HmisaS Halignfa Hbit0fa Hbit1fa Hvalignfa
+      Halignfa Hbit0fa Hbit1fa Hvalignfa
       Halignfl Hbit0fl Hbit1fl Hvalignfl Hpmpf
       HmIE Hlp HMPRV Hpmm Halign Hpmp Hpalign.
-    iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes #Htext Hcont".
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes #Htext Hcont".
+    iDestruct "Hhw" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall)".
     (* [kernel_text] is now persistent (DfracDiscarded code points-to), so we just
        PERSIST it and EXTRACT persistent copies of the two instruction windows; no
        borrow-and-return is needed — [kernel_text] is never consumed. *)
@@ -223,7 +219,7 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity) HmisaS Hpmaall Hpmpf Halignfa Hbit0fa Hbit1fa Hvalignfa
               ltac:(vm_compute; reflexivity) decode_auipc eq_refl HmIE Hlp
               with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa").
-    iNext. iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iNext. iIntros "Hpc Hx2 _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int kpc0 4) with kpc1 by (vm_compute; reflexivity).
     (* Step 2: ld.  base register x2 holds sp1 = the auipc result.  decode is
        discharged by [decode_ld].  Owns the ld bytes at [fetch_pa kpc1]. *)
@@ -233,10 +229,10 @@ Section KernelBootWP.
               ltac:(vm_compute; reflexivity) decode_ld eq_refl
               HmIE Hlp HmisaS HMPRV Hpmm Halign Hpmp Hpalign
               with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
-    iNext. iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes _".
+    iNext. iIntros "Hpc Hx2 _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ Hpmpc _ _ _ _ Hbytes _".
     replace (add_vec_int kpc1 4) with kpc2 by (vm_compute; reflexivity).
     (* [kernel_text] (persistent) was never consumed — hand it straight back. *)
-    iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
+    iApply ("Hcont" with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hbytes Htext").
   Qed.
 
   (* ---- per-instruction fetch windows of _entry (bytes 2..7) ----
@@ -349,7 +345,6 @@ Section KernelBootWP.
     m !! x1 = Some x1_0 -> m !! x2 = Some sp0 ->
     m !! x10 = Some x10_0 -> m !! x11 = Some x11_0 ->
     (* the PMA configuration grants R/W/X to all of memory (every fetch + the ld). *)
-    pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -357,26 +352,22 @@ Section KernelBootWP.
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8l) 8 = true ->
     is_aligned_paddr (Physaddr pal) 8 = true ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_M misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ kpc0 -∗ gpr_file m -∗
-    mhartid ↦ᵣ mhartid0 -∗ misa ↦ᵣ misa0 -∗
+    mhartid ↦ᵣ mhartid0 -∗
     nextPC ↦ᵣ kpc0 -∗ (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-    mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
+    elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
     kernel_text -∗
     ▷ ( PC ↦ᵣ kstart -∗
         gpr_file (<[x1:=x1j]> (<[x2:=x2add]> (<[x10:=x10m]> (<[x11:=x11a]> m)))) -∗
-        mhartid ↦ᵣ mhartid0 -∗ misa ↦ᵣ misa0 -∗
+        mhartid ↦ᵣ mhartid0 -∗
         nextPC ↦ᵣ kstart -∗ (R_bool minstret_increment) ↦ᵣ bb -∗ minstret ↦ᵣ m8 -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-        elp ↦ᵣ elp0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pma_regions ↦ᵣ pmar0 -∗
-        mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗ htif_tohost_base ↦ᵣ None -∗
+        elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
         kernel_text -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -384,8 +375,8 @@ Section KernelBootWP.
   Proof.
     intros bb bump sp1 offl eal a8l pal data2l mst1 x2ld m2 x10l m3 x11c m4 x11a m5
       x10m m6 x2add m7 x1j m8
-      Hm1 Hm2 Hm10 Hm11 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpalal HmisaC HmisaM HmisaS.
-    iIntros "Hpc Hgpr Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext Hcont".
+      Hm1 Hm2 Hm10 Hm11 Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpalal.
+    iIntros "Hpc Hgpr Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc #Hhw Hbytes Htext Hcont".
     (* decompose the GPR file into the four registers _entry touches + residual *)
     iEval (rewrite /gpr_file) in "Hgpr".
     assert (Hd2  : delete x1 m !! x2 = Some sp0) by (by rewrite lookup_delete_ne).
@@ -397,15 +388,15 @@ Section KernelBootWP.
     iDestruct (big_sepM_delete _ _ x11 x11_0 Hd11 with "Hgpr") as "[Hx11 Hgpr]".
     (* ---- steps 0,1: auipc; ld via wp_kernel_first_two ---- *)
     iApply (wp_kernel_first_two v misa0 mc mcfg mseccfg0 pmpcfg0 pmar0 E Φ
-              Hpmaall HmisaS
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               Hpmpf HmIE Hlp HMPRV Hpmm Ha8 Hpmpf Hpalal
-              with "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
+              with "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes Htext").
     iNext.
-    iIntros "Hpc Hx2 Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes #Htext".
+    iIntros "Hpc Hx2 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hbytes #Htext".
+    iDestruct "Hhw" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall)".
     (* now PC = kpc2.  [kernel_text] is persistent: extract each instruction's
        fetch window directly by address via [kernel_window] (the X_get lemmas) —
        [kernel_text] (Htext) is never consumed, so there is nothing to rejoin. *)
@@ -418,7 +409,7 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hlui").
     iNext.
-    iIntros "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms _ Help _ _ Hpmpc _ _ _".
     replace (add_vec_int kpc2 2) with kpc3 by (vm_compute; reflexivity).
     (* ---- step 3: csrr a1,mhartid  (32-bit, 2-aligned) ---- *)
     iDestruct (csrr_get with "Htext") as "#Hcsrr".
@@ -431,7 +422,7 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hcsrr").
     iNext.
-    iIntros "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hx11 Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms _ Help _ _ Hpmpc _ _ _".
     replace (add_vec_int kpc3 4) with kpc4 by (vm_compute; reflexivity).
     (* ---- step 4: addi a1,a1,1  (RVC, 2-aligned) ---- *)
     iDestruct (addi_get with "Htext") as "#Haddi".
@@ -442,7 +433,7 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Haddi").
     iNext.
-    iIntros "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms _ Help _ _ Hpmpc _ _ _".
     replace (add_vec_int kpc4 2) with kpc5 by (vm_compute; reflexivity).
     (* ---- step 5: mul a0,a0,a1  (32-bit, 4-aligned, M-ext) ---- *)
     iDestruct (mul_get with "Htext") as "#Hmul".
@@ -454,7 +445,7 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaM HmisaS
               with "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hmul").
     iNext.
-    iIntros "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms _ Help _ _ Hpmpc _ _ _".
     replace (add_vec_int kpc5 4) with kpc6 by (vm_compute; reflexivity).
     (* ---- step 6: add sp,sp,a0  (RVC, 4-aligned, window spans into jal) ---- *)
     iDestruct (add_get with "Htext") as "#Hadd".
@@ -465,7 +456,7 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hadd").
     iNext.
-    iIntros "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms _ Help _ _ Hpmpc _ _ _".
     replace (add_vec_int kpc6 2) with kpc7 by (vm_compute; reflexivity).
     (* ---- step 7: jal start  (32-bit, 2-aligned) -- the jump to start ---- *)
     iDestruct (jal_get with "Htext") as "#Hjal".
@@ -479,7 +470,7 @@ Section KernelBootWP.
               eq_refl HmIE Hlp HmisaC HmisaS
               with "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hjal").
     iNext.
-    iIntros "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif _".
+    iIntros "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms _ Help _ _ Hpmpc _ _ _".
     replace (add_vec kpc7 (sign_extend' 64 imm_jal)) with kstart by (vm_compute; reflexivity).
     (* [kernel_text] (persistent) was never consumed — no reassembly needed. *)
     (* recompose the GPR file with the four updated registers *)
@@ -509,7 +500,7 @@ Section KernelBootWP.
       destruct (decide (k = x10)) as [->|n10]; [ gpr_map |].
       destruct (decide (k = x11)) as [->|n11]; [ gpr_map |].
       gpr_map. }
-    iApply ("Hcont" with "Hpc Hgpr Hmh Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Htext").
+    iApply ("Hcont" with "Hpc Hgpr Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hbytes Htext").
   Qed.
 
 End KernelBootWP.

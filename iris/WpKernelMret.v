@@ -252,7 +252,7 @@ Section WpKernelMret.
     destruct Hf4 as [vtp Hf4].
     iIntros "Hpc Hfile Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc
              Help Hpmpc Hhw #Htext".
-    iDestruct "Hhw" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %Hpmaall)".
+    iDestruct "Hhw" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall)".
     iIntros "Hcont".
     (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4) ---- *)
     destruct Hf15 as [va5_60 Hf15].
