@@ -43,3 +43,4 @@ WpKernelvec.v
 WpPageWalk.v
 WpStoreS.v
 WpStoreS2.v
+WpKernelvecChain.v
