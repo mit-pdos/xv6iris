@@ -188,6 +188,25 @@ Section WpKernelMret.
     kwin4.
   Qed.
 
+  (* idx 60/61/62 fetch windows, extracted as standalone lemmas (like
+     [kernel_mret_window] / KernelBoot's [auipc_get]).  Proving the
+     [kernel_window] application HERE — in a tiny context — costs ~0.2 s each;
+     doing it inline in [wp_kernel_start_tail]'s huge proof context made each
+     [iDestruct (kernel_window …)] cost ~22 s (the same large-context blow-up the
+     README "Build-perf note" flags for [set_solver]).  The big proof now just
+     [iDestruct]s these already-proved wands. *)
+  Lemma k60_window : kernel_text -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa spc60) j) ↦ₘ□ nth_byte sw60 j).
+  Proof. iIntros "H". rewrite /spc60. iApply (kernel_window (kentry + 0xb4) sw60 4 with "H"). kwin4. Qed.
+
+  Lemma w61_window : kernel_text -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa spc61) j) ↦ₘ□ nth_byte w4_s61 j).
+  Proof. iIntros "H". rewrite /spc61. iApply (kernel_window (kentry + 0xb8) w4_s61 4 with "H"). kwin4. Qed.
+
+  Lemma k62_window : kernel_text -∗
+    ([∗ list] j ∈ seq 0 2, (pa_add (fetch_pa spc62) j) ↦ₘ□ nth_byte sw62 j).
+  Proof. iIntros "H". rewrite /spc62. iApply (kernel_window (kentry + 0xba) sw62 2 with "H"). kwin2. Qed.
+
   (* ===================================================================== *)
   (* wp_kernel_start_tail: idx 60..63 (csrr; c.addiw; c.mv; MRET) THROUGH    *)
   (* the MRET.  Port of WpStart3.wp_st_c7 with [kernel_window] in place of   *)
@@ -242,7 +261,7 @@ Section WpKernelMret.
     iIntros "Hcont".
     (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4) ---- *)
     destruct Hf15 as [va5_60 Hf15].
-    iDestruct (kernel_window (kentry + 0xb4) sw60 4 ltac:(kwin4) with "Htext") as "#K60".
+    iDestruct (k60_window with "Htext") as "#K60".
     iApply (wp_csrr_gpr spc60 sw60 (scsr_rd sw60) mfin va5_60 mhartid0 misa0 mdv0 b1
               _ mst0 mstatus0 mc mcfg pmpcfg0 pmar0 b1 elp0 E Φ
               ltac:(vm_compute; discriminate) Hf15 HmisaS Hpmaall Hpmpf
@@ -258,7 +277,7 @@ Section WpKernelMret.
     replace (add_vec_int spc60 4) with spc61 by (vm_compute; reflexivity).
     set (m60 := <[gpr_of_Z (uint (scsr_rd sw60)) := regval_into_reg mhartid0]> mfin).
     (* ---- idx 61: c.addiw a5 (4-aligned RVC at spc61=0xb8) -- one 4-byte window ---- *)
-    iDestruct (kernel_window (kentry + 0xb8) w4_s61 4 ltac:(kwin4) with "Htext") as "#W61".
+    iDestruct (w61_window with "Htext") as "#W61".
     assert (Ha561 : m60 !! gpr_of_Z (uint (sreg117 sw61)) = Some (regval_into_reg mhartid0)).
     { unfold m60. replace (uint (sreg117 sw61)) with 15 by (vm_compute; reflexivity).
       replace (uint (scsr_rd sw60)) with 15 by (vm_compute; reflexivity).
@@ -274,7 +293,7 @@ Section WpKernelMret.
     replace (add_vec_int spc61 2) with spc62 by (vm_compute; reflexivity).
     set (m61 := <[gpr_of_Z (uint (sreg117 sw61)) := regval_into_reg (caddiw_wval (scaddiw_imm sw61) (regval_into_reg mhartid0))]> m60).
     (* ---- idx 62: c.mv tp,a5 (2-aligned at spc62=0xba) ---- *)
-    iDestruct (kernel_window (kentry + 0xba) sw62 2 ltac:(kwin2) with "Htext") as "#K62".
+    iDestruct (k62_window with "Htext") as "#K62".
     assert (Ha562 : m61 !! gpr_of_Z (uint (sreg62 sw62)) = Some (regval_into_reg (caddiw_wval (scaddiw_imm sw61) (regval_into_reg mhartid0)))).
     { unfold m61. replace (uint (sreg62 sw62)) with 15 by (vm_compute; reflexivity).
       replace (uint (sreg117 sw61)) with 15 by (vm_compute; reflexivity).

@@ -129,6 +129,28 @@ for regenerating the Sail model.
 >   in this model, so it survives the `vm_compute`; only the `Zihintpause`/`Zicfilp`/
 >   `Zca` gates — which read `misa`/privilege — must be peeled by hand first.)
 
+> **Build-perf note (extract `iApply`/`iDestruct` of heavy lemmas out of big
+> proofs).** In `WpKernelMret`, discharging the per-instruction fetch windows
+> *inline* — `iDestruct (kernel_window … ltac:(kwin4) with "Htext") as "#K"` —
+> cost **~22 s each** (3 of them ≈ 57 s of the file). The `kernel_window`
+> application and its `kwin4` side-condition are trivial in isolation (~0.2 s,
+> measured), so the blow-up is entirely the *large surrounding proof context*:
+> elaborating/`iDestruct`ing over a goal whose hypotheses embed heavy
+> dependent-width Sail terms is super-linear (the same effect as the `set_solver`
+> note above). Fix: extract each window into its own tiny lemma proved in an
+> empty context (`k60_window`/`w61_window`/`k62_window`, exactly like
+> `kernel_mret_window` and KernelBoot's `auipc_get`), then `iDestruct` the
+> *already-proved* wand in the big proof. **`WpKernelMret` 73 s → 14 s.**
+> Rule of thumb: if an `iApply`/`iDestruct` of a reusable lemma is slow, prove
+> it standalone and apply the result, rather than re-elaborating it in context.
+>
+> (Counter-example worth recording: the `read_CSR`/`write_CSR` head-rewrite trick
+> does **not** port to the RVC walk `open_rvc`/`cstep`. `repeat (erewrite
+> skip_clause_head …)` over the *compressed* decoder fails to converge — the
+> lemma's `c`/`REST` evars let `erewrite` match non-productively — so that walk
+> keeps its clause-by-clause `cstep`. Always run a new walk tactic under a
+> `timeout`.)
+
 To compile a single file by hand:
 
 ```sh
