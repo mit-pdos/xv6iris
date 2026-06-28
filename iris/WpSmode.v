@@ -37,6 +37,88 @@ Local Open Scope Z_scope.
 Section WpSmode.
   Context `{!riscvGS Σ}.
 
+  (* ===================================================================== *)
+  (* S-mode fetch infrastructure: analogs of the Machine-mode lemmas in     *)
+  (* RiscvFetchExec.v / WpEntry.v, for cur_privilege = Supervisor.  The      *)
+  (* differences (per the model) are exactly:                                *)
+  (*   - translationMode Supervisor READS satp (Machine returns Bare free);  *)
+  (*   - should_inc_minstret uses the SINH (not MINH) filter bit;            *)
+  (*   - translateAddr's effectivePrivilege for a fetch keeps Supervisor.    *)
+  (* ===================================================================== *)
+
+  (* [should_inc_minstret] is privilege-generic: priv only appears in the    *)
+  (* [counter_priv_filter_bit] of the RESULT, never in the control flow.     *)
+  Lemma exec_should_inc_S (mc : mword 32) (mcfg : mword 64) (priv : Privilege) s :
+    register_lookup mcountinhibit s.(sregs) = mc ->
+    register_lookup minstretcfg s.(sregs) = mcfg ->
+    exec (should_inc_minstret priv) s
+      = Some (andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+                   (eq_vec (counter_priv_filter_bit mcfg priv) ('b"0")), s).
+  Proof.
+    intros Hmc Hmcfg. unfold should_inc_minstret.
+    erewrite (exec_and_boolM_Some _ _ s (eq_vec (_get_Counterin_IR mc) ('b"0")) s).
+    2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcountinhibit s)). rewrite Hmc. apply exec_returnm. }
+    destruct (eq_vec (_get_Counterin_IR mc) ('b"0")) eqn:Ea; cbn [andb].
+    - rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg minstretcfg s)). rewrite Hmcfg. apply exec_returnm.
+    - reflexivity.
+  Qed.
+
+  (* translationMode Supervisor = Bare, when SXL = 10 (RV64) and satp's MODE   *)
+  (* field is 0 (Bare).  Mirrors exec_translationMode_M but reads satp.        *)
+  Lemma exec_translationMode_S_bare (satp0 : mword 64) s :
+    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+    register_lookup satp s.(sregs) = satp0 ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4) ->
+    exec (translationMode Supervisor) s = Some (Bare, s).
+  Proof.
+    intros HSXL Hsatp Hmode.
+    unfold translationMode.
+    replace (generic_eq Supervisor Machine) with false by (vm_compute; reflexivity).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_architecture_Supervisor s HSXL)).
+    cbn match.
+    (* The RV64 arm computes mbits = satp.MODE; reduce it to a single value first. *)
+    change (xlen >=? 64) with true.
+    match goal with |- exec (Defs.bind ?ARM _) s = _ =>
+      assert (HARM : exec ARM s = Some (_get_Satp64_Mode (Mk_Satp64 satp0), s)) end.
+    { assert (Hae : exec (Defs.assert_exp' true "sys/vmem.sail:254.25-254.26") s
+                    = Some (eq_refl, s)).
+      { unfold assert_exp'. cbn match. apply exec_returnm. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hae).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+      rewrite Hsatp. apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ HARM).
+    rewrite Hmode.
+    replace (satpMode_of_bits RV64 ('b"0000" : mword 4)) with (Some Bare)
+      by (vm_compute; reflexivity).
+    cbn match. apply exec_returnm.
+  Qed.
+
+  (* translateAddr is the identity for a Supervisor-mode instruction fetch when
+     satp is Bare.  Mirrors exec_translateAddr_identity (Machine) but the
+     effectivePrivilege stays Supervisor and translationMode reads satp. *)
+  Lemma exec_translateAddr_identity_S (a satp0 : mword 64) s :
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+    register_lookup satp s.(sregs) = satp0 ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4) ->
+    exec (translateAddr (Virtaddr a) (InstructionFetch tt)) s
+      = Some (Ok (Physaddr (zero_extend' 64 (bits_of_virtaddr (Virtaddr a))),
+                  PBMT_PMA, init_ext_ptw), s).
+  Proof.
+    intros Hcp HSXL Hsatp Hmode.
+    unfold translateAddr.
+    rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite Hcp.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_fetch _ _ s)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_S_bare satp0 s HSXL Hsatp Hmode)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_fetch s)).
+    unfold Defs.bind0.
+    replace (generic_eq Bare Bare) with true by (vm_compute; reflexivity).
+    rewrite execR_bind. cbn match. reflexivity.
+  Qed.
+
   (* WP for one Supervisor-mode 2-aligned RVC `c.addi rd,rd,imm` step.
      Mirrors WpRvc.wp_caddi_gpr, but in Supervisor mode with satp = Bare. *)
   Lemma wp_smode_caddi (pc : mword 64) (w16 : mword 16) (rd : mword 5) (imm6 : mword 6)
@@ -91,11 +173,22 @@ Section WpSmode.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    (* The EXECUTE (sp := sp + imm) is exactly WpRvc.wp_caddi_gpr's; only the
-       fetch/step wrapper differs (Supervisor translationMode reads satp; S-mode
-       pmpCheck needs a matching X-granting entry; getPendingSet Supervisor=None
-       needs mip/mie/mideleg facts; should_inc uses the SINH bit).  Those S-mode
-       fetch lemmas are the remaining model work. *)
+    (* The EXECUTE (sp := sp + imm) is exactly WpRvc.wp_caddi_gpr's.  The fetch/
+       step wrapper is the S-mode port.  PROVEN reusable pieces above:
+         - exec_should_inc_S        (SINH filter bit; privilege-generic);
+         - exec_translationMode_S_bare (Supervisor reads satp; MODE=0 -> Bare);
+         - exec_translateAddr_identity_S (S-mode fetch identity translation).
+       REMAINING (the substantive S-mode model work):
+         - exec_pmpCheck_supervisor_grant: with all-OFF PMP an S-mode fetch FAULTS,
+           so this needs the kernel's concrete granting entry (pmpcfg0=0xf TOR,
+           pmpaddr0=0x3fffffffffffff): the foreach loop EARLY-RETURNS None at entry
+           0 (pmpMatchAddr TOR -> PMP_Match, pmpCheckRWX -> X granted).  Requires a
+           foreach early-return lemma + concrete TOR range arithmetic.
+         - exec_mem_read_fetch_2_S / exec_fetch_RVC_2_S (mirror the Machine ones,
+           swapping translateAddr_identity_S + pmpCheck_supervisor_grant);
+         - exec_getPendingSet_supervisor_none (mIE is true in S-mode, so this needs
+           pending_m = mip & mie & ~mideleg = 0, i.e. interrupt-register facts);
+         - exec_hart_active_progress / riscv_step / forward_exec for Supervisor. *)
   Admitted.
 
   (* ===================================================================== *)
