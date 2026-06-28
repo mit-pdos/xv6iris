@@ -43,13 +43,14 @@ Qed.
 
 Section Chain.
   Context `{!riscvGS Σ}.
+  Context (root_ppn : mword 44).
 
   (* Chain kernelvec's first two instructions: from the kernelvec entry (empty
      TLB + valid identity page table), run c.addi16sp sp,imm (fills the TLB) then
      c.sdsp ra,0(sp) (writes the stack), reaching PC 0x800053e4. *)
   Lemma wp_kernelvec_12 (w1 : mword 32) (imm6 : mword 6) (w2 : mword 16)
       (m : gmap register_bitvector_64 (mword 64))
-      (vsp vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 mie_v : mword 64)
+      (vsp vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v : mword 64)
       (b1 : bool) (npc0 mst0 : mword 64) (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (mi0 : bool) (elp0 : mword 1)
@@ -58,14 +59,17 @@ Section Chain.
     let spnew := add_vec vsp (sign_extend' 64 (caddi16sp_imm imm6)) in
     let a8 := sign_extend' 64 (subrange_vec_dec (add_vec spnew (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0) in
     let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)) in
-    let tlbf := vec_update_dec tlbvec 5 (Some (pw_tlb_entry (mword_of_int 0))) in
+    let tlbf := vec_update_dec tlbvec 5 (Some (pw_tlb_entry root_ppn (mword_of_int 0))) in
     let mst1 := if b1 then add_vec_int mst0 1 else mst0 in
     m !! gpr_of_Z 2 = Some vsp ->
     m !! gpr_of_Z 1 = Some vra ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     vec_access_dec tlbvec 5 = None ->
     pma_allows_all pmar0 ->
-    matching_pma_region pmar0 (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte ->
+    matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte ->
     (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e2)) 2 = Some region_f2 ->
     (override_PMA (PMA_Region_attributes region_f2) PBMT_PMA).(PMA_executable) = true ->
@@ -80,7 +84,7 @@ Section Chain.
       (uint (mword_of_int 0x800053e0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
       (uint (mword_of_int 0x800053e2 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
@@ -91,7 +95,7 @@ Section Chain.
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     is_aligned_paddr (Physaddr (mword_of_int 0x800053e0)) 4 = true ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     is_aligned_paddr (Physaddr (mword_of_int 0x800053e2)) 2 = true ->
     is_aligned_vaddr (Virtaddr a8) 8 = true ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
@@ -102,7 +106,7 @@ Section Chain.
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     (forall s', register_lookup cur_privilege s'.(sregs) = Supervisor ->
-       register_lookup satp s'.(sregs) = pw_satp ->
+       register_lookup satp s'.(sregs) = satp0 ->
        register_lookup tlb s'.(sregs) = tlbf ->
        _get_Mstatus_SXL (register_lookup mstatus s'.(sregs)) = 'b"10" ->
        exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Store Data)) s'
@@ -119,11 +123,11 @@ Section Chain.
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (mword_of_int 0x80100010) j) ↦ₘ{dq} nth_byte pte_super j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{dq} nth_byte pte_super j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (mword_of_int 0x800053e0) j) ↦ₘ{dq} nth_byte w1 j) -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (mword_of_int 0x800053e2) j) ↦ₘ{dq} nth_byte w2 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vra j) -∗
@@ -132,11 +136,11 @@ Section Chain.
         nextPC ↦ᵣ add_vec_int (mword_of_int 0x800053e2 : mword 64) 2 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ (if b1 then add_vec_int mst1 1 else mst1) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ tlbf -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 8, (pa_add (mword_of_int 0x80100010) j) ↦ₘ{dq} nth_byte pte_super j) -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{dq} nth_byte pte_super j) -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (mword_of_int 0x800053e0) j) ↦ₘ{dq} nth_byte w1 j) -∗
         ([∗ list] j ∈ seq 0 2, (pa_add (mword_of_int 0x800053e2) j) ↦ₘ{dq} nth_byte w2 j) -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vra j) -∗
@@ -144,28 +148,28 @@ Section Chain.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros spnew a8 pa tlbf mst1.
-    intros Hsp Hra HSXL Hvec Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm
+    intros Hsp Hra HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm
       HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Hal4 Halpte Hal2 Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR
       Htr Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hcont".
     assert (HPC2 : add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 = mword_of_int 0x800053e2)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ---- instruction 1: c.addi16sp ---- *)
-    iApply (wp_pagewalk_caddi16sp w1 imm6 m vsp misa0 mdv0 mstatus0 menvcfg0 mie_v b1 npc0 mst0 mc mcfg
+    iApply (wp_pagewalk_caddi16sp root_ppn w1 imm6 m vsp misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v b1 npc0 mst0 mc mcfg
               pmpcfg0 pmpaddr00 pmar0 mi0 elp0 tlbvec region_pte E Phi
-              Hsp HSXL Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
+              Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
               HmisaC HmisaS Hdec1 Hb1 Hmie_mdl HSIE Help
               with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
     iNext.
     iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
     rewrite !HPC2.
     (* ---- instruction 2: c.sdsp ra,0(sp) ---- *)
-    iApply (wp_pagewalk_csdsp w2 (mword_of_int 0) (mword_of_int 1)
-              (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 mie_v
+    iApply (wp_pagewalk_csdsp root_ppn w2 (mword_of_int 0) (mword_of_int 1)
+              (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
               b1 vra (mword_of_int 0x800053e2) mst1 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf region_st region_f2 E Phi
               ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hra | vm_compute; discriminate ])
-              HSXL (vec_access_update_5 tlbvec (pw_tlb_entry (mword_of_int 0)))
+              HSXL Hmode Hasid (vec_access_update_5 tlbvec (pw_tlb_entry root_ppn (mword_of_int 0)))
               Hmatchf2 Hexecf2 Hmatchst Hwrite Hpmm
               HA0 Hord0 Hr2 Hrst HX0 HW0 Hal2 Hal8 Hpal8 HisRVC2 HmisaC HmisaS HMPRV HMXR
               ltac:(intros s' Hcp Hsa Htl Hsx; apply Htr; assumption)

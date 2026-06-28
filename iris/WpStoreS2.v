@@ -24,6 +24,7 @@ Import Defs.
 
 Section SW2.
   Context `{!riscvGS Σ}.
+  Context (root_ppn : mword 44).
 
 (* Store forward engine: RVC store (c.sdsp) with a state-preserving fetch (the
    superpage TLB hit).  Reuses the RVC step engines; the post-execute state has
@@ -110,14 +111,16 @@ End ForwardCsdsp.
 
   (* iris-level bridge: instr 2's fetch hits the superpage TLB entry. *)
   Lemma fetch_from_pts_super2
-      (mstatus0 misa0 : mword 64) (w : mword 16) (region : PMA_Region)
+      (mstatus0 misa0 satp0 : mword 64) (w : mword 16) (region : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (b : bool) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       (s : mstate) {dq : dfrac} :
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e2)) 2 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)) ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
     zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -129,14 +132,14 @@ End ForwardCsdsp.
     isRVC w = true ->
     reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
     PC ↦ᵣ (mword_of_int 0x800053e2 : mword 64) -∗ cur_privilege ↦ᵣ Supervisor -∗
-    (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗ tlb ↦ᵣ tlbvec -∗ misa ↦ᵣ misa0 -∗
+    (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ misa ↦ᵣ misa0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
     pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
     ([∗ list] j ∈ seq 0 2, (pa_add (mword_of_int 0x800053e2) j) ↦ₘ{dq} nth_byte w j) -∗
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_RVC w, set_reg s (R_bool minstret_increment) b) ⌝.
   Proof.
-    iIntros (Hmatch0 Hexec HSXL0 Hvec HA0 Hord0 Hrange0 HX0 Halign HmisaC0 HisRVC)
+    iIntros (Hmatch0 Hexec HSXL0 Hmode Hasid Hvec HA0 Hord0 Hrange0 HX0 Halign HmisaC0 HisRVC)
             "Hreg Hmem Hpc Hpriv Hms Hsatp Htlb Hmisa Hpmpc Hpmpaddr Hpma Hhtif Hbytes".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
@@ -167,7 +170,7 @@ End ForwardCsdsp.
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpriv | vm_compute; reflexivity]. }
     assert (Ltms : register_lookup mstatus t.(sregs) = mstatus0).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lms | vm_compute; reflexivity]. }
-    assert (Ltsatp : register_lookup satp t.(sregs) = pw_satp).
+    assert (Ltsatp : register_lookup satp t.(sregs) = satp0).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lsatp | vm_compute; reflexivity]. }
     assert (Lttlb : register_lookup tlb t.(sregs) = tlbvec).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Ltlb | vm_compute; reflexivity]. }
@@ -184,8 +187,8 @@ End ForwardCsdsp.
     assert (Ltmem : forall j : nat, (N.of_nat j < 2)%N ->
               t.(mem) !! (pa_add (mword_of_int 0x800053e2) j) = Some (nth_byte w j))
       by (unfold t, set_reg; cbn [mem]; exact Hbytesf).
-    exact (exec_fetch_RVC_2_super region w tlbvec t Ltpriv Ltpc
-             ltac:(rewrite Ltms; exact HSXL0) Ltsatp Lttlb Hvec
+    exact (exec_fetch_RVC_2_super root_ppn region w satp0 tlbvec t Ltpriv Ltpc
+             ltac:(rewrite Ltms; exact HSXL0) Ltsatp Hmode Hasid Lttlb Hvec
              ltac:(rewrite Ltpmpc; exact HA0)
              ltac:(rewrite Ltpmpaddr; exact Hord0)
              ltac:(rewrite Ltpmpaddr; exact Hrange0)
@@ -206,7 +209,7 @@ End ForwardCsdsp.
   (* ====================================================================== *)
   Lemma wp_pagewalk_csdsp (w : mword 16) (uimm : mword 6) (rs2 : mword 5)
       (m : gmap register_bitvector_64 (mword 64))
-      (vsp vrs2 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 mie_v : mword 64)
+      (vsp vrs2 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v : mword 64)
       (b1 : bool) (vold : bv 64) (npc0 mst0 : mword 64) (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (mi0 : bool) (elp0 : mword 1)
@@ -220,7 +223,9 @@ End ForwardCsdsp.
     m !! gpr_of_Z 2 = Some vsp ->
     m !! gpr_of_Z (uint rs2) = Some vrs2 ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)) ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e2)) 2 = Some region_f ->
     (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa) 8 = Some region_st ->
@@ -245,7 +250,7 @@ End ForwardCsdsp.
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     (forall s', register_lookup cur_privilege s'.(sregs) = Supervisor ->
-       register_lookup satp s'.(sregs) = pw_satp ->
+       register_lookup satp s'.(sregs) = satp0 ->
        register_lookup tlb s'.(sregs) = tlbvec ->
        _get_Mstatus_SXL (register_lookup mstatus s'.(sregs)) = 'b"10" ->
        exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Store Data)) s'
@@ -260,7 +265,7 @@ End ForwardCsdsp.
     PC ↦ᵣ (mword_of_int 0x800053e2 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -271,7 +276,7 @@ End ForwardCsdsp.
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -280,7 +285,7 @@ End ForwardCsdsp.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros offset ea a8 pa Hrs2 Hsp Hmrs2 HSXL Hvec Hmatchf Hexecf Hmatch Hwrite Hpmm
+    intros offset ea a8 pa Hrs2 Hsp Hmrs2 HSXL Hmode Hasid Hvec Hmatchf Hexecf Hmatch Hwrite Hpmm
       HA0 Hord0 Hrange0f Hrange0 HX0 HW0 Halignf Halign8 Hpalign8 HisRVC HmisaC HmisaS HMPRV HMXR
       Htr Hdec Hb1 Hmie_mdl HSIE Help.
     iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hbytes Hibytes Hcont".
@@ -312,8 +317,8 @@ End ForwardCsdsp.
     iDestruct ("Hfb2" with "Hr2c") as "Hfile".
     assert (Hsi_s : exec (should_inc_minstret Supervisor) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_S mc mcfg Supervisor s Lmc Lmcfg). }
-    iDestruct (fetch_from_pts_super2 mstatus0 misa0 w region_f pmpcfg0 pmpaddr00 pmar0 b1 tlbvec s
-                 Hmatchf Hexecf HSXL Hvec HA0 Hord0 Hrange0f HX0 Halignf HmisaC HisRVC
+    iDestruct (fetch_from_pts_super2 mstatus0 misa0 satp0 w region_f pmpcfg0 pmpaddr00 pmar0 b1 tlbvec s
+                 Hmatchf Hexecf HSXL Hmode Hasid Hvec HA0 Hord0 Hrange0f HX0 Halignf HmisaC HisRVC
                  with "Hreg Hmem Hpc Hpriv Hms Hsatp Htlb Hmisa' Hpmpc Hpmpaddr Hpma Hhtif Hibytes") as %Hfetch_at.
     assert (Hdisp : exec (dispatchInterrupt Supervisor) (set_reg s (R_bool minstret_increment) b1) = Some (None, set_reg s (R_bool minstret_increment) b1)).
     { apply exec_dispatchInterrupt_none_S.
@@ -341,7 +346,7 @@ End ForwardCsdsp.
       do 2 (rewrite irrelevant_register_set; [ | reg_ne ]). exact Lrs2. }
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor).
     { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lpriv. }
-    assert (Lsatp_pc : register_lookup satp s_pc.(sregs) = pw_satp).
+    assert (Lsatp_pc : register_lookup satp s_pc.(sregs) = satp0).
     { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lsatp. }
     assert (Ltlb_pc : register_lookup tlb s_pc.(sregs) = tlbvec).
     { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Ltlb. }
@@ -369,9 +374,9 @@ End ForwardCsdsp.
                      = Some (RETIRE_SUCCESS, s_x)).
     { unfold sp.
       rewrite (exec_execute_STORE_8_gpr_S rs2 (zero_extend' 5 ('b"10")) (zero_extend' 12 (concat_vec uimm ('b"000")))
-                 region_st pw_satp s_pc
+                 region_st satp0 s_pc
                  ltac:(vm_compute; discriminate) Hrs2 Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc
-                 ltac:(vm_compute; reflexivity) ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
+                 Hmode ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
                  ltac:(rewrite Lmenv_pc; exact Hpmm)
                  ltac:(rewrite Lsp_pc; exact Halign8) ltac:(rewrite Lsp_pc; exact Htr_pc)
                  ltac:(rewrite Lpmpc_pc; exact HA0) ltac:(rewrite Lpmpaddr_pc; exact Hord0)
