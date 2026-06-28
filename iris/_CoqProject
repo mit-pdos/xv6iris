@@ -38,3 +38,5 @@ WpStartChain.v
 WpStart2.v
 WpStart3.v
 WpSmode.v
+WpSmode2.v
+WpKernelvec.v
