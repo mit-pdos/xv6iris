@@ -478,7 +478,7 @@ Section WpStart2.
     intros Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     (* idx 30: C_ADDI sp,sp,-16 (4-byte window from skinstr 30 ++ 31) *)
@@ -637,7 +637,7 @@ Section WpStart2.
     intros Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     (* idx 35: C_LUI a4 (4-byte window from skinstr 35 ++ 36; idx 36 is 32-bit, 2 bytes remain) *)
@@ -821,7 +821,7 @@ Section WpStart2.
     intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU HmIE1 HSXL1.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 41)) as "#K41". { sg 41. }
@@ -843,8 +843,8 @@ Section WpStart2.
     (* idx 42: auipc a5 *)
     assert (Ha542 : m !! gpr_of_Z (uint srd42) = Some va5)
       by (replace (uint srd42) with 15 by (vm_compute; reflexivity); exact Hm15).
-    iApply (wp_auipc_gpr (dqc := DfracDiscarded) spc42 sw42 srd42 (subrange_vec_dec sw42 31 12) m va5 b1
-              _ _ mstatus1 misa0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
+    iApply (wp_auipc_gpr spc42 sw42 srd42 (subrange_vec_dec sw42 31 12) m va5 b1
+              _ _ mstatus1 misa0 mc mcfg pmpcfg0 pmar0 _ elp0 E DfracDiscarded Φ
               ltac:(vm_compute; discriminate) Ha542 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               decode_s42 eq_refl HmIE1 Hlp HmisaS
@@ -981,7 +981,7 @@ Section WpStart2.
     intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmede Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 47)) as "#K47". { sg 47. }
@@ -1105,7 +1105,7 @@ Section WpStart2.
     intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmie Hpmpa Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 51)) as "#K51". { sg 51. }
@@ -1334,9 +1334,8 @@ Section WpStart2.
     intros b1 sp1 imm_ra pa_ra a8_ra imm_s0 pa_s0 a8_s0 vra vra_ld tgt mti_def.
     intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmenv Hmcen Hmtime Hstc Hmhartid
-             Hpmpc Hhw Hstkra Hstks0 #H Hcont".
-    iDestruct "Hhw" as "#Hhwb".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0)%I as "#Hhw". { iExact "Hhwb". }
+             Hpmpc #Hhw Hstkra Hstks0 #H Hcont".
+    iPoseProof "Hhw" as "#Hhwb".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     (* ---- idx 59: jal ra, timerinit (kernel_text duplicable: split off K59 here) ---- *)
     iAssert (kinstr_bytes (skinstr 59)) as "#K59". { sg 59. }

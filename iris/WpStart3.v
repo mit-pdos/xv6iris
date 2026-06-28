@@ -79,9 +79,8 @@ Section WpStart3.
     intros b1 Hf15 Hf4 Hf2 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe.
     destruct Hf4 as [vtp Hf4].
     iIntros "Hpc Hfile Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc
-             Help Hpmpc Hhw #H".
-    iDestruct "Hhw" as "#Hhwb".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0)%I as "#Hhw". { iExact "Hhwb". }
+             Help Hpmpc #Hhw #H".
+    iPoseProof "Hhw" as "#Hhwb".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4); kernel_text duplicable ---- *)
@@ -544,9 +543,8 @@ Section WpStart3.
            c6sp tpa_ra tpa_s0 ta8_ra ta8_s0.
     intros Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall HmisaC HmisaM HmisaS HmisaU
            HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe.
-    iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes
+    iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc #Hhw Hbytes
              Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hstkra Hstks0 Htra Htrs0 #H Hcont".
-    iDestruct "Hhw" as "#Hhw".
     (* ---- _entry: boot -> start entry (PC = kstart = spc30) ---- *)
     iApply (wp_kernel_entry sp0b mst0 mstatus0 mi0 elp0 v mc mcfg mseccfg0 pmpcfg0 pmar0
               x1_0 x10_0 x11_0 mhartid0 misa0 m E Φ

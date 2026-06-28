@@ -127,7 +127,7 @@ Section WpSmode.
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} {dqc : dfrac} (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (dqc : dfrac) (Phi : mval -> iProp Σ) :
     uint rd <> 0 ->
     m !! gpr_of_Z (uint rd) = Some vd ->
     (* the hart is NOT in Machine mode (it is in Supervisor after the MRET) *)
@@ -333,10 +333,9 @@ Section WpSmode.
     intros Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall HmisaC HmisaM HmisaS HmisaU
            HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
            Hrd2 Hb1s Hsatp_bare Hmie_s Help_s Hdec.
-    iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes
+    iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc #Hhw Hbytes
              Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hstkra Hstks0 Htra Htrs0 HK Hcont".
-    iDestruct "Hhw" as "#Hhwb".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0)%I as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhw" as "#Hhwb".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     (* ---- run the whole boot path up to and including the MRET ---- *)
     iApply (wp_kernel v sp0b mst0 mstatus0 mi0 elp0 mc mcfg mseccfg0 pmpcfg0 pmar0
@@ -366,7 +365,7 @@ Section WpSmode.
     iApply (wp_smode_caddi (mword_of_int 0x80000e82) (mword_of_int 0x1141 : mword 16) rd imm6
               mf vd misa0 mdv0 (cms5 mstatus1) (satp_legalized satp0 va5_45) newpriv b1s
               (mword_of_int 0x80000e82) mstf mc mcfg pmpcfg1 pmpaddrf pmar0 bb (celpv lpe mstatus1)
-              E (dq := DfracDiscarded) (dqc := DfracDiscarded) Φ
+              E (dq := DfracDiscarded) DfracDiscarded Φ
               ltac:(rewrite Hrd2; discriminate)
               ltac:(rewrite Hrd2; exact Hsp)
               Hnpriv Hsatp_bare Hpmaall

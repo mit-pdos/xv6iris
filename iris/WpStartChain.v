@@ -152,7 +152,7 @@ Section WpStartChain.
       (b1 : bool) (npc0 mst0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} {dqc : dfrac} (Phi : mval -> iProp Σ) :
+      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (dqc : dfrac) (Phi : mval -> iProp Σ) :
     uint rd <> 0 ->
     m !! gpr_of_Z (uint rd) = Some vd ->
     pma_allows_all pmar0 ->
@@ -1123,7 +1123,7 @@ Section WpStartChain.
     intros Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     (* idx 9: 4-byte window from skinstr 9 ++ 10, split off at point of use *)
@@ -1273,7 +1273,7 @@ Section WpStartChain.
     intros Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     (* idx 14: 4-byte window from skinstr 14 ++ 15 *)
@@ -1421,7 +1421,7 @@ Section WpStartChain.
     intros Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 19)) as "#K19". { sg 19. }
@@ -1594,7 +1594,7 @@ Section WpStartChain.
     intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS Ha8ra Hpara Ha8s0 Hpas0 Hcal0 Hcal1.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (hw_config misa0 mseccfg0 mc mcfg pmar0) as "#Hhw". { iExact "Hhwb". }
+    iPoseProof "Hhwb" as "#Hhw".
     iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 24)) as "#K24". { sg 24. }
