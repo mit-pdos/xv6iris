@@ -26,6 +26,16 @@ noncomputable def runSteps : Nat → MState → Option MState
   | 0, s => some s
   | n+1, s => (exec riscv_step s).bind (fun p => runSteps n p.2)
 
+/-- `runSteps` composes: `a+b` steps = `a` steps then `b` steps. -/
+theorem runSteps_add : ∀ (a b : Nat) (σ : MState),
+    runSteps (a + b) σ = (runSteps a σ).bind (fun s => runSteps b s)
+  | 0, b, σ => by simp [runSteps]
+  | a+1, b, σ => by
+      have e : a + 1 + b = (a + b) + 1 := by omega
+      rw [e]
+      simp only [runSteps, Option.bind_assoc]
+      congr 1; funext p; exact runSteps_add a b p.2
+
 /-! ## Whole-machine-state ghost: a `Unit`-keyed heap holding the entire `MState`. -/
 
 abbrev StF : Type → Type := fun V => Std.ExtTreeMap Nat V compare

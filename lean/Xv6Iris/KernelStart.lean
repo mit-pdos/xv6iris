@@ -1,19 +1,15 @@
 /-
-The xv6 kernel's `start()` verified through `mret`, BOTH operationally
-(`start_to_main`) and as a weakest-precondition over the program logic
-(`wp_start_to_main`) — the WP for execution up to `main`.
+The xv6 boot extended INTO supervisor-mode `main`: `start()` runs through `mret`
+to `main` (0x80000E82, Supervisor), then `main`'s first instruction
+(`c.addi sp,sp,-16`) executes — IN SUPERVISOR MODE — and this is chained onto the
+post-`start()` WP. All on the real Sail model.
 
-`start()` (54 instructions: the M-mode config body + the called `timerinit()` + the
-`mret`) leaves the hart at `main` (0x80000E82) in Supervisor mode. The WP is built
-on the whole-machine-state engine `KernelMain.wp_run`: owning the boot token
-`machineState σ0`, after 55 real `try_step`s the continuation gets `machineState
-σmain`, which (`σmain_at_main`) is at `main` in Supervisor mode. The 55 per-step
-`exec` facts come from decomposing the single operational reduction — no
-per-instruction lemmas, and memory writes + the privilege change are handled
-automatically (the whole state is one heap cell).
-
-Boot-frontier reset CSRs: mstatus.SXL/UXL = RV64, misa.MXL = RV64. Build with
-`make kernel-start` (the operational reduction needs a large `--tstack`).
+Engine: the whole-machine-state `wp_run` (KernelMain). `wp_start_to_main` (55 steps
+to `main`) hands off `machineState σmain`; `wp_main_step` runs main's first
+instruction (one S-mode `try_step`); `wp_boot_to_main1` is the chain (56 steps =
+55 ▸ 1, via `runSteps_add`). The single 56-step operational reduction `main_first`
+supplies everything — no per-instruction lemmas, and the S-mode fetch works because
+`start()` set `satp=Bare`/PMP-open. Build with `make kernel-start` (big `--tstack`).
 -/
 import Xv6Iris.KernelMain
 import LeanRV64D
@@ -32,8 +28,7 @@ noncomputable def ramPMA : PMA := { (default : PMA) with
 noncomputable def ramRegion : PMA_Region :=
   { base := 0x80000000#64, size := 0x10000000#64, attributes := ramPMA, include_in_device_tree := false }
 
-/-- Kernel text for `start` (0x58..0xbc) + `timerinit` (0x1c..0x56); stack RAM is
-the default `some 0`. -/
+/-- Kernel text: `start`/`timerinit` (0x1c..0xbf) + `main`'s first bytes (0x80000e82..). -/
 noncomputable def mem0 (a : Nat) : Option (BitVec 8) :=
   if a = 0 then some 0
   else if a = 0x8000001c then some 0x41
@@ -200,10 +195,17 @@ noncomputable def mem0 (a : Nat) : Option (BitVec 8) :=
   else if a = 0x800000bd then some 0x0
   else if a = 0x800000be then some 0x20
   else if a = 0x800000bf then some 0x30
+  else if a = 0x80000e82 then some 0x41
+  else if a = 0x80000e83 then some 0x11
+  else if a = 0x80000e84 then some 0x6
+  else if a = 0x80000e85 then some 0xe4
+  else if a = 0x80000e86 then some 0x22
+  else if a = 0x80000e87 then some 0xe0
+  else if a = 0x80000e88 then some 0x0
+  else if a = 0x80000e89 then some 0x8
   else some 0#8
 
-/-- Booting-Machine state at the `start` entry (hart 0), with reset CSR values
-(`mstatus.SXL/UXL = RV64`, `misa.MXL = RV64`) and a RAM stack. -/
+/-- Booting-Machine state at the `start` entry (hart 0; reset CSRs + RAM stack). -/
 noncomputable def σ0 : MState where
   regs r := match r with
     | .cur_privilege => some Privilege.Machine
@@ -216,46 +218,80 @@ noncomputable def σ0 : MState where
     | r => some (decReg r 0)
   mem := mem0
 
-def mainAddr : BitVec 64 := 0x80000E82
+def mainAddr1 : BitVec 64 := 0x80000E84
 
-/-- **`start()` through `mret`, operationally.** 55 real `try_step`s reach `main`
-in Supervisor mode. Kernel reduction (large `--tstack`). -/
-theorem start_to_main :
-    (runSteps 55 σ0).map (fun s => (s.regs Register.PC, s.regs Register.cur_privilege))
-      = some (some mainAddr, some Privilege.Supervisor) := by
+/-- **Operational: through `mret` AND main's first instruction.** 56 real
+`try_step`s — `start()` (incl. `timerinit` + `mret`) then `main`'s `c.addi sp,-16`
+in **Supervisor** mode — leave PC at `main+2`, sp decremented, still Supervisor. -/
+theorem main_first :
+    (runSteps 56 σ0).map (fun s => (s.regs Register.PC, s.regs Register.x2, s.regs Register.cur_privilege))
+      = some (some mainAddr1, some 0x800fffe0, some Privilege.Supervisor) := by
   with_unfolding_all rfl
 
-/-! ## The WP for execution up to `main` -/
 
-theorem start_isSome : (runSteps 55 σ0).isSome := by
-  obtain ⟨σm, h1, _⟩ := Option.map_eq_some_iff.mp start_to_main
-  rw [h1]; rfl
+theorem isSome56 : (runSteps 56 σ0).isSome := by
+  obtain ⟨σm, h1, _⟩ := Option.map_eq_some_iff.mp main_first; rw [h1]; rfl
 
-/-- The machine state after `start()`. -/
-noncomputable def σmain : MState := (runSteps 55 σ0).get start_isSome
+/-- Machine state after `start()` + main's first instruction. -/
+noncomputable def σ_main1 : MState := (runSteps 56 σ0).get isSome56
+theorem run56 : runSteps 56 σ0 = some σ_main1 := (Option.some_get isSome56).symm
 
-theorem run_to_σmain : runSteps 55 σ0 = some σmain := (Option.some_get start_isSome).symm
+theorem isSome55 : (runSteps 55 σ0).isSome := by
+  have hadd : runSteps 56 σ0 = (runSteps 55 σ0).bind (fun s => runSteps 1 s) := runSteps_add 55 1 σ0
+  rw [run56] at hadd
+  rcases hs : runSteps 55 σ0 with _ | σm
+  · rw [hs] at hadd; simp at hadd
+  · rfl
 
-/-- `σmain` is at `main` in Supervisor mode. -/
-theorem σmain_at_main :
-    σmain.regs Register.PC = some mainAddr ∧
-    σmain.regs Register.cur_privilege = some Privilege.Supervisor := by
-  obtain ⟨a, h1, h2⟩ := Option.map_eq_some_iff.mp start_to_main
-  have ha : a = σmain := Option.some.inj (h1.symm.trans run_to_σmain)
+/-- Machine state after `start()` (the `wp_start_to_main` hand-off point). -/
+noncomputable def σmain : MState := (runSteps 55 σ0).get isSome55
+theorem run55 : runSteps 55 σ0 = some σmain := (Option.some_get isSome55).symm
+
+/-- The first `main` instruction, as a single `exec` step from `σmain`. -/
+theorem exec_main1 : exec riscv_step σmain = some ((), σ_main1) := by
+  have hadd : runSteps 56 σ0 = (runSteps 55 σ0).bind (fun s => runSteps 1 s) := runSteps_add 55 1 σ0
+  rw [run55, run56] at hadd
+  have hadd2 : (exec riscv_step σmain).bind (fun p => some p.2) = some σ_main1 := by
+    rw [hadd]; rfl
+  obtain ⟨⟨u, σ''⟩, he, hb⟩ := Option.bind_eq_some_iff.mp hadd2
+  cases u
+  have hσ : σ'' = σ_main1 := by simpa using hb
+  subst hσ; exact he
+
+theorem σ_main1_props :
+    σ_main1.regs Register.PC = some mainAddr1 ∧
+    σ_main1.regs Register.x2 = some 0x800fffe0 ∧
+    σ_main1.regs Register.cur_privilege = some Privilege.Supervisor := by
+  obtain ⟨a, h1, h2⟩ := Option.map_eq_some_iff.mp main_first
+  have ha : a = σ_main1 := Option.some.inj (h1.symm.trans run56)
   subst ha
-  exact ⟨congrArg Prod.fst h2, congrArg Prod.snd h2⟩
+  exact ⟨congrArg (·.1) h2, congrArg (·.2.1) h2, congrArg (·.2.2) h2⟩
 
 section
 variable {GF : BundledGFunctors} {hlc : HasLC} [D : MainGS hlc GF]
 
-/-- **The WP for execution up to `main`.** Owning the whole-machine token at the
-`start()` entry, after 55 real `try_step`s the continuation receives the token for
-`σmain` — at `main` in Supervisor mode (`σmain_at_main`). -/
+/-- After `start()` (`wp_start_to_main`'s hand-off). -/
 theorem wp_start_to_main {s : Stuckness} {E : CoPset} {Φ : Empty → IProp GF} :
     (machineState σ0 : IProp GF) ⊢
       (▷^[55] (machineState σmain -∗ WP RiscvExpr.Loop @ s; E {{ Φ }})) -∗
         WP RiscvExpr.Loop @ s; E {{ Φ }} :=
-  wp_run 55 σ0 σmain run_to_σmain
+  wp_run 55 σ0 σmain run55
+
+/-- **The first instruction of `main` (Supervisor mode), as a WP step** from the
+post-`start()` state. -/
+theorem wp_main_step {s : Stuckness} {E : CoPset} {Φ : Empty → IProp GF} :
+    machineState σmain -∗ ▷ (machineState σ_main1 -∗ WP RiscvExpr.Loop @ s; E {{ Φ }}) -∗
+      WP RiscvExpr.Loop @ s; E {{ Φ }} :=
+  wp_machine_step exec_main1
+
+/-- **Boot through the first `main` instruction, chained.** This is
+`wp_start_to_main` (55 steps to `main`) composed with `wp_main_step` (one S-mode
+step) — `runSteps 56 = runSteps 55 ▸ runSteps 1`. -/
+theorem wp_boot_to_main1 {s : Stuckness} {E : CoPset} {Φ : Empty → IProp GF} :
+    (machineState σ0 : IProp GF) ⊢
+      (▷^[56] (machineState σ_main1 -∗ WP RiscvExpr.Loop @ s; E {{ Φ }})) -∗
+        WP RiscvExpr.Loop @ s; E {{ Φ }} :=
+  wp_run 56 σ0 σ_main1 run56
 
 end
 end Xv6Iris.Model.KernelStart

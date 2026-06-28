@@ -65,3 +65,11 @@ kernel-entry: model
 kernel-start: model
 	lake build Xv6Iris.KernelMain
 	lake env lean --tstack=64000000 Xv6Iris/KernelStart.lean
+
+# The whole boot through consoleinit() (145 try_steps: boot, start()/mret into
+# supervisor-mode main, cpuid(), consoleinit() incl. uartinit UART MMIO + initlock),
+# as a WP chained via the whole-machine-state engine. Heaviest reduction (~145
+# steps, ~1h) — big stack.
+kernel-console: model
+	lake build Xv6Iris.KernelMain
+	lake env lean --tstack=64000000 Xv6Iris/KernelConsole.lean
