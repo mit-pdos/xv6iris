@@ -1573,7 +1573,7 @@ Section WpStartChain.
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vstk_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vstk_s0 j) -∗
     kernel_text -∗
-    ▷ ( PC ↦ᵣ tgt -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ⌝) -∗ nextPC ↦ᵣ tgt -∗
+    ▷ ( PC ↦ᵣ tgt -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ∧ is_Some (mfin !! gpr_of_Z 2) ⌝) -∗ nextPC ↦ᵣ tgt -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         (∃ mstf : mword 64, minstret ↦ᵣ mstf) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗
@@ -1719,7 +1719,7 @@ Section WpStartChain.
       replace (uint rd27) with 8 by (vm_compute; reflexivity).
       replace (uint rd26) with 1 by (vm_compute; reflexivity).
       replace (uint rsd24) with 15 by (vm_compute; reflexivity).
-      split.
+      split; [| split].
       - rewrite lookup_insert_ne; [| discriminate].
         rewrite lookup_insert_ne; [| discriminate].
         rewrite lookup_insert_ne; [| discriminate].
@@ -1728,7 +1728,9 @@ Section WpStartChain.
         rewrite lookup_insert_ne; [| discriminate].
         rewrite lookup_insert_ne; [| discriminate].
         rewrite lookup_insert_ne; [| discriminate].
-        exact Hm4. }
+        exact Hm4.
+      - (* x2 (sp) present: idx 28 c.addi restores sp (outermost insert rd28=2). *)
+        rewrite lookup_insert. eexists; reflexivity. }
     { iExists _. iFrame "Hmst". }
     { iExists _. iFrame "Hstc". }
     { iFrame. }
@@ -1803,7 +1805,7 @@ Section WpStartChain.
        and ra/s0/sp restored), exposing only that x15 (a5) is still present — which
        is all the START tail needs (it overwrites a5 then reads it). *)
     ▷ ( PC ↦ᵣ tgt
-        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ⌝)
+        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ∧ is_Some (mfin !! gpr_of_Z 2) ⌝)
         -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ tgt
         -∗ (R_bool minstret_increment) ↦ᵣ
              (andb (eq_vec (_get_Counterin_IR mc) ('b"0"))

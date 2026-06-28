@@ -1310,7 +1310,7 @@ Section WpStart2.
        clobbered a4/a5; its CSR writes menvcfg/mcounteren/stimecmp are consumed).
        The gpr_file is existential (x15/a5 present) since a5 is clobbered. *)
     ▷ ( PC ↦ᵣ spc60
-        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ⌝)
+        -∗ (∃ mfin, gpr_file mfin ∗ ⌜ is_Some (mfin !! gpr_of_Z 15) ∧ is_Some (mfin !! gpr_of_Z 4) ∧ is_Some (mfin !! gpr_of_Z 2) ⌝)
         -∗ misa ↦ᵣ misa0 -∗ mhartid ↦ᵣ mhartid0 -∗ nextPC ↦ᵣ spc60
         -∗ (R_bool minstret_increment) ↦ᵣ b1
         -∗ (∃ mstf : mword 64, minstret ↦ᵣ mstf)

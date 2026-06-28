@@ -42,6 +42,7 @@ Section WpStart3.
                      (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
     is_Some (mfin !! gpr_of_Z 15) ->
     is_Some (mfin !! gpr_of_Z 4) ->
+    is_Some (mfin !! gpr_of_Z 2) ->
     pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -63,7 +64,7 @@ Section WpStart3.
     (* After the MRET, the hart is in Supervisor mode at PC = mepc.  Expose the
        full final machine state. *)
     ▷ ( PC ↦ᵣ ctgt mepc0 -∗ nextPC ↦ᵣ ctgt mepc0 -∗
-        (∃ mf2, gpr_file mf2) -∗ misa ↦ᵣ misa0 -∗ mhartid ↦ᵣ mhartid0 -∗
+        (∃ mf2, gpr_file mf2 ∗ ⌜ is_Some (mf2 !! gpr_of_Z 2) ⌝) -∗ misa ↦ᵣ misa0 -∗ mhartid ↦ᵣ mhartid0 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ (∃ mstf : mword 64, minstret ↦ᵣ mstf) -∗
         cur_privilege ↦ᵣ newpriv -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus0 -∗
@@ -74,7 +75,7 @@ Section WpStart3.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 Hf15 Hf4 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe.
+    intros b1 Hf15 Hf4 Hf2 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe.
     destruct Hf4 as [vtp Hf4].
     iIntros "Hpc Hfile Hmisa Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc
              Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif #H".
@@ -150,7 +151,15 @@ Section WpStart3.
     (* kernel_text is duplicable -> the persistent #H is still here. *)
     with_strategy transparent [mbump] (iApply ("Hcont" with "Hpc Hnpc [Hfile] Hmisa Hmhartid Hmi [Hmst] Hpriv Hhs Hmdl Hms Hmepc
               Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif H")).
-    { iExists _. iFrame "Hfile". }
+    { iExists _. iFrame "Hfile". iPureIntro.
+      (* x2 (sp) untouched by idx 60/61/62 (they write x15/x15/x4) -> from input Hf2. *)
+      replace (uint (sreg117 sw62)) with 4 by (vm_compute; reflexivity).
+      rewrite lookup_insert_ne; [| vm_compute; discriminate].
+      unfold m61. replace (uint (sreg117 sw61)) with 15 by (vm_compute; reflexivity).
+      rewrite lookup_insert_ne; [| vm_compute; discriminate].
+      unfold m60. replace (uint (scsr_rd sw60)) with 15 by (vm_compute; reflexivity).
+      rewrite lookup_insert_ne; [| vm_compute; discriminate].
+      exact Hf2. }
     { iExists _. iFrame "Hmst". }
   Qed.
 
@@ -252,16 +261,22 @@ Section WpStart3.
     ([∗ list] j ∈ seq 0 8, (pa_add tpa_ra j) ↦ₘ nth_byte vti_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add tpa_s0 j) ↦ₘ nth_byte vti_s0 j) -∗
     kernel_text -∗
-    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64))
-            (pcf mstatusf midelegf mepcf mstf : mword 64) (elpf : mword 1)
-            (pmpcfgf : type_of_register pmpcfg_n)
-            (privf : Privilege),
-          PC ↦ᵣ pcf ∗ nextPC ↦ᵣ pcf ∗ gpr_file mf ∗ misa ↦ᵣ misa0 ∗ mhartid ↦ᵣ mhartid0 ∗
+    (* Post-MRET state, now exposed CONCRETELY (no longer abstract) so the first
+       Supervisor-mode instruction can chain onto it.  PC = ctgt (mepc_val va5_43)
+       = 0x80000e82 = <main>; cur_privilege = newpriv (Supervisor); satp written to
+       [satp_legalized satp0 va5_45] (va5_45 = 0, MODE = Bare); pmpcfg = pmpcfg1.
+       Only the gpr_file (a4/a5 clobbered), minstret, and pmpaddr stay existential;
+       the gpr_file exposes that x2 (sp) is present. *)
+    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64)) (mstf : mword 64)
+            (pmpaddrf : type_of_register pmpaddr_n),
+          PC ↦ᵣ ctgt (mepc_val va5_43) ∗ nextPC ↦ᵣ ctgt (mepc_val va5_43) ∗
+          gpr_file mf ∗ ⌜ is_Some (mf !! gpr_of_Z 2) ⌝ ∗ misa ↦ᵣ misa0 ∗ mhartid ↦ᵣ mhartid0 ∗
           (R_bool minstret_increment) ↦ᵣ b1 ∗ minstret ↦ᵣ mstf ∗
-          cur_privilege ↦ᵣ privf ∗ ⌜ generic_neq privf Machine = true ⌝ ∗ hart_state ↦ᵣ HART_ACTIVE tt ∗
-          (R_bitvector_64 mideleg) ↦ᵣ midelegf ∗ (R_bitvector_64 mstatus) ↦ᵣ mstatusf ∗ mepc ↦ᵣ mepcf ∗
-          elp ↦ᵣ elpf ∗ mseccfg ↦ᵣ mseccfg0 ∗ mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
-          pmpcfg_n ↦ᵣ pmpcfgf ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
+          cur_privilege ↦ᵣ newpriv ∗ ⌜ generic_neq newpriv Machine = true ⌝ ∗ hart_state ↦ᵣ HART_ACTIVE tt ∗
+          (R_bitvector_64 mideleg) ↦ᵣ mdv0 ∗ (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus1 ∗ mepc ↦ᵣ mepc_val va5_43 ∗
+          satp ↦ᵣ satp_legalized satp0 va5_45 ∗
+          elp ↦ᵣ celpv lpe mstatus1 ∗ mseccfg ↦ᵣ mseccfg0 ∗ mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
+          pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmpaddrf ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
         -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }} ) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -370,19 +385,18 @@ Section WpStart3.
     iNext.
     iIntros "Hpc Hfile Hmisa Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif Hktx".
     (* ---- chunk c7 (idx 60..63): spc60 -> MRET.  Supervisor mode at PC = mepc. ---- *)
-    iDestruct "Hfile" as (mfin) "[Hfile %Hfp]". destruct Hfp as [Hf15 Hf4].
+    iDestruct "Hfile" as (mfin) "[Hfile %Hfp]". destruct Hfp as [Hf15 [Hf4 Hf2]].
     iDestruct "Hmst" as (mstf0) "Hmst".
     iApply (wp_st_c7 mfin mstf0 mi0 misa0 mstatus1 mseccfg0 mdv0 (mepc_val va5_43) mhartid0 mc mcfg pmpcfg1 pmar0
               newpriv lpe elp0 E Φ
-              Hf15 Hf4 Hpmaall Hpmpf1 HmIE1 Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe
+              Hf15 Hf4 Hf2 Hpmaall Hpmpf1 HmIE1 Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe
               with "Hpc Hfile Hmisa Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif H").
     iNext.
     iIntros "Hpc Hnpc Hfile Hmisa Hmhartid Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc Help Hsec Hmcinh Hmcfg Hpmpc Hpma Hhtif Hktx2".
-    iDestruct "Hfile" as (mf2) "Hfile". iDestruct "Hmst" as (mstf1) "Hmst".
+    iDestruct "Hfile" as (mf2) "[Hfile %Hf2sp]". iDestruct "Hmst" as (mstf1) "Hmst".
     iApply "Hcont".
-    iExists mf2, (ctgt (mepc_val va5_43)), (cms5 mstatus1), mdv0, (mepc_val va5_43), mstf1,
-            (celpv lpe mstatus1), pmpcfg1, newpriv.
-    iFrame. iPureIntro. exact Hnpm.
+    iExists mf2, mstf1, _.
+    iFrame. iPureIntro. split; [exact Hf2sp | exact Hnpm].
   Qed.
 
   (* ===================================================================== *)
@@ -497,16 +511,21 @@ Section WpStart3.
     ([∗ list] j ∈ seq 0 8, (pa_add tpa_ra j) ↦ₘ nth_byte vti_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add tpa_s0 j) ↦ₘ nth_byte vti_s0 j) -∗
     kernel_text -∗
-    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64))
-            (pcf mstatusf midelegf mepcf mstf : mword 64) (elpf : mword 1)
-            (pmpcfgf : type_of_register pmpcfg_n)
-            (privf : Privilege),
-          PC ↦ᵣ pcf ∗ nextPC ↦ᵣ pcf ∗ gpr_file mf ∗ misa ↦ᵣ misa0 ∗ mhartid ↦ᵣ mhartid0 ∗
+    (* Post-MRET state exposed CONCRETELY (matches wp_start's post): PC =
+       ctgt (mepc_val va5_43) = 0x80000e82 = <main>; Supervisor mode (newpriv);
+       satp written Bare (satp_legalized satp0 va5_45, va5_45 = 0); only gpr_file
+       (clobbered a4/a5), minstret and pmpaddr stay existential, with x2 (sp) shown
+       present so the first S-mode instruction (c.addi sp,sp,-16) can chain. *)
+    ▷ ( (∃ (mf : gmap register_bitvector_64 (mword 64)) (mstf : mword 64)
+            (pmpaddrf : type_of_register pmpaddr_n),
+          PC ↦ᵣ ctgt (mepc_val va5_43) ∗ nextPC ↦ᵣ ctgt (mepc_val va5_43) ∗
+          gpr_file mf ∗ ⌜ is_Some (mf !! gpr_of_Z 2) ⌝ ∗ misa ↦ᵣ misa0 ∗ mhartid ↦ᵣ mhartid0 ∗
           (R_bool minstret_increment) ↦ᵣ bb ∗ minstret ↦ᵣ mstf ∗
-          cur_privilege ↦ᵣ privf ∗ ⌜ generic_neq privf Machine = true ⌝ ∗ hart_state ↦ᵣ HART_ACTIVE tt ∗
-          (R_bitvector_64 mideleg) ↦ᵣ midelegf ∗ (R_bitvector_64 mstatus) ↦ᵣ mstatusf ∗ mepc ↦ᵣ mepcf ∗
-          elp ↦ᵣ elpf ∗ mseccfg ↦ᵣ mseccfg0 ∗ mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
-          pmpcfg_n ↦ᵣ pmpcfgf ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
+          cur_privilege ↦ᵣ newpriv ∗ ⌜ generic_neq newpriv Machine = true ⌝ ∗ hart_state ↦ᵣ HART_ACTIVE tt ∗
+          (R_bitvector_64 mideleg) ↦ᵣ mdv0 ∗ (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus1 ∗ mepc ↦ᵣ mepc_val va5_43 ∗
+          satp ↦ᵣ satp_legalized satp0 va5_45 ∗
+          elp ↦ᵣ celpv lpe mstatus1 ∗ mseccfg ↦ᵣ mseccfg0 ∗ mcountinhibit ↦ᵣ mc ∗ minstretcfg ↦ᵣ mcfg ∗
+          pmpcfg_n ↦ᵣ pmpcfg1 ∗ pmpaddr_n ↦ᵣ pmpaddrf ∗ pma_regions ↦ᵣ pmar0 ∗ htif_tohost_base ↦ᵣ None ∗ kernel_text)
         -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }} ) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
