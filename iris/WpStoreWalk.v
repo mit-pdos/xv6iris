@@ -315,6 +315,128 @@ Section SWLK.
     reflexivity.
   Qed.
 
+  (* ---- Store-address TLB HIT (state-preserving): a SUBSEQUENT store to the
+     same stack page hits the superpage entry the first store installed. ---- *)
+  Lemma exec_translate_TLB_hit_store_super (vpn : mword 27) (mxr do_sum : bool) s :
+    exec (translate_TLB_hit 39 (mword_of_int 0 : mword 16) vpn (Store Data) Supervisor mxr do_sum
+            tt (tlb_hash (__id 39) vpn) (pw_tlb_entry root_ppn (mword_of_int 0))) s
+      = Some (Ok (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn, PBMT_PMA, tt), s).
+  Proof.
+    unfold translate_TLB_hit. cbn zeta.
+    match goal with |- context[check_PTE_permission ?ac ?pr ?mx ?ds ?fl ?ex ?ep] =>
+      assert (Hchk : exec (check_PTE_permission ac pr mx ds fl ex ep) s = Some (PTE_Check_Success tt, s))
+        by (destruct mxr, do_sum; vm_compute; reflexivity) end.
+    rewrite (exec_bind_Some _ _ _ _ _ Hchk). cbn match.
+    match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
+      assert (Hupd : exec (update_and_write_pte a wd p ac) s = Some (Ok None, s)) end.
+    { unfold update_and_write_pte.
+      match goal with |- context[update_PTE_Bits ?p ?ac] =>
+        replace (update_PTE_Bits p ac) with (@None (mword 64)) by (vm_compute; reflexivity) end.
+      cbn match. apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hupd). cbn match.
+    assert (Hpbmt : exec (tlb_get_pbmt (pw_tlb_entry root_ppn (mword_of_int 0))) s = Some (PBMT_PMA, s))
+      by (vm_compute; reflexivity).
+    rewrite (exec_bind_Some _ _ _ _ _ Hpbmt). apply exec_returnm.
+  Qed.
+
+  Lemma exec_lookup_TLB_hit_store (vpn : mword 27) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    register_lookup tlb s.(sregs) = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    and_vec (sign_extend' (57 - 12) vpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    exec (lookup_TLB 39 (mword_of_int 0 : mword 16) vpn) s
+      = Some (Some (tlb_hash (__id 39) vpn, pw_tlb_entry root_ppn (mword_of_int 0)), s).
+  Proof.
+    intros Htlb Hvec Hmask.
+    unfold lookup_TLB.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
+    rewrite Htlb. rewrite Hvec.
+    match goal with |- context[match_TLB_Entry ?e ?a ?v] =>
+      replace (match_TLB_Entry e a v) with true end.
+    2:{ unfold match_TLB_Entry, pw_tlb_entry; cbn.
+        rewrite Hmask. vm_compute; reflexivity. }
+    apply exec_returnm.
+  Qed.
+
+  Lemma exec_translate_store_hit (vpn : mword 27) (mxr do_sum : bool)
+        (base_ppn : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    register_lookup tlb s.(sregs) = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    and_vec (sign_extend' (57 - 12) vpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    exec (translate 39 (mword_of_int 0 : mword 16) base_ppn vpn (Store Data) Supervisor mxr do_sum tt) s
+      = Some (Ok (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn, PBMT_PMA, tt), s).
+  Proof.
+    intros Htlb Hvec Hmask.
+    unfold translate.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_hit_store vpn tlbvec s Htlb Hvec Hmask)).
+    cbn match.
+    apply exec_translate_TLB_hit_store_super.
+  Qed.
+
+  Lemma exec_translateAddr_store_hit (a : mword 64) (vpn : mword 27)
+        (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
+    register_lookup satp s.(sregs) = satp0 ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    neq_vec (bits_of_virtaddr (Virtaddr a))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub pagesize_bits 1) 0)) = a ->
+    register_lookup tlb s.(sregs) = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    and_vec (sign_extend' (57 - 12) vpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    exec (translateAddr (Virtaddr a) (Store Data)) s
+      = Some (Ok (Physaddr a, PBMT_PMA, init_ext_ptw), s).
+  Proof.
+    intros Hcp HSXL Hmprv Hsatp Hmode Hasid Hcanon Hvpn_def Hident Htlb Hvec Hmask.
+    unfold translateAddr.
+    rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite Hcp.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_store_S (register_lookup mstatus s.(sregs)) s Hmprv)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_S_sv39 satp0 s HSXL Hsatp Hmode)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_store s)).
+    unfold Defs.bind0.
+    replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
+    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
+      by (cbn; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
+    assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
+    { unfold get_satp.
+      assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
+                            "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
+      { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+        unfold assert_exp'. cbn match. apply exec_returnm. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hae).
+      change (Z.eqb 39 32) with false. cbn match.
+      unfold autocast_m.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+      rewrite Hsatp. apply exec_returnm. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgs).
+    assert (Hae2 : exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
+                          "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s)).
+    { replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+      unfold assert_exp'. cbn match. apply exec_returnm. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    rewrite Hcanon. cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
+      replace vpnx with vpn by (symmetry; exact Hvpn_def);
+      replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_translate_store_hit vpn _ _ _ tlbvec s Htlb Hvec Hmask)).
+    cbn match.
+    rewrite execR_returnR. cbn match.
+    rewrite Hident.
+    reflexivity.
+  Qed.
+
 End SWLK.
 
 (* ---- State-CHANGING store path: the store's address translation is a page
