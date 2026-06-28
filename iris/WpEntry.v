@@ -12,6 +12,8 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode.
+Require Import MinstretInv.
+From iris.base_logic.lib Require Import invariants.
 
 (* ---------------------------------------------------------------------- *)
 (* RVC fetch: a 4-byte-aligned 16-bit instruction reads 4 bytes and takes  *)
@@ -1589,10 +1591,11 @@ Section StepLUI.
   End CleanLUI.
 
   Lemma wp_step_lui (pc : mword 64) (w : mword 32)
-      (b1 : bool) (x10_0 npc0 mst0 mstatus0 misa0 : mword 64)
+      (b1 : bool) (x10_0 npc0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
     subrange_vec_dec w 15 0 = h_lui ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
@@ -1606,8 +1609,8 @@ Section StepLUI.
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    minstret_inv -∗
     PC ↦ᵣ pc -∗ (R_bitvector_64 x10) ↦ᵣ x10_0 -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     reg_pointsto misa dqc misa0 -∗
@@ -1616,8 +1619,7 @@ Section StepLUI.
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
         (R_bitvector_64 x10) ↦ᵣ regval_into_reg luival -∗
-        nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
-        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        nextPC ↦ᵣ add_vec_int pc 2 -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         reg_pointsto misa dqc misa0 -∗
@@ -1627,16 +1629,16 @@ Section StepLUI.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
-      "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HN Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
+      "#Hinv Hpc Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
-    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
     iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
@@ -1648,26 +1650,29 @@ Section StepLUI.
                  ltac:(rewrite Hsub; vm_compute; reflexivity)
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     rewrite Hsub in Hfetch_at.
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
-    iExists (sFclu s pc b1 mst0). iSplitR.
+    iModIntro.
+    iExists (sFclu s pc b1 (register_lookup minstret s.(sregs))). iSplitR.
     { iPureIntro.
-      rewrite <- (sFlu_eq s pc b1 mst0 Lpc Lmst).
+      rewrite <- (sFlu_eq s pc b1 (register_lookup minstret s.(sregs)) Lpc eq_refl).
       apply (forward_exec_lui s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa.
       - rewrite Lmisa. exact HmisaS. }
-    iIntros "!>".
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iMod (reg_update _ (R_bitvector_64 x10) _ (regval_into_reg luival) with "Hreg Hx10") as "[Hreg Hx10]".
     iMod (reg_update _ PC _ (add_vec_int pc 2) with "Hreg Hpc") as "[Hreg Hpc]".
     unfold sFclu, base_upd_lu. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hpc Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hpc Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End StepLUI.
 
@@ -1720,10 +1725,11 @@ Section StepADD.
   End CleanADD.
 
   Lemma wp_step_add (pc : mword 64) (w : mword 32)
-      (b1 : bool) (sp_in a0_in npc0 mst0 mstatus0 misa0 : mword 64)
+      (b1 : bool) (sp_in a0_in npc0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
     subrange_vec_dec w 15 0 = h_add ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
@@ -1737,9 +1743,9 @@ Section StepADD.
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    minstret_inv -∗
     PC ↦ᵣ pc -∗ (R_bitvector_64 x2) ↦ᵣ sp_in -∗ (R_bitvector_64 x10) ↦ᵣ a0_in -∗
     nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     reg_pointsto misa dqc misa0 -∗
@@ -1749,8 +1755,7 @@ Section StepADD.
     ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (add_vec sp_in a0_in) -∗
         (R_bitvector_64 x10) ↦ᵣ a0_in -∗
-        nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
-        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        nextPC ↦ᵣ add_vec_int pc 2 -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         reg_pointsto misa dqc misa0 -∗
@@ -1760,10 +1765,11 @@ Section StepADD.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
-      "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HN Hsub Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
+      "#Hinv Hpc Hx2 Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
-    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hx2")    as %Lx2.
     iDestruct (reg_valid_dq with "Hreg Hx10")   as %Lx10.
@@ -1771,7 +1777,6 @@ Section StepADD.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
     iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
@@ -1784,27 +1789,30 @@ Section StepADD.
                  ltac:(rewrite Hsub; vm_compute; reflexivity)
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     rewrite Hsub in Hfetch_at.
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
-    iExists (sFcad s pc b1 mst0). iSplitR.
+    iModIntro.
+    iExists (sFcad s pc b1 (register_lookup minstret s.(sregs))). iSplitR.
     { iPureIntro.
-      rewrite <- (sFad_eq s pc b1 mst0 Lpc Lmst).
+      rewrite <- (sFad_eq s pc b1 (register_lookup minstret s.(sregs)) Lpc eq_refl).
       apply (forward_exec_add s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa.
       - rewrite Lmisa. exact HmisaS. }
-    iIntros "!>".
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iMod (reg_update _ (R_bitvector_64 x2) _ (regval_into_reg (addval s pc b1)) with "Hreg Hx2") as "[Hreg Hx2]".
     iMod (reg_update _ PC _ (add_vec_int pc 2) with "Hreg Hpc") as "[Hreg Hpc]".
     iEval (rewrite Hav) in "Hx2".
     unfold sFcad, base_upd_ad. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx2 Hx10 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hpc Hx2 Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hpc Hx2 Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End StepADD.
 
@@ -1863,10 +1871,11 @@ Section StepMUL.
   End CleanMUL.
 
   Lemma wp_step_mul (pc : mword 64)
-      (b1 : bool) (a0_in a1_in npc0 mst0 mstatus0 misa0 : mword 64)
+      (b1 : bool) (a0_in a1_in npc0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
@@ -1880,9 +1889,9 @@ Section StepMUL.
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_M misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    minstret_inv -∗
     PC ↦ᵣ pc -∗ (R_bitvector_64 x10) ↦ᵣ a0_in -∗ (R_bitvector_64 x11) ↦ᵣ a1_in -∗
     nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     reg_pointsto misa dqc misa0 -∗
@@ -1894,8 +1903,7 @@ Section StepMUL.
           (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
              a0_in a1_in (mulop_mul.(mul_op_result_part))) -∗
         (R_bitvector_64 x11) ↦ᵣ a1_in -∗
-        nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
-        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        nextPC ↦ᵣ add_vec_int pc 4 -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         reg_pointsto misa dqc misa0 -∗
@@ -1905,10 +1913,11 @@ Section StepMUL.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hb1 HmIE Help Hmisa HmisaS)
-      "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HN Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hb1 HmIE Help Hmisa HmisaS)
+      "#Hinv Hpc Hx10 Hx11 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
-    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hx10")   as %Lx10.
     iDestruct (reg_valid_dq with "Hreg Hx11")   as %Lx11.
@@ -1916,7 +1925,6 @@ Section StepMUL.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
     iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
@@ -1929,27 +1937,30 @@ Section StepMUL.
     iDestruct (fetch_from_pts_minstret pc w_mul region_f pmpcfg0 pmar0 b1 s
                  Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
-    iExists (sFcm s pc b1 mst0). iSplitR.
+    iModIntro.
+    iExists (sFcm s pc b1 (register_lookup minstret s.(sregs))). iSplitR.
     { iPureIntro.
-      rewrite <- (sFm_eq s pc b1 mst0 Lpc Lmst).
+      rewrite <- (sFm_eq s pc b1 (register_lookup minstret s.(sregs)) Lpc eq_refl).
       apply (forward_exec_mul s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa.
       - rewrite Lmisa. exact HmisaS. }
-    iIntros "!>".
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iMod (reg_update _ (R_bitvector_64 x10) _ (regval_into_reg (mulprod (s_pcm s pc b1))) with "Hreg Hx10") as "[Hreg Hx10]".
     iMod (reg_update _ PC _ (add_vec_int pc 4) with "Hreg Hpc") as "[Hreg Hpc]".
     iEval (rewrite Hpv) in "Hx10".
     unfold sFcm, base_upd_m. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx10 Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hpc Hx10 Hx11 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hpc Hx10 Hx11 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End StepMUL.
 
@@ -2338,10 +2349,11 @@ Section StepADDI.
   End CleanADDI.
 
   Lemma wp_step_addi (pc : mword 64)
-      (b1 : bool) (a1_in npc0 mst0 mstatus0 misa0 : mword 64)
+      (b1 : bool) (a1_in npc0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
@@ -2354,8 +2366,8 @@ Section StepADDI.
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    minstret_inv -∗
     PC ↦ᵣ pc -∗ (R_bitvector_64 x11) ↦ᵣ a1_in -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     reg_pointsto misa dqc misa0 -∗
@@ -2365,8 +2377,7 @@ Section StepADDI.
     ▷ ( PC ↦ᵣ add_vec_int pc 2 -∗
         (R_bitvector_64 x11) ↦ᵣ regval_into_reg
           (add_vec a1_in (sign_extend' 64 (sign_extend' 12 imm_caddi))) -∗
-        nextPC ↦ᵣ add_vec_int pc 2 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
-        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        nextPC ↦ᵣ add_vec_int pc 2 -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         reg_pointsto misa dqc misa0 -∗
@@ -2376,17 +2387,17 @@ Section StepADDI.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
-      "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HN Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help Hmisa HmisaS)
+      "#Hinv Hpc Hx11 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (region_f & Hmatchf & Hexecf & _ & _).
-    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hx11")   as %Lx11.
     iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
     iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
@@ -2399,27 +2410,30 @@ Section StepADDI.
                  Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hmisa
                  ltac:(vm_compute; reflexivity)
                  with "Hreg Hmem Hpc Hpriv Hmisa' Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
-    iExists (sFcai s pc b1 mst0). iSplitR.
+    iModIntro.
+    iExists (sFcai s pc b1 (register_lookup minstret s.(sregs))). iSplitR.
     { iPureIntro.
-      rewrite <- (sFai_eq s pc b1 mst0 Lpc Lmst).
+      rewrite <- (sFai_eq s pc b1 (register_lookup minstret s.(sregs)) Lpc eq_refl).
       apply (forward_exec_addi s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact Hmisa.
       - rewrite Lmisa. exact HmisaS. }
-    iIntros "!>".
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iMod (reg_update _ (R_bitvector_64 x11) _ (regval_into_reg (addival s pc b1)) with "Hreg Hx11") as "[Hreg Hx11]".
     iMod (reg_update _ PC _ (add_vec_int pc 2) with "Hreg Hpc") as "[Hreg Hpc]".
     iEval (rewrite Hav) in "Hx11".
     unfold sFcai, base_upd_ai. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx11 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hpc Hx11 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hpc Hx11 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End StepADDI.
 
@@ -2698,10 +2712,11 @@ Section StepCSRR.
   End CleanCSRR.
 
   Lemma wp_step_csrr (pc : mword 64)
-      (b1 : bool) (mhartid_in x11_0 npc0 mst0 mstatus0 misa0 : mword 64)
+      (b1 : bool) (mhartid_in x11_0 npc0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
@@ -2717,9 +2732,9 @@ Section StepCSRR.
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    minstret_inv -∗
     PC ↦ᵣ pc -∗ (R_bitvector_64 x11) ↦ᵣ x11_0 -∗ mhartid ↦ᵣ mhartid_in -∗
     nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     reg_pointsto misa dqc misa0 -∗
@@ -2728,8 +2743,7 @@ Section StepCSRR.
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_csrr j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x11) ↦ᵣ regval_into_reg mhartid_in -∗ mhartid ↦ᵣ mhartid_in -∗
-        nextPC ↦ᵣ add_vec_int pc 4 -∗ (R_bool minstret_increment) ↦ᵣ b1 -∗
-        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        nextPC ↦ᵣ add_vec_int pc 4 -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         reg_pointsto misa dqc misa0 -∗
@@ -2739,18 +2753,18 @@ Section StepCSRR.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hb1 HmIE Help Hmisa HmisaS)
-      "Hpc Hx11 Hmhart Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HN Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hb1 HmIE Help Hmisa HmisaS)
+      "#Hinv Hpc Hx11 Hmhart Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (regl & Hml & Hxl & _ & _).
     destruct (Hpmaall (fetch_pa (add_vec_int pc 2)) 2) as (regh & Hmh & Hxh & _ & _).
-    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hmhart") as %Lmhart.
     iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
     iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
@@ -2769,15 +2783,16 @@ Section StepCSRR.
                        [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
                  ltac:(rewrite Lmisa; exact Hmisa)
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hmisa' Hibytes") as %Hfetch_at.
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
-    iExists (sFcc s pc b1 mst0). iSplitR.
+    iModIntro.
+    iExists (sFcc s pc b1 (register_lookup minstret s.(sregs))). iSplitR.
     { iPureIntro.
-      rewrite <- (sFc_eq s pc b1 mst0 Lpc Lmst).
+      rewrite <- (sFc_eq s pc b1 (register_lookup minstret s.(sregs)) Lpc eq_refl).
       apply (forward_exec_csrr s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact HmisaS. }
-    iIntros "!>".
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iEval (rewrite Lmisa) in "Hmisa'".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -2786,11 +2801,13 @@ Section StepCSRR.
     iMod (reg_update _ PC _ (add_vec_int pc 4) with "Hreg Hpc") as "[Hreg Hpc]".
     iEval (rewrite Hmhv) in "Hx11".
     unfold sFcc, base_upd_c. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx11 Hmhart Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx11 Hmhart Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hpc Hx11 Hmhart Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hpc Hx11 Hmhart Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End StepCSRR.
 
@@ -2852,10 +2869,11 @@ Section StepJAL2.
   Qed.
 
   Lemma wp_step_jal (pc : mword 64)
-      (b1 : bool) (x1_0 npc0 mst0 mstatus0 misa0 : mword 64)
+      (b1 : bool) (x1_0 npc0 mstatus0 misa0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ->
@@ -2873,8 +2891,8 @@ Section StepJAL2.
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    minstret_inv -∗
     PC ↦ᵣ pc -∗ (R_bitvector_64 x1) ↦ᵣ x1_0 -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     reg_pointsto misa dqc misa0 -∗
@@ -2884,8 +2902,6 @@ Section StepJAL2.
     ▷ ( PC ↦ᵣ add_vec pc (sign_extend' 64 imm_jal) -∗
         (R_bitvector_64 x1) ↦ᵣ regval_into_reg (add_vec_int pc 4) -∗
         nextPC ↦ᵣ add_vec pc (sign_extend' 64 imm_jal) -∗
-        (R_bool minstret_increment) ↦ᵣ b1 -∗
-        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
         reg_pointsto misa dqc misa0 -∗
@@ -2895,17 +2911,17 @@ Section StepJAL2.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hal0 Hal1 Hb1 HmIE Help Hmisa HmisaS)
-      "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HN Hpmaall Hpmpf Hal2l Hal2h Hbit0f Hbit1f Hvalignf Haddr Hal0 Hal1 Hb1 HmIE Help Hmisa HmisaS)
+      "#Hinv Hpc Hx1 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 2) as (regl & Hml & Hxl & _ & _).
     destruct (Hpmaall (fetch_pa (add_vec_int pc 2)) 2) as (regh & Hmh & Hxh & _ & _).
-    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
     iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
@@ -2924,17 +2940,18 @@ Section StepJAL2.
                        [apply bv_eq; vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity | exfalso; lia])
                  ltac:(rewrite Lmisa; exact Hmisa)
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hmisa' Hibytes") as %Hfetch_at.
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
-    iExists (sFcj s pc b1 mst0). iSplitR.
+    iModIntro.
+    iExists (sFcj s pc b1 (register_lookup minstret s.(sregs))). iSplitR.
     { iPureIntro.
-      rewrite <- (sFj_eq s pc b1 mst0 Lpc Lmst).
+      rewrite <- (sFj_eq s pc b1 (register_lookup minstret s.(sregs)) Lpc eq_refl).
       apply (forward_exec_jal s pc b1 Hfetch_at Hsi_s Lpc Lpriv Lhs Lmdl).
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help.
       - rewrite Lmisa. exact HmisaS.
       - rewrite Hjt. exact Hal0.
       - rewrite Hjt. exact Hal1. }
-    iIntros "!>".
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iEval (rewrite Lmisa) in "Hmisa'".
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -2944,10 +2961,12 @@ Section StepJAL2.
     iMod (reg_update _ PC _ (jtgt s pc b1) with "Hreg Hpc") as "[Hreg Hpc]".
     iEval (rewrite Hjt) in "Hpc". iEval (rewrite Hjt) in "Hnpc".
     unfold sFcj, base_upd_j. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hx1 Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hpc Hx1 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hpc Hx1 Hnpc Hpriv Hhs Hmdl Hms Hmisa' Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End StepJAL2.

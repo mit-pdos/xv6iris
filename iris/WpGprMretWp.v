@@ -8,6 +8,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry.
+Require Import MinstretInv.
+From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
 Require Import WpGpr.
@@ -244,10 +246,11 @@ Section StepMRET.
   End CleanMRET.
 
   Lemma wp_mret (pc : mword 64) (newpriv : Privilege) (lpe : bool)
-      (b1 : bool) (npc0 mst0 mstatus0 misa0 mepc0 mdv0 : mword 64)
+      (b1 : bool) (npc0 mstatus0 misa0 mepc0 mdv0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (mi0 : bool) (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
     is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
@@ -265,8 +268,8 @@ Section StepMRET.
       (_get_Mstatus_MPP (cms2 mstatus0), ('b"0")) = returnM newpriv ->
     generic_neq newpriv Machine = true ->
     (forall sz, exec (get_xLPE newpriv) sz = Some (lpe, sz)) ->
+    minstret_inv -∗
     PC ↦ᵣ pc -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     reg_pointsto misa dqc misa0 -∗ mepc ↦ᵣ mepc0 -∗
@@ -274,8 +277,6 @@ Section StepMRET.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_mret j) -∗
     ▷ ( PC ↦ᵣ ctgt mepc0 -∗ nextPC ↦ᵣ ctgt mepc0 -∗
-        (R_bool minstret_increment) ↦ᵣ b1 -∗
-        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ newpriv -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
         (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus0 -∗
@@ -286,16 +287,16 @@ Section StepMRET.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help HS Hmu Hmc Hnp Hnpm Hlpe)
-      "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
+    iIntros (HN Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help HS Hmu Hmc Hnp Hnpm Hlpe)
+      "#Hinv Hpc Hnpc Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
-    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
     iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hmst")   as %Lmst.
     iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
     iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
@@ -307,10 +308,10 @@ Section StepMRET.
                  Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf
                  ltac:(vm_compute; reflexivity)
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
-    iExists (sFcm s pc b1 newpriv lpe mstatus0 mepc0 mst0). iSplitR.
+    iModIntro.
+    iExists (sFcm s pc b1 newpriv lpe mstatus0 mepc0 (register_lookup minstret s.(sregs))). iSplitR.
     { iPureIntro.
-      rewrite <- (sFm_eq s pc b1 newpriv lpe mstatus0 mepc0 mst0 Lpc Lms Lmepc Lmst).
+      rewrite <- (sFm_eq s pc b1 newpriv lpe mstatus0 mepc0 (register_lookup minstret s.(sregs)) Lpc Lms Lmepc eq_refl).
       apply (forward_exec_mret s pc b1 newpriv lpe Hfetch_at Hsi_s).
       - rewrite Lmisa. exact Hmu.
       - rewrite Lmisa. exact Hmc.
@@ -335,7 +336,8 @@ Section StepMRET.
       - rewrite Lmisa. exact HS.
       - rewrite Lms. exact HmIE.
       - rewrite Lelp. exact Help. }
-    iIntros "!>".
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     unfold sFcm, base_upd_m.
     iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -349,10 +351,12 @@ Section StepMRET.
     iMod (reg_update _ nextPC _ (ctgt mepc0) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iMod (reg_update _ PC _ (ctgt mepc0) with "Hreg Hpc") as "[Hreg Hpc]".
     destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iMod "Hclose" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iApply ("Hcont" with "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hpc Hnpc Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hpc Hnpc Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
   Qed.
 End StepMRET.

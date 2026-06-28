@@ -20,6 +20,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import WpFetch WpDecode WpEntry WpGpr WpRvc WpAlu2 WpGprCsrrAny WpGprCsrr.
 Require Import WpGprMretWp KernelBoot.
+Require Import MinstretInv.
+From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
 Section WpKernelMret.
@@ -214,7 +216,6 @@ Section WpKernelMret.
   (* ===================================================================== *)
   Lemma wp_kernel_start_tail
       (mfin : gmap register_bitvector_64 (mword 64))
-      (mst0 : mword 64) (mi0 : bool)
       (mstatus0 mdv0 mepc0 mhartid0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n)
@@ -223,6 +224,7 @@ Section WpKernelMret.
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
                      (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) in
+    ↑minstretN ⊆ E ->
     is_Some (mfin !! gpr_of_Z 15) ->
     is_Some (mfin !! gpr_of_Z 4) ->
     pmp_allows_all pmpcfg0 ->
@@ -232,7 +234,7 @@ Section WpKernelMret.
     generic_neq newpriv Machine = true ->
     (forall sz, exec (get_xLPE newpriv) sz = Some (lpe, sz)) ->
     PC ↦ᵣ spc60 -∗ gpr_file mfin -∗ mhartid ↦ᵣ mhartid0 -∗ nextPC ↦ᵣ spc60 -∗
-    (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ mst0 -∗
+    minstret_inv -∗
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     mepc ↦ᵣ mepc0 -∗ elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
@@ -240,7 +242,6 @@ Section WpKernelMret.
     kernel_text -∗
     ▷ ( PC ↦ᵣ ctgt mepc0 -∗ nextPC ↦ᵣ ctgt mepc0 -∗
         (∃ mf2, gpr_file mf2) -∗ mhartid ↦ᵣ mhartid0 -∗
-        (R_bool minstret_increment) ↦ᵣ b1 -∗ (∃ mstf : mword 64, minstret ↦ᵣ mstf) -∗
         cur_privilege ↦ᵣ newpriv -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ cms5 mstatus0 -∗
         mepc ↦ᵣ mepc0 -∗ elp ↦ᵣ celpv lpe mstatus0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
@@ -248,9 +249,9 @@ Section WpKernelMret.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 Hf15 Hf4 Hpmpf HmIE Hlp Hnp Hnpm Hlpe.
+    intros b1 HN Hf15 Hf4 Hpmpf HmIE Hlp Hnp Hnpm Hlpe.
     destruct Hf4 as [vtp Hf4].
-    iIntros "Hpc Hfile Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc
+    iIntros "Hpc Hfile Hmhartid Hnpc #Hinv Hpriv Hhs Hmdl Hms Hmepc
              Help Hpmpc Hhw #Htext".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
@@ -258,17 +259,17 @@ Section WpKernelMret.
     destruct Hf15 as [va5_60 Hf15].
     iDestruct (k60_window with "Htext") as "#K60".
     iApply (wp_csrr_gpr spc60 sw60 (scsr_rd sw60) mfin va5_60 mhartid0 misa0 mdv0 b1
-              _ mst0 mstatus0 mc mcfg pmpcfg0 pmar0 b1 elp0 E Φ
-              ltac:(vm_compute; discriminate) Hf15 HmisaS Hpmaall Hpmpf
+              _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
+              HN ltac:(vm_compute; discriminate) Hf15 HmisaS Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               ltac:(intros s0 Hpriv;
                     replace (subrange_vec_dec sw60 31 20) with csr_csrr by (vm_compute; reflexivity);
                     replace (scsr_rs1z sw60) with i_rs1_csrr by (vm_compute; reflexivity);
                     exact (decode_s60 s0 Hpriv))
               eq_refl HmIE Hlp
-              with "Hpc Hfile Hmhartid Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K60").
+              with "Hinv Hpc Hfile Hmhartid Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K60").
     iNext.
-    iIntros "Hpc Hfile Hmhartid _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
+    iIntros "Hpc Hfile Hmhartid _ Hnpc Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc60 4) with spc61 by (vm_compute; reflexivity).
     set (m60 := <[gpr_of_Z (uint (scsr_rd sw60)) := regval_into_reg mhartid0]> mfin).
     (* ---- idx 61: c.addiw a5 (4-aligned RVC at spc61=0xb8) -- one 4-byte window ---- *)
@@ -278,13 +279,13 @@ Section WpKernelMret.
       replace (uint (scsr_rd sw60)) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert. reflexivity. }
     iApply (wp_caddiw_gpr_4 spc61 w4_s61 (sreg117 sw61) (scaddiw_imm sw61) m60 (regval_into_reg mhartid0) misa0 mdv0 b1
-              _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
-              ltac:(vm_compute; discriminate) Ha561 Hpmaall Hpmpf
+              _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
+              HN ltac:(vm_compute; discriminate) Ha561 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               HmisaC HmisaS decode4_s61 eq_refl HmIE Hlp
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W61").
+              with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W61").
     iNext.
-    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
+    iIntros "Hpc Hfile _ Hnpc Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc61 2) with spc62 by (vm_compute; reflexivity).
     set (m61 := <[gpr_of_Z (uint (sreg117 sw61)) := regval_into_reg (caddiw_wval (scaddiw_imm sw61) (regval_into_reg mhartid0))]> m60).
     (* ---- idx 62: c.mv tp,a5 (2-aligned at spc62=0xba) ---- *)
@@ -302,30 +303,29 @@ Section WpKernelMret.
       rewrite lookup_insert_ne; [| vm_compute; discriminate].
       exact Hf4. }
     iApply (wp_cmv_gpr spc62 sw62 (sreg117 sw62) (sreg62 sw62) m61 _ _ misa0 mdv0 b1
-              _ _ mstatus0 mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha562 Htp62 Hpmaall Hpmpf
+              _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
+              HN ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha562 Htp62 Hpmaall Hpmpf
               ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               HmisaC HmisaS decode_s62 eq_refl HmIE Hlp
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K62").
+              with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K62").
     iNext.
-    iIntros "Hpc Hfile _ Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
+    iIntros "Hpc Hfile _ Hnpc Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
     replace (add_vec_int spc62 2) with spc63 by (vm_compute; reflexivity).
     (* ---- idx 63: MRET (4-aligned at spc63=0xbc) -> Supervisor mode ---- *)
     iDestruct (kernel_mret_window with "Htext") as "#K63".
     (* [minstret] has been bumped 3x (csrr;c.addiw;c.mv); let wp_mret infer its
        current value from the resource -- the post exposes it existentially. *)
-    iApply (wp_mret spc63 newpriv lpe b1 _ _ mstatus0 misa0 mepc0 mdv0
-              mc mcfg pmpcfg0 pmar0 _ elp0 E Φ
-              Hpmaall Hpmpf ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+    iApply (wp_mret spc63 newpriv lpe b1 _ mstatus0 misa0 mepc0 mdv0
+              mc mcfg pmpcfg0 pmar0 elp0 E Φ
+              HN Hpmaall Hpmpf ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
               eq_refl HmIE Hlp HmisaS HmisaU HmisaC Hnp Hnpm Hlpe
-              with "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K63").
+              with "Hinv Hpc Hnpc Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif K63").
     iNext.
-    iIntros "Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms _ Hmepc Help _ _ Hpmpc _ _ _".
+    iIntros "Hpc Hnpc Hpriv Hhs Hmdl Hms _ Hmepc Help _ _ Hpmpc _ _ _".
     (* [kernel_text] is persistent: hand it straight back, no reassembly. *)
-    iApply ("Hcont" with "Hpc Hnpc [Hfile] Hmhartid Hmi [Hmst] Hpriv Hhs Hmdl Hms Hmepc
+    iApply ("Hcont" with "Hpc Hnpc [Hfile] Hmhartid Hpriv Hhs Hmdl Hms Hmepc
               Help Hpmpc Htext").
     { iExists _. iFrame "Hfile". }
-    { iExists _. iFrame "Hmst". }
   Qed.
 
 End WpKernelMret.
