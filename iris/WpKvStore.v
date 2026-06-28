@@ -886,4 +886,438 @@ End FetchAt2.
       iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hbytes Hibytes").
   Qed.
 
+(* generalized 4-byte-aligned RVC fetch at a symbolic code-page address va. *)
+Section FetchAt4.
+  Context (va : mword 64) (region : PMA_Region) (w : mword 32) (satp0 : mword 64)
+          (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (s : mstate).
+  Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Supervisor.
+  Hypothesis HpcPC : register_lookup PC s.(sregs) = va.
+  Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
+  Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
+  Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
+  Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16).
+  Hypothesis Htlb : register_lookup tlb s.(sregs) = tlbvec.
+  Hypothesis Hvec : vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)).
+  Hypothesis Hcanon : neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false.
+  Hypothesis Hvpn_def : autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn.
+  Hypothesis Hident : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va.
+  Hypothesis HA : pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
+  Hypothesis Hord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false.
+  Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+      (uint va) (uint (to_bits 64 4)) = PMP_Match.
+  Hypothesis HX : eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
+  Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr va) 4 = Some region.
+  Hypothesis Halign : is_aligned_paddr (Physaddr va) 4 = true.
+  Hypothesis Hexec : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
+  Hypothesis Hc : exec (within_clint (Physaddr va) 4) s = Some (false, s).
+  Hypothesis Hsig : exec (within_sig (Physaddr va) 4) s = Some (false, s).
+  Hypothesis Hh : exec (within_htif_readable (Physaddr va) 4) s = Some (false, s).
+  Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte w j).
+  Hypothesis HisRVC : isRVC (subrange_vec_dec w 15 0) = true.
+  Hypothesis Hbit0 : neq_vec (access_vec_dec va 0) ('b"0") = false.
+  Hypothesis Hbit1 : neq_vec (access_vec_dec va 1) ('b"0") = false.
+  Hypothesis Halign4 : is_aligned_vaddr (Virtaddr va) 4 = true.
+
+  Lemma exec_fetch_bytes_4_at : exec (fetch_bytes va va 4) s = Some (@FetchBytes_Success 4 w, s).
+  Proof using All.
+    unfold fetch_bytes.
+    rewrite exec_catch_early_return.
+    change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+              (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
+           = Some (inr (Ok (Physaddr va, PBMT_PMA, init_ext_ptw)), s))).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+        rewrite execR_liftR.
+        rewrite (exec_translateAddr_super_fetch_at va satp0 tlbvec s Hcp HSXL Hsatp Hmode Hasid Htlb Hvec Hcanon Hvpn_def Hident).
+        cbn match. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr va, PBMT_PMA) s)).
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr va) 4 false false false)) s
+           = Some (inr (Ok w), s))).
+    2:{ rewrite execR_liftR.
+        rewrite (exec_mem_read_fetch_4_S PBMT_PMA va region w s
+                   HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes Hcp).
+        cbn match. reflexivity. }
+    cbv iota beta. rewrite autocast_mword_id.
+    rewrite execR_returnR_fwd. cbn match. reflexivity.
+  Qed.
+
+  Lemma exec_fetch_RVC_4_at : exec (fetch tt) s = Some (F_RVC (subrange_vec_dec w 15 0), s).
+  Proof using All.
+    assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
+    { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
+    unfold fetch.
+    rewrite exec_catch_early_return.
+    change (get_config_rvfi tt) with false. cbv iota beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ false s).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+        unfold or_boolM.
+        rewrite (execR_bind_Some _ _ _ false s).
+        2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+            rewrite Hbit0. apply execR_returnR_fwd. }
+        cbv iota beta.
+        unfold and_boolM.
+        rewrite (execR_bind_Some _ _ _ false s).
+        2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+            rewrite Hbit1. apply execR_returnR_fwd. }
+        cbv iota beta. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ true s).
+    2:{ unfold and_boolM.
+        rewrite (execR_bind_Some _ _ _ true s).
+        2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+            rewrite Halign4. apply execR_returnR_fwd. }
+        cbv iota beta.
+        rewrite execR_liftR. rewrite exec_currentlyEnabled_Ziccif. cbn match. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite (execR_liftR_seq _ _ _ _ _ exec_fetch_bytes_4_at).
+    cbv iota beta. rewrite HisRVC. cbv iota beta.
+    rewrite execR_returnR_fwd. cbn match. reflexivity.
+  Qed.
+End FetchAt4.
+
+  (* generalized iris fetch bridge (4-byte-aligned) at symbolic code address va. *)
+  Lemma fetch_from_pts_at_4 (va : mword 64)
+      (mstatus0 misa0 satp0 : mword 64) (w : mword 32) (region : PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (pmar0 : list PMA_Region) (b : bool) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (s : mstate) {dq : dfrac} :
+    matching_pma_region pmar0 (Physaddr va) 4 = Some region ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
+    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = false ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
+      (uint va) (uint (to_bits 64 4)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    is_aligned_paddr (Physaddr va) 4 = true ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    isRVC (subrange_vec_dec w 15 0) = true ->
+    reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
+    PC ↦ᵣ va -∗ cur_privilege ↦ᵣ Supervisor -∗
+    (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ misa ↦ᵣ misa0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
+    pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add va j) ↦ₘ{dq} nth_byte w j) -∗
+    ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
+      = Some (F_RVC (subrange_vec_dec w 15 0), set_reg s (R_bool minstret_increment) b) ⌝.
+  Proof.
+    iIntros (Hmatch0 Hexec HSXL0 Hmode Hasid Hvec Hcanon Hvpn_def Hident Hbit0 Hbit1 Halign4
+             HA0 Hord0 Hrange0 HX0 Halign HmisaC0 HisRVC)
+            "Hreg Hmem Hpc Hpriv Hms Hsatp Htlb Hmisa Hpmpc Hpmpaddr Hpma Hhtif Hbytes".
+    iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
+    iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hms")    as %Lms.
+    iDestruct (reg_valid with "Hreg Hsatp")  as %Lsatp.
+    iDestruct (reg_valid with "Hreg Htlb")   as %Ltlb.
+    iDestruct (reg_valid with "Hreg Hmisa")  as %Lmisa.
+    iDestruct (reg_valid with "Hreg Hpmpc")  as %Lpmpc.
+    iDestruct (reg_valid with "Hreg Hpmpaddr") as %Lpmpaddr.
+    iDestruct (reg_valid with "Hreg Hpma")   as %Lpma.
+    iDestruct (reg_valid with "Hreg Hhtif")  as %Lhtif.
+    iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
+               s.(mem) !! (pa_add va j) = Some (nth_byte w j)⌝)%I as %Hbytesf.
+    { iIntros (j Hj). assert (Hj' : (j < 4)%nat) by lia.
+      iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+      { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
+      iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+    iAssert (⌜addr_is_ram va⌝)%I as %Hram.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    iPureIntro.
+    unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
+    set (t := set_reg s (R_bool minstret_increment) b).
+    assert (Ltpc : register_lookup PC t.(sregs) = va).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
+    assert (Ltpriv : register_lookup cur_privilege t.(sregs) = Supervisor).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpriv | vm_compute; reflexivity]. }
+    assert (Ltms : register_lookup mstatus t.(sregs) = mstatus0).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lms | vm_compute; reflexivity]. }
+    assert (Ltsatp : register_lookup satp t.(sregs) = satp0).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lsatp | vm_compute; reflexivity]. }
+    assert (Lttlb : register_lookup tlb t.(sregs) = tlbvec).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Ltlb | vm_compute; reflexivity]. }
+    assert (Ltmisa : register_lookup misa t.(sregs) = misa0).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmisa | vm_compute; reflexivity]. }
+    assert (Ltpmpc : register_lookup pmpcfg_n t.(sregs) = pmpcfg0).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpmpc | vm_compute; reflexivity]. }
+    assert (Ltpmpaddr : register_lookup pmpaddr_n t.(sregs) = pmpaddr00).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpmpaddr | vm_compute; reflexivity]. }
+    assert (Ltpma : register_lookup pma_regions t.(sregs) = pmar0).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpma | vm_compute; reflexivity]. }
+    assert (Lthtif : register_lookup htif_tohost_base t.(sregs) = None).
+    { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lhtif | vm_compute; reflexivity]. }
+    assert (Ltmem : forall j : nat, (N.of_nat j < 4)%N ->
+              t.(mem) !! (pa_add va j) = Some (nth_byte w j))
+      by (unfold t, set_reg; cbn [mem]; exact Hbytesf).
+    exact (exec_fetch_RVC_4_at va region w satp0 tlbvec t Ltpriv Ltpc
+             ltac:(rewrite Ltms; exact HSXL0) Ltsatp Hmode Hasid Lttlb Hvec
+             Hcanon Hvpn_def Hident
+             ltac:(rewrite Ltpmpc; exact HA0)
+             ltac:(rewrite Ltpmpaddr; exact Hord0)
+             ltac:(rewrite Ltpmpaddr; exact Hrange0)
+             ltac:(rewrite Ltpmpc; exact HX0)
+             ltac:(rewrite Ltpma; exact Hmatch0)
+             Halign Hexec
+             (within_clint_false va 4 t Hnc ltac:(lia))
+             (within_sig_false  va 4 t Hns ltac:(lia))
+             (within_htif_false va 4 t Lthtif)
+             Ltmem HisRVC Hbit0 Hbit1 Halign4).
+  Qed.
+
+  (* ====================================================================== *)
+  (* GENERALIZED store WP (4-byte-aligned fetch): c.sdsp rs2,uimm*8(sp) at    *)
+  (* ANY code-page address va. Fetch hits the superpage entry at index 5; the *)
+  (* store hits the stack entry at tlb_hash svpn (installed by an earlier     *)
+  (* store). Both translations state-preserving; Htr DISCHARGED via the hit.  *)
+  (* ====================================================================== *)
+  Lemma wp_kv_store_4 (va : mword 64) (w : mword 32) (uimm : mword 6) (rs2 : mword 5) (svpn : mword 27)
+      (m : gmap register_bitvector_64 (mword 64))
+      (vsp vrs2 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v : mword 64)
+      (b1 : bool) (vold : bv 64) (npc0 mst0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (pmar0 : list PMA_Region) (mi0 : bool) (elp0 : mword 1)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (region_st region_f : PMA_Region)
+      E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    let offset := sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) in
+    let ea := add_vec vsp offset in
+    let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+    let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)) in
+    uint rs2 <> 0 ->
+    m !! gpr_of_Z 2 = Some vsp ->
+    m !! gpr_of_Z (uint rs2) = Some vrs2 ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (* fetch superpage-identity bv facts for va *)
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
+    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = false ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    (* store superpage-identity bv facts for a8 / svpn *)
+    neq_vec (bits_of_virtaddr (Virtaddr a8))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
+    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    matching_pma_region pmar0 (Physaddr va) 4 = Some region_f ->
+    (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
+    matching_pma_region pmar0 (Physaddr pa) 8 = Some region_st ->
+    (override_PMA (PMA_Region_attributes region_st) PBMT_PMA).(PMA_writable) = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
+      (uint va) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
+      (uint pa) (uint (to_bits 64 8)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    is_aligned_paddr (Physaddr va) 4 = true ->
+    is_aligned_vaddr (Virtaddr a8) 8 = true ->
+    is_aligned_paddr (Physaddr pa) 8 = true ->
+    isRVC (subrange_vec_dec w 15 0) = true ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
+       exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s0 = Some (C_SDSP (uimm, Regidx rs2), s0)) ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+              (eq_vec (counter_priv_filter_bit mcfg Supervisor) ('b"0")) ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    PC ↦ᵣ va -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
+    tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add va j) ↦ₘ{dq} nth_byte w j) -∗
+    ▷ ( PC ↦ᵣ add_vec_int va 2 -∗
+        gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int va 2 -∗
+        (R_bool minstret_increment) ↦ᵣ b1 -∗
+        minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
+        cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
+        tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vrs2 j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add va j) ↦ₘ{dq} nth_byte w j) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    intros offset ea a8 pa Hrs2 Hsp Hmrs2 HSXL Hmode Hasid Hvec5 Hvecst
+      Hcanonf Hvpndeff Hidentf Hbit0 Hbit1 Halign4
+      Hcanon Hvpn_def Hident Hmask Hmatchf Hexecf Hmatch Hwrite Hpmm
+      HA0 Hord0 Hrange0f Hrange0 HX0 HW0 Halignf Halign8 Hpalign8 HisRVC HmisaC HmisaS HMPRV HMXR
+      Hdec Hb1 Hmie_mdl HSIE Help.
+    iIntros "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hbytes Hibytes Hcont".
+    iApply wp_exec_step. iIntros (s ns κs nt) "[Hreg Hmem]".
+    iDestruct (reg_valid with "Hreg Hpc")      as %Lpc.
+    iDestruct (reg_valid with "Hreg Hpriv")    as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hhs")      as %Lhs.
+    iDestruct (reg_valid with "Hreg Hmdl")     as %Lmdl.
+    iDestruct (reg_valid with "Hreg Hms")      as %Lms.
+    iDestruct (reg_valid with "Hreg Hmst")     as %Lmst.
+    iDestruct (reg_valid with "Hreg Hsatp")    as %Lsatp.
+    iDestruct (reg_valid with "Hreg Htlb")     as %Ltlb.
+    iDestruct (reg_valid with "Hreg Hmenv")    as %Lmenv.
+    iDestruct (reg_valid with "Hreg Hmie")     as %Lmie.
+    iDestruct (reg_valid with "Hreg Help'")    as %Lelp.
+    iDestruct (reg_valid with "Hreg Hmcinh")   as %Lmc.
+    iDestruct (reg_valid with "Hreg Hmcfg")    as %Lmcfg.
+    iDestruct (reg_valid with "Hreg Hmisa'")   as %Lmisa.
+    iDestruct (reg_valid with "Hreg Hpmpc")    as %Lpmpc.
+    iDestruct (reg_valid with "Hreg Hpmpaddr") as %Lpmpaddr.
+    iDestruct (reg_valid with "Hreg Hpma")     as %Lpma.
+    iDestruct (reg_valid with "Hreg Hhtif")    as %Lhtif.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hsp with "Hfile") as "[Hspc Hfb1]".
+    iDestruct (reg_valid with "Hreg Hspc") as %Lsp.
+    iDestruct ("Hfb1" with "Hspc") as "Hfile".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmrs2 with "Hfile") as "[Hr2c Hfb2]".
+    iDestruct (reg_valid with "Hreg Hr2c") as %Lrs2.
+    iDestruct ("Hfb2" with "Hr2c") as "Hfile".
+    assert (Hsi_s : exec (should_inc_minstret Supervisor) s = Some (b1, s)).
+    { rewrite Hb1. apply (exec_should_inc_S mc mcfg Supervisor s Lmc Lmcfg). }
+    iDestruct (fetch_from_pts_at_4 va mstatus0 misa0 satp0 w region_f pmpcfg0 pmpaddr00 pmar0 b1 tlbvec s
+                 Hmatchf Hexecf HSXL Hmode Hasid Hvec5 Hcanonf Hvpndeff Hidentf Hbit0 Hbit1 Halign4
+                 HA0 Hord0 Hrange0f HX0 Halignf HmisaC HisRVC
+                 with "Hreg Hmem Hpc Hpriv Hms Hsatp Htlb Hmisa' Hpmpc Hpmpaddr Hpma Hhtif Hibytes") as %Hfetch_at.
+    assert (Hdisp : exec (dispatchInterrupt Supervisor) (set_reg s (R_bool minstret_increment) b1) = Some (None, set_reg s (R_bool minstret_increment) b1)).
+    { apply exec_dispatchInterrupt_none_S.
+      apply (exec_getPendingSet_supervisor_none (set_reg s (R_bool minstret_increment) b1) mie_v mdv0 mstatus0).
+      - rewrite (exec_currentlyEnabled_S (set_reg s (R_bool minstret_increment) b1)).
+        replace (register_lookup misa (set_reg s (R_bool minstret_increment) b1).(sregs)) with misa0.
+        2:{ unfold set_reg; cbn [sregs].
+            rewrite irrelevant_register_set; [symmetry; exact Lmisa | vm_compute; reflexivity]. }
+        rewrite HmisaS. reflexivity.
+      - unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmie | vm_compute; reflexivity].
+      - unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmdl | vm_compute; reflexivity].
+      - unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lms | vm_compute; reflexivity].
+      - exact Hmie_mdl.
+      - exact HSIE. }
+    set (s_pc := set_reg (set_reg s (R_bool minstret_increment) b1) nextPC (add_vec_int va 2)).
+    assert (Lsp_pc : register_lookup (R_bitvector_64 (gpr_of_Z 2)) s_pc.(sregs) = vsp).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | reg_ne ]). exact Lsp. }
+    assert (Lrs2_pc : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s_pc.(sregs) = vrs2).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | reg_ne ]). exact Lrs2. }
+    assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lpriv. }
+    assert (Lsatp_pc : register_lookup satp s_pc.(sregs) = satp0).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lsatp. }
+    assert (Ltlb_pc : register_lookup tlb s_pc.(sregs) = tlbvec).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Ltlb. }
+    assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lms. }
+    assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lmenv. }
+    assert (Lpmpc_pc : register_lookup pmpcfg_n s_pc.(sregs) = pmpcfg0).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lpmpc. }
+    assert (Lpmpaddr_pc : register_lookup pmpaddr_n s_pc.(sregs) = pmpaddr00).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lpmpaddr. }
+    assert (Lpma_pc : register_lookup pma_regions s_pc.(sregs) = pmar0).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lpma. }
+    assert (Lhtif_pc : register_lookup htif_tohost_base s_pc.(sregs) = None).
+    { unfold s_pc, set_reg; cbn [sregs]. do 2 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lhtif. }
+    iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    pose proof (within_clint_false pa 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false pa 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_htif_writable_false pa 8 s_pc Lhtif_pc) as Hwh.
+    pose (s_x := MState s_pc.(sregs) (write_bytes s_pc.(mem) pa 8 vrs2)).
+    assert (Htr_pc : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Store Data)) s_pc
+                     = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s_pc)).
+    { replace (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8)) with a8
+        by (cbn [bits_of_virtaddr]; change (0 * 8) with 0; rewrite avi0; reflexivity).
+      replace pa with a8 by (unfold pa; change (0 * 8) with 0; rewrite avi0; rewrite zero_extend'_id; reflexivity).
+      apply (exec_translateAddr_store_hit root_ppn a8 svpn satp0 tlbvec s_pc
+               Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) ltac:(rewrite Lms_pc; exact HMPRV)
+               Lsatp_pc Hmode Hasid Hcanon Hvpn_def Hident Ltlb_pc Hvecst Hmask). }
+    assert (Hstore : exec (execute (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8))) s_pc
+                     = Some (RETIRE_SUCCESS, s_x)).
+    { unfold sp.
+      rewrite (exec_execute_STORE_8_gpr_S rs2 (zero_extend' 5 ('b"10")) (zero_extend' 12 (concat_vec uimm ('b"000")))
+                 region_st satp0 s_pc
+                 ltac:(vm_compute; discriminate) Hrs2 Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc
+                 Hmode ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
+                 ltac:(rewrite Lmenv_pc; exact Hpmm)
+                 ltac:(rewrite Lsp_pc; exact Halign8) ltac:(rewrite Lsp_pc; exact Htr_pc)
+                 ltac:(rewrite Lpmpc_pc; exact HA0) ltac:(rewrite Lpmpaddr_pc; exact Hord0)
+                 ltac:(rewrite Lpmpaddr_pc Lsp_pc; exact Hrange0) ltac:(rewrite Lpmpc_pc; exact HW0)
+                 ltac:(rewrite Lpma_pc Lsp_pc; exact Hmatch) ltac:(rewrite Lsp_pc; exact Hpalign8)
+                 Hwrite ltac:(rewrite Lsp_pc; apply Hwc) ltac:(rewrite Lsp_pc; apply Hws)
+                 ltac:(rewrite Lsp_pc; apply Hwh)).
+      subst s_x. do 3 f_equal. rewrite Lsp_pc Lrs2_pc. reflexivity. }
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hclose".
+    iExists (sFcsg_super s va b1 pa vrs2 mst0). iSplitR.
+    { iPureIntro.
+      rewrite <- (sFs_eq_super root_ppn s va b1 (subrange_vec_dec w 15 0) (C_SDSP (uimm, Regidx rs2))
+                    (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) pa vrs2
+                    Hfetch_at Hsi_s Hdec (exec_execute_C_SDSP uimm (Regidx rs2) s_pc) Hstore mst0 Lmst).
+      apply (forward_exec_csdsp_super root_ppn s va b1 (subrange_vec_dec w 15 0) (C_SDSP (uimm, Regidx rs2))
+               (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) pa vrs2
+               Hfetch_at Hsi_s Hdec (exec_execute_C_SDSP uimm (Regidx rs2) s_pc) Hstore Lpc Lpriv Hdisp Lhs).
+      - rewrite Lmisa. exact HmisaS.
+      - rewrite Lelp. exact Help.
+      - rewrite Lmisa. exact HmisaC. }
+    iIntros "!>".
+    iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
+    iMod (reg_update _ nextPC _ (add_vec_int va 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ PC _ (add_vec_int va 2) with "Hreg Hpc") as "[Hreg Hpc]".
+    iMod (upd_window_8 s.(mem) pa vrs2 vold with "Hmem Hbytes") as "[Hmem Hbytes]".
+    unfold sFcsg_super, base_upd_sg_super. destruct b1.
+    - iMod (reg_update _ minstret _ (add_vec_int mst0 1) with "Hreg Hmst") as "[Hreg Hmst]".
+      iMod "Hclose" as "_". iModIntro.
+      unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hbytes Hibytes").
+    - iMod "Hclose" as "_". iModIntro.
+      unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hbytes Hibytes").
+  Qed.
+
 End KVS.
