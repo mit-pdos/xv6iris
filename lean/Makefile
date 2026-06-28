@@ -48,3 +48,11 @@ kernel-first-two: model
 kernel-wp: model
 	lake build Xv6Iris.RealPtsto
 	lake env lean --tstack=16000000 Xv6Iris/KernelWP.lean
+
+# The whole _entry (_start) boot sequence (8 instructions, ending at jal start) as
+# a WP over the program logic (wp_entry), via 8 per-instruction kernel-reduction
+# step lemmas + the generalized wp_estep rule. Heavy (8 try_step reductions) —
+# allow several minutes and a big stack.
+kernel-entry: model
+	lake build Xv6Iris.RealPtsto
+	lake env lean --tstack=64000000 Xv6Iris/KernelEntry.lean
