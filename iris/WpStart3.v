@@ -32,9 +32,9 @@ Section WpStart3.
   Lemma wp_st_c7
       (mfin : gmap register_bitvector_64 (mword 64))
       (mst0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 mdv0 mepc0 mhartid0 : mword 64)
+      (mstatus0 mdv0 mepc0 mhartid0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n)
       (newpriv : Privilege) (lpe : bool)
       (elp0 : mword 1)
       E (Φ : mval -> iProp Σ) :
@@ -43,12 +43,9 @@ Section WpStart3.
     is_Some (mfin !! gpr_of_Z 15) ->
     is_Some (mfin !! gpr_of_Z 4) ->
     is_Some (mfin !! gpr_of_Z 2) ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     (* the MRET's MPP reduces to a non-Machine privilege (Supervisor). *)
     privLevel_bits_forwards (_get_Mstatus_MPP (cms2 mstatus0), ('b"0")) = returnM newpriv ->
     generic_neq newpriv Machine = true ->
@@ -60,7 +57,7 @@ Section WpStart3.
     mepc ↦ᵣ mepc0 -∗
     elp ↦ᵣ elp0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
+    hw_config mc mcfg -∗
     kernel_text -∗
     (* After the MRET, the hart is in Supervisor mode at PC = mepc.  Expose the
        full final machine state. *)
@@ -76,12 +73,12 @@ Section WpStart3.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 Hf15 Hf4 Hf2 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe.
+ intros b1 Hf15 Hf4 Hf2 Hpmpf HmIE Hlp Hnp Hnpm Hlpe.
     destruct Hf4 as [vtp Hf4].
     iIntros "Hpc Hfile Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc
              Help Hpmpc #Hhw #H".
     iPoseProof "Hhw" as "#Hhwb".
-    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iDestruct "Hhwb" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
     (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4); kernel_text duplicable ---- *)
     destruct Hf15 as [va5_60 Hf15].
@@ -178,10 +175,10 @@ Section WpStart3.
       (sp0 vra vs0 va4 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mhartid0 mepc0 satp0 medeleg0 mie0 : mword 64)
+      (mstatus0 menvcfg0 mtime0 stimecmp0 mhartid0 mepc0 satp0 medeleg0 mie0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (elp0 : mword 1) (vold_ra vold_s0 vti_ra vti_s0 : bv 64)
       (newpriv : Privilege) (lpe : bool)
       E (Φ : mval -> iProp Σ) :
@@ -229,14 +226,10 @@ Section WpStart3.
     m !! gpr_of_Z 1 = Some vra -> m !! gpr_of_Z 2 = Some sp0 ->
     m !! gpr_of_Z 8 = Some vs0 -> m !! gpr_of_Z 14 = Some va4 -> m !! gpr_of_Z 15 = Some va5 ->
     is_Some (m !! gpr_of_Z 4) ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE mstatus1) ('b"1") = false ->
     _get_Mstatus_SXL mstatus1 = 'b"10" ->
     is_aligned_vaddr (Virtaddr a8_ra) 8 = true -> is_aligned_paddr (Physaddr pa_ra) 8 = true ->
@@ -244,7 +237,6 @@ Section WpStart3.
     (* extra conditions for the timerinit call (c6): MPRV/MLPE after the mstatus
        write, and alignment of timerinit's own stack frame. *)
     eq_vec (_get_Mstatus_MPRV mstatus1) ('b"1") = false ->
-    bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ->
     pmp_allows_all pmpcfg1 ->
     is_aligned_vaddr (Virtaddr ta8_ra) 8 = true -> is_aligned_paddr (Physaddr tpa_ra) 8 = true ->
     is_aligned_vaddr (Virtaddr ta8_s0) 8 = true -> is_aligned_paddr (Physaddr tpa_s0) 8 = true ->
@@ -258,7 +250,7 @@ Section WpStart3.
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
     mepc ↦ᵣ mepc0 -∗ satp ↦ᵣ satp0 -∗ medeleg ↦ᵣ medeleg0 -∗ mie ↦ᵣ mie0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
     mhartid ↦ᵣ mhartid0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vold_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vold_s0 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add tpa_ra j) ↦ₘ nth_byte vti_ra j) -∗
@@ -283,16 +275,16 @@ Section WpStart3.
         -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }} ) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 va5_c2 va4_35 va4_36 va5_37 va4_38 va4_39 va5_40 mstatus1
+ intros b1 sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 va5_c2 va4_35 va4_36 va5_37 va4_38 va4_39 va5_40 mstatus1
            va5_42 va5_43 va5_45 va5_47 va5_48 mdv0 va5_51 va5_52 va5_54 va5_55 va5_57 pmpcfg1
            c6sp tpa_ra tpa_s0 ta8_ra ta8_s0.
-    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU HmIE1 HSXL1
-           Ha8ra Hpara Ha8s0 Hpas0 HMPRV1 Hmlpe Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe.
+ intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmpf HmIE Hlp HMPRV HmIE1 HSXL1
+           Ha8ra Hpara Ha8s0 Hpas0 HMPRV1 Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hmhartid Hctx Hstkra Hstks0 Htra Htrs0 #H Hcont".
     (* ---- chunk c1 (idx 30..34): spc30 -> spc35 ---- *)
-    iApply (wp_st_c1 sp0 vra vs0 va5 m mst0 npc0 mi0 misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0
-              mcounteren0 mc mcfg pmpcfg0 pmar0 elp0 vold_ra vold_s0 E Φ
-              Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0
+    iApply (wp_st_c1 sp0 vra vs0 va5 m mst0 npc0 mi0 mstatus0 menvcfg0 mtime0 stimecmp0
+              mcounteren0 mc mcfg pmpcfg0 elp0 vold_ra vold_s0 E Φ
+              Hm1 Hm2 Hm8 Hm15 Hpmpf HmIE Hlp HMPRV Ha8ra Hpara Ha8s0 Hpas0
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 H").
     iNext.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0".
@@ -309,8 +301,8 @@ Section WpStart3.
     { unfold m1. replace (uint srd34) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert. reflexivity. }
     iApply (wp_st_c2 va4 (regval_into_reg (subrange_vec_dec mstatus0 (Z.sub xlen 1) 0)) m1
-              _ spc35 _ misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mcounteren0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
-              Hc2_14 Hc2_15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS
+              _ spc35 _ mstatus0 menvcfg0 mtime0 stimecmp0 mcounteren0 mc mcfg pmpcfg0 elp0 E Φ
+              Hc2_14 Hc2_15 Hpmpf HmIE Hlp
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx H").
     iNext.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx".
@@ -324,9 +316,9 @@ Section WpStart3.
     assert (Hc3_15 : m2 !! gpr_of_Z 15 = Some va5_40).
     { unfold m2. replace (uint r_a5) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert. reflexivity. }
-    iApply (wp_st_c3 va5_40 m2 _ _ _ misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mepc0 satp0
-              mcounteren0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
-              Hc3_15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU HmIE1 HSXL1
+    iApply (wp_st_c3 va5_40 m2 _ _ _ mstatus0 menvcfg0 mtime0 stimecmp0 mepc0 satp0
+              mcounteren0 mc mcfg pmpcfg0 elp0 E Φ
+              Hc3_15 Hpmpf HmIE Hlp HmIE1 HSXL1
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hctx H").
     iNext.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hctx".
@@ -339,16 +331,16 @@ Section WpStart3.
       rewrite lookup_insert. reflexivity. }
     (* extract persistent hw_config (kept) and rebuild ti_ctx for c4 *)
     iDestruct "Hctx" as "(#Hhw & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
-    iAssert (ti_ctx misa0 mstatus1 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0)
+    iAssert (ti_ctx mstatus1 (zeros' 64) mc mcfg pmpcfg0 elp0)
       with "[Hpriv Hhs Hmdl Hms Help Hpmpc]" as "Hctx".
     { rewrite /ti_ctx. iFrame "Hhw". iFrame. }
-    iApply (wp_st_c4 va5_45 m3 _ _ _ misa0 mstatus1 mseccfg0 medeleg0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
-              Hc4_15 Hpmaall Hpmpf HmIE1 Hlp HmisaC HmisaS
+    iApply (wp_st_c4 va5_45 m3 _ _ _ mstatus1 medeleg0 mc mcfg pmpcfg0 elp0 E Φ
+              Hc4_15 Hpmpf HmIE1 Hlp
               with "Hpc Hfile Hnpc Hmi Hmst Hmede Hctx H").
     iNext.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmede Help Hpmpc".
     (* ---- chunk c5 (idx 51..58): spc51 -> spc59.  re-assemble ti_ctx with nonzero mdv0. ---- *)
-    iAssert (ti_ctx misa0 mstatus1 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0)
+    iAssert (ti_ctx mstatus1 mdv0 mc mcfg pmpcfg0 elp0)
       with "[Hhw Hpriv Hhs Hmdl Hms Help Hpmpc]" as "Hctx".
     { rewrite /ti_ctx. iFrame "Hhw". iFrame. }
     set (m4 := <[gpr_of_Z (uint (sreg117 sw48)) := regval_into_reg va5_48]>
@@ -356,8 +348,8 @@ Section WpStart3.
     assert (Hc5_15 : m4 !! gpr_of_Z 15 = Some va5_48).
     { unfold m4. replace (uint (sreg117 sw48)) with 15 by (vm_compute; reflexivity).
       rewrite lookup_insert. reflexivity. }
-    iApply (wp_st_c5 va5_48 m4 _ _ _ misa0 mstatus1 mseccfg0 mdv0 mie0 mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 E Φ
-              Hc5_15 Hpmaall Hpmpf HmIE1 Hlp HmisaC HmisaS
+    iApply (wp_st_c5 va5_48 m4 _ _ _ mstatus1 mdv0 mie0 mc mcfg pmpcfg0 pmpaddr00 elp0 E Φ
+              Hc5_15 Hpmpf HmIE1 Hlp
               with "Hpc Hfile Hnpc Hmi Hmst Hmie Hpmpaddr Hctx H").
     iNext.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmie Hpmpaddr Hctx".
@@ -385,9 +377,9 @@ Section WpStart3.
     assert (Hc6_4 : is_Some (m5 !! gpr_of_Z 4)).
     { unfold m5, m4, m3, m2, m1. repeat (rewrite lookup_insert_ne; [| vm_compute; discriminate]). exact Hm4. }
     iApply (wp_st_c6 sp1 vra (regval_into_reg (add_vec sp1 (sign_extend' 64 (caddi4spn_imm nzimm12)))) va4_39 va5_57 m5
-              _ _ _ misa0 mstatus1 mseccfg0 menvcfg0 (zeros' 64) mtime0 stimecmp0 mdv0 mhartid0
-              mcounteren0 mc mcfg pmpcfg1 pmar0 elp0 vti_ra vti_s0 E Φ
-              Hc6_1 Hc6_2 Hc6_8 Hc6_14 Hc6_15 Hc6_4 Hpmaall Hpmpf1 HmIE1 Hlp HMPRV1 Hpmm Hmlpe HmisaC HmisaS HmisaU
+              _ _ _ mstatus1 menvcfg0 (zeros' 64) mtime0 stimecmp0 mdv0 mhartid0
+              mcounteren0 mc mcfg pmpcfg1 elp0 vti_ra vti_s0 E Φ
+              Hc6_1 Hc6_2 Hc6_8 Hc6_14 Hc6_15 Hc6_4 Hpmpf1 HmIE1 Hlp HMPRV1
               Hta8ra Htpara Hta8s0 Htpas0
               with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmenv Hmcen Hmtime Hstc Hmhartid Hpmpc Hhw Htra Htrs0 H").
     iNext.
@@ -395,9 +387,9 @@ Section WpStart3.
     (* ---- chunk c7 (idx 60..63): spc60 -> MRET.  Supervisor mode at PC = mepc. ---- *)
     iDestruct "Hfile" as (mfin) "[Hfile %Hfp]". destruct Hfp as [Hf15 [Hf4 Hf2]].
     iDestruct "Hmst" as (mstf0) "Hmst".
-    iApply (wp_st_c7 mfin mstf0 mi0 misa0 mstatus1 mseccfg0 mdv0 (mepc_val va5_43) mhartid0 mc mcfg pmpcfg1 pmar0
+    iApply (wp_st_c7 mfin mstf0 mi0 mstatus1 mdv0 (mepc_val va5_43) mhartid0 mc mcfg pmpcfg1
               newpriv lpe elp0 E Φ
-              Hf15 Hf4 Hf2 Hpmaall Hpmpf1 HmIE1 Hlp HmisaC HmisaS HmisaU Hnp Hnpm Hlpe
+              Hf15 Hf4 Hf2 Hpmpf1 HmIE1 Hlp Hnp Hnpm Hlpe
               with "Hpc Hfile Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc Help Hpmpc Hhw H").
     iNext.
     iIntros "Hpc Hnpc Hfile Hmhartid Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc Help Hpmpc Hktx2".
@@ -415,9 +407,9 @@ Section WpStart3.
   (* ===================================================================== *)
   Lemma wp_kernel
       (v : bv 64) (sp0b mst0 mstatus0 : mword 64) (mi0 : bool) (elp0 : mword 1)
-      (mc : mword 32) (mcfg : mword 64) (mseccfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (x1_0 x10_0 x11_0 mhartid0 misa0 : mword 64)
+      (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (x1_0 x10_0 x11_0 mhartid0 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (menvcfg0 mtime0 stimecmp0 mepc0 satp0 medeleg0 mie0 : mword 64)
       (mcounteren0 : mword 32) (pmpaddr00 : type_of_register pmpaddr_n)
@@ -480,23 +472,17 @@ Section WpStart3.
     m !! x10 = Some x10_0 -> m !! x11 = Some x11_0 ->
     m !! gpr_of_Z 8 = Some vs0b -> m !! gpr_of_Z 14 = Some va4b -> m !! gpr_of_Z 15 = Some va5b ->
     is_Some (m !! gpr_of_Z 4) ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8l) 8 = true -> is_aligned_paddr (Physaddr pal) 8 = true ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_M misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     (* ---- start()'s extra hypotheses (legalisation / MRET / stack alignment) ---- *)
     eq_vec (_get_Mstatus_MIE mstatus1) ('b"1") = false ->
     _get_Mstatus_SXL mstatus1 = 'b"10" ->
     is_aligned_vaddr (Virtaddr a8_ra) 8 = true -> is_aligned_paddr (Physaddr pa_ra) 8 = true ->
     is_aligned_vaddr (Virtaddr a8_s0) 8 = true -> is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     eq_vec (_get_Mstatus_MPRV mstatus1) ('b"1") = false ->
-    bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ->
     pmp_allows_all pmpcfg1 ->
     is_aligned_vaddr (Virtaddr ta8_ra) 8 = true -> is_aligned_paddr (Physaddr tpa_ra) 8 = true ->
     is_aligned_vaddr (Virtaddr ta8_s0) 8 = true -> is_aligned_paddr (Physaddr tpa_s0) 8 = true ->
@@ -510,7 +496,7 @@ Section WpStart3.
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
+    hw_config mc mcfg -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
     mepc ↦ᵣ mepc0 -∗ satp ↦ᵣ satp0 -∗ medeleg ↦ᵣ medeleg0 -∗ mie ↦ᵣ mie0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
@@ -537,18 +523,18 @@ Section WpStart3.
         -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }} ) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros bb sp1e eal a8l pal bumpe mst1 x2ld x10l x11c x11a x10m x2add x1j m8
+ intros bb sp1e eal a8l pal bumpe mst1 x2ld x10l x11c x11a x10m x2add x1j m8
            sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 va5_c2 va4_35 va4_36 va5_37 va4_38 va4_39 va5_40 mstatus1
            va5_42 va5_43 va5_45 va5_47 va5_48 mdv0 va5_51 va5_52 va5_54 va5_55 va5_57 pmpcfg1
            c6sp tpa_ra tpa_s0 ta8_ra ta8_s0.
-    intros Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall HmisaC HmisaM HmisaS HmisaU
-           HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe.
+ intros Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmpf HmIE Hlp HMPRV Ha8l Hpall 
+           HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe.
     iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc #Hhw Hbytes
              Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hstkra Hstks0 Htra Htrs0 #H Hcont".
     (* ---- _entry: boot -> start entry (PC = kstart = spc30) ---- *)
-    iApply (wp_kernel_entry sp0b mst0 mstatus0 mi0 elp0 v mc mcfg mseccfg0 pmpcfg0 pmar0
-              x1_0 x10_0 x11_0 mhartid0 misa0 m E Φ
-              Hm1 Hm2 Hm10 Hm11 Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall
+    iApply (wp_kernel_entry sp0b mst0 mstatus0 mi0 elp0 v mc mcfg pmpcfg0
+              x1_0 x10_0 x11_0 mhartid0 m E Φ
+              Hm1 Hm2 Hm10 Hm11 Hpmpf HmIE Hlp HMPRV Ha8l Hpall
               with "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes H").
     iNext.
     iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hbytes Hktx".
@@ -557,7 +543,7 @@ Section WpStart3.
     assert (Hks : kstart = spc30) by reflexivity.
     iEval (rewrite Hks) in "Hpc". iEval (rewrite Hks) in "Hnpc".
     (* assemble ti_ctx for start() from _entry's (unchanged) output CSRs *)
-    iAssert (ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0)
+    iAssert (ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0)
       with "[Hhw Hpriv Hhs Hmdl Hms Help Hpmpc]" as "Hctx".
     { rewrite /ti_ctx. iFrame "Hhw". iFrame. }
     (* lookups over _entry's output gpr file *)
@@ -576,11 +562,11 @@ Section WpStart3.
     assert (HE4 : is_Some (mE !! gpr_of_Z 4)).
     { unfold mE. repeat (rewrite lookup_insert_ne; [| vm_compute; discriminate]). exact Hm4. }
     (* ---- start(): start entry -> MRET (Supervisor mode) ---- *)
-    iPoseProof (wp_start x2add x1j vs0b va4b va5b mE m8 kstart bb misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0
-              mhartid0 mepc0 satp0 medeleg0 mie0 mcounteren0 mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0
+    iPoseProof (wp_start x2add x1j vs0b va4b va5b mE m8 kstart bb mstatus0 menvcfg0 mtime0 stimecmp0
+              mhartid0 mepc0 satp0 medeleg0 mie0 mcounteren0 mc mcfg pmpcfg0 pmpaddr00 elp0
               vold_ra vold_s0 vti_ra vti_s0 newpriv lpe E Φ
-              HE1 HE2 HE8 HE14 HE15 HE4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU HmIE1 HSXL1
-              Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
+              HE1 HE2 HE8 HE14 HE15 HE4 Hpmpf HmIE Hlp HMPRV HmIE1 HSXL1
+              Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
               with "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hmh Hctx
                     Hstkra Hstks0 Htra Htrs0 H Hcont") as "Hgoal".
     iExact "Hgoal".

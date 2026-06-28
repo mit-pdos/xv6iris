@@ -55,19 +55,21 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
 Section HwConfig.
   Context `{!riscvGS Σ}.
 
-  Definition hw_config (misa0 mseccfg0 : mword 64) (mc : mword 32)
-      (mcfg : mword 64) (pmar0 : list PMA_Region) : iProp Σ :=
-    (misa ↦ᵣ□ misa0 ∗ mseccfg ↦ᵣ□ mseccfg0 ∗
+  Definition hw_config (mc : mword 32) (mcfg : mword 64) : iProp Σ :=
+    (∃ (misa0 mseccfg0 : mword 64) (pmar0 : list PMA_Region),
+     misa ↦ᵣ□ misa0 ∗ mseccfg ↦ᵣ□ mseccfg0 ∗
      mcountinhibit ↦ᵣ□ mc ∗ minstretcfg ↦ᵣ□ mcfg ∗
      pma_regions ↦ᵣ□ pmar0 ∗ htif_tohost_base ↦ᵣ□ None ∗
      ⌜ eq_vec (_get_Misa_S misa0) ('b"1") = true ⌝ ∗
      ⌜ eq_vec (_get_Misa_C misa0) ('b"1") = true ⌝ ∗
      ⌜ eq_vec (_get_Misa_U misa0) ('b"1") = true ⌝ ∗
      ⌜ eq_vec (_get_Misa_M misa0) ('b"1") = true ⌝ ∗
-     ⌜ pma_allows_all pmar0 ⌝)%I.
+     ⌜ pma_allows_all pmar0 ⌝ ∗
+     ⌜ pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ⌝ ∗
+     ⌜ bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ⌝)%I.
 
-  Global Instance hw_config_persistent misa0 mseccfg0 mc mcfg pmar0 :
-    Persistent (hw_config misa0 mseccfg0 mc mcfg pmar0).
+  Global Instance hw_config_persistent mc mcfg :
+    Persistent (hw_config mc mcfg).
   Proof. apply _. Qed.
 End HwConfig.
 

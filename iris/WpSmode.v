@@ -877,9 +877,9 @@ End FetchRVC2_S.
   (* ===================================================================== *)
   Lemma wp_kernel_smode1
       (v : bv 64) (sp0b mst0 mstatus0 : mword 64) (mi0 : bool) (elp0 : mword 1)
-      (mc : mword 32) (mcfg : mword 64) (mseccfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (x1_0 x10_0 x11_0 mhartid0 misa0 : mword 64)
+      (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n)
+      (x1_0 x10_0 x11_0 mhartid0 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (menvcfg0 mtime0 stimecmp0 mepc0 satp0 medeleg0 mie0 : mword 64)
       (mcounteren0 : mword 32) (pmpaddr00 : type_of_register pmpaddr_n)
@@ -941,22 +941,16 @@ End FetchRVC2_S.
       m !! x10 = Some x10_0 -> m !! x11 = Some x11_0 ->
       m !! gpr_of_Z 8 = Some vs0b -> m !! gpr_of_Z 14 = Some va4b -> m !! gpr_of_Z 15 = Some va5b ->
       is_Some (m !! gpr_of_Z 4) ->
-      pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+      pmp_allows_all pmpcfg0 ->
       eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
       eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
       eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-      pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
       is_aligned_vaddr (Virtaddr a8l) 8 = true -> is_aligned_paddr (Physaddr pal) 8 = true ->
-      eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-      eq_vec (_get_Misa_M misa0) ('b"1") = true ->
-      eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-      eq_vec (_get_Misa_U misa0) ('b"1") = true ->
       eq_vec (_get_Mstatus_MIE mstatus1) ('b"1") = false ->
       _get_Mstatus_SXL mstatus1 = 'b"10" ->
       is_aligned_vaddr (Virtaddr a8_ra) 8 = true -> is_aligned_paddr (Physaddr pa_ra) 8 = true ->
       is_aligned_vaddr (Virtaddr a8_s0) 8 = true -> is_aligned_paddr (Physaddr pa_s0) 8 = true ->
       eq_vec (_get_Mstatus_MPRV mstatus1) ('b"1") = false ->
-      bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ->
       pmp_allows_all pmpcfg1 ->
       is_aligned_vaddr (Virtaddr ta8_ra) 8 = true -> is_aligned_paddr (Physaddr tpa_ra) 8 = true ->
       is_aligned_vaddr (Virtaddr ta8_s0) 8 = true -> is_aligned_paddr (Physaddr tpa_s0) 8 = true ->
@@ -989,7 +983,7 @@ End FetchRVC2_S.
       cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
       (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
       elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
-      hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
+      hw_config mc mcfg -∗
       ([∗ list] j ∈ seq 0 8, (pa_add pal j) ↦ₘ nth_byte v j) -∗
       menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
       mepc ↦ᵣ mepc0 -∗ satp ↦ᵣ satp0 -∗ medeleg ↦ᵣ medeleg0 -∗ mie ↦ᵣ mie0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
@@ -1015,19 +1009,19 @@ End FetchRVC2_S.
            sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 va5_c2 va4_35 va4_36 va5_37 va4_38 va4_39 va5_40 mstatus1
            va5_42 va5_43 va5_45 va5_47 va5_48 mdv0 va5_51 va5_52 va5_54 va5_55 va5_57 pmpcfg1
            c6sp tpa_ra tpa_s0 ta8_ra ta8_s0.
-    intros Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall HmisaC HmisaM HmisaS HmisaU
-           HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
+    intros Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmpf HmIE Hlp HMPRV Ha8l Hpall
+           HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hpmpf1 Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
            Hrd2 Hnpsup Hb1s Hsatp_bare HSXL_s HSIE_s Hmie_mdl HA0 Hord0 Hrange0 HX0 Help_s Hdec.
     subst newpriv.
     iIntros "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc #Hhw Hbytes
              Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hstkra Hstks0 Htra Htrs0 HK Hcont".
-    iPoseProof "Hhw" as "#Hhwc". iDestruct "Hhwc" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iPoseProof "Hhw" as "#Hhwc". iDestruct "Hhwc" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     (* ---- run the whole boot path up to and including the MRET ---- *)
-    iApply (wp_kernel v sp0b mst0 mstatus0 mi0 elp0 mc mcfg mseccfg0 pmpcfg0 pmar0
-              x1_0 x10_0 x11_0 mhartid0 misa0 m menvcfg0 mtime0 stimecmp0 mepc0 satp0 medeleg0 mie0
+    iApply (wp_kernel v sp0b mst0 mstatus0 mi0 elp0 mc mcfg pmpcfg0
+              x1_0 x10_0 x11_0 mhartid0 m menvcfg0 mtime0 stimecmp0 mepc0 satp0 medeleg0 mie0
               mcounteren0 pmpaddr00 vs0b va4b va5b vold_ra vold_s0 vti_ra vti_s0 Supervisor lpe E Φ
-              Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Ha8l Hpall
-              HmisaC HmisaM HmisaS HmisaU HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hmlpe Hpmpf1
+              Hm1 Hm2 Hm10 Hm11 Hm8 Hm14 Hm15 Hm4 Hpmpf HmIE Hlp HMPRV Ha8l Hpall
+              HmIE1 HSXL1 Hsa8ra Hspara Hsa8s0 Hspas0 HMPRV1 Hpmpf1
               Hta8ra Htpara Hta8s0 Htpas0 Hnp Hnpm Hlpe
               with "Hpc Hfile Hmh Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hpmpc Hhw
                     Hbytes Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hmede Hmie Hpmpaddr Hstkra Hstks0 Htra Htrs0 HK").

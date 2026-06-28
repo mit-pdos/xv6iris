@@ -215,9 +215,9 @@ Section WpKernelMret.
   Lemma wp_kernel_start_tail
       (mfin : gmap register_bitvector_64 (mword 64))
       (mst0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 mdv0 mepc0 mhartid0 : mword 64)
+      (mstatus0 mdv0 mepc0 mhartid0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n)
       (newpriv : Privilege) (lpe : bool)
       (elp0 : mword 1)
       E (Φ : mval -> iProp Σ) :
@@ -236,7 +236,7 @@ Section WpKernelMret.
     cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
     mepc ↦ᵣ mepc0 -∗ elp ↦ᵣ elp0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
+    hw_config mc mcfg -∗
     kernel_text -∗
     ▷ ( PC ↦ᵣ ctgt mepc0 -∗ nextPC ↦ᵣ ctgt mepc0 -∗
         (∃ mf2, gpr_file mf2) -∗ mhartid ↦ᵣ mhartid0 -∗
@@ -252,7 +252,7 @@ Section WpKernelMret.
     destruct Hf4 as [vtp Hf4].
     iIntros "Hpc Hfile Hmhartid Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hmepc
              Help Hpmpc Hhw #Htext".
-    iDestruct "Hhw" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall)".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
     (* ---- idx 60: csrr a5,mhartid (4-aligned at spc60=0xb4) ---- *)
     destruct Hf15 as [va5_60 Hf15].

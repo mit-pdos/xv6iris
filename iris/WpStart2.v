@@ -342,7 +342,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_ADDI (imm9, Regidx rd9), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0x1141 : mword 32) 15 0) with w9
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode9; exact HmisaC.
@@ -352,7 +352,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_SDSP (uimm11, Regidx rs2_11), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0xe022 : mword 32) 15 0) with w11
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode11; exact HmisaC.
@@ -362,7 +362,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_LUI (sclui_imm sw35, Regidx (sreg117 sw35)), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0x7779 : mword 32) 15 0) with sw35
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode_s35; exact HmisaC.
@@ -372,7 +372,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_LUI (sclui_imm sw38, Regidx (sreg117 sw38)), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0x6705 : mword 32) 15 0) with sw38
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode_s38; exact HmisaC.
@@ -382,7 +382,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_LI (scli_imm sw45, Regidx (sreg117 sw45)), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0x4781 : mword 32) 15 0) with sw45
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode_s45; exact HmisaC.
@@ -392,7 +392,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_ADDI (scli_imm sw48, Regidx (sreg117 sw48)), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0x17fd : mword 32) 15 0) with sw48
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode_s48; exact HmisaC.
@@ -402,7 +402,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_SRLI (scsrli_sh sw55, scsrli_crsd), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0x83a9 : mword 32) 15 0) with sw55
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode_s55; exact HmisaC.
@@ -412,7 +412,7 @@ Section WpStart2.
     forall s, eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (subrange_vec_dec w 15 0)) s = Some (C_ADDIW (scaddiw_imm sw61, Regidx (sreg117 sw61)), s).
   Proof.
-    intros Hsub s HmisaC. rewrite Hsub.
+ intros Hsub s . rewrite Hsub.
     replace (subrange_vec_dec (mword_of_int 0x2781 : mword 32) 15 0) with sw61
       by (apply bv_eq; vm_compute; reflexivity).
     apply decode_s61; exact HmisaC.
@@ -427,10 +427,10 @@ Section WpStart2.
       (sp0 vra vs0 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (mstatus0 menvcfg0 mtime0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n)
       (elp0 : mword 1) (vold_ra vold_s0 : bv 64)
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -448,38 +448,34 @@ Section WpStart2.
                 (<[gpr_of_Z (uint rd9) := regval_into_reg sp1]> m)) in
     m !! gpr_of_Z 1 = Some vra -> m !! gpr_of_Z 2 = Some sp0 ->
     m !! gpr_of_Z 8 = Some vs0 -> m !! gpr_of_Z 15 = Some va5 ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     is_aligned_vaddr (Virtaddr a8_ra) 8 = true -> is_aligned_paddr (Physaddr pa_ra) 8 = true ->
     is_aligned_vaddr (Virtaddr a8_s0) 8 = true -> is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     PC ↦ᵣ spc30 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vold_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vold_s0 j) -∗
     kernel_text -∗
     ▷ ( PC ↦ᵣ spc35 -∗ gpr_file mout -∗ nextPC ↦ᵣ spc35 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump (bump mst0)))) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-        ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+        ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vra j) -∗
         ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vs0 j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 bump sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 mout.
-    intros Hm1 Hm2 Hm8 Hm15 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
+ intros b1 bump sp1 imm_ra pa_ra imm_s0 pa_s0 a8_ra a8_s0 mout.
+ intros Hm1 Hm2 Hm8 Hm15 Hpmpf HmIE Hlp HMPRV Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx Hstkra Hstks0 #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
     iPoseProof "Hhwb" as "#Hhw".
-    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iDestruct "Hhwb" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
     (* idx 30: C_ADDI sp,sp,-16 (4-byte window from skinstr 30 ++ 31) *)
     iAssert (kinstr_bytes (skinstr 30)) as "#K30". { sg 30. }
@@ -594,10 +590,10 @@ Section WpStart2.
       (va4 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (mstatus0 menvcfg0 mtime0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n)
       (elp0 : mword 1)
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -616,29 +612,27 @@ Section WpStart2.
                 (<[gpr_of_Z (uint (sit_rd sw36)) := regval_into_reg va4_36]>
                 (<[gpr_of_Z (uint (sreg117 sw35)) := regval_into_reg va4_35]> m))))) in
     m !! gpr_of_Z 14 = Some va4 -> m !! gpr_of_Z 15 = Some va5 ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ spc35 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
     kernel_text -∗
     ▷ ( PC ↦ᵣ spc41 -∗ gpr_file mout -∗ nextPC ↦ᵣ spc41 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump (bump (bump mst0))))) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
-        ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+        ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 bump va4_35 va4_36 va5_37 va4_38 va4_39 va5_40 mout.
-    intros Hm14 Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
+ intros b1 bump va4_35 va4_36 va5_37 va4_38 va4_39 va5_40 mout.
+ intros Hm14 Hm15 Hpmpf HmIE Hlp .
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
     iPoseProof "Hhwb" as "#Hhw".
-    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iDestruct "Hhwb" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
     (* idx 35: C_LUI a4 (4-byte window from skinstr 35 ++ 36; idx 36 is 32-bit, 2 bytes remain) *)
     iAssert (kinstr_bytes (skinstr 35)) as "#K35". { sg 35. }
@@ -777,10 +771,10 @@ Section WpStart2.
       (va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mepc0 satp0 : mword 64)
+      (mstatus0 menvcfg0 mtime0 stimecmp0 mepc0 satp0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n)
       (elp0 : mword 1)
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -794,12 +788,9 @@ Section WpStart2.
                 (<[gpr_of_Z (uint (sit_rd sw43)) := regval_into_reg va5_43]>
                 (<[gpr_of_Z (uint srd42) := regval_into_reg va5_42]> m)) in
     m !! gpr_of_Z 15 = Some va5 ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     (* mstatus after idx 41 keeps MIE=0 and has SXL=10 (needed by satp). *)
     eq_vec (_get_Mstatus_MIE mstatus1) ('b"1") = false ->
     _get_Mstatus_SXL mstatus1 = 'b"10" ->
@@ -807,22 +798,22 @@ Section WpStart2.
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
     mepc ↦ᵣ mepc0 -∗ satp ↦ᵣ satp0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
     kernel_text -∗
     ▷ ( PC ↦ᵣ spc47 -∗ gpr_file mout -∗ nextPC ↦ᵣ spc47 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump (bump (bump mst0))))) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
         mepc ↦ᵣ mepc_val va5_43 -∗ satp ↦ᵣ satp_legalized satp0 va5_45 -∗
-        ti_ctx misa0 mstatus1 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+        ti_ctx mstatus1 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 bump mstatus1 va5_42 va5_43 va5_45 mout.
-    intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS HmisaU HmIE1 HSXL1.
+ intros b1 bump mstatus1 va5_42 va5_43 va5_45 mout.
+ intros Hm15 Hpmpf HmIE Hlp HmIE1 HSXL1.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmenv Hmcen Hmtime Hstc Hmepc Hsatp Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
     iPoseProof "Hhwb" as "#Hhw".
-    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iDestruct "Hhwb" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 41)) as "#K41". { sg 41. }
     assert (Hk_a : ki_addr (skinstr 41) = (kentry + 0x74)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 41) = 0x30079073) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 41) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 41) (kentry + 0x74) 0x30079073 Hk_a Hk_e Hk_w with "K41") as "#W41"; clear Hk_a Hk_e Hk_w.
@@ -942,9 +933,9 @@ Section WpStart2.
       (va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 medeleg0 : mword 64)
+      (mstatus0 medeleg0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n)
       (elp0 : mword 1)
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -955,15 +946,13 @@ Section WpStart2.
     let mout := <[gpr_of_Z (uint (sreg117 sw48)) := regval_into_reg va5_48]>
                 (<[gpr_of_Z (uint (sreg117 sw47)) := regval_into_reg va5_47]> m) in
     m !! gpr_of_Z 15 = Some va5 ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ spc47 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     medeleg ↦ᵣ medeleg0 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx mstatus0 (zeros' 64) mc mcfg pmpcfg0 elp0 -∗
     kernel_text -∗
     ▷ ( PC ↦ᵣ spc51 -∗ gpr_file mout -∗ nextPC ↦ᵣ spc51 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump mst0))) -∗
@@ -977,12 +966,12 @@ Section WpStart2.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 bump va5_47 va5_48 mout.
-    intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
+ intros b1 bump va5_47 va5_48 mout.
+ intros Hm15 Hpmpf HmIE Hlp .
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmede Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
     iPoseProof "Hhwb" as "#Hhw".
-    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iDestruct "Hhwb" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 47)) as "#K47". { sg 47. }
     assert (Hk_a : ki_addr (skinstr 47) = (kentry + 0x8a)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 47) = 0x67c1) by (vm_compute; reflexivity); assert (Hk_w : (2 <= ki_width (skinstr 47) / 8)%nat) by (vm_compute; lia); iDestruct (kinstr_window16 (skinstr 47) (kentry + 0x8a) 0x67c1 Hk_a Hk_e Hk_w with "K47") as "#W47"; clear Hk_a Hk_e Hk_w.
@@ -1065,9 +1054,9 @@ Section WpStart2.
       (va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 mdv0 mie0 : mword 64)
+      (mstatus0 mdv0 mie0 : mword 64)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (elp0 : mword 1)
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1084,29 +1073,27 @@ Section WpStart2.
                 (<[gpr_of_Z (uint (sit_rd sw52)) := regval_into_reg va5_52]>
                 (<[gpr_of_Z (uint (scsr_rd sw51)) := regval_into_reg va5_51]> m)))) in
     m !! gpr_of_Z 15 = Some va5 ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     PC ↦ᵣ spc51 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     mie ↦ᵣ mie0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
-    ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg pmpcfg0 pmar0 elp0 -∗
+    ti_ctx mstatus0 mdv0 mc mcfg pmpcfg0 elp0 -∗
     kernel_text -∗
     ▷ ( PC ↦ᵣ spc59 -∗ gpr_file mout -∗ nextPC ↦ᵣ spc59 -∗
         (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ bump (bump (bump (bump (bump (bump (bump (bump mst0))))))) -∗
         mie ↦ᵣ sie_new_mie mie0 mdv0 va5_52 -∗ pmpaddr_n ↦ᵣ pmp0_newaddr pmpcfg0 pmpaddr00 va5_55 -∗
-        ti_ctx misa0 mstatus0 mseccfg0 mdv0 mc mcfg (pmpcfg0_finalvec va5_57 pmpcfg0) pmar0 elp0 -∗
+        ti_ctx mstatus0 mdv0 mc mcfg (pmpcfg0_finalvec va5_57 pmpcfg0) elp0 -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 bump va5_51 va5_52 va5_54 va5_55 va5_57 mout.
-    intros Hm15 Hpmaall Hpmpf HmIE Hlp HmisaC HmisaS.
+ intros b1 bump va5_51 va5_52 va5_54 va5_55 va5_57 mout.
+ intros Hm15 Hpmpf HmIE Hlp .
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hmie Hpmpa Hctx #H".
     iDestruct "Hctx" as "(#Hhwb & Hpriv & Hhs & Hmdl & Hms & Help & Hpmpc)".
     iPoseProof "Hhwb" as "#Hhw".
-    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iDestruct "Hhwb" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     iIntros "Hcont".
     iAssert (kinstr_bytes (skinstr 51)) as "#K51". { sg 51. }
     assert (Hk_a : ki_addr (skinstr 51) = (kentry + 0x96)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 51) = 0x104027f3) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 51) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 51) (kentry + 0x96) 0x104027f3 Hk_a Hk_e Hk_w with "K51") as "#W51"; clear Hk_a Hk_e Hk_w.
@@ -1264,10 +1251,10 @@ Section WpStart2.
       (sp0 vra_in vs0 va4 va5 : mword 64)
       (m : gmap register_bitvector_64 (mword 64))
       (mst0 npc0 : mword 64) (mi0 : bool)
-      (misa0 mstatus0 mseccfg0 menvcfg0 mcounteren0c mtime0 stimecmp0 mdv0 mhartid0 : mword 64)
+      (mstatus0 menvcfg0 mcounteren0c mtime0 stimecmp0 mdv0 mhartid0 : mword 64)
       (mcounteren0 : mword 32)
       (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (pmpcfg0 : type_of_register pmpcfg_n)
       (elp0 : mword 1) (vold_ra vold_s0 : bv 64)
       E (Φ : mval -> iProp Σ) :
     let b1   := andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
@@ -1292,15 +1279,10 @@ Section WpStart2.
     m !! gpr_of_Z 14 = Some va4 ->
     m !! gpr_of_Z 15 = Some va5 ->
     is_Some (m !! gpr_of_Z 4) ->
-    pma_allows_all pmar0 -> pmp_allows_all pmpcfg0 ->
+    pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
-    bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ->
-    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     is_aligned_vaddr (Virtaddr a8_ra) 8 = true -> is_aligned_paddr (Physaddr pa_ra) 8 = true ->
     is_aligned_vaddr (Virtaddr a8_s0) 8 = true -> is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     PC ↦ᵣ spc59 -∗ gpr_file m -∗ nextPC ↦ᵣ npc0 -∗
@@ -1311,7 +1293,7 @@ Section WpStart2.
     menvcfg ↦ᵣ menvcfg0 -∗ mcounteren ↦ᵣ mcounteren0 -∗ mtime ↦ᵣ mtime0 -∗ stimecmp ↦ᵣ stimecmp0 -∗
     mhartid ↦ᵣ mhartid0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    hw_config misa0 mseccfg0 mc mcfg pmar0 -∗
+    hw_config mc mcfg -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte vold_ra j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte vold_s0 j) -∗
     kernel_text -∗
@@ -1331,12 +1313,12 @@ Section WpStart2.
         -∗ kernel_text -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros b1 sp1 imm_ra pa_ra a8_ra imm_s0 pa_s0 a8_s0 vra vra_ld tgt mti_def.
-    intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU Ha8ra Hpara Ha8s0 Hpas0.
+ intros b1 sp1 imm_ra pa_ra a8_ra imm_s0 pa_s0 a8_s0 vra vra_ld tgt mti_def.
+ intros Hm1 Hm2 Hm8 Hm14 Hm15 Hm4 Hpmpf HmIE Hlp HMPRV Ha8ra Hpara Ha8s0 Hpas0.
     iIntros "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmenv Hmcen Hmtime Hstc Hmhartid
              Hpmpc #Hhw Hstkra Hstks0 #H Hcont".
     iPoseProof "Hhw" as "#Hhwb".
-    iDestruct "Hhwb" as "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & _ & _ & _ & _ & _)".
+    iDestruct "Hhwb" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
     (* ---- idx 59: jal ra, timerinit (kernel_text duplicable: split off K59 here) ---- *)
     iAssert (kinstr_bytes (skinstr 59)) as "#K59". { sg 59. }
     assert (Hk_a : ki_addr (skinstr 59) = (kentry + 0xb0)) by (vm_compute; reflexivity); assert (Hk_e : ki_enc (skinstr 59) = 0xf6dff0ef) by (vm_compute; reflexivity); assert (Hk_w : ki_width (skinstr 59) = 32%nat) by (vm_compute; reflexivity); iDestruct (kinstr_window32 (skinstr 59) (kentry + 0xb0) 0xf6dff0ef Hk_a Hk_e Hk_w with "K59") as "#W59"; clear Hk_a Hk_e Hk_w.
@@ -1372,9 +1354,9 @@ Section WpStart2.
     assert (Lti4 : is_Some (mti_def !! gpr_of_Z 4))
       by (unfold mti_def; rewrite lookup_insert_ne; [exact Hm4 | vm_compute; discriminate]).
     iApply (wp_timerinit sp0 vra vs0 va4 va5 mti_def
-              _ misa0 mstatus0 mseccfg0 menvcfg0 mtime0 stimecmp0 mdv0
-              mcounteren0 mc mcfg pmpcfg0 pmar0 b1 elp0 vold_ra vold_s0 E Φ
-              Lti1 Lti2 Lti8 Lti14 Lti15 Lti4 Hpmaall Hpmpf HmIE Hlp HMPRV Hpmm Hmlpe HmisaC HmisaS HmisaU
+              _ mstatus0 menvcfg0 mtime0 stimecmp0 mdv0
+              mcounteren0 mc mcfg pmpcfg0 b1 elp0 vold_ra vold_s0 E Φ
+              Lti1 Lti2 Lti8 Lti14 Lti15 Lti4 Hpmpf HmIE Hlp HMPRV
               Ha8ra Hpara Ha8s0 Hpas0
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               with "Hpc Hfile Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Help Hmenv Hmcen Hmtime Hstc
