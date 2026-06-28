@@ -63,7 +63,7 @@ kernel-entry: model
 # whole-machine-state engine in KernelMain (wp_run). Very heavy operational
 # reduction (~55 try_steps) — several minutes, big stack.
 kernel-start: model
-	lake build Xv6Iris.KernelMain
+	lake build Xv6Iris.KernelMain Xv6Iris.KernelImage
 	lake env lean --tstack=64000000 Xv6Iris/KernelStart.lean
 
 # The whole boot through consoleinit() (145 try_steps: boot, start()/mret into
@@ -71,5 +71,11 @@ kernel-start: model
 # as a WP chained via the whole-machine-state engine. Heaviest reduction (~145
 # steps, ~1h) — big stack.
 kernel-console: model
-	lake build Xv6Iris.KernelMain
+	lake build Xv6Iris.KernelMain Xv6Iris.KernelImage
 	lake env lean --tstack=64000000 Xv6Iris/KernelConsole.lean
+
+# The shared kernel image (full ELF .text+.rodata+.data as a bisection tree),
+# generated from the dumper's data; imported by the proof files so they don't each
+# copy the bytes. Regenerate with: python3 tools/gen_kernel_image.py
+kernel-image: 
+	lake build Xv6Iris.KernelImage
