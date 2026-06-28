@@ -25,6 +25,7 @@ Import Defs.
 
 Section SW.
   Context `{!riscvGS Σ}.
+  Context (root_ppn : mword 44).
 
   (* Supervisor PMP grant for a STORE (W bit). *)
   Lemma exec_pmpCheck_supervisor_grant_store (a : mword 64) (width : Z) s :
@@ -155,7 +156,7 @@ Section SW.
 
   Lemma exec_translate_TLB_hit_super (mxr do_sum : bool) s :
     exec (translate_TLB_hit 39 (mword_of_int 0 : mword 16) sp_vpn (InstructionFetch tt) Supervisor mxr do_sum
-            tt 5 (pw_tlb_entry (mword_of_int 0))) s
+            tt 5 (pw_tlb_entry root_ppn (mword_of_int 0))) s
       = Some (Ok (mword_of_int 0x80005 : mword 44, PBMT_PMA, tt), s).
   Proof.
     destruct mxr, do_sum; vm_compute; reflexivity.
@@ -163,15 +164,15 @@ Section SW.
 
   Lemma exec_lookup_TLB_hit_super (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
     register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)) ->
-    exec (lookup_TLB 39 (mword_of_int 0 : mword 16) sp_vpn) s = Some (Some (5, pw_tlb_entry (mword_of_int 0)), s).
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    exec (lookup_TLB 39 (mword_of_int 0 : mword 16) sp_vpn) s = Some (Some (5, pw_tlb_entry root_ppn (mword_of_int 0)), s).
   Proof.
     intros Htlb Hvec.
     unfold lookup_TLB.
     replace (tlb_hash (__id 39) sp_vpn) with 5 by (vm_compute; reflexivity).
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
     rewrite Htlb. rewrite Hvec.
-    replace (match_TLB_Entry (pw_tlb_entry (mword_of_int 0)) (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) sp_vpn)) with true
+    replace (match_TLB_Entry (pw_tlb_entry root_ppn (mword_of_int 0)) (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) sp_vpn)) with true
       by (vm_compute; reflexivity).
     apply exec_returnm.
   Qed.
@@ -179,7 +180,7 @@ Section SW.
   Lemma exec_translate_hit_super (mxr do_sum : bool)
         (base_ppn : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
     register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     exec (translate 39 (mword_of_int 0 : mword 16) base_ppn sp_vpn (InstructionFetch tt) Supervisor mxr do_sum tt) s
       = Some (Ok (mword_of_int 0x80005 : mword 44, PBMT_PMA, tt), s).
   Proof.
@@ -197,7 +198,7 @@ Section SW.
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     exec (translateAddr (Virtaddr (mword_of_int 0x800053e2)) (InstructionFetch tt)) s
       = Some (Ok (Physaddr (mword_of_int 0x800053e2), PBMT_PMA, init_ext_ptw), s).
   Proof.
@@ -260,7 +261,7 @@ Section FetchSuper2.
   Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
   Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16).
   Hypothesis Htlb : register_lookup tlb s.(sregs) = tlbvec.
-  Hypothesis Hvec : vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)).
+  Hypothesis Hvec : vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)).
   Hypothesis HA : pmpAddrMatchType_encdec_backwards
       (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
   Hypothesis Hord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false.

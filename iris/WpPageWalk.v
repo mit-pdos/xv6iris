@@ -21,6 +21,9 @@ Import Defs.
 
 Section PW.
   Context `{!riscvGS Σ}.
+  (* The root page-table PPN (satp.PPN) is symbolic: the proof constrains it
+     only via the points-to fact for the PTE at pte_paddr root_ppn. *)
+  Context (root_ppn : mword 44).
 
   (* ---- Load-permission Supervisor PMP grant (R bit instead of X) ---- *)
   Lemma exec_pmpCheck_supervisor_grant_load (a : mword 64) (width : Z) s :
@@ -156,15 +159,21 @@ Section PW.
     cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
   Qed.
 
-  (* ---- Concrete identity page table for VA 0x800053e0 (single 1GB superpage) ----
-     A valid Sv39 identity mapping: the root page-table at PPN 0x80100 has, at
-     index VPN[2]=2, a LEAF PTE mapping the 1GB region [0x80000000,0xC0000000)
-     identically (ppn field 0x80000 = 1GB-aligned, flags D A X W R V).
-     Walk reads exactly one PTE → output ppn 0x80005 → pa 0x800053e0 (identity). *)
-  Definition pw_root_ppn : Z := 0x80100.
+  (* ---- Identity page table for VA 0x800053e0 (single 1GB superpage) ----
+     A valid Sv39 identity mapping: the root page-table sits at the SYMBOLIC PPN
+     root_ppn (= satp.PPN); at index VPN[2]=2 it holds a LEAF PTE mapping the 1GB
+     region [0x80000000,0xC0000000) identically (ppn field 0x80000 = 1GB-aligned,
+     flags D A X W R V).  The walk reads exactly one PTE — located at the
+     root_ppn-derived address pte_paddr root_ppn, constrained only by the
+     precondition's points-to fact for that location — and returns output
+     ppn 0x80005 → pa 0x800053e0 (identity). *)
   Definition pte_super : mword 64 := mword_of_int (Z.lor (Z.shiftl 0x80000 10) 0xCF).
-  Definition a_super : mword 64 := mword_of_int 0x80100010.  (* root<<12 + VPN[2]*8 *)
   Definition pw_vpn : mword 27 := mword_of_int 0x80005.
+  (* The PTE physical address the Sv39 walk computes for VA 0x800053e0 at level 2:
+     pte_paddr rp = (rp << 12) | (VPN[2] << 3), exactly the model's
+     concat_vec pt_base (concat_vec vpn_i (zeros' 3)) then zero_extend' 64. *)
+  Definition pte_paddr (rp : mword 44) : mword 64 :=
+    zero_extend' 64 (concat_vec rp (concat_vec (subrange_vec_dec pw_vpn 26 18 : mword 9) (zeros' 3 : mword 3))).
 
   (* The single-level (1GB superpage) page walk: TLB miss reads ONE PTE from
      memory and returns the identity translation output ppn 0x80005. *)
@@ -174,21 +183,21 @@ Section PW.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (mword_of_int 0x80100010)) 8 = Some region ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    exec (within_clint (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_sig (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (mword_of_int 0x80100010) j) = Some (nth_byte pte_super j)) ->
+    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     exec (pt_walk 39 pw_vpn (InstructionFetch tt) Supervisor mxr do_sum
-            (mword_of_int pw_root_ppn : mword 44) 2 false tt) s
+            root_ppn 2 false tt) s
       = Some (Ok (Build_PTW_Output 39 (mword_of_int 0x80005) (autocast (T := mword) pte_super)
-                    (Physaddr (mword_of_int 0x80100010)) 2 PBMT_PMA false, tt), s).
+                    (Physaddr (pte_paddr root_ppn)) 2 PBMT_PMA false, tt), s).
   Proof.
     intros HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
     unfold pt_walk, Zwf_guarded.
@@ -203,10 +212,10 @@ Section PW.
     rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
     (* read_pte: rewrite address to literal, width to 8 *)
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
-      replace a with (mword_of_int 0x80100010 : mword 64) by (vm_compute; reflexivity);
+      replace a with (pte_paddr root_ppn : mword 64) by (unfold pte_paddr; reflexivity);
       replace wd with 8 by (vm_compute; reflexivity) end.
     rewrite (execR_liftR_seq _ _ _ _ _
-               (exec_read_pte_S (mword_of_int 0x80100010) region pte_super s
+               (exec_read_pte_S (pte_paddr root_ppn) region pte_super s
                   HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes)).
     (* pte_is_invalid pte_super = false (V=R=W=X=1, no reserved bits, no reg read) *)
     assert (Hinv : exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte_super 7 0))
@@ -253,13 +262,13 @@ Section PW.
     TLB_Entry_levelMask := mword_of_int 0x3FFFF;
     TLB_Entry_ppn      := mword_of_int 0x80000;
     TLB_Entry_pte      := pte_super;
-    TLB_Entry_pteAddr  := Physaddr (mword_of_int 0x80100010);
+    TLB_Entry_pteAddr  := Physaddr (pte_paddr root_ppn);
   |}.
 
   (* add_to_TLB installs the entry at index 5 (= tlb_hash 39 pw_vpn), changing state. *)
   Lemma exec_add_to_TLB_super (asid : mword 16) s :
     exec (add_to_TLB 39 asid pw_vpn (mword_of_int 0x80005 : mword 44) (autocast (T := mword) pte_super)
-            (Physaddr (mword_of_int 0x80100010)) 2 false) s
+            (Physaddr (pte_paddr root_ppn)) 2 false) s
       = Some (tt, set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs)) 5 (Some (pw_tlb_entry asid)))).
   Proof.
     unfold add_to_TLB. cbn zeta.
@@ -279,18 +288,18 @@ Section PW.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (mword_of_int 0x80100010)) 8 = Some region ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    exec (within_clint (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_sig (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (mword_of_int 0x80100010) j) = Some (nth_byte pte_super j)) ->
+    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec (translate_TLB_miss 39 asid (mword_of_int pw_root_ppn : mword 44) pw_vpn
+    exec (translate_TLB_miss 39 asid root_ppn pw_vpn
             (InstructionFetch tt) Supervisor mxr do_sum tt) s
       = Some (Ok (mword_of_int 0x80005 : mword 44, PBMT_PMA, tt),
               set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs)) 5 (Some (pw_tlb_entry asid)))).
@@ -334,18 +343,18 @@ Section PW.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (mword_of_int 0x80100010)) 8 = Some region ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    exec (within_clint (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_sig (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (mword_of_int 0x80100010) j) = Some (nth_byte pte_super j)) ->
+    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec (translate 39 asid (mword_of_int pw_root_ppn : mword 44) pw_vpn
+    exec (translate 39 asid root_ppn pw_vpn
             (InstructionFetch tt) Supervisor mxr do_sum tt) s
       = Some (Ok (mword_of_int 0x80005 : mword 44, PBMT_PMA, tt),
               set_reg s tlb (vec_update_dec tlbvec 5 (Some (pw_tlb_entry asid)))).
@@ -361,7 +370,7 @@ Section PW.
 
   (* FULL Sv39 translation of vaddr 0x800053e0 with an EMPTY TLB: the page walk
      reads the PTE from memory and fills the TLB (state change). satp encodes
-     MODE=Sv39, ASID=0, root PPN 0x80100. *)
+     MODE=Sv39, ASID=0, and a SYMBOLIC root PPN root_ppn (= satp.PPN). *)
   Definition pw_satp : mword 64 := mword_of_int 0x8000000000080100.
 
   Lemma exec_translateAddr_walk (region : PMA_Region) (menvcfg0 satp0 : mword 64)
@@ -370,7 +379,7 @@ Section PW.
     _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
     register_lookup satp s.(sregs) = satp0 ->
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     register_lookup tlb s.(sregs) = tlbvec ->
     vec_access_dec tlbvec 5 = None ->
@@ -379,15 +388,15 @@ Section PW.
     zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (mword_of_int 0x80100010)) 8 = Some region ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    exec (within_clint (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_sig (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s) ->
-    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (mword_of_int 0x80100010) j) = Some (nth_byte pte_super j)) ->
+    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     exec (translateAddr (Virtaddr (mword_of_int 0x800053e0)) (InstructionFetch tt)) s
@@ -436,7 +445,7 @@ Section PW.
     (* normalise vpn, base_ppn, asid arguments of translate to the concrete walk *)
     match goal with |- context[translate 39 ?asid ?bppn ?vpn _ _ _ _ _] =>
       replace vpn with pw_vpn by (apply bv_eq; vm_compute; reflexivity);
-      replace bppn with (mword_of_int pw_root_ppn : mword 44) by (symmetry; exact Hppn);
+      replace bppn with root_ppn by (symmetry; exact Hppn);
       replace asid with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_translate_walk _ _ (mword_of_int 0) region menvcfg0 tlbvec s
@@ -461,7 +470,7 @@ Section FetchWalk.
   Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
   Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
   Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
-  Hypothesis Hppn : autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44).
+  Hypothesis Hppn : autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn.
   Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16).
   Hypothesis Htlb : register_lookup tlb s.(sregs) = tlbvec.
   Hypothesis Hvec : vec_access_dec tlbvec 5 = None.
@@ -473,15 +482,15 @@ Section FetchWalk.
   Hypothesis pHord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false.
   Hypothesis pHrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match.
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match.
   Hypothesis pHR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
-  Hypothesis pHmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte.
-  Hypothesis pHalign : is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true.
+  Hypothesis pHmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte.
+  Hypothesis pHalign : is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true.
   Hypothesis pHpte : (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true.
-  Hypothesis pHc : exec (within_clint (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s).
-  Hypothesis pHsig : exec (within_sig (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s).
-  Hypothesis pHh : exec (within_htif_readable (Physaddr (mword_of_int 0x80100010)) 8) s = Some (false, s).
-  Hypothesis pHbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (mword_of_int 0x80100010) j) = Some (nth_byte pte_super j).
+  Hypothesis pHc : exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s).
+  Hypothesis pHsig : exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s).
+  Hypothesis pHh : exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s).
+  Hypothesis pHbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j).
   (* PMP/PMA + instruction bytes for the fetch read (evaluated at the FILLED state sf) *)
   Hypothesis iHA : pmpAddrMatchType_encdec_backwards
       (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n sf.(sregs)) 0)) = TOR.
@@ -722,11 +731,11 @@ End ForwardWalk.
       (pmar0 : list PMA_Region) (b : bool) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       (s : mstate) {dq : dfrac} :
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e0)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
-    matching_pma_region pmar0 (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte ->
+    matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte ->
     (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     vec_access_dec tlbvec 5 = None ->
@@ -738,11 +747,11 @@ End ForwardWalk.
       (uint (mword_of_int 0x800053e0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     is_aligned_paddr (Physaddr (mword_of_int 0x800053e0)) 4 = true ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ cur_privilege ↦ᵣ Supervisor -∗
@@ -750,7 +759,7 @@ End ForwardWalk.
     menvcfg ↦ᵣ menvcfg0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
     pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (mword_of_int 0x80100010) j) ↦ₘ{dq} nth_byte pte_super j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{dq} nth_byte pte_super j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (mword_of_int 0x800053e0) j) ↦ₘ{dq} nth_byte w j) -∗
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_RVC (subrange_vec_dec w 15 0), pw_filled tlbvec (set_reg s (R_bool minstret_increment) b)) ⌝.
@@ -768,7 +777,7 @@ End ForwardWalk.
     iDestruct (reg_valid with "Hreg Hpma")   as %Lpma.
     iDestruct (reg_valid with "Hreg Hhtif")  as %Lhtif.
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
-               s.(mem) !! (pa_add (mword_of_int 0x80100010) j) = Some (nth_byte pte_super j)⌝)%I as %Hpbytesf.
+               s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)⌝)%I as %Hpbytesf.
     { iIntros (j Hj). assert (Hj' : (j < 8)%nat) by lia.
       iDestruct (big_sepL_lookup _ _ j j with "Hpbytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
@@ -779,7 +788,7 @@ End ForwardWalk.
       iDestruct (big_sepL_lookup _ _ j j with "Hibytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
       iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
-    iAssert (⌜addr_is_ram (mword_of_int 0x80100010)⌝)%I as %Hramp.
+    iAssert (⌜addr_is_ram (pte_paddr root_ppn)⌝)%I as %Hramp.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
@@ -813,7 +822,7 @@ End ForwardWalk.
     assert (Lthtif : register_lookup htif_tohost_base t.(sregs) = None).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lhtif | vm_compute; reflexivity]. }
     assert (Ltpmem : forall j : nat, (N.of_nat j < 8)%N ->
-              t.(mem) !! (pa_add (mword_of_int 0x80100010) j) = Some (nth_byte pte_super j))
+              t.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j))
       by (unfold t, set_reg; cbn [mem]; exact Hpbytesf).
     (* ----- facts at the FILLED state sf = pw_filled tlbvec t ----- *)
     set (sf := pw_filled tlbvec t).
@@ -840,9 +849,9 @@ End ForwardWalk.
              ltac:(rewrite Ltpmpc; exact HR0)
              ltac:(rewrite Ltpma; exact Hmatchp0)
              Halignp Hpte0
-             (within_clint_false (mword_of_int 0x80100010) 8 t Hncp ltac:(lia))
-             (within_sig_false  (mword_of_int 0x80100010) 8 t Hnsp ltac:(lia))
-             (within_htif_false (mword_of_int 0x80100010) 8 t Lthtif)
+             (within_clint_false (pte_paddr root_ppn) 8 t Hncp ltac:(lia))
+             (within_sig_false  (pte_paddr root_ppn) 8 t Hnsp ltac:(lia))
+             (within_htif_false (pte_paddr root_ppn) 8 t Lthtif)
              Ltpmem
              (* instruction read at sf *)
              ltac:(rewrite Lfpmpc; exact HA0)
@@ -875,11 +884,11 @@ End ForwardWalk.
     m !! gpr_of_Z (uint rd) = Some vd ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     vec_access_dec tlbvec 5 = None ->
     pma_allows_all pmar0 ->
-    matching_pma_region pmar0 (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte ->
+    matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte ->
     (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
@@ -889,11 +898,11 @@ End ForwardWalk.
       (uint (mword_of_int 0x800053e0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     is_aligned_paddr (Physaddr (mword_of_int 0x800053e0)) 4 = true ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
@@ -913,7 +922,7 @@ End ForwardWalk.
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (mword_of_int 0x80100010) j) ↦ₘ{dq} nth_byte pte_super j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{dq} nth_byte pte_super j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (mword_of_int 0x800053e0) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 -∗
         gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (add_vec vd (sign_extend' 64 imm12))]> m) -∗
@@ -926,7 +935,7 @@ End ForwardWalk.
         menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 8, (pa_add (mword_of_int 0x80100010) j) ↦ₘ{dq} nth_byte pte_super j) -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{dq} nth_byte pte_super j) -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (mword_of_int 0x800053e0) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
@@ -1025,11 +1034,11 @@ End ForwardWalk.
     m !! gpr_of_Z 2 = Some vsp ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     vec_access_dec tlbvec 5 = None ->
     pma_allows_all pmar0 ->
-    matching_pma_region pmar0 (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte ->
+    matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte ->
     (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
@@ -1039,11 +1048,11 @@ End ForwardWalk.
       (uint (mword_of_int 0x800053e0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x80100010 : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     is_aligned_paddr (Physaddr (mword_of_int 0x800053e0)) 4 = true ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80100010)) 8 = true ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
@@ -1061,7 +1070,7 @@ End ForwardWalk.
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (mword_of_int 0x80100010) j) ↦ₘ{dq} nth_byte pte_super j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{dq} nth_byte pte_super j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (mword_of_int 0x800053e0) j) ↦ₘ{dq} nth_byte w j) -∗
     ▷ ( PC ↦ᵣ add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 -∗
         gpr_file (<[gpr_of_Z 2 := regval_into_reg (add_vec vsp (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
@@ -1074,7 +1083,7 @@ End ForwardWalk.
         menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
         pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
-        ([∗ list] j ∈ seq 0 8, (pa_add (mword_of_int 0x80100010) j) ↦ₘ{dq} nth_byte pte_super j) -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{dq} nth_byte pte_super j) -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (mword_of_int 0x800053e0) j) ↦ₘ{dq} nth_byte w j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.

@@ -24,6 +24,7 @@ Import Defs.
 
 Section SW2.
   Context `{!riscvGS Σ}.
+  Context (root_ppn : mword 44).
 
 (* Store forward engine: RVC store (c.sdsp) with a state-preserving fetch (the
    superpage TLB hit).  Reuses the RVC step engines; the post-execute state has
@@ -119,7 +120,7 @@ End ForwardCsdsp.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
     zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -186,7 +187,7 @@ End ForwardCsdsp.
     assert (Ltmem : forall j : nat, (N.of_nat j < 2)%N ->
               t.(mem) !! (pa_add (mword_of_int 0x800053e2) j) = Some (nth_byte w j))
       by (unfold t, set_reg; cbn [mem]; exact Hbytesf).
-    exact (exec_fetch_RVC_2_super region w satp0 tlbvec t Ltpriv Ltpc
+    exact (exec_fetch_RVC_2_super root_ppn region w satp0 tlbvec t Ltpriv Ltpc
              ltac:(rewrite Ltms; exact HSXL0) Ltsatp Hmode Hasid Lttlb Hvec
              ltac:(rewrite Ltpmpc; exact HA0)
              ltac:(rewrite Ltpmpaddr; exact Hord0)
@@ -224,7 +225,7 @@ End ForwardCsdsp.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry (mword_of_int 0)) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e2)) 2 = Some region_f ->
     (override_PMA (PMA_Region_attributes region_f) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa) 8 = Some region_st ->
