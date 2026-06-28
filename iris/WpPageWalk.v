@@ -364,11 +364,14 @@ Section PW.
      MODE=Sv39, ASID=0, root PPN 0x80100. *)
   Definition pw_satp : mword 64 := mword_of_int 0x8000000000080100.
 
-  Lemma exec_translateAddr_walk (region : PMA_Region) (menvcfg0 : mword 64)
+  Lemma exec_translateAddr_walk (region : PMA_Region) (menvcfg0 satp0 : mword 64)
         (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
     register_lookup cur_privilege s.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
-    register_lookup satp s.(sregs) = pw_satp ->
+    register_lookup satp s.(sregs) = satp0 ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     register_lookup tlb s.(sregs) = tlbvec ->
     vec_access_dec tlbvec 5 = None ->
     pmpAddrMatchType_encdec_backwards
@@ -391,15 +394,14 @@ Section PW.
       = Some (Ok (Physaddr (mword_of_int 0x800053e0), PBMT_PMA, init_ext_ptw),
               set_reg s tlb (vec_update_dec tlbvec 5 (Some (pw_tlb_entry (mword_of_int 0))))).
   Proof.
-    intros Hcp HSXL Hsatp Htlb Hvec HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    intros Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hvec HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
     unfold translateAddr.
     rewrite exec_catch_early_return.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
     rewrite Hcp.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_fetch _ _ s)).
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_S_sv39 pw_satp s HSXL Hsatp
-               ltac:(vm_compute; reflexivity))).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_S_sv39 satp0 s HSXL Hsatp Hmode)).
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_fetch s)).
     unfold Defs.bind0.
     replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
@@ -407,7 +409,7 @@ Section PW.
     assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
       by (cbn; apply exec_returnm).
     rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
-    assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) pw_satp, s)).
+    assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
     { unfold get_satp.
       assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
                             "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
@@ -434,8 +436,8 @@ Section PW.
     (* normalise vpn, base_ppn, asid arguments of translate to the concrete walk *)
     match goal with |- context[translate 39 ?asid ?bppn ?vpn _ _ _ _ _] =>
       replace vpn with pw_vpn by (apply bv_eq; vm_compute; reflexivity);
-      replace bppn with (mword_of_int pw_root_ppn : mword 44) by (apply bv_eq; vm_compute; reflexivity);
-      replace asid with (mword_of_int 0 : mword 16) by (apply bv_eq; vm_compute; reflexivity) end.
+      replace bppn with (mword_of_int pw_root_ppn : mword 44) by (symmetry; exact Hppn);
+      replace asid with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_translate_walk _ _ (mword_of_int 0) region menvcfg0 tlbvec s
                   Htlb Hvec HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE)).
@@ -449,7 +451,7 @@ Section PW.
     set_reg s tlb (vec_update_dec tlbvec 5 (Some (pw_tlb_entry (mword_of_int 0)))).
 
 Section FetchWalk.
-  Context (region region_pte : PMA_Region) (w : mword 32) (menvcfg0 : mword 64)
+  Context (region region_pte : PMA_Region) (w : mword 32) (menvcfg0 satp0 : mword 64)
           (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (s : mstate).
   Let a := mword_of_int 0x800053e0 : mword 64.    (* instruction vaddr = paddr *)
   Let sf := pw_filled tlbvec s.
@@ -457,7 +459,10 @@ Section FetchWalk.
   Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Supervisor.
   Hypothesis HpcPC : register_lookup PC s.(sregs) = a.
   Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
-  Hypothesis Hsatp : register_lookup satp s.(sregs) = pw_satp.
+  Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
+  Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
+  Hypothesis Hppn : autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44).
+  Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16).
   Hypothesis Htlb : register_lookup tlb s.(sregs) = tlbvec.
   Hypothesis Hvec : vec_access_dec tlbvec 5 = None.
   Hypothesis Hmenv : register_lookup menvcfg s.(sregs) = menvcfg0.
@@ -506,7 +511,7 @@ Section FetchWalk.
            = Some (inr (Ok (Physaddr a, PBMT_PMA, init_ext_ptw)), sf))).
     2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
         rewrite execR_liftR.
-        rewrite (exec_translateAddr_walk region_pte menvcfg0 tlbvec s Hcp HSXL Hsatp Htlb Hvec
+        rewrite (exec_translateAddr_walk region_pte menvcfg0 satp0 tlbvec s Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hvec
                    pHA pHord pHrange pHR pHmatch pHalign pHpte pHc pHsig pHh pHbytes Hmenv HPBMTE).
         cbn match. reflexivity. }
     cbv iota beta.
@@ -712,10 +717,13 @@ End ForwardWalk.
      4 instruction bytes + an EMPTY TLB + CSRs, derive the pure fetch fact,
      which performs the page walk and fills the TLB (state change). *)
   Lemma fetch_from_pts_walk
-      (mstatus0 menvcfg0 : mword 64) (w : mword 32) (region region_pte : PMA_Region)
+      (mstatus0 menvcfg0 satp0 : mword 64) (w : mword 32) (region region_pte : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (b : bool) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       (s : mstate) {dq : dfrac} :
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e0)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte ->
@@ -738,7 +746,7 @@ End ForwardWalk.
     isRVC (subrange_vec_dec w 15 0) = true ->
     reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ cur_privilege ↦ᵣ Supervisor -∗
-    (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗ tlb ↦ᵣ tlbvec -∗
+    (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗
     menvcfg ↦ᵣ menvcfg0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗
     pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -747,7 +755,7 @@ End ForwardWalk.
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_RVC (subrange_vec_dec w 15 0), pw_filled tlbvec (set_reg s (R_bool minstret_increment) b)) ⌝.
   Proof.
-    iIntros (Hmatch0 Hexec Hmatchp0 Hpte0 HSXL0 Hvec HPBMTE0 HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halign Halignp HisRVC)
+    iIntros (Hmode Hppn Hasid Hmatch0 Hexec Hmatchp0 Hpte0 HSXL0 Hvec HPBMTE0 HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halign Halignp HisRVC)
             "Hreg Hmem Hpc Hpriv Hms Hsatp Htlb Hmenv Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hibytes".
     iDestruct (reg_valid with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv")  as %Lpriv.
@@ -790,7 +798,7 @@ End ForwardWalk.
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpriv | vm_compute; reflexivity]. }
     assert (Ltms : register_lookup mstatus t.(sregs) = mstatus0).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lms | vm_compute; reflexivity]. }
-    assert (Ltsatp : register_lookup satp t.(sregs) = pw_satp).
+    assert (Ltsatp : register_lookup satp t.(sregs) = satp0).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lsatp | vm_compute; reflexivity]. }
     assert (Lttlb : register_lookup tlb t.(sregs) = tlbvec).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Ltlb | vm_compute; reflexivity]. }
@@ -823,8 +831,8 @@ End ForwardWalk.
               sf.(mem) !! (pa_add (mword_of_int 0x800053e0) j) = Some (nth_byte w j))
       by (unfold sf, pw_filled, set_reg; cbn [mem]; unfold t, set_reg; cbn [mem]; exact Hibytesf).
     (* discharge the page-table-read and instruction-read register hyps *)
-    apply (exec_fetch_RVC_4_walk region region_pte w menvcfg0 tlbvec t
-             Ltpriv Ltpc ltac:(rewrite Ltms; exact HSXL0) Ltsatp Lttlb Hvec Ltmenv HPBMTE0
+    apply (exec_fetch_RVC_4_walk region region_pte w menvcfg0 satp0 tlbvec t
+             Ltpriv Ltpc ltac:(rewrite Ltms; exact HSXL0) Ltsatp Hmode Hppn Hasid Lttlb Hvec Ltmenv HPBMTE0
              (* PTE read at t *)
              ltac:(rewrite Ltpmpc; exact HA0)
              ltac:(rewrite Ltpmpaddr; exact Hord0)
@@ -857,7 +865,7 @@ End ForwardWalk.
   Lemma wp_pagewalk_addi4 (w : mword 32)
       (cinstr : instruction) (rd : mword 5) (imm12 : mword 12)
       (m : gmap register_bitvector_64 (mword 64))
-      (vd misa0 mdv0 mstatus0 menvcfg0 mie_v : mword 64)
+      (vd misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v : mword 64)
       (b1 : bool) (npc0 mst0 : mword 64) (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (mi0 : bool) (elp0 : mword 1)
@@ -866,6 +874,9 @@ End ForwardWalk.
     uint rd <> 0 ->
     m !! gpr_of_Z (uint rd) = Some vd ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     vec_access_dec tlbvec 5 = None ->
     pma_allows_all pmar0 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte ->
@@ -898,7 +909,7 @@ End ForwardWalk.
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -910,7 +921,7 @@ End ForwardWalk.
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ vec_update_dec tlbvec 5 (Some (pw_tlb_entry (mword_of_int 0))) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
@@ -920,7 +931,7 @@ End ForwardWalk.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hrd Hmd HSXL Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halignf Halignp
+    iIntros (Hrd Hmd HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halignf Halignp
              HisRVC HmisaC HmisaS Hdec Hcexec1 Hb1 Hmie_mdl HSIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hibytes Hcont".
     destruct (Hpmaall (mword_of_int 0x800053e0) 4) as (region_f & Hmatchf & Hexecf & _ & _).
@@ -941,8 +952,8 @@ End ForwardWalk.
     iDestruct ("Hfb" with "Hrdc1") as "Hfile".
     assert (Hsi_s : exec (should_inc_minstret Supervisor) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_S mc mcfg Supervisor s Lmc Lmcfg). }
-    iDestruct (fetch_from_pts_walk mstatus0 menvcfg0 w region_f region_pte pmpcfg0 pmpaddr00 pmar0 b1 tlbvec s
-                 Hmatchf Hexecf Hmatchp Hpte HSXL Hvec HPBMTE HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halignf Halignp HisRVC
+    iDestruct (fetch_from_pts_walk mstatus0 menvcfg0 satp0 w region_f region_pte pmpcfg0 pmpaddr00 pmar0 b1 tlbvec s
+                 Hmode Hppn Hasid Hmatchf Hexecf Hmatchp Hpte HSXL Hvec HPBMTE HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halignf Halignp HisRVC
                  with "Hreg Hmem Hpc Hpriv Hms Hsatp Htlb Hmenv Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hibytes") as %Hfetch_at.
     assert (Hdisp : exec (dispatchInterrupt Supervisor) (sAl s b1) = Some (None, sAl s b1)).
     { apply exec_dispatchInterrupt_none_S.
@@ -1005,7 +1016,7 @@ End ForwardWalk.
   (* ====================================================================== *)
   Lemma wp_pagewalk_caddi16sp (w : mword 32) (imm6 : mword 6)
       (m : gmap register_bitvector_64 (mword 64))
-      (vsp misa0 mdv0 mstatus0 menvcfg0 mie_v : mword 64)
+      (vsp misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v : mword 64)
       (b1 : bool) (npc0 mst0 : mword 64) (mc : mword 32) (mcfg : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (mi0 : bool) (elp0 : mword 1)
@@ -1013,6 +1024,9 @@ End ForwardWalk.
       E {dq : dfrac} (Phi : mval -> iProp Σ) :
     m !! gpr_of_Z 2 = Some vsp ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0x80100 : mword 44) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     vec_access_dec tlbvec 5 = None ->
     pma_allows_all pmar0 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x80100010)) 8 = Some region_pte ->
@@ -1043,7 +1057,7 @@ End ForwardWalk.
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
     (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
     elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
@@ -1055,7 +1069,7 @@ End ForwardWalk.
         (R_bool minstret_increment) ↦ᵣ b1 -∗
         minstret ↦ᵣ (if b1 then add_vec_int mst0 1 else mst0) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ pw_satp -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ vec_update_dec tlbvec 5 (Some (pw_tlb_entry (mword_of_int 0))) -∗
         menvcfg ↦ᵣ menvcfg0 -∗ mie ↦ᵣ mie_v -∗
         elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
@@ -1065,13 +1079,13 @@ End ForwardWalk.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (Hsp HSXL Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halignf Halignp
+    iIntros (Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hrange0 Hrangep0 HX0 HR0 Halignf Halignp
              HisRVC HmisaC HmisaS Hdec Hb1 Hmie_mdl HSIE Help)
       "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hibytes Hcont".
     iApply (wp_pagewalk_addi4 w (C_ADDI16SP imm6) (zero_extend' 5 ('b"10")) (caddi16sp_imm imm6)
-              m vsp misa0 mdv0 mstatus0 menvcfg0 mie_v b1 npc0 mst0 mc mcfg pmpcfg0 pmpaddr00 pmar0 mi0 elp0
+              m vsp misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v b1 npc0 mst0 mc mcfg pmpcfg0 pmpaddr00 pmar0 mi0 elp0
               tlbvec region_pte E Phi
-              ltac:(vm_compute; discriminate) Hsp HSXL Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hrange0 Hrangep0
+              ltac:(vm_compute; discriminate) Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hrange0 Hrangep0
               HX0 HR0 Halignf Halignp HisRVC HmisaC HmisaS Hdec (fun s0 => exec_execute_C_ADDI16SP imm6 s0)
               Hb1 Hmie_mdl HSIE Help
              with "Hpc Hfile Hmisa' Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hibytes [Hcont]").
