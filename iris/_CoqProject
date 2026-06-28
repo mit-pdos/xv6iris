@@ -40,3 +40,4 @@ WpStart3.v
 WpSmode.v
 WpSmode2.v
 WpKernelvec.v
+WpPageWalk.v
