@@ -128,6 +128,16 @@ for regenerating the Sail model.
 >   **`WpStart2` 184 s → 87 s, `WpStartChain` 187 s → 140 s**. (`Zicsr` is pure-true
 >   in this model, so it survives the `vm_compute`; only the `Zihintpause`/`Zicfilp`/
 >   `Zca` gates — which read `misa`/privilege — must be peeled by hand first.)
+>   That `decode_pause_prefix s Hpriv. decode_finish s.` pair is packaged as a
+>   single tactic **`decode_any s Hpriv`** (WpDecode.v): it decodes *any* 32-bit
+>   word in base RV64I + Zicsr — lui/auipc, loads/stores, branches, jal/jalr, the
+>   OP-IMM/OP arithmetic family, csrr/csrw/csrrs — in one line with no per-opcode
+>   stepping (e.g. `decode_auipc`/`decode_ld` are now one-liners; the 24 CSR/ITYPE
+>   decode lemmas in the start chains use it too). The ONE thing it can't do is an
+>   instruction sitting behind a *misa-gated* extension clause (M `mul`/`div`, A
+>   atomics, C compressed, F/D): their `currentlyEnabled Ext_*` reads `misa`, so
+>   `vm_compute` gets stuck on it exactly like `Zicfilp`, and the gate must be
+>   peeled by hand with the relevant misa hypothesis first.
 
 > **Build-perf note (extract `iApply`/`iDestruct` of heavy lemmas out of big
 > proofs).** In `WpKernelMret`, discharging the per-instruction fetch windows

@@ -111,44 +111,12 @@ Ltac decode_finish s :=
        end);
   vm_compute; reflexivity.
 
-Definition imm_auipc : mword 20 := subrange_vec_dec w_auipc 31 12.
-Definition i_auipc : mword 5 :=
-  autocast (subrange_vec_dec (subrange_vec_dec w_auipc 11 7) (regidx_bit_width - 1) 0).
-
-Lemma decode_auipc s :
-  register_lookup cur_privilege (sregs s) = Machine ->
-  exec (ext_decode w_auipc) s = Some (UTYPE (imm_auipc, Regidx i_auipc, AUIPC), s).
-Proof.
-  intro Hpriv. unfold imm_auipc, i_auipc.
-  unfold ext_decode, encdec_backwards. cbv beta. cbn zeta.
-  skip_pure_clause.                       (* ZICBOP *)
-  skip_pure_clause.                       (* NTL    *)
-  (* replace PAUSE/Zicfilp pattern checks (vm_compute) with false *)
-  match goal with |- context[eq_vec w_auipc ?c] =>
-    replace (eq_vec w_auipc c) with false by (vm_compute; reflexivity) end.
-  match goal with |- context[eq_vec (subrange_vec_dec w_auipc 11 0) ?c] =>
-    replace (eq_vec (subrange_vec_dec w_auipc 11 0) c) with false by (vm_compute; reflexivity) end.
-  (* PAUSE and_boolM -> false *)
-  assert (HA1 : exec (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM false)) s
-                = Some (false, s)).
-  { destruct (exec_cE_pause s) as [bp Hbp].
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbp). destruct bp; [apply exec_returnm | reflexivity]. }
-  rewrite (exec_bind_Some _ _ _ _ _ HA1). cbn match.
-  (* Zicfilp and_boolM -> false (nested under another bind) *)
-  rewrite exec_bind.
-  assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s
-                = Some (false, s)).
-  { destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz].
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz). destruct bz; [apply exec_returnm | reflexivity]. }
-  rewrite (exec_bind_Some _ _ _ _ _ HA2). cbn match.
-  (* AUIPC (UTYPE) is not extension-gated: collapse the read-free remainder. *)
-  decode_finish s.
-Qed.
-
-Definition w_ld : mword 32 := mword_of_int 0x1d813103.
-
 (* the shared PAUSE/Zicfilp prefix: 2 pure skips + the two currentlyEnabled
-   and_boolM clauses (both collapse to [false] for any non-LPAD/PAUSE word). *)
+   and_boolM clauses (both collapse to [false] for any non-LPAD/PAUSE word).
+   These two clauses are the ONLY stateful part of the 32-bit decoder for a
+   non-extension-gated instruction: [currentlyEnabled Zihintpause] and
+   [currentlyEnabled Zicfilp] read state (the latter needs cur_privilege=Machine,
+   hence [Hpriv]), so [vm_compute] cannot step through them. *)
 Ltac decode_pause_prefix s Hpriv :=
   unfold ext_decode, encdec_backwards; cbv beta; cbn zeta;
   skip_pure_clause; skip_pure_clause;
@@ -172,6 +140,29 @@ Ltac decode_pause_prefix s Hpriv :=
      rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz); destruct bz; [apply exec_returnm | reflexivity]);
   rewrite (exec_bind_Some _ _ _ _ _ HA2); cbn match; clear HA2.
 
+(* ONE-SHOT decoder for (almost) any 32-bit instruction word: peel the shared
+   stateful PAUSE/Zicfilp prefix, then [decode_finish] collapses the entire
+   read-free remainder in a single [vm_compute].  Works for ALL of base RV64I +
+   Zicsr -- lui/auipc, loads/stores, branches, jal/jalr, the OP-IMM/OP arithmetic
+   family, and csrr/csrw/csrrs -- with no per-opcode clause stepping.
+   LIMITATION: it does NOT handle instructions sitting behind a *misa-gated*
+   extension clause (M mul/div, A atomics, C compressed, F/D), because their
+   [currentlyEnabled Ext_*] reads the misa register and [vm_compute] gets stuck on
+   it (just like Zicfilp).  Those still need the relevant misa hypothesis to peel
+   their gate before finishing. *)
+Ltac decode_any s Hpriv := decode_pause_prefix s Hpriv; decode_finish s.
+
+Definition imm_auipc : mword 20 := subrange_vec_dec w_auipc 31 12.
+Definition i_auipc : mword 5 :=
+  autocast (subrange_vec_dec (subrange_vec_dec w_auipc 11 7) (regidx_bit_width - 1) 0).
+
+Lemma decode_auipc s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode w_auipc) s = Some (UTYPE (imm_auipc, Regidx i_auipc, AUIPC), s).
+Proof. intro Hpriv. unfold imm_auipc, i_auipc. decode_any s Hpriv. Qed.
+
+Definition w_ld : mword 32 := mword_of_int 0x1d813103.
+
 Definition imm_ld : mword 12 := subrange_vec_dec w_ld 31 20.
 Definition i_ld : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_ld 11 7) (regidx_bit_width - 1) 0).
@@ -179,15 +170,4 @@ Definition i_ld : mword 5 :=
 Lemma decode_ld s :
   register_lookup cur_privilege (sregs s) = Machine ->
   exec (ext_decode w_ld) s = Some (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8), s).
-Proof.
-  intro Hpriv. unfold imm_ld, i_ld.
-  decode_pause_prefix s Hpriv.
-  (* UTYPE guard is FALSE for ld -> returnM None, fall through to JAL... *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with false by (vm_compute; reflexivity) end.
-  cbn match.
-  match goal with |- context[exec (returnM ?x) s] => rewrite (exec_returnM x s) end.
-  cbn match. cbn match.
-  (* LOAD is not extension-gated: collapse the read-free remainder in one pass. *)
-  decode_finish s.
-Qed.
+Proof. intro Hpriv. unfold imm_ld, i_ld. decode_any s Hpriv. Qed.

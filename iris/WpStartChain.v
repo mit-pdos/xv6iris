@@ -627,7 +627,7 @@ Section WpStartChain.
     register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode w13) s
       = Some (CSRReg (subrange_vec_dec w13 31 20, Regidx rs1z13, Regidx rd13, CSRRS), s).
-  Proof. intro Hpriv. unfold rs1z13, rd13. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1z13, rd13. decode_any s Hpriv. Qed.
 
   (* idx 17: csrw menvcfg,a5  enc 0x30a79073 -> CSRReg (csr, rs1, zreg, CSRRW). *)
   Definition w17 : mword 32 := mword_of_int 0x30a79073.
@@ -637,7 +637,7 @@ Section WpStartChain.
     exec (ext_decode w17) s
       = Some (CSRReg (subrange_vec_dec w17 31 20, Regidx rs1_17,
                        Regidx (autocast (subrange_vec_dec (subrange_vec_dec w17 11 7) (regidx_bit_width - 1) 0)), CSRRW), s).
-  Proof. intro Hpriv. unfold rs1_17. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1_17. decode_any s Hpriv. Qed.
 
   (* idx 18: csrr a5,mcounteren  enc 0x306027f3 -> CSRRS. *)
   Definition w18 : mword 32 := mword_of_int 0x306027f3.
@@ -647,7 +647,7 @@ Section WpStartChain.
     register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode w18) s
       = Some (CSRReg (subrange_vec_dec w18 31 20, Regidx rs1z18, Regidx rd18, CSRRS), s).
-  Proof. intro Hpriv. unfold rs1z18, rd18. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1z18, rd18. decode_any s Hpriv. Qed.
 
   (* idx 20: csrw mcounteren,a5  enc 0x30679073 -> CSRRW. *)
   Definition w20 : mword 32 := mword_of_int 0x30679073.
@@ -657,7 +657,7 @@ Section WpStartChain.
     exec (ext_decode w20) s
       = Some (CSRReg (subrange_vec_dec w20 31 20, Regidx rs1_20,
                        Regidx (autocast (subrange_vec_dec (subrange_vec_dec w20 11 7) (regidx_bit_width - 1) 0)), CSRRW), s).
-  Proof. intro Hpriv. unfold rs1_20. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1_20. decode_any s Hpriv. Qed.
 
   (* idx 21: csrr a5,time  enc 0xc01027f3 -> CSRRS. *)
   Definition w21 : mword 32 := mword_of_int 0xc01027f3.
@@ -667,7 +667,7 @@ Section WpStartChain.
     register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode w21) s
       = Some (CSRReg (subrange_vec_dec w21 31 20, Regidx rs1z21, Regidx rd21, CSRRS), s).
-  Proof. intro Hpriv. unfold rs1z21, rd21. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1z21, rd21. decode_any s Hpriv. Qed.
 
   (* idx 25: csrw stimecmp,a5  enc 0x14d79073 -> CSRRW. *)
   Definition w25 : mword 32 := mword_of_int 0x14d79073.
@@ -677,7 +677,7 @@ Section WpStartChain.
     exec (ext_decode w25) s
       = Some (CSRReg (subrange_vec_dec w25 31 20, Regidx rs1_25,
                        Regidx (autocast (subrange_vec_dec (subrange_vec_dec w25 11 7) (regidx_bit_width - 1) 0)), CSRRW), s).
-  Proof. intro Hpriv. unfold rs1_25. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1_25. decode_any s Hpriv. Qed.
 
   (* close an ITYPE clause: guard true, peel encdec_reg(19 15), encdec_iop(14 12)->op,
      encdec_reg(11 7), then returnM. *)
@@ -717,7 +717,7 @@ Section WpStartChain.
     register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode w19) s
       = Some (ITYPE (subrange_vec_dec w19 31 20, Regidx rs1_19, Regidx rd19, ORI), s).
-  Proof. intro Hpriv. unfold rs1_19, rd19. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1_19, rd19. decode_any s Hpriv. Qed.
 
   (* idx 23: addi a4,a4,576  enc 0x24070713 -> ITYPE (imm, rs1, rd, ADDI). *)
   Definition w23 : mword 32 := mword_of_int 0x24070713.
@@ -727,7 +727,7 @@ Section WpStartChain.
     register_lookup cur_privilege (sregs s) = Machine ->
     exec (ext_decode w23) s
       = Some (ITYPE (subrange_vec_dec w23 31 20, Regidx rs1_23, Regidx rd23, ADDI), s).
-  Proof. intro Hpriv. unfold rs1_23, rd23. decode_pause_prefix s Hpriv. decode_finish s. Qed.
+  Proof. intro Hpriv. unfold rs1_23, rd23. decode_any s Hpriv. Qed.
 
   (* idx 22: lui a4,0xf4  enc 0x000f4737 -> UTYPE (imm, rd, LUI). *)
   Definition w22 : mword 32 := mword_of_int 0x000f4737.
