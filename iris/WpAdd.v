@@ -401,7 +401,9 @@ Section FinalWP.
     iIntros (HN HS0 HmIE0 Help0 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
       "#Hinv Hx10 Hx11 Hx12 Hpc Hnpc Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
-    iApply (wp_exec_step_minstret with "Hinv"); first done.
+    (* this leaf opens no further invariant, so take the inner mask = E∖↑minstretN
+       (both fupds then reflexive, discharged by iModIntro) *)
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
     iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hx10")  as %Lx10.
     iDestruct (reg_valid_dq with "Hreg Hx11")  as %Lx11.
@@ -415,6 +417,7 @@ Section FinalWP.
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b s
                  Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
+    iModIntro.
     iExists (sF s). iSplitR.
     { iPureIntro. apply forward_exec_final; try assumption.
       - rewrite Lmisa. exact HS0.

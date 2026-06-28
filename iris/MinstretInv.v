@@ -50,35 +50,46 @@ Section MinstretInv.
     iExists mst, mi. iFrame.
   Qed.
 
-  (* A CONVENIENCE step rule for leaves that need the two counter cells: it just
-     [iInv]s [minstret_inv] on top of the general [wp_exec_step_fupd], so a leaf
-     gets [minstret_inv_body] for the step and hands a fresh body back -- without
-     repeating the invariant-opening boilerplate.  Nothing here is minstret-
-     specific beyond the namespace; any invariant can be opened the same way by
-     calling [wp_exec_step_fupd] directly (see the comment on it in RiscvExec.v).
+  (* The step rule for leaves that need the two counter cells: it [iInv]s
+     [minstret_inv] on top of the general [wp_exec_step_fupd], so a leaf gets
+     [minstret_inv_body] for the step and hands a fresh body back -- without
+     repeating the invariant-opening boilerplate.
+
+     Crucially this is itself a FUPD spec: the caller picks the inner mask [Ei],
+     so it can ALSO open its OWN invariants on top of the minstret one.  After the
+     minstret invariant is opened (moving [E] -> [E∖↑minstretN]) the obligation
+     hands the caller a [={E∖↑minstretN, Ei}] fupd; to open a further [inv N P],
+     take [Ei := E ∖ ↑minstretN ∖ ↑N] and [iInv N] on that fupd, closing it in the
+     [={Ei, E∖↑minstretN}] continuation -- exactly as one would with
+     [wp_exec_step_fupd] directly.  Leaves that need no further invariant just take
+     [Ei := E ∖ ↑minstretN] (then both fupds are reflexive, discharged by
+     [iModIntro]).
 
      The obligation must:
        - produce the next state [σ'] and the exec witness (state [σ'] via
          [register_lookup minstret σ.(sregs)], a function of σ -- so the cells are
          NOT needed for the witness, only for the post-step [state_interp] update);
-       - then, working at mask [E∖N], fold the minstret bump into [state_interp σ']
-         and return a fresh [minstret_inv_body] to close the invariant. *)
-  Lemma wp_exec_step_minstret E Φ :
+       - fold the minstret bump into [state_interp σ'] and return a fresh
+         [minstret_inv_body] to close the invariant. *)
+  Lemma wp_exec_step_minstret E Ei Φ :
     ↑minstretN ⊆ E →
     minstret_inv -∗
-    (∀ σ ns κs nt, state_interp σ ns κs nt -∗ minstret_inv_body -∗
+    (∀ σ ns κs nt, state_interp σ ns κs nt -∗ minstret_inv_body
+         ={E ∖ ↑minstretN, Ei}=∗
        ∃ σ', ⌜exec riscv_step σ = Some (tt, σ')⌝ ∗
-          ▷ |={E ∖ ↑minstretN, E ∖ ↑minstretN}=>
-               (state_interp σ' (S ns) κs nt ∗ minstret_inv_body ∗
-                WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ (|={Ei, E ∖ ↑minstretN}=>
+               state_interp σ' (S ns) κs nt ∗ minstret_inv_body ∗
+               WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN) "#Hinv H".
-    iApply (wp_exec_step_fupd E (E ∖ ↑minstretN)).
+    iApply (wp_exec_step_fupd E Ei).
     iIntros (σ ns κs nt) "Hsi".
-    (* open the invariant; this IS the [={E, E∖N}] move the obligation demands *)
+    (* open the minstret invariant; this is the [={E, E∖↑minstretN}] half of the
+       [={E, Ei}] move [wp_exec_step_fupd] demands -- the caller's fupd supplies
+       the rest ([={E∖↑minstretN, Ei}]). *)
     iInv "Hinv" as ">Hbody" "Hclose".
-    iDestruct ("H" $! σ ns κs nt with "Hsi Hbody") as (σ') "[%Hexec Hk]".
+    iMod ("H" $! σ ns κs nt with "Hsi Hbody") as (σ') "[%Hexec Hk]".
     iModIntro. iExists σ'. iSplit; first done.
     iNext.
     iMod "Hk" as "(Hsi' & Hbody' & HWP)".
