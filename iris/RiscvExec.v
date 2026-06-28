@@ -134,6 +134,28 @@ Section WPExec.
     iMod "H" as "[$ $]". iIntros "_ !>". done.
   Qed.
 
+  (* General-purpose form: the caller chooses the "inner" mask [Ei] instead of the
+     hardcoded [∅].  This is what lets a CALLER open its own invariants around the
+     step: to use an invariant [inv N P], take [Ei := E ∖ ↑N] and simply [iInv N]
+     on the [={E,Ei}] obligation (which opens N, moving E→E∖↑N) and close it in the
+     [={Ei,E}] continuation.  No bespoke per-invariant step rule is needed.
+
+     ([wp_exec_step] is the [Ei := ∅] special case; the physical-step "go to ∅" is
+     handled INSIDE this proof, so the caller never sees ∅ and works purely at the
+     masks [E]/[Ei] -- exactly the interface Iris's own atomic-step lemmas expose.) *)
+  Lemma wp_exec_step_fupd E Ei Φ :
+    (∀ σ ns κs nt, state_interp σ ns κs nt ={E,Ei}=∗
+       ∃ σ', ⌜exec riscv_step σ = Some (tt, σ')⌝ ∗
+          ▷ (|={Ei,E}=> state_interp σ' (S ns) κs nt ∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))
+    ⊢ WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros "H". iApply wp_exec_step. iIntros (σ ns κs nt) "Hsi".
+    iMod ("H" $! σ ns κs nt with "Hsi") as (σ') "[%Hexec Hk]".
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
+    iExists σ'. iSplit; first done. iNext.
+    iMod "Hcl" as "_". iMod "Hk" as "[Hsi' HWP]". iModIntro. iFrame.
+  Qed.
+
 End WPExec.
 
 (* Now that the Lang/Iris/Exec sections (which must share stdpp's bv_countable   *)

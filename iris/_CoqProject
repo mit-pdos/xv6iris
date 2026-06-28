@@ -5,6 +5,7 @@ RiscvModelBytes.v
 RiscvLang.v
 RiscvPtsto.v
 RiscvExec.v
+MinstretInv.v
 RiscvExtras.v
 RiscvTryStep.v
 RiscvFetchExec.v

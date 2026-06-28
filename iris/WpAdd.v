@@ -10,6 +10,8 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpFetch.
+Require Import MinstretInv.
+From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
 (* ===== RiscvModelFinalWP ===== *)
@@ -124,7 +126,6 @@ Section FinalWP.
     register_lookup (R_bitvector_64 x10) s.(sregs) = a0 ->
     register_lookup (R_bitvector_64 x11) s.(sregs) = a1 ->
     register_lookup PC s.(sregs) = pc ->
-    register_lookup minstret s.(sregs) = mst0 ->
     register_lookup cur_privilege s.(sregs) = Machine ->
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
     eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -133,7 +134,7 @@ Section FinalWP.
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     exec riscv_step s = Some (tt, sF s).
   Proof using All.
-    intros Hfetch_at Lx10 Lx11 Lpc Lmst Lpriv Lhs LS LmIE Lelp.
+    intros Hfetch_at Lx10 Lx11 Lpc Lpriv Lhs LS LmIE Lelp.
     (* dispatchInterrupt -> None at sA s via the misa.S keystone (mideleg-agnostic). *)
     assert (HdispA : exec (dispatchInterrupt Machine) (sA s) = Some (None, sA s)).
     { apply exec_dispatchInterrupt_none.
@@ -215,6 +216,38 @@ Section FinalWP.
     unfold sF, sFc. rewrite HsT. destruct b; [ | reflexivity ].
     assert (Emst : register_lookup minstret (base_upd s).(sregs) = mst0).
     { unfold base_upd, sA, set_reg; cbn [sregs]. tmiss. tmiss. tmiss. tmiss. exact Lmst. }
+    rewrite Emst. reflexivity.
+  Qed.
+
+  (* Like [sF_eq], but expresses the post-step state through the *runtime* minstret
+     value [register_lookup minstret s.(sregs)] rather than the section parameter
+     [mst0].  This is what a leaf needs when it does NOT own (and never learns) the
+     minstret value up front -- it only obtains it transiently from the invariant
+     after the step. *)
+  Lemma sF_eq_rt (s : mstate) :
+    register_lookup (R_bitvector_64 x10) s.(sregs) = a0 ->
+    register_lookup (R_bitvector_64 x11) s.(sregs) = a1 ->
+    sF s = if b then set_reg (base_upd s) minstret
+                      (add_vec_int (register_lookup minstret s.(sregs)) 1)
+           else base_upd s.
+  Proof using All.
+    intros Lx10 Lx11.
+    assert (E10 : register_lookup (R_bitvector_64 x10)
+                    (set_reg (sA s) nextPC (add_vec_int pc 4)).(sregs) = a0).
+    { unfold sA, set_reg; cbn [sregs]. tmiss. tmiss. exact Lx10. }
+    assert (E11 : register_lookup (R_bitvector_64 x11)
+                    (set_reg (sA s) nextPC (add_vec_int pc 4)).(sregs) = a1).
+    { unfold sA, set_reg; cbn [sregs]. tmiss. tmiss. exact Lx11. }
+    assert (Enpc : register_lookup nextPC (sX s).(sregs) = add_vec_int pc 4).
+    { unfold sX; cbv zeta. unfold sA, set_reg; cbn [sregs]. tmiss.
+      rewrite register_lookup_set. reflexivity. }
+    assert (HsT : sT s = base_upd s).
+    { unfold sT. rewrite Enpc. unfold sX; cbv zeta. rewrite E10 E11.
+      unfold regval_into_reg, base_upd, sA. reflexivity. }
+    unfold sF. rewrite HsT. destruct b; [ | reflexivity ].
+    assert (Emst : register_lookup minstret (base_upd s).(sregs)
+                   = register_lookup minstret s.(sregs)).
+    { unfold base_upd, sA, set_reg; cbn [sregs]. tmiss. tmiss. tmiss. tmiss. reflexivity. }
     rewrite Emst. reflexivity.
   Qed.
 
@@ -309,6 +342,104 @@ Section FinalWP.
     - iMod "Hclose" as "_". iModIntro.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hmi Hmst Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes").
+  Qed.
+
+  (* ====================================================================== *)
+  (* PROTOTYPE: the same ADD leaf, but with [minstret] / [minstret_increment]
+     taken from the persistent [minstret_inv] (opened across the step) instead
+     of threaded as two owned cells.  Note the precondition/continuation no
+     longer mention either cell -- only the (duplicable) [minstret_inv].
+     The exec witness is [sF s], built WITHOUT the minstret value; the cells are
+     obtained from the invariant body only AFTER the step, to fold the bump into
+     [state_interp] and hand a fresh body back to close the invariant.        *)
+  (* ====================================================================== *)
+  Lemma wp_add_real_final_minstret
+      (mstatus0 misa0 mdv0 : mword 64) (elp0 : mword 1)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      E {dq : dfrac} (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    pma_allows_all pmar0 ->
+    pmp_allows_all pmpcfg0 ->
+    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
+    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
+    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    minstret_inv -∗
+    (R_bitvector_64 x10) ↦ᵣ a0 -∗
+    (R_bitvector_64 x11) ↦ᵣ a1 -∗
+    (R_bitvector_64 x12) ↦ᵣ v2old -∗
+    PC ↦ᵣ pc -∗
+    nextPC ↦ᵣ npc -∗
+    cur_privilege ↦ᵣ Machine -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
+    (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+    reg_pointsto misa dqc misa0 -∗
+    elp ↦ᵣ elp0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
+    ▷ ( (R_bitvector_64 x10) ↦ᵣ a0 -∗
+        (R_bitvector_64 x11) ↦ᵣ a1 -∗
+        (R_bitvector_64 x12) ↦ᵣ (add_vec a0 a1) -∗
+        PC ↦ᵣ (add_vec_int pc 4) -∗
+        nextPC ↦ᵣ (add_vec_int pc 4) -∗
+        cur_privilege ↦ᵣ Machine -∗
+        hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗
+        (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
+        reg_pointsto misa dqc misa0 -∗
+        elp ↦ᵣ elp0 -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof using All.
+    iIntros (HN HS0 HmIE0 Help0 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
+      "#Hinv Hx10 Hx11 Hx12 Hpc Hnpc Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes Hcont".
+    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
+    iApply (wp_exec_step_minstret with "Hinv"); first done.
+    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
+    iDestruct (reg_valid_dq with "Hreg Hx10")  as %Lx10.
+    iDestruct (reg_valid_dq with "Hreg Hx11")  as %Lx11.
+    iDestruct (reg_valid_dq with "Hreg Hpc")   as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hhs")   as %Lhs.
+    iDestruct (reg_valid_dq with "Hreg Hmdl")  as %Lmdl.
+    iDestruct (reg_valid_dq with "Hreg Hmst'") as %Lmst2.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Help")  as %Lelp.
+    iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b s
+                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
+    iExists (sF s). iSplitR.
+    { iPureIntro. apply forward_exec_final; try assumption.
+      - rewrite Lmisa. exact HS0.
+      - rewrite Lmst2. exact HmIE0.
+      - rewrite Lelp. exact Help0. }
+    iNext.
+    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
+    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi")  as "[Hreg Hmi]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ (R_bitvector_64 x12) _ (add_vec a0 a1) with "Hreg Hx12") as "[Hreg Hx12]".
+    iMod (reg_update _ PC _ (add_vec_int pc 4) with "Hreg Hpc") as "[Hreg Hpc]".
+    rewrite (sF_eq_rt s Lx10 Lx11). unfold base_upd.
+    destruct b.
+    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1)
+              with "Hreg Hmst") as "[Hreg Hmst]".
+      iModIntro.
+      unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi".
+      { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
+      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes").
+    - iModIntro.
+      unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iSplitL "Hmst Hmi".
+      { iExists mst, false. iFrame. }
+      iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes").
   Qed.
 
 End FinalWP.
