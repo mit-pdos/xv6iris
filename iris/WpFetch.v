@@ -94,11 +94,11 @@ Section WpFetch.
     assert (Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
               (Physaddr (fetch_pa pc)) 4 = Some region)
       by (rewrite Lpma; exact Hmatch0).
-    exact (exec_fetch_done pc region w s Lpc Lpriv Hpmp Hmatch Halign Hexec
+    exact (exec_fetch_done pc region w s Lpc Lpriv Hpmp Hmatch Hexec
              (within_clint_false (fetch_pa pc) 4 s Hnc ltac:(lia))
              (within_sig_false  (fetch_pa pc) 4 s Hns ltac:(lia))
              (within_htif_false (fetch_pa pc) 4 s Lhtif)
-             Hbytesf Hbit0 Hbit1 Hvalign HnotRVC).
+             Hbytesf Hvalign HnotRVC).
   Qed.
 
   (* ====================================================================== *)
@@ -173,11 +173,11 @@ Section WpFetch.
     assert (Hmatch : matching_pma_region (register_lookup pma_regions t.(sregs))
               (Physaddr (fetch_pa pc)) 4 = Some region)
       by (rewrite Ltpma; exact Hmatch0).
-    exact (exec_fetch_done pc region w t Ltpc Ltpriv Hpmp Hmatch Halign Hexec
+    exact (exec_fetch_done pc region w t Ltpc Ltpriv Hpmp Hmatch Hexec
              (within_clint_false (fetch_pa pc) 4 t Hnc ltac:(lia))
              (within_sig_false  (fetch_pa pc) 4 t Hns ltac:(lia))
              (within_htif_false (fetch_pa pc) 4 t Lthtif)
-             Ltmem Hbit0 Hbit1 Hvalign HnotRVC).
+             Ltmem Hvalign HnotRVC).
   Qed.
 
 End WpFetch.

@@ -73,7 +73,7 @@ Section FetchRVC.
     rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
     rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
     rewrite (execR_liftR_seq _ _ _ _ _
-      (exec_fetch_bytes_4 pc region w s HpcPC Hpriv Hpmp Hmatch Halign Hexec Hc Hsig Hh Hbytes Hbit0 Hbit1 Hvalign)).
+      (exec_fetch_bytes_4 pc region w s HpcPC Hpriv Hpmp Hmatch Hexec Hc Hsig Hh Hbytes Hvalign)).
     cbv iota beta. rewrite HisRVC. cbv iota beta.
     rewrite execR_returnR_fwd. cbn match. reflexivity.
   Qed.

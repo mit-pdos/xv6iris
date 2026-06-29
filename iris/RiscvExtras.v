@@ -1,7 +1,7 @@
 (* RiscvExtras.v -- shared, opcode-independent reductions & bitvector identities:
    mword/bv identities; the state-pure should_inc_minstret; the MMIO
    within_clint/sig/htif discharges; and the x2 (sp) register-write leaves. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
+From Stdlib Require Import Eqdep_dec ZArith Zquot Lia.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap.
@@ -113,6 +113,43 @@ Qed.
 (* fetch_pa is the identity on 64-bit physical addresses (M-mode, no paging). *)
 Lemma fetch_pa_id (pc : mword 64) : fetch_pa pc = pc.
 Proof. unfold fetch_pa. cbn [bits_of_virtaddr]. apply zero_extend'_id. Qed.
+
+(* The Sail [uint] of an mword is just its stdpp bv_unsigned. *)
+Lemma uint_unsigned (a : mword 64) : uint a = bv_unsigned a.
+Proof.
+  pose proof (bv_unsigned_in_range _ a) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  rewrite Z2N.id; [ reflexivity | lia ].
+Qed.
+
+(* 4-byte alignment of PC (one fact) implies its low-two-bits-zero forms:
+   the Sail fetch path checks bit 0 and bit 1 of PC separately, but both
+   follow from [is_aligned_vaddr (Virtaddr pc) 4]. *)
+Lemma align4_low_bits (pc : mword 64) :
+  is_aligned_vaddr (Virtaddr pc) 4 = true ->
+  neq_vec (access_vec_dec pc 0) ('b"0") = false
+  /\ neq_vec (access_vec_dec pc 1) ('b"0") = false.
+Proof.
+  unfold is_aligned_vaddr. intros H%Z.eqb_eq. rewrite uint_unsigned in H.
+  apply Zrem_divides in H. destruct H as [k Hk].
+  split; unfold neq_vec; rewrite negb_false_iff;
+    unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word;
+    rewrite MachineWord.MachineWord.eqb_true_iff; apply bv_eq;
+    rewrite bv_extract_unsigned;
+    replace (bv_unsigned ('b"0")) with 0%Z by (vm_compute; reflexivity);
+    unfold bv_wrap, bv_modulus; rewrite Hk.
+  - change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0%Z.
+    rewrite Z.shiftr_0_r.
+    replace (2 ^ Z.of_N 1)%Z with 2%Z by reflexivity.
+    replace (4 * k)%Z with ((2 * k) * 2)%Z by lia. apply Z_mod_mult.
+  - change (Z.of_N (MachineWord.MachineWord.Z_idx 1)) with 1%Z.
+    rewrite (Z.shiftr_div_pow2 (4 * k) 1); [ | lia ].
+    replace (2 ^ 1)%Z with 2%Z by reflexivity.
+    replace (2 ^ Z.of_N 1)%Z with 2%Z by reflexivity.
+    replace (4 * k)%Z with ((2 * k) * 2)%Z by lia.
+    rewrite (Z.div_mul (2 * k) 2); [ | lia ].
+    rewrite Z.mul_comm. apply Z_mod_mult.
+Qed.
 
 (* THE BRIDGE: the j-th byte of the fetch window for the instruction at byte
    address [A] is the physical byte address [A + j].  This is what lets a

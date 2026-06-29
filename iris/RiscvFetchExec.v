@@ -9,7 +9,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -442,15 +442,14 @@ Section FetchExec.
       (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF.
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
       (Physaddr addr) 4 = Some region.
-  Hypothesis Halign : is_aligned_paddr (Physaddr addr) 4 = true.
   Hypothesis Hexec : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
   Hypothesis Hc : exec (within_clint (Physaddr addr) 4) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr addr) 4) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s).
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N ->
       s.(mem) !! (pa_add addr j) = Some (nth_byte w j).
-  Hypothesis Hbit0 : neq_vec (access_vec_dec pc 0) ('b"0") = false.
-  Hypothesis Hbit1 : neq_vec (access_vec_dec pc 1) ('b"0") = false.
+  (* A single PC-alignment fact; the paddr-aligned and low-bit-zero forms the
+     Sail fetch path checks are all derived from this (see align4_low_bits). *)
   Hypothesis Hvalign : is_aligned_vaddr (Virtaddr pc) 4 = true.
 
   (* fetch_bytes assembly: the two liftR sub-computations [translateAddr] and
@@ -464,6 +463,8 @@ Section FetchExec.
   Lemma exec_fetch_bytes_4 :
     exec (fetch_bytes pc pc 4) s = Some (@FetchBytes_Success 4 w, s).
   Proof using All.
+    assert (Halign : is_aligned_paddr (Physaddr addr) 4 = true)
+      by (unfold addr; rewrite fetch_pa_id; exact Hvalign).
     unfold fetch_bytes.
     rewrite exec_catch_early_return.
     change (ext_fetch_check_pc pc pc) with (@None unit). cbv iota beta.
@@ -497,6 +498,7 @@ Section FetchExec.
 
   Lemma exec_fetch_done : exec (fetch tt) s = Some (F_Base w, s).
   Proof using All.
+    destruct (align4_low_bits pc Hvalign) as [Hbit0 Hbit1].
     assert (HrdPC : exec (Defs.read_reg PC) s = Some (pc, s)).
     { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
     unfold fetch.
