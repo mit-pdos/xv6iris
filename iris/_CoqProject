@@ -50,3 +50,4 @@ WpKernelvecChain.v
 WpKvJal.v
 WpKvLoad.v
 WpKvTrap.v
+WpKvLoadWp.v
