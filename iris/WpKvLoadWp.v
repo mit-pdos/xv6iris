@@ -653,4 +653,177 @@ Section KVLW.
       iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hibytes").
   Qed.
 
+  (* ==================================================================== *)
+  (* wp_kv_loads_12: chain the first TWO ld restores —                      *)
+  (*   ld ra, 0(sp)  @va   (4-aligned)  then  ld gp, 16(sp) @va+2 (2-aligned)*)
+  (* Validates that the load WPs chain: load 1's gpr_file insert + PC        *)
+  (* advance thread into load 2's precondition; each reads its own stack     *)
+  (* cell (both hit the same stack-page TLB entry).                          *)
+  (* ==================================================================== *)
+  Lemma wp_kv_loads_12 (va : mword 64) (w1 : mword 32) (w2 : mword 16) (svpn : mword 27)
+      (m : gmap register_bitvector_64 (mword 64))
+      (vsp vd1 vd2 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v : mword 64)
+      (b1 : bool) (v1 v2 : bv 64) (npc0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (pmar0 : list PMA_Region) (elp0 : mword 1)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (region_l1 region_l2 region_f1 region_f2 : PMA_Region)
+      E {dq : dfrac} (Phi : mval -> iProp Σ) :
+    let off1 := sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
+    let a81 := sign_extend' 64 (subrange_vec_dec (add_vec vsp off1) (xlen - 0 - 1) 0) in
+    let pa1 := zero_extend' 64 (add_vec_int a81 (0 * 8)) in
+    let off2 := sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
+    let a82 := sign_extend' 64 (subrange_vec_dec (add_vec vsp off2) (xlen - 0 - 1) 0) in
+    let pa2 := zero_extend' 64 (add_vec_int a82 (0 * 8)) in
+    let data1 := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v1 in
+    let vs := add_vec_int va 2 in
+    ↑minstretN ⊆ E ->
+    m !! gpr_of_Z 2 = Some vsp ->
+    m !! gpr_of_Z 1 = Some vd1 ->
+    m !! gpr_of_Z 3 = Some vd2 ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    (* shared CSR/PMP facts *)
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
+              (eq_vec (counter_priv_filter_bit mcfg Supervisor) ('b"0")) ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    (* load 1 (ra @ va, 4-aligned) facts *)
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
+    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = false ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr a81))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a81)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a81)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a81)) (Z.sub pagesize_bits 1) 0)) = a81 ->
+    matching_pma_region pmar0 (Physaddr va) 4 = Some region_f1 ->
+    (override_PMA (PMA_Region_attributes region_f1) PBMT_PMA).(PMA_executable) = true ->
+    matching_pma_region pmar0 (Physaddr pa1) 8 = Some region_l1 ->
+    (override_PMA (PMA_Region_attributes region_l1) PBMT_PMA).(PMA_readable) = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint va) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa1) (uint (to_bits 64 8)) = PMP_Match ->
+    is_aligned_paddr (Physaddr va) 4 = true ->
+    is_aligned_vaddr (Virtaddr a81) 8 = true ->
+    is_aligned_paddr (Physaddr pa1) 8 = true ->
+    isRVC (subrange_vec_dec w1 15 0) = true ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
+       exec (ext_decode_compressed (subrange_vec_dec w1 15 0)) s0 = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 1)), s0)) ->
+    (* load 2 (gp @ vs, 2-aligned) facts *)
+    neq_vec (bits_of_virtaddr (Virtaddr vs))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vs)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr vs)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
+    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr vs)) (Z.sub pagesize_bits 1) 0)) = vs ->
+    neq_vec (access_vec_dec vs 0) ('b"0") = false ->
+    neq_vec (access_vec_dec vs 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr vs) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr a82))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a82)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a82)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a82)) (Z.sub pagesize_bits 1) 0)) = a82 ->
+    matching_pma_region pmar0 (Physaddr vs) 2 = Some region_f2 ->
+    (override_PMA (PMA_Region_attributes region_f2) PBMT_PMA).(PMA_executable) = true ->
+    matching_pma_region pmar0 (Physaddr pa2) 8 = Some region_l2 ->
+    (override_PMA (PMA_Region_attributes region_l2) PBMT_PMA).(PMA_readable) = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vs) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa2) (uint (to_bits 64 8)) = PMP_Match ->
+    is_aligned_paddr (Physaddr vs) 2 = true ->
+    is_aligned_vaddr (Virtaddr a82) 8 = true ->
+    is_aligned_paddr (Physaddr pa2) 8 = true ->
+    isRVC w2 = true ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
+       exec (ext_decode_compressed w2) s0 = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 3)), s0)) ->
+    minstret_inv -∗
+    PC ↦ᵣ va -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
+    cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
+    tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
+    elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa1 j) ↦ₘ{dq} nth_byte v1 j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa2 j) ↦ₘ{dq} nth_byte v2 j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add va j) ↦ₘ{dq} nth_byte w1 j) -∗
+    ([∗ list] j ∈ seq 0 2, (pa_add vs j) ↦ₘ{dq} nth_byte w2 j) -∗
+    ▷ ( PC ↦ᵣ add_vec_int vs 2 -∗
+        gpr_file (<[gpr_of_Z 3 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v2))]>
+                  (<[gpr_of_Z 1 := regval_into_reg (extend_value false data1)]> m)) -∗
+        misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ add_vec_int vs 2 -∗
+        cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
+        tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
+        elp ↦ᵣ elp0 -∗ mcountinhibit ↦ᵣ mc -∗ minstretcfg ↦ᵣ mcfg -∗
+        pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pma_regions ↦ᵣ pmar0 -∗ htif_tohost_base ↦ᵣ None -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add pa1 j) ↦ₘ{dq} nth_byte v1 j) -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add pa2 j) ↦ₘ{dq} nth_byte v2 j) -∗
+        ([∗ list] j ∈ seq 0 4, (pa_add va j) ↦ₘ{dq} nth_byte w1 j) -∗
+        ([∗ list] j ∈ seq 0 2, (pa_add vs j) ↦ₘ{dq} nth_byte w2 j) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+  Proof.
+    intros off1 a81 pa1 off2 a82 pa2 data1 vs
+      HN Hsp Hra Hgp HSXL Hmode Hasid Hvec5 Hvecld Hmask Hpmm
+      HA0 Hord0 HX0 HR0 HmisaC HmisaS HMPRV HMXR Hb1 Hmie_mdl HSIE Help
+      Hcanonf1 Hvpndeff1 Hidentf1 Hbit01 Hbit11 Halign41 Hcanon1 Hvpndef1 Hident1
+      Hmatchf1 Hexecf1 Hmatch1 Hread1 Hrange0f1 Hrange01 Halignf1 Halign81 Hpalign81 HisRVC1 Hdec1
+      Hcanonf2 Hvpndeff2 Hidentf2 Hbit02 Hbit12 Halign42 Hcanon2 Hvpndef2 Hident2
+      Hmatchf2 Hexecf2 Hmatch2 Hread2 Hrange0f2 Hrange02 Halignf2 Halign82 Hpalign82 HisRVC2 Hdec2.
+    iIntros "#Hinv Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hb1c Hb2c Hib1 Hib2 Hcont".
+    (* ---- load 1: ld ra, 0(sp) @va ---- *)
+    iApply (wp_kv_load_4 va w1 (mword_of_int 0) (mword_of_int 1) svpn m vsp vd1
+              misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v b1 v1 npc0 mc mcfg
+              pmpcfg0 pmpaddr00 pmar0 elp0 tlbvec region_l1 region_f1 E Phi
+              HN ltac:(vm_compute; discriminate) Hsp Hra HSXL Hmode Hasid Hvec5 Hvecld
+              Hcanonf1 Hvpndeff1 Hidentf1 Hbit01 Hbit11 Halign41 Hcanon1 Hvpndef1 Hident1 Hmask
+              Hmatchf1 Hexecf1 Hmatch1 Hread1 Hpmm HA0 Hord0 Hrange0f1 Hrange01 HX0 HR0 Halignf1 Halign81 Hpalign81
+              HisRVC1 HmisaC HmisaS HMPRV HMXR Hdec1 Hb1 Hmie_mdl HSIE Help
+              with "Hinv Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hb1c Hib1").
+    iNext.
+    iIntros "Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hb1c Hib1".
+    (* PC now = va+2 = vs ; gpr_file = <[ra := val1]> m *)
+    (* ---- load 2: ld gp, 16(sp) @vs ---- *)
+    iApply (wp_kv_load_2 vs w2 (mword_of_int 2) (mword_of_int 3) svpn
+              (<[gpr_of_Z 1 := regval_into_reg (extend_value false data1)]> m) vsp vd2
+              misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v b1 v2 (add_vec_int va 2) mc mcfg
+              pmpcfg0 pmpaddr00 pmar0 elp0 tlbvec region_l2 region_f2 E Phi
+              HN ltac:(vm_compute; discriminate)
+              ltac:(rewrite lookup_insert_ne; [exact Hsp | vm_compute; discriminate])
+              ltac:(rewrite lookup_insert_ne; [exact Hgp | vm_compute; discriminate])
+              HSXL Hmode Hasid Hvec5 Hvecld
+              Hcanonf2 Hvpndeff2 Hidentf2 Hbit02 Hbit12 Halign42 Hcanon2 Hvpndef2 Hident2 Hmask
+              Hmatchf2 Hexecf2 Hmatch2 Hread2 Hpmm HA0 Hord0 Hrange0f2 Hrange02 HX0 HR0 Halignf2 Halign82 Hpalign82
+              HisRVC2 HmisaC HmisaS HMPRV HMXR Hdec2 Hb1 Hmie_mdl HSIE Help
+              with "Hinv Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hb2c Hib2").
+    iNext.
+    iIntros "Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hb2c Hib2".
+    iApply ("Hcont" with "Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hb1c Hb2c Hib1 Hib2").
+  Qed.
+
 End KVLW.
