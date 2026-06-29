@@ -86,6 +86,7 @@ Section KVCOMPOSE.
     kv_cell pa17 vR17 -∗ kv_cell pa18 vR18 -∗
     ▷ ( ∀ (m' : gmap register_bitvector_64 (mword 64)) (npc' : mword 64),
         ⌜ m' !! gpr_of_Z 2 = Some vsp ⌝ -∗
+        ⌜ dom m' = dom (<[gpr_of_Z 1 := regval_into_reg (add_vec_int va 4)]> m) ⌝ -∗
         PC ↦ᵣ regval_into_reg (add_vec_int va 4) -∗ nextPC ↦ᵣ npc' -∗ gpr_file m' -∗ minstret_inv -∗
         kv_csrs misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v mc mcfg elp0 pmpcfg0 pmpaddr00 pmar0 tlbvec -∗
         kv_cell pa vra -∗ kv_cell pa3 vgp -∗ kv_cell pa4 vt0 -∗ kv_cell pa5 vR5 -∗ kv_cell pa6 vR6 -∗
@@ -127,8 +128,8 @@ Section KVCOMPOSE.
               with "Hpc Hnpc Hfile Hinv [$Hmisa' $Hpriv $Hhs $Hmdl $Hms $Hsatp $Htlb $Hmenv $Hsec $Hmie $Help' $Hmcinh $Hmcfg $Hpmpc $Hpmpaddr $Hpma $Hhtif]
                     Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18 [Hcont Hibytes]").
     iNext.
-    iIntros (m'' npc'') "Hsp'' Hpc Hnpc Hfile #Hinv2 Hcsrs Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18".
-    iApply ("Hcont" $! m'' npc'' with "Hsp'' Hpc Hnpc Hfile Hinv2 Hcsrs
+    iIntros (m'' npc'') "Hsp'' Hdom'' Hpc Hnpc Hfile #Hinv2 Hcsrs Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18".
+    iApply ("Hcont" $! m'' npc'' with "Hsp'' Hdom'' Hpc Hnpc Hfile Hinv2 Hcsrs
               Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18 Hibytes").
   Qed.
 

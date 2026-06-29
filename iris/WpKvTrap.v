@@ -54,7 +54,9 @@ End KVTRAP.
 (* The kerneltrap contract: EXECUTING the handler body, entered at its function
    address 0x800026a2 with a return address rava in ra (= gpr1), returns to
    PC = rava — with sp and the saved-register frame and the CSRs preserved and
-   the other GPRs arbitrary. *)
+   the other GPRs arbitrary (but the register file keeps the SAME DOMAIN: the
+   handler reads and writes existing registers, it never adds or removes a GPR
+   slot — so kernelvec's `ld` restores can still find every callee register). *)
 Axiom kerneltrap_returns :
   forall `{!riscvGS Σ}
     (m : gmap register_bitvector_64 (mword 64)) (spnew rava : mword 64)
@@ -75,7 +77,7 @@ Axiom kerneltrap_returns :
     kv_cell pa12 vR12 -∗ kv_cell pa13 vR13 -∗ kv_cell pa14 vR14 -∗ kv_cell pa15 vR15 -∗ kv_cell pa16 vR16 -∗
     kv_cell pa17 vR17 -∗ kv_cell pa18 vR18 -∗
     ▷ ( ∀ (m' : gmap register_bitvector_64 (mword 64)) (npc' : mword 64),
-        ⌜ m' !! gpr_of_Z 2 = Some spnew ⌝ -∗
+        ⌜ m' !! gpr_of_Z 2 = Some spnew ⌝ -∗ ⌜ dom m' = dom m ⌝ -∗
         PC ↦ᵣ rava -∗ nextPC ↦ᵣ npc' -∗ gpr_file m' -∗ minstret_inv -∗
         kv_csrs misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v mc mcfg elp0 pmpcfg0 pmpaddr00 pmar0 tlbf2 -∗
         kv_cell pa vra -∗ kv_cell pa3 vgp -∗ kv_cell pa4 vt0 -∗ kv_cell pa5 vR5 -∗ kv_cell pa6 vR6 -∗
