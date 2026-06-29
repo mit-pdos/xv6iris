@@ -197,10 +197,7 @@ Section StepAUIPC.
     (* the pure fetch side-conditions of [fetch_from_pts_minstret] *)
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w_a 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w_a) s0 = Some (UTYPE (imm_a, Regidx i_a, AUIPC), s0)) ->
@@ -228,7 +225,7 @@ Section StepAUIPC.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hia HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hda Hb1 HmIE Help)
+    iIntros (HN Hia HS Hpmaall Hpmpf Hvalignf HnotRVCf Hda Hb1 HmIE Help)
       "#Hinv Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -246,7 +243,7 @@ Section StepAUIPC.
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     (* derive the state-specific fetch fact from the owned instruction bytes *)
     iDestruct (fetch_from_pts_minstret pc w_a region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     (* [apply empty_subseteq] not [set_solver]: the latter runs set_unfold over the
        whole context and blows up on heavy hypotheses (see WpLoad.v). *)

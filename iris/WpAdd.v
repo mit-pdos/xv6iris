@@ -270,10 +270,7 @@ Section FinalWP.
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     minstret_inv -∗
     (R_bitvector_64 x10) ↦ᵣ a0 -∗
@@ -305,7 +302,7 @@ Section FinalWP.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof using All.
-    iIntros (HN HS0 HmIE0 Help0 Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf)
+    iIntros (HN HS0 HmIE0 Help0 Hpmaall Hpmpf Hvalignf HnotRVCf)
       "#Hinv Hx10 Hx11 Hx12 Hpc Hnpc Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     (* this leaf opens no further invariant, so take the inner mask = E∖↑minstretN
@@ -322,7 +319,7 @@ Section FinalWP.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Lelp.
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sF s). iSplitR.

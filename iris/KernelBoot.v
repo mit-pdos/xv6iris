@@ -161,15 +161,9 @@ Section KernelBootWP.
     let data2l := update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v in
     ↑minstretN ⊆ E ->
     (* auipc fetch side-conditions (instruction word [w_auipc] at [fetch_pa kpc0]) *)
-    is_aligned_paddr (Physaddr (fetch_pa kpc0)) 4 = true ->
-    neq_vec (access_vec_dec kpc0 0) ('b"0") = false ->
-    neq_vec (access_vec_dec kpc0 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr kpc0) 4 = true ->
+        is_aligned_vaddr (Virtaddr kpc0) 4 = true ->
     (* ld fetch side-conditions (instruction word [w_ld] at [fetch_pa kpc1]) *)
-    is_aligned_paddr (Physaddr (fetch_pa kpc1)) 4 = true ->
-    neq_vec (access_vec_dec kpc1 0) ('b"0") = false ->
-    neq_vec (access_vec_dec kpc1 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr kpc1) 4 = true ->
+        is_aligned_vaddr (Virtaddr kpc1) 4 = true ->
     (* the shared PMP-off fact (used by both fetch discharges) *)
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
@@ -201,8 +195,8 @@ Section KernelBootWP.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros bb sp1 offl eal a8l pal data2l
-      HN Halignfa Hbit0fa Hbit1fa Hvalignfa
-      Halignfl Hbit0fl Hbit1fl Hvalignfl Hpmpf
+      HN Hvalignfa
+      Hvalignfl Hpmpf
       HmIE Hlp HMPRV Halign Hpmp Hpalign.
     iIntros "Hpc Hx2 Hnpc #Hinv Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes #Htext Hcont".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0) "#(Hmisa & Hsec & Hmcinh & Hmcfg & Hpma & Hhtif & %HmisaS & %HmisaC & %HmisaU & %HmisaM & %Hpmaall & %Hpmm & %Hmlpe)".
@@ -216,7 +210,7 @@ Section KernelBootWP.
        discharged by [decode_auipc].  Owns the auipc bytes + fetch CSRs. *)
     iApply (wp_step_auipc kpc0 w_auipc imm_auipc i_auipc bb sp0 kpc0 mstatus0 misa0 (zeros' 64) mc mcfg
               pmpcfg0 pmar0 elp0 E Φ
-              HN ltac:(vm_compute; reflexivity) HmisaS Hpmaall Hpmpf Halignfa Hbit0fa Hbit1fa Hvalignfa
+              HN ltac:(vm_compute; reflexivity) HmisaS Hpmaall Hpmpf Hvalignfa
               ltac:(vm_compute; reflexivity) decode_auipc eq_refl HmIE Hlp
               with "Hinv Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytesa").
     iNext. iIntros "Hpc Hx2 _ Hnpc Hpriv Hhs Hmdl Hms Help _ _ Hpmpc _ _ _".
@@ -225,7 +219,7 @@ Section KernelBootWP.
        discharged by [decode_ld].  Owns the ld bytes at [fetch_pa kpc1]. *)
     iApply (wp_step_ld kpc1 w_ld imm_ld i_ld bb v sp1 kpc1 mstatus0 misa0 mc mcfg
               mseccfg0 pmpcfg0 pmar0 elp0 E Φ
-              HN ltac:(vm_compute; reflexivity) Hpmaall Hpmpf Halignfl Hbit0fl Hbit1fl Hvalignfl
+              HN ltac:(vm_compute; reflexivity) Hpmaall Hpmpf Hvalignfl
               ltac:(vm_compute; reflexivity) decode_ld eq_refl
               HmIE Hlp HmisaS HMPRV Hpmm Halign Hpmp Hpalign
               with "Hinv Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytesl").
@@ -379,10 +373,8 @@ Section KernelBootWP.
     iDestruct (big_sepM_delete _ _ x11 x11_0 Hd11 with "Hgpr") as "[Hx11 Hgpr]".
     (* ---- steps 0,1: auipc; ld via wp_kernel_first_two ---- *)
     iApply (wp_kernel_first_two v mc mcfg pmpcfg0 E Φ
-              HN ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              HN ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
               Hpmpf HmIE Hlp HMPRV Ha8 Hpmpf Hpalal
               with "Hpc Hx2 Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hpmpc Hhw Hbytes Htext").
     iNext.
@@ -395,8 +387,7 @@ Section KernelBootWP.
     iDestruct (lui_get with "Htext") as "#Hlui".
     iApply (wp_step_lui kpc2 w_lui4 bb x10_0 kpc2 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaC HmisaS
               with "Hinv Hpc Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hlui").
     iNext.
@@ -430,8 +421,7 @@ Section KernelBootWP.
     iDestruct (mul_get with "Htext") as "#Hmul".
     iApply (wp_step_mul kpc5 bb x10l x11a kpc5 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN Hpmaall Hpmpf
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaM HmisaS
               with "Hinv Hpc Hx10 Hx11 Hnpc Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hmul").
@@ -442,8 +432,7 @@ Section KernelBootWP.
     iDestruct (add_get with "Htext") as "#Hadd".
     iApply (wp_step_add kpc6 w_add4 bb x2ld x10m kpc6 mstatus0 misa0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(apply bv_eq; vm_compute; reflexivity) Hpmaall Hpmpf
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
               eq_refl HmIE Hlp HmisaC HmisaS
               with "Hinv Hpc Hx2 Hx10 Hnpc Hpriv Hhs Hmdl Hms Hmisa Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hadd").
     iNext.

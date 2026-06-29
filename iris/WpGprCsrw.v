@@ -441,10 +441,7 @@ Section WpCsrwMedeleg.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_medeleg, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -470,7 +467,7 @@ Section WpCsrwMedeleg.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmde Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -494,7 +491,7 @@ Section WpCsrwMedeleg.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -668,10 +665,7 @@ Section WpCsrwMcounteren.
     eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_mcounteren, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -697,7 +691,7 @@ Section WpCsrwMcounteren.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS HU Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS HU Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmc Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -721,7 +715,7 @@ Section WpCsrwMcounteren.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_mc s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -939,10 +933,7 @@ Section WpCsrwMepc.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_mepc, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -968,7 +959,7 @@ Section WpCsrwMepc.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmepc Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -992,7 +983,7 @@ Section WpCsrwMepc.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_me s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -1177,10 +1168,7 @@ Section WpCsrwMscratch.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_mscratch, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -1206,7 +1194,7 @@ Section WpCsrwMscratch.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmscratch Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -1230,7 +1218,7 @@ Section WpCsrwMscratch.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_msc s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -1524,10 +1512,7 @@ Section WpCsrwMideleg.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_mideleg, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -1553,7 +1538,7 @@ Section WpCsrwMideleg.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -1576,7 +1561,7 @@ Section WpCsrwMideleg.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_mid s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -1806,10 +1791,7 @@ Section WpCsrwSie.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_sie, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -1835,7 +1817,7 @@ Section WpCsrwSie.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmie Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -1861,7 +1843,7 @@ Section WpCsrwSie.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_sie s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -2274,10 +2256,7 @@ Section WpCsrwMstatus.
     eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -2303,7 +2282,7 @@ Section WpCsrwMstatus.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS HU Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS HU Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -2326,7 +2305,7 @@ Section WpCsrwMstatus.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_mst s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -2697,10 +2676,7 @@ Section WpCsrwSatp.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -2726,7 +2702,7 @@ Section WpCsrwSatp.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS HSXL Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS HSXL Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hsatp Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -2750,7 +2726,7 @@ Section WpCsrwSatp.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_satp s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -3044,10 +3020,7 @@ Section WpCsrwPmpaddr0.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_pmpaddr0, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -3073,7 +3046,7 @@ Section WpCsrwPmpaddr0.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hpa Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -3100,7 +3073,7 @@ Section WpCsrwPmpaddr0.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_pa s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -3448,10 +3421,7 @@ Section WpCsrwPmpcfg0.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -3476,7 +3446,7 @@ Section WpCsrwPmpcfg0.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -3500,7 +3470,7 @@ Section WpCsrwPmpcfg0.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_pc s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -4543,10 +4513,7 @@ Section WpCsrwMenvcfg.
     eq_vec (_get_Misa_U misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_menvcfg, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -4572,7 +4539,7 @@ Section WpCsrwMenvcfg.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS HU Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS HU Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hmenvcfg Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -4596,7 +4563,7 @@ Section WpCsrwMenvcfg.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_menvcfg s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.
@@ -4846,10 +4813,7 @@ Section WpCsrwStimecmp.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w) s0 = Some (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW), s0)) ->
@@ -4875,7 +4839,7 @@ Section WpCsrwStimecmp.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
+    iIntros (HN Hrs1 Hm HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
       "#Hinv Hpc Hfile Hstimecmp Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -4899,7 +4863,7 @@ Section WpCsrwStimecmp.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) (s_pccw s pc b1).(sregs) = vrs1)
       by (apply gpr_s_pccw; exact Lrs1).
     iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.
     iExists (sFccw_stimecmp s pc b1 rs1 (register_lookup minstret s.(sregs))). iSplitR.

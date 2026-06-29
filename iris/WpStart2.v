@@ -488,7 +488,8 @@ Section WpStart2.
     iApply (wp_caddi_gpr_4 spc30 wr_s30 rd9 imm9 m sp0 misa0 (zeros' 64) b1
               npc0 mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Hrd30 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s30; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s30; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s30 wr_s30 Hsub_s30) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W30").
     iNext.
@@ -529,7 +530,8 @@ Section WpStart2.
               _ mstatus0 mseccfg0
               mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Hsp32 Hs032 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s32; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s32; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s32 wr_s32 Hsub_s32) eq_refl HmIE Hlp HMPRV Hpmm Ha8s0 Hpas0
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hstks0 W32").
     iNext.
@@ -566,7 +568,8 @@ Section WpStart2.
     iApply (wp_csrr_mstatus_gpr spc34 sw34 srs1z34 srd34 m32 va5 b1
               _ mstatus0 misa0 (zeros' 64) mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vmc) ltac:(vmc) ltac:(vm_compute; discriminate) Ha534 HmisaS Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               decode_s34 eq_refl HmIE Hlp
               with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W34").
     iNext.
@@ -645,7 +648,8 @@ Section WpStart2.
     iApply (wp_clui_gpr_4 spc35 wr_s35 (sreg117 sw35) (sclui_imm sw35) m va4 misa0 (zeros' 64) b1
               npc0 mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha435 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s35; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s35; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s35 wr_s35 Hsub_s35) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W35").
     iNext.
@@ -707,7 +711,8 @@ Section WpStart2.
     iApply (wp_clui_gpr_4 spc38 wr_s38 (sreg117 sw38) (sclui_imm sw38) m37 va4_36 misa0 (zeros' 64) b1
               _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha438 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s38; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s38; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s38 wr_s38 Hsub_s38) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W38").
     iNext.
@@ -825,7 +830,8 @@ Section WpStart2.
     iApply (wp_csrw_mstatus_gpr spc41 sw41 (scsr_rs1z sw41) m va5 misa0 mstatus0 (zeros' 64) b1
               _ mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha541 HmisaS HmisaU Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               decode_s41 eq_refl HmIE Hlp
               with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W41").
     iNext.
@@ -839,7 +845,8 @@ Section WpStart2.
     iApply (wp_auipc_gpr spc42 sw42 srd42 (subrange_vec_dec sw42 31 12) m va5 b1
               _ mstatus1 misa0 mc mcfg pmpcfg0 pmar0 elp0 E DfracDiscarded Φ
               HN ltac:(vm_compute; discriminate) Ha542 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               decode_s42 eq_refl HmIE1 Hlp HmisaS
               with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W42").
     iNext.
@@ -858,7 +865,8 @@ Section WpStart2.
     iApply (wp_addi_gpr spc43 sw43 (sit_rs1 sw43) (sit_rd sw43) (subrange_vec_dec sw43 31 20) m42
               va5_42 va5_42 misa0 (zeros' 64) b1 _ mstatus1 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha543a Ha543b HmisaS Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               decode_s43 eq_refl HmIE1 Hlp
               with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W43").
     iNext.
@@ -874,7 +882,8 @@ Section WpStart2.
     iApply (wp_csrw_mepc_gpr spc44 sw44 (scsr_rs1z sw44) m43 va5_43 mepc0 misa0 (zeros' 64) b1
               _ mstatus1 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha544 HmisaS Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               decode_s44 eq_refl HmIE1 Hlp
               with "Hinv Hpc Hfile Hmepc Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W44").
     iNext.
@@ -890,7 +899,8 @@ Section WpStart2.
     iApply (wp_cli_gpr_4 spc45 wr_s45 (sreg117 sw45) (scli_imm sw45) m43 va5_43 misa0 (zeros' 64) b1
               _ mstatus1 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha545 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s45; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s45; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s45 wr_s45 Hsub_s45) eq_refl HmIE1 Hlp
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W45").
     iNext.
@@ -1000,7 +1010,8 @@ Section WpStart2.
     iApply (wp_caddi_gpr_4 spc48 wr_s48 (sreg117 sw48) (scli_imm sw48) m47 va5_47 misa0 (zeros' 64) b1
               _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha548 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s48; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s48; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s48 wr_s48 Hsub_s48) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W48").
     iNext.
@@ -1181,7 +1192,8 @@ Section WpStart2.
     iApply (wp_csrli_gpr_4 spc55 wr_s55 (scsrli_sh sw55) scsrli_crsd r_a5 m54 va5_54 misa0 mdv0 b1
               _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vmc) ltac:(vm_compute; discriminate) Ha555 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s55; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s55; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s55 wr_s55 Hsub_s55) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W55").
     iNext.
@@ -1230,7 +1242,8 @@ Section WpStart2.
     iApply (wp_csrw_pmpcfg0_gpr spc58 sw58 (scsr_rs1z sw58) m57 va5_57 misa0 mdv0 b1
               _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha558 HmisaS Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               decode_s58 eq_refl HmIE Hlp
               with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W58").
     iNext.
@@ -1328,7 +1341,8 @@ Section WpStart2.
     iApply (wp_jal_gpr spc59 sw59 sjal_imm sjal_rd m vra_in misa0 mdv0 b1
               _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Hra59 HmisaS Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               decode_s59 ltac:(vmc) ltac:(vm_compute; reflexivity) eq_refl HmIE Hlp
               with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W59").
     iNext.

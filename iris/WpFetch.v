@@ -49,10 +49,7 @@ Section WpFetch.
     (* PMP: every entry is OFF *)
     pmp_allows_all pmpcfg0 ->
     (* geometric facts about the concrete pc / w (they compute at kernel PCs) *)
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (* separation-logic ownership: the state interpretation pieces, the PC,
        the fetch CSRs, and the four memory bytes at the fetch address. *)
@@ -66,7 +63,7 @@ Section WpFetch.
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ nth_byte w j) -∗
     ⌜ exec (fetch tt) s = Some (F_Base w, s) ⌝.
   Proof.
-    iIntros (Hmatch0 Hexec Hpmp0 Halign Hbit0 Hbit1 Hvalign HnotRVC)
+    iIntros (Hmatch0 Hexec Hpmp0 Hvalign HnotRVC)
             "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hbytes".
     iDestruct (reg_valid_dq with "Hreg Hpc")   as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
@@ -118,10 +115,7 @@ Section WpFetch.
     matching_pma_region pmar0 (Physaddr (fetch_pa pc)) 4 = Some region ->
     (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     reg_interp s.(sregs) -∗
     gen_heap_interp s.(mem) -∗
@@ -134,7 +128,7 @@ Section WpFetch.
     ⌜ exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
       = Some (F_Base w, set_reg s (R_bool minstret_increment) b) ⌝.
   Proof.
-    iIntros (Hmatch0 Hexec Hpmp0 Halign Hbit0 Hbit1 Hvalign HnotRVC)
+    iIntros (Hmatch0 Hexec Hpmp0 Hvalign HnotRVC)
             "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hbytes".
     iDestruct (reg_valid_dq with "Hreg Hpc")   as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.

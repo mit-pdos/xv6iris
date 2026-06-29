@@ -253,10 +253,7 @@ Section StepMRET.
     ↑minstretN ⊆ E ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
               (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
@@ -287,7 +284,7 @@ Section StepMRET.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    iIntros (HN Hpmaall Hpmpf Halignf Hbit0f Hbit1f Hvalignf Hb1 HmIE Help HS Hmu Hmc Hnp Hnpm Hlpe)
+    iIntros (HN Hpmaall Hpmpf Hvalignf Hb1 HmIE Help HS Hmu Hmc Hnp Hnpm Hlpe)
       "#Hinv Hpc Hnpc Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
@@ -305,7 +302,7 @@ Section StepMRET.
     assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     iDestruct (fetch_from_pts_minstret pc w_mret region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf
+                 Hmatchf Hexecf Hpmpf Hvalignf
                  ltac:(vm_compute; reflexivity)
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iModIntro.

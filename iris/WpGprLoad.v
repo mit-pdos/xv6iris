@@ -261,10 +261,7 @@ Section WpLoadGpr.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-    is_aligned_paddr (Physaddr (fetch_pa pc)) 4 = true ->
-    neq_vec (access_vec_dec pc 0) ('b"0") = false ->
-    neq_vec (access_vec_dec pc 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+        is_aligned_vaddr (Virtaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w_l 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
        exec (ext_decode w_l) s0 = Some (LOAD (imm_l, Regidx rs1, Regidx rd, false, 8), s0)) ->
@@ -297,8 +294,7 @@ Section WpLoadGpr.
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea a8 pa data2 HN Hrs1 Hrd Hmrs1 Hmrd HS Hpmaall Hpmpf Halignf Hbit0f Hbit1f
-      Hvalignf HnotRVCf Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
+    intros offset ea a8 pa data2 HN Hrs1 Hrd Hmrs1 Hmrd HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdl Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
     iIntros "#Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
@@ -323,7 +319,7 @@ Section WpLoadGpr.
     assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
     { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
     iDestruct (fetch_from_pts_minstret pc w_l region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Halignf Hbit0f Hbit1f Hvalignf HnotRVCf
+                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
                  with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j)⌝)%I as %Hbytesf.
     { iIntros (j Hj). assert (Hj' : (j < 8)%nat) by lia.

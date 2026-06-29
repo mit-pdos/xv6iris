@@ -89,7 +89,8 @@ Section WpStart3.
     iApply (wp_csrr_gpr spc60 sw60 (scsr_rd sw60) mfin va5_60 mhartid0 misa0 mdv0 b1
               _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Hf15 HmisaS Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              ltac:(vmc)
+              ltac:(vmc)
               ltac:(intros s0 Hpriv;
                     replace (subrange_vec_dec sw60 31 20) with csr_csrr by (vm_compute; reflexivity);
                     replace (scsr_rs1z sw60) with i_rs1_csrr by (vm_compute; reflexivity);
@@ -111,7 +112,8 @@ Section WpStart3.
     iApply (wp_caddiw_gpr_4 spc61 wr_s61 (sreg117 sw61) (scaddiw_imm sw61) m60 (regval_into_reg mhartid0) misa0 mdv0 b1
               _ mstatus0 mc mcfg pmpcfg0 pmar0 elp0 E Φ
               HN ltac:(vm_compute; discriminate) Ha561 Hpmaall Hpmpf
-              ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(rewrite Hsub_s61; vm_compute; reflexivity)
+              ltac:(vmc)
+              ltac:(rewrite Hsub_s61; vm_compute; reflexivity)
               HmisaC HmisaS (decode4_s61 wr_s61 Hsub_s61) eq_refl HmIE Hlp
               with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W61").
     iNext.
@@ -145,7 +147,7 @@ Section WpStart3.
        (w_mret = mword_of_int 0x30200073). *)
     iApply (wp_mret spc63 newpriv lpe b1 _ mstatus0 misa0 mepc0 mdv0
               mc mcfg pmpcfg0 pmar0 elp0 E Φ
-              HN Hpmaall Hpmpf ltac:(vmc) ltac:(vmc) ltac:(vmc) ltac:(vmc)
+              HN Hpmaall Hpmpf ltac:(vmc)
               eq_refl HmIE Hlp HmisaS HmisaU HmisaC Hnp Hnpm Hlpe
               with "Hinv Hpc Hnpc Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif W63").
     iNext.
