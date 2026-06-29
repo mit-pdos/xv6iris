@@ -125,4 +125,126 @@ Section FetchBaseAt4.
     rewrite execR_returnR_fwd. cbn match. reflexivity.
   Qed.
 End FetchBaseAt4.
+Section HartActiveProgress_gen.
+  Context (priv : Privilege) (s s_f s_x s_final : mstate) (w : mword 32) (instr : instruction)
+          (pc : mword 64) (resf : ExecutionResult).
+
+  Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = priv.
+  Hypothesis Hdisp : exec (dispatchInterrupt priv) s = Some (None, s).
+  Hypothesis Hfetch : exec (fetch tt) s = Some (F_Base w, s_f).
+  Hypothesis Hdec : exec (ext_decode w) s_f = Some (instr, s_f).
+  Hypothesis Hlpad : eq_vec (register_lookup elp s_f.(sregs))
+                            (landing_pad_bits_backwards LP_EXPECTED) = false.
+  Hypothesis Hnotlpad : is_lpad_instruction instr = false.
+  Hypothesis HpcF : register_lookup PC s_f.(sregs) = pc.
+  Let s_pc : mstate := set_reg s_f nextPC (add_vec_int pc 4).
+  Hypothesis Hexec : exec (execute instr) s_pc = Some (resf, s_x).
+  Hypothesis Hnotexec : match resf with ExecuteAs _ => False | _ => True end.
+
+  Lemma exec_hart_active_progress_gen :
+    exec (run_hart_active 0) s
+    = Some (Step_Execute (resf, zero_extend' 32 w), s_x).
+  Proof using All.
+    unfold run_hart_active.
+    rewrite exec_catch_early_return.
+    (* read cur_privilege -> Machine *)
+    rewrite execR_bind execR_liftR exec_read_reg Hpriv. cbn match.
+    (* dispatchInterrupt -> None ; the `fun w1 =>` body is
+       (match w1) >> liftR(fetch) >>= fun w2 => ..  =  bind (bind0 MATCH (liftR fetch)) k *)
+    rewrite execR_bind execR_liftR Hdisp. cbn match.
+    (* outer bind; inner bind0 (returnR tt) (liftR fetch) *)
+    rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
+    rewrite execR_liftR Hfetch. cbn match. cbn match.
+    (* ext_fetch_hook (F_Base w) = F_Base w ; F_Base branch (announce/callback lets) *)
+    unfold ext_fetch_hook. cbn match. cbn beta iota.
+    (* ext_decode w -> instr *)
+    rewrite execR_bind execR_liftR Hdec. cbn match.
+    (* (if print=false then.. else returnR tt) >> and_boolM(..) >>= fun w21 => ..
+       = bind (bind0 (returnR tt) and_boolM) k *)
+    unfold get_config_print_instr. cbn match.
+    rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
+    (* and_boolM (liftR is_landing_pad) (returnR (not lpad)) -> false (short-circuit) *)
+    unfold and_boolM.
+    rewrite execR_bind execR_liftR exec_is_landing_pad Hlpad. cbn match. cbn match.
+    rewrite execR_returnR. cbn match. cbn match.
+    (* w21 = false -> else: read PC >>= fun w22 => bind0 (write nextPC) (liftR execute) >>= ... *)
+    rewrite execR_bind execR_liftR (exec_read_reg PC) HpcF. cbn match.
+    rewrite execR_bind. rewrite execR_bind0 execR_liftR (exec_write_reg nextPC). cbn match.
+    fold s_pc. rewrite execR_liftR Hexec. cbn match. cbn match.
+    (* (match resf : not ExecuteAs => resf) >>= fun result' => returnR (Step_Execute ..) *)
+    rewrite execR_bind.
+    destruct resf; cbn in Hnotexec; try contradiction;
+      cbn match; rewrite execR_returnR; cbn match; rewrite execR_returnR; reflexivity.
+  Qed.
+
+End HartActiveProgress_gen.
+
+Section ForwardJALsup.
+  Context (s : mstate) (pc : mword 64) (b : bool) (w : mword 32) (imm : mword 21) (rd : mword 5).
+  Hypothesis Hfetch_at :
+    exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
+      = Some (F_Base w, set_reg s (R_bool minstret_increment) b).
+  Hypothesis Hsi_s : exec (should_inc_minstret Supervisor) s = Some (b, s).
+  Hypothesis Hrd0 : uint rd <> 0.
+  Hypothesis Hdec : forall s0, register_lookup cur_privilege (sregs s0) = Supervisor ->
+    exec (ext_decode w) s0 = Some (JAL (imm, Regidx rd), s0).
+  Hypothesis Hdisp_s : exec (dispatchInterrupt Supervisor) (set_reg s (R_bool minstret_increment) b) = Some (None, set_reg s (R_bool minstret_increment) b).
+
+  Definition sAjs : mstate := set_reg s (R_bool minstret_increment) b.
+  Definition s_pcjs : mstate := set_reg sAjs nextPC (add_vec_int pc 4).
+  Definition jtgts : mword 64 :=
+    add_vec (register_lookup PC s_pcjs.(sregs)) (sign_extend' 64 imm).
+  Definition jlinks : mword 64 := register_lookup nextPC s_pcjs.(sregs).
+  Definition sXjs : mstate :=
+    set_reg (set_reg s_pcjs nextPC jtgts)
+            (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg jlinks).
+  Definition sTjs : mstate := set_reg sXjs PC (register_lookup nextPC sXjs.(sregs)).
+  Definition sFjs : mstate :=
+    if b then set_reg sTjs minstret (add_vec_int (register_lookup minstret sTjs.(sregs)) 1)
+         else sTjs.
+
+  
+  Lemma forward_exec_jal_sup :
+    register_lookup PC s.(sregs) = pc ->
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
+    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    eq_vec (access_vec_dec jtgts 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec jtgts 1) = false ->
+    exec riscv_step s = Some (tt, sFjs).
+  Proof using All.
+    intros Lpc Lpriv Lhs Lelp Halign Hbit1.
+    assert (LpcA  : register_lookup PC sAjs.(sregs) = pc).
+    { unfold sAjs, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
+    assert (LprivA: register_lookup cur_privilege sAjs.(sregs) = Supervisor).
+    { unfold sAjs, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
+    assert (LhsA  : register_lookup hart_state sAjs.(sregs) = HART_ACTIVE tt).
+    { unfold sAjs, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lhs | vm_compute; reflexivity ]. }
+    assert (LelpA : eq_vec (register_lookup elp sAjs.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false).
+    { unfold sAjs, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lelp | vm_compute; reflexivity ]. }
+    assert (HfetchA : exec (fetch tt) sAjs = Some (F_Base w, sAjs)) by exact Hfetch_at.
+    assert (HdecA : exec (ext_decode w) sAjs = Some (JAL (imm, Regidx rd), sAjs)) by (apply Hdec; exact LprivA).
+    assert (HexecJ : exec (execute (JAL (imm, Regidx rd))) s_pcjs = Some (RETIRE_SUCCESS, sXjs)).
+    { change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
+      rewrite (exec_execute_JAL_gpr imm rd s_pcjs Hrd0 Halign Hbit1).
+      unfold sXjs, jtgts, jlinks. reflexivity. }
+    assert (Hha : exec (run_hart_active 0) sAjs = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXjs)).
+    { exact (exec_hart_active_progress_gen Supervisor sAjs sAjs sXjs sAjs w
+               (JAL (imm, Regidx rd)) pc RETIRE_SUCCESS
+               LprivA Hdisp_s HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecJ I). }
+    apply (exec_riscv_step_gen_gen Supervisor s sXjs (zero_extend' 32 w) b).
+    - exact Lpriv.
+    - exact Hsi_s.
+    - exact LhsA.
+    - exact Hha.
+    - unfold sXjs, s_pcjs, sAjs; cbn [sregs].
+      do 4 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]). exact Lhs.
+    - unfold sXjs, s_pcjs, sAjs; cbn [sregs].
+      do 3 (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      rewrite register_lookup_set. reflexivity.
+    - reflexivity.
+  Qed.
+End ForwardJALsup.
+
+
 End KVJAL.
