@@ -143,12 +143,9 @@ Section KVALL.
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     vec_access_dec tlbvec 5 = None ->
     vec_access_dec tlbf (tlb_hash (__id 39) vpn) = None ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (store_ppn_out vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (store_ppn_out vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
     subrange_vec_dec vpn 26 18 = (mword_of_int 2 : mword 9) ->
     sign_extend' 45 (and_vec vpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
     zero_extend' 44 (and_vec (store_ppn_out vpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
@@ -163,24 +160,14 @@ Section KVALL.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
     zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053e0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053e2 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa) (uint (to_bits 64 8)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053e0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053e2 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053e0)) 4 = true ->
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053e2)) 2 = true ->
     is_aligned_vaddr (Virtaddr a8) 8 = true ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
     isRVC (subrange_vec_dec w1 15 0) = true ->
@@ -189,482 +176,239 @@ Section KVALL.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w1 15 0)) s0 = Some (C_ADDI16SP imm6, s0)) ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w2) s0 = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 1)), s0)) ->
-    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
-              (eq_vec (counter_priv_filter_bit mcfg Supervisor) ('b"0")) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w1 15 0)) s0 = Some (C_ADDI16SP imm6, s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w2) s0 = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 1)), s0)) ->
+    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0")) (eq_vec (counter_priv_filter_bit mcfg Supervisor) ('b"0")) ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     m !! gpr_of_Z 3 = Some vgp ->
     vec_access_dec tlbf2 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     vec_access_dec tlbf2 (tlb_hash (__id 39) vpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053e4 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_3))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_3)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_3)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_3)) (Z.sub pagesize_bits 1) 0)) = a8_3 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_3)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_3)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_3)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_3)) (Z.sub pagesize_bits 1) 0)) = a8_3 ->
     and_vec (sign_extend' (57 - 12) vpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e4)) 4 = Some region_f3 ->
     (override_PMA (PMA_Region_attributes region_f3) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa3) 8 = Some region_st3 ->
     (override_PMA (PMA_Region_attributes region_st3) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053e4 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa3) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053e4)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053e4 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa3) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_3) 8 = true ->
     is_aligned_paddr (Physaddr pa3) 8 = true ->
     isRVC (subrange_vec_dec w3 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w3 15 0)) s0 = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 3)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w3 15 0)) s0 = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 3)), s0)) ->
     m !! gpr_of_Z 5 = Some vt0 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053e6 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_4))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_4)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_4)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_4)) (Z.sub pagesize_bits 1) 0)) = a8_4 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_4)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_4)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_4)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_4)) (Z.sub pagesize_bits 1) 0)) = a8_4 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e6)) 2 = Some region_f4 ->
     (override_PMA (PMA_Region_attributes region_f4) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa4) 8 = Some region_st4 ->
     (override_PMA (PMA_Region_attributes region_st4) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053e6 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa4) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053e6)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053e6 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa4) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_4) 8 = true ->
     is_aligned_paddr (Physaddr pa4) 8 = true ->
     isRVC w4 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w4) s0 = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 5)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w4) s0 = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 5)), s0)) ->
     m !! gpr_of_Z 6 = Some vR5 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053e8 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_5))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_5)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_5)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_5)) (Z.sub pagesize_bits 1) 0)) = a8_5 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_5)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_5)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_5)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_5)) (Z.sub pagesize_bits 1) 0)) = a8_5 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053e8)) 4 = Some region_f5 ->
     (override_PMA (PMA_Region_attributes region_f5) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa5) 8 = Some region_st5 ->
     (override_PMA (PMA_Region_attributes region_st5) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053e8 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa5) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053e8)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053e8 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa5) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_5) 8 = true ->
     is_aligned_paddr (Physaddr pa5) 8 = true ->
     isRVC (subrange_vec_dec w5 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w5 15 0)) s0 = Some (C_SDSP (mword_of_int 5, Regidx (mword_of_int 6)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w5 15 0)) s0 = Some (C_SDSP (mword_of_int 5, Regidx (mword_of_int 6)), s0)) ->
     m !! gpr_of_Z 7 = Some vR6 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053ea : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_6))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_6)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_6)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_6)) (Z.sub pagesize_bits 1) 0)) = a8_6 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_6)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_6)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_6)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_6)) (Z.sub pagesize_bits 1) 0)) = a8_6 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053ea)) 2 = Some region_f6 ->
     (override_PMA (PMA_Region_attributes region_f6) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa6) 8 = Some region_st6 ->
     (override_PMA (PMA_Region_attributes region_st6) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053ea : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa6) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053ea)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053ea : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa6) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_6) 8 = true ->
     is_aligned_paddr (Physaddr pa6) 8 = true ->
     isRVC w6 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w6) s0 = Some (C_SDSP (mword_of_int 6, Regidx (mword_of_int 7)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w6) s0 = Some (C_SDSP (mword_of_int 6, Regidx (mword_of_int 7)), s0)) ->
     m !! gpr_of_Z 10 = Some vR7 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053ec : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_7))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_7)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_7)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_7)) (Z.sub pagesize_bits 1) 0)) = a8_7 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_7)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_7)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_7)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_7)) (Z.sub pagesize_bits 1) 0)) = a8_7 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053ec)) 4 = Some region_f7 ->
     (override_PMA (PMA_Region_attributes region_f7) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa7) 8 = Some region_st7 ->
     (override_PMA (PMA_Region_attributes region_st7) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053ec : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa7) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053ec)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053ec : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa7) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_7) 8 = true ->
     is_aligned_paddr (Physaddr pa7) 8 = true ->
     isRVC (subrange_vec_dec w7 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w7 15 0)) s0 = Some (C_SDSP (mword_of_int 9, Regidx (mword_of_int 10)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w7 15 0)) s0 = Some (C_SDSP (mword_of_int 9, Regidx (mword_of_int 10)), s0)) ->
     m !! gpr_of_Z 11 = Some vR8 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053ee : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_8)) (Z.sub pagesize_bits 1) 0)) = a8_8 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_8)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_8)) (Z.sub pagesize_bits 1) 0)) = a8_8 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053ee)) 2 = Some region_f8 ->
     (override_PMA (PMA_Region_attributes region_f8) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa8) 8 = Some region_st8 ->
     (override_PMA (PMA_Region_attributes region_st8) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053ee : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa8) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053ee)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053ee : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa8) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_8) 8 = true ->
     is_aligned_paddr (Physaddr pa8) 8 = true ->
     isRVC w8 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w8) s0 = Some (C_SDSP (mword_of_int 10, Regidx (mword_of_int 11)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w8) s0 = Some (C_SDSP (mword_of_int 10, Regidx (mword_of_int 11)), s0)) ->
     m !! gpr_of_Z 12 = Some vR9 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f0 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_9))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_9)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_9)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_9)) (Z.sub pagesize_bits 1) 0)) = a8_9 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_9)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_9)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_9)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_9)) (Z.sub pagesize_bits 1) 0)) = a8_9 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053f0)) 4 = Some region_f9 ->
     (override_PMA (PMA_Region_attributes region_f9) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa9) 8 = Some region_st9 ->
     (override_PMA (PMA_Region_attributes region_st9) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053f0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa9) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053f0)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053f0 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa9) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_9) 8 = true ->
     is_aligned_paddr (Physaddr pa9) 8 = true ->
     isRVC (subrange_vec_dec w9 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w9 15 0)) s0 = Some (C_SDSP (mword_of_int 11, Regidx (mword_of_int 12)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w9 15 0)) s0 = Some (C_SDSP (mword_of_int 11, Regidx (mword_of_int 12)), s0)) ->
     m !! gpr_of_Z 13 = Some vR10 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f2 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_10))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_10)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_10)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_10)) (Z.sub pagesize_bits 1) 0)) = a8_10 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_10)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_10)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_10)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_10)) (Z.sub pagesize_bits 1) 0)) = a8_10 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053f2)) 2 = Some region_f10 ->
     (override_PMA (PMA_Region_attributes region_f10) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa10) 8 = Some region_st10 ->
     (override_PMA (PMA_Region_attributes region_st10) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053f2 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa10) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053f2)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053f2 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa10) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_10) 8 = true ->
     is_aligned_paddr (Physaddr pa10) 8 = true ->
     isRVC w10 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w10) s0 = Some (C_SDSP (mword_of_int 12, Regidx (mword_of_int 13)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w10) s0 = Some (C_SDSP (mword_of_int 12, Regidx (mword_of_int 13)), s0)) ->
     m !! gpr_of_Z 14 = Some vR11 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f4 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_11))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_11)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_11)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_11)) (Z.sub pagesize_bits 1) 0)) = a8_11 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_11)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_11)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_11)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_11)) (Z.sub pagesize_bits 1) 0)) = a8_11 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053f4)) 4 = Some region_f11 ->
     (override_PMA (PMA_Region_attributes region_f11) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa11) 8 = Some region_st11 ->
     (override_PMA (PMA_Region_attributes region_st11) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053f4 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa11) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053f4)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053f4 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa11) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_11) 8 = true ->
     is_aligned_paddr (Physaddr pa11) 8 = true ->
     isRVC (subrange_vec_dec w11 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w11 15 0)) s0 = Some (C_SDSP (mword_of_int 13, Regidx (mword_of_int 14)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w11 15 0)) s0 = Some (C_SDSP (mword_of_int 13, Regidx (mword_of_int 14)), s0)) ->
     m !! gpr_of_Z 15 = Some vR12 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f6 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_12))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_12)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_12)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_12)) (Z.sub pagesize_bits 1) 0)) = a8_12 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_12)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_12)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_12)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_12)) (Z.sub pagesize_bits 1) 0)) = a8_12 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053f6)) 2 = Some region_f12 ->
     (override_PMA (PMA_Region_attributes region_f12) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa12) 8 = Some region_st12 ->
     (override_PMA (PMA_Region_attributes region_st12) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053f6 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa12) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053f6)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053f6 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa12) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_12) 8 = true ->
     is_aligned_paddr (Physaddr pa12) 8 = true ->
     isRVC w12 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w12) s0 = Some (C_SDSP (mword_of_int 14, Regidx (mword_of_int 15)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w12) s0 = Some (C_SDSP (mword_of_int 14, Regidx (mword_of_int 15)), s0)) ->
     m !! gpr_of_Z 16 = Some vR13 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f8 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_13))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_13)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_13)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_13)) (Z.sub pagesize_bits 1) 0)) = a8_13 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_13)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_13)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_13)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_13)) (Z.sub pagesize_bits 1) 0)) = a8_13 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053f8)) 4 = Some region_f13 ->
     (override_PMA (PMA_Region_attributes region_f13) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa13) 8 = Some region_st13 ->
     (override_PMA (PMA_Region_attributes region_st13) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053f8 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa13) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053f8)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053f8 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa13) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_13) 8 = true ->
     is_aligned_paddr (Physaddr pa13) 8 = true ->
     isRVC (subrange_vec_dec w13 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w13 15 0)) s0 = Some (C_SDSP (mword_of_int 15, Regidx (mword_of_int 16)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w13 15 0)) s0 = Some (C_SDSP (mword_of_int 15, Regidx (mword_of_int 16)), s0)) ->
     m !! gpr_of_Z 17 = Some vR14 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053fa : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_14))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_14)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_14)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_14)) (Z.sub pagesize_bits 1) 0)) = a8_14 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_14)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_14)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_14)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_14)) (Z.sub pagesize_bits 1) 0)) = a8_14 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053fa)) 2 = Some region_f14 ->
     (override_PMA (PMA_Region_attributes region_f14) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa14) 8 = Some region_st14 ->
     (override_PMA (PMA_Region_attributes region_st14) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053fa : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa14) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053fa)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053fa : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa14) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_14) 8 = true ->
     is_aligned_paddr (Physaddr pa14) 8 = true ->
     isRVC w14 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w14) s0 = Some (C_SDSP (mword_of_int 16, Regidx (mword_of_int 17)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w14) s0 = Some (C_SDSP (mword_of_int 16, Regidx (mword_of_int 17)), s0)) ->
     m !! gpr_of_Z 28 = Some vR15 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053fc : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_15))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_15)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_15)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_15)) (Z.sub pagesize_bits 1) 0)) = a8_15 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_15)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_15)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_15)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_15)) (Z.sub pagesize_bits 1) 0)) = a8_15 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053fc)) 4 = Some region_f15 ->
     (override_PMA (PMA_Region_attributes region_f15) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa15) 8 = Some region_st15 ->
     (override_PMA (PMA_Region_attributes region_st15) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053fc : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa15) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053fc)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053fc : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa15) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_15) 8 = true ->
     is_aligned_paddr (Physaddr pa15) 8 = true ->
     isRVC (subrange_vec_dec w15 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w15 15 0)) s0 = Some (C_SDSP (mword_of_int 27, Regidx (mword_of_int 28)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w15 15 0)) s0 = Some (C_SDSP (mword_of_int 27, Regidx (mword_of_int 28)), s0)) ->
     m !! gpr_of_Z 29 = Some vR16 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053fe : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_16))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_16)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_16)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_16)) (Z.sub pagesize_bits 1) 0)) = a8_16 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_16)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_16)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_16)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_16)) (Z.sub pagesize_bits 1) 0)) = a8_16 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x800053fe)) 2 = Some region_f16 ->
     (override_PMA (PMA_Region_attributes region_f16) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa16) 8 = Some region_st16 ->
     (override_PMA (PMA_Region_attributes region_st16) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x800053fe : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa16) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x800053fe)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x800053fe : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa16) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_16) 8 = true ->
     is_aligned_paddr (Physaddr pa16) 8 = true ->
     isRVC w16 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w16) s0 = Some (C_SDSP (mword_of_int 28, Regidx (mword_of_int 29)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w16) s0 = Some (C_SDSP (mword_of_int 28, Regidx (mword_of_int 29)), s0)) ->
     m !! gpr_of_Z 30 = Some vR17 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x80005400 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_17))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_17)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_17)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_17)) (Z.sub pagesize_bits 1) 0)) = a8_17 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_17)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_17)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_17)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_17)) (Z.sub pagesize_bits 1) 0)) = a8_17 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x80005400)) 4 = Some region_f17 ->
     (override_PMA (PMA_Region_attributes region_f17) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa17) 8 = Some region_st17 ->
     (override_PMA (PMA_Region_attributes region_st17) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x80005400 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa17) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80005400)) 4 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x80005400 : mword 64)) (uint (to_bits 64 4)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa17) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_17) 8 = true ->
     is_aligned_paddr (Physaddr pa17) 8 = true ->
     isRVC (subrange_vec_dec w17 15 0) = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed (subrange_vec_dec w17 15 0)) s0 = Some (C_SDSP (mword_of_int 29, Regidx (mword_of_int 30)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec w17 15 0)) s0 = Some (C_SDSP (mword_of_int 29, Regidx (mword_of_int 30)), s0)) ->
     m !! gpr_of_Z 31 = Some vR18 ->
-    neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64)))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x80005402 : mword 64) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_18))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_18)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_18)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_18)) (Z.sub pagesize_bits 1) 0)) = a8_18 ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_18)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_18)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_18)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_18)) (Z.sub pagesize_bits 1) 0)) = a8_18 ->
     matching_pma_region pmar0 (Physaddr (mword_of_int 0x80005402)) 2 = Some region_f18 ->
     (override_PMA (PMA_Region_attributes region_f18) PBMT_PMA).(PMA_executable) = true ->
     matching_pma_region pmar0 (Physaddr pa18) 8 = Some region_st18 ->
     (override_PMA (PMA_Region_attributes region_st18) PBMT_PMA).(PMA_writable) = true ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint (mword_of_int 0x80005402 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa18) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_paddr (Physaddr (mword_of_int 0x80005402)) 2 = true ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (mword_of_int 0x80005402 : mword 64)) (uint (to_bits 64 2)) = PMP_Match ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa18) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_18) 8 = true ->
     is_aligned_paddr (Physaddr pa18) 8 = true ->
     isRVC w18 = true ->
-    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
-       exec (ext_decode_compressed w18) s0 = Some (C_SDSP (mword_of_int 30, Regidx (mword_of_int 31)), s0)) ->
+    (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed w18) s0 = Some (C_SDSP (mword_of_int 30, Regidx (mword_of_int 31)), s0)) ->
     let vaj := (add_vec_int (mword_of_int 0x80005402 : mword 64) 2 : mword 64) in
     let vLj0 := add_vec_int vaj 4 in
     let vLj1 := add_vec_int vLj0 2 in
@@ -736,30 +480,16 @@ Section KVALL.
     let offLj16 := sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))) in
     let a8Lj16 := sign_extend' 64 (subrange_vec_dec (add_vec spnew offLj16) (xlen - 0 - 1) 0) in
     let paLj16 := zero_extend' 64 (add_vec_int a8Lj16 (0 * 8)) in
-    neq_vec (bits_of_virtaddr (Virtaddr vaj)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vaj)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vaj)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vaj)) (Z.sub pagesize_bits 1) 0)) = vaj ->
-    neq_vec (access_vec_dec vaj 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vaj 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vaj) 4 = true ->
     matching_pma_region pmar0 (Physaddr vaj) 4 = Some region_j ->
     (override_PMA (PMA_Region_attributes region_j) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vaj) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vaj) 4 = true ->
     isRVC (subrange_vec_dec wj 15 0) = false ->
     add_vec vaj (sign_extend' 64 imm) = (mword_of_int 0x800026a2 : mword 64) ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Supervisor -> exec (ext_decode wj) s0 = Some (JAL (imm, Regidx (mword_of_int 1)), s0)) ->
     eq_vec (access_vec_dec (add_vec vaj (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj0)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj0)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj0)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj0)) (Z.sub pagesize_bits 1) 0)) = vLj0 ->
-    neq_vec (access_vec_dec vLj0 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj0 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj0) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj0) 4 = Some region_fL0 ->
     (override_PMA (PMA_Region_attributes region_fL0) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj0) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj0) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj0)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj0)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj0)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj0)) (Z.sub pagesize_bits 1) 0)) = a8Lj0 ->
@@ -770,16 +500,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj0) 8 = true ->
     isRVC (subrange_vec_dec wL0 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL0 15 0)) s0 = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 1)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj1)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj1)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj1)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj1)) (Z.sub pagesize_bits 1) 0)) = vLj1 ->
-    neq_vec (access_vec_dec vLj1 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj1 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj1) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj1) 2 = Some region_fL1 ->
     (override_PMA (PMA_Region_attributes region_fL1) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj1) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj1) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj1)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj1)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj1)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj1)) (Z.sub pagesize_bits 1) 0)) = a8Lj1 ->
@@ -790,16 +513,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj1) 8 = true ->
     isRVC wL1 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL1) s0 = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 3)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj2)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj2)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj2)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj2)) (Z.sub pagesize_bits 1) 0)) = vLj2 ->
-    neq_vec (access_vec_dec vLj2 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj2 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj2) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj2) 4 = Some region_fL2 ->
     (override_PMA (PMA_Region_attributes region_fL2) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj2) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj2) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj2)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj2)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj2)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj2)) (Z.sub pagesize_bits 1) 0)) = a8Lj2 ->
@@ -810,16 +526,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj2) 8 = true ->
     isRVC (subrange_vec_dec wL2 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL2 15 0)) s0 = Some (C_LDSP (mword_of_int 4, Regidx (mword_of_int 5)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj3)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj3)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj3)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj3)) (Z.sub pagesize_bits 1) 0)) = vLj3 ->
-    neq_vec (access_vec_dec vLj3 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj3 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj3) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj3) 2 = Some region_fL3 ->
     (override_PMA (PMA_Region_attributes region_fL3) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj3) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj3) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj3)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj3)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj3)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj3)) (Z.sub pagesize_bits 1) 0)) = a8Lj3 ->
@@ -830,16 +539,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj3) 8 = true ->
     isRVC wL3 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL3) s0 = Some (C_LDSP (mword_of_int 5, Regidx (mword_of_int 6)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj4)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj4)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj4)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj4)) (Z.sub pagesize_bits 1) 0)) = vLj4 ->
-    neq_vec (access_vec_dec vLj4 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj4 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj4) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj4) 4 = Some region_fL4 ->
     (override_PMA (PMA_Region_attributes region_fL4) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj4) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj4) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj4)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj4)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj4)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj4)) (Z.sub pagesize_bits 1) 0)) = a8Lj4 ->
@@ -850,16 +552,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj4) 8 = true ->
     isRVC (subrange_vec_dec wL4 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL4 15 0)) s0 = Some (C_LDSP (mword_of_int 6, Regidx (mword_of_int 7)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj5)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj5)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj5)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj5)) (Z.sub pagesize_bits 1) 0)) = vLj5 ->
-    neq_vec (access_vec_dec vLj5 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj5 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj5) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj5) 2 = Some region_fL5 ->
     (override_PMA (PMA_Region_attributes region_fL5) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj5) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj5) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj5)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj5)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj5)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj5)) (Z.sub pagesize_bits 1) 0)) = a8Lj5 ->
@@ -870,16 +565,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj5) 8 = true ->
     isRVC wL5 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL5) s0 = Some (C_LDSP (mword_of_int 9, Regidx (mword_of_int 10)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj6)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj6)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj6)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj6)) (Z.sub pagesize_bits 1) 0)) = vLj6 ->
-    neq_vec (access_vec_dec vLj6 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj6 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj6) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj6) 4 = Some region_fL6 ->
     (override_PMA (PMA_Region_attributes region_fL6) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj6) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj6) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj6)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj6)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj6)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj6)) (Z.sub pagesize_bits 1) 0)) = a8Lj6 ->
@@ -890,16 +578,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj6) 8 = true ->
     isRVC (subrange_vec_dec wL6 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL6 15 0)) s0 = Some (C_LDSP (mword_of_int 10, Regidx (mword_of_int 11)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj7)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj7)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj7)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj7)) (Z.sub pagesize_bits 1) 0)) = vLj7 ->
-    neq_vec (access_vec_dec vLj7 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj7 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj7) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj7) 2 = Some region_fL7 ->
     (override_PMA (PMA_Region_attributes region_fL7) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj7) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj7) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj7)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj7)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj7)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj7)) (Z.sub pagesize_bits 1) 0)) = a8Lj7 ->
@@ -910,16 +591,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj7) 8 = true ->
     isRVC wL7 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL7) s0 = Some (C_LDSP (mword_of_int 11, Regidx (mword_of_int 12)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj8)) (Z.sub pagesize_bits 1) 0)) = vLj8 ->
-    neq_vec (access_vec_dec vLj8 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj8 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj8) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj8) 4 = Some region_fL8 ->
     (override_PMA (PMA_Region_attributes region_fL8) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj8) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj8) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj8)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj8)) (Z.sub pagesize_bits 1) 0)) = a8Lj8 ->
@@ -930,16 +604,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj8) 8 = true ->
     isRVC (subrange_vec_dec wL8 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL8 15 0)) s0 = Some (C_LDSP (mword_of_int 12, Regidx (mword_of_int 13)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj9)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj9)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj9)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj9)) (Z.sub pagesize_bits 1) 0)) = vLj9 ->
-    neq_vec (access_vec_dec vLj9 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj9 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj9) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj9) 2 = Some region_fL9 ->
     (override_PMA (PMA_Region_attributes region_fL9) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj9) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj9) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj9)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj9)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj9)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj9)) (Z.sub pagesize_bits 1) 0)) = a8Lj9 ->
@@ -950,16 +617,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj9) 8 = true ->
     isRVC wL9 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL9) s0 = Some (C_LDSP (mword_of_int 13, Regidx (mword_of_int 14)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj10)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj10)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj10)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj10)) (Z.sub pagesize_bits 1) 0)) = vLj10 ->
-    neq_vec (access_vec_dec vLj10 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj10 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj10) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj10) 4 = Some region_fL10 ->
     (override_PMA (PMA_Region_attributes region_fL10) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj10) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj10) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj10)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj10)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj10)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj10)) (Z.sub pagesize_bits 1) 0)) = a8Lj10 ->
@@ -970,16 +630,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj10) 8 = true ->
     isRVC (subrange_vec_dec wL10 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL10 15 0)) s0 = Some (C_LDSP (mword_of_int 14, Regidx (mword_of_int 15)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj11)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj11)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj11)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj11)) (Z.sub pagesize_bits 1) 0)) = vLj11 ->
-    neq_vec (access_vec_dec vLj11 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj11 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj11) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj11) 2 = Some region_fL11 ->
     (override_PMA (PMA_Region_attributes region_fL11) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj11) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj11) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj11)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj11)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj11)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj11)) (Z.sub pagesize_bits 1) 0)) = a8Lj11 ->
@@ -990,16 +643,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj11) 8 = true ->
     isRVC wL11 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL11) s0 = Some (C_LDSP (mword_of_int 15, Regidx (mword_of_int 16)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj12)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj12)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj12)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj12)) (Z.sub pagesize_bits 1) 0)) = vLj12 ->
-    neq_vec (access_vec_dec vLj12 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj12 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj12) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj12) 4 = Some region_fL12 ->
     (override_PMA (PMA_Region_attributes region_fL12) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj12) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj12) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj12)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj12)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj12)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj12)) (Z.sub pagesize_bits 1) 0)) = a8Lj12 ->
@@ -1010,16 +656,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj12) 8 = true ->
     isRVC (subrange_vec_dec wL12 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL12 15 0)) s0 = Some (C_LDSP (mword_of_int 16, Regidx (mword_of_int 17)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj13)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj13)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj13)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj13)) (Z.sub pagesize_bits 1) 0)) = vLj13 ->
-    neq_vec (access_vec_dec vLj13 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj13 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj13) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj13) 2 = Some region_fL13 ->
     (override_PMA (PMA_Region_attributes region_fL13) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj13) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj13) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj13)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj13)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj13)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj13)) (Z.sub pagesize_bits 1) 0)) = a8Lj13 ->
@@ -1030,16 +669,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj13) 8 = true ->
     isRVC wL13 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL13) s0 = Some (C_LDSP (mword_of_int 27, Regidx (mword_of_int 28)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj14)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj14)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj14)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj14)) (Z.sub pagesize_bits 1) 0)) = vLj14 ->
-    neq_vec (access_vec_dec vLj14 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj14 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj14) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj14) 4 = Some region_fL14 ->
     (override_PMA (PMA_Region_attributes region_fL14) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj14) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj14) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj14)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj14)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj14)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj14)) (Z.sub pagesize_bits 1) 0)) = a8Lj14 ->
@@ -1050,16 +682,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj14) 8 = true ->
     isRVC (subrange_vec_dec wL14 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL14 15 0)) s0 = Some (C_LDSP (mword_of_int 28, Regidx (mword_of_int 29)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj15)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj15)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj15)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj15)) (Z.sub pagesize_bits 1) 0)) = vLj15 ->
-    neq_vec (access_vec_dec vLj15 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj15 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vLj15) 4 = false ->
     matching_pma_region pmar0 (Physaddr vLj15) 2 = Some region_fL15 ->
     (override_PMA (PMA_Region_attributes region_fL15) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj15) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj15) 2 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj15)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj15)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj15)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj15)) (Z.sub pagesize_bits 1) 0)) = a8Lj15 ->
@@ -1070,16 +695,9 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj15) 8 = true ->
     isRVC wL15 = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wL15) s0 = Some (C_LDSP (mword_of_int 29, Regidx (mword_of_int 30)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vLj16)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj16)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj16)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj16)) (Z.sub pagesize_bits 1) 0)) = vLj16 ->
-    neq_vec (access_vec_dec vLj16 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vLj16 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vLj16) 4 = true ->
     matching_pma_region pmar0 (Physaddr vLj16) 4 = Some region_fL16 ->
     (override_PMA (PMA_Region_attributes region_fL16) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vLj16) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vLj16) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr a8Lj16)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj16)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj16)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8Lj16)) (Z.sub pagesize_bits 1) 0)) = a8Lj16 ->
@@ -1090,28 +708,14 @@ Section KVALL.
     is_aligned_paddr (Physaddr paLj16) 8 = true ->
     isRVC (subrange_vec_dec wL16 15 0) = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed (subrange_vec_dec wL16 15 0)) s0 = Some (C_LDSP (mword_of_int 30, Regidx (mword_of_int 31)), s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vAj)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vAj)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vAj)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vAj)) (Z.sub pagesize_bits 1) 0)) = vAj ->
-    neq_vec (access_vec_dec vAj 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vAj 1) ('b"0") = true ->
-    is_aligned_vaddr (Virtaddr vAj) 4 = false ->
     matching_pma_region pmar0 (Physaddr vAj) 2 = Some region_A ->
     (override_PMA (PMA_Region_attributes region_A) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vAj) (uint (to_bits 64 2)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vAj) 2 = true ->
     isRVC wA = true ->
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true -> exec (ext_decode_compressed wA) s0 = Some (C_ADDI16SP immA, s0)) ->
-    neq_vec (bits_of_virtaddr (Virtaddr vSj)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vSj)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vSj)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn ->
-    zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vSj)) (Z.sub pagesize_bits 1) 0)) = vSj ->
-    neq_vec (access_vec_dec vSj 0) ('b"0") = false ->
-    neq_vec (access_vec_dec vSj 1) ('b"0") = false ->
-    is_aligned_vaddr (Virtaddr vSj) 4 = true ->
     matching_pma_region pmar0 (Physaddr vSj) 4 = Some region_S ->
     (override_PMA (PMA_Region_attributes region_S) PBMT_PMA).(PMA_executable) = true ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint vSj) (uint (to_bits 64 4)) = PMP_Match ->
-    is_aligned_paddr (Physaddr vSj) 4 = true ->
     isRVC (subrange_vec_dec wS 15 0) = false ->
     (forall s0, register_lookup cur_privilege (sregs s0) = Supervisor -> exec (ext_decode wS) s0 = Some (SRET tt, s0)) ->
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
@@ -1197,7 +801,213 @@ Section KVALL.
         WP (Loop : expr riscv_lang) @ E {{ Phi }} ) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros spnew a8 pa tlbf tlbf2 mst1 offset3 a8_3 pa3 mst2 mst3 offset4 a8_4 pa4 mst4 offset5 a8_5 pa5 mst5 offset6 a8_6 pa6 mst6 offset7 a8_7 pa7 mst7 offset8 a8_8 pa8 mst8 offset9 a8_9 pa9 mst9 offset10 a8_10 pa10 mst10 offset11 a8_11 pa11 mst11 offset12 a8_12 pa12 mst12 offset13 a8_13 pa13 mst13 offset14 a8_14 pa14 mst14 offset15 a8_15 pa15 mst15 offset16 a8_16 pa16 mst16 offset17 a8_17 pa17 mst17 offset18 a8_18 pa18 HN Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Hal4 Halpte Hal2 Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help Hgp Hvec5_2 Hvecst3 Hcanonf3 Hvpndeff3 Hidentf3 Hcanon3 Hvpndef3 Hident3 Hmask3 Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hr3f Hr3s Hal3f Hal3v Hpal3 HisRVC3 Hdec3 Ht0 Hcanonf4 Hvpndeff4 Hidentf4 Hcanon4 Hvpndef4 Hident4 Hmatchf4 Hexecf4 Hmatchst4 Hwrite4 Hr4f Hr4s Hal4f Hal4v Hpal4 HisRVC4 Hdec4 Hgpr5 Hcanonf5 Hvpndeff5 Hidentf5 Hcanon5 Hvpndef5 Hident5 Hmatchf5 Hexecf5 Hmatchst5 Hwrite5 Hrf5 Hrs5 Half5 Halv5 Hzpal5 Hisrvc5 Hdec5 Hgpr6 Hcanonf6 Hvpndeff6 Hidentf6 Hcanon6 Hvpndef6 Hident6 Hmatchf6 Hexecf6 Hmatchst6 Hwrite6 Hrf6 Hrs6 Half6 Halv6 Hzpal6 Hisrvc6 Hdec6 Hgpr7 Hcanonf7 Hvpndeff7 Hidentf7 Hcanon7 Hvpndef7 Hident7 Hmatchf7 Hexecf7 Hmatchst7 Hwrite7 Hrf7 Hrs7 Half7 Halv7 Hzpal7 Hisrvc7 Hdec7 Hgpr8 Hcanonf8 Hvpndeff8 Hidentf8 Hcanon8 Hvpndef8 Hident8 Hmatchf8 Hexecf8 Hmatchst8 Hwrite8 Hrf8 Hrs8 Half8 Halv8 Hzpal8 Hisrvc8 Hdec8 Hgpr9 Hcanonf9 Hvpndeff9 Hidentf9 Hcanon9 Hvpndef9 Hident9 Hmatchf9 Hexecf9 Hmatchst9 Hwrite9 Hrf9 Hrs9 Half9 Halv9 Hzpal9 Hisrvc9 Hdec9 Hgpr10 Hcanonf10 Hvpndeff10 Hidentf10 Hcanon10 Hvpndef10 Hident10 Hmatchf10 Hexecf10 Hmatchst10 Hwrite10 Hrf10 Hrs10 Half10 Halv10 Hzpal10 Hisrvc10 Hdec10 Hgpr11 Hcanonf11 Hvpndeff11 Hidentf11 Hcanon11 Hvpndef11 Hident11 Hmatchf11 Hexecf11 Hmatchst11 Hwrite11 Hrf11 Hrs11 Half11 Halv11 Hzpal11 Hisrvc11 Hdec11 Hgpr12 Hcanonf12 Hvpndeff12 Hidentf12 Hcanon12 Hvpndef12 Hident12 Hmatchf12 Hexecf12 Hmatchst12 Hwrite12 Hrf12 Hrs12 Half12 Halv12 Hzpal12 Hisrvc12 Hdec12 Hgpr13 Hcanonf13 Hvpndeff13 Hidentf13 Hcanon13 Hvpndef13 Hident13 Hmatchf13 Hexecf13 Hmatchst13 Hwrite13 Hrf13 Hrs13 Half13 Halv13 Hzpal13 Hisrvc13 Hdec13 Hgpr14 Hcanonf14 Hvpndeff14 Hidentf14 Hcanon14 Hvpndef14 Hident14 Hmatchf14 Hexecf14 Hmatchst14 Hwrite14 Hrf14 Hrs14 Half14 Halv14 Hzpal14 Hisrvc14 Hdec14 Hgpr15 Hcanonf15 Hvpndeff15 Hidentf15 Hcanon15 Hvpndef15 Hident15 Hmatchf15 Hexecf15 Hmatchst15 Hwrite15 Hrf15 Hrs15 Half15 Halv15 Hzpal15 Hisrvc15 Hdec15 Hgpr16 Hcanonf16 Hvpndeff16 Hidentf16 Hcanon16 Hvpndef16 Hident16 Hmatchf16 Hexecf16 Hmatchst16 Hwrite16 Hrf16 Hrs16 Half16 Halv16 Hzpal16 Hisrvc16 Hdec16 Hgpr17 Hcanonf17 Hvpndeff17 Hidentf17 Hcanon17 Hvpndef17 Hident17 Hmatchf17 Hexecf17 Hmatchst17 Hwrite17 Hrf17 Hrs17 Half17 Halv17 Hzpal17 Hisrvc17 Hdec17 Hgpr18 Hcanonf18 Hvpndeff18 Hidentf18 Hcanon18 Hvpndef18 Hident18 Hmatchf18 Hexecf18 Hmatchst18 Hwrite18 Hrf18 Hrs18 Half18 Halv18 Hzpal18 Hisrvc18 Hdec18 vaj vLj0 vLj1 vLj2 vLj3 vLj4 vLj5 vLj6 vLj7 vLj8 vLj9 vLj10 vLj11 vLj12 vLj13 vLj14 vLj15 vLj16 vAj vSj offLj0 a8Lj0 paLj0 offLj1 a8Lj1 paLj1 offLj2 a8Lj2 paLj2 offLj3 a8Lj3 paLj3 offLj4 a8Lj4 paLj4 offLj5 a8Lj5 paLj5 offLj6 a8Lj6 paLj6 offLj7 a8Lj7 paLj7 offLj8 a8Lj8 paLj8 offLj9 a8Lj9 paLj9 offLj10 a8Lj10 paLj10 offLj11 a8Lj11 paLj11 offLj12 a8Lj12 paLj12 offLj13 a8Lj13 paLj13 offLj14 a8Lj14 paLj14 offLj15 a8Lj15 paLj15 offLj16 a8Lj16 paLj16 T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32 T33 T34 T35 T36 T37 T38 T39 T40 T41 T42 T43 T44 T45 T46 T47 T48 T49 T50 T51 T52 T53 T54 T55 T56 T57 T58 T59 T60 T61 T62 T63 T64 T65 T66 T67 T68 T69 T70 T71 T72 T73 T74 T75 T76 T77 T78 T79 T80 T81 T82 T83 T84 T85 T86 T87 T88 T89 T90 T91 T92 T93 T94 T95 T96 T97 T98 T99 T100 T101 T102 T103 T104 T105 T106 T107 T108 T109 T110 T111 T112 T113 T114 T115 T116 T117 T118 T119 T120 T121 T122 T123 T124 T125 T126 T127 T128 T129 T130 T131 T132 T133 T134 T135 T136 T137 T138 T139 T140 T141 T142 T143 T144 T145 T146 T147 T148 T149 T150 T151 T152 T153 T154 T155 T156 T157 T158 T159 T160 T161 T162 T163 T164 T165 T166 T167 T168 T169 T170 T171 T172 T173 T174 T175 T176 T177 T178 T179 T180 T181 T182 T183 T184 T185 T186 T187 T188 T189 T190 T191 T192 T193 T194 T195 T196 T197 T198 T199 T200 T201 T202 T203 T204 T205 T206 T207 T208 T209 T210 T211 T212 T213 T214 T215 T216 T217 T218 T219 T220 T221 T222 T223 T224 T225 T226 T227 T228 T229 T230 T231 T232 T233 T234 T235 T236 T237 T238 T239 T240 T241 T242 T243 T244 T245 T246 T247 T248 T249 T250 T251 T252 T253 T254 T255 T256 T257 T258 T259 T260 T261 T262 T263 T264 T265 T266 T267 T268 T269 T270 T271 T272 T273 T274 T275 T276 T277 T278 T279 T280 T281 T282 T283 T284 T285 T286 T287 T288 T289 T290 T291 T292 T293 T294 T295 T296 T297 T298 T299 T300 T301 T302 T303 T304 T305 T306 T307 T308 T309 T310 T311 T312 T313 T314 T315 T316 T317 T318 T319 T320 T321 T322 T323 T324 T325 T326 T327 T328 T329 T330 T331 T332 T333 T334 T335 T336 T337 T338 T339 T340 T341 T342 T343 T344 T345 T346 T347 T348 T349 T350 T351 T352 T353 T354 T355 T356 T357 T358 T359 T360 T361 T362 T363 T364 T365 T366 T367 T368 T369 T370 T371 T372 T373 T374 T375 T376 T377 T378 T379 Htvec5 Htvecld Hmask_t Hcancel.
+    intros spnew a8 pa tlbf tlbf2 mst1 offset3 a8_3 pa3 mst2 mst3 offset4 a8_4 pa4 mst4 offset5 a8_5 pa5 mst5 offset6 a8_6 pa6 mst6 offset7 a8_7 pa7 mst7 offset8 a8_8 pa8 mst8 offset9 a8_9 pa9 mst9 offset10 a8_10 pa10 mst10 offset11 a8_11 pa11 mst11 offset12 a8_12 pa12 mst12 offset13 a8_13 pa13 mst13 offset14 a8_14 pa14 mst14 offset15 a8_15 pa15 mst15 offset16 a8_16 pa16 mst16 offset17 a8_17 pa17 mst17 offset18 a8_18 pa18 HN Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Halpte Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help Hgp Hvec5_2 Hvecst3 Hcanon3 Hvpndef3 Hident3 Hmask3 Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hr3f Hr3s Hal3v Hpal3 HisRVC3 Hdec3 Ht0 Hcanon4 Hvpndef4 Hident4 Hmatchf4 Hexecf4 Hmatchst4 Hwrite4 Hr4f Hr4s Hal4v Hpal4 HisRVC4 Hdec4 Hgpr5 Hcanon5 Hvpndef5 Hident5 Hmatchf5 Hexecf5 Hmatchst5 Hwrite5 Hrf5 Hrs5 Halv5 Hzpal5 Hisrvc5 Hdec5 Hgpr6 Hcanon6 Hvpndef6 Hident6 Hmatchf6 Hexecf6 Hmatchst6 Hwrite6 Hrf6 Hrs6 Halv6 Hzpal6 Hisrvc6 Hdec6 Hgpr7 Hcanon7 Hvpndef7 Hident7 Hmatchf7 Hexecf7 Hmatchst7 Hwrite7 Hrf7 Hrs7 Halv7 Hzpal7 Hisrvc7 Hdec7 Hgpr8 Hcanon8 Hvpndef8 Hident8 Hmatchf8 Hexecf8 Hmatchst8 Hwrite8 Hrf8 Hrs8 Halv8 Hzpal8 Hisrvc8 Hdec8 Hgpr9 Hcanon9 Hvpndef9 Hident9 Hmatchf9 Hexecf9 Hmatchst9 Hwrite9 Hrf9 Hrs9 Halv9 Hzpal9 Hisrvc9 Hdec9 Hgpr10 Hcanon10 Hvpndef10 Hident10 Hmatchf10 Hexecf10 Hmatchst10 Hwrite10 Hrf10 Hrs10 Halv10 Hzpal10 Hisrvc10 Hdec10 Hgpr11 Hcanon11 Hvpndef11 Hident11 Hmatchf11 Hexecf11 Hmatchst11 Hwrite11 Hrf11 Hrs11 Halv11 Hzpal11 Hisrvc11 Hdec11 Hgpr12 Hcanon12 Hvpndef12 Hident12 Hmatchf12 Hexecf12 Hmatchst12 Hwrite12 Hrf12 Hrs12 Halv12 Hzpal12 Hisrvc12 Hdec12 Hgpr13 Hcanon13 Hvpndef13 Hident13 Hmatchf13 Hexecf13 Hmatchst13 Hwrite13 Hrf13 Hrs13 Halv13 Hzpal13 Hisrvc13 Hdec13 Hgpr14 Hcanon14 Hvpndef14 Hident14 Hmatchf14 Hexecf14 Hmatchst14 Hwrite14 Hrf14 Hrs14 Halv14 Hzpal14 Hisrvc14 Hdec14 Hgpr15 Hcanon15 Hvpndef15 Hident15 Hmatchf15 Hexecf15 Hmatchst15 Hwrite15 Hrf15 Hrs15 Halv15 Hzpal15 Hisrvc15 Hdec15 Hgpr16 Hcanon16 Hvpndef16 Hident16 Hmatchf16 Hexecf16 Hmatchst16 Hwrite16 Hrf16 Hrs16 Halv16 Hzpal16 Hisrvc16 Hdec16 Hgpr17 Hcanon17 Hvpndef17 Hident17 Hmatchf17 Hexecf17 Hmatchst17 Hwrite17 Hrf17 Hrs17 Halv17 Hzpal17 Hisrvc17 Hdec17 Hgpr18 Hcanon18 Hvpndef18 Hident18 Hmatchf18 Hexecf18 Hmatchst18 Hwrite18 Hrf18 Hrs18 Halv18 Hzpal18 Hisrvc18 Hdec18 vaj vLj0 vLj1 vLj2 vLj3 vLj4 vLj5 vLj6 vLj7 vLj8 vLj9 vLj10 vLj11 vLj12 vLj13 vLj14 vLj15 vLj16 vAj vSj offLj0 a8Lj0 paLj0 offLj1 a8Lj1 paLj1 offLj2 a8Lj2 paLj2 offLj3 a8Lj3 paLj3 offLj4 a8Lj4 paLj4 offLj5 a8Lj5 paLj5 offLj6 a8Lj6 paLj6 offLj7 a8Lj7 paLj7 offLj8 a8Lj8 paLj8 offLj9 a8Lj9 paLj9 offLj10 a8Lj10 paLj10 offLj11 a8Lj11 paLj11 offLj12 a8Lj12 paLj12 offLj13 a8Lj13 paLj13 offLj14 a8Lj14 paLj14 offLj15 a8Lj15 paLj15 offLj16 a8Lj16 paLj16 T6 T7 T8 T10 T11 T12 T13 T20 T21 T22 T24 T25 T26 T27 T28 T29 T30 T31 T32 T33 T40 T41 T42 T44 T45 T46 T47 T48 T49 T50 T51 T52 T53 T60 T61 T62 T64 T65 T66 T67 T68 T69 T70 T71 T72 T73 T80 T81 T82 T84 T85 T86 T87 T88 T89 T90 T91 T92 T93 T100 T101 T102 T104 T105 T106 T107 T108 T109 T110 T111 T112 T113 T120 T121 T122 T124 T125 T126 T127 T128 T129 T130 T131 T132 T133 T140 T141 T142 T144 T145 T146 T147 T148 T149 T150 T151 T152 T153 T160 T161 T162 T164 T165 T166 T167 T168 T169 T170 T171 T172 T173 T180 T181 T182 T184 T185 T186 T187 T188 T189 T190 T191 T192 T193 T200 T201 T202 T204 T205 T206 T207 T208 T209 T210 T211 T212 T213 T220 T221 T222 T224 T225 T226 T227 T228 T229 T230 T231 T232 T233 T240 T241 T242 T244 T245 T246 T247 T248 T249 T250 T251 T252 T253 T260 T261 T262 T264 T265 T266 T267 T268 T269 T270 T271 T272 T273 T280 T281 T282 T284 T285 T286 T287 T288 T289 T290 T291 T292 T293 T300 T301 T302 T304 T305 T306 T307 T308 T309 T310 T311 T312 T313 T320 T321 T322 T324 T325 T326 T327 T328 T329 T330 T331 T332 T333 T340 T341 T342 T344 T345 T346 T347 T348 T349 T350 T351 T352 T353 T360 T361 T362 T364 T365 T372 T373 T374 T376 T377 T378 T379 Htvec5 Htvecld Hmask_t Hcancel.
+    assert (Hal4 : is_aligned_paddr (Physaddr (mword_of_int 0x800053e0)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hal2 : is_aligned_paddr (Physaddr (mword_of_int 0x800053e2)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf3 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff3 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf3 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e4 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053e4 : mword 64)) by (vm_compute; reflexivity).
+    assert (Hal3f : is_aligned_paddr (Physaddr (mword_of_int 0x800053e4)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf4 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff4 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf4 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e6 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053e6 : mword 64)) by (vm_compute; reflexivity).
+    assert (Hal4f : is_aligned_paddr (Physaddr (mword_of_int 0x800053e6)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf5 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff5 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf5 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053e8 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053e8 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half5 : is_aligned_paddr (Physaddr (mword_of_int 0x800053e8)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf6 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff6 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf6 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ea : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053ea : mword 64)) by (vm_compute; reflexivity).
+    assert (Half6 : is_aligned_paddr (Physaddr (mword_of_int 0x800053ea)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf7 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff7 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf7 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ec : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053ec : mword 64)) by (vm_compute; reflexivity).
+    assert (Half7 : is_aligned_paddr (Physaddr (mword_of_int 0x800053ec)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf8 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff8 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf8 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053ee : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053ee : mword 64)) by (vm_compute; reflexivity).
+    assert (Half8 : is_aligned_paddr (Physaddr (mword_of_int 0x800053ee)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf9 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff9 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf9 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f0 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f0 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half9 : is_aligned_paddr (Physaddr (mword_of_int 0x800053f0)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf10 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff10 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf10 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f2 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f2 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half10 : is_aligned_paddr (Physaddr (mword_of_int 0x800053f2)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf11 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff11 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf11 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f4 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f4 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half11 : is_aligned_paddr (Physaddr (mword_of_int 0x800053f4)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf12 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff12 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf12 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f6 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f6 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half12 : is_aligned_paddr (Physaddr (mword_of_int 0x800053f6)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf13 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff13 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf13 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053f8 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053f8 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half13 : is_aligned_paddr (Physaddr (mword_of_int 0x800053f8)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf14 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff14 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf14 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fa : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053fa : mword 64)) by (vm_compute; reflexivity).
+    assert (Half14 : is_aligned_paddr (Physaddr (mword_of_int 0x800053fa)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf15 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff15 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf15 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fc : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053fc : mword 64)) by (vm_compute; reflexivity).
+    assert (Half15 : is_aligned_paddr (Physaddr (mword_of_int 0x800053fc)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf16 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff16 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf16 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x800053fe : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x800053fe : mword 64)) by (vm_compute; reflexivity).
+    assert (Half16 : is_aligned_paddr (Physaddr (mword_of_int 0x800053fe)) 2 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf17 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff17 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf17 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005400 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x80005400 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half17 : is_aligned_paddr (Physaddr (mword_of_int 0x80005400)) 4 = true) by (vm_compute; reflexivity).
+    assert (Hcanonf18 : neq_vec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64))) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (Hvpndeff18 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (Hidentf18 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int 0x80005402 : mword 64))) (Z.sub pagesize_bits 1) 0)) = (mword_of_int 0x80005402 : mword 64)) by (vm_compute; reflexivity).
+    assert (Half18 : is_aligned_paddr (Physaddr (mword_of_int 0x80005402)) 2 = true) by (vm_compute; reflexivity).
+    assert (T0 : neq_vec (bits_of_virtaddr (Virtaddr vaj)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vaj)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T1 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vaj)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T2 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vaj)) (Z.sub pagesize_bits 1) 0)) = vaj) by (vm_compute; reflexivity).
+    assert (T3 : neq_vec (access_vec_dec vaj 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T4 : neq_vec (access_vec_dec vaj 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T5 : is_aligned_vaddr (Virtaddr vaj) 4 = true) by (vm_compute; reflexivity).
+    assert (T9 : is_aligned_paddr (Physaddr vaj) 4 = true) by (vm_compute; reflexivity).
+    assert (T14 : neq_vec (bits_of_virtaddr (Virtaddr vLj0)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj0)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T15 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj0)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T16 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj0)) (Z.sub pagesize_bits 1) 0)) = vLj0) by (vm_compute; reflexivity).
+    assert (T17 : neq_vec (access_vec_dec vLj0 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T18 : neq_vec (access_vec_dec vLj0 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T19 : is_aligned_vaddr (Virtaddr vLj0) 4 = true) by (vm_compute; reflexivity).
+    assert (T23 : is_aligned_paddr (Physaddr vLj0) 4 = true) by (vm_compute; reflexivity).
+    assert (T34 : neq_vec (bits_of_virtaddr (Virtaddr vLj1)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj1)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T35 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj1)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T36 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj1)) (Z.sub pagesize_bits 1) 0)) = vLj1) by (vm_compute; reflexivity).
+    assert (T37 : neq_vec (access_vec_dec vLj1 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T38 : neq_vec (access_vec_dec vLj1 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T39 : is_aligned_vaddr (Virtaddr vLj1) 4 = false) by (vm_compute; reflexivity).
+    assert (T43 : is_aligned_paddr (Physaddr vLj1) 2 = true) by (vm_compute; reflexivity).
+    assert (T54 : neq_vec (bits_of_virtaddr (Virtaddr vLj2)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj2)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T55 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj2)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T56 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj2)) (Z.sub pagesize_bits 1) 0)) = vLj2) by (vm_compute; reflexivity).
+    assert (T57 : neq_vec (access_vec_dec vLj2 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T58 : neq_vec (access_vec_dec vLj2 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T59 : is_aligned_vaddr (Virtaddr vLj2) 4 = true) by (vm_compute; reflexivity).
+    assert (T63 : is_aligned_paddr (Physaddr vLj2) 4 = true) by (vm_compute; reflexivity).
+    assert (T74 : neq_vec (bits_of_virtaddr (Virtaddr vLj3)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj3)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T75 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj3)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T76 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj3)) (Z.sub pagesize_bits 1) 0)) = vLj3) by (vm_compute; reflexivity).
+    assert (T77 : neq_vec (access_vec_dec vLj3 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T78 : neq_vec (access_vec_dec vLj3 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T79 : is_aligned_vaddr (Virtaddr vLj3) 4 = false) by (vm_compute; reflexivity).
+    assert (T83 : is_aligned_paddr (Physaddr vLj3) 2 = true) by (vm_compute; reflexivity).
+    assert (T94 : neq_vec (bits_of_virtaddr (Virtaddr vLj4)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj4)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T95 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj4)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T96 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj4)) (Z.sub pagesize_bits 1) 0)) = vLj4) by (vm_compute; reflexivity).
+    assert (T97 : neq_vec (access_vec_dec vLj4 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T98 : neq_vec (access_vec_dec vLj4 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T99 : is_aligned_vaddr (Virtaddr vLj4) 4 = true) by (vm_compute; reflexivity).
+    assert (T103 : is_aligned_paddr (Physaddr vLj4) 4 = true) by (vm_compute; reflexivity).
+    assert (T114 : neq_vec (bits_of_virtaddr (Virtaddr vLj5)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj5)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T115 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj5)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T116 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj5)) (Z.sub pagesize_bits 1) 0)) = vLj5) by (vm_compute; reflexivity).
+    assert (T117 : neq_vec (access_vec_dec vLj5 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T118 : neq_vec (access_vec_dec vLj5 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T119 : is_aligned_vaddr (Virtaddr vLj5) 4 = false) by (vm_compute; reflexivity).
+    assert (T123 : is_aligned_paddr (Physaddr vLj5) 2 = true) by (vm_compute; reflexivity).
+    assert (T134 : neq_vec (bits_of_virtaddr (Virtaddr vLj6)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj6)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T135 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj6)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T136 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj6)) (Z.sub pagesize_bits 1) 0)) = vLj6) by (vm_compute; reflexivity).
+    assert (T137 : neq_vec (access_vec_dec vLj6 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T138 : neq_vec (access_vec_dec vLj6 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T139 : is_aligned_vaddr (Virtaddr vLj6) 4 = true) by (vm_compute; reflexivity).
+    assert (T143 : is_aligned_paddr (Physaddr vLj6) 4 = true) by (vm_compute; reflexivity).
+    assert (T154 : neq_vec (bits_of_virtaddr (Virtaddr vLj7)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj7)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T155 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj7)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T156 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj7)) (Z.sub pagesize_bits 1) 0)) = vLj7) by (vm_compute; reflexivity).
+    assert (T157 : neq_vec (access_vec_dec vLj7 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T158 : neq_vec (access_vec_dec vLj7 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T159 : is_aligned_vaddr (Virtaddr vLj7) 4 = false) by (vm_compute; reflexivity).
+    assert (T163 : is_aligned_paddr (Physaddr vLj7) 2 = true) by (vm_compute; reflexivity).
+    assert (T174 : neq_vec (bits_of_virtaddr (Virtaddr vLj8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj8)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T175 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T176 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj8)) (Z.sub pagesize_bits 1) 0)) = vLj8) by (vm_compute; reflexivity).
+    assert (T177 : neq_vec (access_vec_dec vLj8 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T178 : neq_vec (access_vec_dec vLj8 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T179 : is_aligned_vaddr (Virtaddr vLj8) 4 = true) by (vm_compute; reflexivity).
+    assert (T183 : is_aligned_paddr (Physaddr vLj8) 4 = true) by (vm_compute; reflexivity).
+    assert (T194 : neq_vec (bits_of_virtaddr (Virtaddr vLj9)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj9)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T195 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj9)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T196 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj9)) (Z.sub pagesize_bits 1) 0)) = vLj9) by (vm_compute; reflexivity).
+    assert (T197 : neq_vec (access_vec_dec vLj9 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T198 : neq_vec (access_vec_dec vLj9 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T199 : is_aligned_vaddr (Virtaddr vLj9) 4 = false) by (vm_compute; reflexivity).
+    assert (T203 : is_aligned_paddr (Physaddr vLj9) 2 = true) by (vm_compute; reflexivity).
+    assert (T214 : neq_vec (bits_of_virtaddr (Virtaddr vLj10)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj10)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T215 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj10)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T216 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj10)) (Z.sub pagesize_bits 1) 0)) = vLj10) by (vm_compute; reflexivity).
+    assert (T217 : neq_vec (access_vec_dec vLj10 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T218 : neq_vec (access_vec_dec vLj10 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T219 : is_aligned_vaddr (Virtaddr vLj10) 4 = true) by (vm_compute; reflexivity).
+    assert (T223 : is_aligned_paddr (Physaddr vLj10) 4 = true) by (vm_compute; reflexivity).
+    assert (T234 : neq_vec (bits_of_virtaddr (Virtaddr vLj11)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj11)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T235 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj11)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T236 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj11)) (Z.sub pagesize_bits 1) 0)) = vLj11) by (vm_compute; reflexivity).
+    assert (T237 : neq_vec (access_vec_dec vLj11 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T238 : neq_vec (access_vec_dec vLj11 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T239 : is_aligned_vaddr (Virtaddr vLj11) 4 = false) by (vm_compute; reflexivity).
+    assert (T243 : is_aligned_paddr (Physaddr vLj11) 2 = true) by (vm_compute; reflexivity).
+    assert (T254 : neq_vec (bits_of_virtaddr (Virtaddr vLj12)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj12)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T255 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj12)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T256 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj12)) (Z.sub pagesize_bits 1) 0)) = vLj12) by (vm_compute; reflexivity).
+    assert (T257 : neq_vec (access_vec_dec vLj12 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T258 : neq_vec (access_vec_dec vLj12 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T259 : is_aligned_vaddr (Virtaddr vLj12) 4 = true) by (vm_compute; reflexivity).
+    assert (T263 : is_aligned_paddr (Physaddr vLj12) 4 = true) by (vm_compute; reflexivity).
+    assert (T274 : neq_vec (bits_of_virtaddr (Virtaddr vLj13)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj13)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T275 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj13)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T276 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj13)) (Z.sub pagesize_bits 1) 0)) = vLj13) by (vm_compute; reflexivity).
+    assert (T277 : neq_vec (access_vec_dec vLj13 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T278 : neq_vec (access_vec_dec vLj13 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T279 : is_aligned_vaddr (Virtaddr vLj13) 4 = false) by (vm_compute; reflexivity).
+    assert (T283 : is_aligned_paddr (Physaddr vLj13) 2 = true) by (vm_compute; reflexivity).
+    assert (T294 : neq_vec (bits_of_virtaddr (Virtaddr vLj14)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj14)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T295 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj14)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T296 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj14)) (Z.sub pagesize_bits 1) 0)) = vLj14) by (vm_compute; reflexivity).
+    assert (T297 : neq_vec (access_vec_dec vLj14 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T298 : neq_vec (access_vec_dec vLj14 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T299 : is_aligned_vaddr (Virtaddr vLj14) 4 = true) by (vm_compute; reflexivity).
+    assert (T303 : is_aligned_paddr (Physaddr vLj14) 4 = true) by (vm_compute; reflexivity).
+    assert (T314 : neq_vec (bits_of_virtaddr (Virtaddr vLj15)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj15)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T315 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj15)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T316 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj15)) (Z.sub pagesize_bits 1) 0)) = vLj15) by (vm_compute; reflexivity).
+    assert (T317 : neq_vec (access_vec_dec vLj15 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T318 : neq_vec (access_vec_dec vLj15 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T319 : is_aligned_vaddr (Virtaddr vLj15) 4 = false) by (vm_compute; reflexivity).
+    assert (T323 : is_aligned_paddr (Physaddr vLj15) 2 = true) by (vm_compute; reflexivity).
+    assert (T334 : neq_vec (bits_of_virtaddr (Virtaddr vLj16)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj16)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T335 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj16)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T336 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vLj16)) (Z.sub pagesize_bits 1) 0)) = vLj16) by (vm_compute; reflexivity).
+    assert (T337 : neq_vec (access_vec_dec vLj16 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T338 : neq_vec (access_vec_dec vLj16 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T339 : is_aligned_vaddr (Virtaddr vLj16) 4 = true) by (vm_compute; reflexivity).
+    assert (T343 : is_aligned_paddr (Physaddr vLj16) 4 = true) by (vm_compute; reflexivity).
+    assert (T354 : neq_vec (bits_of_virtaddr (Virtaddr vAj)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vAj)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T355 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vAj)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T356 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vAj)) (Z.sub pagesize_bits 1) 0)) = vAj) by (vm_compute; reflexivity).
+    assert (T357 : neq_vec (access_vec_dec vAj 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T358 : neq_vec (access_vec_dec vAj 1) ('b"0") = true) by (vm_compute; reflexivity).
+    assert (T359 : is_aligned_vaddr (Virtaddr vAj) 4 = false) by (vm_compute; reflexivity).
+    assert (T363 : is_aligned_paddr (Physaddr vAj) 2 = true) by (vm_compute; reflexivity).
+    assert (T366 : neq_vec (bits_of_virtaddr (Virtaddr vSj)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr vSj)) (Z.sub 39 1) 0)) = false) by (vm_compute; reflexivity).
+    assert (T367 : autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr vSj)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = sp_vpn) by (vm_compute; reflexivity).
+    assert (T368 : zero_extend' 64 (concat_vec (mword_of_int 0x80005 : mword 44) (subrange_vec_dec (bits_of_virtaddr (Virtaddr vSj)) (Z.sub pagesize_bits 1) 0)) = vSj) by (vm_compute; reflexivity).
+    assert (T369 : neq_vec (access_vec_dec vSj 0) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T370 : neq_vec (access_vec_dec vSj 1) ('b"0") = false) by (vm_compute; reflexivity).
+    assert (T371 : is_aligned_vaddr (Virtaddr vSj) 4 = true) by (vm_compute; reflexivity).
+    assert (T375 : is_aligned_paddr (Physaddr vSj) 4 = true) by (vm_compute; reflexivity).
     iIntros "Hpc Hfile Hmisa Hnpc #Hinv Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hib4 Hstack4 Hib5 Hstack5 Hib6 Hstack6 Hib7 Hstack7 Hib8 Hstack8 Hib9 Hstack9 Hib10 Hstack10 Hib11 Hstack11 Hib12 Hstack12 Hib13 Hstack13 Hib14 Hstack14 Hib15 Hstack15 Hib16 Hstack16 Hib17 Hstack17 Hib18 Hstack18 Hsepc Hjb Hlb0 Hlb1 Hlb2 Hlb3 Hlb4 Hlb5 Hlb6 Hlb7 Hlb8 Hlb9 Hlb10 Hlb11 Hlb12 Hlb13 Hlb14 Hlb15 Hlb16 Hab Hsb Hcont".
     iApply (wp_kernelvec_stores root_ppn w1 imm6 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 w18 vpn m vsp vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v b1 npc0 mst0 mc mcfg pmpcfg0 pmpaddr00 pmar0 mi0 elp0 tlbvec region_pte region_st region_f2 region_f3 region_st3 region_f4 region_st4 region_f5 region_st5 region_f6 region_st6 region_f7 region_st7 region_f8 region_st8 region_f9 region_st9 region_f10 region_st10 region_f11 region_st11 region_f12 region_st12 region_f13 region_st13 region_f14 region_st14 region_f15 region_st15 region_f16 region_st16 region_f17 region_st17 region_f18 region_st18 vgp vt0 vR5 vR6 vR7 vR8 vR9 vR10 vR11 vR12 vR13 vR14 vR15 vR16 vR17 vR18 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 vold18 E Phi HN Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Hal4 Halpte Hal2 Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help Hgp Hvec5_2 Hvecst3 Hcanonf3 Hvpndeff3 Hidentf3 Hcanon3 Hvpndef3 Hident3 Hmask3 Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hr3f Hr3s Hal3f Hal3v Hpal3 HisRVC3 Hdec3 Ht0 Hcanonf4 Hvpndeff4 Hidentf4 Hcanon4 Hvpndef4 Hident4 Hmatchf4 Hexecf4 Hmatchst4 Hwrite4 Hr4f Hr4s Hal4f Hal4v Hpal4 HisRVC4 Hdec4 Hgpr5 Hcanonf5 Hvpndeff5 Hidentf5 Hcanon5 Hvpndef5 Hident5 Hmatchf5 Hexecf5 Hmatchst5 Hwrite5 Hrf5 Hrs5 Half5 Halv5 Hzpal5 Hisrvc5 Hdec5 Hgpr6 Hcanonf6 Hvpndeff6 Hidentf6 Hcanon6 Hvpndef6 Hident6 Hmatchf6 Hexecf6 Hmatchst6 Hwrite6 Hrf6 Hrs6 Half6 Halv6 Hzpal6 Hisrvc6 Hdec6 Hgpr7 Hcanonf7 Hvpndeff7 Hidentf7 Hcanon7 Hvpndef7 Hident7 Hmatchf7 Hexecf7 Hmatchst7 Hwrite7 Hrf7 Hrs7 Half7 Halv7 Hzpal7 Hisrvc7 Hdec7 Hgpr8 Hcanonf8 Hvpndeff8 Hidentf8 Hcanon8 Hvpndef8 Hident8 Hmatchf8 Hexecf8 Hmatchst8 Hwrite8 Hrf8 Hrs8 Half8 Halv8 Hzpal8 Hisrvc8 Hdec8 Hgpr9 Hcanonf9 Hvpndeff9 Hidentf9 Hcanon9 Hvpndef9 Hident9 Hmatchf9 Hexecf9 Hmatchst9 Hwrite9 Hrf9 Hrs9 Half9 Halv9 Hzpal9 Hisrvc9 Hdec9 Hgpr10 Hcanonf10 Hvpndeff10 Hidentf10 Hcanon10 Hvpndef10 Hident10 Hmatchf10 Hexecf10 Hmatchst10 Hwrite10 Hrf10 Hrs10 Half10 Halv10 Hzpal10 Hisrvc10 Hdec10 Hgpr11 Hcanonf11 Hvpndeff11 Hidentf11 Hcanon11 Hvpndef11 Hident11 Hmatchf11 Hexecf11 Hmatchst11 Hwrite11 Hrf11 Hrs11 Half11 Halv11 Hzpal11 Hisrvc11 Hdec11 Hgpr12 Hcanonf12 Hvpndeff12 Hidentf12 Hcanon12 Hvpndef12 Hident12 Hmatchf12 Hexecf12 Hmatchst12 Hwrite12 Hrf12 Hrs12 Half12 Halv12 Hzpal12 Hisrvc12 Hdec12 Hgpr13 Hcanonf13 Hvpndeff13 Hidentf13 Hcanon13 Hvpndef13 Hident13 Hmatchf13 Hexecf13 Hmatchst13 Hwrite13 Hrf13 Hrs13 Half13 Halv13 Hzpal13 Hisrvc13 Hdec13 Hgpr14 Hcanonf14 Hvpndeff14 Hidentf14 Hcanon14 Hvpndef14 Hident14 Hmatchf14 Hexecf14 Hmatchst14 Hwrite14 Hrf14 Hrs14 Half14 Halv14 Hzpal14 Hisrvc14 Hdec14 Hgpr15 Hcanonf15 Hvpndeff15 Hidentf15 Hcanon15 Hvpndef15 Hident15 Hmatchf15 Hexecf15 Hmatchst15 Hwrite15 Hrf15 Hrs15 Half15 Halv15 Hzpal15 Hisrvc15 Hdec15 Hgpr16 Hcanonf16 Hvpndeff16 Hidentf16 Hcanon16 Hvpndef16 Hident16 Hmatchf16 Hexecf16 Hmatchst16 Hwrite16 Hrf16 Hrs16 Half16 Halv16 Hzpal16 Hisrvc16 Hdec16 Hgpr17 Hcanonf17 Hvpndeff17 Hidentf17 Hcanon17 Hvpndef17 Hident17 Hmatchf17 Hexecf17 Hmatchst17 Hwrite17 Hrf17 Hrs17 Half17 Halv17 Hzpal17 Hisrvc17 Hdec17 Hgpr18 Hcanonf18 Hvpndeff18 Hidentf18 Hcanon18 Hvpndef18 Hident18 Hmatchf18 Hexecf18 Hmatchst18 Hwrite18 Hrf18 Hrs18 Half18 Halv18 Hzpal18 Hisrvc18 Hdec18 with "Hpc Hfile Hmisa Hnpc Hinv Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hib4 Hstack4 Hib5 Hstack5 Hib6 Hstack6 Hib7 Hstack7 Hib8 Hstack8 Hib9 Hstack9 Hib10 Hstack10 Hib11 Hstack11 Hib12 Hstack12 Hib13 Hstack13 Hib14 Hstack14 Hib15 Hstack15 Hib16 Hstack16 Hib17 Hstack17 Hib18 Hstack18").
     iNext.
