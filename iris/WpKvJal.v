@@ -19,6 +19,75 @@ Import Defs.
    TLB hit). Same as WpKvStore.FetchAt4 but the instruction is NOT compressed
    (isRVC (w[15:0]) = false), so the fetch yields F_Base w. *)
 
+(* JAL to a 2-byte-aligned (bit1=1) target with the C extension enabled: the
+   misalignment check (bit1 && not Zca) is false, so the jump succeeds. *)
+Lemma exec_jump_to_zca (target : mword 64) s :
+  eq_vec (access_vec_dec target 0) ('b"0") = true ->
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
+Proof.
+  intros Halign Hzca.
+  unfold jump_to. rewrite exec_catch_early_return.
+  change (ext_control_check_pc target) with (@None unit). cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ false s).
+  2:{ unfold Defs.bind0.
+      erewrite execR_bind_Some.
+      2:{ erewrite execR_bind_Some.
+          2:{ apply execR_returnR_fwd. }
+          rewrite execR_liftR. unfold assert_exp. rewrite Halign. cbn match.
+          rewrite exec_returnm. reflexivity. }
+      unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ (bit_to_bool (access_vec_dec target 1)) s).
+      2:{ apply execR_returnR_fwd. }
+      destruct (bit_to_bool (access_vec_dec target 1)).
+      - cbv iota beta.
+        rewrite (execR_bind_Some _ _ _ true s).
+        2:{ rewrite execR_liftR. rewrite Hzca. reflexivity. }
+        cbv iota beta. apply execR_returnR_fwd.
+      - cbv iota beta. apply execR_returnR_fwd. }
+  cbv iota beta.
+  unfold Defs.bind0.
+  rewrite (execR_bind_Some _ _ _ tt (set_reg s nextPC target)).
+  2:{ rewrite execR_liftR. rewrite exec_set_next_pc. reflexivity. }
+  rewrite (execR_returnR_fwd RETIRE_SUCCESS (set_reg s nextPC target)).
+  reflexivity.
+Qed.
+
+Lemma exec_execute_JAL_zca (imm : mword 21) (rd : regidx) s s_w :
+  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  exec (wX_bits rd (register_lookup nextPC s.(sregs)))
+       (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))) = Some (tt, s_w) ->
+  exec (execute_JAL imm rd) s = Some (RETIRE_SUCCESS, s_w).
+Proof.
+  intros Halign Hzca Hwx.
+  unfold execute_JAL, get_next_pc.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to_zca _ s Halign Hzca)).
+  cbn match.
+  rewrite (exec_bind0_Some _ _ _ _ _ Hwx).
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_JAL_gpr_zca (imm : mword 21) (rd : mword 5) s :
+  uint rd <> 0 ->
+  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  exec (execute_JAL imm (Regidx rd)) s
+  = Some (RETIRE_SUCCESS,
+          set_reg (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
+                  (R_bitvector_64 (gpr_of_Z (uint rd)))
+                  (regval_into_reg (register_lookup nextPC s.(sregs)))).
+Proof.
+  intros Hrd Halign Hzca.
+  apply (exec_execute_JAL_zca imm (Regidx rd) s _ Halign Hzca).
+  rewrite (exec_wX_bits_gpr rd (register_lookup nextPC s.(sregs))
+             (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))).
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  reflexivity.
+Qed.
+
 Section KVJAL.
   Context `{!riscvGS Σ}.
   Context (root_ppn : mword 44).
@@ -210,10 +279,10 @@ Section ForwardJALsup.
     register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     eq_vec (access_vec_dec jtgts 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec jtgts 1) = false ->
+    exec (currentlyEnabled Ext_Zca) s_pcjs = Some (true, s_pcjs) ->
     exec riscv_step s = Some (tt, sFjs).
   Proof using All.
-    intros Lpc Lpriv Lhs Lelp Halign Hbit1.
+    intros Lpc Lpriv Lhs Lelp Halign Hzca.
     assert (LpcA  : register_lookup PC sAjs.(sregs) = pc).
     { unfold sAjs, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ]. }
     assert (LprivA: register_lookup cur_privilege sAjs.(sregs) = Supervisor).
@@ -226,7 +295,7 @@ Section ForwardJALsup.
     assert (HdecA : exec (ext_decode w) sAjs = Some (JAL (imm, Regidx rd), sAjs)) by (apply Hdec; exact LprivA).
     assert (HexecJ : exec (execute (JAL (imm, Regidx rd))) s_pcjs = Some (RETIRE_SUCCESS, sXjs)).
     { change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
-      rewrite (exec_execute_JAL_gpr imm rd s_pcjs Hrd0 Halign Hbit1).
+      rewrite (exec_execute_JAL_gpr_zca imm rd s_pcjs Hrd0 Halign Hzca).
       unfold sXjs, jtgts, jlinks. reflexivity. }
     assert (Hha : exec (run_hart_active 0) sAjs = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXjs)).
     { exact (exec_hart_active_progress_gen Supervisor sAjs sAjs sXjs sAjs w
