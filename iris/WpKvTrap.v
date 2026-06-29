@@ -51,12 +51,22 @@ Section KVTRAP.
      htif_tohost_base ↦ᵣ None)%I.
 End KVTRAP.
 
+(* The caller-saved temporaries that a C function (kerneltrap) is permitted to
+   clobber: ra + t0..t6 + a0..a7.  These are EXACTLY the registers kernelvec's
+   assembly itself saves/restores around the call.  Every OTHER register
+   (sp, gp, tp, s0..s11) is callee-saved and must be preserved by kerneltrap. *)
+Definition kt_clobbered : gset register_bitvector_64 :=
+  {[ gpr_of_Z 1; gpr_of_Z 5; gpr_of_Z 6; gpr_of_Z 7; gpr_of_Z 10; gpr_of_Z 11;
+     gpr_of_Z 12; gpr_of_Z 13; gpr_of_Z 14; gpr_of_Z 15; gpr_of_Z 16; gpr_of_Z 17;
+     gpr_of_Z 28; gpr_of_Z 29; gpr_of_Z 30; gpr_of_Z 31 ]}.
+
 (* The kerneltrap contract: EXECUTING the handler body, entered at its function
    address 0x800026a2 with a return address rava in ra (= gpr1), returns to
-   PC = rava — with sp and the saved-register frame and the CSRs preserved and
-   the other GPRs arbitrary (but the register file keeps the SAME DOMAIN: the
-   handler reads and writes existing registers, it never adds or removes a GPR
-   slot — so kernelvec's `ld` restores can still find every callee register). *)
+   PC = rava — with sp and the saved-register frame and the CSRs preserved.
+   The register file keeps the SAME DOMAIN (the handler never adds/removes a GPR
+   slot), and — per the C calling convention — it AGREES WITH THE INPUT on every
+   callee-saved register (everything outside [kt_clobbered]); only the
+   caller-saved temporaries it is allowed to use are left arbitrary. *)
 Axiom kerneltrap_returns :
   forall `{!riscvGS Σ}
     (m : gmap register_bitvector_64 (mword 64)) (spnew rava : mword 64)
@@ -78,6 +88,7 @@ Axiom kerneltrap_returns :
     kv_cell pa17 vR17 -∗ kv_cell pa18 vR18 -∗
     ▷ ( ∀ (m' : gmap register_bitvector_64 (mword 64)) (npc' : mword 64),
         ⌜ m' !! gpr_of_Z 2 = Some spnew ⌝ -∗ ⌜ dom m' = dom m ⌝ -∗
+        ⌜ ∀ r, r ∉ kt_clobbered → m' !! r = m !! r ⌝ -∗
         PC ↦ᵣ rava -∗ nextPC ↦ᵣ npc' -∗ gpr_file m' -∗ minstret_inv -∗
         kv_csrs misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v mc mcfg elp0 pmpcfg0 pmpaddr00 pmar0 tlbf2 -∗
         kv_cell pa vra -∗ kv_cell pa3 vgp -∗ kv_cell pa4 vt0 -∗ kv_cell pa5 vR5 -∗ kv_cell pa6 vR6 -∗

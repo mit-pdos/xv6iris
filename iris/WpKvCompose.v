@@ -87,6 +87,7 @@ Section KVCOMPOSE.
     ▷ ( ∀ (m' : gmap register_bitvector_64 (mword 64)) (npc' : mword 64),
         ⌜ m' !! gpr_of_Z 2 = Some vsp ⌝ -∗
         ⌜ dom m' = dom (<[gpr_of_Z 1 := regval_into_reg (add_vec_int va 4)]> m) ⌝ -∗
+        ⌜ ∀ r, r ∉ kt_clobbered → m' !! r = m !! r ⌝ -∗
         PC ↦ᵣ regval_into_reg (add_vec_int va 4) -∗ nextPC ↦ᵣ npc' -∗ gpr_file m' -∗ minstret_inv -∗
         kv_csrs misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v mc mcfg elp0 pmpcfg0 pmpaddr00 pmar0 tlbvec -∗
         kv_cell pa vra -∗ kv_cell pa3 vgp -∗ kv_cell pa4 vt0 -∗ kv_cell pa5 vR5 -∗ kv_cell pa6 vR6 -∗
@@ -128,8 +129,15 @@ Section KVCOMPOSE.
               with "Hpc Hnpc Hfile Hinv [$Hmisa' $Hpriv $Hhs $Hmdl $Hms $Hsatp $Htlb $Hmenv $Hsec $Hmie $Help' $Hmcinh $Hmcfg $Hpmpc $Hpmpaddr $Hpma $Hhtif]
                     Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18 [Hcont Hibytes]").
     iNext.
-    iIntros (m'' npc'') "Hsp'' Hdom'' Hpc Hnpc Hfile #Hinv2 Hcsrs Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18".
-    iApply ("Hcont" $! m'' npc'' with "Hsp'' Hdom'' Hpc Hnpc Hfile Hinv2 Hcsrs
+    iIntros (m'' npc'') "Hsp'' Hdom'' %Hpr Hpc Hnpc Hfile #Hinv2 Hcsrs Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18".
+    (* the axiom preserves m'' off [kt_clobbered] relative to m' = <[x1:=va+4]>m;
+       since x1 ∈ kt_clobbered, that lifts to preservation relative to m itself. *)
+    iAssert (⌜ ∀ r, r ∉ kt_clobbered → m'' !! r = m !! r ⌝)%I as "Hpres".
+    { iPureIntro.
+      assert (Hkey : gpr_of_Z (uint (mword_of_int 1 : mword 5)) = gpr_of_Z 1) by (vm_compute; reflexivity).
+      intros r Hr. rewrite (Hpr r Hr). subst m'. rewrite Hkey.
+      rewrite lookup_insert_ne; [reflexivity|]. intros Heq. apply Hr. rewrite -Heq. set_solver. }
+    iApply ("Hcont" $! m'' npc'' with "Hsp'' Hdom'' Hpres Hpc Hnpc Hfile Hinv2 Hcsrs
               Hc0 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hc9 Hc10 Hc11 Hc12 Hc13 Hc14 Hc15 Hc16 Hc17 Hc18 Hibytes").
   Qed.
 
@@ -819,6 +827,7 @@ Section KVCOMPOSE.
     ([∗ list] j ∈ seq 0 4, (pa_add vS j) ↦ₘ nth_byte wS j) -∗
     ▷ ( ∀ (m' : gmap register_bitvector_64 (mword 64)) (npc' : mword 64),
         ⌜ m' !! gpr_of_Z 2 = Some vsp ⌝ -∗ ⌜ dom m' = dom (<[gpr_of_Z 1 := link]> m) ⌝ -∗
+        ⌜ ∀ r, r ∉ kt_clobbered → m' !! r = m !! r ⌝ -∗
         PC ↦ᵣ sret_tgt sepc0 -∗
         gpr_file (<[gpr_of_Z 2 := regval_into_reg (add_vec vsp (sign_extend' 64 (caddi16sp_imm immA)))]> (<[gpr_of_Z 31 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval16))]> (<[gpr_of_Z 30 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval15))]> (<[gpr_of_Z 29 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval14))]> (<[gpr_of_Z 28 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval13))]> (<[gpr_of_Z 17 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval12))]> (<[gpr_of_Z 16 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval11))]> (<[gpr_of_Z 15 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval10))]> (<[gpr_of_Z 14 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval9))]> (<[gpr_of_Z 13 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval8))]> (<[gpr_of_Z 12 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval7))]> (<[gpr_of_Z 11 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval6))]> (<[gpr_of_Z 10 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval5))]> (<[gpr_of_Z 7 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval4))]> (<[gpr_of_Z 6 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval3))]> (<[gpr_of_Z 5 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval2))]> (<[gpr_of_Z 3 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval1))]> (<[gpr_of_Z 1 := regval_into_reg (extend_value false (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) vLval0))]> m')))))))))))))))))) -∗
         misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ sret_tgt sepc0 -∗
@@ -873,7 +882,7 @@ Section KVCOMPOSE.
               HN Hsp Hra Htgt HSXL Hmode Hasid Hvec5 jcanon jvpndef jident jbit0 jbit1 jalign4 jmatchf jexecf HA0 Hord0 jrangef HX0 jalignf HmisaC HmisaS jisRVC jdec jal0 Hb1 Hmie_mdl HSIE Help
               with "Hinv Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hjbytes Hcell0 Hcell1 Hcell2 Hcell3 Hcell4 Hcell5 Hcell6 Hcell7 Hcell8 Hcell9 Hcell10 Hcell11 Hcell12 Hcell13 Hcell14 Hcell15 Hcell16").
     iNext.
-    iIntros (m' npc') "%Hsp' %Hdom' Hpc Hnpc Hfile #Hinv2 Hcsrs Hcell0 Hcell1 Hcell2 Hcell3 Hcell4 Hcell5 Hcell6 Hcell7 Hcell8 Hcell9 Hcell10 Hcell11 Hcell12 Hcell13 Hcell14 Hcell15 Hcell16 Hjbytes".
+    iIntros (m' npc') "%Hsp' %Hdom' %Hpres' Hpc Hnpc Hfile #Hinv2 Hcsrs Hcell0 Hcell1 Hcell2 Hcell3 Hcell4 Hcell5 Hcell6 Hcell7 Hcell8 Hcell9 Hcell10 Hcell11 Hcell12 Hcell13 Hcell14 Hcell15 Hcell16 Hjbytes".
     assert (HisL0 : is_Some (m' !! gpr_of_Z 1)).
     { destruct Hor0 as [vo0 Hvo0]. apply elem_of_dom. rewrite Hdom'. rewrite dom_insert_L.
       apply elem_of_union_r. apply elem_of_dom. rewrite Hvo0. eauto. }
@@ -955,9 +964,10 @@ Section KVCOMPOSE.
               with "Hinv2 Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmie Hsepc Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif HibA HibS").
     iNext.
     iIntros "Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmie Hsepc Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif HibA HibS".
-    iApply ("Hcont" $! m' npc' with "[%] [%] Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmie Hsepc Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hjbytes Hcell0 Hcell1 Hcell2 Hcell3 Hcell4 Hcell5 Hcell6 Hcell7 Hcell8 Hcell9 Hcell10 Hcell11 Hcell12 Hcell13 Hcell14 Hcell15 Hcell16 Hib0 Hib1 Hib2 Hib3 Hib4 Hib5 Hib6 Hib7 Hib8 Hib9 Hib10 Hib11 Hib12 Hib13 Hib14 Hib15 Hib16 HibA HibS").
+    iApply ("Hcont" $! m' npc' with "[%] [%] [%] Hpc Hfile Hmisa' Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmie Hsepc Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hjbytes Hcell0 Hcell1 Hcell2 Hcell3 Hcell4 Hcell5 Hcell6 Hcell7 Hcell8 Hcell9 Hcell10 Hcell11 Hcell12 Hcell13 Hcell14 Hcell15 Hcell16 Hib0 Hib1 Hib2 Hib3 Hib4 Hib5 Hib6 Hib7 Hib8 Hib9 Hib10 Hib11 Hib12 Hib13 Hib14 Hib15 Hib16 HibA HibS").
     - exact Hsp'.
     - exact Hdom'.
+    - exact Hpres'.
     Unshelve. all: (repeat (rewrite lookup_insert_ne; [|vm_compute; discriminate]); exact Hsp').
   Qed.
 
