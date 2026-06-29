@@ -54,3 +54,4 @@ WpKvLoadWp.v
 WpGprSret.v
 WpKvSret.v
 WpKvCompose.v
+WpKernelvecAll.v
