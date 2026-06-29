@@ -47,3 +47,4 @@ WpStoreWalk.v
 WpStoreS2.v
 WpKvStore.v
 WpKernelvecChain.v
+WpKvTrap.v
