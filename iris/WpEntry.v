@@ -30,20 +30,18 @@ Section FetchRVC.
       (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF.
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
       (Physaddr addr) 4 = Some region.
-  Hypothesis Halign : is_aligned_paddr (Physaddr addr) 4 = true.
   Hypothesis Hexec : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
   Hypothesis Hc : exec (within_clint (Physaddr addr) 4) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr addr) 4) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s).
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N ->
       s.(mem) !! (pa_add addr j) = Some (nth_byte w j).
-  Hypothesis Hbit0 : neq_vec (access_vec_dec pc 0) ('b"0") = false.
-  Hypothesis Hbit1 : neq_vec (access_vec_dec pc 1) ('b"0") = false.
   Hypothesis Hvalign : is_aligned_vaddr (Virtaddr pc) 4 = true.
   Hypothesis HisRVC : isRVC (subrange_vec_dec w 15 0) = true.
 
   Lemma exec_fetch_RVC_4 : exec (fetch tt) s = Some (F_RVC (subrange_vec_dec w 15 0), s).
   Proof using All.
+    destruct (align4_low_bits pc Hvalign) as [Hbit0 Hbit1].
     assert (HrdPC : exec (Defs.read_reg PC) s = Some (pc, s)).
     { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
     unfold fetch.
@@ -1544,11 +1542,11 @@ Section WpFetchRVC.
     assert (Hmatch : matching_pma_region (register_lookup pma_regions t.(sregs))
               (Physaddr (fetch_pa pc)) 4 = Some region)
       by (rewrite Ltpma; exact Hmatch0).
-    exact (exec_fetch_RVC_4 pc region w t Ltpc Ltpriv Hpmp Hmatch Halign Hexec
+    exact (exec_fetch_RVC_4 pc region w t Ltpc Ltpriv Hpmp Hmatch Hexec
              (within_clint_false (fetch_pa pc) 4 t Hnc ltac:(lia))
              (within_sig_false  (fetch_pa pc) 4 t Hns ltac:(lia))
              (within_htif_false (fetch_pa pc) 4 t Lthtif)
-             Ltmem Hbit0 Hbit1 Hvalign HisRVC).
+             Ltmem Hvalign HisRVC).
   Qed.
 End WpFetchRVC.
 
