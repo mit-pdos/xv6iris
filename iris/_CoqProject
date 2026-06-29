@@ -53,3 +53,4 @@ WpKvTrap.v
 WpKvLoadWp.v
 WpGprSret.v
 WpKvSret.v
+WpKvCompose.v
