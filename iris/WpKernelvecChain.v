@@ -201,6 +201,7 @@ Section Chain.
     let tlbf := vec_update_dec tlbvec 5 (Some (pw_tlb_entry root_ppn (mword_of_int 0))) in
     let tlbf2 := vec_update_dec tlbf (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn (mword_of_int 0))) in
     let mst1 := if b1 then add_vec_int mst0 1 else mst0 in
+    ↑minstretN ⊆ E ->
     m !! gpr_of_Z 2 = Some vsp ->
     m !! gpr_of_Z 1 = Some vra ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -265,7 +266,7 @@ Section Chain.
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -278,7 +279,6 @@ Section Chain.
     ▷ ( PC ↦ᵣ add_vec_int (mword_of_int 0x800053e2 : mword 64) 2 -∗
         gpr_file (<[gpr_of_Z 2 := regval_into_reg spnew]> m) -∗ misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int (mword_of_int 0x800053e2 : mword 64) 2 -∗
-        (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ (if b1 then add_vec_int mst1 1 else mst1) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ tlbf2 -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -291,37 +291,37 @@ Section Chain.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros spnew a8 pa tlbf tlbf2 mst1.
-    intros Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
+    intros HN Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
       Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm
       HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Hal4 Halpte Hal2 Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR
       Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hcont".
+    iIntros "Hpc Hfile Hmisa Hnpc #Hinv Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hcont".
     assert (HPC2 : add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 = mword_of_int 0x800053e2)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ---- instruction 1: c.addi16sp (page-walk fills TLB at index 5) ---- *)
     iApply (wp_pagewalk_caddi16sp root_ppn w1 imm6 m vsp misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v b1 npc0 mst0 mc mcfg
               pmpcfg0 pmpaddr00 pmar0 mi0 elp0 tlbvec region_pte E Phi
-              Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
+              HN Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
               HmisaC HmisaS Hdec1 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
     rewrite !HPC2.
     (* ---- instruction 2: c.sdsp ra,0(sp) — store-address translation WALKS ---- *)
     iApply (wp_pagewalk_csdsp_walk root_ppn w2 (mword_of_int 0) (mword_of_int 1) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vra (mword_of_int 0x800053e2) mst1 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf region_st region_f2 region_pte E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vra (mword_of_int 0x800053e2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf region_st region_f2 region_pte E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hra | vm_compute; discriminate ])
               HSXL Hmode Hppn Hasid (vec_access_update_5 tlbvec (pw_tlb_entry root_ppn (mword_of_int 0))) Hvecst
               Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
               Hmatchf2 Hexecf2 Hmatchst Hwrite Hmatchp Hpte Hpmm HPBMTE
               HA0 Hord0 Hr2 Hrst Hrpte HX0 HW0 HR0 Hal2 Hal8 Hpal8 Halpte HisRVC2 HmisaC HmisaS HMPRV HMXR
               Hdec2 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
-    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
+    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
   Qed.
 
   Lemma wp_kernelvec_123 (w1 : mword 32) (imm6 : mword 6) (w2 : mword 16) (w3 : mword 32) (vpn : mword 27)
@@ -343,6 +343,7 @@ Section Chain.
     let a8_3 := sign_extend' 64 (subrange_vec_dec (add_vec (regval_into_reg spnew) offset3) (xlen - 0 - 1) 0) in
     let pa3 := zero_extend' 64 (add_vec_int a8_3 (0 * 8)) in
     let mst2 := if b1 then add_vec_int mst1 1 else mst1 in
+    ↑minstretN ⊆ E ->
     m !! gpr_of_Z 2 = Some vsp ->
     m !! gpr_of_Z 1 = Some vra ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -439,7 +440,7 @@ Section Chain.
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed (subrange_vec_dec w3 15 0)) s0 = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 3)), s0)) ->
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -454,7 +455,6 @@ Section Chain.
     ▷ ( PC ↦ᵣ add_vec_int (mword_of_int 0x800053e4 : mword 64) 2 -∗
         gpr_file (<[gpr_of_Z 2 := regval_into_reg spnew]> m) -∗ misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int (mword_of_int 0x800053e4 : mword 64) 2 -∗
-        (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ (if b1 then add_vec_int mst2 1 else mst2) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ tlbf2 -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -469,46 +469,46 @@ Section Chain.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros spnew a8 pa tlbf tlbf2 mst1 offset3 a8_3 pa3 mst2.
-    intros Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
+    intros HN Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
       Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm
       HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Hal4 Halpte Hal2 Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR
       Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help
       Hgp Hvec5_2 Hvecst3 Hcanonf3 Hvpndeff3 Hidentf3 Hcanon3 Hvpndef3 Hident3 Hmask3
       Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hr3f Hr3s Hal3f Hal3v Hpal3 HisRVC3 Hdec3.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hcont".
+    iIntros "Hpc Hfile Hmisa Hnpc #Hinv Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hcont".
     assert (HPC2 : add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 = mword_of_int 0x800053e2)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ---- instruction 1: c.addi16sp (page-walk fills TLB at index 5) ---- *)
     iApply (wp_pagewalk_caddi16sp root_ppn w1 imm6 m vsp misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v b1 npc0 mst0 mc mcfg
               pmpcfg0 pmpaddr00 pmar0 mi0 elp0 tlbvec region_pte E Phi
-              Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
+              HN Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
               HmisaC HmisaS Hdec1 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
     rewrite !HPC2.
     (* ---- instruction 2: c.sdsp ra,0(sp) — store-address translation WALKS ---- *)
     iApply (wp_pagewalk_csdsp_walk root_ppn w2 (mword_of_int 0) (mword_of_int 1) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vra (mword_of_int 0x800053e2) mst1 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf region_st region_f2 region_pte E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vra (mword_of_int 0x800053e2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf region_st region_f2 region_pte E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hra | vm_compute; discriminate ])
               HSXL Hmode Hppn Hasid (vec_access_update_5 tlbvec (pw_tlb_entry root_ppn (mword_of_int 0))) Hvecst
               Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
               Hmatchf2 Hexecf2 Hmatchst Hwrite Hmatchp Hpte Hpmm HPBMTE
               HA0 Hord0 Hr2 Hrst Hrpte HX0 HW0 HR0 Hal2 Hal8 Hpal8 Halpte HisRVC2 HmisaC HmisaS HMPRV HMXR
               Hdec2 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
     assert (HPC4 : add_vec_int (mword_of_int 0x800053e2 : mword 64) 2 = mword_of_int 0x800053e4)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPC4.
     (* ---- instruction 3: c.sdsp gp,16(sp) @0x800053e4 (4-aligned, TLB HIT) ---- *)
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053e4) w3 (mword_of_int 2) (mword_of_int 3) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vgp misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold3 (add_vec_int (mword_of_int 0x800053e2 : mword 64) 2) mst2 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st3 region_f3 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold3 (add_vec_int (mword_of_int 0x800053e2 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st3 region_f3 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgp | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf3 Hvpndeff3 Hidentf3 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -516,10 +516,10 @@ Section Chain.
               Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hpmm
               HA0 Hord0 Hr3f Hr3s HX0 HW0 Hal3f Hal3v Hpal3 HisRVC3 HmisaC HmisaS HMPRV HMXR
               Hdec3 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3".
-    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hstack3 Hpbytes Hib2 Hib3").
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3".
+    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hstack3 Hpbytes Hib2 Hib3").
   Qed.
 
   Lemma wp_kernelvec_1234 (w1 : mword 32) (imm6 : mword 6) (w2 : mword 16) (w3 : mword 32) (w4 : mword 16) (vpn : mword 27)
@@ -545,6 +545,7 @@ Section Chain.
     let offset4 := sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) in
     let a8_4 := sign_extend' 64 (subrange_vec_dec (add_vec (regval_into_reg spnew) offset4) (xlen - 0 - 1) 0) in
     let pa4 := zero_extend' 64 (add_vec_int a8_4 (0 * 8)) in
+    ↑minstretN ⊆ E ->
     m !! gpr_of_Z 2 = Some vsp ->
     m !! gpr_of_Z 1 = Some vra ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -670,7 +671,7 @@ Section Chain.
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w4) s0 = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 5)), s0)) ->
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -687,7 +688,6 @@ Section Chain.
     ▷ ( PC ↦ᵣ add_vec_int (mword_of_int 0x800053e6 : mword 64) 2 -∗
         gpr_file (<[gpr_of_Z 2 := regval_into_reg spnew]> m) -∗ misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int (mword_of_int 0x800053e6 : mword 64) 2 -∗
-        (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ (if b1 then add_vec_int mst3 1 else mst3) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ tlbf2 -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -704,47 +704,47 @@ Section Chain.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros spnew a8 pa tlbf tlbf2 mst1 offset3 a8_3 pa3 mst2 mst3 offset4 a8_4 pa4.
-    intros Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
+    intros HN Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
       Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm
       HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Hal4 Halpte Hal2 Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR
       Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help
       Hgp Hvec5_2 Hvecst3 Hcanonf3 Hvpndeff3 Hidentf3 Hcanon3 Hvpndef3 Hident3 Hmask3
       Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hr3f Hr3s Hal3f Hal3v Hpal3 HisRVC3 Hdec3
       Ht0 Hcanonf4 Hvpndeff4 Hidentf4 Hcanon4 Hvpndef4 Hident4 Hmatchf4 Hexecf4 Hmatchst4 Hwrite4 Hr4f Hr4s Hal4f Hal4v Hpal4 HisRVC4 Hdec4.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hib4 Hstack4 Hcont".
+    iIntros "Hpc Hfile Hmisa Hnpc #Hinv Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hib4 Hstack4 Hcont".
     assert (HPC2 : add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 = mword_of_int 0x800053e2)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ---- instruction 1: c.addi16sp (page-walk fills TLB at index 5) ---- *)
     iApply (wp_pagewalk_caddi16sp root_ppn w1 imm6 m vsp misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v b1 npc0 mst0 mc mcfg
               pmpcfg0 pmpaddr00 pmar0 mi0 elp0 tlbvec region_pte E Phi
-              Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
+              HN Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
               HmisaC HmisaS Hdec1 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
     rewrite !HPC2.
     (* ---- instruction 2: c.sdsp ra,0(sp) — store-address translation WALKS ---- *)
     iApply (wp_pagewalk_csdsp_walk root_ppn w2 (mword_of_int 0) (mword_of_int 1) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vra (mword_of_int 0x800053e2) mst1 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf region_st region_f2 region_pte E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vra (mword_of_int 0x800053e2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf region_st region_f2 region_pte E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hra | vm_compute; discriminate ])
               HSXL Hmode Hppn Hasid (vec_access_update_5 tlbvec (pw_tlb_entry root_ppn (mword_of_int 0))) Hvecst
               Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
               Hmatchf2 Hexecf2 Hmatchst Hwrite Hmatchp Hpte Hpmm HPBMTE
               HA0 Hord0 Hr2 Hrst Hrpte HX0 HW0 HR0 Hal2 Hal8 Hpal8 Halpte HisRVC2 HmisaC HmisaS HMPRV HMXR
               Hdec2 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
     assert (HPC4 : add_vec_int (mword_of_int 0x800053e2 : mword 64) 2 = mword_of_int 0x800053e4)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPC4.
     (* ---- instruction 3: c.sdsp gp,16(sp) @0x800053e4 (4-aligned, TLB HIT) ---- *)
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053e4) w3 (mword_of_int 2) (mword_of_int 3) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vgp misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold3 (add_vec_int (mword_of_int 0x800053e2 : mword 64) 2) mst2 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st3 region_f3 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold3 (add_vec_int (mword_of_int 0x800053e2 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st3 region_f3 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgp | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf3 Hvpndeff3 Hidentf3 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -752,17 +752,17 @@ Section Chain.
               Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hpmm
               HA0 Hord0 Hr3f Hr3s HX0 HW0 Hal3f Hal3v Hpal3 HisRVC3 HmisaC HmisaS HMPRV HMXR
               Hdec3 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3".
     assert (HPC6 : add_vec_int (mword_of_int 0x800053e4 : mword 64) 2 = mword_of_int 0x800053e6)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPC6.
     (* ---- instruction 4: c.sdsp t0,32(sp) @0x800053e6 (2-aligned, TLB HIT) ---- *)
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053e6) w4 (mword_of_int 4) (mword_of_int 5) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vt0 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold4 (add_vec_int (mword_of_int 0x800053e4 : mword 64) 2) mst3 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st4 region_f4 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold4 (add_vec_int (mword_of_int 0x800053e4 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st4 region_f4 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Ht0 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf4 Hvpndeff4 Hidentf4 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -770,10 +770,10 @@ Section Chain.
               Hmatchf4 Hexecf4 Hmatchst4 Hwrite4 Hpmm
               HA0 Hord0 Hr4f Hr4s HX0 HW0 Hal4f Hal4v Hpal4 HisRVC4 HmisaC HmisaS HMPRV HMXR
               Hdec4 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4".
-    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hstack3 Hstack4 Hpbytes Hib2 Hib3 Hib4").
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4".
+    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hstack3 Hstack4 Hpbytes Hib2 Hib3 Hib4").
   Qed.
 
   Lemma wp_kernelvec_stores (w1 : mword 32) (imm6 : mword 6) (w2 : mword 16) (w3 : mword 32) (w4 : mword 16) (w5 : mword 32) (w6 : mword 16) (w7 : mword 32) (w8 : mword 16) (w9 : mword 32) (w10 : mword 16) (w11 : mword 32) (w12 : mword 16) (w13 : mword 32) (w14 : mword 16) (w15 : mword 32) (w16 : mword 16) (w17 : mword 32) (w18 : mword 16) (vpn : mword 27)
@@ -855,6 +855,7 @@ Section Chain.
     let offset18 := sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))) in
     let a8_18 := sign_extend' 64 (subrange_vec_dec (add_vec (regval_into_reg spnew) offset18) (xlen - 0 - 1) 0) in
     let pa18 := zero_extend' 64 (add_vec_int a8_18 (0 * 8)) in
+    ↑minstretN ⊆ E ->
     m !! gpr_of_Z 2 = Some vsp ->
     m !! gpr_of_Z 1 = Some vra ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -1386,7 +1387,7 @@ Section Chain.
     (forall s0, eq_vec (_get_Misa_C (register_lookup misa s0.(sregs))) ('b"1") = true ->
        exec (ext_decode_compressed w18) s0 = Some (C_SDSP (mword_of_int 30, Regidx (mword_of_int 31)), s0)) ->
     PC ↦ᵣ (mword_of_int 0x800053e0 : mword 64) -∗ gpr_file m -∗ misa ↦ᵣ misa0 -∗ nextPC ↦ᵣ npc0 -∗
-    (R_bool minstret_increment) ↦ᵣ mi0 -∗ minstret ↦ᵣ mst0 -∗
+    minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -1431,7 +1432,6 @@ Section Chain.
     ▷ ( PC ↦ᵣ add_vec_int (mword_of_int 0x80005402 : mword 64) 2 -∗
         gpr_file (<[gpr_of_Z 2 := regval_into_reg spnew]> m) -∗ misa ↦ᵣ misa0 -∗
         nextPC ↦ᵣ add_vec_int (mword_of_int 0x80005402 : mword 64) 2 -∗
-        (R_bool minstret_increment) ↦ᵣ b1 -∗ minstret ↦ᵣ (if b1 then add_vec_int mst17 1 else mst17) -∗
         cur_privilege ↦ᵣ Supervisor -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
         (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗ satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ tlbf2 -∗ menvcfg ↦ᵣ menvcfg0 -∗ mseccfg ↦ᵣ mseccfg0 -∗ mie ↦ᵣ mie_v -∗
@@ -1476,7 +1476,7 @@ Section Chain.
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
     intros spnew a8 pa tlbf tlbf2 mst1 offset3 a8_3 pa3 mst2 mst3 offset4 a8_4 pa4 mst4 offset5 a8_5 pa5 mst5 offset6 a8_6 pa6 mst6 offset7 a8_7 pa7 mst7 offset8 a8_8 pa8 mst8 offset9 a8_9 pa9 mst9 offset10 a8_10 pa10 mst10 offset11 a8_11 pa11 mst11 offset12 a8_12 pa12 mst12 offset13 a8_13 pa13 mst13 offset14 a8_14 pa14 mst14 offset15 a8_15 pa15 mst15 offset16 a8_16 pa16 mst16 offset17 a8_17 pa17 mst17 offset18 a8_18 pa18.
-    intros Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
+    intros HN Hsp Hra HSXL Hmode Hppn Hasid Hvec Hvecst Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
       Hpmaall Hmatchp Hpte Hmatchf2 Hexecf2 Hmatchst Hwrite HPBMTE Hpmm
       HA0 Hord0 Hr1 Hrpte Hr2 Hrst HX0 HR0 HW0 Hal4 Halpte Hal2 Hal8 Hpal8 HisRVC1 HisRVC2 HmisaC HmisaS HMPRV HMXR
       Hdec1 Hdec2 Hb1 Hmie_mdl HSIE Help
@@ -1484,40 +1484,40 @@ Section Chain.
       Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hr3f Hr3s Hal3f Hal3v Hpal3 HisRVC3 Hdec3
       Ht0 Hcanonf4 Hvpndeff4 Hidentf4 Hcanon4 Hvpndef4 Hident4 Hmatchf4 Hexecf4 Hmatchst4 Hwrite4 Hr4f Hr4s Hal4f Hal4v Hpal4 HisRVC4 Hdec4
       Hgpr5 Hcanonf5 Hvpndeff5 Hidentf5 Hcanon5 Hvpndef5 Hident5 Hmatchf5 Hexecf5 Hmatchst5 Hwrite5 Hrf5 Hrs5 Half5 Halv5 Hzpal5 Hisrvc5 Hdec5 Hgpr6 Hcanonf6 Hvpndeff6 Hidentf6 Hcanon6 Hvpndef6 Hident6 Hmatchf6 Hexecf6 Hmatchst6 Hwrite6 Hrf6 Hrs6 Half6 Halv6 Hzpal6 Hisrvc6 Hdec6 Hgpr7 Hcanonf7 Hvpndeff7 Hidentf7 Hcanon7 Hvpndef7 Hident7 Hmatchf7 Hexecf7 Hmatchst7 Hwrite7 Hrf7 Hrs7 Half7 Halv7 Hzpal7 Hisrvc7 Hdec7 Hgpr8 Hcanonf8 Hvpndeff8 Hidentf8 Hcanon8 Hvpndef8 Hident8 Hmatchf8 Hexecf8 Hmatchst8 Hwrite8 Hrf8 Hrs8 Half8 Halv8 Hzpal8 Hisrvc8 Hdec8 Hgpr9 Hcanonf9 Hvpndeff9 Hidentf9 Hcanon9 Hvpndef9 Hident9 Hmatchf9 Hexecf9 Hmatchst9 Hwrite9 Hrf9 Hrs9 Half9 Halv9 Hzpal9 Hisrvc9 Hdec9 Hgpr10 Hcanonf10 Hvpndeff10 Hidentf10 Hcanon10 Hvpndef10 Hident10 Hmatchf10 Hexecf10 Hmatchst10 Hwrite10 Hrf10 Hrs10 Half10 Halv10 Hzpal10 Hisrvc10 Hdec10 Hgpr11 Hcanonf11 Hvpndeff11 Hidentf11 Hcanon11 Hvpndef11 Hident11 Hmatchf11 Hexecf11 Hmatchst11 Hwrite11 Hrf11 Hrs11 Half11 Halv11 Hzpal11 Hisrvc11 Hdec11 Hgpr12 Hcanonf12 Hvpndeff12 Hidentf12 Hcanon12 Hvpndef12 Hident12 Hmatchf12 Hexecf12 Hmatchst12 Hwrite12 Hrf12 Hrs12 Half12 Halv12 Hzpal12 Hisrvc12 Hdec12 Hgpr13 Hcanonf13 Hvpndeff13 Hidentf13 Hcanon13 Hvpndef13 Hident13 Hmatchf13 Hexecf13 Hmatchst13 Hwrite13 Hrf13 Hrs13 Half13 Halv13 Hzpal13 Hisrvc13 Hdec13 Hgpr14 Hcanonf14 Hvpndeff14 Hidentf14 Hcanon14 Hvpndef14 Hident14 Hmatchf14 Hexecf14 Hmatchst14 Hwrite14 Hrf14 Hrs14 Half14 Halv14 Hzpal14 Hisrvc14 Hdec14 Hgpr15 Hcanonf15 Hvpndeff15 Hidentf15 Hcanon15 Hvpndef15 Hident15 Hmatchf15 Hexecf15 Hmatchst15 Hwrite15 Hrf15 Hrs15 Half15 Halv15 Hzpal15 Hisrvc15 Hdec15 Hgpr16 Hcanonf16 Hvpndeff16 Hidentf16 Hcanon16 Hvpndef16 Hident16 Hmatchf16 Hexecf16 Hmatchst16 Hwrite16 Hrf16 Hrs16 Half16 Halv16 Hzpal16 Hisrvc16 Hdec16 Hgpr17 Hcanonf17 Hvpndeff17 Hidentf17 Hcanon17 Hvpndef17 Hident17 Hmatchf17 Hexecf17 Hmatchst17 Hwrite17 Hrf17 Hrs17 Half17 Halv17 Hzpal17 Hisrvc17 Hdec17 Hgpr18 Hcanonf18 Hvpndeff18 Hidentf18 Hcanon18 Hvpndef18 Hident18 Hmatchf18 Hexecf18 Hmatchst18 Hwrite18 Hrf18 Hrs18 Half18 Halv18 Hzpal18 Hisrvc18 Hdec18.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hib4 Hstack4 Hib5 Hstack5 Hib6 Hstack6 Hib7 Hstack7 Hib8 Hstack8 Hib9 Hstack9 Hib10 Hstack10 Hib11 Hstack11 Hib12 Hstack12 Hib13 Hstack13 Hib14 Hstack14 Hib15 Hstack15 Hib16 Hstack16 Hib17 Hstack17 Hib18 Hstack18 Hcont".
+    iIntros "Hpc Hfile Hmisa Hnpc #Hinv Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1 Hib2 Hstack Hib3 Hstack3 Hib4 Hstack4 Hib5 Hstack5 Hib6 Hstack6 Hib7 Hstack7 Hib8 Hstack8 Hib9 Hstack9 Hib10 Hstack10 Hib11 Hstack11 Hib12 Hstack12 Hib13 Hstack13 Hib14 Hstack14 Hib15 Hstack15 Hib16 Hstack16 Hib17 Hstack17 Hib18 Hstack18 Hcont".
     assert (HPC2 : add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 = mword_of_int 0x800053e2)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ---- instruction 1: c.addi16sp (page-walk fills TLB at index 5) ---- *)
     iApply (wp_pagewalk_caddi16sp root_ppn w1 imm6 m vsp misa0 mdv0 mstatus0 menvcfg0 satp0 mie_v b1 npc0 mst0 mc mcfg
               pmpcfg0 pmpaddr00 pmar0 mi0 elp0 tlbvec region_pte E Phi
-              Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
+              HN Hsp HSXL Hmode Hppn Hasid Hvec Hpmaall Hmatchp Hpte HPBMTE HA0 Hord0 Hr1 Hrpte HX0 HR0 Hal4 Halpte HisRVC1
               HmisaC HmisaS Hdec1 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hpbytes Hib1".
     rewrite !HPC2.
     (* ---- instruction 2: c.sdsp ra,0(sp) — store-address translation WALKS ---- *)
     iApply (wp_pagewalk_csdsp_walk root_ppn w2 (mword_of_int 0) (mword_of_int 1) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vra misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vra (mword_of_int 0x800053e2) mst1 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf region_st region_f2 region_pte E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vra (mword_of_int 0x800053e2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf region_st region_f2 region_pte E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hra | vm_compute; discriminate ])
               HSXL Hmode Hppn Hasid (vec_access_update_5 tlbvec (pw_tlb_entry root_ppn (mword_of_int 0))) Hvecst
               Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
               Hmatchf2 Hexecf2 Hmatchst Hwrite Hmatchp Hpte Hpmm HPBMTE
               HA0 Hord0 Hr2 Hrst Hrpte HX0 HW0 HR0 Hal2 Hal8 Hpal8 Halpte HisRVC2 HmisaC HmisaS HMPRV HMXR
               Hdec2 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hpbytes Hib2".
     assert (HPC4 : add_vec_int (mword_of_int 0x800053e2 : mword 64) 2 = mword_of_int 0x800053e4)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPC4.
     (* ---- instruction 3: c.sdsp gp,16(sp) @0x800053e4 (4-aligned, TLB HIT) ---- *)
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053e4) w3 (mword_of_int 2) (mword_of_int 3) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vgp misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold3 (add_vec_int (mword_of_int 0x800053e2 : mword 64) 2) mst2 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st3 region_f3 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold3 (add_vec_int (mword_of_int 0x800053e2 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st3 region_f3 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgp | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf3 Hvpndeff3 Hidentf3 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1525,17 +1525,17 @@ Section Chain.
               Hmatchf3 Hexecf3 Hmatchst3 Hwrite3 Hpmm
               HA0 Hord0 Hr3f Hr3s HX0 HW0 Hal3f Hal3v Hpal3 HisRVC3 HmisaC HmisaS HMPRV HMXR
               Hdec3 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack3 Hib3".
     assert (HPC6 : add_vec_int (mword_of_int 0x800053e4 : mword 64) 2 = mword_of_int 0x800053e6)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPC6.
     (* ---- instruction 4: c.sdsp t0,32(sp) @0x800053e6 (2-aligned, TLB HIT) ---- *)
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053e6) w4 (mword_of_int 4) (mword_of_int 5) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vt0 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold4 (add_vec_int (mword_of_int 0x800053e4 : mword 64) 2) mst3 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st4 region_f4 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold4 (add_vec_int (mword_of_int 0x800053e4 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st4 region_f4 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Ht0 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf4 Hvpndeff4 Hidentf4 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1543,15 +1543,15 @@ Section Chain.
               Hmatchf4 Hexecf4 Hmatchst4 Hwrite4 Hpmm
               HA0 Hord0 Hr4f Hr4s HX0 HW0 Hal4f Hal4v Hpal4 HisRVC4 HmisaC HmisaS HMPRV HMXR
               Hdec4 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack4 Hib4".
     assert (HPCx5 : add_vec_int (mword_of_int 0x800053e6 : mword 64) 2 = mword_of_int 0x800053e8) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx5.
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053e8) w5 (mword_of_int 5) (mword_of_int 6) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR5 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold5 (add_vec_int (mword_of_int 0x800053e6 : mword 64) 2) mst4 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st5 region_f5 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold5 (add_vec_int (mword_of_int 0x800053e6 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st5 region_f5 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr5 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf5 Hvpndeff5 Hidentf5 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1559,15 +1559,15 @@ Section Chain.
               Hmatchf5 Hexecf5 Hmatchst5 Hwrite5 Hpmm
               HA0 Hord0 Hrf5 Hrs5 HX0 HW0 Half5 Halv5 Hzpal5 Hisrvc5 HmisaC HmisaS HMPRV HMXR
               Hdec5 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack5 Hib5").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack5 Hib5").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack5 Hib5".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack5 Hib5".
     assert (HPCx6 : add_vec_int (mword_of_int 0x800053e8 : mword 64) 2 = mword_of_int 0x800053ea) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx6.
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053ea) w6 (mword_of_int 6) (mword_of_int 7) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR6 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold6 (add_vec_int (mword_of_int 0x800053e8 : mword 64) 2) mst5 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st6 region_f6 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold6 (add_vec_int (mword_of_int 0x800053e8 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st6 region_f6 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr6 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf6 Hvpndeff6 Hidentf6 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1575,15 +1575,15 @@ Section Chain.
               Hmatchf6 Hexecf6 Hmatchst6 Hwrite6 Hpmm
               HA0 Hord0 Hrf6 Hrs6 HX0 HW0 Half6 Halv6 Hzpal6 Hisrvc6 HmisaC HmisaS HMPRV HMXR
               Hdec6 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack6 Hib6").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack6 Hib6").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack6 Hib6".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack6 Hib6".
     assert (HPCx7 : add_vec_int (mword_of_int 0x800053ea : mword 64) 2 = mword_of_int 0x800053ec) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx7.
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053ec) w7 (mword_of_int 9) (mword_of_int 10) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR7 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold7 (add_vec_int (mword_of_int 0x800053ea : mword 64) 2) mst6 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st7 region_f7 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold7 (add_vec_int (mword_of_int 0x800053ea : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st7 region_f7 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr7 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf7 Hvpndeff7 Hidentf7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1591,15 +1591,15 @@ Section Chain.
               Hmatchf7 Hexecf7 Hmatchst7 Hwrite7 Hpmm
               HA0 Hord0 Hrf7 Hrs7 HX0 HW0 Half7 Halv7 Hzpal7 Hisrvc7 HmisaC HmisaS HMPRV HMXR
               Hdec7 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack7 Hib7").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack7 Hib7").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack7 Hib7".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack7 Hib7".
     assert (HPCx8 : add_vec_int (mword_of_int 0x800053ec : mword 64) 2 = mword_of_int 0x800053ee) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx8.
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053ee) w8 (mword_of_int 10) (mword_of_int 11) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR8 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold8 (add_vec_int (mword_of_int 0x800053ec : mword 64) 2) mst7 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st8 region_f8 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold8 (add_vec_int (mword_of_int 0x800053ec : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st8 region_f8 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr8 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf8 Hvpndeff8 Hidentf8 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1607,15 +1607,15 @@ Section Chain.
               Hmatchf8 Hexecf8 Hmatchst8 Hwrite8 Hpmm
               HA0 Hord0 Hrf8 Hrs8 HX0 HW0 Half8 Halv8 Hzpal8 Hisrvc8 HmisaC HmisaS HMPRV HMXR
               Hdec8 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack8 Hib8").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack8 Hib8").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack8 Hib8".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack8 Hib8".
     assert (HPCx9 : add_vec_int (mword_of_int 0x800053ee : mword 64) 2 = mword_of_int 0x800053f0) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx9.
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053f0) w9 (mword_of_int 11) (mword_of_int 12) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR9 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold9 (add_vec_int (mword_of_int 0x800053ee : mword 64) 2) mst8 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st9 region_f9 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold9 (add_vec_int (mword_of_int 0x800053ee : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st9 region_f9 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr9 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf9 Hvpndeff9 Hidentf9 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1623,15 +1623,15 @@ Section Chain.
               Hmatchf9 Hexecf9 Hmatchst9 Hwrite9 Hpmm
               HA0 Hord0 Hrf9 Hrs9 HX0 HW0 Half9 Halv9 Hzpal9 Hisrvc9 HmisaC HmisaS HMPRV HMXR
               Hdec9 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack9 Hib9").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack9 Hib9").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack9 Hib9".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack9 Hib9".
     assert (HPCx10 : add_vec_int (mword_of_int 0x800053f0 : mword 64) 2 = mword_of_int 0x800053f2) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx10.
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053f2) w10 (mword_of_int 12) (mword_of_int 13) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR10 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold10 (add_vec_int (mword_of_int 0x800053f0 : mword 64) 2) mst9 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st10 region_f10 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold10 (add_vec_int (mword_of_int 0x800053f0 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st10 region_f10 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr10 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf10 Hvpndeff10 Hidentf10 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1639,15 +1639,15 @@ Section Chain.
               Hmatchf10 Hexecf10 Hmatchst10 Hwrite10 Hpmm
               HA0 Hord0 Hrf10 Hrs10 HX0 HW0 Half10 Halv10 Hzpal10 Hisrvc10 HmisaC HmisaS HMPRV HMXR
               Hdec10 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack10 Hib10").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack10 Hib10").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack10 Hib10".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack10 Hib10".
     assert (HPCx11 : add_vec_int (mword_of_int 0x800053f2 : mword 64) 2 = mword_of_int 0x800053f4) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx11.
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053f4) w11 (mword_of_int 13) (mword_of_int 14) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR11 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold11 (add_vec_int (mword_of_int 0x800053f2 : mword 64) 2) mst10 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st11 region_f11 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold11 (add_vec_int (mword_of_int 0x800053f2 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st11 region_f11 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr11 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf11 Hvpndeff11 Hidentf11 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1655,15 +1655,15 @@ Section Chain.
               Hmatchf11 Hexecf11 Hmatchst11 Hwrite11 Hpmm
               HA0 Hord0 Hrf11 Hrs11 HX0 HW0 Half11 Halv11 Hzpal11 Hisrvc11 HmisaC HmisaS HMPRV HMXR
               Hdec11 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack11 Hib11").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack11 Hib11").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack11 Hib11".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack11 Hib11".
     assert (HPCx12 : add_vec_int (mword_of_int 0x800053f4 : mword 64) 2 = mword_of_int 0x800053f6) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx12.
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053f6) w12 (mword_of_int 14) (mword_of_int 15) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR12 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold12 (add_vec_int (mword_of_int 0x800053f4 : mword 64) 2) mst11 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st12 region_f12 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold12 (add_vec_int (mword_of_int 0x800053f4 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st12 region_f12 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr12 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf12 Hvpndeff12 Hidentf12 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1671,15 +1671,15 @@ Section Chain.
               Hmatchf12 Hexecf12 Hmatchst12 Hwrite12 Hpmm
               HA0 Hord0 Hrf12 Hrs12 HX0 HW0 Half12 Halv12 Hzpal12 Hisrvc12 HmisaC HmisaS HMPRV HMXR
               Hdec12 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack12 Hib12").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack12 Hib12").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack12 Hib12".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack12 Hib12".
     assert (HPCx13 : add_vec_int (mword_of_int 0x800053f6 : mword 64) 2 = mword_of_int 0x800053f8) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx13.
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053f8) w13 (mword_of_int 15) (mword_of_int 16) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR13 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold13 (add_vec_int (mword_of_int 0x800053f6 : mword 64) 2) mst12 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st13 region_f13 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold13 (add_vec_int (mword_of_int 0x800053f6 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st13 region_f13 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr13 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf13 Hvpndeff13 Hidentf13 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1687,15 +1687,15 @@ Section Chain.
               Hmatchf13 Hexecf13 Hmatchst13 Hwrite13 Hpmm
               HA0 Hord0 Hrf13 Hrs13 HX0 HW0 Half13 Halv13 Hzpal13 Hisrvc13 HmisaC HmisaS HMPRV HMXR
               Hdec13 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack13 Hib13").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack13 Hib13").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack13 Hib13".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack13 Hib13".
     assert (HPCx14 : add_vec_int (mword_of_int 0x800053f8 : mword 64) 2 = mword_of_int 0x800053fa) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx14.
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053fa) w14 (mword_of_int 16) (mword_of_int 17) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR14 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold14 (add_vec_int (mword_of_int 0x800053f8 : mword 64) 2) mst13 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st14 region_f14 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold14 (add_vec_int (mword_of_int 0x800053f8 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st14 region_f14 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr14 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf14 Hvpndeff14 Hidentf14 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1703,15 +1703,15 @@ Section Chain.
               Hmatchf14 Hexecf14 Hmatchst14 Hwrite14 Hpmm
               HA0 Hord0 Hrf14 Hrs14 HX0 HW0 Half14 Halv14 Hzpal14 Hisrvc14 HmisaC HmisaS HMPRV HMXR
               Hdec14 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack14 Hib14").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack14 Hib14").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack14 Hib14".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack14 Hib14".
     assert (HPCx15 : add_vec_int (mword_of_int 0x800053fa : mword 64) 2 = mword_of_int 0x800053fc) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx15.
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x800053fc) w15 (mword_of_int 27) (mword_of_int 28) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR15 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold15 (add_vec_int (mword_of_int 0x800053fa : mword 64) 2) mst14 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st15 region_f15 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold15 (add_vec_int (mword_of_int 0x800053fa : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st15 region_f15 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr15 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf15 Hvpndeff15 Hidentf15 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1719,15 +1719,15 @@ Section Chain.
               Hmatchf15 Hexecf15 Hmatchst15 Hwrite15 Hpmm
               HA0 Hord0 Hrf15 Hrs15 HX0 HW0 Half15 Halv15 Hzpal15 Hisrvc15 HmisaC HmisaS HMPRV HMXR
               Hdec15 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack15 Hib15").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack15 Hib15").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack15 Hib15".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack15 Hib15".
     assert (HPCx16 : add_vec_int (mword_of_int 0x800053fc : mword 64) 2 = mword_of_int 0x800053fe) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx16.
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x800053fe) w16 (mword_of_int 28) (mword_of_int 29) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR16 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold16 (add_vec_int (mword_of_int 0x800053fc : mword 64) 2) mst15 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st16 region_f16 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold16 (add_vec_int (mword_of_int 0x800053fc : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st16 region_f16 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr16 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf16 Hvpndeff16 Hidentf16 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1735,15 +1735,15 @@ Section Chain.
               Hmatchf16 Hexecf16 Hmatchst16 Hwrite16 Hpmm
               HA0 Hord0 Hrf16 Hrs16 HX0 HW0 Half16 Halv16 Hzpal16 Hisrvc16 HmisaC HmisaS HMPRV HMXR
               Hdec16 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack16 Hib16").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack16 Hib16").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack16 Hib16".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack16 Hib16".
     assert (HPCx17 : add_vec_int (mword_of_int 0x800053fe : mword 64) 2 = mword_of_int 0x80005400) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx17.
     iApply (wp_kv_store_4 root_ppn (mword_of_int 0x80005400) w17 (mword_of_int 29) (mword_of_int 30) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR17 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold17 (add_vec_int (mword_of_int 0x800053fe : mword 64) 2) mst16 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st17 region_f17 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold17 (add_vec_int (mword_of_int 0x800053fe : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st17 region_f17 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr17 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf17 Hvpndeff17 Hidentf17 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1751,15 +1751,15 @@ Section Chain.
               Hmatchf17 Hexecf17 Hmatchst17 Hwrite17 Hpmm
               HA0 Hord0 Hrf17 Hrs17 HX0 HW0 Half17 Halv17 Hzpal17 Hisrvc17 HmisaC HmisaS HMPRV HMXR
               Hdec17 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack17 Hib17").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack17 Hib17").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack17 Hib17".
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack17 Hib17".
     assert (HPCx18 : add_vec_int (mword_of_int 0x80005400 : mword 64) 2 = mword_of_int 0x80005402) by (apply bv_eq; vm_compute; reflexivity).
     rewrite !HPCx18.
     iApply (wp_kv_store_2 root_ppn (mword_of_int 0x80005402) w18 (mword_of_int 30) (mword_of_int 31) vpn
               (<[gpr_of_Z 2 := regval_into_reg spnew]> m) (regval_into_reg spnew) vR18 misa0 mdv0 mstatus0 menvcfg0 mseccfg0 satp0 mie_v
-              b1 vold18 (add_vec_int (mword_of_int 0x80005400 : mword 64) 2) mst17 mc mcfg pmpcfg0 pmpaddr00 pmar0 b1 elp0 tlbf2 region_st18 region_f18 E Phi
-              ltac:(vm_compute; discriminate)
+              b1 vold18 (add_vec_int (mword_of_int 0x80005400 : mword 64) 2) mc mcfg pmpcfg0 pmpaddr00 pmar0 elp0 tlbf2 region_st18 region_f18 E Phi
+              HN ltac:(vm_compute; discriminate)
               (lookup_insert _ _ _) ltac:(rewrite lookup_insert_ne; [ exact Hgpr18 | vm_compute; discriminate ])
               HSXL Hmode Hasid Hvec5_2 Hvecst3
               Hcanonf18 Hvpndeff18 Hidentf18 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -1767,10 +1767,10 @@ Section Chain.
               Hmatchf18 Hexecf18 Hmatchst18 Hwrite18 Hpmm
               HA0 Hord0 Hrf18 Hrs18 HX0 HW0 Half18 Halv18 Hzpal18 Hisrvc18 HmisaC HmisaS HMPRV HMXR
               Hdec18 Hb1 Hmie_mdl HSIE Help
-              with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack18 Hib18").
+              with "Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack18 Hib18").
     iNext.
-    iIntros "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack18 Hib18".
-    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hmi Hmst Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hstack3 Hstack4 Hstack5 Hstack6 Hstack7 Hstack8 Hstack9 Hstack10 Hstack11 Hstack12 Hstack13 Hstack14 Hstack15 Hstack16 Hstack17 Hstack18 Hpbytes Hib2 Hib3 Hib4 Hib5 Hib6 Hib7 Hib8 Hib9 Hib10 Hib11 Hib12 Hib13 Hib14 Hib15 Hib16 Hib17 Hib18").
+    iIntros "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack18 Hib18".
+    iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Hsatp Htlb Hmenv Hsec Hmie Help' Hmcinh Hmcfg Hpmpc Hpmpaddr Hpma Hhtif Hstack Hstack3 Hstack4 Hstack5 Hstack6 Hstack7 Hstack8 Hstack9 Hstack10 Hstack11 Hstack12 Hstack13 Hstack14 Hstack15 Hstack16 Hstack17 Hstack18 Hpbytes Hib2 Hib3 Hib4 Hib5 Hib6 Hib7 Hib8 Hib9 Hib10 Hib11 Hib12 Hib13 Hib14 Hib15 Hib16 Hib17 Hib18").
   Qed.
 
 End Chain.
