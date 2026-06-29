@@ -71,7 +71,26 @@ Section HwConfig.
   Global Instance hw_config_persistent mc mcfg :
     Persistent (hw_config mc mcfg).
   Proof. apply _. Qed.
+
+  (* The ambient register context a straight-line M-mode instruction reads but
+     leaves unchanged: the [hw_config] bundle plus the privilege/trap CSRs.
+     Bundling these into one resource (instead of listing ~11 points-to per
+     leaf, twice) is what shortens the per-opcode WP statements. *)
+  Definition instr_ctx (mstatus0 mdv0 : mword 64) (mc : mword 32) (mcfg : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (elp0 : mword 1) : iProp Σ :=
+    (hw_config mc mcfg ∗ cur_privilege ↦ᵣ Machine ∗ hart_state ↦ᵣ HART_ACTIVE tt ∗
+     (R_bitvector_64 mideleg) ↦ᵣ mdv0 ∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 ∗
+     elp ↦ᵣ elp0 ∗ pmpcfg_n ↦ᵣ pmpcfg0)%I.
 End HwConfig.
+
+(* The geometric fetch side-conditions for a 4-byte instruction at [pc] with
+   word [w]: PMP open, [pc] 4-byte aligned, and the word is not compressed.
+   (The is_aligned_paddr / low-two-bits forms follow via align4_low_bits.) *)
+Definition fetch_ok (pc : mword 64) (w : mword 32)
+    (pmpcfg0 : type_of_register pmpcfg_n) : Prop :=
+  pmp_allows_all pmpcfg0
+  /\ is_aligned_vaddr (Virtaddr pc) 4 = true
+  /\ isRVC (subrange_vec_dec w 15 0) = false.
 
 (* ===== RiscvModelADDfinal ===== *)
 (* ====================================================================== *)
