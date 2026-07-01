@@ -31,9 +31,26 @@ Section InstrBytes.
   Definition instr_bytes (pc : mword 64) (r : FetchResult) : iProp Σ :=
     (match r with
      | F_Base w =>
-         ⌜ is_aligned_vaddr (Virtaddr pc) 4 = true ⌝ ∗
          ⌜ isRVC (subrange_vec_dec w 15 0) = false ⌝ ∗
-         [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
+         if is_aligned_vaddr (Virtaddr pc) 4
+         then (* 4-aligned: one 4-byte read of [w] at pc..pc+3 *)
+           [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
+         else (* 2-aligned (but not 4): two 2-byte reads, at pc and pc+2, whose
+                 halfwords are the low/high 16 bits of [w].  Same geometry as the
+                 (deleted) [instr_bytes_2] carried. *)
+           ⌜ is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ⌝ ∗
+           ⌜ is_aligned_paddr (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = true ⌝ ∗
+           ⌜ neq_vec (access_vec_dec pc 0) ('b"0") = false ⌝ ∗
+           ⌜ neq_vec (access_vec_dec pc 1) ('b"0") = true ⌝ ∗
+           ⌜ is_aligned_vaddr (Virtaddr pc) 4 = false ⌝ ∗
+           ⌜ concat_vec (subrange_vec_dec w 31 16) (subrange_vec_dec w 15 0) = w ⌝ ∗
+           ⌜ forall j : nat, (N.of_nat j < 2)%N ->
+                pa_add (fetch_pa (add_vec_int pc 2)) j = pa_add (fetch_pa pc) (2 + j) ⌝ ∗
+           ⌜ forall j : nat, (N.of_nat j < 2)%N ->
+                nth_byte (subrange_vec_dec w 15 0 : mword 16) j = nth_byte w j ⌝ ∗
+           ⌜ forall j : nat, (N.of_nat j < 2)%N ->
+                nth_byte (subrange_vec_dec w 31 16 : mword 16) j = nth_byte w (2 + j) ⌝ ∗
+           [∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ□ nth_byte w j
      | F_RVC h =>
          ⌜ isRVC h = true ⌝ ∗
          if is_aligned_vaddr (Virtaddr pc) 4
@@ -142,28 +159,76 @@ Section InstrBytes.
     iEval (rewrite /instr_bytes) in "Hbytes".
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: [instr_bytes] is [False] *) done.
-    - (* F_Base w : 4 bytes of [w] *)
-      iDestruct "Hbytes" as "(%Hvalign & %HnotRVC & Hbytes)".
-      iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
-                 σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbf.
-      { iIntros (j Hj). rewrite fetch_pa_id.
-        iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
-        { rewrite lookup_seq_lt; [reflexivity | lia]. }
-        iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
-      iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
-      { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
-        { rewrite lookup_seq_lt; [reflexivity | lia]. }
-        iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
-        rewrite fetch_pa_id. iPureIntro. exact Hr0. }
-      iPureIntro. unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
-      destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
-      assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
-                (Physaddr (fetch_pa pc)) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
-      exact (exec_fetch_done pc region w σ Lpc Lpriv Hpmp Hmatch Hexec0
-               (within_clint_false (fetch_pa pc) 4 σ Hnc ltac:(lia))
-               (within_sig_false  (fetch_pa pc) 4 σ Hns ltac:(lia))
-               (within_htif_false (fetch_pa pc) 4 σ Lhtif)
-               Hbf Hvalign HnotRVC).
+    - (* F_Base w : dispatch on alignment *)
+      iDestruct "Hbytes" as "[%HnotRVC Hbytes]".
+      destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal.
+      + (* 4-aligned: one 4-byte read of [w] *)
+        iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
+                   σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbf.
+        { iIntros (j Hj). rewrite fetch_pa_id.
+          iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+        iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
+        { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          rewrite fetch_pa_id. iPureIntro. exact Hr0. }
+        iPureIntro. unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
+        destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
+        assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
+                  (Physaddr (fetch_pa pc)) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
+        exact (exec_fetch_done pc region w σ Lpc Lpriv Hpmp Hmatch Hexec0
+                 (within_clint_false (fetch_pa pc) 4 σ Hnc ltac:(lia))
+                 (within_sig_false  (fetch_pa pc) 4 σ Hns ltac:(lia))
+                 (within_htif_false (fetch_pa pc) 4 σ Lhtif)
+                 Hbf Hal HnotRVC).
+      + (* 2-aligned (not 4): two 2-byte reads at pc and pc+2, via
+           [exec_fetch_F_Base_2] (RiscvFetchExec).  Body of the deleted
+           [fetch_from_instr_bytes_2]. *)
+        iDestruct "Hbytes" as "(%Halignl & %Halignh & %Hbit0 & %Hbit1 & %Hvalign &
+                                %Hconcat & %Haddr & %Hlo & %Hhi & Hbytes)".
+        assert (Hoff : fetch_pa (add_vec_int pc 2) = pa_add (fetch_pa pc) 2).
+        { specialize (Haddr 0%nat ltac:(lia)). rewrite pa_add_0 in Haddr. exact Haddr. }
+        iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
+                   σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbytesf.
+        { iIntros (j Hj). assert (Hj' : (j < 4)%nat) by lia.
+          iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+          { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
+          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+        iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hraml.
+        { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+        iAssert (⌜addr_is_ram (fetch_pa (add_vec_int pc 2))⌝)%I as %Hramh.
+        { iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hbytes") as "Hb2".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_ram with "Hb2") as %Hr2. rewrite Hoff. iPureIntro. exact Hr2. }
+        iPureIntro.
+        destruct Hraml as [Hncl Hnsl]. destruct Hramh as [Hnch Hnsh].
+        destruct (Hpma0 (fetch_pa pc) 2) as (regl & Hml0 & Hxl & _ & _).
+        destruct (Hpma0 (fetch_pa (add_vec_int pc 2)) 2) as (regh & Hmh0 & Hxh & _ & _).
+        assert (Hml : matching_pma_region (register_lookup pma_regions σ.(sregs))
+                  (Physaddr (fetch_pa pc)) 2 = Some regl) by (rewrite Lpma; exact Hml0).
+        assert (Hmh : matching_pma_region (register_lookup pma_regions σ.(sregs))
+                  (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = Some regh) by (rewrite Lpma; exact Hmh0).
+        assert (HmisaC' : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
+          by (rewrite Lmisa; exact HmisaC).
+        assert (Hbl : forall j : nat, (N.of_nat j < 2)%N ->
+                  σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)).
+        { intros j Hj. rewrite Hlo; [|exact Hj]. apply Hbytesf. lia. }
+        assert (Hbh : forall j : nat, (N.of_nat j < 2)%N ->
+                  σ.(mem) !! (pa_add (fetch_pa (add_vec_int pc 2)) j) = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)).
+        { intros j Hj. rewrite Hhi; [|exact Hj]. rewrite (Haddr j Hj). apply Hbytesf. lia. }
+        exact (exec_fetch_F_Base_2 pc regl regh w σ Lpc Lpriv Hpmp Hml Hmh Halignl Halignh
+                 Hxl Hxh
+                 (within_clint_false (fetch_pa pc) 2 σ Hncl ltac:(lia))
+                 (within_sig_false  (fetch_pa pc) 2 σ Hnsl ltac:(lia))
+                 (within_htif_false (fetch_pa pc) 2 σ Lhtif)
+                 (within_clint_false (fetch_pa (add_vec_int pc 2)) 2 σ Hnch ltac:(lia))
+                 (within_sig_false  (fetch_pa (add_vec_int pc 2)) 2 σ Hnsh ltac:(lia))
+                 (within_htif_false (fetch_pa (add_vec_int pc 2)) 2 σ Lhtif)
+                 Hbl Hbh Hbit0 Hbit1 Hal HmisaC' HnotRVC Hconcat).
     - (* F_RVC h *)
       iDestruct "Hbytes" as "[%HisRVC Hbytes]".
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal.

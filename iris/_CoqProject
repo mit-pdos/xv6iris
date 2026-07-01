@@ -31,7 +31,6 @@ WpGprCsrw.v
 WpGprMret.v
 WpGprMretWp.v
 WpGprRvc1.v
-WpGprRvc2.v
 InstrBytes.v
 WpEntryNew.v
 # WpStartText.v

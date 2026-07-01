@@ -18,11 +18,13 @@
    WpEntry.v -- not redefined here.
 
    The chain applies, in order:
-     wp_auipc_gpr → wp_ld_gpr → wp_clui_gpr → wp_csrr_mhartid_gpr_2
-       → wp_caddi_gpr → wp_mul_gpr → wp_cadd_gpr → wp_jal_gpr_2
+     wp_auipc_gpr → wp_ld_gpr → wp_clui_gpr → wp_csrr_mhartid_gpr
+       → wp_caddi_gpr → wp_mul_gpr → wp_cadd_gpr → wp_jal_gpr
    threading pc_is / gpr_file / mmode_config / pmpcfg_n through each
-   continuation.  The two 2-aligned full-instruction WPs
-   (wp_csrr_mhartid_gpr_2, wp_jal_gpr_2) live in WpGprRvc2.v. *)
+   continuation.  The two 2-aligned full instructions (csrr@0xa, jal@0x16)
+   now go through the SAME [instr]/[wp_instr]-based WPs as the 4-aligned
+   ones: [instr]/[instr_bytes] dispatch on alignment (InstrBytes.v), so
+   [wp_csrr_mhartid_gpr] / [wp_jal_gpr] work at any 2-aligned PC. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -33,7 +35,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry WpGpr.
-Require Import WpAuipc WpGprAuipc WpGprLoad WpGprMul WpGprCsrr WpGprJal WpGprRvc1 WpGprRvc2.
+Require Import WpAuipc WpGprAuipc WpGprLoad WpGprMul WpGprCsrr WpGprJal WpGprRvc1.
 Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
@@ -144,16 +146,17 @@ Section WpEntryNew.
     mhartid ↦ᵣ mhartid_in -∗
     (* the stack0 pointer word sitting at the load effective address *)
     ([∗ list] j ∈ seq 0 8, (pa_add entry_ld_ea j) ↦ₘ{ dq } nth_byte v_stack0 j) -∗
-    (* the eight decoded instructions ([instr] for 4-aligned/RVC,
-       [instr_2] for the two 2-aligned full instructions) *)
+    (* the eight decoded instructions (all via [instr]; [instr]/[instr_bytes]
+       dispatch on alignment, so the two 2-aligned full instructions use
+       [instr pc false] just like the 4-aligned ones) *)
     instr   pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC)) -∗
     instr   pc_e1 false (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8)) -∗
     instr   pc_e2 true  (C_LUI (imm_clui, rd_clui)) -∗
-    instr_2 pc_e3       (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS)) -∗
+    instr   pc_e3 false (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS)) -∗
     instr   pc_e4 true  (C_ADDI (imm_caddi, rsd_caddi)) -∗
     instr   pc_e5 false (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd, mulop_mul)) -∗
     instr   pc_e6 true  (C_ADD (rsd_cadd, rs2_cadd)) -∗
-    instr_2 pc_e7       (JAL (imm_jal, Regidx i_jal)) -∗
+    instr   pc_e7 false (JAL (imm_jal, Regidx i_jal)) -∗
     ( mmode_config (DfracOwn 1) -∗
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pc_is pc_start -∗
@@ -216,7 +219,7 @@ Section WpEntryNew.
              with (m_clui m v_stack0)) in "Hfile".
 
     (* ---- 4. CSRRS @ pc_e3 (2-aligned): a1 := mhartid ---- *)
-    iApply (wp_csrr_mhartid_gpr_2 E Φ pc_e3 i_rd_csrr mhartid_in
+    iApply (wp_csrr_mhartid_gpr E Φ pc_e3 i_rd_csrr mhartid_in
               (m_clui m v_stack0) pmpcfg0 HN Hpmp Hrd3
               with "Hmm Hpmpc Hpc Hfile Hmh Hi3").
     iEval (rewrite pc_e3_e4).
@@ -265,7 +268,7 @@ Section WpEntryNew.
              with (m_cadd m v_stack0 mhartid_in)) in "Hfile".
 
     (* ---- 8. JAL @ pc_e7 (2-aligned): ra := pc+4; PC := start ---- *)
-    iApply (wp_jal_gpr_2 E Φ pc_e7 i_jal imm_jal
+    iApply (wp_jal_gpr E Φ pc_e7 i_jal imm_jal
               (m_cadd m v_stack0 mhartid_in) pmpcfg0 HN Hpmp Hrd7 jal_aligned
               with "Hmm Hpmpc Hpc Hfile Hi7").
     iEval (rewrite pc_e7_start).
