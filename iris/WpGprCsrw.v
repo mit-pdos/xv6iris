@@ -1329,21 +1329,6 @@ Qed.
 (* ---- pmpcfg0 forward/clean/wp: writes vec pmpcfg_n (= fetch frame) ---- *)
 
 
-(* ===================================================================== *)
-(* 2-ALIGNED fetch variants (_2): 4-byte CSR instr at addr%4=2 PCs.        *)
-(* fetch_from_pts_minstret_2 (halfword PMA split + misa.C). forward/clean   *)
-(* lemmas are REUSED unchanged.                                            *)
-(* ===================================================================== *)
-
-
-(* ===================================================================== *)
-(* menvcfg (0x30A) + stimecmp (0x14D): the last monadic-legalize boot   *)
-(* CSRs. menvcfg legalize chains currentlyEnabled over Zicfilp/Zicfiss/  *)
-(* Zicboz/Zicbom/Sstc/Smnpm/Svadu/Svpbmt + legalize_xenvcfg_cbie.        *)
-(* stimecmp is Sstc-gated; legalize = update_subrange 63 0 (pure).       *)
-(* NOTE: exec_hartSupports_Zicfilp is reused from WpDecode.v.            *)
-(* ===================================================================== *)
-
 Lemma exec_hartSupports_Zicfiss s : exec (hartSupports Ext_Zicfiss) s = Some (true, s).
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).
