@@ -20,44 +20,32 @@ Local Open Scope Z_scope.
 Section InstrBytes.
   Context `{!riscvGS Σ}.
 
-  (* The instruction at [pc] is [r] (bytes + geometry, in duplicable [↦ₘ□]):
-       - [F_Base w]: [pc] is 4-aligned, the low 16 bits of [w] are NOT a
-         compressed opcode, and the four bytes of [w] live at pc..pc+3.
+  (* The instruction at [pc] is [r] (bytes + geometry, in duplicable [↦ₘ□]).
+     [pc] is always (at least) 2-aligned -- that single fact is hoisted out of
+     the match (the fetch-error arms become [2-aligned ∗ False] = [False]):
+       - [F_Base w]: the low 16 bits of [w] are NOT a compressed opcode, and
+         the four bytes of [w] live at pc..pc+3.  No alignment dispatch: the
+         footprint is the same whether [pc] is 4-aligned (one 4-byte read) or
+         only 2-aligned (two 2-byte reads); all the extra geometry the
+         2-aligned fetch reduction needs is derivable (see
+         [fetch_from_instr_bytes]).
        - [F_RVC h] : a 16-bit (compressed) instruction ([isRVC h]).  A 4-aligned
          [pc] lets the fetch unit read a whole 4-byte word, so there are 4 bytes
          at pc whose low 2 bytes are [h] (the high 2 are whatever follows); a
          non-4-aligned (but 2-aligned) [pc] reads only the 2 bytes of [h].
        - fetch-error results carry no instruction, hence no footprint. *)
   Definition instr_bytes (pc : mword 64) (r : FetchResult) : iProp Σ :=
-    (match r with
+    (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝ ∗
+     match r with
      | F_Base w =>
          ⌜ isRVC (subrange_vec_dec w 15 0) = false ⌝ ∗
-         if is_aligned_vaddr (Virtaddr pc) 4
-         then (* 4-aligned: one 4-byte read of [w] at pc..pc+3 *)
-           [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
-         else (* 2-aligned (but not 4): two 2-byte reads, at pc and pc+2, whose
-                 halfwords are the low/high 16 bits of [w].  Same geometry as the
-                 (deleted) [instr_bytes_2] carried. *)
-           ⌜ is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true ⌝ ∗
-           ⌜ is_aligned_paddr (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = true ⌝ ∗
-           ⌜ neq_vec (access_vec_dec pc 0) ('b"0") = false ⌝ ∗
-           ⌜ neq_vec (access_vec_dec pc 1) ('b"0") = true ⌝ ∗
-           ⌜ is_aligned_vaddr (Virtaddr pc) 4 = false ⌝ ∗
-           ⌜ concat_vec (subrange_vec_dec w 31 16) (subrange_vec_dec w 15 0) = w ⌝ ∗
-           ⌜ forall j : nat, (N.of_nat j < 2)%N ->
-                pa_add (fetch_pa (add_vec_int pc 2)) j = pa_add (fetch_pa pc) (2 + j) ⌝ ∗
-           ⌜ forall j : nat, (N.of_nat j < 2)%N ->
-                nth_byte (subrange_vec_dec w 15 0 : mword 16) j = nth_byte w j ⌝ ∗
-           ⌜ forall j : nat, (N.of_nat j < 2)%N ->
-                nth_byte (subrange_vec_dec w 31 16 : mword 16) j = nth_byte w (2 + j) ⌝ ∗
-           [∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ□ nth_byte w j
+         [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
      | F_RVC h =>
          ⌜ isRVC h = true ⌝ ∗
          if is_aligned_vaddr (Virtaddr pc) 4
          then ∃ w : mword 32, ⌜ subrange_vec_dec w 15 0 = h ⌝ ∗
                 [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
-         else ⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝ ∗
-              [∗ list] j ∈ seq 0 2, (pa_add pc j) ↦ₘ□ nth_byte h j
+         else [∗ list] j ∈ seq 0 2, (pa_add pc j) ↦ₘ□ nth_byte h j
      | _ => False
      end)%I.
 
@@ -121,6 +109,150 @@ Section InstrBytes.
       rewrite Hkodd in Heq. discriminate Heq.
   Qed.
 
+  (* add_vec_int associates with Z addition: everything reduces mod 2^64.
+     Gives [pa_add (pc+2) j = pa_add pc (2+j)], the address geometry of the
+     high halfword read of a 2-aligned 32-bit fetch. *)
+  Lemma avi_assoc (a : mword 64) (x y : Z) :
+    add_vec_int (add_vec_int a x) y = add_vec_int a (x + y).
+  Proof.
+    unfold add_vec_int, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+           SailStdpp.Values.with_word, mword_of_int,
+           MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
+    apply bv_eq. rewrite !bv_add_unsigned !Z_to_bv_unsigned.
+    change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+    rewrite bv_wrap_add_idemp_l.
+    rewrite !bv_wrap_add_idemp_r.
+    rewrite Z.add_shuffle0.
+    rewrite bv_wrap_add_idemp_r.
+    f_equal. lia.
+  Qed.
+
+  (* pc 2-aligned ⟹ pc+2 2-aligned (as the physical fetch address): both are
+     [Z.rem .. 2 = 0], and adding 2 preserves divisibility by 2 through the
+     mod-2^64 wraparound of [add_vec_int]. *)
+  Lemma align2_plus2 (pc : mword 64) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_paddr (Physaddr (fetch_pa (add_vec_int pc 2))) 2 = true.
+  Proof.
+    intro H2. unfold is_aligned_vaddr in H2. apply Z.eqb_eq in H2.
+    rewrite uint_unsigned in H2.
+    pose proof (bv_unsigned_in_range _ pc) as [Hlo _].
+    rewrite Z.rem_mod_nonneg in H2; [| lia | lia].
+    unfold is_aligned_paddr. rewrite fetch_pa_id. apply Z.eqb_eq.
+    rewrite uint_unsigned.
+    unfold add_vec_int, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+           SailStdpp.Values.with_word, mword_of_int,
+           MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
+    rewrite bv_add_unsigned Z_to_bv_unsigned.
+    change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+    assert (Hw2 : bv_wrap 64 2 = 2) by (vm_compute; reflexivity).
+    rewrite Hw2. unfold bv_wrap, bv_modulus.
+    assert (HMpos : 0 < 2 ^ Z.of_N 64) by (vm_compute; reflexivity).
+    pose proof (Z.mod_pos_bound (bv_unsigned pc + 2) (2 ^ Z.of_N 64) HMpos) as Hmb.
+    rewrite Z.rem_mod_nonneg; [| exact (proj1 Hmb) | lia].
+    rewrite Z.mod_mod_divide; [| exists (2 ^ 63); vm_compute; reflexivity].
+    rewrite Zdiv.Zplus_mod H2. reflexivity.
+  Qed.
+
+  (* an 8-bit window inside a 16-bit window of [x] is an 8-bit window of [x]
+     (on unsigneds); shared core of the nth_byte-of-subrange lemmas below. *)
+  Lemma wrap8_shift_wrap16 (x s t : Z) :
+    0 <= s -> 0 <= t -> t + 8 <= 16 ->
+    bv_wrap 8 (bv_wrap 16 (x ≫ s) ≫ t) = bv_wrap 8 (x ≫ (s + t)).
+  Proof.
+    intros Hs Ht Hlt. unfold bv_wrap, bv_modulus.
+    change (Z.of_N 8) with 8. change (Z.of_N 16) with 16.
+    apply Z.bits_inj'. intros k Hk.
+    destruct (decide (k < 8)) as [Hk8 | Hk8].
+    - rewrite Z.mod_pow2_bits_low; [| lia].
+      rewrite Z.mod_pow2_bits_low; [| lia].
+      rewrite Z.shiftr_spec; [| lia].
+      rewrite Z.mod_pow2_bits_low; [| lia].
+      rewrite Z.shiftr_spec; [| lia].
+      rewrite Z.shiftr_spec; [| lia].
+      f_equal. lia.
+    - rewrite Z.mod_pow2_bits_high; [| lia].
+      rewrite Z.mod_pow2_bits_high; [| lia].
+      reflexivity.
+  Qed.
+
+  (* the low 2 bytes of a 32-bit word are the bytes of its low 16-bit slice *)
+  Lemma nth_byte_subrange_lo (w : mword 32) (j : nat) :
+    (N.of_nat j < 2)%N ->
+    nth_byte (subrange_vec_dec w 15 0 : mword 16) j = nth_byte w j.
+  Proof.
+    intro Hj. apply bv_eq. unfold nth_byte, subrange_vec_dec.
+    rewrite autocast_id.
+    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold get_word, MachineWord.MachineWord.slice.
+    rewrite !bv_extract_unsigned.
+    change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+    change (MachineWord.MachineWord.Z_idx (15 - 0 + 1)) with 16%N.
+    change (Z.of_N 0) with 0.
+    rewrite wrap8_shift_wrap16; [| lia | lia | lia].
+    rewrite Z.add_0_l. reflexivity.
+  Qed.
+
+  (* the high 2 bytes of a 32-bit word are the bytes of its high 16-bit slice *)
+  Lemma nth_byte_subrange_hi (w : mword 32) (j : nat) :
+    (N.of_nat j < 2)%N ->
+    nth_byte (subrange_vec_dec w 31 16 : mword 16) j = nth_byte w (2 + j).
+  Proof.
+    intro Hj. apply bv_eq. unfold nth_byte, subrange_vec_dec.
+    rewrite autocast_id.
+    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold get_word, MachineWord.MachineWord.slice.
+    rewrite !bv_extract_unsigned.
+    change (MachineWord.MachineWord.Z_idx 16) with 16%N.
+    change (MachineWord.MachineWord.Z_idx (31 - 16 + 1)) with 16%N.
+    change (Z.of_N 16) with 16.
+    rewrite wrap8_shift_wrap16; [| lia | lia | lia].
+    f_equal. f_equal. lia.
+  Qed.
+
+  (* a 32-bit word is the concatenation of its high and low 16-bit slices --
+     the [F_Base] reassembly fact of the 2-aligned (2+2-read) fetch. *)
+  Lemma concat_subranges_id (w : mword 32) :
+    concat_vec (subrange_vec_dec w 31 16) (subrange_vec_dec w 15 0) = w.
+  Proof.
+    apply bv_eq. unfold concat_vec, subrange_vec_dec.
+    rewrite !autocast_id.
+    unfold to_word_idx, to_word. rewrite !MachineWord.MachineWord.cast_idx_refl.
+    unfold get_word, MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
+    rewrite bv_concat_unsigned'.
+    rewrite !bv_extract_unsigned.
+    change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+    change (MachineWord.MachineWord.Z_idx 16) with 16%N.
+    change (MachineWord.MachineWord.Z_idx (15 - 0 + 1)) with 16%N.
+    change (MachineWord.MachineWord.Z_idx (31 - 16 + 1)) with 16%N.
+    change (16 + 16)%N with 32%N.
+    pose proof (bv_unsigned_in_range _ w) as [Hlo Hhi].
+    unfold bv_modulus in Hhi.
+    unfold bv_wrap, bv_modulus.
+    change (Z.of_N 16) with 16. change (Z.of_N 32) with 32.
+    rewrite Z.shiftr_0_r.
+    apply Z.bits_inj'. intros k Hk.
+    destruct (decide (k < 32)) as [Hk32 | Hk32].
+    - rewrite (Z.mod_pow2_bits_low _ 32 k); [| lia].
+      rewrite Z.lor_spec.
+      destruct (decide (k < 16)) as [Hk16 | Hk16].
+      + rewrite Z.shiftl_spec_low; [| lia].
+        rewrite (Z.mod_pow2_bits_low _ 16 k); [| lia].
+        apply orb_false_l.
+      + rewrite Z.shiftl_spec; [| lia].
+        rewrite (Z.mod_pow2_bits_low _ 16 (k - 16)); [| lia].
+        rewrite Z.shiftr_spec; [| lia].
+        rewrite (Z.mod_pow2_bits_high _ 16 k); [| lia].
+        rewrite orb_false_r. f_equal. lia.
+    - rewrite (Z.mod_pow2_bits_high _ 32 k); [| lia].
+      symmetry.
+      change (Z.of_N (MachineWord.MachineWord.Z_idx 32)) with 32 in Hhi.
+      assert (Hms : bv_unsigned w mod 2 ^ 32 = bv_unsigned w).
+      { apply Z.mod_small. lia. }
+      pose proof (Z.mod_pow2_bits_high (bv_unsigned w) 32 k ltac:(lia)) as Hb.
+      rewrite Hms in Hb. exact Hb.
+  Qed.
+
   (* fetch_from_instr_bytes: given the state interpretation, ownership of PC and
      the (read-only) fetch configuration CSRs, and [instr_bytes pc r], executing
      [fetch] yields exactly [r], leaving the state unchanged.  Dispatches on
@@ -128,7 +260,8 @@ Section InstrBytes.
      / [exec_fetch_RVC_4] / [exec_fetch_RVC_2].  The RAM-constrained byte
      ownership discharges the within_clint/within_sig MMIO checks; [htif = None]
      discharges within_htif; [pmp_allows_all]/[pma_allows_all]/[Misa.C] supply
-     the PMP/PMA/C-extension config, and the geometry rides inside [instr_bytes]. *)
+     the PMP/PMA/C-extension config, and the geometry is derived from the
+     2-alignment fact in [instr_bytes] (via the pure lemmas above). *)
   Lemma fetch_from_instr_bytes
       (σ : mstate) ns κs nt (pc : mword 64) (r : FetchResult)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
@@ -157,6 +290,7 @@ Section InstrBytes.
               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) i)) = OFF)
       by (rewrite Lpmpc; exact Hpmp0).
     iEval (rewrite /instr_bytes) in "Hbytes".
+    iDestruct "Hbytes" as "[%H2al Hbytes]".
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: [instr_bytes] is [False] *) done.
     - (* F_Base w : dispatch on alignment *)
@@ -184,26 +318,33 @@ Section InstrBytes.
                  (within_htif_false (fetch_pa pc) 4 σ Lhtif)
                  Hbf Hal HnotRVC).
       + (* 2-aligned (not 4): two 2-byte reads at pc and pc+2, via
-           [exec_fetch_F_Base_2] (RiscvFetchExec).  Body of the deleted
-           [fetch_from_instr_bytes_2]. *)
-        iDestruct "Hbytes" as "(%Halignl & %Halignh & %Hbit0 & %Hbit1 & %Hvalign &
-                                %Hconcat & %Haddr & %Hlo & %Hhi & Hbytes)".
+           [exec_fetch_F_Base_2] (RiscvFetchExec).  [instr_bytes] no longer
+           carries any of the geometry: it is all derived here from [H2al],
+           [Hal] and the generic bitvector lemmas above. *)
+        destruct (align2_not4_facts pc H2al Hal) as (Halignl & Hbit0 & Hbit1).
+        pose proof (align2_plus2 pc H2al) as Halignh.
+        assert (Haddr : forall j : nat, (N.of_nat j < 2)%N ->
+                  pa_add (fetch_pa (add_vec_int pc 2)) j = pa_add (fetch_pa pc) (2 + j)).
+        { intros j _. rewrite !fetch_pa_id. unfold pa_add.
+          rewrite avi_assoc. f_equal. lia. }
         assert (Hoff : fetch_pa (add_vec_int pc 2) = pa_add (fetch_pa pc) 2).
         { specialize (Haddr 0%nat ltac:(lia)). rewrite pa_add_0 in Haddr. exact Haddr. }
         iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
                    σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbytesf.
-        { iIntros (j Hj). assert (Hj' : (j < 4)%nat) by lia.
+        { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
-          { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hraml.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iAssert (⌜addr_is_ram (fetch_pa (add_vec_int pc 2))⌝)%I as %Hramh.
         { iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hbytes") as "Hb2".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_ram with "Hb2") as %Hr2. rewrite Hoff. iPureIntro. exact Hr2. }
+          iDestruct (mem_ram with "Hb2") as %Hr2. rewrite Hoff fetch_pa_id.
+          iPureIntro. exact Hr2. }
         iPureIntro.
         destruct Hraml as [Hncl Hnsl]. destruct Hramh as [Hnch Hnsh].
         destruct (Hpma0 (fetch_pa pc) 2) as (regl & Hml0 & Hxl & _ & _).
@@ -216,10 +357,11 @@ Section InstrBytes.
           by (rewrite Lmisa; exact HmisaC).
         assert (Hbl : forall j : nat, (N.of_nat j < 2)%N ->
                   σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)).
-        { intros j Hj. rewrite Hlo; [|exact Hj]. apply Hbytesf. lia. }
+        { intros j Hj. rewrite nth_byte_subrange_lo; [|exact Hj]. apply Hbytesf. lia. }
         assert (Hbh : forall j : nat, (N.of_nat j < 2)%N ->
                   σ.(mem) !! (pa_add (fetch_pa (add_vec_int pc 2)) j) = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)).
-        { intros j Hj. rewrite Hhi; [|exact Hj]. rewrite (Haddr j Hj). apply Hbytesf. lia. }
+        { intros j Hj. rewrite nth_byte_subrange_hi; [|exact Hj].
+          rewrite (Haddr j Hj). apply Hbytesf. lia. }
         exact (exec_fetch_F_Base_2 pc regl regh w σ Lpc Lpriv Hpmp Hml Hmh Halignl Halignh
                  Hxl Hxh
                  (within_clint_false (fetch_pa pc) 2 σ Hncl ltac:(lia))
@@ -228,7 +370,7 @@ Section InstrBytes.
                  (within_clint_false (fetch_pa (add_vec_int pc 2)) 2 σ Hnch ltac:(lia))
                  (within_sig_false  (fetch_pa (add_vec_int pc 2)) 2 σ Hnsh ltac:(lia))
                  (within_htif_false (fetch_pa (add_vec_int pc 2)) 2 σ Lhtif)
-                 Hbl Hbh Hbit0 Hbit1 Hal HmisaC' HnotRVC Hconcat).
+                 Hbl Hbh Hbit0 Hbit1 Hal HmisaC' HnotRVC (concat_subranges_id w)).
     - (* F_RVC h *)
       iDestruct "Hbytes" as "[%HisRVC Hbytes]".
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal.
@@ -256,9 +398,9 @@ Section InstrBytes.
                  (within_sig_false  (fetch_pa pc) 4 σ Hns ltac:(lia))
                  (within_htif_false (fetch_pa pc) 4 σ Lhtif)
                  Hbf Hal HisRVC').
-      + (* not 4-aligned : 2 bytes = [h]; derive the bit/paddr facts *)
-        iDestruct "Hbytes" as "[%Halign_v Hbytes]".
-        destruct (align2_not4_facts pc Halign_v Hal) as (Halign & Hbit0 & Hbit1).
+      + (* not 4-aligned : 2 bytes = [h]; derive the bit/paddr facts from the
+           top-level 2-alignment fact *)
+        destruct (align2_not4_facts pc H2al Hal) as (Halign & Hbit0 & Hbit1).
         iAssert (⌜forall j : nat, (N.of_nat j < 2)%N ->
                    σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte h j)⌝)%I as %Hbf.
         { iIntros (j Hj). rewrite fetch_pa_id.
@@ -382,14 +524,16 @@ Section InstrBytes.
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes") as %Hfetch.
     iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec.
     destruct r as [e | w | h | erx].
-    - (* F_Ext_Error: instr_bytes is False *) iDestruct "Hbytes" as %[].
+    - (* F_Ext_Error: instr_bytes is 2-aligned ∗ False *)
+      iDestruct "Hbytes" as %[_ []].
     - (* F_Base w : fetch_is_rvc = false, so is_rvc = false *)
       cbn [fetch_is_rvc] in Hrvc. subst is_rvc. iPureIntro.
       exists w. split; [exact Hfetch | split; [exact Hdec | exact Hnlpad]].
     - (* F_RVC h : fetch_is_rvc = true, so is_rvc = true *)
       cbn [fetch_is_rvc] in Hrvc. subst is_rvc. iPureIntro.
       exists h. split; [exact Hfetch | split; [exact Hdec | exact Hnlpad]].
-    - (* F_Error: instr_bytes is False *) iDestruct "Hbytes" as %[].
+    - (* F_Error: instr_bytes is 2-aligned ∗ False *)
+      iDestruct "Hbytes" as %[_ []].
   Qed.
 
   (* wp_exec_step_decode_execute_inv -- the DECODE/EXECUTE flavour, built on
