@@ -31,7 +31,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry WpGpr WpGprAddi WpGprLogic WpGprLui.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry WpGpr WpGprAddi WpGprLogic WpGprLui WpGprCsrr WpGprJal.
 Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
@@ -459,6 +459,195 @@ Section WpGprRvc2.
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (luival imm))).(sregs)
              = add_vec_int pc 4).
+    { unfold set_reg; cbn [sregs].
+      tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
+  Qed.
+
+  (* csrr rd, mhartid  (2-aligned fetch); the FULL 32-bit CSRReg at a 2-aligned
+     PC.  This is [wp_csrr_mhartid_gpr] (WpGprCsrr) with [instr pc false] →
+     [instr_2 pc] and [wp_instr … pc false] → [wp_instr_2 … pc]; the execute
+     obligation for [wp_instr_2] is the SAME non-rvc form, so the CSRReg execute
+     discharge is unchanged. *)
+  Lemma wp_csrr_mhartid_gpr_2 E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+      (mhartid_in : mword 64) (m : gmap regidx (mword 64))
+      (pmpcfg0 : type_of_register pmpcfg_n) :
+    ↑minstretN ⊆ E ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn 1) -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    mhartid ↦ᵣ mhartid_in -∗
+    instr_2 pc (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) -∗
+    ( mmode_config (DfracOwn 1) -∗
+      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg mhartid_in]> m) -∗
+      mhartid ↦ᵣ mhartid_in -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hmh Hinstr Hcont".
+    (* keep half of [mmode_config] to read cur_privilege at the execute state *)
+    iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
+    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+    iApply (wp_instr_2 E Φ pc (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) pmpcfg0
+              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    (* the destination entry is a real register (rd <> 0) *)
+    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    (* read cur_privilege (kept half) and mhartid off their points-to (against σ) *)
+    iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hmh") as %Lmh.
+    (* tick nextPC; PC/cur_privilege/mhartid unchanged *)
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    assert (LprivS : register_lookup cur_privilege
+             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = Machine).
+    { unfold set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
+    assert (LmhS : register_lookup mhartid
+             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = mhartid_in).
+    { rewrite mhartid_set_nextPC. exact Lmh. }
+    (* write rd (rd <> 0, so its entry is the real register points-to) *)
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+            (regval_into_reg mhartid_in)
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg mhartid_in)
+                 with "[Hrdc]") as "Hfmap".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+               (R_bitvector_64 (gpr_of_Z (uint rd)))
+               (regval_into_reg mhartid_in)).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq.
+      change (execute (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)))
+        with (execute_CSRReg csr_csrr zreg (Regidx rd) CSRRS).
+      rewrite (exec_execute_CSRReg_gpr rd (set_reg σ nextPC (add_vec_int pc 4)) Hrd LprivS).
+      rewrite LmhS. reflexivity. }
+    iSplitL "Hreg Hmem".
+    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    (* continuation: PC/nextPC are both pc+4; reassemble mmode_config and hand
+       everything back *)
+    iIntros "Hmm' Hpmpc' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+                (R_bitvector_64 (gpr_of_Z (uint rd)))
+                (regval_into_reg mhartid_in)).(sregs)
+             = add_vec_int pc 4).
+    { unfold set_reg; cbn [sregs].
+      tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    (* rebuild the kept half of mmode_config and recombine with the returned half *)
+    iAssert (mmode_config (DfracOwn (1/2)))%I
+      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
+    { iFrame "Hinv Hhs_k Hpriv_k". iSplitR "Hms_k".
+      - iExists misa0, mseccfg0, pmar0, elp0.
+        iFrame "Hmisa Hmseccfg Hpma Hhtif Help %".
+      - iExists ms0. iFrame "Hms_k %". }
+    iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
+    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
+    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hmh").
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
+  Qed.
+
+  (* jal rd, off  (2-aligned fetch); the FULL 32-bit JAL at a 2-aligned PC.
+     This is [wp_jal_gpr] (WpGprJal) with [instr pc false] → [instr_2 pc] and
+     [wp_instr … pc false] → [wp_instr_2 … pc]; the control-flow tail is
+     unchanged because [wp_instr_2] hands the continuation [PC := jump target]
+     exactly like [wp_instr]. *)
+  Lemma wp_jal_gpr_2 E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+      (imm : mword 21) (m : gmap regidx (mword 64))
+      (pmpcfg0 : type_of_register pmpcfg_n) :
+    ↑minstretN ⊆ E ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
+    mmode_config (DfracOwn 1) -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr_2 pc (JAL (imm, Regidx rd)) -∗
+    ( mmode_config (DfracOwn 1) -∗
+      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hpmp Hrd Halign) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
+    iApply (wp_instr_2 E Φ pc (JAL (imm, Regidx rd)) pmpcfg0
+              HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    (* tick nextPC to [pc+4]: this ticked value is the link JAL writes to rd,
+       and JAL then overwrites nextPC with the jump target. *)
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* PC unchanged by the nextPC tick; still [pc] *)
+    assert (Hpcv : register_lookup PC
+             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
+    { unfold set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
+    (* the link value: [register_lookup nextPC (set_reg σ nextPC (pc+4)) = pc+4] *)
+    assert (Hlink : register_lookup nextPC
+             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
+    { unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    (* nextPC := target [add_vec pc (sign_extend' 64 imm)] (the JUMP) *)
+    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
+            with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* write rd := link = pc+4 (rd <> 0, so its entry is the real points-to) *)
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+            (regval_into_reg (add_vec_int pc 4))
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg (add_vec_int pc 4))
+                 with "[Hrdc]") as "Hfmap".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+                        nextPC (add_vec pc (sign_extend' 64 imm)))
+               (R_bitvector_64 (gpr_of_Z (uint rd)))
+               (regval_into_reg (add_vec_int pc 4))).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq.
+      change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
+      rewrite (exec_execute_JAL_gpr imm rd (set_reg σ nextPC (add_vec_int pc 4))
+                 Hrd).
+      - rewrite Hpcv. rewrite Hlink. reflexivity.
+      - rewrite Hpcv. exact Hal0.
+      - rewrite Hpcv. exact Hal1. }
+    iSplitL "Hreg Hmem".
+    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    (* continuation: PC (from wp_instr_2) is [register_lookup nextPC s_exec] = the
+       target; own nextPC ↦ target too, giving [pc_is target]. *)
+    iIntros "Hmm' Hpmpc' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+                         nextPC (add_vec pc (sign_extend' 64 imm)))
+                (R_bitvector_64 (gpr_of_Z (uint rd)))
+                (regval_into_reg (add_vec_int pc 4))).(sregs)
+             = add_vec pc (sign_extend' 64 imm)).
     { unfold set_reg; cbn [sregs].
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
