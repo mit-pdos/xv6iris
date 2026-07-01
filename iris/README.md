@@ -196,6 +196,38 @@ for regenerating the Sail model.
 >   and **drop config from the leaf postconditions** too. Now config is threaded
 >   nowhere and returned nowhere.
 
+> **Build-perf note (rebuild a destructed persistent bundle by NAME, never by
+> pieces).** Profiled 2026-07-01: rebuilding `mmode_config` for the continuation
+> with the piecewise
+> `iExists misa0, …, elp0. iFrame "Hmisa Hmseccfg Hpma Hhtif Help %"`
+> cost **2.5–8 s per call site** — ~50 % of the compile time of `WpGprCsrw` /
+> `WpGprCsrr` / `WpGprRvc1` (≈ 90 s of the whole build). Each named `iFrame` hyp
+> triggers a goal-wide search whose match is *up to conversion*, and the `%`
+> pure-framing pass retries every pure hypothesis against every pure conjunct —
+> all over goals embedding heavy Sail terms (the same super-linear effect as the
+> `set_solver` note). Since `hw_config` is `Persistent`, the fix is to keep the
+> *undestructed* bundle alive and hand it back whole:
+> `iPoseProof "Hhw" as "#Hhwc"; iDestruct "Hhwc" as (…) "(…)"` for the pieces,
+> then rebuild with `iFrame "Hhw …"` — one exact-name match, ~0 s. The same
+> applies to `iFrame "… %"`: with heavy hypotheses in the Coq context the `%`
+> pass costs ~1.3 s per site (it conversion-tests *every* pure hypothesis
+> against every pure conjunct), so close the pure tail explicitly instead:
+> `iPureIntro. exact (conj HmIE (conj HMPRV HSXL))`. Applied to
+> `InstrBytes`, `WpGprCsrw`, `WpGprCsrr`, `WpGprRvc1`, `WpGprLoad`, `WpGprStore`,
+> `WpGprJalr`: clean-build wall time 168 s → 128 s (→ ~100 s together with the
+> `WpLeafCommon.v` split below).
+
+> **Build-perf note (keep slow files off the leaves' import path —
+> `WpLeafCommon.v`).** With 32 cores the clean build is *critical-path bound*
+> (wall ≈ the longest `Require` chain, everything else overlaps). The leaves all
+> imported `WpEntry.v` (30–40 s) for ~23 tiny helper lemmas
+> (`exec_if_false_g`, `exec_jump_to`, `exec_execute_JAL`, the csrr cluster, …),
+> which put `infra → WpEntry → WpGpr → leaf` on every leaf's path. Those helpers
+> now live in `WpLeafCommon.v` (~2 s); leaves and `WpGpr` import it instead, and
+> `WpEntry` re-`Export`s it, so only `WpEntryNew` still waits for `WpEntry`.
+> When adding a leaf-shared helper, put it in `WpLeafCommon.v` (or another cheap
+> early file), never in a file with expensive proofs.
+
 To compile a single file by hand:
 
 ```sh

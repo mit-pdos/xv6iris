@@ -730,7 +730,8 @@ Section InstrBytes.
     iIntros (HN Hpmp) "Hmm Hpmpc Hpc Hinstr H".
     iDestruct "Hmm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
     iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL)".
-    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
@@ -756,11 +757,8 @@ Section InstrBytes.
              WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hpmpc]" as "Hcont'".
     { iIntros "Hhs' Hpc'". iApply ("Hcont" with "[- Hpc' Hpmpc] Hpmpc Hpc'").
-      iFrame "Hinv Hhs' Hpriv".
-      iSplitR "Hmstatus".
-      - iExists misa0, mseccfg0, pmar0, elp0.
-        iFrame "Hmisa Hmseccfg Hpma Hhtif Help %".
-      - iExists mstatus0. iFrame "Hmstatus".
+      iFrame "Hhw Hinv Hhs' Hpriv".
+      iExists mstatus0. iFrame "Hmstatus".
         iSplitR; [ iPureIntro; exact HmIE | ]. iSplitR; iPureIntro; [ exact HMPRV | exact HSXL ]. }
     destruct is_rvc.
     - (* RVC: instr_lift gives F_RVC h; caller's Hexec is the RVC execute *)

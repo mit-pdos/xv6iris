@@ -18,7 +18,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpGpr.
 Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
@@ -162,7 +162,8 @@ Section WpJalrGpr.
        the Zicfilp check (both come from mmode_config / its hw_config). *)
     iDestruct (mmode_config_split_half with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np)".
     (* wp_instr ties pmpcfg's fraction to mmode_config's, so split it too *)
@@ -232,9 +233,7 @@ Section WpJalrGpr.
     (* recombine mmode_config from the kept half + the half wp_instr returned *)
     iAssert (mmode_config (DfracOwn (1/2)))%I
       with "[Hhs_k Hpriv_k Hmst_k]" as "Hmm_k'".
-    { iFrame "Hinv Hhs_k Hpriv_k Hmst_k".
-      iExists misa0, mseccfg0, pmar0, elp0.
-      iFrame "Hmisa Hmseccfg Hpma Hhtif Help %". }
+    { iFrame "Hhw Hinv Hhs_k Hpriv_k Hmst_k". }
     iDestruct (mmode_config_combine_half with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap]").

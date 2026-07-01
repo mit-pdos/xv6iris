@@ -14,6 +14,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode.
 Require Import MinstretInv.
 From iris.base_logic.lib Require Import invariants.
+Require Export WpLeafCommon.
 
 (* ---------------------------------------------------------------------- *)
 (* RVC fetch: a 4-byte-aligned 16-bit instruction reads 4 bytes and takes  *)
@@ -28,7 +29,6 @@ From iris.base_logic.lib Require Import invariants.
 
 
 (* ==== compressed decode: walker + decode_C_lui ==== *)
-Definition h_lui : mword 16 := mword_of_int 0x6505.
 
 (* a cE-Zca decode clause whose pattern is false collapses the and_boolM to false. *)
 Lemma exec_cezca_false s pat :
@@ -40,35 +40,6 @@ Proof.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zca s HmisaC)).
   cbn match. rewrite Hpat. apply exec_returnm.
 Qed.
-
-(* and_boolM of two true-reducing computations (no cbn -> no driving into cE Zca). *)
-Lemma exec_returnM_true (b : bool) s : b = true -> exec (returnM b) s = Some (true, s).
-Proof. intro H. rewrite exec_returnm. rewrite H. reflexivity. Qed.
-Lemma exec_andM_true (l r : M bool) s :
-  exec l s = Some (true, s) -> exec r s = Some (true, s) ->
-  exec (Defs.and_boolM l r) s = Some (true, s).
-Proof. intros Hl Hr. rewrite (exec_and_boolM_Some _ _ _ _ _ Hl). exact Hr. Qed.
-
-(* reduce a settled bool-guard WITHOUT cbn (which would drive exec into cE Zca). *)
-Lemma exec_if_true {X} (A B : M X) s : exec (if true then A else B) s = exec A s.
-Proof. reflexivity. Qed.
-Lemma exec_if_false {X} (A B : M X) s : exec (if false then A else B) s = exec B s.
-Proof. reflexivity. Qed.
-
-(* HEAD-position guarded if-elimination, for walking a deep nested-if decision
-   tree (e.g. [read_CSR]/[write_CSR]'s ~90-way CSR-address dispatch).  The
-   obvious idiom
-     [repeat (match goal with |- context[if ?g then _ else _] =>
-              replace g with false by (vm_compute; reflexivity) end; cbn match)]
-   is O(#clauses^2): every iteration re-scans the whole (huge) goal for [context]
-   and then [cbn match]-traverses it.  Rewriting at the HEAD instead
-     [repeat (erewrite exec_if_false_g by (vm_compute; reflexivity))]
-   peels one guard per step with no goal-wide scan and no [cbn match], leaving the
-   goal in the same shape (the matching [if g then _ else _] at head).  See the
-   "Build-perf note" in README.md. *)
-Lemma exec_if_false_g {X} (g : bool) (A B : M X) s :
-  g = false -> exec (if g then A else B) s = exec B s.
-Proof. intros ->. reflexivity. Qed.
 
 (* walk one non-matching level of the nested compressed-decode tree. *)
 Ltac cstep s HmisaC :=
@@ -84,8 +55,6 @@ Ltac cstep s HmisaC :=
   | match goal with |- context[if ?g then _ else _] =>
       replace g with false by (vm_compute; reflexivity) end; cbn match ].
 
-Definition imm_clui : mword 6 :=
-  concat_vec (subrange_vec_dec h_lui 12 12) (subrange_vec_dec h_lui 6 2).
 Definition rd_clui : regidx :=
   Regidx (autocast (T := mword)
             (subrange_vec_dec (subrange_vec_dec h_lui 11 7) (Z.sub regidx_bit_width 1) 0)).
@@ -129,17 +98,6 @@ Proof.
 Qed.
 
 (* ==== execute lemmas (generic register write) ==== *)
-
-(* write any GPR (given the reflexivity equation for its concrete index). *)
-Lemma exec_wX_bits_at (i : mword 5) (r : register_bitvector_64) s (v : mword 64) :
-  wX (Regno (uint i)) v
-    = Defs.bind0 (Defs.write_reg (R_bitvector_64 r) (regval_into_reg v)) (returnM tt) ->
-  exec (wX_bits (Regidx i) v) s = Some (tt, set_reg s (R_bitvector_64 r) (regval_into_reg v)).
-Proof.
-  intro Heq. unfold wX_bits. rewrite Heq.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bitvector_64 r) _ s)).
-  apply exec_returnm.
-Qed.
 
 (* C_LUI decodes-and-expands to UTYPE LUI via ExecuteAs. *)
 Lemma exec_execute_C_LUI (imm : mword 6) (rd : regidx) s :
@@ -238,8 +196,6 @@ End StepGen.
 (* ==== lui exec-step (forward_exec_lui) ==== *)
 Definition i_lui : mword 5 :=
   autocast (T := mword) (subrange_vec_dec (subrange_vec_dec h_lui 11 7) (Z.sub regidx_bit_width 1) 0).
-Definition luival : mword 64 :=
-  sign_extend' 64 (concat_vec (sign_extend' 20 imm_clui) ((Ox"000") : mword 12)).
 
 Lemma rd_clui_eq : rd_clui = Regidx i_lui.
 Proof. reflexivity. Qed.
@@ -338,61 +294,6 @@ End ForwardADD.
 (* ====================================================================== *)
 (* JAL (control flow) -- the "jump to start" capstone.                     *)
 (* ====================================================================== *)
-Lemma exec_set_next_pc (target : mword 64) s :
-  exec (set_next_pc target) s = Some (tt, set_reg s nextPC target).
-Proof.
-  unfold set_next_pc. cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg nextPC target s)).
-  apply exec_returnm.
-Qed.
-
-Lemma exec_jump_to (target : mword 64) s :
-  eq_vec (access_vec_dec target 0) ('b"0") = true ->
-  bit_to_bool (access_vec_dec target 1) = false ->
-  exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
-Proof.
-  intros Halign Hbit1.
-  unfold jump_to. rewrite exec_catch_early_return.
-  change (ext_control_check_pc target) with (@None unit). cbv iota beta.
-  (* outer bind: w1 = false (target[1]=0 short-circuits and_boolM) *)
-  rewrite (execR_bind_Some _ _ _ false s).
-  2:{ unfold Defs.bind0.
-      (* INNER = bind (bind (returnR())(fun _ => liftR assert)) (fun _ => and_boolM..) *)
-      erewrite execR_bind_Some.
-      2:{ erewrite execR_bind_Some.
-          2:{ apply execR_returnR_fwd. }
-          rewrite execR_liftR. unfold assert_exp. rewrite Halign. cbn match.
-          rewrite exec_returnm. reflexivity. }
-      unfold and_boolM.
-      rewrite (execR_bind_Some _ _ _ (bit_to_bool (access_vec_dec target 1)) s).
-      2:{ apply execR_returnR_fwd. }
-      rewrite Hbit1. cbv iota beta. apply execR_returnR_fwd. }
-  cbv iota beta.
-  (* K false = liftR (set_next_pc target) >> returnR RETIRE_SUCCESS *)
-  unfold Defs.bind0.
-  rewrite (execR_bind_Some _ _ _ tt (set_reg s nextPC target)).
-  2:{ rewrite execR_liftR. rewrite exec_set_next_pc. reflexivity. }
-  rewrite (execR_returnR_fwd RETIRE_SUCCESS (set_reg s nextPC target)).
-  reflexivity.
-Qed.
-
-Lemma exec_execute_JAL (imm : mword 21) (rd : regidx) s s_w :
-  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-  bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
-  exec (wX_bits rd (register_lookup nextPC s.(sregs)))
-       (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))) = Some (tt, s_w) ->
-  exec (execute_JAL imm rd) s = Some (RETIRE_SUCCESS, s_w).
-Proof.
-  intros Halign Hbit1 Hwx.
-  unfold execute_JAL, get_next_pc.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to _ s Halign Hbit1)).
-  cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _ Hwx).
-  apply exec_returnm.
-Qed.
-
 Definition w_jal : mword 32 := mword_of_int 0x42000ef.
 Definition i_jal : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_jal 11 7) (regidx_bit_width - 1) 0).
@@ -515,8 +416,6 @@ Definition i_mul_rs1 : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_mul 19 15) (regidx_bit_width - 1) 0).
 Definition i_mul_rd : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_mul 11 7) (regidx_bit_width - 1) 0).
-Definition mulop_mul : mul_op :=
-  {| mul_op_result_part := Low; mul_op_signed_rs1 := Signed; mul_op_signed_rs2 := Signed |}.
 
 Lemma decode_mul s :
   register_lookup cur_privilege (sregs s) = Machine ->
@@ -689,19 +588,6 @@ Lemma exec_execute_C_ADDI (imm : mword 6) (rsd : regidx) s :
   exec (execute (C_ADDI (imm, rsd))) s
     = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, rsd, rsd, ADDI)), s).
 Proof. unfold execute. cbn match. unfold execute_C_ADDI. apply exec_returnM. Qed.
-
-Lemma exec_execute_ITYPE_ADDI (imm : mword 12) (rs1 rd : regidx) (a : mword 64) s s' :
-  exec (rX_bits rs1) s = Some (a, s) ->
-  exec (wX_bits rd (add_vec a (sign_extend' 64 imm))) s = Some (tt, s') ->
-  exec (execute (ITYPE (imm, rs1, rd, ADDI))) s = Some (RETIRE_SUCCESS, s').
-Proof.
-  intros Ha Hw.
-  change (execute (ITYPE (imm, rs1, rd, ADDI))) with (execute_ITYPE imm rs1 rd ADDI).
-  unfold execute_ITYPE. cbn match.
-  rewrite (exec_bind_Some _ _ _ (add_vec a (sign_extend' 64 imm)) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha). apply exec_returnm. }
-  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm.
-Qed.
 
 Lemma wX_addi_x11 (v : mword 64) :
   wX (Regno (uint i_addi)) v
@@ -962,13 +848,6 @@ Proof.
   apply exec_hartSupports_Zicsr.
 Qed.
 
-Definition w_csrr : mword 32 := mword_of_int 0xf14025f3.
-Definition csr_csrr : mword 12 := subrange_vec_dec w_csrr 31 20.
-Definition i_rs1_csrr : mword 5 :=
-  autocast (subrange_vec_dec (subrange_vec_dec w_csrr 19 15) (regidx_bit_width - 1) 0).
-Definition i_rd_csrr : mword 5 :=
-  autocast (subrange_vec_dec (subrange_vec_dec w_csrr 11 7) (regidx_bit_width - 1) 0).
-
 Lemma decode_csrr s :
   register_lookup cur_privilege (sregs s) = Machine ->
   exec (ext_decode w_csrr) s
@@ -1035,38 +914,6 @@ Proof.
   rewrite (exec_returnM _ s). cbn match.
   apply exec_returnM.
 Qed.
-
-Lemma exec_check_CSR_csrr s : exec (check_CSR csr_csrr Machine CSRRead) s = Some (true, s).
-Proof.
-  assert (H : check_CSR csr_csrr Machine CSRRead = returnM true) by (vm_compute; reflexivity).
-  rewrite H. apply exec_returnM.
-Qed.
-
-Lemma exec_csr_id_read_callback_csrr s d :
-  exec (csr_id_read_callback csr_csrr d) s = Some (tt, s).
-Proof.
-  assert (H : csr_id_read_callback csr_csrr d = returnM tt) by (vm_compute; reflexivity).
-  rewrite H. apply exec_returnM.
-Qed.
-
-Lemma exec_rX_bits_x0 (i : mword 5) s :
-  uint i = 0 -> exec (rX_bits (Regidx i)) s = Some (zero_reg, s).
-Proof.
-  intro H. unfold rX_bits; cbn match. rewrite H. unfold rX.
-  replace (Z.eqb 0 0) with true by reflexivity. cbn match. apply exec_returnM.
-Qed.
-
-Lemma exec_check_CSR_result_csrr s :
-  exec (check_CSR_result csr_csrr Machine CSRRead) s = Some (CSR_Check_OK tt, s).
-Proof.
-  unfold check_CSR_result.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_csrr s)).
-  exact (exec_returnM (CSR_Check_OK tt) s).
-Qed.
-
-Lemma exec_read_CSR_csrr s :
-  exec (read_CSR csr_csrr) s = Some (register_lookup mhartid s.(sregs), s).
-Proof. exact (exec_read_reg (R_bitvector_64 mhartid) s). Qed.
 
 Lemma exec_execute_CSRReg s s_w :
   register_lookup cur_privilege s.(sregs) = Machine ->
