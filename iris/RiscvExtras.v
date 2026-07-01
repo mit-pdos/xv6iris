@@ -151,6 +151,24 @@ Proof.
     rewrite Z.mul_comm. apply Z_mod_mult.
 Qed.
 
+(* 4-byte alignment of a jump target -> the two low-bit facts the model's
+   [jump_to] checks (bit 0 = 0 via [eq_vec .. 'b"0"], bit 1 = 0 via
+   [bit_to_bool]).  Lets JAL / JALR state a single [is_aligned_paddr .. 4]
+   premise instead of two per-bit facts. *)
+Lemma aligned4_jump_bits (a : mword 64) :
+  is_aligned_paddr (Physaddr a) 4 = true ->
+  eq_vec (access_vec_dec a 0) ('b"0") = true /\
+  bit_to_bool (access_vec_dec a 1) = false.
+Proof.
+  intros H. destruct (align4_low_bits a H) as [H0 H1].
+  unfold neq_vec in H0, H1.
+  apply negb_false_iff in H0. apply negb_false_iff in H1.
+  split; [ exact H0 |].
+  unfold bit_to_bool, eq_vec, get_word in H1.
+  rewrite MachineWord.MachineWord.eqb_true_iff in H1.
+  rewrite H1. reflexivity.
+Qed.
+
 (* THE BRIDGE: the j-th byte of the fetch window for the instruction at byte
    address [A] is the physical byte address [A + j].  This is what lets a
    per-byte image (keyed by absolute byte address) feed the WP fetch windows,

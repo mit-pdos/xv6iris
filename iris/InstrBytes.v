@@ -1,0 +1,581 @@
+(* InstrBytes.v -- the memory footprint of an instruction fetch.
+   [instr_bytes pc r] owns exactly the bytes a fetch at [pc] must read in
+   order to produce the FetchResult [r], TOGETHER with the purely-geometric
+   side conditions (alignment / compressed-ness) the fetch reduction needs.
+   It is the resource a fetch lemma consumes to establish
+   [exec (fetch tt) s = Some (r, s)]. *)
+From Stdlib Require Import Eqdep_dec ZArith Zquot Lia.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import gen_heap.
+From iris.program_logic Require Import language weakestpre lifting.
+From iris.bi.lib Require Import fractional.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Base SailStdpp.TypeCasts.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
+Local Open Scope Z_scope.
+
+Section InstrBytes.
+  Context `{!riscvGS Σ}.
+
+  (* The instruction at [pc] is [r] (bytes + geometry, in duplicable [↦ₘ□]):
+       - [F_Base w]: [pc] is 4-aligned, the low 16 bits of [w] are NOT a
+         compressed opcode, and the four bytes of [w] live at pc..pc+3.
+       - [F_RVC h] : a 16-bit (compressed) instruction ([isRVC h]).  A 4-aligned
+         [pc] lets the fetch unit read a whole 4-byte word, so there are 4 bytes
+         at pc whose low 2 bytes are [h] (the high 2 are whatever follows); a
+         non-4-aligned (but 2-aligned) [pc] reads only the 2 bytes of [h].
+       - fetch-error results carry no instruction, hence no footprint. *)
+  Definition instr_bytes (pc : mword 64) (r : FetchResult) : iProp Σ :=
+    (match r with
+     | F_Base w =>
+         ⌜ is_aligned_vaddr (Virtaddr pc) 4 = true ⌝ ∗
+         ⌜ isRVC (subrange_vec_dec w 15 0) = false ⌝ ∗
+         [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
+     | F_RVC h =>
+         ⌜ isRVC h = true ⌝ ∗
+         if is_aligned_vaddr (Virtaddr pc) 4
+         then ∃ w : mword 32, ⌜ subrange_vec_dec w 15 0 = h ⌝ ∗
+                [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
+         else ⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝ ∗
+              [∗ list] j ∈ seq 0 2, (pa_add pc j) ↦ₘ□ nth_byte h j
+     | _ => False
+     end)%I.
+
+  (* For a 2-aligned but NOT 4-aligned pc, the low two bits are 0 then 1; and
+     [is_aligned_paddr .. 2] is just [is_aligned_vaddr .. 2] (same [Z.rem .. 2]).
+     These are exactly the bit/align side conditions [exec_fetch_RVC_2] wants,
+     so they need not be carried separately in [instr_bytes]. *)
+  Lemma align2_not4_facts (pc : mword 64) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
+    is_aligned_paddr (Physaddr (fetch_pa pc)) 2 = true /\
+    neq_vec (access_vec_dec pc 0) ('b"0") = false /\
+    neq_vec (access_vec_dec pc 1) ('b"0") = true.
+  Proof.
+    intros H2 H4.
+    pose proof (bv_unsigned_in_range _ pc) as [Hlo _].
+    assert (Hr2 : Z.rem (bv_unsigned pc) 2 = 0).
+    { unfold is_aligned_vaddr in H2. apply Z.eqb_eq in H2.
+      rewrite uint_unsigned in H2. exact H2. }
+    assert (Hr4 : Z.rem (bv_unsigned pc) 4 <> 0).
+    { unfold is_aligned_vaddr in H4. apply Z.eqb_neq in H4.
+      rewrite uint_unsigned in H4. exact H4. }
+    apply Zrem_divides in Hr2. destruct Hr2 as [k Hk].
+    assert (Hkpos : (0 <= k)%Z) by nia.
+    (* not-4-aligned + [pc = 2k] forces [k] odd, i.e. [k mod 2 = 1]. *)
+    assert (Hkodd : (k mod 2 = 1)%Z).
+    { destruct (Z.eq_dec (k mod 2) 0) as [He | He].
+      - exfalso. apply Hr4. rewrite Hk.
+        apply Z.mod_divide in He; [| lia]. destruct He as [m ->].
+        replace (2 * (m * 2))%Z with (m * 4)%Z by lia.
+        rewrite Z.rem_mod_nonneg; [ apply Z_mod_mult | nia | lia ].
+      - pose proof (Z.mod_pos_bound k 2 ltac:(lia)) as [? ?]. lia. }
+    split; [| split].
+    - (* paddr = vaddr for width 2 *)
+      unfold is_aligned_paddr. rewrite fetch_pa_id.
+      unfold is_aligned_vaddr in H2. exact H2.
+    - (* bit0 = 0 *)
+      unfold neq_vec; rewrite negb_false_iff;
+      unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word;
+      rewrite MachineWord.MachineWord.eqb_true_iff; apply bv_eq;
+      rewrite bv_extract_unsigned;
+      replace (bv_unsigned ('b"0")) with 0%Z by (vm_compute; reflexivity);
+      unfold bv_wrap, bv_modulus; rewrite Hk.
+      change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0%Z.
+      rewrite Z.shiftr_0_r.
+      replace (2 ^ Z.of_N 1)%Z with 2%Z by reflexivity.
+      replace (2 * k)%Z with (k * 2)%Z by lia. apply Z_mod_mult.
+    - (* bit1 = 1 *)
+      unfold neq_vec; rewrite negb_true_iff;
+      unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word.
+      apply not_true_is_false. rewrite MachineWord.MachineWord.eqb_true_iff.
+      intro Heq. apply (f_equal bv_unsigned) in Heq.
+      rewrite bv_extract_unsigned in Heq.
+      replace (bv_unsigned ('b"0")) with 0%Z in Heq by (vm_compute; reflexivity).
+      unfold bv_wrap, bv_modulus in Heq. rewrite Hk in Heq.
+      change (Z.of_N (MachineWord.MachineWord.Z_idx 1)) with 1%Z in Heq.
+      rewrite (Z.shiftr_div_pow2 (2 * k) 1) in Heq; [| lia].
+      replace (2 ^ 1)%Z with 2%Z in Heq by reflexivity.
+      replace (2 ^ Z.of_N 1)%Z with 2%Z in Heq by reflexivity.
+      rewrite (Z.mul_comm 2 k) in Heq. rewrite (Z.div_mul k 2) in Heq; [| lia].
+      rewrite Hkodd in Heq. discriminate Heq.
+  Qed.
+
+  (* fetch_from_instr_bytes: given the state interpretation, ownership of PC and
+     the (read-only) fetch configuration CSRs, and [instr_bytes pc r], executing
+     [fetch] yields exactly [r], leaving the state unchanged.  Dispatches on
+     [r]/alignment to the three pure fetch reductions [exec_fetch_done] (F_Base)
+     / [exec_fetch_RVC_4] / [exec_fetch_RVC_2].  The RAM-constrained byte
+     ownership discharges the within_clint/within_sig MMIO checks; [htif = None]
+     discharges within_htif; [pmp_allows_all]/[pma_allows_all]/[Misa.C] supply
+     the PMP/PMA/C-extension config, and the geometry rides inside [instr_bytes]. *)
+  Lemma fetch_from_instr_bytes
+      (σ : mstate) ns κs nt (pc : mword 64) (r : FetchResult)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (misa0 : mword 64) {dqp dqc dqa dqh dqm : dfrac} :
+    pmp_allows_all pmpcfg0 ->
+    pma_allows_all pmar0 ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    state_interp σ ns κs nt -∗
+    PC ↦ᵣ pc -∗
+    cur_privilege ↦ᵣ{ dqp } Machine -∗
+    pmpcfg_n ↦ᵣ{ dqc } pmpcfg0 -∗
+    pma_regions ↦ᵣ{ dqa } pmar0 -∗
+    htif_tohost_base ↦ᵣ{ dqh } None -∗
+    misa ↦ᵣ{ dqm } misa0 -∗
+    instr_bytes pc r -∗
+    ⌜ exec (fetch tt) σ = Some (r, σ) ⌝.
+  Proof.
+    iIntros (Hpmp0 Hpma0 HmisaC) "[Hreg Hmem] Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes".
+    iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
+    iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
+    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    assert (Hpmp : forall i, pmpAddrMatchType_encdec_backwards
+              (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) i)) = OFF)
+      by (rewrite Lpmpc; exact Hpmp0).
+    iEval (rewrite /instr_bytes) in "Hbytes".
+    destruct r as [e | w | h | erx].
+    - (* F_Ext_Error: [instr_bytes] is [False] *) done.
+    - (* F_Base w : 4 bytes of [w] *)
+      iDestruct "Hbytes" as "(%Hvalign & %HnotRVC & Hbytes)".
+      iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
+                 σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbf.
+      { iIntros (j Hj). rewrite fetch_pa_id.
+        iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+        { rewrite lookup_seq_lt; [reflexivity | lia]. }
+        iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+      iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
+      { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+        { rewrite lookup_seq_lt; [reflexivity | lia]. }
+        iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+        rewrite fetch_pa_id. iPureIntro. exact Hr0. }
+      iPureIntro. unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
+      destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
+      assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
+                (Physaddr (fetch_pa pc)) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
+      exact (exec_fetch_done pc region w σ Lpc Lpriv Hpmp Hmatch Hexec0
+               (within_clint_false (fetch_pa pc) 4 σ Hnc ltac:(lia))
+               (within_sig_false  (fetch_pa pc) 4 σ Hns ltac:(lia))
+               (within_htif_false (fetch_pa pc) 4 σ Lhtif)
+               Hbf Hvalign HnotRVC).
+    - (* F_RVC h *)
+      iDestruct "Hbytes" as "[%HisRVC Hbytes]".
+      destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal.
+      + (* 4-aligned : 4 bytes, whose low 16 bits are [h] *)
+        iDestruct "Hbytes" as (w) "[%Hsub Hbytes]".
+        iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
+                   σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j)⌝)%I as %Hbf.
+        { iIntros (j Hj). rewrite fetch_pa_id.
+          iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+        iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
+        { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          rewrite fetch_pa_id. iPureIntro. exact Hr0. }
+        iPureIntro. unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
+        destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
+        assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
+                  (Physaddr (fetch_pa pc)) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
+        assert (HisRVC' : isRVC (subrange_vec_dec w 15 0) = true) by (rewrite Hsub; exact HisRVC).
+        rewrite <- Hsub.
+        exact (exec_fetch_RVC_4 pc region w σ Lpc Lpriv Hpmp Hmatch Hexec0
+                 (within_clint_false (fetch_pa pc) 4 σ Hnc ltac:(lia))
+                 (within_sig_false  (fetch_pa pc) 4 σ Hns ltac:(lia))
+                 (within_htif_false (fetch_pa pc) 4 σ Lhtif)
+                 Hbf Hal HisRVC').
+      + (* not 4-aligned : 2 bytes = [h]; derive the bit/paddr facts *)
+        iDestruct "Hbytes" as "[%Halign_v Hbytes]".
+        destruct (align2_not4_facts pc Halign_v Hal) as (Halign & Hbit0 & Hbit1).
+        iAssert (⌜forall j : nat, (N.of_nat j < 2)%N ->
+                   σ.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte h j)⌝)%I as %Hbf.
+        { iIntros (j Hj). rewrite fetch_pa_id.
+          iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+        iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
+        { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          rewrite fetch_pa_id. iPureIntro. exact Hr0. }
+        iPureIntro. unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
+        destruct (Hpma0 (fetch_pa pc) 2) as (region & Hmatch0 & Hexec0 & _ & _).
+        assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
+                  (Physaddr (fetch_pa pc)) 2 = Some region) by (rewrite Lpma; exact Hmatch0).
+        assert (HmisaC' : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
+          by (rewrite Lmisa; exact HmisaC).
+        exact (exec_fetch_RVC_2 pc region h σ Lpc Lpriv Hpmp Hmatch Halign Hexec0
+                 (within_clint_false (fetch_pa pc) 2 σ Hnc ltac:(lia))
+                 (within_sig_false  (fetch_pa pc) 2 σ Hns ltac:(lia))
+                 (within_htif_false (fetch_pa pc) 2 σ Lhtif)
+                 Hbf Hbit0 Hbit1 Hal HmisaC' HisRVC).
+    - (* F_Error: [instr_bytes] is [False] *) done.
+  Qed.
+
+  (* dispatchInterrupt_none_from_regs: during M-mode kernel execution the
+     interrupt dispatch is a no-op ([None]) as long as
+       - the S extension is enabled ([misa.S = 1]) -- this makes
+         [currentlyEnabled Ext_S = true], discharging the [getPendingSet]
+         delegation assert; and
+       - M-mode interrupts are globally disabled ([mstatus.MIE = 0]) -- this
+         makes the Machine-privilege interrupt-enable [mIE] false, so no
+         pending set is ever returned (and [sIE] is false at Machine anyway).
+     Exactly the two values the pure [exec_getPendingSet_machine_none] keystone
+     needs; here we read them off owned (dfrac-generic) config points-to, so a
+     WP client can discharge its [dispatchInterrupt Machine = None] obligation
+     straight from [hw_config]'s misa plus a mstatus.MIE fact. *)
+  Lemma dispatchInterrupt_none_from_regs
+      (σ : mstate) ns κs nt (misa0 mstatus0 : mword 64) {dqm dqs : dfrac} :
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
+    state_interp σ ns κs nt -∗
+    misa ↦ᵣ{ dqm } misa0 -∗
+    mstatus ↦ᵣ{ dqs } mstatus0 -∗
+    ⌜ exec (dispatchInterrupt Machine) σ = Some (None, σ) ⌝.
+  Proof.
+    iIntros (HmisaS HmIE) "[Hreg Hmem] Hmisa Hmstatus".
+    iDestruct (reg_valid_dq with "Hreg Hmisa")    as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Hmstatus") as %Lmstatus.
+    iPureIntro.
+    apply exec_dispatchInterrupt_none.
+    apply (exec_getPendingSet_machine_none σ _ (exec_currentlyEnabled_S σ)).
+    - rewrite Lmisa.    exact HmisaS.
+    - rewrite Lmstatus. exact HmIE.
+  Qed.
+
+  (* The decoder appropriate to a fetch result: [ext_decode] for a full 32-bit
+     word, [ext_decode_compressed] for a 16-bit compressed halfword.  (The error
+     arms are unreachable: [instr_bytes] is [False] there.) *)
+  Definition decode_fetch (r : FetchResult) : M instruction :=
+    match r with
+    | F_Base w => ext_decode w
+    | F_RVC h  => ext_decode_compressed h
+    | _        => ext_decode (mword_of_int 0)
+    end.
+
+  (* Whether a fetch result is a 2-byte compressed (RVC) instruction. *)
+  Definition fetch_is_rvc (r : FetchResult) : bool :=
+    match r with F_RVC _ => true | _ => false end.
+
+  (* The instruction at [pc] is [i]: some fetch result [r] lives there (with its
+     byte footprint, via [instr_bytes]) whose decode is [i], and [i] is not a
+     landing-pad instruction (so it takes the ordinary execute path).  The bool
+     [is_rvc] records the fetch width ([true] iff [r] is a 2-byte [F_RVC]); it is
+     the visible discriminant clients branch on instead of the hidden [r].
+     Decoding is state-independent, but we phrase it against an arbitrary
+     [state_interp σ] so it composes with the fetch/decode obligations at [σ]. *)
+  Definition instr (pc : mword 64) (is_rvc : bool) (i : instruction) : iProp Σ :=
+    (⌜ is_lpad_instruction i = false ⌝ ∗
+     ∃ r : FetchResult,
+       ⌜ fetch_is_rvc r = is_rvc ⌝ ∗
+       instr_bytes pc r ∗
+       (∀ σ ns κs nt, state_interp σ ns κs nt -∗
+          ⌜ exec (decode_fetch r) σ = Some (i, σ) ⌝))%I.
+
+  (* Lift [instr pc i] to the pure fetch/decode facts a decode/execute WP step
+     consumes: the fetch reads the bytes to [r] (via [fetch_from_instr_bytes]),
+     [r] decodes to [i], and [i] is not a landing pad.  The read-only fetch
+     config (PC / privilege / PMP / PMA / htif / misa) is threaded in and, being
+     used only to prove [⌜..⌝], is returned to the caller unchanged. *)
+  Lemma instr_lift
+      (σ : mstate) ns κs nt (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
+      (misa0 : mword 64) {dqp dqc dqa dqh dqm : dfrac} :
+    pmp_allows_all pmpcfg0 ->
+    pma_allows_all pmar0 ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    state_interp σ ns κs nt -∗
+    PC ↦ᵣ pc -∗
+    cur_privilege ↦ᵣ{ dqp } Machine -∗
+    pmpcfg_n ↦ᵣ{ dqc } pmpcfg0 -∗
+    pma_regions ↦ᵣ{ dqa } pmar0 -∗
+    htif_tohost_base ↦ᵣ{ dqh } None -∗
+    misa ↦ᵣ{ dqm } misa0 -∗
+    instr pc is_rvc i -∗
+    ⌜ if is_rvc
+      then ∃ h : half,
+             exec (fetch tt) σ = Some (F_RVC h, σ) /\
+             exec (decode_fetch (F_RVC h)) σ = Some (i, σ) /\
+             is_lpad_instruction i = false
+      else ∃ w : word,
+             exec (fetch tt) σ = Some (F_Base w, σ) /\
+             exec (decode_fetch (F_Base w)) σ = Some (i, σ) /\
+             is_lpad_instruction i = false ⌝.
+  Proof.
+    iIntros (Hpmp Hpma HmisaC) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr".
+    iDestruct "Hinstr" as "[%Hnlpad Hr]".
+    iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
+    iDestruct (fetch_from_instr_bytes σ ns κs nt pc r pmpcfg0 pmar0 misa0
+                 Hpmp Hpma HmisaC
+                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes") as %Hfetch.
+    iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec.
+    destruct r as [e | w | h | erx].
+    - (* F_Ext_Error: instr_bytes is False *) iDestruct "Hbytes" as %[].
+    - (* F_Base w : fetch_is_rvc = false, so is_rvc = false *)
+      cbn [fetch_is_rvc] in Hrvc. subst is_rvc. iPureIntro.
+      exists w. split; [exact Hfetch | split; [exact Hdec | exact Hnlpad]].
+    - (* F_RVC h : fetch_is_rvc = true, so is_rvc = true *)
+      cbn [fetch_is_rvc] in Hrvc. subst is_rvc. iPureIntro.
+      exists h. split; [exact Hfetch | split; [exact Hdec | exact Hnlpad]].
+    - (* F_Error: instr_bytes is False *) iDestruct "Hbytes" as %[].
+  Qed.
+
+  (* wp_exec_step_decode_execute_inv -- the DECODE/EXECUTE flavour, built on
+     [wp_exec_step_hart_active_inv].  General-purpose over ANY fetch result [r]:
+     the caller supplies the fetch [= r] and decode [decode_fetch r -> i] facts
+     (which don't depend on the width), and ONLY the execute obligation is
+     dispatched on [r], since the two run_hart_active paths differ: F_Base ticks
+     nextPC:=PC+4 and runs [execute i] once (no [ExecuteAs]); F_RVC ticks
+     nextPC:=PC+2, gates on [Ext_Zca] (misa.C), and [execute i] yields
+     [ExecuteAs other] which is then run to [RETIRE_SUCCESS].  The pure
+     [exec_hart_active_progress] / [exec_hart_active_progress_RVC] assemble the
+     run_hart_active fact, forwarded to [wp_exec_step_hart_active_inv]. *)
+  Lemma wp_exec_step_decode_execute_inv E Φ {dq : dfrac} :
+    ↑minstretN ⊆ E →
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    (∀ σ ns κs nt, state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+       ∃ (r : FetchResult) (i : instruction) (s_exec : mstate),
+         ⌜ register_lookup cur_privilege σ.(sregs) = Machine ⌝ ∗
+         ⌜ exec (dispatchInterrupt Machine) σ = Some (None, σ) ⌝ ∗
+         ⌜ exec (fetch tt) σ = Some (r, σ) ⌝ ∗
+         ⌜ exec (decode_fetch r) σ = Some (i, σ) ⌝ ∗
+         ⌜ eq_vec (register_lookup elp σ.(sregs))
+                  (landing_pad_bits_backwards LP_EXPECTED) = false ⌝ ∗
+         (match r with
+          | F_Base w =>
+              ⌜ is_lpad_instruction i = false ⌝ ∗
+              ⌜ exec (execute i)
+                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 4))
+                  = Some (RETIRE_SUCCESS, s_exec) ⌝
+          | F_RVC h =>
+              ⌜ eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ⌝ ∗
+              ∃ other : instruction,
+                ⌜ exec (execute i)
+                       (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
+                    = Some (ExecuteAs other,
+                            set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2)) ⌝ ∗
+                ⌜ exec (execute other)
+                       (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
+                    = Some (RETIRE_SUCCESS, s_exec) ⌝
+          | _ => False
+          end) ∗
+         PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
+         state_interp s_exec ns κs nt ∗
+         (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN) "Hinv Hhs H".
+    iApply (wp_exec_step_hart_active_inv E Φ HN with "Hinv Hhs").
+    iIntros (σ ns κs nt) "Hsi".
+    iMod ("H" $! σ ns κs nt with "Hsi") as (r i s_exec)
+      "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
+    destruct r as [e | w | h | erx].
+    - (* F_Ext_Error: unreachable *) iDestruct "Hrest" as %[].
+    - (* F_Base w : 4-byte, single execute *)
+      iDestruct "Hrest" as "[%Hnotlpad %Hexec]".
+      iModIntro. iExists (zero_extend' 32 w), s_exec. iSplitR.
+      { iPureIntro.
+        exact (exec_hart_active_progress σ σ s_exec σ w i
+                 (register_lookup PC σ.(sregs)) RETIRE_SUCCESS
+                 Hpriv Hdisp Hfetch Hdec Hlpad Hnotlpad eq_refl Hexec I). }
+      iFrame "Hpc Hsi_exec". iExact "Hcont".
+    - (* F_RVC h : 2-byte, ExecuteAs expansion; Ext_Zca from misa.C *)
+      iDestruct "Hrest" as "[%HmisaC Hrest]".
+      iDestruct "Hrest" as (other) "[%Hexec %Hexec2]".
+      iModIntro. iExists (zero_extend' 32 h), s_exec. iSplitR.
+      { iPureIntro.
+        exact (exec_hart_active_progress_RVC σ s_exec h i other
+                 (register_lookup PC σ.(sregs)) RETIRE_SUCCESS
+                 Hpriv Hdisp Hfetch Hdec Hlpad eq_refl
+                 (exec_currentlyEnabled_Zca σ HmisaC) Hexec Hexec2). }
+      iFrame "Hpc Hsi_exec". iExact "Hcont".
+    - (* F_Error: unreachable *) iDestruct "Hrest" as %[].
+  Qed.
+
+  (* pc_is x: the program counter is at [x].  During straight-line execution
+     PC and nextPC are held in lock-step (the previous step's tick set
+     PC := nextPC, and neither has moved since), so a single [x] pins both.
+     A step advances [pc_is pc] to [pc_is (pc + width)]. *)
+  Definition pc_is (x : mword 64) : iProp Σ :=
+    (PC ↦ᵣ x ∗ nextPC ↦ᵣ x)%I.
+
+  (* mmode_config: the ambient resources a straight-line M-mode kernel
+     instruction reads and preserves -- the persistent [hw_config] and
+     [minstret_inv], plus ownership of hart_state (ACTIVE), cur_privilege
+     (Machine), and mstatus (with MIE clear, so [dispatchInterrupt] is a no-op
+     by [dispatchInterrupt_none_from_regs]).  A [wp_instr] step consumes it and
+     hands it back (unchanged) for the next instruction. *)
+  (* [dq]-fractional: the non-duplicable register cells (hart_state,
+     cur_privilege, mstatus) are held at fraction [dq]; hw_config / minstret_inv
+     are persistent.  A client owning [mmode_config (DfracOwn 1)] can split off a
+     fraction to hand to [wp_instr] while retaining the rest to keep reasoning
+     about the config during the instruction. *)
+  Definition mmode_config (dq : dfrac) : iProp Σ :=
+    (hw_config ∗ minstret_inv ∗
+     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+     cur_privilege ↦ᵣ{ dq } Machine ∗
+     ∃ mstatus0 : mword 64,
+       mstatus ↦ᵣ{ dq } mstatus0 ∗
+       ⌜ eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ⌝ ∗
+       ⌜ eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ⌝ ∗
+       ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝)%I.
+
+  (* [dq]-fractional register cells split/combine: a client owning
+     [mmode_config (DfracOwn 1)] may hand a half to [wp_instr] and keep the
+     other half to reg_valid_dq the config (cur_privilege / mstatus / hart_state
+     are read-only during the instruction), then recombine for the
+     continuation.  Used by every memory / control-flow instruction WP. *)
+  Global Instance reg_pointsto_fractional (r : register) (v : type_of_register r) :
+    Fractional (fun q => reg_pointsto r (DfracOwn q) v).
+  Proof. rewrite /reg_pointsto. apply _. Qed.
+  Global Instance reg_pointsto_as_fractional (r : register) (q : Qp) (v : type_of_register r) :
+    AsFractional (reg_pointsto r (DfracOwn q) v) (fun q => reg_pointsto r (DfracOwn q) v) q.
+  Proof. rewrite /reg_pointsto. split; [done | apply _]. Qed.
+
+  Lemma reg_pointsto_agree (r : register) (dq1 dq2 : dfrac) (v1 v2 : type_of_register r) :
+    reg_pointsto r dq1 v1 -∗ reg_pointsto r dq2 v2 -∗ ⌜ v1 = v2 ⌝.
+  Proof.
+    rewrite /reg_pointsto. iIntros "H1 H2".
+    iDestruct (pointsto_agree with "H1 H2") as %Heq.
+    iPureIntro. exact (Eqdep_dec.inj_pair2_eq_dec _ Decidable_eq_register _ r v1 v2 Heq).
+  Qed.
+
+  Lemma mmode_config_split_half :
+    mmode_config (DfracOwn 1) ⊢
+      mmode_config (DfracOwn (1/2)) ∗ mmode_config (DfracOwn (1/2)).
+  Proof.
+    iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
+    iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hhs" as "[Hhs1 Hhs2]".
+    iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
+    iDestruct "Hms" as "[Hms1 Hms2]".
+    iSplitL "Hhs1 Hpriv1 Hms1".
+    - iFrame "Hhw Hinv Hhs1 Hpriv1". iExists ms0. iFrame "Hms1 %".
+    - iFrame "Hhw Hinv Hhs2 Hpriv2". iExists ms0. iFrame "Hms2 %".
+  Qed.
+
+  Lemma mmode_config_combine_half :
+    mmode_config (DfracOwn (1/2)) -∗ mmode_config (DfracOwn (1/2)) -∗
+    mmode_config (DfracOwn 1).
+  Proof.
+    iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1) (_ & _ & Hhs2 & Hpriv2 & Hmst2)".
+    iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
+    iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %<-.
+    iCombine "Hhs1 Hhs2" as "Hhs".
+    iCombine "Hpriv1 Hpriv2" as "Hpriv".
+    iCombine "Hms1 Hms2" as "Hms".
+    iFrame "Hhw Hinv Hhs Hpriv". iExists ms0. iFrame "Hms %".
+  Qed.
+
+  (* wp_instr -- the [instr]-driven variant of wp_exec_step_decode_execute_inv.
+     The caller no longer proves fetch / decode / not-a-landing-pad NOR
+     [dispatchInterrupt = None]: it supplies [instr pc is_rvc i] (packaging the
+     former, pinning the width bool [is_rvc]) and [mmode_config] (the ambient
+     config), and this lemma discharges all of those via [instr_lift],
+     reg_valid off [hw_config], and [dispatchInterrupt_none_from_regs].  What
+     remains for the caller: just the execute of [i], branched on the visible
+     [is_rvc] ([is_rvc]: nextPC+2, ExecuteAs; else: nextPC+4, single).  [PC] is
+     owned here (read for the fetch, returned to the underlying WP), and
+     [mmode_config] is handed back to the continuation. *)
+  Lemma wp_instr E Φ (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
+    ↑minstretN ⊆ E →
+    pmp_allows_all pmpcfg0 ->
+    mmode_config dq -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+    PC ↦ᵣ pc -∗
+    instr pc is_rvc i -∗
+    (∀ σ ns κs nt (Hpceq : register_lookup PC σ.(sregs) = pc),
+       state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+       ∃ (s_exec : mstate),
+         (if is_rvc
+          then ∃ other : instruction,
+              ⌜ exec (execute i)
+                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
+                  = Some (ExecuteAs other,
+                          set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2)) ⌝ ∗
+              ⌜ exec (execute other)
+                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
+                  = Some (RETIRE_SUCCESS, s_exec) ⌝
+          else ⌜ exec (execute i)
+                      (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 4))
+                   = Some (RETIRE_SUCCESS, s_exec) ⌝) ∗
+         state_interp s_exec ns κs nt ∗
+         (mmode_config dq -∗
+          pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hpmp) "Hmm Hpmpc Hpc Hinstr H".
+    iDestruct "Hmm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
+    iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+    iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
+    iIntros (σ ns κs nt) "Hsi".
+    iDestruct (instr_lift σ ns κs nt pc is_rvc i pmpcfg0 pmar0 misa0
+                 Hpmp Hpma_all HmisaC
+                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr") as %Hlift.
+    iDestruct (dispatchInterrupt_none_from_regs σ ns κs nt misa0 mstatus0 HmisaS HmIE
+                 with "Hsi Hmisa Hmstatus") as %Hdisp.
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σ.
+    iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σ.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σ.
+    iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
+    iMod ("H" $! σ ns κs nt Lpc with "[$Hreg $Hmem]")
+      as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
+    iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
+    (* Reassemble [mmode_config dq] + pmpcfg for the caller's continuation.
+       cur_privilege / mstatus / pmpcfg / hart_state are all held at fraction
+       [dq] and only read, so the step can't touch them. *)
+    iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+             PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+             WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+      with "[Hcont Hpriv Hmstatus Hpmpc]" as "Hcont'".
+    { iIntros "Hhs' Hpc'". iApply ("Hcont" with "[- Hpc' Hpmpc] Hpmpc Hpc'").
+      iFrame "Hinv Hhs' Hpriv".
+      iSplitR "Hmstatus".
+      - iExists misa0, mseccfg0, pmar0, elp0.
+        iFrame "Hmisa Hmseccfg Hpma Hhtif Help %".
+      - iExists mstatus0. iFrame "Hmstatus".
+        iSplitR; [ iPureIntro; exact HmIE | ]. iSplitR; iPureIntro; [ exact HMPRV | exact HSXL ]. }
+    destruct is_rvc.
+    - (* RVC: instr_lift gives F_RVC h; caller's Hexec is the RVC execute *)
+      destruct Hlift as (h & Hfetch & Hdec & Hnlpad).
+      iModIntro. iExists (F_RVC h), i, s_exec.
+      iSplitR; [iPureIntro; exact Hpriv_σ |].
+      iSplitR; [iPureIntro; exact Hdisp |].
+      iSplitR; [iPureIntro; exact Hfetch |].
+      iSplitR; [iPureIntro; exact Hdec |].
+      iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
+      iSplitL "Hexec".
+      { iSplitR; [iPureIntro; rewrite Hmisa_σ; exact HmisaC |]. iExact "Hexec". }
+      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
+    - (* F_Base: instr_lift gives F_Base w; caller's Hexec is the base execute *)
+      destruct Hlift as (w & Hfetch & Hdec & Hnlpad).
+      iModIntro. iExists (F_Base w), i, s_exec.
+      iSplitR; [iPureIntro; exact Hpriv_σ |].
+      iSplitR; [iPureIntro; exact Hdisp |].
+      iSplitR; [iPureIntro; exact Hfetch |].
+      iSplitR; [iPureIntro; exact Hdec |].
+      iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
+      iSplitL "Hexec".
+      { iSplitR; [iPureIntro; exact Hnlpad |]. iExact "Hexec". }
+      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
+  Qed.
+
+End InstrBytes.

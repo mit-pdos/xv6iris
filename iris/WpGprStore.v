@@ -8,8 +8,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry WpGpr WpGprLoad.
-Require Import MinstretInv.
+Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
+From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -383,17 +384,18 @@ Proof.
   apply exec_returnM.
 Qed.
 
-(* register-generic 8-byte vmem_write: base address from ANY rs1, value [data]. *)
+(* register-generic 8-byte vmem_write: base address from ANY rs1 (incl. x0 ->
+   zero_reg), value [data]. *)
 Section VWg.
 Variable rs1 : mword 5.
 Variable offset : mword 64.
 Variable data : bv 64.
 Variable region : PMA_Region.
 Variable s : mstate.
-Let ea := add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
 Let a8 := zero_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
 Let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)).
-Hypothesis Hrs1 : uint rs1 <> 0.
 Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Machine.
 Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
 Hypothesis Hpmm : pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))) = PMM_Disabled.
@@ -415,7 +417,7 @@ Proof.
   assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Store Data) 8) s
                  = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
   { unfold get_transformed_data_addr.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Store Data) 8 s Hrs1)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Store Data) 8 s)).
     cbn match.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_store ea s Hcp Hmprv Hpmm)).
     apply exec_returnM. }
@@ -442,19 +444,20 @@ Proof.
   apply bv_wrap_bv_unsigned.
 Qed.
 
-(* register-generic 8-byte STORE execute: base from rs1, value from rs2. *)
+(* register-generic 8-byte STORE execute: base from rs1, value from rs2 (ANY
+   rs1/rs2, incl. x0 -> zero_reg for both the base and the stored value). *)
 Section ExecStoreG.
 Variable rs2 rs1 : mword 5.
 Variable imm : mword 12.
 Variable region : PMA_Region.
 Variable s : mstate.
 Let offset := sign_extend' 64 imm.
-Let vrs2 := register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs).
-Let ea := add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+Let vrs2 := if Z.eqb (uint rs2) 0 then zero_reg
+            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs).
+Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
 Let a8 := zero_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
 Let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)).
-Hypothesis Hrs1 : uint rs1 <> 0.
-Hypothesis Hrs2 : uint rs2 <> 0.
 Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Machine.
 Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
 Hypothesis Hpmm : pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))) = PMM_Disabled.
@@ -480,107 +483,15 @@ Proof.
                  = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (exec_bind_Some _ _ _ _ _ Hass).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  rewrite (proj2 (Z.eqb_neq (uint rs2) 0) Hrs2). cbn match.
+  cbn match.
   rewrite (exec_bind_Some _ _ _ _ _
-    (exec_vmem_write_8_gpr rs1 offset _ region s Hrs1 Hcp Hmprv Hpmm Halign Hpmp Hmatch Hpalign Hwrite Hc Hsig Hh)).
+    (exec_vmem_write_8_gpr rs1 offset _ region s Hcp Hmprv Hpmm Halign Hpmp Hmatch Hpalign Hwrite Hc Hsig Hh)).
   cbn match.
   rewrite (exec_returnM _ _).
   rewrite autocast_subrange_id.
   reflexivity.
 Qed.
 End ExecStoreG.
-
-(* exec-level register-generic STORE step (32-bit, F_Base): ANY rs1/rs2.
-   The execute post-state [s_x] is parameterised (its sregs equal the
-   pre-execute regs; only memory changed), so this is reusable for the WP. *)
-Section ForwardSDg.
-  Context (s s_x : mstate) (w : mword 32) (pc : mword 64) (imm : mword 12)
-          (rs1 rs2 : mword 5) (b : bool).
-  Definition sAsg : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition s_pcg : mstate := set_reg sAsg nextPC (add_vec_int pc 4).
-  Hypothesis Hsx_sregs : s_x.(sregs) = s_pcg.(sregs).
-  Hypothesis Hfetch_at :
-    exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
-      = Some (F_Base w, set_reg s (R_bool minstret_increment) b).
-  Hypothesis Hdec_gen : forall s0 : mstate,
-    register_lookup cur_privilege (sregs s0) = Machine ->
-    exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), s0).
-  Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
-  Hypothesis Hexec_spc :
-    exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s_pcg
-    = Some (RETIRE_SUCCESS, s_x).
-
-  Definition sTsg : mstate := set_reg s_x PC (register_lookup nextPC s_x.(sregs)).
-  Definition sFsg : mstate :=
-    if b then set_reg sTsg minstret (add_vec_int (register_lookup minstret sTsg.(sregs)) 1)
-         else sTsg.
-
-  Lemma forward_exec_sd_gpr :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
-           ('b"1") = false ->
-    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec riscv_step s = Some (tt, sFsg).
-  Proof using All.
-    intros Lpc Lpriv Lhs LS LmIE Lelp.
-    assert (LpcA  : register_lookup PC sAsg.(sregs) = pc).
-    { unfold sAsg. trans_mi. exact Lpc. }
-    assert (LprivA: register_lookup cur_privilege sAsg.(sregs) = Machine).
-    { unfold sAsg. trans_mi. exact Lpriv. }
-    assert (LhsA  : register_lookup hart_state sAsg.(sregs) = HART_ACTIVE tt).
-    { unfold sAsg. trans_mi. exact Lhs. }
-    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAsg.(sregs))) ('b"1") = true).
-    { unfold sAsg. trans_mi. exact LS. }
-    assert (LmIEA : eq_vec (_get_Mstatus_MIE
-              (register_lookup (R_bitvector_64 mstatus) sAsg.(sregs))) ('b"1") = false).
-    { unfold sAsg. trans_mi. exact LmIE. }
-    assert (LelpA : eq_vec (register_lookup elp sAsg.(sregs))
-              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { unfold sAsg. trans_mi. exact Lelp. }
-    assert (HdispA : exec (dispatchInterrupt Machine) sAsg = Some (None, sAsg)).
-    { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAsg _ (exec_currentlyEnabled_S sAsg) LSA LmIEA). }
-    assert (HfetchA : exec (fetch tt) sAsg = Some (F_Base w, sAsg)) by exact Hfetch_at.
-    assert (HdecA : exec (ext_decode w) sAsg
-              = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), sAsg))
-      by (apply Hdec_gen; exact LprivA).
-    assert (Hha : exec (run_hart_active 0) sAsg
-              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), s_x)).
-    { exact (exec_hart_active_progress sAsg sAsg s_x sAsg w
-               (STORE (imm, Regidx rs2, Regidx rs1, 8)) pc RETIRE_SUCCESS
-               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA Hexec_spc I). }
-    apply (exec_riscv_step_ADD s s_x w b pc).
-    - exact Lpriv.
-    - exact Hsi_s.
-    - exact LhsA.
-    - exact Hha.
-    - rewrite Hsx_sregs. unfold s_pcg, sAsg. trans_mi. trans_mi. exact Lhs.
-    - rewrite Hsx_sregs. unfold s_pcg, sAsg. trans_mi. rewrite register_lookup_set. reflexivity.
-    - reflexivity.
-  Qed.
-
-  Variable mst0 : mword 64.
-  Hypothesis Lmst_s : register_lookup minstret s.(sregs) = mst0.
-
-  Definition base_upd_sg : mstate := set_reg s_x PC (add_vec_int pc 4).
-  Definition sFcsg : mstate :=
-    if b then set_reg base_upd_sg minstret (add_vec_int mst0 1) else base_upd_sg.
-
-  Lemma sFs_eq : sFsg = sFcsg.
-  Proof.
-    assert (Enpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 4).
-    { rewrite Hsx_sregs. unfold s_pcg, sAsg. rewrite register_lookup_set. reflexivity. }
-    assert (Emst : register_lookup minstret s_x.(sregs) = mst0).
-    { rewrite Hsx_sregs. unfold s_pcg, sAsg, set_reg; cbn [sregs]. tmig. tmig. exact Lmst_s. }
-    unfold sFsg, sTsg, sFcsg, base_upd_sg. rewrite Enpc. destruct b; [|reflexivity].
-    assert (Emst2 : register_lookup minstret (set_reg s_x PC (add_vec_int pc 4)).(sregs) = mst0).
-    { unfold set_reg; cbn [sregs]. tmig. exact Emst. }
-    rewrite Emst2. reflexivity.
-  Qed.
-End ForwardSDg.
 
 (* ====================================================================== *)
 (* Memory ghost-state update: turn the 8 owned target bytes from their     *)
@@ -628,174 +539,174 @@ End MemUpdate.
 (* ====================================================================== *)
 Section WpStoreGpr.
   Context `{!riscvGS Σ}.
-  Context {dqc : dfrac}.
 
-  Lemma wp_store_gpr (pc : mword 64) (w_s : mword 32) (imm_s : mword 12)
-      (rs1 rs2 : mword 5) (m : gmap register_bitvector_64 (mword 64))
-      (vrs1 vrs2 misa0 mdv0 : mword 64) (b1 : bool) (vold : bv 64)
-      (npc0a mstatus0a : mword 64)
-      (mc : mword 32) (mcfg : mword 64)
-      (mseccfg0 : mword 64) (pmpcfg0 : type_of_register pmpcfg_n)
-      (pmar0 : list PMA_Region) (elp0a : mword 1)
-      E {dq : dfrac} (Φ : mval -> iProp Σ) :
-    let offset := sign_extend' 64 imm_s in
-    let ea := add_vec vrs1 offset in
-    let a8 := zero_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-    let pa := zero_extend' 64 (add_vec_int a8 (0 * 8)) in
+  (* reg_pointsto fractional instances + mmode_config_split_half /
+     mmode_config_combine_half now live in InstrBytes.v (shared). *)
+
+  (* [instr]/[mmode_config]-formulated register-generic 8-byte STORE WP -- the
+     write-dual of [wp_ld_gpr].  STORE reads TWO sources: rs1 (base address) and
+     rs2 (data), each borrowed off [gpr_file] independently (so rs1 = rs2 is
+     fine), and WRITES the 8 target bytes from their old contents [vold] to rs2's
+     bytes.  The caller supplies the OLD (full-owned) target bytes and the store's
+     alignment; the config the translation / PMP checks read is recovered from the
+     KEPT half of [mmode_config] + [hw_config].  No register is written ([gpr_file]
+     is handed back UNCHANGED). *)
+  Lemma wp_store_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rs2 : mword 5)
+      (imm : mword 12) (m : gmap regidx (mword 64)) (vold : bv 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) :
+    let offset := sign_extend' 64 imm in
+    let ea := add_vec (m !!! Regidx rs1) offset in
     ↑minstretN ⊆ E ->
-    uint rs1 <> 0 -> uint rs2 <> 0 ->
-    m !! gpr_of_Z (uint rs1) = Some vrs1 ->
-    m !! gpr_of_Z (uint rs2) = Some vrs2 ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    pma_allows_all pmar0 ->
     pmp_allows_all pmpcfg0 ->
-        is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    isRVC (subrange_vec_dec w_s 15 0) = false ->
-    (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
-       exec (ext_decode w_s) s0 = Some (STORE (imm_s, Regidx rs2, Regidx rs1, 8), s0)) ->
-    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
-              (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
-    eq_vec (_get_Mstatus_MIE mstatus0a) ('b"1") = false ->
-    eq_vec elp0a (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0a) ('b"1") = false ->
-    pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
-    is_aligned_vaddr (Virtaddr a8) 8 = true ->
-    is_aligned_paddr (Physaddr pa) 8 = true ->
-    minstret_inv -∗
-    PC ↦ᵣ pc -∗ gpr_file m -∗ reg_pointsto misa dqc misa0 -∗ nextPC ↦ᵣ npc0a -∗
-    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
-    elp ↦ᵣ elp0a -∗ reg_pointsto mseccfg dqc mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗
-    reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗ reg_pointsto htif_tohost_base dqc None -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_s j) -∗
-    ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
-        gpr_file m -∗
-        reg_pointsto misa dqc misa0 -∗
-        nextPC ↦ᵣ add_vec_int pc 4 -∗
-        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
-        elp ↦ᵣ elp0a -∗ reg_pointsto mseccfg dqc mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗
-        reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗ reg_pointsto htif_tohost_base dqc None -∗
-        ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vrs2 j) -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_s j) -∗
-        WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    is_aligned_paddr (Physaddr ea) 8 = true ->
+    mmode_config (DfracOwn 1) -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
+    ( mmode_config (DfracOwn 1) -∗
+      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file m -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea a8 pa HN Hrs1 Hrs2 Hmrs1 Hmrs2 HS Hpmaall Hpmpf Hvalignf HnotRVCf Hds Hb1 HmIE Help HMPRV Hpmm Halign Hpalign.
-    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
-    destruct (Hpmaall pa 8) as (region & Hmatch & _ & _ & Hwrite).
-    iIntros "#Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
-    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
-    iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
-    iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
-    iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
-    iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
-    iDestruct (reg_valid_dq with "Hreg Hsec")   as %Lsec.
-    iDestruct (reg_valid_dq with "Hreg Hpmpc")  as %Lpmpc.
-    iDestruct (reg_valid_dq with "Hreg Hpma")   as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
-    iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
-    iDestruct (reg_valid_dq with "Hreg Hhtif")  as %Lhtif.
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmrs1 with "Hfile") as "[Hr1c Hfb1]".
-    iDestruct (reg_valid_dq with "Hreg Hr1c") as %Lrs1.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmrs2 with "Hfile") as "[Hr2c Hfb2]".
-    iDestruct (reg_valid_dq with "Hreg Hr2c") as %Lrs2.
-    iDestruct ("Hfb2" with "Hr2c") as "Hfile".
-    assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
-    { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
-    iDestruct (fetch_from_pts_minstret pc w_s region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
-                 with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
-    iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
+    intros offset ea HN Hpmp Halign.
+    iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+    iDestruct (mmode_config_split_half with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
+    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+    destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite).
+    iApply (wp_instr E Φ pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
+              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hpmpc_k")   as %Lpmpc.
+    iDestruct (reg_valid_dq with "Hreg Hmseccfg")  as %Lsec.
+    iDestruct (reg_valid_dq with "Hreg Hpma")      as %Lpma.
+    iDestruct (reg_valid_dq with "Hreg Hhtif")     as %Lhtif.
+    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    (* read rs1 (base) -- borrow, read, return *)
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hr1c") as %Lrs1v.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    (* read rs2 (data) -- independent borrow; rs1 = rs2 is fine *)
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm2 with "Hfmap") as "[Hr2c Hfb2]".
+    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hr2c") as %Lrs2v.
+    iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
+    iAssert (⌜addr_is_ram ea⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
-    set (s_pc := set_reg (set_reg s (R_bool minstret_increment) b1) nextPC (add_vec_int pc 4)).
-    assert (Lrs1p : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs) = vrs1).
-    { unfold s_pc. gpr_trans. trans_mi. exact Lrs1. }
-    assert (Lrs2p : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s_pc.(sregs) = vrs2).
-    { unfold s_pc. gpr_trans. trans_mi. exact Lrs2. }
-    assert (Lprivp : register_lookup cur_privilege s_pc.(sregs) = Machine).
-    { unfold s_pc; trans_mi; trans_mi; exact Lpriv. }
-    assert (Lmsp : register_lookup mstatus s_pc.(sregs) = mstatus0a).
-    { unfold s_pc; trans_mi; trans_mi; exact Lms. }
-    assert (Lsecp : register_lookup mseccfg s_pc.(sregs) = mseccfg0).
-    { unfold s_pc; trans_mi; trans_mi; exact Lsec. }
-    assert (Lpmpcp : register_lookup pmpcfg_n s_pc.(sregs) = pmpcfg0).
-    { unfold s_pc; trans_mi; trans_mi; exact Lpmpc. }
-    assert (Lpmap : register_lookup pma_regions s_pc.(sregs) = pmar0).
-    { unfold s_pc; trans_mi; trans_mi; exact Lpma. }
-    assert (Lhtifp : register_lookup htif_tohost_base s_pc.(sregs) = None).
-    { unfold s_pc; trans_mi; trans_mi; exact Lhtif. }
-    pose proof (within_clint_false pa 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
-    pose proof (within_sig_false pa 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
-    pose proof (within_htif_writable_false pa 8 s_pc Lhtifp) as Hwh.
-    pose (s_x := MState s_pc.(sregs) (write_bytes s_pc.(mem) pa 8 vrs2)).
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+      iPureIntro. exact Hr0. }
+    (* base register at the execute state, uniform over rs1 (x0 -> zero_reg). *)
+    assert (Hbase : (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                    = m !!! Regidx rs1)
+      by exact Lrs1v.
+    (* data register at the execute state, uniform over rs2 (x0 -> zero_reg). *)
+    assert (Hdata : (if Z.eqb (uint rs2) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s_pc.(sregs))
+                    = m !!! Regidx rs2)
+      by exact Lrs2v.
+    assert (Lprivp : register_lookup cur_privilege s_pc.(sregs) = Machine)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lmsp : register_lookup mstatus s_pc.(sregs) = ms0)
+      by (unfold s_pc; tmig; exact Lms).
+    assert (Lsecp : register_lookup mseccfg s_pc.(sregs) = mseccfg0)
+      by (unfold s_pc; tmig; exact Lsec).
+    assert (Lpmpcp : register_lookup pmpcfg_n s_pc.(sregs) = pmpcfg0)
+      by (unfold s_pc; tmig; exact Lpmpc).
+    assert (Lpmap : register_lookup pma_regions s_pc.(sregs) = pmar0)
+      by (unfold s_pc; tmig; exact Lpma).
+    assert (Lhtifp : register_lookup htif_tohost_base s_pc.(sregs) = None)
+      by (unfold s_pc; tmig; exact Lhtif).
+    pose proof (within_clint_false ea 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false ea 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_htif_writable_false ea 8 s_pc Lhtifp) as Hwh.
+    (* [ea]/[pa] the model computes coincide with [ea] once the identity
+       zero-extends / +0 are stripped; bridge each PMP/translation goal. *)
+    assert (Ha8 : zero_extend' 64 (subrange_vec_dec
+              (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                       offset) (xlen - 0 - 1) 0) = ea).
+    { rewrite Hbase. rewrite zero_extend'_id. rewrite subrange_id. reflexivity. }
+    assert (Hpa : zero_extend' 64 (add_vec_int (zero_extend' 64 (subrange_vec_dec
+              (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                       offset) (xlen - 0 - 1) 0)) (0 * 8)) = ea).
+    { rewrite Hbase. rewrite !zero_extend'_id. rewrite subrange_id.
+      change (0 * 8) with 0. rewrite avi0. reflexivity. }
+    pose (s_x := MState s_pc.(sregs) (write_bytes s_pc.(mem) ea 8 (m !!! Regidx rs2))).
     assert (Hexec_spc :
-      exec (execute (STORE (imm_s, Regidx rs2, Regidx rs1, 8))) s_pc
+      exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s_pc
       = Some (RETIRE_SUCCESS, s_x)).
-    { rewrite (exec_execute_STORE_8_gpr rs2 rs1 imm_s region s_pc Hrs1 Hrs2 Lprivp
-                ltac:(rewrite Lmsp; exact HMPRV) ltac:(rewrite Lsecp; exact Hpmm)
-                ltac:(rewrite Lrs1p; exact Halign) ltac:(intro j; rewrite Lpmpcp; exact (Hpmpf j))
-                ltac:(rewrite Lpmap Lrs1p; exact Hmatch) ltac:(rewrite Lrs1p; exact Hpalign)
-                Hwrite ltac:(rewrite Lrs1p; apply Hwc) ltac:(rewrite Lrs1p; apply Hws)
-                ltac:(rewrite Lrs1p; apply Hwh)).
-      subst s_x. do 3 f_equal. rewrite Lrs1p Lrs2p. reflexivity. }
+    { rewrite (exec_execute_STORE_8_gpr rs2 rs1 imm region s_pc Lprivp
+                ltac:(rewrite Lmsp; exact HMPRV) ltac:(rewrite Lsecp; exact Hseccfg1)
+                ltac:(rewrite Ha8; unfold is_aligned_vaddr; unfold is_aligned_paddr in Halign; exact Halign)
+                ltac:(intro j; rewrite Lpmpcp; exact (Hpmp j))
+                ltac:(rewrite Lpmap Hpa; exact Hmatch) ltac:(rewrite Hpa; exact Halign)
+                Hwrite ltac:(rewrite Hpa; apply Hwc) ltac:(rewrite Hpa; apply Hws)
+                ltac:(rewrite Hpa; apply Hwh)).
+      subst s_x. rewrite Hpa Hdata. reflexivity. }
+    (* write the 8 target bytes: from [vold] to rs2's value, updating the heap. *)
+    iMod (upd_window_8 σ.(mem) ea (m !!! Regidx rs2) vold
+            with "Hmem Hbytes") as "[Hmem Hbytes]".
     iModIntro.
-    iExists (sFcsg s_x pc b1 (register_lookup minstret s.(sregs))). iSplitR.
-    { iPureIntro.
-      assert (Hsxs : s_x.(sregs) = (s_pcg s pc b1).(sregs)) by reflexivity.
-      rewrite <- (sFs_eq s s_x w_s pc b1 Hsxs Hfetch_at Hsi_s (register_lookup minstret s.(sregs)) eq_refl).
-      apply (forward_exec_sd_gpr s s_x w_s pc imm_s rs1 rs2 b1 Hsxs Hfetch_at Hds Hsi_s Hexec_spc
-               Lpc Lpriv Lhs).
-      - rewrite Lmisa. exact HS.
-      - rewrite Lms. exact HmIE.
-      - rewrite Lelp. exact Help. }
-    iNext.
-    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-    iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iMod (reg_update _ PC _ (add_vec_int pc 4) with "Hreg Hpc") as "[Hreg Hpc]".
-    iMod (upd_window_8 s.(mem) pa vrs2 vold with "Hmem Hbytes") as "[Hmem Hbytes]".
-    unfold sFcsg, base_upd_sg. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iModIntro.
-      unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
-      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
-    - iModIntro.
-      unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
+    iExists s_x.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. exact Hexec_spc. }
+    iSplitL "Hreg Hmem".
+    { unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hmm' Hpmpc' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 4).
+    { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iAssert (mmode_config (DfracOwn (1/2)))%I
+      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
+    { iFrame "Hinv Hhs_k Hpriv_k". iSplitR "Hms_k".
+      - iExists misa0, mseccfg0, pmar0, elp0.
+        iFrame "Hmisa Hmseccfg Hpma Hhtif Help %".
+      - iExists ms0. iFrame "Hms_k %". }
+    iDestruct (mmode_config_combine_half with "Hmm' Hmm_k'") as "Hmm''".
+    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
+    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbytes").
+    iSplitR.
+    { iPureIntro. exact Hdom. }
+    iExact "Hfmap".
   Qed.
 End WpStoreGpr.
 
 (* ====================================================================== *)
 (* Demonstration: ONE lemma [wp_store_gpr] serves many (rs2,rs1) pairs.    *)
-(* Only the register operands differ between `sd ra, 8(sp)` and            *)
-(* `sd a0, _(a1)`.                                                          *)
+(* Only the register operands differ between `sd ra, imm(sp)` and          *)
+(* `sd a0, imm(a1)`.                                                        *)
 (* ====================================================================== *)
 Section WpStoreGprDemo.
   Context `{!riscvGS Σ}.
-  Context {dqc : dfrac}.
   (* `sd ra, imm(sp)` : rs2=ra(x1), rs1=sp(x2). *)
-  Definition wp_store_ra_sp (pc : mword 64) (w : mword 32) (imm : mword 12) :=
-    wp_store_gpr (dqc:=DfracOwn 1) pc w imm (mword_of_int 2) (mword_of_int 1).
+  Definition wp_store_ra_sp (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
+    wp_store_gpr E Φ pc (mword_of_int 2) (mword_of_int 1) imm.
   (* `sd a0, imm(a1)` : rs2=a0(x10), rs1=a1(x11).  SAME lemma, different regs. *)
-  Definition wp_store_a0_a1 (pc : mword 64) (w : mword 32) (imm : mword 12) :=
-    wp_store_gpr (dqc:=DfracOwn 1) pc w imm (mword_of_int 11) (mword_of_int 10).
+  Definition wp_store_a0_a1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
+    wp_store_gpr E Φ pc (mword_of_int 11) (mword_of_int 10) imm.
 
   Goal gpr_of_Z (uint (mword_of_int 1 : mword 5)) = x1
     /\ gpr_of_Z (uint (mword_of_int 2 : mword 5)) = x2
     /\ gpr_of_Z (uint (mword_of_int 10 : mword 5)) = x10
-    /\ gpr_of_Z (uint (mword_of_int 11 : mword 5)) = x11
-    /\ uint (mword_of_int 1 : mword 5) <> 0
-    /\ uint (mword_of_int 2 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
+    /\ gpr_of_Z (uint (mword_of_int 11 : mword 5)) = x11.
+  Proof. repeat split; vm_compute; reflexivity. Qed.
 End WpStoreGprDemo.

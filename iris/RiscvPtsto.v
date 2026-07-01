@@ -71,7 +71,7 @@ Definition reg_pointsto `{!riscvGS Σ} (r : register) (dq : dfrac)
   pointsto (L:=register) (V:=sigT type_of_register) r dq (existT r v).
 
 Notation "r ↦ᵣ{ dq } v" := (reg_pointsto r dq v)
-  (at level 20, dq custom dfrac at level 1, format "r  ↦ᵣ{ dq }  v") : bi_scope.
+  (at level 20, format "r  ↦ᵣ{ dq }  v") : bi_scope.
 Notation "r ↦ᵣ v" := (reg_pointsto r (DfracOwn 1) v)
   (at level 20, format "r  ↦ᵣ  v") : bi_scope.
 (* discarded (persistent, duplicable) read-only register ownership.  Used for the

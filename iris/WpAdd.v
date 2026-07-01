@@ -28,59 +28,9 @@ Local Open Scope Z_scope.
 
 Local Open Scope Z_scope.
 
-(* ---------------------------------------------------------------------- *)
-(* Step 1: exec_currentlyEnabled_S -- exec twin of run_currentlyEnabled_S. *)
-(* Supplies HecES for exec_hart_active_done.                               *)
-(* ---------------------------------------------------------------------- *)
-
-Lemma exec_hartSupports_S s : exec (hartSupports Ext_S) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_S) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)).
-  apply exec_returnM.
-Qed.
-
-Lemma exec_hartSupports_Zicsr s : exec (hartSupports Ext_Zicsr) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Zicsr) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)).
-  apply exec_returnM.
-Qed.
-
-Lemma exec_rec_cE_Zicsr s (acc : Acc (Zwf 0) 0) :
-  exec (_rec_currentlyEnabled Ext_Zicsr 0 acc) s = Some (true, s).
-Proof.
-  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb 0 0) with true by reflexivity. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  apply exec_hartSupports_Zicsr.
-Qed.
-
-Lemma exec_currentlyEnabled_S s :
-  exec (currentlyEnabled Ext_S) s
-    = Some (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1"), s).
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_S) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  (* outer and_boolM (hartSupports Ext_S = true) INNER *)
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_S s)).
-  (* INNER = and_boolM (read misa; misa.S check) (cE Ext_Zicsr) *)
-  rewrite (exec_and_boolM_Some _ _ s
-             (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s)). apply exec_returnM. }
-  destruct (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) eqn:Hb.
-  - apply exec_rec_cE_Zicsr.
-  - reflexivity.
-Qed.
+(* [exec_hartSupports_S] / [exec_hartSupports_Zicsr] / [exec_rec_cE_Zicsr] /
+   [exec_currentlyEnabled_S] were moved to RiscvFetchExec.v (general-purpose
+   exec twins of the S-extension enablement); available here via import. *)
 
 (* ---------------------------------------------------------------------- *)
 (* Step 2: the capstone WP, with Hne DERIVED via exec_hart_active_done.    *)

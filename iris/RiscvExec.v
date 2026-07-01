@@ -134,28 +134,6 @@ Section WPExec.
     iMod "H" as "[$ $]". iIntros "_ !>". done.
   Qed.
 
-  (* General-purpose form: the caller chooses the "inner" mask [Ei] instead of the
-     hardcoded [∅].  This is what lets a CALLER open its own invariants around the
-     step: to use an invariant [inv N P], take [Ei := E ∖ ↑N] and simply [iInv N]
-     on the [={E,Ei}] obligation (which opens N, moving E→E∖↑N) and close it in the
-     [={Ei,E}] continuation.  No bespoke per-invariant step rule is needed.
-
-     ([wp_exec_step] is the [Ei := ∅] special case; the physical-step "go to ∅" is
-     handled INSIDE this proof, so the caller never sees ∅ and works purely at the
-     masks [E]/[Ei] -- exactly the interface Iris's own atomic-step lemmas expose.) *)
-  Lemma wp_exec_step_fupd E Ei Φ :
-    (∀ σ ns κs nt, state_interp σ ns κs nt ={E,Ei}=∗
-       ∃ σ', ⌜exec riscv_step σ = Some (tt, σ')⌝ ∗
-          ▷ (|={Ei,E}=> state_interp σ' (S ns) κs nt ∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))
-    ⊢ WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    iIntros "H". iApply wp_exec_step. iIntros (σ ns κs nt) "Hsi".
-    iMod ("H" $! σ ns κs nt with "Hsi") as (σ') "[%Hexec Hk]".
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
-    iExists σ'. iSplit; first done. iNext.
-    iMod "Hcl" as "_". iMod "Hk" as "[Hsi' HWP]". iModIntro. iFrame.
-  Qed.
-
 End WPExec.
 
 (* Now that the Lang/Iris/Exec sections (which must share stdpp's bv_countable   *)
@@ -285,20 +263,23 @@ Qed.
 (* reduction (Hha), FUNCTIONALLY via exec_bind.  s_final is explicit.      *)
 (* ---------------------------------------------------------------------- *)
 
-Section StepADD.
-  Context (s s_exec : mstate) (w : mword 32) (b : bool) (pc : mword 64).
+Section StepHartActive.
+  Context (s s_exec : mstate) (retval : mword 32) (b : bool).
 
-  Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
-  Hypothesis Hsi   : exec (should_inc_minstret Machine) s = Some (b, s).
+  (* [should_inc] at whatever privilege [s] happens to be in -- the wrapper
+     reads [cur_privilege] only to feed [should_inc], so we never need to pin
+     it to [Machine]. *)
+  Hypothesis Hsi   :
+    exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
+      = Some (b, s).
   Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
   Hypothesis Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt.
   Hypothesis Hha :
     exec (run_hart_active 0) s_a
-      = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), s_exec).
+      = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec).
   Hypothesis Hhart_exec : register_lookup hart_state s_exec.(sregs) = HART_ACTIVE tt.
   Hypothesis Hmi_exec :
     register_lookup (R_bool minstret_increment) s_exec.(sregs) = b.
-  Hypothesis Hrvfi : get_config_rvfi tt = false.
 
   Let s_tick : mstate := set_reg s_exec PC (register_lookup nextPC s_exec.(sregs)).
   Let s_final : mstate :=
@@ -306,7 +287,7 @@ Section StepADD.
                       (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
          else s_tick.
 
-  Lemma exec_riscv_step_ADD : exec riscv_step s = Some (tt, s_final).
+  Lemma exec_riscv_step_hart_active : exec riscv_step s = Some (tt, s_final).
   Proof using All.
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _
@@ -315,10 +296,10 @@ Section StepADD.
     (* now prove exec (try_step 0 false) s = Some (false, s_final) *)
     unfold try_step.
     cbn [ext_pre_step_hook].
-    (* read cur_privilege *)
+    (* read cur_privilege -- kept SYMBOLIC (whatever privilege [s] is in) *)
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-    cbn beta. rewrite Hpriv.
-    (* should_inc_minstret Machine -> b *)
+    cbn beta.
+    (* should_inc_minstret <that privilege> -> b *)
     rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
     (* write minstret_increment b >> read hart_state *)
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
@@ -347,7 +328,7 @@ Section StepADD.
         erewrite exec_bind_Some.
         2:{ reflexivity. }
         cbn beta iota. apply (exec_read_reg minstret_increment). }
-    rewrite Hrvfi.
+    change (get_config_rvfi tt) with false.
     replace (register_lookup minstret_increment
                (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs))
       with b.
@@ -372,5 +353,164 @@ Section StepADD.
       reflexivity.
   Qed.
 
+End StepHartActive.
+
+Section StepADD.
+  Context (s s_exec : mstate) (w : mword 32) (b : bool) (pc : mword 64).
+
+  Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
+  Hypothesis Hsi   : exec (should_inc_minstret Machine) s = Some (b, s).
+  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
+  Hypothesis Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hha :
+    exec (run_hart_active 0) s_a
+      = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), s_exec).
+  Hypothesis Hhart_exec : register_lookup hart_state s_exec.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hmi_exec :
+    register_lookup (R_bool minstret_increment) s_exec.(sregs) = b.
+  Hypothesis Hrvfi : get_config_rvfi tt = false.
+
+  Let s_tick : mstate := set_reg s_exec PC (register_lookup nextPC s_exec.(sregs)).
+  Let s_final : mstate :=
+    if b then set_reg s_tick minstret
+                      (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
+         else s_tick.
+
+  Lemma exec_riscv_step_ADD : exec riscv_step s = Some (tt, s_final).
+  Proof using All.
+    assert (Hsi' : exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
+                     = Some (b, s)) by (rewrite Hpriv; exact Hsi).
+    apply (exec_riscv_step_hart_active s s_exec (zero_extend' 32 w) b
+             Hsi' Hhart_a Hha Hhart_exec Hmi_exec).
+  Qed.
+
 End StepADD.
+
+(* [should_inc_minstret] is TOTAL: it only reads mcountinhibit + minstretcfg
+   and combines them with [and_boolM], so at any state / privilege its [exec]
+   yields [Some (_, s)] for SOME boolean -- we never need to know which. *)
+Lemma exec_should_inc_minstret_Some (priv : Privilege) s :
+  ∃ b : bool, exec (should_inc_minstret priv) s = Some (b, s).
+Proof.
+  unfold should_inc_minstret, Defs.and_boolM.
+  (* outer bind on [read mcountinhibit >>= returnM _] *)
+  erewrite exec_bind_Some.
+  2:{ erewrite exec_bind_Some.
+      2:{ apply (exec_read_reg mcountinhibit s). }
+      apply exec_returnm. }
+  cbn beta.
+  (* [if <mcountinhibit bit> then (read minstretcfg >>= returnM _) else returnM false] *)
+  match goal with |- context [ if ?c then _ else _ ] => destruct c end.
+  - erewrite exec_bind_Some.
+    2:{ apply (exec_read_reg minstretcfg s). }
+    eexists. apply exec_returnm.
+  - eexists. apply exec_returnm.
+Qed.
+
+(* ====================================================================== *)
+(* wp_exec_step_hart_active -- a variant of [wp_exec_step] whose caller    *)
+(* reasons only about the inner instruction [run_hart_active], NOT the     *)
+(* whole [riscv_step] wrapper.  This lemma OWNS the wrapper registers it    *)
+(* actually WRITES/reads around the step -- hart_state, minstret,          *)
+(* minstret_increment, PC -- and discharges the wrapper's effects itself:  *)
+(*   - writes minstret_increment := b BEFORE handing control to the caller *)
+(*     so the quantified state [σ] the caller reasons about IS ALREADY the *)
+(*     post-[minstret_increment := b] state;                               *)
+(*   - after the caller's [run_hart_active] step, ticks PC := nextPC and   *)
+(*     bumps minstret by [b].                                              *)
+(*                                                                         *)
+(* [cur_privilege] is DELIBERATELY not owned here: [run_hart_active] reads  *)
+(* it (dispatchInterrupt + fetch/PMP), so the caller keeps its own          *)
+(* [cur_privilege] points-to to prove the step.  The wrapper ALSO reads     *)
+(* cur_privilege (only to feed [should_inc]); rather than pin it to         *)
+(* [Machine], [Hsi_gen] is stated at the state's OWN privilege              *)
+(* ([should_inc_minstret (register_lookup cur_privilege s')]), so NO        *)
+(* [⌜cur_privilege = Machine⌝] fact is required -- the step goes through at  *)
+(* whatever privilege [s] is in.  [run_hart_active] does NOT touch          *)
+(* [hart_state] or [minstret_increment], so the caller need not know them   *)
+(* -- they stay owned here.  The caller hands back [state_interp s_exec]     *)
+(* DIRECTLY, and because this lemma still holds the [hart_state] /          *)
+(* [minstret_increment] points-to, it just [reg_valid]s them against that   *)
+(* returned interp to recover [hart_state s_exec = HART_ACTIVE] (the        *)
+(* wrapper's post-step [assert_exp hart_is_active]) and                     *)
+(* [minstret_increment s_exec = b] (which selects the minstret bump).       *)
+(* Whether minstret increments ([b]) is IRRELEVANT to the caller: [should_  *)
+(* inc_minstret] is total ([exec_should_inc_minstret_Some]), so the lemma    *)
+(* obtains SOME [b] internally and the continuation is quantified over the   *)
+(* resulting minstret / minstret_increment values (the caller does not care  *)
+(* what they are).  Boils down to [wp_exec_step] via the pure                *)
+(* [exec_riscv_step_hart_active]. *)
+Section WPHartActive.
+  Context `{!riscvGS Σ}.
+
+  Lemma wp_exec_step_hart_active E Φ
+      (mst : mword 64) (mi_old : bool) (opc : mword 64) :
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    minstret ↦ᵣ mst -∗
+    (R_bool minstret_increment) ↦ᵣ mi_old -∗
+    PC ↦ᵣ opc -∗
+    (∀ σ ns κs nt,
+       state_interp σ ns κs nt ={E}=∗
+       ∃ (retval : mword 32) (s_exec : mstate),
+         ⌜ exec (run_hart_active 0) σ
+             = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
+         state_interp s_exec ns κs nt ∗
+         (∀ (mst' : mword 64) (mi' : bool),
+          hart_state ↦ᵣ HART_ACTIVE tt -∗
+          minstret ↦ᵣ mst' -∗
+          (R_bool minstret_increment) ↦ᵣ mi' -∗
+          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros "Hhs Hmst Hmi Hpc H".
+    iApply wp_exec_step.
+    iIntros (s ns κs nt) "[Hreg Hmem]".
+    iDestruct (reg_valid with "Hreg Hhs") as %Lhs.
+    (* [should_inc] returns SOME [b]; we neither know nor care which *)
+    destruct (exec_should_inc_minstret_Some
+                (register_lookup cur_privilege s.(sregs)) s) as [b Hsi].
+    (* PRE: minstret_increment := b; the caller's [σ] is this post-update state *)
+    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
+    iMod ("H" $! (set_reg s (R_bool minstret_increment) b) ns κs nt with "[Hreg Hmem]")
+      as (retval s_exec) "(%Hha & [Hreg Hmem] & Hcont)".
+    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    (* the wrapper's post-step reads, recovered from the still-owned points-to
+       against the returned [state_interp s_exec] -- no caller-side equalities *)
+    iDestruct (reg_valid with "Hreg Hhs") as %Hhart_exec.
+    iDestruct (reg_valid with "Hreg Hmi") as %Hmi_exec.
+    assert (Hhart_a :
+      register_lookup hart_state (set_reg s (R_bool minstret_increment) b).(sregs)
+        = HART_ACTIVE tt).
+    { unfold set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
+    (* [wp_exec_step]'s obligation is [={E,∅}], the caller's fupd was [={E}];
+       bridge the [E→∅] with a [fupd_mask_intro] close token [Hcl]. *)
+    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
+    iExists _. iSplitR.
+    { iPureIntro.
+      exact (exec_riscv_step_hart_active s s_exec retval b
+               Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
+    iNext.
+    (* POST: read minstret off [s_exec], tick PC, bump minstret by [b] *)
+    iDestruct (reg_valid with "Hreg Hmst") as %Lmst_e.
+    iMod (reg_update _ PC _ (register_lookup nextPC s_exec.(sregs)) with "Hreg Hpc")
+      as "[Hreg Hpc]".
+    (* [minstret] is unchanged by the PC tick *)
+    assert (Hmst_tick :
+      register_lookup minstret
+        (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs) = mst).
+    { unfold set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [exact Lmst_e | reflexivity]. }
+    destruct b.
+    - iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst")
+        as "[Hreg Hmst]".
+      iMod "Hcl" as "_". iModIntro. cbn [sregs mem]. rewrite Hmst_tick.
+      unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" $! (add_vec_int mst 1) true with "Hhs Hmst Hmi Hpc").
+    - iMod "Hcl" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iApply ("Hcont" $! mst false with "Hhs Hmst Hmi Hpc").
+  Qed.
+
+End WPHartActive.
 

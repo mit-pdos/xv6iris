@@ -95,11 +95,55 @@ Definition gpr_list : list register_bitvector_64 :=
    x17;x18;x19;x20;x21;x22;x23;x24;x25;x26;x27;x28;x29;x30;x31].
 Definition gpr_set : gset register_bitvector_64 := list_to_set gpr_list.
 
+(* [gpr_of_Z n] is always one of x0..x31 (the else branch is x31), so it always
+   lands in [gpr_set]. *)
+Lemma gpr_of_Z_in_gpr_set (n : Z) : gpr_of_Z n ∈ gpr_set.
+Proof. unfold gpr_of_Z, gpr_set; repeat case_match; set_solver. Qed.
+
 Section GprFile.
   Context `{!riscvGS Σ}.
   Context {dqc : dfrac}.
-  Definition gpr_file (m : gmap register_bitvector_64 (mword 64)) : iProp Σ :=
-    ([∗ map] r ↦ v ∈ m, (R_bitvector_64 r) ↦ᵣ v)%I.
+  (* Backing of register index [r].  Indexing by [regidx] (not
+     register_bitvector_64) means index 0 = x0 is a genuine key even though
+     there is no x0 register: since x0 is hardwired zero, its entry owns nothing
+     and simply asserts the value is [zero_reg]; x1..x31 back the real register. *)
+  Definition gpr_pt (r : regidx) (v : mword 64) : iProp Σ :=
+    match r with
+    | Regidx i => if Z.eqb (uint i) 0
+                  then ⌜ v = zero_reg ⌝
+                  else (R_bitvector_64 (gpr_of_Z (uint i))) ↦ᵣ v
+    end%I.
+
+  (* [gpr_file m] holds the WHOLE register file, indexed by [regidx]: [m] has an
+     entry for every register index (so any [Regidx i] can be looked up total),
+     and each entry backs its register (x0's is just the value-zero fact). *)
+  Definition gpr_file (m : gmap regidx (mword 64)) : iProp Σ :=
+    (⌜ ∀ r : regidx, r ∈ dom m ⌝ ∗
+     [∗ map] r ↦ v ∈ m, gpr_pt r v)%I.
+
+  (* Reading register index [i] off its [gpr_pt] entry, uniformly over x0 vs a
+     real register: the value the model's [rX] would return equals the entry's
+     value [v].  Conclusion is pure, so callers keep [reg_interp]/[gpr_pt]. *)
+  Lemma gpr_pt_value (i : mword 5) (v : mword 64) (σ : mstate) :
+    reg_interp σ.(sregs) -∗ gpr_pt (Regidx i) v -∗
+    ⌜ (if Z.eqb (uint i) 0 then zero_reg
+       else register_lookup (R_bitvector_64 (gpr_of_Z (uint i))) σ.(sregs)) = v ⌝.
+  Proof.
+    iIntros "Hreg Hpt". unfold gpr_pt; cbn match.
+    destruct (Z.eqb (uint i) 0) eqn:Hz.
+    - iDestruct "Hpt" as %Hv. iPureIntro. symmetry; exact Hv.
+    - iDestruct (reg_valid_dq with "Hreg Hpt") as %L. iPureIntro. exact L.
+  Qed.
+
+  (* For a nonzero index the [gpr_pt] entry IS the register points-to. *)
+  Lemma gpr_pt_nz (i : mword 5) (v : mword 64) :
+    uint i <> 0 ->
+    gpr_pt (Regidx i) v = (R_bitvector_64 (gpr_of_Z (uint i)) ↦ᵣ v)%I.
+  Proof.
+    intro H. unfold gpr_pt; cbn match.
+    replace (Z.eqb (uint i) 0) with false by (symmetry; apply Z.eqb_neq; exact H).
+    reflexivity.
+  Qed.
 End GprFile.
 
 (* exec-level register-generic ADD step (32-bit, F_Base): one lemma, ANY rd/rs1/rs2. *)
@@ -261,134 +305,3 @@ Section CleanGpr.
   Qed.
 End CleanGpr.
 
-(* ====================================================================== *)
-(* The register-GENERIC add WP: ONE lemma covering `add rd,rs1,rs2` for    *)
-(* ANY register triple, with all GPRs held as the single [gpr_file]        *)
-(* resource (special/CSR registers stay as individual points-tos).         *)
-(* ====================================================================== *)
-Section WpAddGpr.
-  Context `{!riscvGS Σ}.
-  Context {dqc : dfrac}.
-
-  Lemma wp_add_gpr (pc : mword 64) (w : mword 32) (rs2 rs1 rd : mword 5)
-      (m : gmap register_bitvector_64 (mword 64)) (va vb vd misa0 mdv0 : mword 64)
-      (b1 : bool) (npc0 mstatus0 : mword 64)
-      (mc : mword 32) (mcfg : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
-      (elp0 : mword 1) E {dq : dfrac} (Phi : mval -> iProp Σ) :
-    ↑minstretN ⊆ E ->
-    uint rs1 <> 0 -> uint rs2 <> 0 -> uint rd <> 0 ->
-    m !! gpr_of_Z (uint rs1) = Some va ->
-    m !! gpr_of_Z (uint rs2) = Some vb ->
-    m !! gpr_of_Z (uint rd) = Some vd ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    pma_allows_all pmar0 ->
-    pmp_allows_all pmpcfg0 ->
-        is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    isRVC (subrange_vec_dec w 15 0) = false ->
-    (forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
-       exec (ext_decode w) s0 = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD), s0)) ->
-    b1 = andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
-              (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")) ->
-    eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
-    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    minstret_inv -∗
-    PC ↦ᵣ pc -∗ gpr_file m -∗ reg_pointsto misa dqc misa0 -∗ nextPC ↦ᵣ npc0 -∗
-    cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-    elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
-    ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
-        gpr_file (<[gpr_of_Z (uint rd) := regval_into_reg (add_vec va vb)]> m) -∗
-        reg_pointsto misa dqc misa0 -∗
-        nextPC ↦ᵣ add_vec_int pc 4 -∗
-        cur_privilege ↦ᵣ Machine -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-        (R_bitvector_64 mideleg) ↦ᵣ mdv0 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0 -∗
-        elp ↦ᵣ elp0 -∗ reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗
-        pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗ reg_pointsto htif_tohost_base dqc None -∗
-        ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w j) -∗
-        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
-  Proof.
-    iIntros (HN Hr1 Hr2 Hrd Hm1 Hm2 Hmd HS Hpmaall Hpmpf Hvalignf HnotRVCf Hdec Hb1 HmIE Help)
-      "#Hinv Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
-    destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
-    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
-    iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
-    iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.
-    iDestruct (reg_valid_dq with "Hreg Hmdl")   as %Lmdl.
-    iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hms")    as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Help")   as %Lelp.
-    iDestruct (reg_valid_dq with "Hreg Hmcinh") as %Lmc.
-    iDestruct (reg_valid_dq with "Hreg Hmcfg")  as %Lmcfg.
-    (* read rs1, rs2 values out of the register file (non-destructively) *)
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfile") as "[Hr1c Hfb1]".
-    iDestruct (reg_valid_dq with "Hreg Hr1c") as %Lrs1.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm2 with "Hfile") as "[Hr2c Hfb2]".
-    iDestruct (reg_valid_dq with "Hreg Hr2c") as %Lrs2.
-    iDestruct ("Hfb2" with "Hr2c") as "Hfile".
-    assert (Hsi_s : exec (should_inc_minstret Machine) s = Some (b1, s)).
-    { rewrite Hb1. apply (exec_should_inc_M mc mcfg s Lmc Lmcfg). }
-    assert (Hrdv : gpr_rd_val rs2 rs1 (s_pcg s pc b1) = add_vec va vb)
-      by (apply (gpr_rd_val_file s pc b1 rs2 rs1 va vb Hr1 Hr2 Lrs1 Lrs2)).
-    iDestruct (fetch_from_pts_minstret pc w region_f pmpcfg0 pmar0 b1 s
-                 Hmatchf Hexecf Hpmpf Hvalignf HnotRVCf
-                 with "Hreg Hmem Hpc Hpriv Hpmpc Hpma Hhtif Hibytes") as %Hfetch_at.
-    iModIntro.
-    iExists (sFcg s pc b1 rs2 rs1 rd (register_lookup minstret s.(sregs))). iSplitR.
-    { iPureIntro.
-      rewrite <- (sFg_eq s pc b1 rs2 rs1 rd (register_lookup minstret s.(sregs)) Lpc eq_refl).
-      apply (forward_exec_add_gpr s pc b1 w rs2 rs1 rd Hfetch_at Hsi_s Hrd Hdec
-               Lpc Lpriv Lhs).
-      - rewrite Lmisa. exact HS.
-      - rewrite Lms. exact HmIE.
-      - rewrite Lelp. exact Help. }
-    iNext.
-    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-    iMod (reg_update _ (R_bool minstret_increment) _ b1 with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfile") as "[Hrdc Hfins]".
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (gpr_rd_val rs2 rs1 (s_pcg s pc b1))) with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iMod (reg_update _ PC _ (add_vec_int pc 4) with "Hreg Hpc") as "[Hreg Hpc]".
-    iEval (rewrite Hrdv) in "Hrdc".
-    iDestruct ("Hfins" $! (regval_into_reg (add_vec va vb)) with "Hrdc") as "Hfile".
-    unfold sFcg, base_upd_g. destruct b1.
-    - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
-      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-      iApply ("Hcont" with "Hpc Hfile Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes").
-  Qed.
-End WpAddGpr.
-
-(* ====================================================================== *)
-(* Demonstration: ONE lemma [wp_add_gpr] serves many register triples.     *)
-(* The register operands are ordinary arguments; only they differ between  *)
-(* `add x5,x6,x7` and `add x28,x1,x2`.  (Concrete reg numbers reduce:       *)
-(* uint (mword_of_int 6) = 6 and gpr_of_Z 6 = x6, etc.)                     *)
-(* ====================================================================== *)
-Section WpAddGprDemo.
-  Context `{!riscvGS Σ}.
-  Context {dqc : dfrac}.
-
-  (* `add x5, x6, x7` : rd=x5, rs1=x6, rs2=x7.  Same lemma, instantiated. *)
-  Definition wp_add_x5_x6_x7 (pc : mword 64) (w : mword 32) :=
-    wp_add_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 7) (mword_of_int 6) (mword_of_int 5).
-  (* `add x28, x1, x2` : rd=x28, rs1=x1, rs2=x2.  SAME lemma, different regs. *)
-  Definition wp_add_x28_x1_x2 (pc : mword 64) (w : mword 32) :=
-    wp_add_gpr (dqc:=DfracOwn 1) pc w (mword_of_int 2) (mword_of_int 1) (mword_of_int 28).
-
-  (* The concrete register operands resolve to the intended file entries. *)
-  Goal gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6
-    /\ gpr_of_Z (uint (mword_of_int 28 : mword 5)) = x28
-    /\ uint (mword_of_int 7 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpAddGprDemo.
