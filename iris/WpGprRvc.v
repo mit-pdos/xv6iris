@@ -1,4 +1,4 @@
-(* WpGprRvc1.v -- register-generic RVC (compressed, 2-byte) instruction WPs,
+(* WpGprRvc.v -- register-generic RVC (compressed, 2-byte) instruction WPs,
    ported to the NEW [wp_instr] / [mmode_config] / [gpr_file] layer (cf.
    WpGprAddi / WpGprLoad / WpGprStore / WpGprJalr).  Every WP here uses
    [is_rvc = true]: the fetch reads a 2-byte compressed halfword (packaged by
