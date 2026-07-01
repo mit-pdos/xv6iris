@@ -471,20 +471,45 @@ Section InstrBytes.
   Definition fetch_is_rvc (r : FetchResult) : bool :=
     match r with F_RVC _ => true | _ => false end.
 
+  (* Read a single register fact off a WHOLE [state_interp] (the reg component
+     is its first conjunct).  Lets holders of [state_interp σ] extract
+     [register_lookup r σ.(sregs) = v] from a fractional points-to without
+     destructuring the state interpretation at their own level. *)
+  Lemma state_interp_reg_dq (σ : mstate) ns κs nt
+      (r : register) (dq : dfrac) (v : type_of_register r) :
+    state_interp σ ns κs nt -∗
+    r ↦ᵣ{ dq } v -∗
+    ⌜ register_lookup r σ.(sregs) = v ⌝.
+  Proof.
+    iIntros "[Hreg _] Hr". iApply (reg_valid_dq with "Hreg Hr").
+  Qed.
+
   (* The instruction at [pc] is [i]: some fetch result [r] lives there (with its
      byte footprint, via [instr_bytes]) whose decode is [i], and [i] is not a
      landing-pad instruction (so it takes the ordinary execute path).  The bool
      [is_rvc] records the fetch width ([true] iff [r] is a 2-byte [F_RVC]); it is
      the visible discriminant clients branch on instead of the hidden [r].
-     Decoding is state-independent, but we phrase it against an arbitrary
-     [state_interp σ] so it composes with the fetch/decode obligations at [σ]. *)
+     Decoding is phrased against an arbitrary [state_interp σ], but only as a
+     PURE implication from the two state facts the per-instruction decode
+     lemmas need (M-mode for the Zicfilp internal_error arm; misa.C for the
+     compressed decoders) -- so [instr] is CONSTRUCTIBLE from the code bytes
+     alone, without owning those registers.  [instr_lift] (whose caller holds
+     cur_privilege = Machine and misa.C = 1) discharges both premises.
+     TODO(non-M-mode): decode doesn't really need M-mode -- the LPAD guard's
+     [get_xLPE] succeeds in ANY non-virtual privilege (M reads mseccfg.MLPE,
+     S reads menvcfg.LPE, U reads senvcfg/menvcfg.LPE; only the virtualized
+     modes hit internal_error).  When we start running S-mode code, weaken this
+     hypothesis (and the per-instruction decode lemmas + [instr_lift]) from
+     [= Machine] to membership in {Machine, Supervisor, User}. *)
   Definition instr (pc : mword 64) (is_rvc : bool) (i : instruction) : iProp Σ :=
     (⌜ is_lpad_instruction i = false ⌝ ∗
      ∃ r : FetchResult,
        ⌜ fetch_is_rvc r = is_rvc ⌝ ∗
        instr_bytes pc r ∗
        (∀ σ ns κs nt, state_interp σ ns κs nt -∗
-          ⌜ exec (decode_fetch r) σ = Some (i, σ) ⌝))%I.
+          ⌜ register_lookup cur_privilege σ.(sregs) = Machine ->
+            eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ->
+            exec (decode_fetch r) σ = Some (i, σ) ⌝))%I.
 
   (* Lift [instr pc i] to the pure fetch/decode facts a decode/execute WP step
      consumes: the fetch reads the bytes to [r] (via [fetch_from_instr_bytes]),
@@ -519,10 +544,16 @@ Section InstrBytes.
     iIntros (Hpmp Hpma HmisaC) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
+    iDestruct (state_interp_reg_dq σ ns κs nt cur_privilege dqp Machine
+                 with "Hsi Hpriv") as %Lpriv.
+    iDestruct (state_interp_reg_dq σ ns κs nt misa dqm misa0
+                 with "Hsi Hmisa") as %Lmisa.
     iDestruct (fetch_from_instr_bytes σ ns κs nt pc r pmpcfg0 pmar0 misa0
                  Hpmp Hpma HmisaC
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes") as %Hfetch.
-    iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec.
+    iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec0.
+    assert (Hdec : exec (decode_fetch r) σ = Some (i, σ))
+      by (apply Hdec0; [exact Lpriv | rewrite Lmisa; exact HmisaC]).
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: instr_bytes is 2-aligned ∗ False *)
       iDestruct "Hbytes" as %[_ []].
