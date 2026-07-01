@@ -22,17 +22,8 @@ Proof.
   apply bv_eq_signed. rewrite bv_sign_extend_signed; [ reflexivity | lia ].
 Qed.
 
-(* the bare-mode 64-bit address translation extracts bits [63:0] -- a noop. *)
-Lemma subrange_id (a : mword 64) : subrange_vec_dec a (xlen - 0 - 1) 0 = a.
-Proof.
-  apply bv_eq. unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  rewrite bv_extract_0_unsigned.
-  change (MachineWord.MachineWord.Z_idx (xlen - 0 - 1 - 0 + 1)) with 64%N.
-  apply bv_wrap_bv_unsigned.
-Qed.
+(* [subrange_id] / [exec_ext_data_get_addr_gpr] moved to WpGpr.v so that
+   WpGprStore.v (which shares them) need not wait for this file. *)
 
 (* writing all 64 bits of [v] into a zero word yields [v] -- a noop. *)
 Lemma data2_id (v : mword 64) :
@@ -48,17 +39,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* register-generic base-address read (any rs1, INCLUDING x0 -> zero_reg). *)
-Lemma exec_ext_data_get_addr_gpr (rs1 : mword 5) (offset : mword 64) acc w s :
-  exec (ext_data_get_addr (Regidx rs1) offset acc w) s
-  = Some (Ext_DataAddr_OK (Virtaddr (add_vec
-      (if Z.eqb (uint rs1) 0 then zero_reg
-       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset)), s).
-Proof.
-  unfold ext_data_get_addr.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  cbn match. apply exec_returnm.
-Qed.
 
 (* register-generic 8-byte vmem_read: base address from ANY rs1. *)
 Section VRg.

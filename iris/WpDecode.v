@@ -156,10 +156,8 @@ Definition imm_auipc : mword 20 := subrange_vec_dec w_auipc 31 12.
 Definition i_auipc : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_auipc 11 7) (regidx_bit_width - 1) 0).
 
-Lemma decode_auipc s :
-  register_lookup cur_privilege (sregs s) = Machine ->
-  exec (ext_decode w_auipc) s = Some (UTYPE (imm_auipc, Regidx i_auipc, AUIPC), s).
-Proof. intro Hpriv. unfold imm_auipc, i_auipc. decode_any s Hpriv. Qed.
+(* decode_auipc / decode_ld moved to KernelBoot.v (their only user)
+   to keep this shared-prefix file cheap. *)
 
 Definition w_ld : mword 32 := mword_of_int 0x1d813103.
 
@@ -167,7 +165,3 @@ Definition imm_ld : mword 12 := subrange_vec_dec w_ld 31 20.
 Definition i_ld : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_ld 11 7) (regidx_bit_width - 1) 0).
 
-Lemma decode_ld s :
-  register_lookup cur_privilege (sregs s) = Machine ->
-  exec (ext_decode w_ld) s = Some (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8), s).
-Proof. intro Hpriv. unfold imm_ld, i_ld. decode_any s Hpriv. Qed.

@@ -267,8 +267,13 @@ Proof.
   do 4 (gpr_trans). rewrite Lva. rewrite Lvb. reflexivity.
 Qed.
 
+(* NB the per-case discharge must be [vm_compute; reflexivity], NOT bare
+   [reflexivity]: each case is a [register_beq <concrete> <concrete> = false]
+   goal, and kernel-conversion reflexivity re-normalizes the ~300-constructor
+   [register_beq] match per case (5.6 s for one [tmig] in WpGprRvc1);
+   vm_compute discharges all 32 cases in ~0 s. *)
 Ltac reg_ne := solve [ vm_compute; reflexivity
-                     | (unfold gpr_of_Z; repeat case_match; reflexivity) ].
+                     | (unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity) ].
 Ltac tmig := rewrite irrelevant_register_set; [ | reg_ne ].
 
 Section CleanGpr.
@@ -305,3 +310,29 @@ Section CleanGpr.
   Qed.
 End CleanGpr.
 
+
+(* Shared by WpGprLoad and WpGprStore (moved from WpGprLoad.v so the two
+   compile in parallel): *)
+(* the bare-mode 64-bit address translation extracts bits [63:0] -- a noop. *)
+Lemma subrange_id (a : mword 64) : subrange_vec_dec a (xlen - 0 - 1) 0 = a.
+Proof.
+  apply bv_eq. unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  rewrite bv_extract_0_unsigned.
+  change (MachineWord.MachineWord.Z_idx (xlen - 0 - 1 - 0 + 1)) with 64%N.
+  apply bv_wrap_bv_unsigned.
+Qed.
+
+(* register-generic base-address read (any rs1, INCLUDING x0 -> zero_reg). *)
+Lemma exec_ext_data_get_addr_gpr (rs1 : mword 5) (offset : mword 64) acc w s :
+  exec (ext_data_get_addr (Regidx rs1) offset acc w) s
+  = Some (Ext_DataAddr_OK (Virtaddr (add_vec
+      (if Z.eqb (uint rs1) 0 then zero_reg
+       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset)), s).
+Proof.
+  unfold ext_data_get_addr.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  cbn match. apply exec_returnm.
+Qed.

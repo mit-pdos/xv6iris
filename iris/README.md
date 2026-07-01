@@ -226,7 +226,14 @@ for regenerating the Sail model.
 > now live in `WpLeafCommon.v` (~2 s); leaves and `WpGpr` import it instead, and
 > `WpEntry` re-`Export`s it, so only `WpEntryNew` still waits for `WpEntry`.
 > When adding a leaf-shared helper, put it in `WpLeafCommon.v` (or another cheap
-> early file), never in a file with expensive proofs.
+> early file), never in a file with expensive proofs. Three more instances of the
+> same rule: `decode_auipc`/`decode_ld` moved from `WpDecode.v` (every leaf's
+> prefix) to `KernelBoot.v` (their only user); `subrange_id`/
+> `exec_ext_data_get_addr_gpr` moved from `WpGprLoad.v` to `WpGpr.v` so
+> `WpGprStore` need not wait for `WpGprLoad`; and the two ~25–47 s terminal poles
+> `WpGprCsrw.v` / `WpGprCsrr.v` were each split into `*Common.v` + two balanced
+> per-CSR-cluster halves `*A.v` ∥ `*B.v` (the original filename remains as a
+> `Require Export` shim so importers are unaffected).
 
 To compile a single file by hand:
 

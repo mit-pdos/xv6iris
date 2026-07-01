@@ -305,45 +305,7 @@ Definition imm_jal : mword 21 :=
 Lemma decode_jal s :
   register_lookup cur_privilege (sregs s) = Machine ->
   exec (ext_decode w_jal) s = Some (JAL (imm_jal, Regidx i_jal), s).
-Proof.
-  intro Hpriv. unfold imm_jal, i_jal.
-  unfold ext_decode, encdec_backwards. cbv beta. cbn zeta.
-  skip_pure_clause.                       (* ZICBOP *)
-  skip_pure_clause.                       (* NTL    *)
-  match goal with |- context[eq_vec w_jal ?c] =>
-    replace (eq_vec w_jal c) with false by (vm_compute; reflexivity) end.
-  match goal with |- context[eq_vec (subrange_vec_dec w_jal 11 0) ?c] =>
-    replace (eq_vec (subrange_vec_dec w_jal 11 0) c) with false by (vm_compute; reflexivity) end.
-  assert (HA1 : exec (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM false)) s
-                = Some (false, s)).
-  { destruct (exec_cE_pause s) as [bp Hbp].
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbp). destruct bp; [apply exec_returnm | reflexivity]. }
-  rewrite (exec_bind_Some _ _ _ _ _ HA1). cbn match.
-  rewrite exec_bind.
-  assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s
-                = Some (false, s)).
-  { destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz].
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz). destruct bz; [apply exec_returnm | reflexivity]. }
-  rewrite (exec_bind_Some _ _ _ _ _ HA2). cbn match.
-  (* UTYPE guard false for JAL -> returnM None -> skip to JAL clause *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with false by (vm_compute; reflexivity) end.
-  cbn match.
-  rewrite (exec_returnM (@None instruction) s). cbn match.
-  (* JAL clause guard true *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  rewrite exec_bind.
-  unfold encdec_reg_backwards.
-  match goal with |- context[if ?g then returnM (Regidx ?x) else _] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn match.
-  match goal with |- context[exec (returnM ?x) s] => rewrite (exec_returnM x s) end.
-  cbn match. cbn match.
-  apply exec_returnM.
-Qed.
+Proof. intro Hpriv. unfold imm_jal, i_jal. decode_any s Hpriv. Qed.
 
 Lemma wX_jal_x1 (v : mword 64) :
   wX (Regno (uint i_jal)) v
@@ -852,68 +814,7 @@ Lemma decode_csrr s :
   register_lookup cur_privilege (sregs s) = Machine ->
   exec (ext_decode w_csrr) s
     = Some (CSRReg (csr_csrr, Regidx i_rs1_csrr, Regidx i_rd_csrr, CSRRS), s).
-Proof.
-  intro Hpriv. unfold csr_csrr, i_rs1_csrr, i_rd_csrr.
-  unfold ext_decode, encdec_backwards. cbv beta. cbn zeta.
-  skip_pure_clause.                       (* ZICBOP *)
-  skip_pure_clause.                       (* NTL    *)
-  match goal with |- context[eq_vec w_csrr ?c] =>
-    replace (eq_vec w_csrr c) with false by (vm_compute; reflexivity) end.
-  match goal with |- context[eq_vec (subrange_vec_dec w_csrr 11 0) ?c] =>
-    replace (eq_vec (subrange_vec_dec w_csrr 11 0) c) with false by (vm_compute; reflexivity) end.
-  assert (HA1 : exec (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM false)) s
-                = Some (false, s)).
-  { destruct (exec_cE_pause s) as [bp Hbp].
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbp). destruct bp; [apply exec_returnm | reflexivity]. }
-  rewrite (exec_bind_Some _ _ _ _ _ HA1). cbn match.
-  rewrite exec_bind.
-  assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s
-                = Some (false, s)).
-  { destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz].
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz). destruct bz; [apply exec_returnm | reflexivity]. }
-  rewrite (exec_bind_Some _ _ _ _ _ HA2). cbn match.
-  (* UTYPE guard false -> returnM None -> reach JAL clause *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with false by (vm_compute; reflexivity) end.
-  cbn match.
-  rewrite (exec_returnM (@None instruction) s). cbn match.
-  (* now at JAL clause (clause 6); skip clauses 6..91 to reach CSRReg (clause 92) *)
-  repeat skip_pure_clause.
-  (* CSRReg clause (guard true) *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  rewrite exec_bind.
-  assert (Hr1 : exec (encdec_reg_backwards (subrange_vec_dec w_csrr 19 15)) s
-      = Some (Regidx (autocast (subrange_vec_dec (subrange_vec_dec w_csrr 19 15)
-                                 (regidx_bit_width - 1) 0)), s)).
-  { unfold encdec_reg_backwards.
-    match goal with |- context[if ?g then returnM (Regidx ?x) else _] =>
-      replace g with true by (vm_compute; reflexivity) end.
-    cbn match. apply exec_returnM. }
-  assert (Hcsrop : exec (encdec_csrop_backwards (subrange_vec_dec w_csrr 13 12)) s
-      = Some (CSRRS, s)).
-  { unfold encdec_csrop_backwards.
-    replace (eq_vec (subrange_vec_dec w_csrr 13 12) ('b"01")) with false
-      by (vm_compute; reflexivity).
-    replace (eq_vec (subrange_vec_dec w_csrr 13 12) ('b"10")) with true
-      by (vm_compute; reflexivity).
-    cbn match. apply exec_returnM. }
-  assert (Hr2 : exec (encdec_reg_backwards (subrange_vec_dec w_csrr 11 7)) s
-      = Some (Regidx (autocast (subrange_vec_dec (subrange_vec_dec w_csrr 11 7)
-                                 (regidx_bit_width - 1) 0)), s)).
-  { unfold encdec_reg_backwards.
-    match goal with |- context[if ?g then returnM (Regidx ?x) else _] =>
-      replace g with true by (vm_compute; reflexivity) end.
-    cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1).
-  rewrite (exec_bind_Some _ _ _ _ _ Hcsrop).
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2).
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Zicsr s)).
-  rewrite (exec_returnM _ s). cbn match.
-  apply exec_returnM.
-Qed.
+Proof. intro Hpriv. unfold csr_csrr, i_rs1_csrr, i_rd_csrr. decode_any s Hpriv. Qed.
 
 Lemma exec_execute_CSRReg s s_w :
   register_lookup cur_privilege s.(sregs) = Machine ->
