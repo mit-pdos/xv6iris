@@ -118,6 +118,17 @@ for regenerating the Sail model.
 >   reflexivity))` drop one guard per step with no goal-wide `context` match and no
 >   `cbn match`. Used for the `write_CSR`/`read_CSR` walks (`WpGprCsrw`, `drive_csr`
 >   in `WpGprCsrrAny`); `WpGprCsrw` 105 s → 82 s.
+>   **…and peel in BATCHES.** Ltac profiling (2026-07-02) showed even the head-peel
+>   walk dominating its files (68 % of `WpGprCsrwB`): every `erewrite` re-types the
+>   O(#clauses) *tail* of the dispatch, so a per-clause walk is still O(n²) in
+>   retyping. `exec_if_false_g16`/`_g4` (WpLeafCommon.v, plain-`if` form) and
+>   `skip_clause_head16`/`4` (WpDecode.v, decoder `bind`-form) collapse 16/4 clauses
+>   per rewrite; the wrappers `skip_csr_false_clauses` / `skip_pure_clauses` try
+>   16 → 4 → 1 (a batch whose window covers the TRUE guard just fails its side
+>   condition and backtracks). WpGprCsrwB 27 s → 13 s, WpGprCsrwA 22 s → 16 s,
+>   WpGprMretWp 13 s → 2 s. (Do NOT try to collapse the guards by conversion with
+>   `cbv -[…]` instead: the negative delta form unfolds some Sail definition with a
+>   huge normal form and OOMs the machine.)
 > * **Collapse a read-free tail in ONE `vm_compute`.** Once the *gated* prefix
 >   (`currentlyEnabled` PAUSE/Zicfilp, which read state) is peeled by
 >   `decode_pause_prefix`, the rest of a CSR/ITYPE decode is a pure function of the
@@ -195,6 +206,20 @@ for regenerating the Sail model.
 >   config back from a leaf), switch each shared leaf to a `hw_config` precondition
 >   and **drop config from the leaf postconditions** too. Now config is threaded
 >   nowhere and returned nowhere.
+
+> **Build-perf note (never case-split inside a heavy proof context — pre-prove
+> the split as a standalone lemma).** Ltac profiling (2026-07-02) showed `reg_ne`
+> — the side-condition solver for `tmig`/`irrelevant_register_set` — as the top
+> cost of `WpGprLoad`/`WpGprRvc`/`WpGprLogic` (74 %/54 %/45 %): its fallback
+> `unfold gpr_of_Z; repeat case_match` runs ~32 `destruct`s, and **each `destruct`
+> re-types the entire proof context**, which in a WP proof embeds huge Sail terms
+> (one inline `reg_ne` = 6.6 s / 853 destructs). The same 32-way split done in a
+> *standalone lemma* (empty context) costs ~1 ms/case. Fix: the recurring shapes
+> are pre-proved once in WpGpr.v (`regbeq_nextPC_gpr`, `regbeq_gpr_PC`, `…minstret…`,
+> `…minc…`) and `reg_ne` now `apply`s them first, keeping the inline split only as
+> a last-resort fallback. `WpGprLoad` 12 s → 5 s, `WpGprMretWp` 13 s → 2 s (with
+> the batched peel below). Generally: `destruct`/`case_match` cost is proportional
+> to the whole context, so hoist any fixed finite case analysis out of WP proofs.
 
 > **Build-perf note (rebuild a destructed persistent bundle by NAME, never by
 > pieces).** Profiled 2026-07-01: rebuilding `mmode_config` for the continuation

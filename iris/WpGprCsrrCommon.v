@@ -82,7 +82,9 @@ Qed.
 Ltac drive_csr :=
   unfold read_CSR;
   repeat first
-    [ erewrite exec_if_false_g by (vm_compute; reflexivity)
+    [ erewrite exec_if_false_g16 by (vm_compute; reflexivity)
+    | erewrite exec_if_false_g4 by (vm_compute; reflexivity)
+    | erewrite exec_if_false_g by (vm_compute; reflexivity)
     | match goal with
       | |- context[if ?g then _ else _] =>
           let v := eval vm_compute in g in

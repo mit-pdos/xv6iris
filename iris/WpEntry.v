@@ -408,7 +408,7 @@ Proof.
     replace g with false by (vm_compute; reflexivity) end.
   cbn match.
   rewrite (exec_returnM (@None instruction) s). cbn match.
-  do 33 skip_pure_clause.
+  skip_pure_clauses.
   (* MUL clause guard true *)
   match goal with |- context[if ?g then _ else returnM None] =>
     replace g with true by (vm_compute; reflexivity) end.

@@ -84,6 +84,51 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) s)). reflexivity.
 Qed.
 
+
+(* Batched forms: one [erewrite] per 16 (resp. 4) false-guard clauses.  The
+   per-clause walk retypes the O(#clauses) decoder tail at every step (Ltac
+   profiling: 47% of WpGprMretWp); batching makes that retyping happen
+   ~log-many times.  [skip_pure_clauses] tries 16, then 4, then 1. *)
+Lemma skip_clause_head16 (c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 c13 c14 c15 c16 : M (option instruction)) (g1 : bool) (g2 : bool) (g3 : bool) (g4 : bool) (g5 : bool) (g6 : bool) (g7 : bool) (g8 : bool) (g9 : bool) (g10 : bool) (g11 : bool) (g12 : bool) (g13 : bool) (g14 : bool) (g15 : bool) (g16 : bool)
+    (REST : M instruction) s :
+  g1 = false -> g2 = false -> g3 = false -> g4 = false -> g5 = false -> g6 = false -> g7 = false -> g8 = false -> g9 = false -> g10 = false -> g11 = false -> g12 = false -> g13 = false -> g14 = false -> g15 = false -> g16 = false ->
+  exec (Defs.bind (if g1 then c1 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g2 then c2 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g3 then c3 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g4 then c4 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g5 then c5 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g6 then c6 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g7 then c7 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g8 then c8 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g9 then c9 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g10 then c10 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g11 then c11 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g12 then c12 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g13 then c13 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g14 then c14 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g15 then c15 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g16 then c16 else returnM None)
+          (fun w => match w with Some r => returnM r | None => REST end) end) end) end) end) end) end) end) end) end) end) end) end) end) end) end)) s
+    = exec REST s.
+Proof.
+  intros -> -> -> -> -> -> -> -> -> -> -> -> -> -> -> ->.
+  repeat (erewrite skip_clause_head by reflexivity). reflexivity.
+Qed.
+
+Lemma skip_clause_head4 (c1 c2 c3 c4 : M (option instruction)) (g1 : bool) (g2 : bool) (g3 : bool) (g4 : bool)
+    (REST : M instruction) s :
+  g1 = false -> g2 = false -> g3 = false -> g4 = false ->
+  exec (Defs.bind (if g1 then c1 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g2 then c2 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g3 then c3 else returnM None)
+          (fun w => match w with Some r => returnM r | None => Defs.bind (if g4 then c4 else returnM None)
+          (fun w => match w with Some r => returnM r | None => REST end) end) end) end)) s
+    = exec REST s.
+Proof.
+  intros -> -> -> ->.
+  repeat (erewrite skip_clause_head by reflexivity). reflexivity.
+Qed.
+
 Ltac skip_pure_clause :=
   first
   [ erewrite skip_clause_head by (vm_compute; reflexivity)
@@ -94,6 +139,11 @@ Ltac skip_pure_clause :=
     cbn match;
     rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) _));
     cbn match ].
+
+Ltac skip_pure_clauses :=
+  repeat (erewrite skip_clause_head16 by (vm_compute; reflexivity));
+  repeat (erewrite skip_clause_head4 by (vm_compute; reflexivity));
+  repeat skip_pure_clause.
 
 (* [decode_finish s]: for an instruction that is NOT extension-gated, the
    remaining decoder is a read-free pure function of the (concrete) word, so a

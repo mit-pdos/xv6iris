@@ -22,7 +22,7 @@ Lemma exec_write_CSR_mcounteren (v : mword 64) s :
             set_reg s mcounteren (legalize_mcounteren (register_lookup mcounteren s.(sregs)) v)).
 Proof.
   unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   (* reached the 0x306 clause *)
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcounteren s)).
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mcounteren _ s)).
@@ -71,7 +71,7 @@ Lemma exec_write_CSR_medeleg (v : mword 64) s :
             set_reg s medeleg (legalize_medeleg (register_lookup medeleg s.(sregs)) v)).
 Proof.
   unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg medeleg s)).
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg medeleg _ s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg medeleg _)).
@@ -158,7 +158,7 @@ Lemma exec_write_CSR_mepc (v : mword 64) s :
   exec (write_CSR csr_mepc v) s = Some (Ok (mepc_val v), set_reg s mepc (mepc_val v)).
 Proof.
   unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   assert (Hsx : exec (set_xepc Machine v) s = Some (mepc_val v, set_reg s mepc (mepc_val v))).
   { unfold set_xepc.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_legalize_xepc v s)). cbn match.
@@ -202,7 +202,7 @@ Definition csr_mscratch : mword 12 := mword_of_int 0x340.
 Lemma exec_write_CSR_mscratch (v : mword 64) s :
   exec (write_CSR csr_mscratch v) s = Some (Ok v, set_reg s mscratch v).
 Proof. unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mscratch v s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mscratch (set_reg s mscratch v))).
   rewrite register_lookup_set. apply exec_returnM. Qed.
@@ -390,7 +390,7 @@ Lemma exec_write_CSR_mstatus (v : mword 64) s :
             set_reg s mstatus (mstatus_legalized (register_lookup mstatus s.(sregs)) v)).
 Proof.
   intros HS HU. unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   (* reached the xlen=64 0x300 clause; expose its body *)
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
@@ -551,7 +551,7 @@ Lemma exec_write_CSR_pmpcfg0 (v : mword 64) s :
             pmpcfg0_final v s).
 Proof.
   unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   cbn zeta.
@@ -833,7 +833,7 @@ Lemma exec_write_CSR_menvcfg (v : mword 64) s :
             set_reg s menvcfg (menvcfg_legalized (register_lookup menvcfg s.(sregs)) v)).
 Proof.
   intro HS. unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)).
@@ -856,7 +856,7 @@ Lemma exec_is_CSR_accessible_menvcfg s :
   exec (is_CSR_accessible csr_menvcfg Machine CSRWrite) s = Some (true, s).
 Proof.
   intro HU. unfold is_CSR_accessible.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   apply (exec_currentlyEnabled_U s HU).

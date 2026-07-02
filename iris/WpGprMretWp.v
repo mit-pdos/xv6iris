@@ -49,7 +49,7 @@ Proof.
   cbn match.
   rewrite (exec_returnM (@None instruction) s). cbn match.
   (* skip clauses until the ECALL/MRET/SRET flat clause *)
-  repeat skip_pure_clause.
+  skip_pure_clauses.
   (* MRET clause: ECALL guard false, MRET guard true *)
   match goal with |- context[if ?g then returnM (Some (ECALL tt)) else _] =>
     replace g with false by (vm_compute; reflexivity) end.

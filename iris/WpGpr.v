@@ -267,13 +267,51 @@ Proof.
   do 4 (gpr_trans). rewrite Lva. rewrite Lvb. reflexivity.
 Qed.
 
-(* NB the per-case discharge must be [vm_compute; reflexivity], NOT bare
-   [reflexivity]: each case is a [register_beq <concrete> <concrete> = false]
-   goal, and kernel-conversion reflexivity re-normalizes the ~300-constructor
-   [register_beq] match per case (5.6 s for one [tmig] in WpGprRvc1);
-   vm_compute discharges all 32 cases in ~0 s. *)
-Ltac reg_ne := solve [ vm_compute; reflexivity
-                     | (unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity) ].
+(* The [register_beq <special> (gpr_of_Z n) = false] side conditions of
+   [irrelevant_register_set] are proved ONCE here, in an empty context, for the
+   register names that straight-line WPs step over.  Doing the 32-way
+   [case_match] split *inline* instead is degenerate: [destruct] re-types the
+   whole proof context per case, and WP contexts embed huge Sail terms — Ltac
+   profiling showed a single inline [reg_ne] costing 6.6 s (853 destructs) in
+   WpGprLoad.  Here each lemma is ~1 ms of [vm_compute] per case. *)
+Lemma regbeq_nextPC_gpr (n : Z) :
+  register_beq nextPC (R_bitvector_64 (gpr_of_Z n)) = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+Lemma regbeq_gpr_nextPC (n : Z) :
+  register_beq (R_bitvector_64 (gpr_of_Z n)) nextPC = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+Lemma regbeq_PC_gpr (n : Z) :
+  register_beq PC (R_bitvector_64 (gpr_of_Z n)) = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+Lemma regbeq_gpr_PC (n : Z) :
+  register_beq (R_bitvector_64 (gpr_of_Z n)) PC = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+Lemma regbeq_minstret_gpr (n : Z) :
+  register_beq minstret (R_bitvector_64 (gpr_of_Z n)) = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+Lemma regbeq_gpr_minstret (n : Z) :
+  register_beq (R_bitvector_64 (gpr_of_Z n)) minstret = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+Lemma regbeq_gpr_minc (n : Z) :
+  register_beq (R_bitvector_64 (gpr_of_Z n)) (R_bool minstret_increment) = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+Lemma regbeq_minc_gpr (n : Z) :
+  register_beq (R_bool minstret_increment) (R_bitvector_64 (gpr_of_Z n)) = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+
+(* Try the pre-proved shapes first ([apply] is O(1)); [vm_compute] next (covers
+   fully-concrete register pairs instantly); the inline case split stays only as
+   a last-resort fallback — see the note above for why it must not run on the
+   common path, and why its leaves end in [vm_compute; reflexivity] rather than
+   bare [reflexivity] (kernel-conversion reflexivity re-normalizes the
+   ~300-constructor [register_beq] match per case). *)
+Ltac reg_ne := solve
+  [ apply regbeq_nextPC_gpr | apply regbeq_gpr_nextPC
+  | apply regbeq_PC_gpr | apply regbeq_gpr_PC
+  | apply regbeq_minstret_gpr | apply regbeq_gpr_minstret
+  | apply regbeq_gpr_minc | apply regbeq_minc_gpr
+  | vm_compute; reflexivity
+  | (unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity) ].
 Ltac tmig := rewrite irrelevant_register_set; [ | reg_ne ].
 
 Section CleanGpr.

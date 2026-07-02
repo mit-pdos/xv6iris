@@ -46,6 +46,28 @@ Lemma exec_if_false_g {X} (g : bool) (A B : M X) s :
   g = false -> exec (if g then A else B) s = exec B s.
 Proof. intros ->. reflexivity. Qed.
 
+(* Batched head-peels for the ~90-way read_CSR/write_CSR nested-if dispatch:
+   one [erewrite] per 16 (resp. 4) false guards instead of per clause, so the
+   O(tail)-sized retyping that dominates the clause walk (Ltac profiling:
+   68% of WpGprCsrwB) happens ~3 times per lemma instead of ~28.  Use via
+   [skip_csr_false_clauses]; the 1-clause [exec_if_false_g] stays as the
+   fallback (and for the final clauses before the TRUE guard, where the
+   batched side conditions fail and the erewrite backtracks cheaply). *)
+Lemma exec_if_false_g16 {X} (g1 : bool) (g2 : bool) (g3 : bool) (g4 : bool) (g5 : bool) (g6 : bool) (g7 : bool) (g8 : bool) (g9 : bool) (g10 : bool) (g11 : bool) (g12 : bool) (g13 : bool) (g14 : bool) (g15 : bool) (g16 : bool) (A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 A15 A16 B : M X) s :
+  g1 = false -> g2 = false -> g3 = false -> g4 = false -> g5 = false -> g6 = false -> g7 = false -> g8 = false -> g9 = false -> g10 = false -> g11 = false -> g12 = false -> g13 = false -> g14 = false -> g15 = false -> g16 = false ->
+  exec (if g1 then A1 else (if g2 then A2 else (if g3 then A3 else (if g4 then A4 else (if g5 then A5 else (if g6 then A6 else (if g7 then A7 else (if g8 then A8 else (if g9 then A9 else (if g10 then A10 else (if g11 then A11 else (if g12 then A12 else (if g13 then A13 else (if g14 then A14 else (if g15 then A15 else (if g16 then A16 else (B))))))))))))))))) s = exec B s.
+Proof. intros -> -> -> -> -> -> -> -> -> -> -> -> -> -> -> ->. reflexivity. Qed.
+
+Lemma exec_if_false_g4 {X} (g1 : bool) (g2 : bool) (g3 : bool) (g4 : bool) (A1 A2 A3 A4 B : M X) s :
+  g1 = false -> g2 = false -> g3 = false -> g4 = false ->
+  exec (if g1 then A1 else (if g2 then A2 else (if g3 then A3 else (if g4 then A4 else (B))))) s = exec B s.
+Proof. intros -> -> -> ->. reflexivity. Qed.
+
+Ltac skip_csr_false_clauses :=
+  repeat (erewrite exec_if_false_g16 by (vm_compute; reflexivity));
+  repeat (erewrite exec_if_false_g4 by (vm_compute; reflexivity));
+  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+
 Definition imm_clui : mword 6 :=
   concat_vec (subrange_vec_dec h_lui 12 12) (subrange_vec_dec h_lui 6 2).
 
