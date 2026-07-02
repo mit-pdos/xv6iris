@@ -129,7 +129,7 @@ Proof.
   - exact Hrs1.
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_S csr_mideleg s HS);
-      [ vm_compute; reflexivity | vm_compute; reflexivity | reflexivity | vm_compute; reflexivity ].
+      [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
@@ -194,7 +194,7 @@ Proof.
   - exact Hrs1.
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_S csr_sie s HS);
-      [ vm_compute; reflexivity | vm_compute; reflexivity | reflexivity | vm_compute; reflexivity ].
+      [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.

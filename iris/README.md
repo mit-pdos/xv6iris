@@ -207,6 +207,33 @@ for regenerating the Sail model.
 >   and **drop config from the leaf postconditions** too. Now config is threaded
 >   nowhere and returned nowhere.
 
+> **Build-perf note (never `vm_compute`/`reflexivity` an equality whose RHS is a
+> well-founded-recursion term — target-unfold the LHS's dispatch instead).**
+> Ltac profiling (2026-07-02) found `is_CSR_accessible csr Machine Acc =
+> currentlyEnabled Ext_U`-style asserts costing **~1.7 s each** (`by (vm_compute;
+> reflexivity)`, or bare `reflexivity`) — ~35 % of `WpGprCsrrA`/`WpGprCsrrB`.
+> `currentlyEnabled`/`hartSupports` are defined as `_rec_currentlyEnabled ext
+> (measure ext) (Zwf_guarded _)`: a well-founded fixpoint over an `Acc` proof
+> witness, which neither the tactic-level `vm_compute` nor the kernel's
+> `Qed`-time conversion check (invoked again by `reflexivity`) reduce cheaply —
+> so with an *identical* subterm on both sides of the equality, you pay for
+> normalizing that same expensive recursor roughly twice over. But
+> `is_CSR_accessible`'s OWN dispatch on the concrete CSR address is a plain
+> (non-well-founded) `eq_vec`/`if` chain — so a delta-list `cbv` that unfolds
+> only the guard-deciding primitives (`eq_vec`, `get_word`,
+> `MachineWord.MachineWord.eqb`, `bool_decide`) — and nothing else, so
+> `currentlyEnabled`/`hartSupports`/`and_boolM`/`or_boolM` stay folded and
+> untouched — selects the matching clause and lands on a goal that's
+> syntactically `RHS = RHS`, closed by a free `reflexivity`. Packaged as
+> `csr_dispatch_eq` (WpLeafCommon.v). Measured **~1.7 s → ~0.02 s per call**
+> (`WpGprCsrrA` 11.3 s → 7.4 s, `WpGprCsrrB` 12.9 s → 6.9 s). General lesson: a
+> positive `cbv delta [...]` whitelist is always safe (nothing outside the list
+> can be touched); the WRONG shape to reach for here is a *negative* `cbv
+> -[preserve-list]`, which unfolds everything else and can OOM the machine (see
+> the batched-peel note above) — and bare `simpl`/`cbn` (no restriction) is
+> *not* safe either: it still ends up reducing through the Acc recursor
+> (measured no faster than the original `vm_compute`).
+
 > **Build-perf note (never case-split inside a heavy proof context — pre-prove
 > the split as a standalone lemma).** Ltac profiling (2026-07-02) showed `reg_ne`
 > — the side-condition solver for `tmig`/`irrelevant_register_set` — as the top

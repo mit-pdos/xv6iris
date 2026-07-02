@@ -103,7 +103,7 @@ Proof.
   - exact Hrs1.
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_S csr_medeleg s HS);
-      [ vm_compute; reflexivity | vm_compute; reflexivity | reflexivity | vm_compute; reflexivity ].
+      [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
@@ -124,7 +124,7 @@ Lemma exec_execute_csrw_mcounteren_full (rs1 : mword 5) s :
 Proof.
   intros Hrs1 Hpriv HU. apply exec_execute_csrw_mcounteren; try assumption.
   apply (exec_check_CSR_result_csrw_U csr_mcounteren s HU);
-    [ vm_compute; reflexivity | vm_compute; reflexivity | reflexivity | vm_compute; reflexivity ].
+    [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].
 Qed.
 
 (* ---- forward_exec for csrw medeleg (exec riscv_step, generic rs1) ---- *)
@@ -880,7 +880,7 @@ Proof.
   - exact Hrs1.
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_U csr_menvcfg s HU);
-      [ vm_compute; reflexivity | vm_compute; reflexivity | reflexivity | vm_compute; reflexivity ].
+      [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.

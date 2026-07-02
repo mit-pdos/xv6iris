@@ -161,7 +161,7 @@ Proof.
     rewrite H. apply exec_returnm.
   - vm_compute; reflexivity.
   - assert (Hacceq : is_CSR_accessible csr_mcounteren Machine CSRRead = currentlyEnabled Ext_U)
-      by (vm_compute; reflexivity).
+      by csr_dispatch_eq.
     rewrite Hacceq. apply (exec_currentlyEnabled_U s HU).
   - assert (H : stateen_allows_CSR_access csr_mcounteren Machine CSRRead = returnM true)
       by (vm_compute; reflexivity).

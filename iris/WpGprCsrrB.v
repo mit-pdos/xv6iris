@@ -47,7 +47,7 @@ Proof.
     rewrite H. apply exec_returnm.
   - vm_compute; reflexivity.
   - assert (Hacceq : is_CSR_accessible csr_menvcfg Machine CSRRead = currentlyEnabled Ext_U)
-      by (vm_compute; reflexivity).
+      by csr_dispatch_eq.
     rewrite Hacceq. apply (exec_currentlyEnabled_U s HU).
   - assert (H : stateen_allows_CSR_access csr_menvcfg Machine CSRRead = returnM true)
       by (vm_compute; reflexivity).
@@ -96,7 +96,7 @@ Proof.
     rewrite H. apply exec_returnm.
   - vm_compute; reflexivity.
   - assert (Hacceq : is_CSR_accessible csr_sie Machine CSRRead = currentlyEnabled Ext_S)
-      by (vm_compute; reflexivity).
+      by csr_dispatch_eq.
     rewrite Hacceq. rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
   - assert (H : stateen_allows_CSR_access csr_sie Machine CSRRead = returnM true)
       by (vm_compute; reflexivity).
@@ -178,7 +178,7 @@ Lemma exec_is_CSR_accessible_time s :
 Proof.
   assert (Hred : is_CSR_accessible csr_time Machine CSRRead
                  = Defs.and_boolM (currentlyEnabled Ext_Zicntr) (counter_enabled 1 Machine))
-    by (vm_compute; reflexivity).
+    by csr_dispatch_eq.
   rewrite Hred.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zicntr s)). cbn match.
   apply exec_counter_enabled_machine.

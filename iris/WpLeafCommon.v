@@ -183,6 +183,25 @@ Proof.
   replace (Z.eqb 0 0) with true by reflexivity. cbn match. apply exec_returnM.
 Qed.
 
+(* [is_CSR_accessible csr priv acc = RHS] goals (RHS an opaque gate term like
+   [currentlyEnabled Ext_U] or [Defs.and_boolM (currentlyEnabled Ext_X) ...]):
+   do NOT use [vm_compute; reflexivity] here.  [currentlyEnabled]/[hartSupports]
+   are defined via a well-founded (Acc/Zwf_guarded) fixpoint whose proof term
+   vm_compute cannot reduce cheaply (~0.7-1s EACH for LHS via vm_compute AND
+   again for the kernel's Qed-time conversion check in reflexivity, since both
+   sides mention the same recursor). [is_CSR_accessible]'s dispatch on the
+   concrete [csr] is a plain (non-well-founded) if-chain on [eq_vec]/
+   [subrange_vec_dec]/[access_vec_dec] guards, so a TARGETED unfold that
+   evaluates only those guard primitives -- never touching [currentlyEnabled]/
+   [hartSupports]/[and_boolM]/[or_boolM], which stay folded and un-normalized
+   on both sides -- selects the matching clause and lands on a goal that's
+   syntactically [RHS = RHS], closed by a free [reflexivity]. Measured
+   ~1.7s -> ~0.02s per call. *)
+Ltac csr_dispatch_eq :=
+  unfold is_CSR_accessible;
+  cbv delta [eq_vec get_word MachineWord.MachineWord.eqb bool_decide] iota zeta beta;
+  reflexivity.
+
 Lemma exec_check_CSR_result_csrr s :
   exec (check_CSR_result csr_csrr Machine CSRRead) s = Some (CSR_Check_OK tt, s).
 Proof.
