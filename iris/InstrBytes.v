@@ -491,23 +491,24 @@ Section InstrBytes.
      the visible discriminant clients branch on instead of the hidden [r].
      Decoding is phrased against an arbitrary [state_interp σ], but only as a
      PURE implication from the two state facts the per-instruction decode
-     lemmas need (M-mode for the Zicfilp internal_error arm; misa.C for the
-     compressed decoders) -- so [instr] is CONSTRUCTIBLE from the code bytes
-     alone, without owning those registers.  [instr_lift] (whose caller holds
-     cur_privilege = Machine and misa.C = 1) discharges both premises.
-     TODO(non-M-mode): decode doesn't really need M-mode -- the LPAD guard's
-     [get_xLPE] succeeds in ANY non-virtual privilege (M reads mseccfg.MLPE,
-     S reads menvcfg.LPE, U reads senvcfg/menvcfg.LPE; only the virtualized
-     modes hit internal_error).  When we start running S-mode code, weaken this
-     hypothesis (and the per-instruction decode lemmas + [instr_lift]) from
-     [= Machine] to membership in {Machine, Supervisor, User}. *)
+     lemmas need (a NON-VIRTUAL privilege for the Zicfilp LPAD guard's
+     [get_xLPE]; misa.C for the compressed decoders) -- so [instr] is
+     CONSTRUCTIBLE from the code bytes alone, without owning those registers.
+     The privilege hypothesis is MEMBERSHIP in {Machine, Supervisor, User}
+     ([priv_mSU .. = true], see RiscvFetchExec): [get_xLPE] succeeds in any of
+     those (M reads mseccfg.MLPE, S reads menvcfg.LPE, U reads
+     senvcfg/menvcfg.LPE), and its VALUE never matters for a non-lpad word --
+     only the virtualized modes hit internal_error.  So the SAME [instr]
+     predicate serves M-mode and S-mode code; only the LIFT differs
+     ([instr_lift] holds cur_privilege = Machine and weakens it to membership;
+     an S-mode lift does the same from Supervisor). *)
   Definition instr (pc : mword 64) (is_rvc : bool) (i : instruction) : iProp Σ :=
     (⌜ is_lpad_instruction i = false ⌝ ∗
      ∃ r : FetchResult,
        ⌜ fetch_is_rvc r = is_rvc ⌝ ∗
        instr_bytes pc r ∗
        (∀ σ ns κs nt, state_interp σ ns κs nt -∗
-          ⌜ register_lookup cur_privilege σ.(sregs) = Machine ->
+          ⌜ priv_mSU (register_lookup cur_privilege σ.(sregs)) = true ->
             eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ->
             exec (decode_fetch r) σ = Some (i, σ) ⌝))%I.
 
@@ -553,7 +554,7 @@ Section InstrBytes.
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes") as %Hfetch.
     iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec0.
     assert (Hdec : exec (decode_fetch r) σ = Some (i, σ))
-      by (apply Hdec0; [exact Lpriv | rewrite Lmisa; exact HmisaC]).
+      by (apply Hdec0; [rewrite Lpriv; reflexivity | rewrite Lmisa; exact HmisaC]).
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: instr_bytes is 2-aligned ∗ False *)
       iDestruct "Hbytes" as %[_ []].

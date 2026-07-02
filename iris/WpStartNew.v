@@ -330,103 +330,103 @@ Qed.
 
 (* ---- the sixteen 32-bit instructions: one-shot [decode_any] ---- *)
 Lemma st_decode34 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w34) s
     = Some (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode36 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w36) s
     = Some (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode39 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w39) s
     = Some (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode41 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w41) s
     = Some (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode42 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w42) s
     = Some (UTYPE (si42, Regidx ti_a5, AUIPC), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode43 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w43) s
     = Some (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode44 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w44) s
     = Some (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode46 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w46) s
     = Some (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode49 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w49) s
     = Some (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode50 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w50) s
     = Some (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode51 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w51) s
     = Some (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode52 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w52) s
     = Some (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode53 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w53) s
     = Some (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode56 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w56) s
     = Some (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode58 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w58) s
     = Some (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode59 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w59) s
     = Some (JAL (sjimm59, Regidx ti_ra), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Lemma st_decode60 s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode st_w60) s
     = Some (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.

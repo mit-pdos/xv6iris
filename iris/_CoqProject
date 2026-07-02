@@ -43,24 +43,12 @@ WpGprRvc.v
 WpGprRvcTor.v
 InstrBytes.v
 WpEntryNew.v
+SmodeCore.v
+WpSmodeGpr.v
+WpSmodeSret.v
 WpTimerinit.v
 WpStartNew.v
 WpKernelNew.v
-# WpSmode.v
-# WpSmode2.v
+WpKvInstr.v
+WpKernelvecNew.v
 # WpKernelMret.v
-# WpKernelvec.v
-# WpKernelvecChain.v
-# WpKernelvecAll.v
-# WpPageWalk.v
-# WpStoreS.v
-# WpStoreS2.v
-# WpStoreWalk.v
-# WpKvStore.v
-# WpKvJal.v
-# WpKvLoad.v
-# WpKvLoadWp.v
-# WpKvTrap.v
-# WpKvSret.v
-# WpKvCompose.v
-# WpGprSret.v

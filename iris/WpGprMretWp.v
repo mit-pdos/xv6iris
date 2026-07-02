@@ -21,7 +21,7 @@ Require Import WpGprMret.
 Definition w_mret : mword 32 := mword_of_int 0x30200073.
 
 Lemma decode_mret s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode w_mret) s = Some (MRET tt, s).
 Proof.
   intro Hpriv.
@@ -40,7 +40,7 @@ Proof.
   rewrite exec_bind.
   assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s
                 = Some (false, s)).
-  { destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz].
+  { destruct (exec_cE_zicfilp_mSU s Hpriv) as [bz Hbz].
     rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz). destruct bz; [apply exec_returnm | reflexivity]. }
   rewrite (exec_bind_Some _ _ _ _ _ HA2). cbn match.
   (* UTYPE guard false -> returnM None -> reach JAL clause *)
@@ -137,7 +137,7 @@ Section ForwardMRET.
     assert (HfetchA : exec (fetch tt) sAm = Some (F_Base w_mret, sAm))
       by exact Hfetch_at.
     assert (HdecA : exec (ext_decode w_mret) sAm = Some (MRET tt, sAm))
-      by (apply decode_mret; exact LprivA).
+      by (apply decode_mret; rewrite LprivA; reflexivity).
     (* The MRET execute side-conditions transfer from [s] to [s_pcm]. *)
     assert (LprivP : register_lookup cur_privilege s_pcm.(sregs) = Machine).
     { unfold s_pcm, sAm, set_reg; cbn [sregs].

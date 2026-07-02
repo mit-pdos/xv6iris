@@ -44,11 +44,11 @@ Local Open Scope Z_scope.
 (* Moved here from WpDecode.v via the late KernelBoot.v (this file is now their
    only user): the one-shot decodes of _entry's two 32-bit prefix instructions. *)
 Lemma decode_auipc s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode w_auipc) s = Some (UTYPE (imm_auipc, Regidx i_auipc, AUIPC), s).
 Proof. intro Hpriv. unfold imm_auipc, i_auipc. decode_any s Hpriv. Qed.
 Lemma decode_ld s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode w_ld) s = Some (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8), s).
 Proof. intro Hpriv. unfold imm_ld, i_ld. decode_any s Hpriv. Qed.
 

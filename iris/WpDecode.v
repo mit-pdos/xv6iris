@@ -29,8 +29,49 @@ Proof.
   cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). apply exec_returnM.
 Qed.
 
-Lemma exec_cE_zicfilp_M s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+(* currentlyEnabled Ext_S = (misa.S bit), at Acc level 1 (stated with a [k = 1]
+   equation so the call site's syntactic level [measure - 1 - 1] unifies).
+   The reduced-budget twin of RiscvFetchExec's [exec_currentlyEnabled_S],
+   needed inside [get_xLPE]'s User arm.  (The level cannot be left symbolic:
+   the Ext_S arm's inner recursion consumes the assert_exp' PROOF, so the
+   [k >=? 0] guard cannot be rewritten dependently -- with a concrete level,
+   [replace ... by reflexivity] goes through by conversion.) *)
+Lemma exec_rec_cE_S_1 (k : Z) (acc : Acc (Zwf 0) k) s :
+  k = 1 ->
+  exec (_rec_currentlyEnabled Ext_S k acc) s
+    = Some (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1"), s).
+Proof.
+  intro Hk. subst k. destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  replace (Z.geb 1 0) with true by reflexivity. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_S s)).
+  rewrite (exec_and_boolM_Some _ _ s
+             (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s)). apply exec_returnM. }
+  destruct (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) eqn:Hb.
+  - apply exec_rec_cE_Zicsr_any. vm_compute; reflexivity.
+  - reflexivity.
+Qed.
+
+(* read_senvcfg is three register reads + returnM: always succeeds, no state
+   change (the value is irrelevant to the decode walker). *)
+Lemma exec_read_senvcfg_any s :
+  exists v : mword 64, exec (read_senvcfg tt) s = Some (v, s).
+Proof.
+  unfold read_senvcfg.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg s)).
+  eexists. apply exec_returnM.
+Qed.
+
+(* currentlyEnabled Ext_Zicfilp reduces (to SOME boolean, state unchanged) in
+   ANY non-virtualized privilege: [get_xLPE] is a plain register read in M
+   (mseccfg) and S (menvcfg), and in U it is currentlyEnabled Ext_S followed by
+   a senvcfg-or-menvcfg read -- all total.  The VALUE is irrelevant to every
+   non-lpad decode (the guard's and_boolM result is [b && false = false]). *)
+Lemma exec_cE_zicfilp_mSU s :
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exists b, exec (currentlyEnabled Ext_Zicfilp) s = Some (b, s).
 Proof.
   intro Hpriv.
@@ -45,15 +86,48 @@ Proof.
   cbn match.
   (* inner and_boolM: hartSupports Zicfilp = true *)
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zicfilp s)). cbn match.
-  (* read cur_privilege = Machine *)
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-  (* get_xLPE Machine = read mseccfg >>= returnM (MLPE bit) *)
-  match goal with |- context[_rec_get_xLPE Machine _ ?acc] => destruct acc end.
-  cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mseccfg s)). cbn match.
-  eexists. apply exec_returnM.
+  (* read cur_privilege, then dispatch get_xLPE on the (non-virtual) value *)
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  destruct (register_lookup cur_privilege (sregs s)) eqn:Hp;
+    try discriminate Hpriv.
+  - (* User: get_xLPE = cE Ext_S >>= (senvcfg | menvcfg read) *)
+    match goal with |- context[_rec_get_xLPE User _ ?acc] => destruct acc end.
+    cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
+    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
+    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (exec_rec_cE_S_1 (currentlyEnabled_measure Ext_Zicfilp - 1 - 1) _ s
+                 ltac:(vm_compute; reflexivity))).
+    cbn beta.
+    destruct (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")).
+    + destruct (exec_read_senvcfg_any s) as [v Hv].
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn match beta.
+      eexists. apply exec_returnM.
+    + rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn match beta.
+      eexists. apply exec_returnM.
+  - (* Supervisor: get_xLPE = read menvcfg >>= returnM (LPE bit) *)
+    match goal with |- context[_rec_get_xLPE Supervisor _ ?acc] => destruct acc end.
+    cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
+    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
+    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn match beta.
+    eexists. apply exec_returnM.
+  - (* Machine: get_xLPE = read mseccfg >>= returnM (MLPE bit) *)
+    match goal with |- context[_rec_get_xLPE Machine _ ?acc] => destruct acc end.
+    cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
+    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
+    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mseccfg s)). cbn match beta.
+    eexists. apply exec_returnM.
+Qed.
+
+(* the Machine-equation corollary (kept for the callers that pin the value
+   chain off a [= Machine] fact, e.g. WpGprMretWp / WpGprJalr). *)
+Lemma exec_cE_zicfilp_M s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exists b, exec (currentlyEnabled Ext_Zicfilp) s = Some (b, s).
+Proof.
+  intro Hpriv. apply exec_cE_zicfilp_mSU. rewrite Hpriv. reflexivity.
 Qed.
 
 Lemma exec_cE_pause s : exists b, exec (currentlyEnabled Ext_Zihintpause) s = Some (b, s).
@@ -165,8 +239,12 @@ Ltac decode_finish s :=
    and_boolM clauses (both collapse to [false] for any non-LPAD/PAUSE word).
    These two clauses are the ONLY stateful part of the 32-bit decoder for a
    non-extension-gated instruction: [currentlyEnabled Zihintpause] and
-   [currentlyEnabled Zicfilp] read state (the latter needs cur_privilege=Machine,
-   hence [Hpriv]), so [vm_compute] cannot step through them. *)
+   [currentlyEnabled Zicfilp] read state (the latter needs a NON-VIRTUAL
+   privilege, hence [Hpriv]), so [vm_compute] cannot step through them.
+   [Hpriv] may be EITHER the membership fact
+   [priv_mSU (register_lookup cur_privilege (sregs s)) = true] itself OR a
+   value equation [register_lookup cur_privilege (sregs s) = Machine/
+   Supervisor/User] (converted on the fly). *)
 Ltac decode_pause_prefix s Hpriv :=
   unfold ext_decode, encdec_backwards; cbv beta; cbn zeta;
   skip_pure_clause; skip_pure_clause;
@@ -186,7 +264,8 @@ Ltac decode_pause_prefix s Hpriv :=
   assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s
                 = Some (false, s)) by
     (let bz := fresh in let Hbz := fresh in
-     destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz];
+     destruct (exec_cE_zicfilp_mSU s
+                 ltac:(first [exact Hpriv | rewrite Hpriv; reflexivity])) as [bz Hbz];
      rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz); destruct bz; [apply exec_returnm | reflexivity]);
   rewrite (exec_bind_Some _ _ _ _ _ HA2); cbn match; clear HA2.
 

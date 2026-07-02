@@ -303,7 +303,7 @@ Definition imm_jal : mword 21 :=
     (subrange_vec_dec w_jal 20 20)) (subrange_vec_dec w_jal 30 21)) ('b"0").
 
 Lemma decode_jal s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode w_jal) s = Some (JAL (imm_jal, Regidx i_jal), s).
 Proof. intro Hpriv. unfold imm_jal, i_jal. decode_any s Hpriv. Qed.
 
@@ -380,7 +380,7 @@ Definition i_mul_rd : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_mul 11 7) (regidx_bit_width - 1) 0).
 
 Lemma decode_mul s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   eq_vec (_get_Misa_M (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode w_mul) s
     = Some (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd, mulop_mul), s).
@@ -401,7 +401,7 @@ Proof.
   rewrite exec_bind.
   assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s
                 = Some (false, s)).
-  { destruct (exec_cE_zicfilp_M s Hpriv) as [bz Hbz].
+  { destruct (exec_cE_zicfilp_mSU s Hpriv) as [bz Hbz].
     rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz). destruct bz; [apply exec_returnm | reflexivity]. }
   rewrite (exec_bind_Some _ _ _ _ _ HA2). cbn match.
   match goal with |- context[if ?g then _ else returnM None] =>
@@ -811,7 +811,7 @@ Proof.
 Qed.
 
 Lemma decode_csrr s :
-  register_lookup cur_privilege (sregs s) = Machine ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode w_csrr) s
     = Some (CSRReg (csr_csrr, Regidx i_rs1_csrr, Regidx i_rd_csrr, CSRRS), s).
 Proof. intro Hpriv. unfold csr_csrr, i_rs1_csrr, i_rd_csrr. decode_any s Hpriv. Qed.

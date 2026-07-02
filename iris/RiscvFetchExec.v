@@ -965,6 +965,19 @@ Proof.
   - reflexivity.
 Qed.
 
+(* priv_mSU: the non-virtualized privileges.  In any of these, the decoder's
+   Zicfilp LPAD-clause guard [get_xLPE] reduces to SOME boolean (M reads
+   mseccfg.MLPE, S reads menvcfg.LPE, U reads senvcfg/menvcfg.LPE); only the
+   virtualized modes hit internal_error.  This is the decode-side privilege
+   hypothesis: the decode walkers only need the guard to REDUCE (its value is
+   discarded via [b && false = false] for every non-lpad word), so membership
+   here is all a decode lemma ever needs. *)
+Definition priv_mSU (p : Privilege) : bool :=
+  match p with
+  | Machine | Supervisor | User => true
+  | VirtualSupervisor | VirtualUser => false
+  end.
+
 (* ---- moved from WpEntry.v: width-2 mem-read stack + exec_fetch_bytes_2 ---- *)
 Lemma autocast_mword_id_16 (w : bv 16) :
   autocast (T := mword) (m := 8 * 2) (n := 2 * 8) w = w.
