@@ -1,5 +1,5 @@
 (* RiscvFetchExec.v -- exec-level fetch reduction + the conditioned Hne engine. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
+From Stdlib Require Import Eqdep_dec ZArith Zquot Lia.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap.
@@ -14,13 +14,44 @@ Local Open Scope Z_scope.
 
 (* ====================================================================== *)
 (* The PMP configuration used throughout the boot WPs: every PMP entry is  *)
-(* OFF (disabled).  With no entry matching any address, PMP imposes no      *)
-(* restriction, so in M-mode every access (R/W/X) to all of physical       *)
-(* memory is granted.  This single predicate replaces the per-lemma        *)
-(* "all entries OFF" side-condition.                                       *)
+(* UNLOCKED (L = 0).  In M-mode this grants every access that fits in one   *)
+(* aligned 4-byte grain cell (all instruction fetches: 4-byte at 4-aligned  *)
+(* pc, 2-byte at 2-aligned pc), INDEPENDENT of the entries' A-fields and    *)
+(* of the pmpaddr register values: a matching entry with L = 0 allows an    *)
+(* M-mode access outright, and with no matching entry M-mode defaults to    *)
+(* allow.  (The cell-fit proviso rules out PARTIAL matches, which fault     *)
+(* even in M-mode; see exec_pmpCheck_machine_unlocked in RiscvTryStep.v.)   *)
+(* Unlike the previous "every A-field is OFF" definition, this survives     *)
+(* xv6's `csrw pmpcfg0` with a5=0xf, which legalizes entry 0 to             *)
+(* A=TOR/RWX=111/L=0 and entries 1..7 to 0x00 -- all unlocked (see          *)
+(* pmp_allows_all_written in WpGprCsrwC.v).                                 *)
 (* ====================================================================== *)
 Definition pmp_allows_all (cfg : type_of_register pmpcfg_n) : Prop :=
+  forall i, pmpLocked (vec_access_dec cfg i) = false.
+
+(* ====================================================================== *)
+(* The stronger, pre-pmpcfg0-write PMP configuration: every entry is OFF    *)
+(* (disabled) AND unlocked.  With no entry ever matching, M-mode grants     *)
+(* accesses of ANY width -- in particular the 8-byte loads/stores, whose    *)
+(* pmpCheck cannot be discharged from unlocked-ness alone: an 8-byte        *)
+(* access can PARTIALLY overlap a TOR/NA4 region boundary (any multiple     *)
+(* of 4) at an unfortunate pmpaddr value, and a partial match faults even   *)
+(* in M-mode.  The 8-byte data-access WPs therefore take [pmp_all_off];     *)
+(* it holds of the boot-time all-zero pmpcfg by vm_compute and implies      *)
+(* [pmp_allows_all] (for their instruction fetches) by projection.          *)
+(* ====================================================================== *)
+Definition pmp_all_off (cfg : type_of_register pmpcfg_n) : Prop :=
+  forall i, pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg i)) = OFF
+         /\ pmpLocked (vec_access_dec cfg i) = false.
+
+Lemma pmp_all_off_A (cfg : type_of_register pmpcfg_n) :
+  pmp_all_off cfg ->
   forall i, pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg i)) = OFF.
+Proof. intros H i. exact (proj1 (H i)). Qed.
+
+Lemma pmp_all_off_allows_all (cfg : type_of_register pmpcfg_n) :
+  pmp_all_off cfg -> pmp_allows_all cfg.
+Proof. intros H i. exact (proj2 (H i)). Qed.
 
 (* ====================================================================== *)
 (* The PMA configuration used throughout the boot WPs: a single region     *)
@@ -309,6 +340,43 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* Fetch-shaped corollaries of exec_pmpCheck_machine_unlocked: a 4-byte    *)
+(* instruction fetch at a 4-aligned pc / a 2-byte fetch at a 2-aligned pc  *)
+(* fits in one aligned 4-byte grain cell, so unlocked entries suffice.     *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma exec_pmpCheck_machine_unlocked_ifetch4 (addr : mword 64) s :
+  (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  exec (pmpCheck (Physaddr addr) 4 (InstructionFetch tt) Machine) s = Some (None, s).
+Proof.
+  intros HL Halign.
+  apply exec_pmpCheck_machine_unlocked; [exact HL | intros ent; eexists; reflexivity |].
+  unfold is_aligned_paddr in Halign. apply Z.eqb_eq in Halign.
+  apply Zrem_divides in Halign. destruct Halign as [k Hk].
+  change (bits_of_physaddr (Physaddr addr)) with addr.
+  replace (uint (to_bits 64 4)) with 4 by (vm_compute; reflexivity).
+  rewrite Hk. replace (4 * k) with (k * 4) by lia. rewrite Z_mod_mult. lia.
+Qed.
+
+Lemma exec_pmpCheck_machine_unlocked_ifetch2 (addr : mword 64) s :
+  (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
+  is_aligned_paddr (Physaddr addr) 2 = true ->
+  exec (pmpCheck (Physaddr addr) 2 (InstructionFetch tt) Machine) s = Some (None, s).
+Proof.
+  intros HL Halign.
+  apply exec_pmpCheck_machine_unlocked; [exact HL | intros ent; eexists; reflexivity |].
+  unfold is_aligned_paddr in Halign. apply Z.eqb_eq in Halign.
+  apply Zrem_divides in Halign. destruct Halign as [k Hk].
+  change (bits_of_physaddr (Physaddr addr)) with addr.
+  replace (uint (to_bits 64 2)) with 2 by (vm_compute; reflexivity).
+  rewrite Hk.
+  pose proof (Z.mod_pos_bound (2 * k) 4 ltac:(lia)).
+  pose proof (Z.div_mod (2 * k) 4 ltac:(lia)).
+  lia.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* pmaCheck = None (RAM), exec version.                                    *)
 (* ---------------------------------------------------------------------- *)
 
@@ -340,9 +408,7 @@ Qed.
 
 Lemma exec_checked_mem_read_ram (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 32) s :
-  (forall i, pmpAddrMatchType_encdec_backwards
-               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-             = OFF) ->
+  (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
     = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
@@ -361,7 +427,7 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
   2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_none _ _ _ s Hpmp)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_unlocked_ifetch4 addr s Hpmp Halign)).
       cbn match.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram addr pbmt region s Hmatch Halign Hexec)).
       cbn match. apply exec_returnM. }
@@ -384,9 +450,7 @@ Qed.
 
 Lemma exec_mem_read_fetch (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 32) s :
-  (forall i, pmpAddrMatchType_encdec_backwards
-               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-             = OFF) ->
+  (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
     = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
@@ -452,8 +516,8 @@ Section FetchExec.
 
   Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
   Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
-  Hypothesis Hpmp : forall i, pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF.
+  Hypothesis Hpmp : forall i,
+      pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false.
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
       (Physaddr addr) 4 = Some region.
   Hypothesis Hexec : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
@@ -727,8 +791,8 @@ Section FetchRVC.
 
   Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
   Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
-  Hypothesis Hpmp : forall i, pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF.
+  Hypothesis Hpmp : forall i,
+      pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false.
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
       (Physaddr addr) 4 = Some region.
   Hypothesis Hexec : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true.
@@ -976,9 +1040,7 @@ Qed.
 
 Lemma exec_checked_mem_read_ram_2 (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 16) s :
-  (forall i, pmpAddrMatchType_encdec_backwards
-               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-             = OFF) ->
+  (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 2
     = Some region ->
   is_aligned_paddr (Physaddr addr) 2 = true ->
@@ -996,7 +1058,7 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
   2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_none _ _ _ s Hpmp)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_unlocked_ifetch2 addr s Hpmp Halign)).
       cbn match.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_2 addr pbmt region s Hmatch Halign Hexec)).
       cbn match. apply exec_returnM. }
@@ -1014,9 +1076,7 @@ Qed.
 
 Lemma exec_mem_read_fetch_2 (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 16) s :
-  (forall i, pmpAddrMatchType_encdec_backwards
-               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-             = OFF) ->
+  (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 2
     = Some region ->
   is_aligned_paddr (Physaddr addr) 2 = true ->
@@ -1052,8 +1112,8 @@ Section FetchBytes2.
   Let addr := fetch_pa pc.
   Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
   Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
-  Hypothesis Hpmp : forall i, pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF.
+  Hypothesis Hpmp : forall i,
+      pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false.
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
       (Physaddr addr) 2 = Some region.
   Hypothesis Halign : is_aligned_paddr (Physaddr addr) 2 = true.
@@ -1098,8 +1158,8 @@ Section FetchRVC2.
   Let addr := fetch_pa pc.
   Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
   Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
-  Hypothesis Hpmp : forall i, pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF.
+  Hypothesis Hpmp : forall i,
+      pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false.
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
       (Physaddr addr) 2 = Some region.
   Hypothesis Halign : is_aligned_paddr (Physaddr addr) 2 = true.
@@ -1174,8 +1234,8 @@ Section FetchFBase2.
 
   Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
   Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Machine.
-  Hypothesis Hpmp : forall i, pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF.
+  Hypothesis Hpmp : forall i,
+      pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false.
   Hypothesis Hmatchl : matching_pma_region (register_lookup pma_regions s.(sregs))
       (Physaddr addr) 2 = Some regl.
   Hypothesis Hmatchh : matching_pma_region (register_lookup pma_regions s.(sregs))

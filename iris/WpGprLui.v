@@ -47,17 +47,17 @@ Section WpLuiGpr.
      (the write to x0 is a no-op). *)
   Lemma wp_lui_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (imm : mword 20) (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗

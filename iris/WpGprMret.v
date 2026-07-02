@@ -109,7 +109,16 @@ Section ExecMRET.
   Hypothesis Hmc : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true.
   Hypothesis Hnp : privLevel_bits_forwards (_get_Mstatus_MPP ms2, ('b"0")) = returnM newpriv.
   Hypothesis Hnpm : generic_neq newpriv Machine = true.
-  Hypothesis Hlpe : forall sz, exec (get_xLPE newpriv) sz = Some (lpe, sz).
+  (* the get_xLPE read is performed at exactly ONE intermediate state (after
+     the mstatus updates + the privilege switch); requiring it only there --
+     instead of [forall sz] -- lets a caller discharge it from a per-state
+     register fact (get_xLPE Supervisor reads menvcfg, which is untouched by
+     the preceding set_regs).  A caller holding the old [forall sz] fact
+     instantiates it. *)
+  Let sLPE := set_reg (set_reg (set_reg (set_reg (set_reg
+                (set_reg s mstatus ms1) mstatus ms2)
+                cur_privilege newpriv) mstatus ms3) mstatus ms4) mstatus ms5.
+  Hypothesis Hlpe : exec (get_xLPE newpriv) sLPE = Some (lpe, sLPE).
 
   Lemma exec_execute_MRET : exec (execute (MRET tt)) s = Some (RETIRE_SUCCESS, sF).
   Proof using All.
@@ -174,6 +183,7 @@ Section ExecMRET.
        zicfilp branch.  Goal: bind (bind0 (bind (read cur_priv)(zicfilp mRET))
        (read mstatus)) K.  Reduce LHS to (ms5, s7). *)
     set (s6 := set_reg s5 mstatus ms5).
+    assert (Hlpe6 : exec (get_xLPE newpriv) s6 = Some (lpe, s6)) by exact Hlpe.
     set (s7 := set_reg s6 elp elpv).
     rewrite (exec_bind_Some _ _ _ _ _
       (_ : exec (Defs.bind0 (Defs.bind (Defs.read_reg cur_privilege)
@@ -205,7 +215,7 @@ Section ExecMRET.
                   by (subst s5; rewrite register_lookup_set; reflexivity).
                 rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus ms5 s5)).
                 apply exec_returnm. }
-            rewrite (exec_bind_Some _ _ _ _ _ (Hlpe s6)).
+            rewrite (exec_bind_Some _ _ _ _ _ Hlpe6).
             rewrite (exec_write_reg elp elpv s6). reflexivity. }
         rewrite (exec_read_reg mstatus s7).
         replace (register_lookup mstatus s7.(sregs)) with ms5

@@ -219,18 +219,18 @@ Section WpCsrrMhartidGpr.
 
   Lemma wp_csrr_mhartid_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (mhartid_in : mword 64) (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     mhartid ↦ᵣ mhartid_in -∗
     instr pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg mhartid_in]> m) -∗
       mhartid ↦ᵣ mhartid_in -∗
@@ -299,7 +299,7 @@ Section WpCsrrMhartidGpr.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     (* rebuild the kept half of mmode_config and recombine with the returned half *)
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
@@ -342,24 +342,28 @@ Section WpCsrrGprA.
   Context `{!riscvGS Σ}.
 
   (* mstatus (0x300): machine CSR, no extra gate. *)
+  (* [dqm]-generic mstatus cell: mstatus lives INSIDE [mmode_config], so a
+     chain can only ever hand this WP a FRACTION of the cell (the half it
+     kept outside its working bundle to pin the value).  Only the value is
+     read, so any fraction works. *)
   Lemma wp_csrr_mstatus_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (mstatus_in : mword 64) (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dqm : dfrac} :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    mstatus ↦ᵣ mstatus_in -∗
+    mstatus ↦ᵣ{dqm} mstatus_in -∗
     instr pc false (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd :=
         regval_into_reg (mstatus_in)]> m) -∗
-      mstatus ↦ᵣ mstatus_in -∗
+      mstatus ↦ᵣ{dqm} mstatus_in -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -379,7 +383,7 @@ Section WpCsrrGprA.
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
     iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hcsr") as %Lcsr.
+    iDestruct (reg_valid_dq with "Hreg Hcsr") as %Lcsr.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     assert (LprivS : register_lookup cur_privilege
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = Machine).
@@ -417,7 +421,7 @@ Section WpCsrrGprA.
              = add_vec_int pc 4).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
@@ -431,18 +435,18 @@ Section WpCsrrGprA.
   (* mcounteren (0x306): Ext_U-gated; misa.U recovered from hw_config. *)
   Lemma wp_csrr_mcounteren_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (mcen_in : mword 32) (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     mcounteren ↦ᵣ mcen_in -∗
     instr pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (zero_extend' 64 mcen_in)]> m) -∗
       mcounteren ↦ᵣ mcen_in -∗
@@ -507,7 +511,7 @@ Section WpCsrrGprA.
              = add_vec_int pc 4).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".

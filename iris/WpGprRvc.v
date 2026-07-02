@@ -143,7 +143,7 @@ Section RvcGprWrite.
      [_gpr] value lemmas (gpr_addi_val_file, gpr_srli_val_file, ...) consume. *)
   Lemma wp_rvc_gpr_write E (Φ : mval -> iProp Σ) (pc : mword 64) (rd rsa rsb : mword 5)
       (ci base : instruction) (wval : mword 64)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -160,13 +160,13 @@ Section RvcGprWrite.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true ci -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -256,11 +256,11 @@ Section RvcOps.
     sign_extend' 64 imm6.
 
   Lemma wp_cli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_LI (imm6, Regidx rd)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (cli_wval imm6)]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -268,7 +268,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rd cli_rs1 cli_rs1
               (C_LI (imm6, Regidx rd)) (ITYPE (sign_extend' 12 imm6, zreg, Regidx rd, ADDI))
-              (cli_wval imm6) m pmpcfg0 HN Hpmp Hrd
+              (cli_wval imm6) m pmpcfg0 q HN Hpmp Hrd
               (fun s => exec_execute_C_LI imm6 (Regidx rd) s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc _ _.
@@ -282,11 +282,11 @@ Section RvcOps.
 
   (* ---- c.addi rd, imm6  =  addi rd, rd, sext(imm6) ---- *)
   Lemma wp_caddi_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_ADDI (imm6, Regidx rd)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
         regval_into_reg (add_vec (m !!! Regidx rd) (sign_extend' 64 imm6))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -295,7 +295,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rd rd rd
               (C_ADDI (imm6, Regidx rd)) (ITYPE (sign_extend' 12 imm6, Regidx rd, Regidx rd, ADDI))
-              (add_vec (m !!! Regidx rd) (sign_extend' 64 imm6)) m pmpcfg0 HN Hpmp Hrd
+              (add_vec (m !!! Regidx rd) (sign_extend' 64 imm6)) m pmpcfg0 q HN Hpmp Hrd
               (fun s => exec_execute_C_ADDI imm6 (Regidx rd) s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
@@ -306,11 +306,11 @@ Section RvcOps.
 
   (* ---- c.lui rd, imm6  =  lui rd, sext20(imm6) ---- *)
   Lemma wp_clui_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5) (imm6 : mword 6)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_LUI (imm6, Regidx rd)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival (sign_extend' 20 imm6))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -318,7 +318,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rd rd rd
               (C_LUI (imm6, Regidx rd)) (UTYPE (sign_extend' 20 imm6, Regidx rd, LUI))
-              (luival (sign_extend' 20 imm6)) m pmpcfg0 HN Hpmp Hrd
+              (luival (sign_extend' 20 imm6)) m pmpcfg0 q HN Hpmp Hrd
               (fun s => exec_execute_C_LUI imm6 (Regidx rd) s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc _ _.
@@ -329,11 +329,11 @@ Section RvcOps.
 
   (* ---- c.slli rsd, shamt  =  slli rsd, rsd, shamt ---- *)
   Lemma wp_cslli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rsd : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rsd <> 0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_SLLI (shamt, Regidx rsd)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rsd := regval_into_reg
         (shift_bits_left (m !!! Regidx rsd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -343,7 +343,7 @@ Section RvcOps.
     unshelve iApply (wp_rvc_gpr_write E Φ pc rsd rsd rsd
               (C_SLLI (shamt, Regidx rsd)) (SHIFTIOP (shamt, Regidx rsd, Regidx rsd, SLLI))
               (shift_bits_left (m !!! Regidx rsd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
-              m pmpcfg0 HN Hpmp Hrd
+              m pmpcfg0 q HN Hpmp Hrd
               (fun s => exec_execute_C_SLLI shamt (Regidx rsd) s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
@@ -355,12 +355,12 @@ Section RvcOps.
   (* ---- c.srli rsd', shamt  =  srli rsd', rsd', shamt.  rsd = creg2reg_idx crsd ---- *)
   Lemma wp_csrli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (shamt : mword 6)
       (crsd : cregidx) (rsd : mword 5)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rsd <> 0 ->
     creg2reg_idx crsd = Regidx rsd ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_SRLI (shamt, crsd)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rsd := regval_into_reg
         (shift_bits_right (m !!! Regidx rsd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -370,7 +370,7 @@ Section RvcOps.
     unshelve iApply (wp_rvc_gpr_write E Φ pc rsd rsd rsd
               (C_SRLI (shamt, crsd)) (SHIFTIOP (shamt, Regidx rsd, Regidx rsd, SRLI))
               (shift_bits_right (m !!! Regidx rsd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
-              m pmpcfg0 HN Hpmp Hrd
+              m pmpcfg0 q HN Hpmp Hrd
               _ _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     - intro s. rewrite (exec_execute_C_SRLI shamt crsd s). rewrite Hcreg. reflexivity.
@@ -382,11 +382,11 @@ Section RvcOps.
 
   (* ---- c.mv rd, rs2  =  add rd, x0, rs2 ---- *)
   Lemma wp_cmv_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_MV (Regidx rd, Regidx rs2)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (m !!! Regidx rs2)]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -394,7 +394,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rd rs2 cli_rs1
               (C_MV (Regidx rd, Regidx rs2)) (RTYPE (Regidx rs2, zreg, Regidx rd, ADD))
-              (m !!! Regidx rs2) m pmpcfg0 HN Hpmp Hrd
+              (m !!! Regidx rs2) m pmpcfg0 q HN Hpmp Hrd
               (fun s => exec_execute_C_MV (Regidx rd) (Regidx rs2) s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
@@ -408,11 +408,11 @@ Section RvcOps.
 
   (* ---- c.add rsd, rs2  =  add rsd, rsd, rs2 ---- *)
   Lemma wp_cadd_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rsd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rsd <> 0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_ADD (Regidx rsd, Regidx rs2)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rsd := regval_into_reg (add_vec (m !!! Regidx rsd) (m !!! Regidx rs2))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -420,7 +420,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rsd rs2 rsd
               (C_ADD (Regidx rsd, Regidx rs2)) (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, ADD))
-              (add_vec (m !!! Regidx rsd) (m !!! Regidx rs2)) m pmpcfg0 HN Hpmp Hrd
+              (add_vec (m !!! Regidx rsd) (m !!! Regidx rs2)) m pmpcfg0 q HN Hpmp Hrd
               (fun s => exec_execute_C_ADD (Regidx rsd) (Regidx rs2) s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva2 Hvad.
@@ -431,12 +431,12 @@ Section RvcOps.
 
   (* ---- c.or rsd', rs2'  =  or rsd', rsd', rs2'.  Both from crsd/crs2 (x8-x15) ---- *)
   Lemma wp_cor_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (crsd crs2 : cregidx) (rsd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rsd <> 0 ->
     creg2reg_idx crsd = Regidx rsd -> creg2reg_idx crs2 = Regidx rs2 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_OR (crsd, crs2)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rsd := regval_into_reg (or_vec (m !!! Regidx rsd) (m !!! Regidx rs2))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -444,7 +444,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd Hc1 Hc2) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rsd rs2 rsd
               (C_OR (crsd, crs2)) (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, OR))
-              (or_vec (m !!! Regidx rsd) (m !!! Regidx rs2)) m pmpcfg0 HN Hpmp Hrd
+              (or_vec (m !!! Regidx rsd) (m !!! Regidx rs2)) m pmpcfg0 q HN Hpmp Hrd
               _ _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     - intro s. rewrite (exec_execute_C_OR crsd crs2 s). rewrite Hc1 Hc2. reflexivity.
@@ -455,12 +455,12 @@ Section RvcOps.
 
   (* ---- c.and rsd', rs2'  =  and rsd', rsd', rs2' ---- *)
   Lemma wp_cand_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (crsd crs2 : cregidx) (rsd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rsd <> 0 ->
     creg2reg_idx crsd = Regidx rsd -> creg2reg_idx crs2 = Regidx rs2 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_AND (crsd, crs2)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rsd := regval_into_reg (and_vec (m !!! Regidx rsd) (m !!! Regidx rs2))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -468,7 +468,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd Hc1 Hc2) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rsd rs2 rsd
               (C_AND (crsd, crs2)) (RTYPE (Regidx rs2, Regidx rsd, Regidx rsd, AND))
-              (and_vec (m !!! Regidx rsd) (m !!! Regidx rs2)) m pmpcfg0 HN Hpmp Hrd
+              (and_vec (m !!! Regidx rsd) (m !!! Regidx rs2)) m pmpcfg0 q HN Hpmp Hrd
               _ _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     - intro s. rewrite (exec_execute_C_AND crsd crs2 s). rewrite Hc1 Hc2. reflexivity.
@@ -479,11 +479,11 @@ Section RvcOps.
 
   (* ---- c.addiw rsd, imm6  =  addiw rsd, rsd, sext(imm6) ---- *)
   Lemma wp_caddiw_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rsd : mword 5) (imm6 : mword 6)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rsd <> 0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_ADDIW (imm6, Regidx rsd)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rsd := regval_into_reg (sign_extend' 64
         (subrange_vec_dec (add_vec (m !!! Regidx rsd) (sign_extend' 64 imm6)) 31 0))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -494,7 +494,7 @@ Section RvcOps.
               (C_ADDIW (imm6, Regidx rsd)) (ADDIW (sign_extend' 12 imm6, Regidx rsd, Regidx rsd))
               (sign_extend' 64 (subrange_vec_dec
                  (add_vec (m !!! Regidx rsd) (sign_extend' 64 imm6)) 31 0))
-              m pmpcfg0 HN Hpmp Hrd
+              m pmpcfg0 q HN Hpmp Hrd
               (fun s => exec_execute_C_ADDIW imm6 (Regidx rsd) s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
@@ -505,11 +505,11 @@ Section RvcOps.
 
   (* ---- c.addi16sp imm6  =  addi sp, sp, caddi16sp_imm(imm6) ---- *)
   Lemma wp_caddi16sp_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (imm6 : mword 6)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_ADDI16SP imm6) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -519,7 +519,7 @@ Section RvcOps.
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
     unshelve iApply (wp_rvc_gpr_write E Φ pc csp_rs1 csp_rs1 csp_rs1
               (C_ADDI16SP imm6) (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
-              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6))) m pmpcfg0 HN Hpmp Hsp
+              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6))) m pmpcfg0 q HN Hpmp Hsp
               (fun s => exec_execute_C_ADDI16SP imm6 s) _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
@@ -532,12 +532,12 @@ Section RvcOps.
   (* ---- c.addi4spn rdc, nzimm  =  addi rdc, sp, caddi4spn_imm(nzimm) ---- *)
   Lemma wp_caddi4spn_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (nzimm : mword 8)
       (crdc : cregidx) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rd <> 0 ->
     creg2reg_idx crdc = Regidx rd ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_ADDI4SPN (crdc, nzimm)) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -546,7 +546,7 @@ Section RvcOps.
     iIntros (HN Hpmp Hrd Hcreg) "Hmm Hpmpc Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_rvc_gpr_write E Φ pc rd csp_rs1 csp_rs1
               (C_ADDI4SPN (crdc, nzimm)) (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI))
-              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm))) m pmpcfg0 HN Hpmp Hrd
+              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm))) m pmpcfg0 q HN Hpmp Hrd
               _ _
               with "Hmm Hpmpc Hpc Hfile Hinstr Hcont").
     - intro s. rewrite (exec_execute_C_ADDI4SPN crdc nzimm s). rewrite Hcreg. reflexivity.
@@ -570,23 +570,23 @@ Section RvcLoad.
 
   Lemma wp_rvc_ld_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5)
       (imm : mword 12) (ci : instruction) (m : gmap regidx (mword 64)) (v : bv 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dq : dfrac} :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
     ↑minstretN ⊆ E ->
-    pmp_allows_all pmpcfg0 ->
+    pmp_all_off pmpcfg0 ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
     (forall s : mstate,
        exec (execute ci) s = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)), s)) ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true ci -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
@@ -595,7 +595,7 @@ Section RvcLoad.
   Proof.
     intros offset ea HN Hpmp Hrd Halign Hexp.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
-    iDestruct (mmode_config_split_half with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
     iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
@@ -604,7 +604,7 @@ Section RvcLoad.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
-    iApply (wp_instr E Φ pc true ci pmpcfg0 HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr E Φ pc true ci pmpcfg0 HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -677,7 +677,7 @@ Section RvcLoad.
       - rewrite Lmsp. exact HMPRV.
       - rewrite Lsecp. exact Hseccfg1.
       - rewrite Ha8. unfold is_aligned_vaddr. unfold is_aligned_paddr in Halign. exact Halign.
-      - intro j. rewrite Lpmpcp. exact (Hpmp j).
+      - intro j. rewrite Lpmpcp. exact (proj1 (Hpmp j)).
       - rewrite Lpmap Hpa. exact Hmatch.
       - rewrite Hpa. exact Halign.
       - exact Hread.
@@ -709,10 +709,10 @@ Section RvcLoad.
              = add_vec_int pc 2).
     { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
-    iDestruct (mmode_config_combine_half with "Hmm' Hmm_k'") as "Hmm''".
+    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbytes").
     iSplitR.
@@ -723,16 +723,16 @@ Section RvcLoad.
   (* ---- c.ld rdc, uimm(rsc)  (both regs x8-x15) ---- *)
   Lemma wp_cld_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 5)
       (crsc crdc : cregidx) (rs1 rd : mword 5) (m : gmap regidx (mword 64)) (v : bv 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dq : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rd <> 0 ->
+    ↑minstretN ⊆ E -> pmp_all_off pmpcfg0 -> uint rd <> 0 ->
     creg2reg_idx crsc = Regidx rs1 -> creg2reg_idx crdc = Regidx rd ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_LD (uimm, crsc, crdc)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -740,7 +740,7 @@ Section RvcLoad.
   Proof.
     intros imm ea HN Hpmp Hrd Hc1 Hc2 Halign.
     iIntros "Hmm Hpmpc Hpc Hfile Hinstr Hbytes Hcont".
-    unshelve iApply (wp_rvc_ld_gpr E Φ pc rs1 rd imm (C_LD (uimm, crsc, crdc)) m v pmpcfg0
+    unshelve iApply (wp_rvc_ld_gpr E Φ pc rs1 rd imm (C_LD (uimm, crsc, crdc)) m v pmpcfg0 q
               HN Hpmp Hrd Halign _ with "Hmm Hpmpc Hpc Hfile Hinstr Hbytes Hcont").
     intro s. rewrite (exec_execute_C_LD uimm crsc crdc s). rewrite Hc1 Hc2. reflexivity.
   Qed.
@@ -748,15 +748,15 @@ Section RvcLoad.
   (* ---- c.ldsp rd, uimm(sp)  (base = sp) ---- *)
   Lemma wp_cldsp_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 6)
       (rd : mword 5) (m : gmap regidx (mword 64)) (v : bv 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dq : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) in
-    ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 -> uint rd <> 0 ->
+    ↑minstretN ⊆ E -> pmp_all_off pmpcfg0 -> uint rd <> 0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_LDSP (uimm, Regidx rd)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -764,7 +764,7 @@ Section RvcLoad.
   Proof.
     intros imm ea HN Hpmp Hrd Halign.
     iIntros "Hmm Hpmpc Hpc Hfile Hinstr Hbytes Hcont".
-    unshelve iApply (wp_rvc_ld_gpr E Φ pc csp_rs1 rd imm (C_LDSP (uimm, Regidx rd)) m v pmpcfg0
+    unshelve iApply (wp_rvc_ld_gpr E Φ pc csp_rs1 rd imm (C_LDSP (uimm, Regidx rd)) m v pmpcfg0 q
               HN Hpmp Hrd Halign _ with "Hmm Hpmpc Hpc Hfile Hinstr Hbytes Hcont").
     intro s. change sp with (Regidx csp_rs1). apply (exec_execute_C_LDSP uimm (Regidx rd) s).
   Qed.
@@ -782,22 +782,22 @@ Section RvcStore.
 
   Lemma wp_rvc_store_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rs2 : mword 5)
       (imm : mword 12) (ci : instruction) (m : gmap regidx (mword 64)) (vold : bv 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
     ↑minstretN ⊆ E ->
-    pmp_allows_all pmpcfg0 ->
+    pmp_all_off pmpcfg0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
     (forall s : mstate,
        exec (execute ci) s = Some (ExecuteAs (STORE (imm, Regidx rs2, Regidx rs1, 8)), s)) ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true ci -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
@@ -806,7 +806,7 @@ Section RvcStore.
   Proof.
     intros offset ea HN Hpmp Halign Hexp.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
-    iDestruct (mmode_config_split_half with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
     iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
@@ -815,7 +815,7 @@ Section RvcStore.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite).
-    iApply (wp_instr E Φ pc true ci pmpcfg0 HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr E Φ pc true ci pmpcfg0 HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -882,7 +882,7 @@ Section RvcStore.
     { rewrite (exec_execute_STORE_8_gpr rs2 rs1 imm region s_pc Lprivp
                 ltac:(rewrite Lmsp; exact HMPRV) ltac:(rewrite Lsecp; exact Hseccfg1)
                 ltac:(rewrite Ha8; unfold is_aligned_vaddr; unfold is_aligned_paddr in Halign; exact Halign)
-                ltac:(intro j; rewrite Lpmpcp; exact (Hpmp j))
+                ltac:(intro j; rewrite Lpmpcp; exact (proj1 (Hpmp j)))
                 ltac:(rewrite Lpmap Hpa; exact Hmatch) ltac:(rewrite Hpa; exact Halign)
                 Hwrite ltac:(rewrite Hpa; apply Hwc) ltac:(rewrite Hpa; apply Hws)
                 ltac:(rewrite Hpa; apply Hwh)).
@@ -901,10 +901,10 @@ Section RvcStore.
     assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 2).
     { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
-    iDestruct (mmode_config_combine_half with "Hmm' Hmm_k'") as "Hmm''".
+    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbytes").
     iSplitR.
@@ -915,15 +915,15 @@ Section RvcStore.
   (* ---- c.sdsp rs2, uimm(sp)  (base = sp, data = rs2) ---- *)
   Lemma wp_csdsp_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 6)
       (rs2 : mword 5) (m : gmap regidx (mword 64)) (vold : bv 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) in
-    ↑minstretN ⊆ E -> pmp_allows_all pmpcfg0 ->
+    ↑minstretN ⊆ E -> pmp_all_off pmpcfg0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
-    mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
+    mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is pc -∗ gpr_file m -∗
     instr pc true (C_SDSP (uimm, Regidx rs2)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
-    ( mmode_config (DfracOwn 1) -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
+    ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗ pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -931,7 +931,7 @@ Section RvcStore.
   Proof.
     intros imm ea HN Hpmp Halign.
     iIntros "Hmm Hpmpc Hpc Hfile Hinstr Hbytes Hcont".
-    unshelve iApply (wp_rvc_store_gpr E Φ pc csp_rs1 rs2 imm (C_SDSP (uimm, Regidx rs2)) m vold pmpcfg0
+    unshelve iApply (wp_rvc_store_gpr E Φ pc csp_rs1 rs2 imm (C_SDSP (uimm, Regidx rs2)) m vold pmpcfg0 q
               HN Hpmp Halign _ with "Hmm Hpmpc Hpc Hfile Hinstr Hbytes Hcont").
     intro s. change sp with (Regidx csp_rs1). apply (exec_execute_C_SDSP uimm (Regidx rs2) s).
   Qed.
@@ -953,18 +953,18 @@ Section RvcRet.
     update_vec_dec (add_vec vra (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0").
 
   Lemma wp_cret_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) :
+      (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint ra <> 0 ->
     is_aligned_paddr (Physaddr (cret_target (m !!! Regidx ra))) 4 = true ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (C_JR (Regidx ra)) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (cret_target (m !!! Regidx ra)) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -972,7 +972,7 @@ Section RvcRet.
   Proof.
     iIntros (HN Hpmp Hra Halign) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iDestruct (mmode_config_split_half with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -1034,10 +1034,10 @@ Section RvcRet.
              = cret_target (m !!! Regidx ra)).
     { rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hmst_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k Hmst_k". }
-    iDestruct (mmode_config_combine_half with "Hmm' Hmm_k'") as "Hmm''".
+    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap]").
     iSplitR; [ iPureIntro; exact Hdom | iExact "Hfmap" ].

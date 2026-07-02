@@ -255,18 +255,18 @@ Section WpCsrrGprB.
   (* time (0xC01): Ext_Zicntr-gated, no misa premise needed (holds for any state). *)
   Lemma wp_csrr_time_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (mtime_in : mword 64) (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     mtime ↦ᵣ mtime_in -∗
     instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd :=
         regval_into_reg (mtime_in)]> m) -∗
@@ -328,7 +328,7 @@ Section WpCsrrGprB.
              = add_vec_int pc 4).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
@@ -342,18 +342,18 @@ Section WpCsrrGprB.
   (* menvcfg (0x30A): Ext_U-gated; misa.U recovered from hw_config. *)
   Lemma wp_csrr_menvcfg_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (menvcfg_in : mword 64) (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     menvcfg ↦ᵣ menvcfg_in -∗
     instr pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd :=
         regval_into_reg (menvcfg_in)]> m) -∗
@@ -419,7 +419,7 @@ Section WpCsrrGprB.
              = add_vec_int pc 4).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
@@ -429,4 +429,100 @@ Section WpCsrrGprB.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
   Qed.
+  (* sie (0x104): Ext_S-gated; misa.S recovered from hw_config.  The read
+     value is a VIEW over TWO registers ([lower_mie mie mideleg]), so both
+     cells are threaded (returned unchanged). *)
+  Lemma wp_csrr_sie_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+      (mie_in mideleg_in : mword 64) (m : gmap regidx (mword 64))
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    ↑minstretN ⊆ E ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    mie ↦ᵣ mie_in -∗
+    mideleg ↦ᵣ mideleg_in -∗
+    instr pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd :=
+        regval_into_reg (lower_mie mie_in mideleg_in)]> m) -∗
+      mie ↦ᵣ mie_in -∗
+      mideleg ↦ᵣ mideleg_in -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hmie Hmdl Hinstr Hcont".
+    iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
+    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+    iApply (wp_instr E Φ pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
+              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iDestruct (reg_valid with "Hreg Hmie") as %Lmie.
+    iDestruct (reg_valid with "Hreg Hmdl") as %Lmdl.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    assert (LprivS : register_lookup cur_privilege
+             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = Machine).
+    { unfold set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
+    assert (HSS : eq_vec (_get_Misa_S (register_lookup misa
+             (set_reg σ nextPC (add_vec_int pc 4)).(sregs))) ('b"1") = true).
+    { rewrite misa_set_nextPC. rewrite Lmisa. exact HmisaS. }
+    assert (Hrv : sie_rdval (set_reg σ nextPC (add_vec_int pc 4))
+             = lower_mie mie_in mideleg_in).
+    { rewrite sie_rdval_set_nextPC. unfold sie_rdval. rewrite Lmie Lmdl. reflexivity. }
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+            (regval_into_reg (lower_mie mie_in mideleg_in))
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg (lower_mie mie_in mideleg_in))
+                 with "[Hrdc]") as "Hfmap".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+               (R_bitvector_64 (gpr_of_Z (uint rd)))
+               (regval_into_reg (lower_mie mie_in mideleg_in))).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq.
+      change (execute (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)))
+        with (execute_CSRReg csr_sie zreg (Regidx rd) CSRRS).
+      rewrite (exec_execute_csrr_sie_gpr rd
+                 (set_reg σ nextPC (add_vec_int pc 4)) Hrd LprivS HSS).
+      rewrite Hrv. reflexivity. }
+    iSplitL "Hreg Hmem".
+    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hmm' Hpmpc' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+                (R_bitvector_64 (gpr_of_Z (uint rd)))
+                (regval_into_reg (lower_mie mie_in mideleg_in))).(sregs)
+             = add_vec_int pc 4).
+    { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iAssert (mmode_config (DfracOwn (q/2)))%I
+      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
+    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
+    iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
+    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
+    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hmie Hmdl").
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
+  Qed.
+
 End WpCsrrGprB.

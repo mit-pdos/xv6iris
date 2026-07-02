@@ -459,7 +459,11 @@ Section WpEntryNew.
       (m : gmap regidx (mword 64)) (v_stack0 : bv 64) (mhartid_in : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
     ↑minstretN ⊆ E ->
-    pmp_allows_all pmpcfg0 ->
+    (* [pmp_all_off] (not just unlocked): the chain contains an 8-byte load
+       (`ld sp, ..`), whose PMP check needs the all-OFF form -- see the note
+       on [pmp_all_off] in RiscvFetchExec.v.  It holds of the boot-time
+       all-zero pmpcfg by vm_compute. *)
+    pmp_all_off pmpcfg0 ->
     is_aligned_paddr (Physaddr entry_ld_ea) 8 = true ->
     mmode_config (DfracOwn 1) -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
@@ -483,6 +487,7 @@ Section WpEntryNew.
   Proof.
     iIntros (HN Hpmp Hld_al)
       "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Htext Hcont".
+    pose proof (pmp_all_off_allows_all _ Hpmp) as HpmpU.
     (* derive the eight [instr] facts off the (persistent) text image; MUL's
        decoder additionally needs misa.M = 1, read off [mmode_config]'s
        persistent [hw_config], which is split out and put back. *)
@@ -508,7 +513,7 @@ Section WpEntryNew.
     assert (Hrd7 : uint i_jal <> 0) by (vm_compute; discriminate).
 
     (* ---- 1. AUIPC @ pc_e0: sp := entry_sp1 ---- *)
-    iApply (wp_auipc_gpr E Φ pc_e0 i_auipc imm_auipc m pmpcfg0 HN Hpmp Hrd0
+    iApply (wp_auipc_gpr E Φ pc_e0 i_auipc imm_auipc m pmpcfg0 1%Qp HN HpmpU Hrd0
               with "Hmm Hpmpc Hpc Hfile Hi0").
     iEval (rewrite pc_e0_e1).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -539,7 +544,7 @@ Section WpEntryNew.
 
     (* ---- 3. C.LUI @ pc_e2: a0 := 0x1000 ---- *)
     iApply (wp_clui_gpr E Φ pc_e2 (regidx_bits rd_clui) imm_clui
-              (m_ld m v_stack0) pmpcfg0 HN Hpmp Hrd2
+              (m_ld m v_stack0) pmpcfg0 1%Qp HN HpmpU Hrd2
               with "Hmm Hpmpc Hpc Hfile Hi2").
     iEval (rewrite pc_e2_e3).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -549,7 +554,7 @@ Section WpEntryNew.
 
     (* ---- 4. CSRRS @ pc_e3 (2-aligned): a1 := mhartid ---- *)
     iApply (wp_csrr_mhartid_gpr E Φ pc_e3 i_rd_csrr mhartid_in
-              (m_clui m v_stack0) pmpcfg0 HN Hpmp Hrd3
+              (m_clui m v_stack0) pmpcfg0 1%Qp HN HpmpU Hrd3
               with "Hmm Hpmpc Hpc Hfile Hmh Hi3").
     iEval (rewrite pc_e3_e4).
     iIntros "Hmm Hpmpc Hpc Hfile Hmh".
@@ -558,7 +563,7 @@ Section WpEntryNew.
 
     (* ---- 5. C.ADDI @ pc_e4: a1 := a1 + 1 ---- *)
     iApply (wp_caddi_gpr E Φ pc_e4 (regidx_bits rsd_caddi) imm_caddi
-              (m_csrr m v_stack0 mhartid_in) pmpcfg0 HN Hpmp Hrd4
+              (m_csrr m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd4
               with "Hmm Hpmpc Hpc Hfile Hi4").
     iEval (rewrite pc_e4_e5).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -570,7 +575,7 @@ Section WpEntryNew.
 
     (* ---- 6. MUL @ pc_e5: a0 := a0 * a1 ---- *)
     iApply (wp_mul_gpr E Φ pc_e5 i_mul_rs2 i_mul_rs1 i_mul_rd
-              (m_caddi m v_stack0 mhartid_in) pmpcfg0 HN Hpmp Hrd5
+              (m_caddi m v_stack0 mhartid_in) pmpcfg0 HN HpmpU Hrd5
               with "Hmm Hpmpc Hpc Hfile Hi5").
     iEval (rewrite pc_e5_e6).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -585,7 +590,7 @@ Section WpEntryNew.
 
     (* ---- 7. C.ADD @ pc_e6: sp := sp + a0 ---- *)
     iApply (wp_cadd_gpr E Φ pc_e6 (regidx_bits rsd_cadd) (regidx_bits rs2_cadd)
-              (m_mul m v_stack0 mhartid_in) pmpcfg0 HN Hpmp Hrd6
+              (m_mul m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd6
               with "Hmm Hpmpc Hpc Hfile Hi6").
     iEval (rewrite pc_e6_e7).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -598,7 +603,7 @@ Section WpEntryNew.
 
     (* ---- 8. JAL @ pc_e7 (2-aligned): ra := pc+4; PC := start ---- *)
     iApply (wp_jal_gpr E Φ pc_e7 i_jal imm_jal
-              (m_cadd m v_stack0 mhartid_in) pmpcfg0 HN Hpmp Hrd7 jal_aligned
+              (m_cadd m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd7 jal_aligned
               with "Hmm Hpmpc Hpc Hfile Hi7").
     iEval (rewrite pc_e7_start).
     iIntros "Hmm Hpmpc Hpc Hfile".

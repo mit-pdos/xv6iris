@@ -34,16 +34,18 @@ WpGprStore.v
 WpGprCsrwCommon.v
 WpGprCsrwA.v
 WpGprCsrwB.v
+WpGprCsrwC.v
 WpGprCsrw.v
 WpGprMret.v
 WpGprMretWp.v
+WpGprMretNew.v
 WpGprRvc.v
+WpGprRvcTor.v
 InstrBytes.v
 WpEntryNew.v
-# WpStartText.v
-# WpStart2.v
-# WpStart3.v
-# WpStartChain.v
+WpTimerinit.v
+WpStartNew.v
+WpKernelNew.v
 # WpSmode.v
 # WpSmode2.v
 # WpKernelMret.v

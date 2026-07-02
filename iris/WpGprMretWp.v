@@ -158,7 +158,7 @@ Section ForwardMRET.
                ('b"0")) = returnM newpriv).
     { exact Hnp. }
     assert (HexecM : exec (execute (MRET tt)) s_pcm = Some (RETIRE_SUCCESS, sXm)).
-    { exact (exec_execute_MRET s_pcm newpriv lpe LprivP HmuP HmcP HnpP Hnpm Hlpe). }
+    { exact (exec_execute_MRET s_pcm newpriv lpe LprivP HmuP HmcP HnpP Hnpm (Hlpe _)). }
     assert (Hha : exec (run_hart_active 0) sAm
               = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w_mret), sXm)).
     { exact (exec_hart_active_progress sAm sAm sXm sAm w_mret

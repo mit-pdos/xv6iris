@@ -273,7 +273,11 @@ Section WpLdGpr.
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
     ↑minstretN ⊆ E ->
-    pmp_allows_all pmpcfg0 ->
+    (* the 8-byte DATA access needs the stronger all-OFF form: an 8-byte
+       window can partially overlap a TOR/NA4 boundary (partial match faults
+       even in M-mode), so unlocked-ness alone does not suffice.  The fetch
+       side uses [pmp_all_off_allows_all]. *)
+    pmp_all_off pmpcfg0 ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
     mmode_config (DfracOwn 1) -∗
@@ -302,7 +306,7 @@ Section WpLdGpr.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
     iApply (wp_instr E Φ pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
-              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+              HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -379,7 +383,7 @@ Section WpLdGpr.
       - rewrite Lmsp. exact HMPRV.
       - rewrite Lsecp. exact Hseccfg1.
       - rewrite Ha8. unfold is_aligned_vaddr. unfold is_aligned_paddr in Halign. exact Halign.
-      - intro j. rewrite Lpmpcp. exact (Hpmp j).
+      - intro j. rewrite Lpmpcp. exact (proj1 (Hpmp j)).
       - rewrite Lpmap Hpa. exact Hmatch.
       - rewrite Hpa. exact Halign.
       - exact Hread.

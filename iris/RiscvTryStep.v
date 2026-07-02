@@ -1691,6 +1691,195 @@ Qed.
 
 Print Assumptions exec_pmpCheck_machine_none.
 
+(* ---------------------------------------------------------------------- *)
+(* NEW CENTERPIECE (unlocked PMP): in MACHINE mode, if every PMP entry is  *)
+(* UNLOCKED (L = 0) -- regardless of its A-field and of the pmpaddr        *)
+(* register values -- pmpCheck grants the access, PROVIDED the access lies *)
+(* within a single 4-byte grain cell (addr mod 4 + width <= 4).  All       *)
+(* region boundaries the walk can produce (TOR / NA4 / NAPOT, grain 0) are *)
+(* multiples of 4, so a cell-contained access can never PARTIALLY match an *)
+(* entry (a partial match faults EVEN in M-mode).  Per entry the step is   *)
+(* then allow-or-continue:                                                 *)
+(*   NoMatch -> continue;                                                  *)
+(*   Match   -> priv = Machine /\ L = 0 -> or_boolM short-circuits to true *)
+(*              -> early_return None (allow).                              *)
+(* The fold invariant is [execR_foreach_ZM_up_allow] below: every body     *)
+(* iteration is a state-preserving no-op OR the early-return [inl r]; the  *)
+(* whole loop then ends in [inr vars] (fall through to the M-mode default  *)
+(* allow) or [inl r] (early allow).                                        *)
+(* ---------------------------------------------------------------------- *)
+
+(* early_return under execR: the [inl] early-exit value, state unchanged. *)
+Lemma execR_early_return {R X} (r : R) s :
+  execR (Defs.early_return r : Defs.monadR R exception X) s = Some (inl r, s).
+Proof. reflexivity. Qed.
+
+(* The loop invariant with early exit: a body that at every index either
+   continues (inr v, no state change) or early-returns (inl r, no state
+   change) makes the whole bounded loop end in one of the same two ways. *)
+Lemma execR_foreach_ZM_up'_allow {R Vars} (to step : Z)
+    (body : forall (z : Z), Vars -> Defs.monadR R exception Vars) (s : mstate) (r : R) :
+  (forall i v, execR (body i v) s = Some (inr v, s)
+            \/ execR (body i v) s = Some (inl r, s)) ->
+  forall (n : nat) (from : Z) (vars : Vars),
+    execR (Defs.foreach_ZM_up' (E := (R + exception)%type) from to step n vars body)
+          s = Some (inr vars, s)
+    \/ execR (Defs.foreach_ZM_up' (E := (R + exception)%type) from to step n vars body)
+          s = Some (inl r, s).
+Proof.
+  intros Hbody. induction n as [|n IH]; intros from vars.
+  - cbn [Defs.foreach_ZM_up']. destruct (from <=? to); left; apply execR_returnm_fwd.
+  - destruct (Z.leb_spec from to) as [Hle|Hgt].
+    + rewrite (Defs.unroll_foreach_ZM_up' _ _ from to step n vars body Hle).
+      rewrite execR_bind.
+      destruct (Hbody from vars) as [Hb|Hb]; rewrite Hb.
+      * exact (IH (from + step) vars).
+      * right. reflexivity.
+    + cbn [Defs.foreach_ZM_up'].
+      replace (from <=? to) with false by (symmetry; apply Z.leb_gt; lia).
+      left. apply execR_returnm_fwd.
+Qed.
+
+Lemma execR_foreach_ZM_up_allow {R Vars} (from to step : Z)
+    (body : forall (z : Z), Vars -> Defs.monadR R exception Vars)
+    (s : mstate) (vars : Vars) (r : R) :
+  (forall i v, execR (body i v) s = Some (inr v, s)
+            \/ execR (body i v) s = Some (inl r, s)) ->
+  execR (Defs.foreach_ZM_up (E := (R + exception)%type) from to step vars body)
+        s = Some (inr vars, s)
+  \/ execR (Defs.foreach_ZM_up (E := (R + exception)%type) from to step vars body)
+        s = Some (inl r, s).
+Proof.
+  intros Hbody. unfold Defs.foreach_ZM_up.
+  apply execR_foreach_ZM_up'_allow; exact Hbody.
+Qed.
+
+(* pmpRangeMatch dichotomy: against a region whose two boundaries are      *)
+(* multiples of 4, an access contained in one aligned 4-byte cell          *)
+(* (a mod 4 + w <= 4) either misses or matches FULLY -- never partially.   *)
+Lemma pmpRangeMatch_cell (b e a w : Z) :
+  (4 | b) -> (4 | e) -> a mod 4 + w <= 4 ->
+  pmpRangeMatch b e a w = PMP_NoMatch \/ pmpRangeMatch b e a w = PMP_Match.
+Proof.
+  intros [kb ->] [ke ->] Hfit.
+  unfold pmpRangeMatch.
+  destruct (Z.leb (Z.add a w) (kb * 4)) eqn:H1; [left; reflexivity|].
+  destruct (Z.leb (ke * 4) a) eqn:H2; cbn [orb]; [left; reflexivity|].
+  apply Z.leb_gt in H1. apply Z.leb_gt in H2.
+  right.
+  replace (Z.leb (kb * 4) a) with true
+    by (symmetry; apply Z.leb_le;
+        pose proof (Z.div_mod a 4 ltac:(lia)); pose proof (Z.mod_pos_bound a 4 ltac:(lia)); lia).
+  replace (Z.leb (Z.add a w) (ke * 4)) with true
+    by (symmetry; apply Z.leb_le;
+        pose proof (Z.div_mod a 4 ltac:(lia)); pose proof (Z.mod_pos_bound a 4 ltac:(lia)); lia).
+  reflexivity.
+Qed.
+
+(* the two divisibility shapes the pmpMatchAddr boundaries come in *)
+Lemma divide4_factor (x : Z) : (4 | Z.mul x 4).
+Proof. exists x. reflexivity. Qed.
+Lemma divide4_factor_plus (x : Z) : (4 | Z.add (Z.mul x 4) 4).
+Proof. exists (x + 1). lia. Qed.
+
+(* pmpMatchAddr dichotomy for a cell-contained access: whatever the entry's
+   A-field and the pmpaddr values, the result is NoMatch or (full) Match,
+   with no state change.  (NA4's grain assertion passes: sys_pmp_grain = 0.) *)
+Lemma exec_pmpMatchAddr_machine_cell (pa : physaddr) (wbv : mword 64) (ent : mword 8)
+    (paddr prev : mword 64) s :
+  uint (bits_of_physaddr pa) mod 4 + uint wbv <= 4 ->
+  exec (pmpMatchAddr pa wbv ent paddr prev) s = Some (PMP_NoMatch, s)
+  \/ exec (pmpMatchAddr pa wbv ent paddr prev) s = Some (PMP_Match, s).
+Proof.
+  intros Hfit. destruct pa as [a]. cbn in Hfit.
+  unfold pmpMatchAddr. cbn zeta.
+  destruct (pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent)).
+  - (* OFF *) left. apply exec_returnM.
+  - (* TOR *)
+    destruct (zopz0zKzJ_u prev paddr).
+    + left. apply exec_returnM.
+    + destruct (pmpRangeMatch_cell (Z.mul (uint prev) 4) (Z.mul (uint paddr) 4)
+                  (uint a) (uint wbv)
+                  (divide4_factor (uint prev)) (divide4_factor (uint paddr)) Hfit)
+        as [Hr|Hr]; [left|right]; rewrite Hr; apply exec_returnM.
+  - (* NA4: the grain assertion holds (sys_pmp_grain = 0 < 1). *)
+    destruct (pmpRangeMatch_cell (Z.mul (uint paddr) 4) (Z.add (Z.mul (uint paddr) 4) 4)
+                  (uint a) (uint wbv)
+                  (divide4_factor (uint paddr)) (divide4_factor_plus (uint paddr)) Hfit)
+        as [Hr|Hr]; [left|right]; rewrite Hr; apply exec_returnM.
+  - (* NAPOT *)
+    destruct (pmpRangeMatch_cell
+                  (Z.mul (uint (and_vec paddr (not_vec (xor_vec paddr (add_vec_int paddr 1))))) 4)
+                  (Z.mul (Z.add (Z.add (uint (and_vec paddr (not_vec (xor_vec paddr (add_vec_int paddr 1)))))
+                                       (uint (xor_vec paddr (add_vec_int paddr 1)))) 1) 4)
+                  (uint a) (uint wbv)
+                  (divide4_factor _) (divide4_factor _) Hfit)
+        as [Hr|Hr]; [left|right]; rewrite Hr; apply exec_returnM.
+Qed.
+
+(* The unlocked-M-mode pmpCheck reduction.  [Hrwx] asks only that the RWX  *)
+(* permission read is a pure boolean for this access type (it is, for all  *)
+(* the access types the boot WPs use; it is consulted -- and short-circuited *)
+(* by Machine /\ unlocked -- only in the full-match case).                 *)
+Lemma exec_pmpCheck_machine_unlocked
+    (addr : physaddr) (width : Z) (access : MemoryAccessType mem_payload) s :
+  (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
+  (forall ent, exists b, exec (pmpCheckRWX ent access) s = Some (b, s)) ->
+  uint (bits_of_physaddr addr) mod 4 + uint (to_bits 64 width) <= 4 ->
+  exec (pmpCheck addr width access Machine) s = Some (None, s).
+Proof.
+  intros HL Hrwx Hfit.
+  unfold pmpCheck.
+  rewrite exec_catch_early_return.
+  replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity).
+  cbn zeta.
+  rewrite execR_bind0.
+  match goal with
+  | |- context[Defs.foreach_ZM_up ?F ?T ?S ?vars ?body] =>
+      assert (Hbody : forall i v,
+                 execR (body i v) s = Some (inr v, s)
+              \/ execR (body i v) s = Some (inl (None : option ExceptionType), s))
+  end.
+  { intros i v. destruct v. cbn beta.
+    destruct (Z.gtb i 0) eqn:Hi; cbn match.
+    - destruct (exec_pmpReadAddrReg_ex (i - 1) s) as [pv Hpv].
+      rewrite (execR_liftR_seq _ _ _ _ _ Hpv). cbn beta.
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)). cbn beta.
+      destruct (exec_pmpReadAddrReg_ex i s) as [w2 Hw2].
+      rewrite (execR_liftR_seq _ _ _ _ _ Hw2). cbn beta.
+      destruct (exec_pmpMatchAddr_machine_cell addr (to_bits 64 width)
+                  (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) w2 pv s Hfit)
+        as [Hm|Hm].
+      + left. rewrite (execR_liftR_seq _ _ _ _ _ Hm). cbn beta.
+        cbn match. apply execR_returnR.
+      + right. rewrite (execR_liftR_seq _ _ _ _ _ Hm). cbn beta. cbn match.
+        rewrite execR_bind. unfold or_boolM. rewrite execR_bind. rewrite execR_liftR.
+        destruct (Hrwx (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) as [b Hb].
+        rewrite Hb. cbn match.
+        destruct b; [reflexivity | rewrite (HL i); reflexivity].
+    - rewrite execR_bind. rewrite execR_returnR. cbn match. cbn beta.
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)). cbn beta.
+      destruct (exec_pmpReadAddrReg_ex i s) as [w2 Hw2].
+      rewrite (execR_liftR_seq _ _ _ _ _ Hw2). cbn beta.
+      destruct (exec_pmpMatchAddr_machine_cell addr (to_bits 64 width)
+                  (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) w2 (zeros' 64) s Hfit)
+        as [Hm|Hm].
+      + left. rewrite (execR_liftR_seq _ _ _ _ _ Hm). cbn beta.
+        cbn match. apply execR_returnR.
+      + right. rewrite (execR_liftR_seq _ _ _ _ _ Hm). cbn beta. cbn match.
+        rewrite execR_bind. unfold or_boolM. rewrite execR_bind. rewrite execR_liftR.
+        destruct (Hrwx (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) as [b Hb].
+        rewrite Hb. cbn match.
+        destruct b; [reflexivity | rewrite (HL i); reflexivity]. }
+  match goal with
+  | |- context[Defs.foreach_ZM_up ?F ?T ?S ?vars ?body] =>
+      destruct (execR_foreach_ZM_up_allow F T S body s vars _ Hbody) as [Hloop|Hloop]
+  end;
+  rewrite Hloop; cbn match; reflexivity.
+Qed.
+
+Print Assumptions exec_pmpCheck_machine_unlocked.
+
 (* ===== RiscvModelFetchAsm ===== *)
 (* ====================================================================== *)
 (* RiscvModelFetchAsm.v                                                    *)

@@ -82,9 +82,7 @@ Qed.
 Ltac drive_csr :=
   unfold read_CSR;
   repeat first
-    [ erewrite exec_if_false_g16 by (vm_compute; reflexivity)
-    | erewrite exec_if_false_g4 by (vm_compute; reflexivity)
-    | erewrite exec_if_false_g by (vm_compute; reflexivity)
+    [ erewrite exec_if_false_g by (vm_compute; reflexivity)
     | match goal with
       | |- context[if ?g then _ else _] =>
           let v := eval vm_compute in g in
@@ -178,12 +176,13 @@ Section WpCsrrGprShared.
     iPureIntro. exact (Eqdep_dec.inj_pair2_eq_dec _ Decidable_eq_register _ r v1 v2 Heq).
   Qed.
 
-  (* Split [mmode_config (DfracOwn 1)] into two halves: one to hand to
+  (* Split [mmode_config (DfracOwn q)] into two halves: one to hand to
      [wp_instr], the other kept to read [cur_privilege = Machine] at the
-     execute state (the CSR read needs M-privilege). *)
-  Lemma mmode_config_split_half_csrr :
-    mmode_config (DfracOwn 1) ⊢
-      mmode_config (DfracOwn (1/2)) ∗ mmode_config (DfracOwn (1/2)).
+     execute state (the CSR read needs M-privilege).  Fraction-generic
+     ([q := 1] recovers the original full-ownership version). *)
+  Lemma mmode_config_split_half_csrr (q : Qp) :
+    mmode_config (DfracOwn q) ⊢
+      mmode_config (DfracOwn (q/2)) ∗ mmode_config (DfracOwn (q/2)).
   Proof.
     iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
     iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL)".
@@ -195,9 +194,9 @@ Section WpCsrrGprShared.
     - iFrame "Hhw Hinv Hhs2 Hpriv2". iExists ms0. iFrame "Hms2 %".
   Qed.
 
-  Lemma mmode_config_combine_half_csrr :
-    mmode_config (DfracOwn (1/2)) -∗ mmode_config (DfracOwn (1/2)) -∗
-    mmode_config (DfracOwn 1).
+  Lemma mmode_config_combine_half_csrr (q : Qp) :
+    mmode_config (DfracOwn (q/2)) -∗ mmode_config (DfracOwn (q/2)) -∗
+    mmode_config (DfracOwn q).
   Proof.
     iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1) (_ & _ & Hhs2 & Hpriv2 & Hmst2)".
     iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL)".

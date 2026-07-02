@@ -1,0 +1,1750 @@
+(* WpStartNew.v -- the xv6 kernel [start()] (34 instructions at
+   0x80000058 .. 0x800000bf, KernelInstrs indices 30..63), proved as ONE WP
+   theorem [wp_start] by composing ONLY the new-style register-generic
+   [wp_*_gpr] WPs, [wp_timerinit] (the jal-called subroutine), the raw
+   config-writing WPs of WpGprCsrwC, and the [wp_mret_gpr] endpoint.
+
+   The trace (ground truth: kernel-rocq/KernelInstrs.v):
+     30 0x80000058 0x1141     c.addi  sp, -16          [RVC, 4-aligned]
+     31 0x8000005a 0xe406     c.sdsp  ra, 8(sp)        [RVC, 8-byte STORE]
+     32 0x8000005c 0xe022     c.sdsp  s0, 0(sp)        [RVC, 8-byte STORE]
+     33 0x8000005e 0x0800     c.addi4spn s0, sp, 16    [RVC]
+     34 0x80000060 0x300027f3 csrr    a5, mstatus      [F_Base, 4-aligned]
+     35 0x80000064 0x7779     c.lui   a4, 0xffffe      [RVC]
+     36 0x80000066 0x7ff70713 addi    a4, a4, 2047     [F_Base, 2-aligned]
+     37 0x8000006a 0x8ff9     c.and   a5, a4           [RVC]
+     38 0x8000006c 0x6705     c.lui   a4, 0x1          [RVC]
+     39 0x8000006e 0x80070713 addi    a4, a4, -2048    [F_Base, 2-aligned]
+     40 0x80000072 0x8fd9     c.or    a5, a4           [RVC]
+     41 0x80000074 0x30079073 csrw    mstatus, a5      [F_Base, 4-aligned]
+     42 0x80000078 0x00001797 auipc   a5, 0x1          [F_Base, 4-aligned]
+     43 0x8000007c 0xe0a78793 addi    a5, a5, -502     [F_Base, 4-aligned]
+     44 0x80000080 0x34179073 csrw    mepc, a5         [F_Base, 4-aligned]
+     45 0x80000084 0x4781     c.li    a5, 0            [RVC]
+     46 0x80000086 0x18079073 csrw    satp, a5         [F_Base, 2-aligned]
+     47 0x8000008a 0x67c1     c.lui   a5, 0x10         [RVC]
+     48 0x8000008c 0x17fd     c.addi  a5, -1           [RVC]
+     49 0x8000008e 0x30279073 csrw    medeleg, a5      [F_Base, 2-aligned]
+     50 0x80000092 0x30379073 csrw    mideleg, a5      [F_Base, 2-aligned]
+     51 0x80000096 0x104027f3 csrr    a5, sie          [F_Base, 2-aligned]
+     52 0x8000009a 0x2207e793 ori     a5, a5, 544      [F_Base, 2-aligned]
+     53 0x8000009e 0x10479073 csrw    sie, a5          [F_Base, 2-aligned]
+     54 0x800000a2 0x57fd     c.li    a5, -1           [RVC]
+     55 0x800000a4 0x83a9     c.srli  a5, 0xa          [RVC]
+     56 0x800000a6 0x3b079073 csrw    pmpaddr0, a5     [F_Base, 2-aligned]
+     57 0x800000aa 0x47bd     c.li    a5, 15           [RVC]
+     58 0x800000ac 0x3a079073 csrw    pmpcfg0, a5      [F_Base, 4-aligned]
+     59 0x800000b0 0xf6dff0ef jal     ra, timerinit    [F_Base, 4-aligned]
+     60 0x800000b4 0xf14027f3 csrr    a5, mhartid      [F_Base, 4-aligned]
+     61 0x800000b8 0x2781     c.addiw a5, 0 (sext.w)   [RVC]
+     62 0x800000ba 0x823e     c.mv    tp, a5           [RVC]
+     63 0x800000bc 0x30200073 mret                     [F_Base, 4-aligned]
+
+   Fraction choreography: the caller's [mmode_config (DfracOwn 1)] is
+   unbundled ONCE at the top (naming the entry mstatus value [ms0] with its
+   invariant facts), split in half: a working bundle [mmode_config
+   (DfracOwn (1/2))] runs the ordinary WPs, while the outside raw halves pin
+   the mstatus VALUE.  At the three config-writing sites (csrw mstatus,
+   csrw pmpcfg0, mret) the halves are recombined to full raw cells (value
+   pinned by [reg_pointsto_agree]) and the RAW WPs of WpGprCsrwC /
+   WpGprMretNew run at full ownership, after which the cells are re-split. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import gen_heap.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import RiscvModelBytes.
+Require Import SailStdpp.Base SailStdpp.TypeCasts.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpGpr.
+Require Import WpAuipc WpGprAuipc WpGprLoad WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprJal WpGprJalr WpGprStore WpGprRvc WpGprRvcTor.
+Require Import WpGprCsrrCommon WpGprCsrrA WpGprCsrrB WpGprCsrwCommon WpGprCsrwA WpGprCsrwB WpGprCsrwC.
+Require Import WpGprMret WpGprMretWp WpGprMretNew.
+Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit.
+From iris.base_logic.lib Require Import invariants.
+From Kernel Require KernelInstrs.
+Local Open Scope Z_scope.
+
+(* ===================================================================== *)
+(* Canonical operand values.  The register / small-immediate literals    *)
+(* i9 / u10 / u11 / nz12 / ti_ra / ti_s0 / ti_a4 / ti_a5 / ti_ca4 /      *)
+(* ti_ca5 are REUSED from WpTimerinit (same registers, same encodings).  *)
+(* ===================================================================== *)
+Definition st_tp : mword 5 := mword_of_int 4.    (* x4 *)
+
+Definition si35 : mword 6  := mword_of_int 62.    (* c.lui a4, imm6 (-2 -> 0xffffe) *)
+Definition si36 : mword 12 := mword_of_int 2047.  (* addi a4, 2047 *)
+Definition si38 : mword 6  := mword_of_int 1.     (* c.lui a4, 1 *)
+Definition si39 : mword 12 := mword_of_int 2048.  (* addi a4, -2048 (bits 0x800) *)
+Definition si42 : mword 20 := mword_of_int 1.     (* auipc a5, 1 *)
+Definition si43 : mword 12 := mword_of_int 3594.  (* addi a5, -502 (bits 0xe0a) *)
+Definition si45 : mword 6  := mword_of_int 0.     (* c.li a5, 0 *)
+Definition si47 : mword 6  := mword_of_int 16.    (* c.lui a5, 0x10 *)
+Definition si48 : mword 6  := mword_of_int 63.    (* c.addi a5, -1 *)
+Definition si52 : mword 12 := mword_of_int 544.   (* ori a5, 544 *)
+Definition si54 : mword 6  := mword_of_int 63.    (* c.li a5, -1 *)
+Definition ssh55 : mword 6 := mword_of_int 10.    (* c.srli a5, 0xa *)
+Definition si57 : mword 6  := mword_of_int 15.    (* c.li a5, 15 *)
+Definition sjimm59 : mword 21 := mword_of_int 0x1fff6c. (* jal offset -148 *)
+Definition si61 : mword 6  := mword_of_int 0.     (* c.addiw a5, 0 *)
+
+(* the RVC halfwords and, for the 4-aligned RVC sites, the whole 4-byte
+   fetch-window words; halfwords already present in WpTimerinit are reused
+   (ti_h9 = 0x1141, ti_h10 = 0xe406, ti_h11 = 0xe022, ti_h12 = 0x0800,
+   ti_h16 = 0x8fd9). *)
+Definition st_w30 : mword 32 := mword_of_int 0xe4061141.
+Definition st_w32 : mword 32 := mword_of_int 0x0800e022.
+Definition st_w34 : mword 32 := mword_of_int 0x300027f3.
+Definition st_h35 : mword 16 := mword_of_int 0x7779.
+Definition st_w35 : mword 32 := mword_of_int 0x07137779.
+Definition st_w36 : mword 32 := mword_of_int 0x7ff70713.
+Definition st_h37 : mword 16 := mword_of_int 0x8ff9.
+Definition st_h38 : mword 16 := mword_of_int 0x6705.
+Definition st_w38 : mword 32 := mword_of_int 0x07136705.
+Definition st_w39 : mword 32 := mword_of_int 0x80070713.
+Definition st_w41 : mword 32 := mword_of_int 0x30079073.
+Definition st_w42 : mword 32 := mword_of_int 0x00001797.
+Definition st_w43 : mword 32 := mword_of_int 0xe0a78793.
+Definition st_w44 : mword 32 := mword_of_int 0x34179073.
+Definition st_h45 : mword 16 := mword_of_int 0x4781.
+Definition st_w45 : mword 32 := mword_of_int 0x90734781.
+Definition st_w46 : mword 32 := mword_of_int 0x18079073.
+Definition st_h47 : mword 16 := mword_of_int 0x67c1.
+Definition st_h48 : mword 16 := mword_of_int 0x17fd.
+Definition st_w48 : mword 32 := mword_of_int 0x907317fd.
+Definition st_w49 : mword 32 := mword_of_int 0x30279073.
+Definition st_w50 : mword 32 := mword_of_int 0x30379073.
+Definition st_w51 : mword 32 := mword_of_int 0x104027f3.
+Definition st_w52 : mword 32 := mword_of_int 0x2207e793.
+Definition st_w53 : mword 32 := mword_of_int 0x10479073.
+Definition st_h54 : mword 16 := mword_of_int 0x57fd.
+Definition st_h55 : mword 16 := mword_of_int 0x83a9.
+Definition st_w55 : mword 32 := mword_of_int 0x907383a9.
+Definition st_w56 : mword 32 := mword_of_int 0x3b079073.
+Definition st_h57 : mword 16 := mword_of_int 0x47bd.
+Definition st_w58 : mword 32 := mword_of_int 0x3a079073.
+Definition st_w59 : mword 32 := mword_of_int 0xf6dff0ef.
+Definition st_w60 : mword 32 := mword_of_int 0xf14027f3.
+Definition st_h61 : mword 16 := mword_of_int 0x2781.
+Definition st_w61 : mword 32 := mword_of_int 0x823e2781.
+Definition st_h62 : mword 16 := mword_of_int 0x823e.
+(* MRET's word is WpGprMretWp.w_mret (0x30200073). *)
+
+(* ===================================================================== *)
+(* Decode lemmas for the encodings not already decoded by WpTimerinit /  *)
+(* WpEntry / WpGprMretWp.  RVC: the WpEntry clause walkers + per-clause   *)
+(* closes (WpTimerinit recipe); 32-bit: [decode_any] one-shot.            *)
+(* ===================================================================== *)
+
+Local Ltac st_reg_step name w hi lo s :=
+  assert (name : exec (encdec_reg_backwards (subrange_vec_dec w hi lo)) s
+              = Some (Regidx (autocast (T := mword)
+                        (subrange_vec_dec (subrange_vec_dec w hi lo)
+                           (Z.sub regidx_bit_width 1) 0)), s));
+  [ unfold encdec_reg_backwards;
+    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
+      replace g with true by (vm_compute; reflexivity) end; cbn match; apply exec_returnM
+  | idtac ].
+
+Local Ltac st_open_rvc s HmisaC :=
+  unfold ext_decode_compressed, encdec_compressed_backwards; cbv beta; cbn zeta;
+  skip_pure_clause; repeat (dstep s HmisaC);
+  match goal with |- context[if ?g then _ else returnM None] =>
+    replace g with true by (vm_compute; reflexivity) end;
+  cbn match; rewrite exec_bind.
+
+Local Ltac st_ast :=
+  first [ reflexivity
+        | repeat f_equal;
+          first [ reflexivity | apply bv_eq; vm_compute; reflexivity ] ].
+
+(* single [and_boolM (returnM _) (currentlyEnabled Ext_Zca)] guard *)
+Local Ltac st_close1 s HmisaC :=
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s)));
+  [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; st_ast
+  | apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
+    apply exec_currentlyEnabled_Zca; exact HmisaC ].
+
+(* double-nested [and_boolM (returnM _) (and_boolM (returnM _) (cE Zca))] *)
+Local Ltac st_close2 s HmisaC :=
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _)
+                          (currentlyEnabled Ext_Zca))) s = Some (true, s)));
+  [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; st_ast
+  | apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
+    apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
+    apply exec_currentlyEnabled_Zca; exact HmisaC ].
+
+(* bare [currentlyEnabled Ext_Zca] guard *)
+Local Ltac st_close0 s HmisaC :=
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (currentlyEnabled Ext_Zca) s = Some (true, s)));
+  [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; st_ast
+  | apply (exec_currentlyEnabled_Zca s HmisaC) ].
+
+(* ---- idx 35: 0x7779 -> c.lui a4, 62(=0xffffe) ---- *)
+Lemma st_decode35 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h35) s = Some (C_LUI (si35, Regidx ti_a4), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h35 11 7 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close2 s HmisaC.
+Qed.
+
+(* ---- idx 37: 0x8ff9 -> c.and a5, a4 ---- *)
+Lemma st_decode37 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h37) s = Some (C_AND (ti_ca5, ti_ca4), s).
+Proof.
+  intro HmisaC.
+  st_open_rvc s HmisaC.
+  st_close0 s HmisaC.
+Qed.
+
+(* ---- idx 38: 0x6705 -> c.lui a4, 1 ---- *)
+Lemma st_decode38 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h38) s = Some (C_LUI (si38, Regidx ti_a4), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h38 11 7 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close2 s HmisaC.
+Qed.
+
+(* ---- idx 45: 0x4781 -> c.li a5, 0 ---- *)
+Lemma st_decode45 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h45) s = Some (C_LI (si45, Regidx ti_a5), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h45 11 7 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close0 s HmisaC.
+Qed.
+
+(* ---- idx 47: 0x67c1 -> c.lui a5, 16 ---- *)
+Lemma st_decode47 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h47) s = Some (C_LUI (si47, Regidx ti_a5), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h47 11 7 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close2 s HmisaC.
+Qed.
+
+(* ---- idx 48: 0x17fd -> c.addi a5, -1 ---- *)
+Lemma st_decode48 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h48) s = Some (C_ADDI (si48, Regidx ti_a5), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h48 11 7 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close1 s HmisaC.
+Qed.
+
+(* ---- idx 54: 0x57fd -> c.li a5, -1 ---- *)
+Lemma st_decode54 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h54) s = Some (C_LI (si54, Regidx ti_a5), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h54 11 7 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close0 s HmisaC.
+Qed.
+
+(* ---- idx 55: 0x83a9 -> c.srli a5, 10 ---- *)
+Lemma st_decode55 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h55) s = Some (C_SRLI (ssh55, ti_ca5), s).
+Proof.
+  intro HmisaC.
+  st_open_rvc s HmisaC.
+  st_close1 s HmisaC.
+Qed.
+
+(* ---- idx 57: 0x47bd -> c.li a5, 15 ---- *)
+Lemma st_decode57 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h57) s = Some (C_LI (si57, Regidx ti_a5), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h57 11 7 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close0 s HmisaC.
+Qed.
+
+(* ---- idx 61: 0x2781 -> c.addiw a5, 0 ---- *)
+(* The C_JAL / C_ADDIW encodings share one fused decoder clause, guarded by
+   [and_boolM (and_boolM (returnM (xlen =? 32)) (cE Zca)) (returnM pat)]: on
+   RV64 the C_JAL side collapses to false (xlen <> 32, short-circuiting past
+   the Zca read), selecting the C_ADDIW body. *)
+Lemma st_decode61 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h61) s = Some (C_ADDIW (si61, Regidx ti_a5), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr st_h61 11 7 s.
+  st_open_rvc s HmisaC.
+  match goal with |- context[Defs.and_boolM (Defs.and_boolM (returnM ?b32) (currentlyEnabled Ext_Zca)) (returnM ?p)] =>
+    assert (HJ : exec (Defs.and_boolM (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) (returnM p)) s = Some (false, s))
+      by (rewrite (exec_and_boolM_Some _ _ _ _ _
+            (_ : exec (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) s = Some (false, s)));
+          [ reflexivity
+          | rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM b32 s));
+            replace b32 with false by (vm_compute; reflexivity); reflexivity ])
+  end.
+  rewrite HJ. cbn match.
+  rewrite exec_bind.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  st_close2 s HmisaC.
+Qed.
+
+(* ---- idx 62: 0x823e -> c.mv tp, a5 ---- *)
+Lemma st_decode62 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed st_h62) s = Some (C_MV (Regidx st_tp, Regidx ti_a5), s).
+Proof.
+  intro HmisaC.
+  st_reg_step Hr1 st_h62 11 7 s.
+  st_reg_step Hr2 st_h62 6 2 s.
+  st_open_rvc s HmisaC.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
+  st_close1 s HmisaC.
+Qed.
+
+(* ---- the sixteen 32-bit instructions: one-shot [decode_any] ---- *)
+Lemma st_decode34 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w34) s
+    = Some (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode36 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w36) s
+    = Some (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode39 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w39) s
+    = Some (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode41 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w41) s
+    = Some (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode42 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w42) s
+    = Some (UTYPE (si42, Regidx ti_a5, AUIPC), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode43 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w43) s
+    = Some (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode44 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w44) s
+    = Some (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode46 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w46) s
+    = Some (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode49 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w49) s
+    = Some (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode50 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w50) s
+    = Some (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode51 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w51) s
+    = Some (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode52 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w52) s
+    = Some (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode53 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w53) s
+    = Some (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode56 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w56) s
+    = Some (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode58 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w58) s
+    = Some (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode59 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w59) s
+    = Some (JAL (sjimm59, Regidx ti_ra), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+Lemma st_decode60 s :
+  register_lookup cur_privilege (sregs s) = Machine ->
+  exec (ext_decode st_w60) s
+    = Some (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+(* idx 63 MRET: [decode_mret] (WpGprMretWp) applies verbatim (w_mret is the
+   same word 0x30200073). *)
+
+(* ===================================================================== *)
+(* The 34 [instr] constructors from [kernel_text] (WpEntryNew recipe).    *)
+(* ===================================================================== *)
+Section WpStartInstr.
+  Context `{!riscvGS Σ}.
+
+  (* PCs of the 34 instructions. *)
+  Definition st_pc30 : mword 64 := mword_of_int 0x80000058.
+  Definition st_pc31 : mword 64 := mword_of_int 0x8000005a.
+  Definition st_pc32 : mword 64 := mword_of_int 0x8000005c.
+  Definition st_pc33 : mword 64 := mword_of_int 0x8000005e.
+  Definition st_pc34 : mword 64 := mword_of_int 0x80000060.
+  Definition st_pc35 : mword 64 := mword_of_int 0x80000064.
+  Definition st_pc36 : mword 64 := mword_of_int 0x80000066.
+  Definition st_pc37 : mword 64 := mword_of_int 0x8000006a.
+  Definition st_pc38 : mword 64 := mword_of_int 0x8000006c.
+  Definition st_pc39 : mword 64 := mword_of_int 0x8000006e.
+  Definition st_pc40 : mword 64 := mword_of_int 0x80000072.
+  Definition st_pc41 : mword 64 := mword_of_int 0x80000074.
+  Definition st_pc42 : mword 64 := mword_of_int 0x80000078.
+  Definition st_pc43 : mword 64 := mword_of_int 0x8000007c.
+  Definition st_pc44 : mword 64 := mword_of_int 0x80000080.
+  Definition st_pc45 : mword 64 := mword_of_int 0x80000084.
+  Definition st_pc46 : mword 64 := mword_of_int 0x80000086.
+  Definition st_pc47 : mword 64 := mword_of_int 0x8000008a.
+  Definition st_pc48 : mword 64 := mword_of_int 0x8000008c.
+  Definition st_pc49 : mword 64 := mword_of_int 0x8000008e.
+  Definition st_pc50 : mword 64 := mword_of_int 0x80000092.
+  Definition st_pc51 : mword 64 := mword_of_int 0x80000096.
+  Definition st_pc52 : mword 64 := mword_of_int 0x8000009a.
+  Definition st_pc53 : mword 64 := mword_of_int 0x8000009e.
+  Definition st_pc54 : mword 64 := mword_of_int 0x800000a2.
+  Definition st_pc55 : mword 64 := mword_of_int 0x800000a4.
+  Definition st_pc56 : mword 64 := mword_of_int 0x800000a6.
+  Definition st_pc57 : mword 64 := mword_of_int 0x800000aa.
+  Definition st_pc58 : mword 64 := mword_of_int 0x800000ac.
+  Definition st_pc59 : mword 64 := mword_of_int 0x800000b0.
+  Definition st_pc60 : mword 64 := mword_of_int 0x800000b4.
+  Definition st_pc61 : mword 64 := mword_of_int 0x800000b8.
+  Definition st_pc62 : mword 64 := mword_of_int 0x800000ba.
+  Definition st_pc63 : mword 64 := mword_of_int 0x800000bc.
+
+  (* ---- constructor templates (copied from WpTimerinit; file-local) ---- *)
+  Local Ltac st_mk_rvc4 A h w pc ast decname :=
+    let Hlpad := fresh "Hlpad" in
+    let H2al := fresh "H2al" in
+    let H4al := fresh "H4al" in
+    let Hrvc := fresh "Hrvc" in
+    let Hsub := fresh "Hsub" in
+    let Hbytes := fresh "Hbytes" in
+    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = true) by (vm_compute; reflexivity);
+    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
+    assert (Hsub : subrange_vec_dec w 15 0 = h) by (apply bv_eq; vm_compute; reflexivity);
+    assert (Hbytes : forall j, (j < 4)%nat ->
+        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
+      by (intros j Hj;
+          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+    iIntros "#Ht"; rewrite /instr;
+    iSplitR; [iPureIntro; exact Hlpad|];
+    iExists (F_RVC h);
+    iSplitR; [iPureIntro; reflexivity|];
+    iSplitL "";
+    [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
+      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
+    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+
+  Local Ltac st_mk_rvc2 A h pc ast decname :=
+    let Hlpad := fresh "Hlpad" in
+    let H2al := fresh "H2al" in
+    let H4al := fresh "H4al" in
+    let Hrvc := fresh "Hrvc" in
+    let Hbytes := fresh "Hbytes" in
+    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = false) by (vm_compute; reflexivity);
+    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
+    assert (Hbytes : forall j, (j < 2)%nat ->
+        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte h j))
+      by (intros j Hj;
+          do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+    iIntros "#Ht"; rewrite /instr;
+    iSplitR; [iPureIntro; exact Hlpad|];
+    iExists (F_RVC h);
+    iSplitR; [iPureIntro; reflexivity|];
+    iSplitL "";
+    [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
+      iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
+    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+
+  Local Ltac st_mk_base A w pc ast decname :=
+    let Hlpad := fresh "Hlpad" in
+    let H2al := fresh "H2al" in
+    let Hnrvc := fresh "Hnrvc" in
+    let Hbytes := fresh "Hbytes" in
+    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+    assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
+    assert (Hbytes : forall j, (j < 4)%nat ->
+        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
+      by (intros j Hj;
+          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+    iIntros "#Ht"; rewrite /instr;
+    iSplitR; [iPureIntro; exact Hlpad|];
+    iExists (F_Base w);
+    iSplitR; [iPureIntro; reflexivity|];
+    iSplitL "";
+    [ iApply (instr_bytes_base pc w H2al Hnrvc);
+      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
+    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+
+  Lemma st_instr30 :
+    kernel_text -∗ instr st_pc30 true (C_ADDI (i9, Regidx csp_rs1)).
+  Proof. st_mk_rvc4 0x80000058 ti_h9 st_w30 st_pc30 (C_ADDI (i9, Regidx csp_rs1)) ti_decode9. Qed.
+
+  Lemma st_instr31 :
+    kernel_text -∗ instr st_pc31 true (C_SDSP (u10, Regidx ti_ra)).
+  Proof. st_mk_rvc2 0x8000005a ti_h10 st_pc31 (C_SDSP (u10, Regidx ti_ra)) ti_decode10. Qed.
+
+  Lemma st_instr32 :
+    kernel_text -∗ instr st_pc32 true (C_SDSP (u11, Regidx ti_s0)).
+  Proof. st_mk_rvc4 0x8000005c ti_h11 st_w32 st_pc32 (C_SDSP (u11, Regidx ti_s0)) ti_decode11. Qed.
+
+  Lemma st_instr33 :
+    kernel_text -∗ instr st_pc33 true (C_ADDI4SPN (ti_cs0, nz12)).
+  Proof. st_mk_rvc2 0x8000005e ti_h12 st_pc33 (C_ADDI4SPN (ti_cs0, nz12)) ti_decode12. Qed.
+
+  Lemma st_instr34 :
+    kernel_text -∗ instr st_pc34 false (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS)).
+  Proof. st_mk_base 0x80000060 st_w34 st_pc34 (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS)) st_decode34. Qed.
+
+  Lemma st_instr35 :
+    kernel_text -∗ instr st_pc35 true (C_LUI (si35, Regidx ti_a4)).
+  Proof. st_mk_rvc4 0x80000064 st_h35 st_w35 st_pc35 (C_LUI (si35, Regidx ti_a4)) st_decode35. Qed.
+
+  Lemma st_instr36 :
+    kernel_text -∗ instr st_pc36 false (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI)).
+  Proof. st_mk_base 0x80000066 st_w36 st_pc36 (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI)) st_decode36. Qed.
+
+  Lemma st_instr37 :
+    kernel_text -∗ instr st_pc37 true (C_AND (ti_ca5, ti_ca4)).
+  Proof. st_mk_rvc2 0x8000006a st_h37 st_pc37 (C_AND (ti_ca5, ti_ca4)) st_decode37. Qed.
+
+  Lemma st_instr38 :
+    kernel_text -∗ instr st_pc38 true (C_LUI (si38, Regidx ti_a4)).
+  Proof. st_mk_rvc4 0x8000006c st_h38 st_w38 st_pc38 (C_LUI (si38, Regidx ti_a4)) st_decode38. Qed.
+
+  Lemma st_instr39 :
+    kernel_text -∗ instr st_pc39 false (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI)).
+  Proof. st_mk_base 0x8000006e st_w39 st_pc39 (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI)) st_decode39. Qed.
+
+  Lemma st_instr40 :
+    kernel_text -∗ instr st_pc40 true (C_OR (ti_ca5, ti_ca4)).
+  Proof. st_mk_rvc2 0x80000072 ti_h16 st_pc40 (C_OR (ti_ca5, ti_ca4)) ti_decode16. Qed.
+
+  Lemma st_instr41 :
+    kernel_text -∗ instr st_pc41 false (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x80000074 st_w41 st_pc41 (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW)) st_decode41. Qed.
+
+  Lemma st_instr42 :
+    kernel_text -∗ instr st_pc42 false (UTYPE (si42, Regidx ti_a5, AUIPC)).
+  Proof. st_mk_base 0x80000078 st_w42 st_pc42 (UTYPE (si42, Regidx ti_a5, AUIPC)) st_decode42. Qed.
+
+  Lemma st_instr43 :
+    kernel_text -∗ instr st_pc43 false (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI)).
+  Proof. st_mk_base 0x8000007c st_w43 st_pc43 (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI)) st_decode43. Qed.
+
+  Lemma st_instr44 :
+    kernel_text -∗ instr st_pc44 false (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x80000080 st_w44 st_pc44 (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW)) st_decode44. Qed.
+
+  Lemma st_instr45 :
+    kernel_text -∗ instr st_pc45 true (C_LI (si45, Regidx ti_a5)).
+  Proof. st_mk_rvc4 0x80000084 st_h45 st_w45 st_pc45 (C_LI (si45, Regidx ti_a5)) st_decode45. Qed.
+
+  Lemma st_instr46 :
+    kernel_text -∗ instr st_pc46 false (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x80000086 st_w46 st_pc46 (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW)) st_decode46. Qed.
+
+  Lemma st_instr47 :
+    kernel_text -∗ instr st_pc47 true (C_LUI (si47, Regidx ti_a5)).
+  Proof. st_mk_rvc2 0x8000008a st_h47 st_pc47 (C_LUI (si47, Regidx ti_a5)) st_decode47. Qed.
+
+  Lemma st_instr48 :
+    kernel_text -∗ instr st_pc48 true (C_ADDI (si48, Regidx ti_a5)).
+  Proof. st_mk_rvc4 0x8000008c st_h48 st_w48 st_pc48 (C_ADDI (si48, Regidx ti_a5)) st_decode48. Qed.
+
+  Lemma st_instr49 :
+    kernel_text -∗ instr st_pc49 false (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x8000008e st_w49 st_pc49 (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW)) st_decode49. Qed.
+
+  Lemma st_instr50 :
+    kernel_text -∗ instr st_pc50 false (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x80000092 st_w50 st_pc50 (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW)) st_decode50. Qed.
+
+  Lemma st_instr51 :
+    kernel_text -∗ instr st_pc51 false (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS)).
+  Proof. st_mk_base 0x80000096 st_w51 st_pc51 (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS)) st_decode51. Qed.
+
+  Lemma st_instr52 :
+    kernel_text -∗ instr st_pc52 false (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI)).
+  Proof. st_mk_base 0x8000009a st_w52 st_pc52 (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI)) st_decode52. Qed.
+
+  Lemma st_instr53 :
+    kernel_text -∗ instr st_pc53 false (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x8000009e st_w53 st_pc53 (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW)) st_decode53. Qed.
+
+  Lemma st_instr54 :
+    kernel_text -∗ instr st_pc54 true (C_LI (si54, Regidx ti_a5)).
+  Proof. st_mk_rvc2 0x800000a2 st_h54 st_pc54 (C_LI (si54, Regidx ti_a5)) st_decode54. Qed.
+
+  Lemma st_instr55 :
+    kernel_text -∗ instr st_pc55 true (C_SRLI (ssh55, ti_ca5)).
+  Proof. st_mk_rvc4 0x800000a4 st_h55 st_w55 st_pc55 (C_SRLI (ssh55, ti_ca5)) st_decode55. Qed.
+
+  Lemma st_instr56 :
+    kernel_text -∗ instr st_pc56 false (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x800000a6 st_w56 st_pc56 (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW)) st_decode56. Qed.
+
+  Lemma st_instr57 :
+    kernel_text -∗ instr st_pc57 true (C_LI (si57, Regidx ti_a5)).
+  Proof. st_mk_rvc2 0x800000aa st_h57 st_pc57 (C_LI (si57, Regidx ti_a5)) st_decode57. Qed.
+
+  Lemma st_instr58 :
+    kernel_text -∗ instr st_pc58 false (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW)).
+  Proof. st_mk_base 0x800000ac st_w58 st_pc58 (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW)) st_decode58. Qed.
+
+  Lemma st_instr59 :
+    kernel_text -∗ instr st_pc59 false (JAL (sjimm59, Regidx ti_ra)).
+  Proof. st_mk_base 0x800000b0 st_w59 st_pc59 (JAL (sjimm59, Regidx ti_ra)) st_decode59. Qed.
+
+  Lemma st_instr60 :
+    kernel_text -∗ instr st_pc60 false (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)).
+  Proof. st_mk_base 0x800000b4 st_w60 st_pc60 (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)) st_decode60. Qed.
+
+  Lemma st_instr61 :
+    kernel_text -∗ instr st_pc61 true (C_ADDIW (si61, Regidx ti_a5)).
+  Proof. st_mk_rvc4 0x800000b8 st_h61 st_w61 st_pc61 (C_ADDIW (si61, Regidx ti_a5)) st_decode61. Qed.
+
+  Lemma st_instr62 :
+    kernel_text -∗ instr st_pc62 true (C_MV (Regidx st_tp, Regidx ti_a5)).
+  Proof. st_mk_rvc2 0x800000ba st_h62 st_pc62 (C_MV (Regidx st_tp, Regidx ti_a5)) st_decode62. Qed.
+
+  Lemma st_instr63 :
+    kernel_text -∗ instr st_pc63 false (MRET tt).
+  Proof. st_mk_base 0x800000bc w_mret st_pc63 (MRET tt) decode_mret. Qed.
+
+End WpStartInstr.
+
+(* ===================================================================== *)
+(* Symbolic values of the run (functions of the entry state).  start()'s *)
+(* own 16-byte frame reuses timerinit's slot geometry: the frame base is  *)
+(* [ti_sp1 sp0] and the slots are [ti_ea_ra sp0] / [ti_ea_s0 sp0];        *)
+(* timerinit's (nested) frame slots are [ti_ea_ra (ti_sp1 sp0)] /         *)
+(* [ti_ea_s0 (ti_sp1 sp0)].                                               *)
+(* ===================================================================== *)
+
+(* mstatus write mask: a5 := (mstatus & 0xffffffffffffe7ff) | 0x800
+   (clear MPP[12:11], set MPP := 01 = Supervisor). *)
+Definition st_mask_and : mword 64 := mword_of_int 0xffffffffffffe7ff.
+Definition st_mask_or  : mword 64 := mword_of_int 0x800.
+Definition st_va5_40 (ms : mword 64) : mword 64 :=
+  or_vec (and_vec ms st_mask_and) st_mask_or.
+(* the legalized mstatus after idx 41 *)
+Definition st_ms1 (ms : mword 64) : mword 64 := mstatus_legalized ms (st_va5_40 ms).
+
+Definition st_a42v : mword 64 := mword_of_int 0x80001078.  (* auipc a5,1 *)
+Definition st_main : mword 64 := mword_of_int 0x80000e82.  (* <main> *)
+Definition st_ffff : mword 64 := mword_of_int 0xffff.      (* medeleg/mideleg wval *)
+Definition st_pmpw : mword 64 := mword_of_int 0x3fffffffffffff. (* pmpaddr0 wval *)
+Definition st_ra_link : mword 64 := mword_of_int 0x800000b4.    (* jal link *)
+
+Definition st_mdl1 (mdl0 : mword 64) : mword 64 := mideleg_legalized mdl0 st_ffff.
+Definition st_va5_52 (mie0 mdl0 : mword 64) : mword 64 :=
+  or_vec (lower_mie mie0 (st_mdl1 mdl0)) (sign_extend' 64 si52).
+Definition st_mie1 (mie0 mdl0 : mword 64) : mword 64 :=
+  sie_new_mie mie0 (st_mdl1 mdl0) (st_va5_52 mie0 mdl0).
+Definition st_pmpcfg1 (cfg0 : type_of_register pmpcfg_n) : type_of_register pmpcfg_n :=
+  pmpcfg_written (mword_of_int 15) cfg0.
+Definition st_pmpaddr1 (cfg0 : type_of_register pmpcfg_n)
+    (pa0 : type_of_register pmpaddr_n) : type_of_register pmpaddr_n :=
+  pmp0_newaddr cfg0 pa0 st_pmpw.
+Definition st_tpv (mh : mword 64) : mword 64 :=
+  sign_extend' 64 (subrange_vec_dec (add_vec mh (sign_extend' 64 si61)) 31 0).
+
+(* s0 := sp + 16 after the -16 prologue is the ORIGINAL sp. *)
+Lemma st_s0_16 (sp0 : mword 64) :
+  add_vec (ti_sp1 sp0) (sign_extend' 64 (caddi4spn_imm nz12)) = sp0.
+Proof.
+  unfold ti_sp1. rewrite ti_addv_assoc.
+  replace (add_vec (sign_extend' 64 i9) (sign_extend' 64 (caddi4spn_imm nz12)))
+    with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
+  exact (avi0 sp0).
+Qed.
+
+(* ===================================================================== *)
+(* Bit-window facts about the mstatus write mask, for SYMBOLIC ms:        *)
+(*   - MIE (bit 3) / MPRV (bit 17) of the written value equal those of    *)
+(*     the read mstatus (the AND mask keeps them, the OR mask misses);    *)
+(*   - MPP (bits 12:11) of the written value is 01 (Supervisor bits)      *)
+(*     UNCONDITIONALLY (AND clears them, OR sets bit 11).                  *)
+(* ===================================================================== *)
+
+Local Ltac st_bit_open :=
+  cbv [st_va5_40 or_vec and_vec Operators_mwords.word_binop
+       Operators_mwords.with_word' SailStdpp.Values.with_word];
+  unfold MachineWord.MachineWord.and, MachineWord.MachineWord.or;
+  unfold subrange_vec_dec; rewrite !autocast_id;
+  unfold to_word_idx, to_word; rewrite !MachineWord.MachineWord.cast_idx_refl;
+  unfold get_word, MachineWord.MachineWord.slice;
+  apply bv_eq; rewrite !bv_extract_unsigned;
+  rewrite bv_or_unsigned bv_and_unsigned;
+  replace (bv_unsigned st_mask_and) with 0xffffffffffffe7ff
+    by (vm_compute; reflexivity);
+  replace (bv_unsigned st_mask_or) with 0x800 by (vm_compute; reflexivity);
+  unfold bv_wrap, bv_modulus.
+
+Lemma st_va5_40_MIE (x : mword 64) :
+  _get_Mstatus_MIE (st_va5_40 x) = _get_Mstatus_MIE x.
+Proof.
+  unfold _get_Mstatus_MIE. st_bit_open.
+  repeat match goal with
+  | |- context[Z.of_N ?t] =>
+      let v := eval vm_compute in (Z.of_N t) in
+      progress (replace (Z.of_N t) with v by (vm_compute; reflexivity))
+  end.
+  apply Z.bits_inj'. intros j Hj.
+  destruct (decide (j < 1)) as [Hj1 | Hj1].
+  - replace j with 0 by lia.
+    rewrite !Z.mod_pow2_bits_low; [| lia | lia].
+    rewrite !Z.shiftr_spec; [| lia | lia].
+    rewrite Z.lor_spec Z.land_spec.
+    replace (Z.testbit 0xffffffffffffe7ff (0 + 3)) with true by (vm_compute; reflexivity).
+    replace (Z.testbit 0x800 (0 + 3)) with false by (vm_compute; reflexivity).
+    rewrite andb_true_r orb_false_r. reflexivity.
+  - rewrite !Z.mod_pow2_bits_high; [reflexivity | lia | lia].
+Qed.
+
+Lemma st_va5_40_MPRV (x : mword 64) :
+  _get_Mstatus_MPRV (st_va5_40 x) = _get_Mstatus_MPRV x.
+Proof.
+  unfold _get_Mstatus_MPRV. st_bit_open.
+  repeat match goal with
+  | |- context[Z.of_N ?t] =>
+      let v := eval vm_compute in (Z.of_N t) in
+      progress (replace (Z.of_N t) with v by (vm_compute; reflexivity))
+  end.
+  apply Z.bits_inj'. intros j Hj.
+  destruct (decide (j < 1)) as [Hj1 | Hj1].
+  - replace j with 0 by lia.
+    rewrite !Z.mod_pow2_bits_low; [| lia | lia].
+    rewrite !Z.shiftr_spec; [| lia | lia].
+    rewrite Z.lor_spec Z.land_spec.
+    replace (Z.testbit 0xffffffffffffe7ff (0 + 17)) with true by (vm_compute; reflexivity).
+    replace (Z.testbit 0x800 (0 + 17)) with false by (vm_compute; reflexivity).
+    rewrite andb_true_r orb_false_r. reflexivity.
+  - rewrite !Z.mod_pow2_bits_high; [reflexivity | lia | lia].
+Qed.
+
+Lemma st_va5_40_MPP (x : mword 64) :
+  _get_Mstatus_MPP (st_va5_40 x) = ('b"01" : mword 2).
+Proof.
+  unfold _get_Mstatus_MPP. st_bit_open.
+  repeat match goal with
+  | |- context[Z.of_N ?t] =>
+      let v := eval vm_compute in (Z.of_N t) in
+      progress (replace (Z.of_N t) with v by (vm_compute; reflexivity))
+  end.
+  replace (bv_unsigned ('b"01" : mword 2)) with 1 by (vm_compute; reflexivity).
+  apply Z.bits_inj'. intros j Hj.
+  destruct (decide (j < 2)) as [Hj2 | Hj2].
+  - rewrite Z.mod_pow2_bits_low; [| lia].
+    rewrite Z.shiftr_spec; [| lia].
+    rewrite Z.lor_spec Z.land_spec.
+    destruct (decide (j = 0)) as [-> | Hj0].
+    + replace (Z.testbit 0xffffffffffffe7ff (0 + 11)) with false by (vm_compute; reflexivity).
+      replace (Z.testbit 0x800 (0 + 11)) with true by (vm_compute; reflexivity).
+      rewrite andb_false_r orb_true_r. vm_compute. reflexivity.
+    + replace j with 1 by lia.
+      replace (Z.testbit 0xffffffffffffe7ff (1 + 11)) with false by (vm_compute; reflexivity).
+      replace (Z.testbit 0x800 (1 + 11)) with false by (vm_compute; reflexivity).
+      rewrite andb_false_r orb_false_r. vm_compute. reflexivity.
+  - rewrite Z.mod_pow2_bits_high; [| lia].
+    symmetry. apply Z.bits_above_log2; [lia |].
+    replace (Z.log2 1) with 0 by reflexivity. lia.
+Qed.
+
+(* ===================================================================== *)
+(* menvcfg.LPE (bit 2) is never set by the boot flow: the legalizer's     *)
+(* LPE field is written from the written value, whose bit 2 the           *)
+(* [STCE |= bit63] OR does not touch.  Get-over-update ladder in the      *)
+(* style of WpGprCsrwC's Mstatus family.                                  *)
+(* ===================================================================== *)
+Local Ltac st_guu :=
+  unfold _get_MEnvcfg_LPE,
+         _update_MEnvcfg_FIOM, _update_MEnvcfg_LPE, _update_MEnvcfg_SSE,
+         _update_MEnvcfg_CBZE, _update_MEnvcfg_CBCFE, _update_MEnvcfg_CBIE,
+         _update_MEnvcfg_STCE, _update_MEnvcfg_PMM, _update_MEnvcfg_ADUE,
+         _update_MEnvcfg_PBMTE;
+  unfold subrange_vec_dec, update_subrange_vec_dec;
+  rewrite !autocast_refl;
+  unfold to_word_idx, to_word, get_word;
+  rewrite !MachineWord.MachineWord.cast_idx_refl.
+
+Local Ltac st_gu_disj :=
+  st_guu;
+  apply bv_extract_update_slice_disjoint;
+  [ first [ left; vm_compute; let X := fresh in intro X; discriminate X
+          | right; vm_compute; let X := fresh in intro X; discriminate X ]
+  | vm_compute; let X := fresh in intro X; discriminate X ].
+
+Local Ltac st_gu_same :=
+  st_guu;
+  apply bv_extract_update_slice_same;
+  vm_compute; let X := fresh in intro X; discriminate X.
+
+Lemma gLPEe_uLPE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_LPE w x) = x.
+Proof. st_gu_same. Qed.
+Lemma gLPEe_uSSE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_SSE w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+Lemma gLPEe_uCBZE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_CBZE w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+Lemma gLPEe_uCBCFE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_CBCFE w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+Lemma gLPEe_uCBIE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_CBIE w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+Lemma gLPEe_uSTCE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_STCE w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+Lemma gLPEe_uPMM (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_PMM w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+Lemma gLPEe_uADUE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_ADUE w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+Lemma gLPEe_uPBMTE (w : mword 64) x : _get_MEnvcfg_LPE (_update_MEnvcfg_PBMTE w x) = _get_MEnvcfg_LPE w.
+Proof. st_gu_disj. Qed.
+
+Lemma menvcfg_legalized_LPE (o v : mword 64) :
+  _get_MEnvcfg_LPE (menvcfg_legalized o v) = _get_MEnvcfg_LPE v.
+Proof.
+  unfold menvcfg_legalized. cbn zeta.
+  rewrite gLPEe_uPBMTE gLPEe_uADUE gLPEe_uPMM gLPEe_uSTCE gLPEe_uCBIE
+          gLPEe_uCBCFE gLPEe_uCBZE gLPEe_uSSE gLPEe_uLPE.
+  unfold Mk_MEnvcfg. reflexivity.
+Qed.
+
+(* bit 2 of (x | (1<<63)) is bit 2 of x. *)
+Lemma st_LPE_or_bit63 (x : mword 64) :
+  _get_MEnvcfg_LPE (ti_menv1 x) = _get_MEnvcfg_LPE x.
+Proof.
+  unfold _get_MEnvcfg_LPE, ti_menv1.
+  cbv [or_vec Operators_mwords.word_binop
+       Operators_mwords.with_word' SailStdpp.Values.with_word].
+  unfold MachineWord.MachineWord.or.
+  unfold subrange_vec_dec. rewrite !autocast_id.
+  unfold to_word_idx, to_word. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  apply bv_eq. rewrite !bv_extract_unsigned. rewrite bv_or_unsigned.
+  replace (bv_unsigned ti_bit63) with 0x8000000000000000 by (vm_compute; reflexivity).
+  unfold bv_wrap, bv_modulus.
+  repeat match goal with
+  | |- context[Z.of_N ?t] =>
+      let v := eval vm_compute in (Z.of_N t) in
+      progress (replace (Z.of_N t) with v by (vm_compute; reflexivity))
+  end.
+  apply Z.bits_inj'. intros j Hj.
+  destruct (decide (j < 1)) as [Hj1 | Hj1].
+  - replace j with 0 by lia.
+    rewrite !Z.mod_pow2_bits_low; [| lia | lia].
+    rewrite !Z.shiftr_spec; [| lia | lia].
+    rewrite Z.lor_spec.
+    replace (Z.testbit 0x8000000000000000 (0 + 2)) with false by (vm_compute; reflexivity).
+    rewrite orb_false_r. reflexivity.
+  - rewrite !Z.mod_pow2_bits_high; [reflexivity | lia | lia].
+Qed.
+
+(* the LPE bit of the FINAL menvcfg (post-timerinit) is 0, given it starts 0. *)
+Lemma st_menvcfg_LPE_final (menv0 : mword 64) :
+  _get_MEnvcfg_LPE menv0 = ('b"0") ->
+  _get_MEnvcfg_LPE (menvcfg_legalized menv0 (ti_menv1 menv0)) = ('b"0").
+Proof.
+  intro H. rewrite menvcfg_legalized_LPE. rewrite st_LPE_or_bit63. exact H.
+Qed.
+
+(* ===================================================================== *)
+(* The MPP-at-MRET keystone: the target privilege decoded from the        *)
+(* legalized-then-cms-updated mstatus is Supervisor.                      *)
+(* ===================================================================== *)
+Lemma st_mret_priv (ms : mword 64) :
+  privLevel_bits_forwards (_get_Mstatus_MPP (cms2 (st_ms1 ms)), ('b"0"))
+    = returnM Supervisor.
+Proof.
+  unfold cms2, cms1.
+  change (update_subrange_vec_dec (st_ms1 ms) 3 3 (_get_Mstatus_MPIE (st_ms1 ms)))
+    with (_update_Mstatus_MIE (st_ms1 ms) (_get_Mstatus_MPIE (st_ms1 ms))).
+  match goal with |- context[update_subrange_vec_dec ?w 7 7 ?x] =>
+    change (update_subrange_vec_dec w 7 7 x) with (_update_Mstatus_MPIE w x) end.
+  rewrite gMPP_uMPIE gMPP_uMIE.
+  unfold st_ms1. rewrite mstatus_legalized_MPP. rewrite st_va5_40_MPP.
+  replace (have_nom_val ('b"01" : mword 2)) with true by (vm_compute; reflexivity).
+  vm_compute. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* PMP facts of the WRITTEN config/addr: entry 0 of the written pmpcfg is *)
+(* TOR + unlocked; the written pmpaddr0 is the CONCRETE 0x3fffffffffffff, *)
+(* whose TOR region [0, 0xfffffffffffffc) covers any bounded access.      *)
+(* ===================================================================== *)
+
+(* vec_access over vec_update for the pmpaddr vector (64 x mword 64);      *)
+(* verbatim clone of WpGprCsrwC.pmpcfg_access_update at the other type.   *)
+Lemma pmpaddr_access_update (v : type_of_register pmpaddr_n) (m j : Z) (t : mword 64) :
+  0 <= m < 64 ->
+  vec_access_dec (vec_update_dec v m t) j
+  = (if Z.eqb j m then t else vec_access_dec v j).
+Proof.
+  intros Hm. destruct v as [xs Hlen].
+  assert (Hl : length xs = 64%nat) by (rewrite Hlen; reflexivity).
+  unfold vec_update_dec.
+  destruct (sumbool_of_bool (0 <=? m <? 64)) as [He|He].
+  2:{ exfalso.
+      assert (Ht : ((0 <=? m) && (m <? 64))%bool = true)
+        by (apply andb_true_intro; split; [apply Z.leb_le|apply Z.ltb_lt]; lia).
+      rewrite Ht in He. discriminate He. }
+  unfold vec_access_dec. cbn [projT1].
+  unfold update_list_dec, update_list_inc, access_list_dec, access_list_inc, length_list.
+  rewrite !Hl.
+  change (Z.of_nat 64 - 1) with 63.
+  set (k := Z.to_nat (63 - m)).
+  assert (Hk : (k < length xs)%nat) by (unfold k; rewrite Hl; lia).
+  rewrite (list_update_insert xs k t Hk).
+  rewrite length_insert. rewrite Hl.
+  change (Z.of_nat 64 - 1) with 63.
+  destruct (Z.ltb (63 - j) 0) eqn:Hg.
+  - apply Z.ltb_lt in Hg.
+    replace (Z.eqb j m) with false by (symmetry; apply Z.eqb_neq; lia).
+    reflexivity.
+  - apply Z.ltb_ge in Hg.
+    destruct (Z.eqb j m) eqn:Hjm.
+    + apply Z.eqb_eq in Hjm. subst j.
+      rewrite nth_lookup.
+      replace (Z.to_nat (63 - m)) with k by reflexivity.
+      rewrite (list_lookup_insert xs k t Hk). reflexivity.
+    + apply Z.eqb_neq in Hjm.
+      rewrite nth_lookup.
+      rewrite list_lookup_insert_ne.
+      2:{ unfold k. lia. }
+      rewrite <- nth_lookup. reflexivity.
+Qed.
+
+(* entry 0 of the written pmpaddr vector is the concrete legalized value
+   (= st_pmpw itself: 54 low bits, all kept). *)
+Lemma st_pmpaddr1_entry0 (cfg0 : type_of_register pmpcfg_n)
+    (pa0 : type_of_register pmpaddr_n) :
+  pmp_all_off cfg0 ->
+  vec_access_dec (st_pmpaddr1 cfg0 pa0) 0 = st_pmpw.
+Proof.
+  intro Hoff.
+  unfold st_pmpaddr1, pmp0_newaddr.
+  rewrite (pmpaddr_access_update pa0 0 0 _ ltac:(lia)).
+  replace (Z.eqb 0 0) with true by reflexivity.
+  destruct (Hoff 0) as [_ HL0].
+  unfold pmpWriteAddr.
+  rewrite HL0.
+  assert (HTL : pmpTORLocked (vec_access_dec cfg0 (Z.add 0 1)) = false).
+  { destruct (Hoff (Z.add 0 1)) as [_ HL1].
+    unfold pmpTORLocked. unfold pmpLocked in HL1. rewrite HL1. reflexivity. }
+  rewrite HTL. cbn [orb].
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+(* entry 0 of the written pmpcfg is TOR + unlocked (byte 0x0f). *)
+Lemma st_pmpcfg1_entry0 (cfg0 : type_of_register pmpcfg_n) :
+  pmp_all_off cfg0 ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (st_pmpcfg1 cfg0) 0)) = TOR
+  /\ pmpLocked (vec_access_dec (st_pmpcfg1 cfg0) 0) = false.
+Proof.
+  intro Hoff.
+  assert (HE : vec_access_dec (st_pmpcfg1 cfg0) 0
+               = pmpWriteCfg_val (vec_access_dec cfg0 (Z.add (Z.mul 0 4) 0))
+                   (autocast (T := mword)
+                      (subrange_vec_dec (mword_of_int 15 : mword 64)
+                         (Z.add (Z.mul 8 0) 7) (Z.mul 8 0)))).
+  { unfold st_pmpcfg1, pmpcfg_written.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 7) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 7)) with false by reflexivity.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 6) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 6)) with false by reflexivity.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 5) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 5)) with false by reflexivity.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 4) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 4)) with false by reflexivity.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 3) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 3)) with false by reflexivity.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 2) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 2)) with false by reflexivity.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 1) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 1)) with false by reflexivity.
+    unfold pmpcfg0_vecupd at 1.
+    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 0) 0 _ ltac:(lia)).
+    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 0)) with true by reflexivity.
+    reflexivity. }
+  rewrite HE.
+  destruct (Hoff (Z.add (Z.mul 0 4) 0)) as [_ HL0].
+  unfold pmpWriteCfg_val.
+  rewrite HL0.
+  split; vm_compute; reflexivity.
+Qed.
+
+(* THE data-side PMP fact wp_timerinit needs, for a bounded access. *)
+Lemma st_pmp_tor0_grants (cfg0 : type_of_register pmpcfg_n)
+    (pa0 : type_of_register pmpaddr_n) (ea : mword 64) (width : Z) :
+  pmp_all_off cfg0 ->
+  0 < width ->
+  uint ea + width <= 0xfffffffffffffc ->
+  pmp_tor0_grants (st_pmpcfg1 cfg0) (st_pmpaddr1 cfg0 pa0) ea width.
+Proof.
+  intros Hoff Hw Hbnd.
+  destruct (st_pmpcfg1_entry0 cfg0 Hoff) as [HA HL].
+  split; [exact HA | split; [exact HL | split; [exact Hw |]]].
+  rewrite (st_pmpaddr1_entry0 cfg0 pa0 Hoff).
+  replace (uint st_pmpw) with 0x3fffffffffffff by (vm_compute; reflexivity).
+  lia.
+Qed.
+
+(* ===================================================================== *)
+(* The gpr-file after each register write, as nested-insert abbreviations *)
+(* over the abstract entry file [m] (WpTimerinit [ti_m*] style).          *)
+(* ===================================================================== *)
+Definition st_m30 (m : gmap regidx (mword 64)) (sp0 : mword 64) :=
+  <[Regidx csp_rs1 := regval_into_reg (ti_sp1 sp0)]> m.
+Definition st_m33 (m : gmap regidx (mword 64)) (sp0 : mword 64) :=
+  <[Regidx ti_s0 := regval_into_reg sp0]> (st_m30 m sp0).
+Definition st_m34 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg ms0]> (st_m33 m sp0).
+Definition st_m35 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si35))]> (st_m34 m sp0 ms0).
+Definition st_m36 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a4 := regval_into_reg st_mask_and]> (st_m35 m sp0 ms0).
+Definition st_m37 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (and_vec ms0 st_mask_and)]> (st_m36 m sp0 ms0).
+Definition st_m38 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si38))]> (st_m37 m sp0 ms0).
+Definition st_m39 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a4 := regval_into_reg st_mask_or]> (st_m38 m sp0 ms0).
+Definition st_m40 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (st_va5_40 ms0)]> (st_m39 m sp0 ms0).
+Definition st_m42 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg st_a42v]> (st_m40 m sp0 ms0).
+Definition st_m43 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg st_main]> (st_m42 m sp0 ms0).
+Definition st_m45 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (mword_of_int 0)]> (st_m43 m sp0 ms0).
+Definition st_m47 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si47))]> (st_m45 m sp0 ms0).
+Definition st_m48 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg st_ffff]> (st_m47 m sp0 ms0).
+Definition st_m51 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (lower_mie mie0 (st_mdl1 mdl0))]> (st_m48 m sp0 ms0).
+Definition st_m52 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (st_va5_52 mie0 mdl0)]> (st_m51 m sp0 ms0 mie0 mdl0).
+Definition st_m54 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (cli_wval si54)]> (st_m52 m sp0 ms0 mie0 mdl0).
+Definition st_m55 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg st_pmpw]> (st_m54 m sp0 ms0 mie0 mdl0).
+Definition st_m57 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (mword_of_int 15)]> (st_m55 m sp0 ms0 mie0 mdl0).
+Definition st_m59 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+  <[Regidx ti_ra := regval_into_reg st_ra_link]> (st_m57 m sp0 ms0 mie0 mdl0).
+Definition st_mti (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+    (mcen0 : mword 32) (mtime0 : mword 64) :=
+  ti_mout (st_m59 m sp0 ms0 mie0 mdl0) (ti_sp1 sp0) menv0 mcen0 mtime0 st_ra_link sp0.
+Definition st_m60 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+    (mcen0 : mword 32) (mtime0 mh : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg mh]> (st_mti m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0).
+Definition st_m61 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+    (mcen0 : mword 32) (mtime0 mh : mword 64) :=
+  <[Regidx ti_a5 := regval_into_reg (st_tpv mh)]> (st_m60 m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh).
+(* the FINAL file: sp = sp0-16 (the still-open start frame), s0 = sp0,
+   ra = 0x800000b4, a4 = timerinit's interval, a5 = tp = sext32(mhartid). *)
+Definition st_mout (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+    (mcen0 : mword 32) (mtime0 mh : mword 64) :=
+  <[Regidx st_tp := regval_into_reg (st_tpv mh)]> (st_m61 m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh).
+
+(* concrete-register-key disequality + total-lookup driver (ti_look clones). *)
+Local Ltac st_reg_neq :=
+  let H := fresh in intro H;
+  apply (f_equal (fun r : regidx => uint (regidx_bits r))) in H;
+  vm_compute in H; discriminate H.
+
+Local Ltac st_look :=
+  repeat first [ rewrite lookup_total_insert
+               | rewrite lookup_total_insert_ne; [ | st_reg_neq ] ];
+  first [ reflexivity | assumption ].
+
+Local Ltac st_unfold :=
+  unfold st_mout, st_m61, st_m60, st_mti, st_m59, st_m57, st_m55, st_m54,
+         st_m52, st_m51, st_m48, st_m47, st_m45, st_m43, st_m42, st_m40,
+         st_m39, st_m38, st_m37, st_m36, st_m35, st_m34, st_m33, st_m30,
+         ti_mout, ti_m27, ti_m26, ti_m24, ti_m23, ti_m22, ti_m21, ti_m19,
+         ti_m18, ti_m16, ti_m15, ti_m14, ti_m13, ti_m12, ti_m1.
+
+(* ===================================================================== *)
+(* THE THEOREM: the whole start() body (including the timerinit call),   *)
+(* one Qed, from [mmode_config (DfracOwn 1)] through the MRET into        *)
+(* Supervisor mode at <main> (0x80000e82).                                *)
+(* ===================================================================== *)
+Section WpStartThm.
+  Context `{!riscvGS Σ}.
+
+  (* two halves of a register cell rejoin to the full cell. *)
+  Lemma reg_half_join (r : register) (v : type_of_register r) :
+    r ↦ᵣ{DfracOwn (1/2)} v -∗ r ↦ᵣ{DfracOwn (1/2)} v -∗ r ↦ᵣ v.
+  Proof.
+    rewrite /reg_pointsto. iIntros "H1 H2".
+    iDestruct (pointsto_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own Qp.half_half. iExact "H".
+  Qed.
+
+  Lemma wp_start E (Φ : mval -> iProp Σ)
+      (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)
+      (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in : mword 64)
+      (mcounteren0 : mword 32)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (vsra vss0 vtra vts0 : bv 64) :
+    ↑minstretN ⊆ E ->
+    (* the boot pmpcfg is all-OFF (fetches + the two prologue stores). *)
+    pmp_all_off pmpcfg0 ->
+    (* Zicfilp landing-pad enable of the initial menvcfg is off (the boot
+       flow never sets it), so the MRET target check is a no-op. *)
+    _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
+    (* entry register file: sp / ra / s0. *)
+    m !!! Regidx csp_rs1 = sp0 ->
+    m !!! Regidx ti_ra = ra0 ->
+    m !!! Regidx ti_s0 = s00 ->
+    (* start()'s own frame slots (stored under the all-OFF pmp). *)
+    is_aligned_paddr (Physaddr (ti_ea_ra sp0)) 8 = true ->
+    is_aligned_paddr (Physaddr (ti_ea_s0 sp0)) 8 = true ->
+    (* timerinit's frame slots: 8-aligned + inside the written TOR region
+       [0, 0xfffffffffffffc). *)
+    is_aligned_paddr (Physaddr (ti_ea_ra (ti_sp1 sp0))) 8 = true ->
+    is_aligned_paddr (Physaddr (ti_ea_s0 (ti_sp1 sp0))) 8 = true ->
+    uint (ti_ea_ra (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
+    uint (ti_ea_s0 (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
+    mmode_config (DfracOwn 1) -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ pmpaddr00 -∗
+    pc_is st_pc30 -∗
+    gpr_file m -∗
+    mhartid ↦ᵣ mhartid_in -∗
+    mepc ↦ᵣ mepc0 -∗
+    satp ↦ᵣ satp0 -∗
+    medeleg ↦ᵣ medeleg0 -∗
+    mideleg ↦ᵣ mideleg0 -∗
+    mie ↦ᵣ mie0 -∗
+    menvcfg ↦ᵣ menvcfg0 -∗
+    mcounteren ↦ᵣ mcounteren0 -∗
+    mtime ↦ᵣ mtime0 -∗
+    stimecmp ↦ᵣ stimecmp0 -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte vsra j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte vss0 j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra (ti_sp1 sp0)) j) ↦ₘ nth_byte vtra j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 (ti_sp1 sp0)) j) ↦ₘ nth_byte vts0 j) -∗
+    kernel_text -∗
+    (* the continuation is universally quantified over the (hidden) entry
+       mstatus value [ms0] with its mmode_config invariant facts. *)
+    ( ∀ (ms0 : mword 64)
+        (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
+        (HoPRV : eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false)
+        (HoSXL : _get_Mstatus_SXL ms0 = ('b"10")),
+      hart_state ↦ᵣ HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ Supervisor -∗
+      mstatus ↦ᵣ cms5 (st_ms1 ms0) -∗
+      pmpcfg_n ↦ᵣ st_pmpcfg1 pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ st_pmpaddr1 pmpcfg0 pmpaddr00 -∗
+      pc_is st_main -∗
+      gpr_file (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in) -∗
+      mhartid ↦ᵣ mhartid_in -∗
+      mepc ↦ᵣ st_main -∗
+      satp ↦ᵣ satp_legalized satp0 (mword_of_int 0) -∗
+      medeleg ↦ᵣ legalize_medeleg medeleg0 st_ffff -∗
+      mideleg ↦ᵣ st_mdl1 mideleg0 -∗
+      mie ↦ᵣ st_mie1 mie0 mideleg0 -∗
+      menvcfg ↦ᵣ menvcfg_legalized menvcfg0 (ti_menv1 menvcfg0) -∗
+      mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
+      mtime ↦ᵣ mtime0 -∗
+      stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte ra0 j) -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte s00 j) -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra (ti_sp1 sp0)) j) ↦ₘ nth_byte st_ra_link j) -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 (ti_sp1 sp0)) j) ↦ₘ nth_byte sp0 j) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hpmp HlpeE Hsp Hra Hs0 Hal_ra Hal_s0 Hal_tra Hal_ts0 Hbnd_ra Hbnd_s0.
+    iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
+             Hmtime Hstc Hsra Hss0 Htra Hts0 #Htext Hcont".
+    (* the 34 [instr] facts, off the persistent text image *)
+    iPoseProof (st_instr30 with "Htext") as "Hi30".
+    iPoseProof (st_instr31 with "Htext") as "Hi31".
+    iPoseProof (st_instr32 with "Htext") as "Hi32".
+    iPoseProof (st_instr33 with "Htext") as "Hi33".
+    iPoseProof (st_instr34 with "Htext") as "Hi34".
+    iPoseProof (st_instr35 with "Htext") as "Hi35".
+    iPoseProof (st_instr36 with "Htext") as "Hi36".
+    iPoseProof (st_instr37 with "Htext") as "Hi37".
+    iPoseProof (st_instr38 with "Htext") as "Hi38".
+    iPoseProof (st_instr39 with "Htext") as "Hi39".
+    iPoseProof (st_instr40 with "Htext") as "Hi40".
+    iPoseProof (st_instr41 with "Htext") as "Hi41".
+    iPoseProof (st_instr42 with "Htext") as "Hi42".
+    iPoseProof (st_instr43 with "Htext") as "Hi43".
+    iPoseProof (st_instr44 with "Htext") as "Hi44".
+    iPoseProof (st_instr45 with "Htext") as "Hi45".
+    iPoseProof (st_instr46 with "Htext") as "Hi46".
+    iPoseProof (st_instr47 with "Htext") as "Hi47".
+    iPoseProof (st_instr48 with "Htext") as "Hi48".
+    iPoseProof (st_instr49 with "Htext") as "Hi49".
+    iPoseProof (st_instr50 with "Htext") as "Hi50".
+    iPoseProof (st_instr51 with "Htext") as "Hi51".
+    iPoseProof (st_instr52 with "Htext") as "Hi52".
+    iPoseProof (st_instr53 with "Htext") as "Hi53".
+    iPoseProof (st_instr54 with "Htext") as "Hi54".
+    iPoseProof (st_instr55 with "Htext") as "Hi55".
+    iPoseProof (st_instr56 with "Htext") as "Hi56".
+    iPoseProof (st_instr57 with "Htext") as "Hi57".
+    iPoseProof (st_instr58 with "Htext") as "Hi58".
+    iPoseProof (st_instr59 with "Htext") as "Hi59".
+    iPoseProof (st_instr60 with "Htext") as "Hi60".
+    iPoseProof (st_instr61 with "Htext") as "Hi61".
+    iPoseProof (st_instr62 with "Htext") as "Hi62".
+    iPoseProof (st_instr63 with "Htext") as "Hi63".
+    (* pure side conditions *)
+    pose proof (pmp_all_off_allows_all _ Hpmp) as HpmpU.
+    assert (Hpmp1 : pmp_allows_all (st_pmpcfg1 pmpcfg0))
+      by (apply pmp_allows_all_written; exact HpmpU).
+    assert (Htor_ra : pmp_tor0_grants (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00)
+                        (ti_ea_ra (ti_sp1 sp0)) 8)
+      by (apply st_pmp_tor0_grants; [exact Hpmp | lia | exact Hbnd_ra]).
+    assert (Htor_s0 : pmp_tor0_grants (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00)
+                        (ti_ea_s0 (ti_sp1 sp0)) 8)
+      by (apply st_pmp_tor0_grants; [exact Hpmp | lia | exact Hbnd_s0]).
+    assert (Hnz_sp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
+    assert (Hnz_ra : uint ti_ra <> 0) by (vm_compute; discriminate).
+    assert (Hnz_s0 : uint ti_s0 <> 0) by (vm_compute; discriminate).
+    assert (Hnz_a4 : uint ti_a4 <> 0) by (vm_compute; discriminate).
+    assert (Hnz_a5 : uint ti_a5 <> 0) by (vm_compute; discriminate).
+    assert (Hnz_tp : uint st_tp <> 0) by (vm_compute; discriminate).
+    assert (Hcs0 : creg2reg_idx ti_cs0 = Regidx ti_s0) by (vm_compute; reflexivity).
+    assert (Hca5 : creg2reg_idx ti_ca5 = Regidx ti_a5) by (vm_compute; reflexivity).
+    assert (Hca4 : creg2reg_idx ti_ca4 = Regidx ti_a4) by (vm_compute; reflexivity).
+    (* PC steps *)
+    assert (P30 : add_vec_int st_pc30 2 = st_pc31) by (vm_compute; reflexivity).
+    assert (P31 : add_vec_int st_pc31 2 = st_pc32) by (vm_compute; reflexivity).
+    assert (P32 : add_vec_int st_pc32 2 = st_pc33) by (vm_compute; reflexivity).
+    assert (P33 : add_vec_int st_pc33 2 = st_pc34) by (vm_compute; reflexivity).
+    assert (P34 : add_vec_int st_pc34 4 = st_pc35) by (vm_compute; reflexivity).
+    assert (P35 : add_vec_int st_pc35 2 = st_pc36) by (vm_compute; reflexivity).
+    assert (P36 : add_vec_int st_pc36 4 = st_pc37) by (vm_compute; reflexivity).
+    assert (P37 : add_vec_int st_pc37 2 = st_pc38) by (vm_compute; reflexivity).
+    assert (P38 : add_vec_int st_pc38 2 = st_pc39) by (vm_compute; reflexivity).
+    assert (P39 : add_vec_int st_pc39 4 = st_pc40) by (vm_compute; reflexivity).
+    assert (P40 : add_vec_int st_pc40 2 = st_pc41) by (vm_compute; reflexivity).
+    assert (P41 : add_vec_int st_pc41 4 = st_pc42) by (vm_compute; reflexivity).
+    assert (P42 : add_vec_int st_pc42 4 = st_pc43) by (vm_compute; reflexivity).
+    assert (P43 : add_vec_int st_pc43 4 = st_pc44) by (vm_compute; reflexivity).
+    assert (P44 : add_vec_int st_pc44 4 = st_pc45) by (vm_compute; reflexivity).
+    assert (P45 : add_vec_int st_pc45 2 = st_pc46) by (vm_compute; reflexivity).
+    assert (P46 : add_vec_int st_pc46 4 = st_pc47) by (vm_compute; reflexivity).
+    assert (P47 : add_vec_int st_pc47 2 = st_pc48) by (vm_compute; reflexivity).
+    assert (P48 : add_vec_int st_pc48 2 = st_pc49) by (vm_compute; reflexivity).
+    assert (P49 : add_vec_int st_pc49 4 = st_pc50) by (vm_compute; reflexivity).
+    assert (P50 : add_vec_int st_pc50 4 = st_pc51) by (vm_compute; reflexivity).
+    assert (P51 : add_vec_int st_pc51 4 = st_pc52) by (vm_compute; reflexivity).
+    assert (P52 : add_vec_int st_pc52 4 = st_pc53) by (vm_compute; reflexivity).
+    assert (P53 : add_vec_int st_pc53 4 = st_pc54) by (vm_compute; reflexivity).
+    assert (P54 : add_vec_int st_pc54 2 = st_pc55) by (vm_compute; reflexivity).
+    assert (P55 : add_vec_int st_pc55 2 = st_pc56) by (vm_compute; reflexivity).
+    assert (P56 : add_vec_int st_pc56 4 = st_pc57) by (vm_compute; reflexivity).
+    assert (P57 : add_vec_int st_pc57 2 = st_pc58) by (vm_compute; reflexivity).
+    assert (P58 : add_vec_int st_pc58 4 = st_pc59) by (vm_compute; reflexivity).
+    assert (P59 : add_vec st_pc59 (sign_extend' 64 sjimm59) = ti_pc9)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (P60 : add_vec_int st_pc60 4 = st_pc61) by (vm_compute; reflexivity).
+    assert (P61 : add_vec_int st_pc61 2 = st_pc62) by (vm_compute; reflexivity).
+    assert (P62 : add_vec_int st_pc62 2 = st_pc63) by (vm_compute; reflexivity).
+    (* closed-value bridges *)
+    assert (Hm1v : add_vec (WpGprLui.luival (sign_extend' 20 si35)) (sign_extend' 64 si36) = st_mask_and)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hm2v : add_vec (WpGprLui.luival (sign_extend' 20 si38)) (sign_extend' 64 si39) = st_mask_or)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Ha42v : add_vec st_pc42 (auipc_off si42) = st_a42v)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Ha43v : add_vec st_a42v (sign_extend' 64 si43) = st_main)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hmepcv : mepc_val st_main = st_main)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hz45 : cli_wval si45 = (mword_of_int 0 : mword 64))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hffv : add_vec (WpGprLui.luival (sign_extend' 20 si47)) (sign_extend' 64 si48) = st_ffff)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hshv : shift_bits_right (cli_wval si54)
+                     (subrange_vec_dec ssh55 (Z.sub log2_xlen 1) 0) = st_pmpw)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (H15v : cli_wval si57 = (mword_of_int 15 : mword 64))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hlinkv : add_vec_int st_pc59 4 = st_ra_link) by (vm_compute; reflexivity).
+    assert (Hjal_al : is_aligned_paddr (Physaddr (add_vec st_pc59 (sign_extend' 64 sjimm59))) 4 = true)
+      by (vm_compute; reflexivity).
+    assert (Hcretv : cret_target st_ra_link = st_pc60)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hcret_al : is_aligned_paddr (Physaddr (cret_target st_ra_link)) 4 = true)
+      by (vm_compute; reflexivity).
+    assert (Hctgtv : ctgt st_main = st_main)
+      by (apply bv_eq; vm_compute; reflexivity).
+    pose proof (st_s0_16 sp0) as Hs016.
+
+    (* ---- unbundle the FULL config once, naming the entry mstatus [ms0];
+       split all cells in half: a working bundle at 1/2 + pinned halves. ---- *)
+    iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
+    iDestruct "Hmst" as (ms0) "(Hms & %HoIE & %HoPRV & %HoSXL)".
+    iDestruct "Hhs" as "[HhsA HhsK]".
+    iDestruct "Hpriv" as "[HprivA HprivK]".
+    iDestruct "Hms" as "[HmsA HmsK]".
+    iDestruct "Hpcf" as "[HpcfA HpcfK]".
+    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) ms0 HoIE HoPRV HoSXL
+                  with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
+    (* invariant facts of the post-csrw mstatus value *)
+    assert (HmIE1 : eq_vec (_get_Mstatus_MIE (st_ms1 ms0)) ('b"1") = false).
+    { unfold st_ms1. rewrite mstatus_legalized_MIE. rewrite st_va5_40_MIE. exact HoIE. }
+    assert (HMPRV1 : eq_vec (_get_Mstatus_MPRV (st_ms1 ms0)) ('b"1") = false).
+    { unfold st_ms1. rewrite mstatus_legalized_MPRV. rewrite st_va5_40_MPRV. exact HoPRV. }
+    assert (HSXL1 : _get_Mstatus_SXL (st_ms1 ms0) = ('b"10")).
+    { unfold st_ms1. rewrite mstatus_legalized_SXL. exact HoSXL. }
+
+    (* ---- 30. c.addi sp, -16 ---- *)
+    iApply (wp_caddi_gpr E Φ st_pc30 csp_rs1 i9 m pmpcfg0 (1/2)%Qp HN HpmpU Hnz_sp
+              with "Hmm HpcfA Hpc Hfile Hi30").
+    iEval (rewrite P30). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (rewrite Hsp) in "Hfile".
+    iEval (change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 i9))]> m)
+             with (st_m30 m sp0)) in "Hfile".
+
+    (* ---- 31. c.sdsp ra, 8(sp) ---- *)
+    assert (L31sp : st_m30 m sp0 !!! Regidx csp_rs1 = ti_sp1 sp0) by (st_unfold; st_look).
+    assert (L31ra : st_m30 m sp0 !!! Regidx ti_ra = ra0) by (st_unfold; st_look).
+    assert (Hea31 : add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
+              (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))) = ti_ea_ra sp0)
+      by (rewrite L31sp; reflexivity).
+    assert (Hal31 : is_aligned_paddr (Physaddr
+              (add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
+                 (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))))) 8 = true)
+      by (rewrite Hea31; exact Hal_ra).
+    iApply (wp_csdsp_gpr E Φ st_pc31 u10 ti_ra (st_m30 m sp0) vsra pmpcfg0 (1/2)%Qp
+              HN Hpmp Hal31 with "Hmm HpcfA Hpc Hfile Hi31 [Hsra]").
+    { rewrite Hea31. iExact "Hsra". }
+    iEval (rewrite P31 Hea31 L31ra). iIntros "Hmm HpcfA Hpc Hfile Hsra".
+
+    (* ---- 32. c.sdsp s0, 0(sp) ---- *)
+    assert (L32s0 : st_m30 m sp0 !!! Regidx ti_s0 = s00) by (st_unfold; st_look).
+    assert (Hea32 : add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
+              (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))) = ti_ea_s0 sp0)
+      by (rewrite L31sp; reflexivity).
+    assert (Hal32 : is_aligned_paddr (Physaddr
+              (add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
+                 (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))))) 8 = true)
+      by (rewrite Hea32; exact Hal_s0).
+    iApply (wp_csdsp_gpr E Φ st_pc32 u11 ti_s0 (st_m30 m sp0) vss0 pmpcfg0 (1/2)%Qp
+              HN Hpmp Hal32 with "Hmm HpcfA Hpc Hfile Hi32 [Hss0]").
+    { rewrite Hea32. iExact "Hss0". }
+    iEval (rewrite P32 Hea32 L32s0). iIntros "Hmm HpcfA Hpc Hfile Hss0".
+
+    (* ---- 33. c.addi4spn s0, sp, 16 (s0 := sp0) ---- *)
+    iApply (wp_caddi4spn_gpr E Φ st_pc33 nz12 ti_cs0 ti_s0 (st_m30 m sp0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_s0 Hcs0 with "Hmm HpcfA Hpc Hfile Hi33").
+    iEval (rewrite P33 L31sp Hs016). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_s0 := regval_into_reg sp0]> (st_m30 m sp0))
+             with (st_m33 m sp0)) in "Hfile".
+
+    (* ---- 34. csrr a5, mstatus (reads the PINNED outside half) ---- *)
+    iApply (wp_csrr_mstatus_gpr E Φ st_pc34 ti_a5 ms0 (st_m33 m sp0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile HmsK Hi34").
+    iEval (rewrite P34). iIntros "Hmm HpcfA Hpc Hfile HmsK".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg ms0]> (st_m33 m sp0))
+             with (st_m34 m sp0 ms0)) in "Hfile".
+
+    (* ---- 35. c.lui a4, 0xffffe ---- *)
+    iApply (wp_clui_gpr E Φ st_pc35 ti_a4 si35 (st_m34 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi35").
+    iEval (rewrite P35). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si35))]>
+                     (st_m34 m sp0 ms0))
+             with (st_m35 m sp0 ms0)) in "Hfile".
+
+    (* ---- 36. addi a4, a4, 2047 (a4 := 0xffffffffffffe7ff) ---- *)
+    assert (L36a4 : st_m35 m sp0 ms0 !!! Regidx ti_a4 = WpGprLui.luival (sign_extend' 20 si35))
+      by (st_unfold; st_look).
+    iApply (wp_addi_gpr E Φ st_pc36 ti_a4 ti_a4 si36 (st_m35 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi36").
+    iEval (rewrite P36 L36a4 Hm1v). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a4 := regval_into_reg st_mask_and]> (st_m35 m sp0 ms0))
+             with (st_m36 m sp0 ms0)) in "Hfile".
+
+    (* ---- 37. c.and a5, a4 ---- *)
+    assert (L37a5 : st_m36 m sp0 ms0 !!! Regidx ti_a5 = ms0) by (st_unfold; st_look).
+    assert (L37a4 : st_m36 m sp0 ms0 !!! Regidx ti_a4 = st_mask_and) by (st_unfold; st_look).
+    iApply (wp_cand_gpr E Φ st_pc37 ti_ca5 ti_ca4 ti_a5 ti_a4 (st_m36 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 Hca5 Hca4 with "Hmm HpcfA Hpc Hfile Hi37").
+    iEval (rewrite P37 L37a5 L37a4). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (and_vec ms0 st_mask_and)]> (st_m36 m sp0 ms0))
+             with (st_m37 m sp0 ms0)) in "Hfile".
+
+    (* ---- 38. c.lui a4, 1 ---- *)
+    iApply (wp_clui_gpr E Φ st_pc38 ti_a4 si38 (st_m37 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi38").
+    iEval (rewrite P38). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si38))]>
+                     (st_m37 m sp0 ms0))
+             with (st_m38 m sp0 ms0)) in "Hfile".
+
+    (* ---- 39. addi a4, a4, -2048 (a4 := 0x800) ---- *)
+    assert (L39a4 : st_m38 m sp0 ms0 !!! Regidx ti_a4 = WpGprLui.luival (sign_extend' 20 si38))
+      by (st_unfold; st_look).
+    iApply (wp_addi_gpr E Φ st_pc39 ti_a4 ti_a4 si39 (st_m38 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi39").
+    iEval (rewrite P39 L39a4 Hm2v). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a4 := regval_into_reg st_mask_or]> (st_m38 m sp0 ms0))
+             with (st_m39 m sp0 ms0)) in "Hfile".
+
+    (* ---- 40. c.or a5, a4 (a5 := the mstatus write mask value) ---- *)
+    assert (L40a5 : st_m39 m sp0 ms0 !!! Regidx ti_a5 = and_vec ms0 st_mask_and) by (st_unfold; st_look).
+    assert (L40a4 : st_m39 m sp0 ms0 !!! Regidx ti_a4 = st_mask_or) by (st_unfold; st_look).
+    iApply (wp_cor_gpr E Φ st_pc40 ti_ca5 ti_ca4 ti_a5 ti_a4 (st_m39 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 Hca5 Hca4 with "Hmm HpcfA Hpc Hfile Hi40").
+    iEval (rewrite P40 L40a5 L40a4). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (or_vec (and_vec ms0 st_mask_and) st_mask_or)]>
+                     (st_m39 m sp0 ms0))
+             with (st_m40 m sp0 ms0)) in "Hfile".
+
+    (* ---- 41. csrw mstatus, a5: recombine to FULL raw cells and run the
+       RAW config-writing WP; the value stays a single symbol. ---- *)
+    assert (L41a5 : st_m40 m sp0 ms0 !!! Regidx ti_a5 = st_va5_40 ms0) by (st_unfold; st_look).
+    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & _ & HhsA & HprivA & HmstA)".
+    iDestruct "HmstA" as (ms0') "(HmsA & _ & _ & _)".
+    iDestruct (reg_pointsto_agree with "HmsA HmsK") as %->.
+    iDestruct (reg_half_join with "HhsA HhsK") as "Hhs".
+    iDestruct (reg_half_join with "HprivA HprivK") as "Hpriv".
+    iDestruct (reg_half_join with "HmsA HmsK") as "Hms".
+    iDestruct (reg_half_join with "HpcfA HpcfK") as "Hpcf".
+    iApply (wp_csrw_mstatus_raw E Φ st_pc41 ti_a5 (st_m40 m sp0 ms0) ms0 pmpcfg0
+              HN HpmpU Hnz_a5 HoIE
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hfile Hi41").
+    iEval (rewrite P41 L41a5).
+    iIntros "Hhs Hpriv Hms Hpcf Hpc Hfile".
+    iEval (change (mstatus_legalized ms0 (st_va5_40 ms0)) with (st_ms1 ms0)) in "Hms".
+    iDestruct "Hhs" as "[HhsA HhsK]".
+    iDestruct "Hpriv" as "[HprivA HprivK]".
+    iDestruct "Hms" as "[HmsA HmsK]".
+    iDestruct "Hpcf" as "[HpcfA HpcfK]".
+    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1
+                  with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
+
+    (* ---- 42. auipc a5, 1 ---- *)
+    iApply (wp_auipc_gpr E Φ st_pc42 ti_a5 si42 (st_m40 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi42").
+    iEval (rewrite P42 Ha42v). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg st_a42v]> (st_m40 m sp0 ms0))
+             with (st_m42 m sp0 ms0)) in "Hfile".
+
+    (* ---- 43. addi a5, a5, -502 (a5 := <main>) ---- *)
+    assert (L43a5 : st_m42 m sp0 ms0 !!! Regidx ti_a5 = st_a42v) by (st_unfold; st_look).
+    iApply (wp_addi_gpr E Φ st_pc43 ti_a5 ti_a5 si43 (st_m42 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi43").
+    iEval (rewrite P43 L43a5 Ha43v). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg st_main]> (st_m42 m sp0 ms0))
+             with (st_m43 m sp0 ms0)) in "Hfile".
+
+    (* ---- 44. csrw mepc, a5 ---- *)
+    assert (L44a5 : st_m43 m sp0 ms0 !!! Regidx ti_a5 = st_main) by (st_unfold; st_look).
+    iApply (wp_csrw_mepc_gpr E Φ st_pc44 ti_a5 (st_m43 m sp0 ms0) mepc0 pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmepc Hi44").
+    iEval (rewrite P44 L44a5 Hmepcv). iIntros "Hmm HpcfA Hpc Hfile Hmepc".
+
+    (* ---- 45. c.li a5, 0 ---- *)
+    iApply (wp_cli_gpr E Φ st_pc45 ti_a5 si45 (st_m43 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi45").
+    iEval (rewrite P45 Hz45). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (mword_of_int 0)]> (st_m43 m sp0 ms0))
+             with (st_m45 m sp0 ms0)) in "Hfile".
+
+    (* ---- 46. csrw satp, a5 (Bare) ---- *)
+    assert (L46a5 : st_m45 m sp0 ms0 !!! Regidx ti_a5 = (mword_of_int 0 : mword 64)) by (st_unfold; st_look).
+    iApply (wp_csrw_satp_gpr E Φ st_pc46 ti_a5 (st_m45 m sp0 ms0) satp0 pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hsatp Hi46").
+    iEval (rewrite P46 L46a5). iIntros "Hmm HpcfA Hpc Hfile Hsatp".
+
+    (* ---- 47. c.lui a5, 0x10 ---- *)
+    iApply (wp_clui_gpr E Φ st_pc47 ti_a5 si47 (st_m45 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi47").
+    iEval (rewrite P47). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si47))]>
+                     (st_m45 m sp0 ms0))
+             with (st_m47 m sp0 ms0)) in "Hfile".
+
+    (* ---- 48. c.addi a5, -1 (a5 := 0xffff) ---- *)
+    assert (L48a5 : st_m47 m sp0 ms0 !!! Regidx ti_a5 = WpGprLui.luival (sign_extend' 20 si47))
+      by (st_unfold; st_look).
+    iApply (wp_caddi_gpr E Φ st_pc48 ti_a5 si48 (st_m47 m sp0 ms0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi48").
+    iEval (rewrite P48 L48a5 Hffv). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg st_ffff]> (st_m47 m sp0 ms0))
+             with (st_m48 m sp0 ms0)) in "Hfile".
+
+    (* ---- 49. csrw medeleg, a5 ---- *)
+    assert (L49a5 : st_m48 m sp0 ms0 !!! Regidx ti_a5 = st_ffff) by (st_unfold; st_look).
+    iApply (wp_csrw_medeleg_gpr E Φ st_pc49 ti_a5 (st_m48 m sp0 ms0) medeleg0 pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmede Hi49").
+    iEval (rewrite P49 L49a5). iIntros "Hmm HpcfA Hpc Hfile Hmede".
+
+    (* ---- 50. csrw mideleg, a5 ---- *)
+    iApply (wp_csrw_mideleg_gpr E Φ st_pc50 ti_a5 (st_m48 m sp0 ms0) mideleg0 pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmdl Hi50").
+    iEval (rewrite P50 L49a5). iIntros "Hmm HpcfA Hpc Hfile Hmdl".
+    iEval (change (mideleg_legalized mideleg0 st_ffff) with (st_mdl1 mideleg0)) in "Hmdl".
+
+    (* ---- 51. csrr a5, sie (view over mie & mideleg) ---- *)
+    iApply (wp_csrr_sie_gpr E Φ st_pc51 ti_a5 mie0 (st_mdl1 mideleg0) (st_m48 m sp0 ms0)
+              pmpcfg0 (1/2)%Qp HN HpmpU Hnz_a5
+              with "Hmm HpcfA Hpc Hfile Hmie Hmdl Hi51").
+    iEval (rewrite P51). iIntros "Hmm HpcfA Hpc Hfile Hmie Hmdl".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (lower_mie mie0 (st_mdl1 mideleg0))]>
+                     (st_m48 m sp0 ms0))
+             with (st_m51 m sp0 ms0 mie0 mideleg0)) in "Hfile".
+
+    (* ---- 52. ori a5, a5, 544 ---- *)
+    assert (L52a5 : st_m51 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5
+                    = lower_mie mie0 (st_mdl1 mideleg0)) by (st_unfold; st_look).
+    iApply (wp_ori_gpr E Φ st_pc52 ti_a5 ti_a5 si52 (st_m51 m sp0 ms0 mie0 mideleg0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi52").
+    iEval (rewrite P52 L52a5). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg
+                      (or_vec (lower_mie mie0 (st_mdl1 mideleg0)) (sign_extend' 64 si52))]>
+                     (st_m51 m sp0 ms0 mie0 mideleg0))
+             with (st_m52 m sp0 ms0 mie0 mideleg0)) in "Hfile".
+
+    (* ---- 53. csrw sie, a5 ---- *)
+    assert (L53a5 : st_m52 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5
+                    = st_va5_52 mie0 mideleg0) by (st_unfold; st_look).
+    iApply (wp_csrw_sie_gpr E Φ st_pc53 ti_a5 (st_m52 m sp0 ms0 mie0 mideleg0)
+              mie0 (st_mdl1 mideleg0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmie Hmdl Hi53").
+    iEval (rewrite P53 L53a5). iIntros "Hmm HpcfA Hpc Hfile Hmie Hmdl".
+    iEval (change (sie_new_mie mie0 (st_mdl1 mideleg0) (st_va5_52 mie0 mideleg0))
+             with (st_mie1 mie0 mideleg0)) in "Hmie".
+
+    (* ---- 54. c.li a5, -1 ---- *)
+    iApply (wp_cli_gpr E Φ st_pc54 ti_a5 si54 (st_m52 m sp0 ms0 mie0 mideleg0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi54").
+    iEval (rewrite P54). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (cli_wval si54)]>
+                     (st_m52 m sp0 ms0 mie0 mideleg0))
+             with (st_m54 m sp0 ms0 mie0 mideleg0)) in "Hfile".
+
+    (* ---- 55. c.srli a5, 10 (a5 := 0x3fffffffffffff) ---- *)
+    assert (L55a5 : st_m54 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5 = cli_wval si54)
+      by (st_unfold; st_look).
+    iApply (wp_csrli_gpr E Φ st_pc55 ssh55 ti_ca5 ti_a5 (st_m54 m sp0 ms0 mie0 mideleg0)
+              pmpcfg0 (1/2)%Qp HN HpmpU Hnz_a5 Hca5
+              with "Hmm HpcfA Hpc Hfile Hi55").
+    iEval (rewrite P55 L55a5 Hshv). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg st_pmpw]> (st_m54 m sp0 ms0 mie0 mideleg0))
+             with (st_m55 m sp0 ms0 mie0 mideleg0)) in "Hfile".
+
+    (* ---- 56. csrw pmpaddr0, a5 ---- *)
+    assert (L56a5 : st_m55 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5 = st_pmpw)
+      by (st_unfold; st_look).
+    iApply (wp_csrw_pmpaddr0_gpr E Φ st_pc56 ti_a5 (st_m55 m sp0 ms0 mie0 mideleg0)
+              pmpaddr00 pmpcfg0 (1/2)%Qp HN HpmpU Hnz_a5
+              with "Hmm HpcfA Hpc Hfile Hpaddr Hi56").
+    iEval (rewrite P56 L56a5). iIntros "Hmm HpcfA Hpc Hfile Hpaddr".
+    iEval (change (pmp0_newaddr pmpcfg0 pmpaddr00 st_pmpw)
+             with (st_pmpaddr1 pmpcfg0 pmpaddr00)) in "Hpaddr".
+
+    (* ---- 57. c.li a5, 15 ---- *)
+    iApply (wp_cli_gpr E Φ st_pc57 ti_a5 si57 (st_m55 m sp0 ms0 mie0 mideleg0) pmpcfg0 (1/2)%Qp
+              HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi57").
+    iEval (rewrite P57 H15v). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (mword_of_int 15)]>
+                     (st_m55 m sp0 ms0 mie0 mideleg0))
+             with (st_m57 m sp0 ms0 mie0 mideleg0)) in "Hfile".
+
+    (* ---- 58. csrw pmpcfg0, a5: recombine to FULL and run the RAW WP. ---- *)
+    assert (L58a5 : st_m57 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5 = (mword_of_int 15 : mword 64))
+      by (st_unfold; st_look).
+    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & _ & HhsA & HprivA & HmstA)".
+    iDestruct "HmstA" as (ms1') "(HmsA & _ & _ & _)".
+    iDestruct (reg_pointsto_agree with "HmsA HmsK") as %->.
+    iDestruct (reg_half_join with "HhsA HhsK") as "Hhs".
+    iDestruct (reg_half_join with "HprivA HprivK") as "Hpriv".
+    iDestruct (reg_half_join with "HmsA HmsK") as "Hms".
+    iDestruct (reg_half_join with "HpcfA HpcfK") as "Hpcf".
+    iApply (wp_csrw_pmpcfg0_raw E Φ st_pc58 ti_a5 (st_m57 m sp0 ms0 mie0 mideleg0)
+              (st_ms1 ms0) pmpcfg0 HN HpmpU Hnz_a5 HmIE1
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hfile Hi58").
+    iEval (rewrite P58 L58a5).
+    iIntros "Hhs Hpriv Hms Hpcf Hpc Hfile".
+    iEval (change (pmpcfg_written (mword_of_int 15) pmpcfg0) with (st_pmpcfg1 pmpcfg0)) in "Hpcf".
+    iDestruct "Hhs" as "[HhsA HhsK]".
+    iDestruct "Hpriv" as "[HprivA HprivK]".
+    iDestruct "Hms" as "[HmsA HmsK]".
+    iDestruct "Hpcf" as "[HpcfA HpcfK]".
+    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1
+                  with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
+
+    (* ---- 59. jal ra, timerinit (ra := 0x800000b4; PC := 0x8000001c) ---- *)
+    iApply (wp_jal_gpr E Φ st_pc59 ti_ra sjimm59 (st_m57 m sp0 ms0 mie0 mideleg0)
+              (st_pmpcfg1 pmpcfg0) (1/2)%Qp HN Hpmp1 Hnz_ra Hjal_al
+              with "Hmm HpcfA Hpc Hfile Hi59").
+    iEval (rewrite P59 Hlinkv). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_ra := regval_into_reg st_ra_link]>
+                     (st_m57 m sp0 ms0 mie0 mideleg0))
+             with (st_m59 m sp0 ms0 mie0 mideleg0)) in "Hfile".
+
+    (* ---- timerinit() (21 instructions), at q = 1/2 ---- *)
+    assert (L59sp : st_m59 m sp0 ms0 mie0 mideleg0 !!! Regidx csp_rs1 = ti_sp1 sp0)
+      by (st_unfold; st_look).
+    assert (L59ra : st_m59 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_ra = st_ra_link)
+      by (st_unfold; st_look).
+    assert (L59s0 : st_m59 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_s0 = sp0)
+      by (st_unfold; st_look).
+    iDestruct "Hpaddr" as "[HpaA HpaK]".
+    iApply (wp_timerinit E Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
+              st_ra_link sp0 menvcfg0 mtime0 stimecmp0 mcounteren0
+              (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) vtra vts0
+              HN Hpmp1 Htor_ra Htor_s0 Hal_tra Hal_ts0 Hcret_al L59sp L59ra L59s0
+              with "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htra Hts0 Htext").
+    iEval (rewrite Hcretv).
+    iIntros "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htra Hts0".
+    iEval (change (ti_mout (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
+                     menvcfg0 mcounteren0 mtime0 st_ra_link sp0)
+             with (st_mti m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0)) in "Hfile".
+    iDestruct (reg_half_join with "HpaA HpaK") as "Hpaddr".
+
+    (* ---- 60. csrr a5, mhartid ---- *)
+    iApply (wp_csrr_mhartid_gpr E Φ st_pc60 ti_a5 mhartid_in
+              (st_mti m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0)
+              (st_pmpcfg1 pmpcfg0) (1/2)%Qp HN Hpmp1 Hnz_a5
+              with "Hmm HpcfA Hpc Hfile Hmh Hi60").
+    iEval (rewrite P60). iIntros "Hmm HpcfA Hpc Hfile Hmh".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg mhartid_in]>
+                     (st_mti m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0))
+             with (st_m60 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in)) in "Hfile".
+
+    (* ---- 61. c.addiw a5, 0 (sext.w) ---- *)
+    assert (L61a5 : st_m60 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in
+                      !!! Regidx ti_a5 = mhartid_in) by (st_unfold; st_look).
+    iApply (wp_caddiw_gpr E Φ st_pc61 ti_a5 si61
+              (st_m60 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in)
+              (st_pmpcfg1 pmpcfg0) (1/2)%Qp HN Hpmp1 Hnz_a5
+              with "Hmm HpcfA Hpc Hfile Hi61").
+    iEval (rewrite P61 L61a5). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx ti_a5 := regval_into_reg
+                      (sign_extend' 64 (subrange_vec_dec
+                         (add_vec mhartid_in (sign_extend' 64 si61)) 31 0))]>
+                     (st_m60 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in))
+             with (st_m61 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in)) in "Hfile".
+
+    (* ---- 62. c.mv tp, a5 ---- *)
+    assert (L62a5 : st_m61 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in
+                      !!! Regidx ti_a5 = st_tpv mhartid_in) by (st_unfold; st_look).
+    iApply (wp_cmv_gpr E Φ st_pc62 st_tp ti_a5
+              (st_m61 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in)
+              (st_pmpcfg1 pmpcfg0) (1/2)%Qp HN Hpmp1 Hnz_tp
+              with "Hmm HpcfA Hpc Hfile Hi62").
+    iEval (rewrite P62 L62a5). iIntros "Hmm HpcfA Hpc Hfile".
+    iEval (change (<[Regidx st_tp := regval_into_reg (st_tpv mhartid_in)]>
+                     (st_m61 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in))
+             with (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in)) in "Hfile".
+
+    (* ---- 63. MRET into Supervisor mode at <main>. ---- *)
+    iDestruct (mmode_config_unbundle with "Hmm") as "(_ & _ & HhsA & HprivA & HmstA)".
+    iDestruct "HmstA" as (ms1') "(HmsA & _ & _ & _)".
+    iDestruct (reg_pointsto_agree with "HmsA HmsK") as %->.
+    iDestruct (reg_half_join with "HhsA HhsK") as "Hhs".
+    iDestruct (reg_half_join with "HprivA HprivK") as "Hpriv".
+    iDestruct (reg_half_join with "HmsA HmsK") as "Hms".
+    iDestruct (reg_half_join with "HpcfA HpcfK") as "Hpcf".
+    assert (Hnp : privLevel_bits_forwards (_get_Mstatus_MPP (cms2 (st_ms1 ms0)), ('b"0"))
+                  = returnM Supervisor) by (apply st_mret_priv).
+    assert (HlpeF : _get_MEnvcfg_LPE (menvcfg_legalized menvcfg0 (ti_menv1 menvcfg0)) = ('b"0"))
+      by (apply st_menvcfg_LPE_final; exact HlpeE).
+    iApply (wp_mret_gpr E Φ st_pc63 Supervisor (st_ms1 ms0) st_main
+              (menvcfg_legalized menvcfg0 (ti_menv1 menvcfg0))
+              (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in)
+              (st_pmpcfg1 pmpcfg0)
+              HN Hpmp1 HmIE1 Hnp eq_refl HlpeF
+              with "Hhw Hinv Hhs Hpriv Hms Hpcf Hmenv Hpc Hfile Hmepc Hi63").
+    iEval (rewrite Hctgtv).
+    iIntros "Hhs Hpriv Hms Hpcf Hmenv Hpc Hfile Hmepc".
+
+    (* hand everything to the caller's continuation *)
+    iApply ("Hcont" $! ms0 HoIE HoPRV HoSXL
+              with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
+                    Hmenv Hmcen Hmtime Hstc Hsra Hss0 Htra Hts0").
+  Qed.
+
+End WpStartThm.

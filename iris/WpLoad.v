@@ -644,7 +644,10 @@ Section StepLD.
     eq_vec (_get_Mstatus_MPRV mstatus0a) ('b"1") = false ->
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
     is_aligned_vaddr (Virtaddr a8) 8 = true ->
-    pmp_allows_all pmpcfg0 ->
+    (* the 8-byte DATA access needs the stronger all-OFF form: an 8-byte
+       window can partially overlap a TOR/NA4 boundary (partial match faults
+       even in M-mode), so unlocked-ness alone does not suffice. *)
+    pmp_all_off pmpcfg0 ->
     is_aligned_paddr (Physaddr pa) 8 = true ->
     (* within_clint/within_sig are now discharged from the RAM-constrained bytes,
        and within_htif from the owned [htif_tohost_base |-> None] below. *)
@@ -734,7 +737,7 @@ Section StepLD.
       - rewrite Lmsp. exact HMPRV.
       - rewrite Lsecp. exact Hpmm.
       - rewrite Lx2p. exact Halign.
-      - intro j. rewrite Lpmpcp. exact (Hpmp j).
+      - intro j. rewrite Lpmpcp. exact (proj1 (Hpmp j)).
       - rewrite Lpmap Lx2p. exact Hmatch.
       - rewrite Lx2p. exact Hpalign.
       - exact Hread.

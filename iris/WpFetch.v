@@ -85,8 +85,8 @@ Section WpFetch.
     iPureIntro.
     unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
     (* transfer the owned CSR values into [exec_fetch_done]'s register-lookup form *)
-    assert (Hpmp : forall i, pmpAddrMatchType_encdec_backwards
-              (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i)) = OFF)
+    assert (Hpmp : forall i,
+              pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false)
       by (rewrite Lpmpc; exact Hpmp0).
     assert (Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs))
               (Physaddr (fetch_pa pc)) 4 = Some region)
@@ -161,8 +161,8 @@ Section WpFetch.
     assert (Ltmem : forall j : nat, (N.of_nat j < 4)%N ->
               t.(mem) !! (pa_add (fetch_pa pc) j) = Some (nth_byte w j))
       by (unfold t, set_reg; cbn [mem]; exact Hbytesf).
-    assert (Hpmp : forall i, pmpAddrMatchType_encdec_backwards
-              (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n t.(sregs)) i)) = OFF)
+    assert (Hpmp : forall i,
+              pmpLocked (vec_access_dec (register_lookup pmpcfg_n t.(sregs)) i) = false)
       by (rewrite Ltpmpc; exact Hpmp0).
     assert (Hmatch : matching_pma_region (register_lookup pma_regions t.(sregs))
               (Physaddr (fetch_pa pc)) 4 = Some region)
