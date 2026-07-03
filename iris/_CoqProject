@@ -52,3 +52,7 @@ WpStartNew.v
 WpKernelNew.v
 WpKvInstr.v
 WpKernelvecNew.v
+WpIntrBits.v
+WpIntrCore.v
+WpKvHit.v
+WpIntrStep.v
