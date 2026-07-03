@@ -291,26 +291,25 @@ Section WpCsrwGprNewC.
 
   (* ---- csrw mstatus (0x300): the continuation receives the RAW UNBUNDLED
      cells with the EXPLICIT legalized mstatus value, universally quantified
-     over the (hidden) old mstatus [ms_old] together with its invariant facts.
-     A chain rebuilds [mmode_config (DfracOwn 1)] via [mmode_config_rebuild]:
-     the MIE / MPRV facts on the new value come from [mstatus_legalized_MIE] /
-     [mstatus_legalized_MPRV] (they depend only on the written value, which the
-     chain knows concretely), and SXL from [mstatus_legalized_SXL] + the old
-     invariant. ---- *)
+     over the (hidden) old mstatus [ms_old] together with its SXL invariant
+     fact. A chain rebuilds [mmode_config (DfracOwn 1)] via
+     [mmode_config_rebuild]: the MIE / MPRV facts on the new value come from
+     [mstatus_legalized_MIE] / [mstatus_legalized_MPRV], which depend ONLY on
+     the written value (which the chain knows concretely) -- so unlike SXL
+     (preserved unconditionally from [ms_old] by the legalizer, hence still
+     needing the old invariant fact here), no old-value MIE/MPRV fact is
+     threaded through. ---- *)
   Lemma wp_csrw_mstatus_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
-    uint rs1 <> 0 ->
     mmode_config (DfracOwn 1) -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)) -∗
     ( ∀ (ms_old : mword 64)
-        (HoIE : eq_vec (_get_Mstatus_MIE ms_old) ('b"1") = false)
-        (HoPRV : eq_vec (_get_Mstatus_MPRV ms_old) ('b"1") = false)
         (HoSXL : _get_Mstatus_SXL ms_old = 'b"10"),
       hw_config -∗
       minstret_inv -∗
@@ -323,7 +322,7 @@ Section WpCsrwGprNewC.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrs1) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (HN Hpmp) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & #Hinv & Hhs & Hpriv0 & Hmst)".
     iDestruct "Hmst" as (ms0) "(Hms0 & %HmIE & %HMPRV & %HSXL)".
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
@@ -351,11 +350,6 @@ Section WpCsrwGprNewC.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Lmsp : register_lookup mstatus s_pc.(sregs) = ms0)
       by (unfold s_pc; tmig; exact Lms).
-    assert (Lrs1p : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                    = m !!! Regidx rs1).
-    { rewrite -Lrs1u.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
     iMod (reg_update _ mstatus _ (mstatus_legalized ms0 (m !!! Regidx rs1))
             with "Hreg Hms") as "[Hreg Hms]".
     iModIntro.
@@ -364,10 +358,10 @@ Section WpCsrwGprNewC.
     { iPureIntro. rewrite Hpceq.
       change (execute (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)))
         with (execute_CSRReg csr_mstatus (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_mstatus rs1 s_pc Hrs1 Lprivp
+      rewrite (exec_execute_csrw_mstatus rs1 s_pc Lprivp
                  ltac:(rewrite Lmisap; exact HmisaS)
                  ltac:(rewrite Lmisap; exact HmisaU)).
-      rewrite Lmsp Lrs1p. reflexivity. }
+      rewrite Lmsp Lrs1u. reflexivity. }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
@@ -376,7 +370,7 @@ Section WpCsrwGprNewC.
              = add_vec_int pc 4).
     { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" $! ms0 HmIE HMPRV HSXL
+    iApply ("Hcont" $! ms0 HSXL
               with "Hhw Hinv Hhs Hpriv Hms Hpmpc [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
     { iPureIntro. intro r. apply Hdom. }
@@ -394,7 +388,6 @@ Section WpCsrwGprNewC.
       (pmpcfg0 : type_of_register pmpcfg_n) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
-    uint rs1 <> 0 ->
     mmode_config (DfracOwn 1) -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pc_is pc -∗
@@ -407,7 +400,7 @@ Section WpCsrwGprNewC.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrs1) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (HN Hpmp) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & #Hinv & Hhs & Hpriv0 & Hmst)".
     iDestruct "Hmst" as (ms0) "(Hms0 & %HmIE & %HMPRV & %HSXL)".
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
@@ -428,11 +421,6 @@ Section WpCsrwGprNewC.
       by (unfold s_pc; tmig; exact Lpriv).
     assert (Lcfgp : register_lookup pmpcfg_n s_pc.(sregs) = pmpcfg0)
       by (unfold s_pc; tmig; exact Lcfg).
-    assert (Lrs1p : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                    = m !!! Regidx rs1).
-    { rewrite -Lrs1u.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
     iMod (reg_update _ pmpcfg_n _ (pmpcfg_written (m !!! Regidx rs1) pmpcfg0)
             with "Hreg Hpmpc") as "[Hreg Hpmpc]".
     iModIntro.
@@ -441,8 +429,8 @@ Section WpCsrwGprNewC.
     { iPureIntro. rewrite Hpceq.
       change (execute (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW)))
         with (execute_CSRReg csr_pmpcfg0 (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_pmpcfg0 rs1 s_pc Hrs1 Lprivp).
-      rewrite Lrs1p pmpcfg0_final_set Lcfgp. reflexivity. }
+      rewrite (exec_execute_csrw_pmpcfg0 rs1 s_pc Lprivp).
+      rewrite Lrs1u pmpcfg0_final_set Lcfgp. reflexivity. }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
@@ -471,7 +459,6 @@ Section WpCsrwGprNewC.
       (pmpcfg0 : type_of_register pmpcfg_n) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
-    uint rs1 <> 0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
     hw_config -∗
     minstret_inv -∗
@@ -491,7 +478,7 @@ Section WpCsrwGprNewC.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrs1 HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (HN Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 HN Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
@@ -517,11 +504,6 @@ Section WpCsrwGprNewC.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Lmsp : register_lookup mstatus s_pc.(sregs) = ms0)
       by (unfold s_pc; tmig; exact Lms).
-    assert (Lrs1p : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                    = m !!! Regidx rs1).
-    { rewrite -Lrs1u.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
     iMod (reg_update _ mstatus _ (mstatus_legalized ms0 (m !!! Regidx rs1))
             with "Hreg Hms") as "[Hreg Hms]".
     iModIntro.
@@ -530,10 +512,10 @@ Section WpCsrwGprNewC.
     { iPureIntro. rewrite Hpceq.
       change (execute (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)))
         with (execute_CSRReg csr_mstatus (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_mstatus rs1 s_pc Hrs1 Lprivp
+      rewrite (exec_execute_csrw_mstatus rs1 s_pc Lprivp
                  ltac:(rewrite Lmisap; exact HmisaS)
                  ltac:(rewrite Lmisap; exact HmisaU)).
-      rewrite Lmsp Lrs1p. reflexivity. }
+      rewrite Lmsp Lrs1u. reflexivity. }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
@@ -558,7 +540,6 @@ Section WpCsrwGprNewC.
       (pmpcfg0 : type_of_register pmpcfg_n) :
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
-    uint rs1 <> 0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
     hw_config -∗
     minstret_inv -∗
@@ -578,7 +559,7 @@ Section WpCsrwGprNewC.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrs1 HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (HN Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 HN Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
@@ -597,11 +578,6 @@ Section WpCsrwGprNewC.
       by (unfold s_pc; tmig; exact Lpriv).
     assert (Lcfgp : register_lookup pmpcfg_n s_pc.(sregs) = pmpcfg0)
       by (unfold s_pc; tmig; exact Lcfg).
-    assert (Lrs1p : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                    = m !!! Regidx rs1).
-    { rewrite -Lrs1u.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
     iMod (reg_update _ pmpcfg_n _ (pmpcfg_written (m !!! Regidx rs1) pmpcfg0)
             with "Hreg Hpmpc") as "[Hreg Hpmpc]".
     iModIntro.
@@ -610,8 +586,8 @@ Section WpCsrwGprNewC.
     { iPureIntro. rewrite Hpceq.
       change (execute (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW)))
         with (execute_CSRReg csr_pmpcfg0 (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_pmpcfg0 rs1 s_pc Hrs1 Lprivp).
-      rewrite Lrs1p pmpcfg0_final_set Lcfgp. reflexivity. }
+      rewrite (exec_execute_csrw_pmpcfg0 rs1 s_pc Lprivp).
+      rewrite Lrs1u pmpcfg0_final_set Lcfgp. reflexivity. }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".

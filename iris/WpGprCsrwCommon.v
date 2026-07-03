@@ -63,29 +63,27 @@ Proof.
   apply exec_returnM.
 Qed.
 
-(* execute_CSRReg for csrw (rd=x0=zreg, op=CSRRW): reads rs1 (generic), then doCSR write. *)
+(* execute_CSRReg for csrw (rd=x0=zreg, op=CSRRW): reads rs1 (generic -- rs1=0
+   is a legitimate "write literal 0" and is handled like any other index, by
+   baking the same if-guard [rX_bits] itself uses directly into the [write_CSR]
+   premise, rather than imposing a [uint rs1 <> 0] side condition). *)
 Lemma exec_execute_csrw_gpr (csr : mword 12) (rs1 : mword 5) (s s' : mstate) (cfinal : mword 64) :
-  uint rs1 <> 0 ->
   register_lookup cur_privilege s.(sregs) = Machine ->
   exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s) ->
   ext_check_CSR csr Machine CSRWrite = true ->
   eq_vec csr (Ox"344") = false ->
   eq_vec csr (Ox"144") = false ->
-  exec (write_CSR csr (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))) s
+  exec (write_CSR csr (if Z.eqb (uint rs1) 0 then zero_reg
+                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))) s
     = Some (Ok cfinal, s') ->
   exec (csr_id_write_callback csr cfinal) s' = Some (tt, s') ->
   exec (execute_CSRReg csr (Regidx rs1) zreg CSRRW) s = Some (RETIRE_SUCCESS, s').
 Proof.
-  intros Hrs1 Hpriv Hchk Hext H344 H144 Hwr Hcb.
+  intros Hpriv Hchk Hext H344 H144 Hwr Hcb.
   unfold execute_CSRReg.
   replace (csr_access_type CSRRW (generic_eq zreg zreg) (generic_eq (Regidx rs1) zreg))
     with CSRWrite by (replace (generic_eq zreg zreg) with true by reflexivity; reflexivity).
-  assert (Hrv : exec (rX_bits (Regidx rs1)) s
-                = Some (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs), s)).
-  { rewrite (exec_rX_bits_gpr rs1 s).
-    replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-    reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hrv).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
   apply (exec_doCSR_csrw csr _ s s' cfinal); assumption.
 Qed.
 

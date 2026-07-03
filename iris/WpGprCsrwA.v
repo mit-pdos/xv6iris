@@ -49,10 +49,14 @@ Lemma exec_execute_csrw_mcounteren (rs1 : mword 5) s :
                  (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
 Proof.
   intros Hrs1 Hpriv Hchk.
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
   apply (exec_execute_csrw_gpr csr_mcounteren rs1 s _
            (zero_extend' 64 (legalize_mcounteren (register_lookup mcounteren s.(sregs))
-              (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
-  - exact Hrs1.
+              (if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
   - exact Hpriv.
   - exact Hchk.
   - vm_compute; reflexivity.
@@ -97,10 +101,15 @@ Lemma exec_execute_csrw_medeleg (rs1 : mword 5) s :
                  (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
 Proof.
   intros Hrs1 Hpriv HS.
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
   apply (exec_execute_csrw_gpr csr_medeleg rs1 s _
            (legalize_medeleg (register_lookup medeleg s.(sregs))
-              (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
-  - exact Hrs1.
+              ((if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+  
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_S csr_medeleg s HS);
       [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].
@@ -183,9 +192,14 @@ Lemma exec_execute_csrw_mepc (rs1 : mword 5) s :
             set_reg s mepc (mepc_val (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
 Proof.
   intros Hrs1 Hpriv.
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
   apply (exec_execute_csrw_gpr csr_mepc rs1 s _
-           (mepc_val (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
-  - exact Hrs1.
+           (mepc_val ((if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+  
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_pure csr_mepc s);
       [ vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity ].
@@ -215,8 +229,14 @@ Lemma exec_execute_csrw_mscratch (rs1 : mword 5) s :
   exec (execute_CSRReg csr_mscratch (Regidx rs1) zreg CSRRW) s
     = Some (RETIRE_SUCCESS, set_reg s mscratch (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))).
 Proof. intros Hrs1 Hpriv.
-  apply (exec_execute_csrw_gpr csr_mscratch rs1 s _ (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))).
-  - exact Hrs1. - exact Hpriv.
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
+  apply (exec_execute_csrw_gpr csr_mscratch rs1 s _
+           (if Z.eqb (uint rs1) 0 then zero_reg
+            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))).
+  - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_pure csr_mscratch s);
       [ vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity ].
   - vm_compute; reflexivity. - vm_compute; reflexivity. - vm_compute; reflexivity.
@@ -411,7 +431,6 @@ Proof.
 Qed.
 
 Lemma exec_execute_csrw_mstatus (rs1 : mword 5) s :
-  uint rs1 <> 0 ->
   register_lookup cur_privilege s.(sregs) = Machine ->
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -419,13 +438,14 @@ Lemma exec_execute_csrw_mstatus (rs1 : mword 5) s :
     = Some (RETIRE_SUCCESS,
             set_reg s mstatus
               (mstatus_legalized (register_lookup mstatus s.(sregs))
-                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
+                 (if Z.eqb (uint rs1) 0 then zero_reg
+                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
 Proof.
-  intros Hrs1 Hpriv HS HU.
+  intros Hpriv HS HU.
   apply (exec_execute_csrw_gpr csr_mstatus rs1 s _
            (mstatus_legalized (register_lookup mstatus s.(sregs))
-              (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
-  - exact Hrs1.
+              (if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_pure csr_mstatus s);
       [ vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity ].
@@ -573,17 +593,17 @@ Proof.
 Qed.
 
 Lemma exec_execute_csrw_pmpcfg0 (rs1 : mword 5) s :
-  uint rs1 <> 0 ->
   register_lookup cur_privilege s.(sregs) = Machine ->
   exec (execute_CSRReg csr_pmpcfg0 (Regidx rs1) zreg CSRRW) s
     = Some (RETIRE_SUCCESS,
-            pmpcfg0_final (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) s).
+            pmpcfg0_final (if Z.eqb (uint rs1) 0 then zero_reg
+                           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) s).
 Proof.
-  intros Hrs1 Hpriv.
+  intros Hpriv.
   apply (exec_execute_csrw_gpr csr_pmpcfg0 rs1 s _
            (pmpcfg0_readback (register_lookup pmpcfg_n
-              (pmpcfg0_final (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) s).(sregs)))).
-  - exact Hrs1.
+              (pmpcfg0_final (if Z.eqb (uint rs1) 0 then zero_reg
+                              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) s).(sregs)))).
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_pure csr_pmpcfg0 s);
       [ vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity ].
@@ -874,10 +894,15 @@ Lemma exec_execute_csrw_menvcfg (rs1 : mword 5) s :
                  (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
 Proof.
   intros Hrs1 Hpriv HS HU.
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
   apply (exec_execute_csrw_gpr csr_menvcfg rs1 s _
            (menvcfg_legalized (register_lookup menvcfg s.(sregs))
-              (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
-  - exact Hrs1.
+              ((if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+  
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw_U csr_menvcfg s HU);
       [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].

@@ -1492,7 +1492,7 @@ Section WpStartThm.
     iDestruct (reg_half_join with "HmsA HmsK") as "Hms".
     iDestruct (reg_half_join with "HpcfA HpcfK") as "Hpcf".
     iApply (wp_csrw_mstatus_raw E Φ st_pc41 ti_a5 (st_m40 m sp0 ms0) ms0 pmpcfg0
-              HN HpmpU Hnz_a5 HoIE
+              HN HpmpU HoIE
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hfile Hi41").
     iEval (rewrite P41 L41a5).
     iIntros "Hhs Hpriv Hms Hpcf Hpc Hfile".
@@ -1644,7 +1644,7 @@ Section WpStartThm.
     iDestruct (reg_half_join with "HmsA HmsK") as "Hms".
     iDestruct (reg_half_join with "HpcfA HpcfK") as "Hpcf".
     iApply (wp_csrw_pmpcfg0_raw E Φ st_pc58 ti_a5 (st_m57 m sp0 ms0 mie0 mideleg0)
-              (st_ms1 ms0) pmpcfg0 HN HpmpU Hnz_a5 HmIE1
+              (st_ms1 ms0) pmpcfg0 HN HpmpU HmIE1
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hfile Hi58").
     iEval (rewrite P58 L58a5).
     iIntros "Hhs Hpriv Hms Hpcf Hpc Hfile".
