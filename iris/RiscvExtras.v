@@ -25,6 +25,31 @@ Qed.
 Lemma autocast_id (m : Z) (x : mword m) : autocast x = x.
 Proof. apply autocast_refl. Qed.
 
+(* sign-extending a 9-bit value to 12 bits then to 64 is the same as
+   zero-extending it to 64 directly: the 12-bit zero-extension's sign bit
+   (bit 11) is always 0 since a 9-bit value's magnitude is well below 2^11,
+   so sign- and zero-extending it agree from there on. Used by the
+   [kernelvec]/[kerneltrap] saved-register-slot address computations, each
+   of which builds a byte offset as [concat_vec (reg-index : mword 6)
+   ('b"000") : mword 9] and widens it to 64 for the add against sp. *)
+Lemma sext9_12_64 (x : mword 9) : sign_extend' 64 (zero_extend' 12 x) = zero_extend' 64 x.
+Proof.
+  cbv [sign_extend' zero_extend' Operators_mwords.sign_extend Operators_mwords.zero_extend
+       Operators_mwords.exts_vec Operators_mwords.extz_vec to_word get_word
+       MachineWord.MachineWord.sign_extend MachineWord.MachineWord.zero_extend].
+  apply bv_eq.
+  rewrite bv_sign_extend_unsigned.
+  rewrite bv_zero_extend_signed.
+  rewrite bv_zero_extend_unsigned'.
+  rewrite bv_swrap_small; [reflexivity |].
+  pose proof (bv_unsigned_in_range 9 x) as [Hl Hh].
+  unfold bv_modulus in Hh. simpl in Hh.
+  unfold bv_half_modulus, bv_modulus. simpl.
+  change (2 ^ 9) with 512 in Hh.
+  change (2 ^ 12 / 2) with 2048.
+  lia.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* should_inc_minstret is state-pure: its result is fully determined by    *)
 (* the mcountinhibit and minstretcfg cells.  Owning those two CSRs thus     *)
