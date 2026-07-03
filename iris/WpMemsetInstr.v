@@ -334,12 +334,13 @@ Section WpMemsetInstr.
   (*  decodings discharged from [kernel_text].  Every [instr] premise is    *)
   (*  gone; the operand fields are the concrete decoded values.             *)
   (* =================================================================== *)
+
   Lemma wp_memset_s_full_kt (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (N : nat) (wval_add : mword 64)
       (svpn svpn_ra svpn_s0 : mword 27) (olds : nat -> bv 8)
       (satp0 mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dq dqt : dfrac} :
+      (region_pte : PMA_Region) {dq dqb : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -388,8 +389,9 @@ Section WpMemsetInstr.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     kv_fetch_geom pcE -> kv_fetch_geom (add_vec_int pcE 2) -> kv_fetch_geom (add_vec_int pcE 4) ->
     kv_fetch_geom (add_vec_int pcE 6) -> kv_fetch_geom (add_vec_int pcE 8) -> kv_fetch_geom (add_vec_int pcE 10) ->
     kv_fetch_geom (add_vec_int pcE 12) -> kv_fetch_geom (add_vec_int pcE 14) ->
@@ -414,6 +416,11 @@ Section WpMemsetInstr.
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 2) ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 4) ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 6) ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
+       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
        (if Z.eqb (uint a2_idx) 0 then zero_reg
@@ -429,7 +436,9 @@ Section WpMemsetInstr.
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn_ra)
        (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_ra)) (Z.sub pagesize_bits 1) 0)) = a8_ra ->
     and_vec (sign_extend' (57 - 12) svpn_ra) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) svpn_ra) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    subrange_vec_dec svpn_ra 26 18 = (mword_of_int 2 : mword 9) ->
+    sign_extend' 45 (and_vec svpn_ra (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
+    zero_extend' 44 (and_vec (sdata_ppn_out svpn_ra) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa_ra) (uint (to_bits 64 8)) = PMP_Match ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
@@ -443,7 +452,9 @@ Section WpMemsetInstr.
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn_s0)
        (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_s0)) (Z.sub pagesize_bits 1) 0)) = a8_s0 ->
     and_vec (sign_extend' (57 - 12) svpn_s0) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) svpn_s0) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    subrange_vec_dec svpn_s0 26 18 = (mword_of_int 2 : mword 9) ->
+    sign_extend' 45 (and_vec svpn_s0 (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
+    zero_extend' 44 (and_vec (sdata_ppn_out svpn_s0) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa_s0) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
@@ -454,7 +465,9 @@ Section WpMemsetInstr.
     add_vec (add_vec_int pc0L 6) (sign_extend' 64 imm_bne) = pc0L ->
     eq_vec (access_vec_dec pc0L 0) ('b"0") = true ->
     and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
+    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
+    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
     (forall j : nat, (j < N)%nat ->
        neq_vec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j))))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0)) = false) ->
@@ -474,7 +487,7 @@ Section WpMemsetInstr.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ satp ↦ᵣ{ dq } satp0 -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb ↦ᵣ{ dqt } tlbvec -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗ pte_super_bytes root_ppn dqb -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte (bv_0 64) j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte (bv_0 64) j) -∗
@@ -482,7 +495,7 @@ Section WpMemsetInstr.
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ satp ↦ᵣ{ dq } satp0 -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb ↦ᵣ{ dqt } tlbvec -∗
+      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗ pte_super_bytes root_ppn dqb -∗
       pc_is ret_tgt -∗
       ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte ra0 j) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte s00 j) -∗
@@ -494,17 +507,17 @@ Section WpMemsetInstr.
       imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz i_add imm_bne
       sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      HN HNge1 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hlpe Hvec5
+      HN HNge1 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hppn Hlpe
       Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18
       HgL0 HgL2 HgL4 HgL6 HgL8 HgS0 HgS2 HgS4 HgS6
       Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
-      HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6
+      HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6 Hpmpp Hpteregion Halignp
       Hbexec_add
-      HcanonR HvpnR HidentR HmaskR HvecstR HrangeR HW_R HR_R HalignR HpalignR
-      HcanonS HvpnS HidentS HmaskS HvecstS HrangeS HalignS HpalignS
-      Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvecst_b
+      HcanonR HvpnR HidentR HmaskR Hvpn2R HmvpnR HmppnR HrangeR HW_R HR_R HalignR HpalignR
+      HcanonS HvpnS HidentS HmaskS Hvpn2S HmvpnS HmppnS HrangeS HalignS HpalignS
+      Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb
+    iIntros "#Hhw #Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpbytes
              #Htext Hpc Hfile Hbra Hbs0 Hbuf Hcont".
     (* derive the thirteen prefix/suffix instr resources from the text image *)
     iPoseProof (minstr_cba with "Htext") as "Hi0".
@@ -522,19 +535,19 @@ Section WpMemsetInstr.
     iPoseProof (minstr_cde with "Htext") as "HiL6".
     iApply (wp_memset_s_full root_ppn E Φ m0 N imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz
               i_add wval_add imm_bne svpn svpn_ra svpn_s0 olds
-              satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)
-              HN HNge1 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hlpe Hvec5
+              satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)(dqb:=dqb)
+              HN HNge1 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hppn Hlpe
               Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18
               HgL0 HgL2 HgL4 HgL6 HgL8 HgS0 HgS2 HgS4 HgS6
               Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
-              HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6
+              HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6 Hpmpp Hpteregion Halignp
               Hbexec_add
-              HcanonR HvpnR HidentR HmaskR HvecstR HrangeR HW_R HR_R HalignR HpalignR
-              HcanonS HvpnS HidentS HmaskS HvecstS HrangeS HalignS HpalignS
-              Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvecst_b
+              HcanonR HvpnR HidentR HmaskR Hvpn2R HmvpnR HmppnR HrangeR HW_R HR_R HalignR HpalignR
+              HcanonS HvpnS HidentS HmaskS Hvpn2S HmvpnS HmppnS HrangeS HalignS HpalignS
+              Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
               Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
               minstr_cce minstr_cd2 minstr_cd4
-              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb
+              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpbytes
                     Htext Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16
                     HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 Hbuf Hcont").
   Qed.
