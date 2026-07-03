@@ -173,6 +173,48 @@ Section WpMemsetS.
       unfold gpr_addi_val. rewrite Hva. reflexivity.
   Qed.
 
+  (* ---- c.addi rd, imm  (rd := rd + sext(imm), via ITYPE ADDI rd,rd,imm) ---- *)
+  Lemma wp_caddi_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 6)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (C_ADDI (imm, Regidx rd)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hvec Hgeom Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc rd rd rd
+              (C_ADDI (imm, Regidx rd))
+              (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI))
+              (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))
+              m satp0 pmpcfg0 pmpaddr00 tlbvec q HN Hvec Hgeom Hpmp Hrd
+              (fun s => exec_execute_C_ADDI imm (Regidx rd) s) _
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_ITYPE_ADDI_gpr rd rd (sign_extend' 12 imm) s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_addi_val. rewrite Hva. reflexivity.
+  Qed.
+
   (* ---- c.mv rd, rs2  (rd := rs2, via RTYPE ADD rd, x0, rs2) ---- *)
   Lemma wp_cmv_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
