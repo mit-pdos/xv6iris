@@ -43,6 +43,7 @@ WpGprRvc.v
 WpGprRvcTor.v
 InstrBytes.v
 WpEntryNew.v
+WpSpinNew.v
 SmodeCore.v
 WpSmodeGpr.v
 WpSmodeSret.v
