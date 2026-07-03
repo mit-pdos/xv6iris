@@ -52,6 +52,7 @@ WpTimerinit.v
 WpStartNew.v
 WpKernelNew.v
 WpKvInstr.v
+WpMemsetInstr.v
 WpKernelvecNew.v
 WpIntrBits.v
 WpIntrCore.v
