@@ -86,7 +86,7 @@ Qed.
 Section Wp_slli.
   Context `{!riscvGS Σ}.
   Context {dqc : dfrac}.
-  Lemma wp_slli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5) (shamt : mword 6)
+  Lemma wp_slli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
@@ -96,10 +96,10 @@ Section Wp_slli.
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
+    instr pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
-      pc_is (add_vec_int pc 4) -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd :=
         regval_into_reg (shift_bits_left (m !!! Regidx rs1)
           (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
@@ -107,7 +107,7 @@ Section Wp_slli.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) pmpcfg0
+    iApply (wp_instr E Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -115,12 +115,12 @@ Section Wp_slli.
       by (apply lookup_lookup_total_dom; apply Hdom).
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
-                 (set_reg σ nextPC (add_vec_int pc 4)) with "Hreg Hr1c") as %Hrv.
+                 (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))) with "Hreg Hr1c") as %Hrv.
     iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
-    assert (Hav : gpr_slli_val rs1 shamt (set_reg σ nextPC (add_vec_int pc 4))
+    assert (Hav : gpr_slli_val rs1 shamt (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                   = shift_bits_left (m !!! Regidx rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)).
     { unfold gpr_slli_val, gpr_src. rewrite Hrv. reflexivity. }
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
@@ -134,24 +134,24 @@ Section Wp_slli.
                  with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+    iExists (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg (shift_bits_left (m !!! Regidx rs1)
                   (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))).
     iSplitR.
     { iPureIntro. rewrite Hpceq.
-      rewrite (exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt (set_reg σ nextPC (add_vec_int pc 4))).
+      rewrite (exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))).
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       rewrite Hav. reflexivity. }
     iSplitL "Hreg Hmem".
     { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+             (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (shift_bits_left (m !!! Regidx rs1)
                    (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))).(sregs)
-             = add_vec_int pc 4).
+             = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
@@ -165,7 +165,7 @@ End Wp_slli.
 Section Wp_srli.
   Context `{!riscvGS Σ}.
   Context {dqc : dfrac}.
-  Lemma wp_srli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5) (shamt : mword 6)
+  Lemma wp_srli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
@@ -175,10 +175,10 @@ Section Wp_srli.
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) -∗
+    instr pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
-      pc_is (add_vec_int pc 4) -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd :=
         regval_into_reg (shift_bits_right (m !!! Regidx rs1)
           (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
@@ -186,7 +186,7 @@ Section Wp_srli.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) pmpcfg0
+    iApply (wp_instr E Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -194,12 +194,12 @@ Section Wp_srli.
       by (apply lookup_lookup_total_dom; apply Hdom).
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
-                 (set_reg σ nextPC (add_vec_int pc 4)) with "Hreg Hr1c") as %Hrv.
+                 (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))) with "Hreg Hr1c") as %Hrv.
     iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
-    assert (Hav : gpr_srli_val rs1 shamt (set_reg σ nextPC (add_vec_int pc 4))
+    assert (Hav : gpr_srli_val rs1 shamt (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                   = shift_bits_right (m !!! Regidx rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)).
     { unfold gpr_srli_val, gpr_src. rewrite Hrv. reflexivity. }
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
@@ -213,24 +213,24 @@ Section Wp_srli.
                  with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+    iExists (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg (shift_bits_right (m !!! Regidx rs1)
                   (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))).
     iSplitR.
     { iPureIntro. rewrite Hpceq.
-      rewrite (exec_execute_SHIFTIOP_SRLI_gpr rs1 rd shamt (set_reg σ nextPC (add_vec_int pc 4))).
+      rewrite (exec_execute_SHIFTIOP_SRLI_gpr rs1 rd shamt (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))).
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       rewrite Hav. reflexivity. }
     iSplitL "Hreg Hmem".
     { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+             (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (shift_bits_right (m !!! Regidx rs1)
                    (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))).(sregs)
-             = add_vec_int pc 4).
+             = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
@@ -246,13 +246,13 @@ Section WpGprShiftDemo.
   Context `{!riscvGS Σ}.
   Context {dqc : dfrac}.
   Definition wp_slli_x5_x6  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_slli_gpr E Φ pc (mword_of_int 6) (mword_of_int 5) sh.    (* slli x5, x6, sh *)
+    wp_slli_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) sh.    (* slli x5, x6, sh *)
   Definition wp_slli_x28_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_slli_gpr E Φ pc (mword_of_int 1) (mword_of_int 28) sh.   (* slli x28, x1, sh *)
+    wp_slli_gpr E Φ pc false (mword_of_int 1) (mword_of_int 28) sh.   (* slli x28, x1, sh *)
   Definition wp_srli_x5_x6  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_srli_gpr E Φ pc (mword_of_int 6) (mword_of_int 5) sh.
+    wp_srli_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) sh.
   Definition wp_srli_x28_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_srli_gpr E Φ pc (mword_of_int 1) (mword_of_int 28) sh.
+    wp_srli_gpr E Φ pc false (mword_of_int 1) (mword_of_int 28) sh.
   Goal gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6
     /\ gpr_of_Z (uint (mword_of_int 15 : mword 5)) = x15
     /\ uint (mword_of_int 28 : mword 5) <> 0.

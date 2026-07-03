@@ -35,7 +35,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry WpGpr.
-Require Import WpAuipc WpGprAuipc WpGprLoad WpGprMul WpGprCsrr WpGprJal WpGprRvc.
+Require Import WpAuipc WpGprAuipc WpGprLoad WpGprMul WpGprCsrr WpGprJal WpGprRvc WpGprLui WpGprAddi WpGprLogic.
 Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
@@ -259,9 +259,9 @@ Section WpEntryNew.
   Qed.
 
   Lemma entry_instr_clui :
-    kernel_text -∗ instr pc_e2 true (C_LUI (imm_clui, rd_clui)).
+    kernel_text -∗ instr pc_e2 true (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (C_LUI (imm_clui, rd_clui)) = false)
+    assert (Hlpad : is_lpad_instruction (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI)) = false)
       by (vm_compute; reflexivity).
     assert (H2al : is_aligned_vaddr (Virtaddr pc_e2) 2 = true) by (vm_compute; reflexivity).
     assert (H4al : is_aligned_vaddr (Virtaddr pc_e2) 4 = true) by (vm_compute; reflexivity).
@@ -279,8 +279,11 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_rvc4 pc_e2 h_lui w_lui4 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms._entry + 0x8) w_lui4 4 pc_e2 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
-      exact (decode_C_lui σ HmisaC).
+    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+      exists (C_LUI (imm_clui, rd_clui)).
+      split; [exact (decode_C_lui σ HmisaC) |].
+      split; [vm_compute; reflexivity |].
+      intro s. exact (exec_execute_C_LUI imm_clui rd_clui s).
   Qed.
 
   Lemma entry_instr_csrr :
@@ -307,9 +310,9 @@ Section WpEntryNew.
   Qed.
 
   Lemma entry_instr_caddi :
-    kernel_text -∗ instr pc_e4 true (C_ADDI (imm_caddi, rsd_caddi)).
+    kernel_text -∗ instr pc_e4 true (ITYPE (sign_extend' 12 imm_caddi, rsd_caddi, rsd_caddi, ADDI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (C_ADDI (imm_caddi, rsd_caddi)) = false)
+    assert (Hlpad : is_lpad_instruction (ITYPE (sign_extend' 12 imm_caddi, rsd_caddi, rsd_caddi, ADDI)) = false)
       by (vm_compute; reflexivity).
     assert (H2al : is_aligned_vaddr (Virtaddr pc_e4) 2 = true) by (vm_compute; reflexivity).
     assert (H4al : is_aligned_vaddr (Virtaddr pc_e4) 4 = false) by (vm_compute; reflexivity).
@@ -325,8 +328,11 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_e4 h_addi H2al H4al Hrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0xe) h_addi 2 pc_e4 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
-      exact (decode_C_ADDI σ HmisaC).
+    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+      exists (C_ADDI (imm_caddi, rsd_caddi)).
+      split; [exact (decode_C_ADDI σ HmisaC) |].
+      split; [vm_compute; reflexivity |].
+      intro s. exact (exec_execute_C_ADDI imm_caddi rsd_caddi s).
   Qed.
 
   Lemma entry_instr_mul :
@@ -362,9 +368,9 @@ Section WpEntryNew.
   Qed.
 
   Lemma entry_instr_cadd :
-    kernel_text -∗ instr pc_e6 true (C_ADD (rsd_cadd, rs2_cadd)).
+    kernel_text -∗ instr pc_e6 true (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (C_ADD (rsd_cadd, rs2_cadd)) = false)
+    assert (Hlpad : is_lpad_instruction (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD)) = false)
       by (vm_compute; reflexivity).
     assert (H2al : is_aligned_vaddr (Virtaddr pc_e6) 2 = true) by (vm_compute; reflexivity).
     assert (H4al : is_aligned_vaddr (Virtaddr pc_e6) 4 = true) by (vm_compute; reflexivity).
@@ -382,8 +388,11 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_rvc4 pc_e6 h_add w_add4 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms._entry + 0x14) w_add4 4 pc_e6 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
-      exact (decode_C_ADD σ HmisaC).
+    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+      exists (C_ADD (rsd_cadd, rs2_cadd)).
+      split; [exact (decode_C_ADD σ HmisaC) |].
+      split; [vm_compute; reflexivity |].
+      intro s. exact (exec_execute_C_ADD rsd_cadd rs2_cadd s).
   Qed.
 
   Lemma entry_instr_jal :
@@ -534,7 +543,7 @@ Section WpEntryNew.
               (Physaddr (add_vec (m_auipc m !!! Regidx i_ld) (sign_extend' 64 imm_ld))) 8
               = true).
     { rewrite Hea. exact Hld_al. }
-    iApply (wp_ld_gpr E Φ pc_e1 i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0
+    iApply (wp_ld_gpr E Φ pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
               (dq := dq) HN Hpmp Hrd1 Hea_al with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
     { rewrite Hea. iExact "Hbytes". }
     iEval (rewrite pc_e1_e2).
@@ -544,9 +553,10 @@ Section WpEntryNew.
              with (m_ld m v_stack0)) in "Hfile".
 
     (* ---- 3. C.LUI @ pc_e2: a0 := 0x1000 ---- *)
-    iApply (wp_clui_gpr E Φ pc_e2 (regidx_bits rd_clui) imm_clui
+    iApply (wp_lui_gpr E Φ pc_e2 true (regidx_bits rd_clui) (sign_extend' 20 imm_clui)
               (m_ld m v_stack0) pmpcfg0 1%Qp HN HpmpU Hrd2
               with "Hmm Hpmpc Hpc Hfile Hi2").
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e2_e3).
     iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx (regidx_bits rd_clui) :=
@@ -563,11 +573,14 @@ Section WpEntryNew.
              with (m_csrr m v_stack0 mhartid_in)) in "Hfile".
 
     (* ---- 5. C.ADDI @ pc_e4: a1 := a1 + 1 ---- *)
-    iApply (wp_caddi_gpr E Φ pc_e4 (regidx_bits rsd_caddi) imm_caddi
+    iApply (wp_addi_gpr E Φ pc_e4 true (regidx_bits rsd_caddi) (regidx_bits rsd_caddi)
+              (sign_extend' 12 imm_caddi)
               (m_csrr m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd4
               with "Hmm Hpmpc Hpc Hfile Hi4").
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e4_e5).
     iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (rewrite sext6_12_64) in "Hfile".
     iEval (change (<[Regidx (regidx_bits rsd_caddi) :=
              regval_into_reg
                (add_vec (m_csrr m v_stack0 mhartid_in !!! Regidx (regidx_bits rsd_caddi))
@@ -590,9 +603,11 @@ Section WpEntryNew.
              with (m_mul m v_stack0 mhartid_in)) in "Hfile".
 
     (* ---- 7. C.ADD @ pc_e6: sp := sp + a0 ---- *)
-    iApply (wp_cadd_gpr E Φ pc_e6 (regidx_bits rsd_cadd) (regidx_bits rs2_cadd)
+    iApply (wp_add_gpr E Φ pc_e6 true (regidx_bits rs2_cadd) (regidx_bits rsd_cadd)
+              (regidx_bits rsd_cadd)
               (m_mul m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd6
               with "Hmm Hpmpc Hpc Hfile Hi6").
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e6_e7).
     iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx (regidx_bits rsd_cadd) :=

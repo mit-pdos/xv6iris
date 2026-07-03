@@ -267,9 +267,9 @@ Section WpLdGpr.
      caller supplies the loaded bytes ([pa..pa+7] ↦ₘ) and alignment facts; the
      config the load's translation / PMP checks read is recovered from the KEPT
      half of [mmode_config] + [hw_config].  [rs1<>0] (base) / [rd<>0] (dest). *)
-  Lemma wp_ld_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5)
+  Lemma wp_ld_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : gmap regidx (mword 64)) (v : bv 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dq : dfrac} :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
     ↑minstretN ⊆ E ->
@@ -280,15 +280,15 @@ Section WpLdGpr.
     pmp_all_off pmpcfg0 ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
-      pc_is (add_vec_int pc 4) -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -296,7 +296,7 @@ Section WpLdGpr.
   Proof.
     intros offset ea HN Hpmp Hrd Halign.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
-    iDestruct (mmode_config_split_half with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
     iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
@@ -305,7 +305,7 @@ Section WpLdGpr.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
-    iApply (wp_instr E Φ pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
+    iApply (wp_instr E Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -333,8 +333,8 @@ Section WpLdGpr.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
     (* base register at the execute state, uniform over rs1 (x0 -> zero_reg). *)
     assert (Hbase : (if Z.eqb (uint rs1) 0 then zero_reg
                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
@@ -410,13 +410,13 @@ Section WpLdGpr.
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg v)).(sregs)
-             = add_vec_int pc 4).
+             = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
-    iDestruct (mmode_config_combine_half with "Hmm' Hmm_k'") as "Hmm''".
+    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbytes").
     iSplitR.

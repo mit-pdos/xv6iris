@@ -45,7 +45,7 @@ Section WpLuiGpr.
      the ABSOLUTE [luival imm] (not PC-relative).  [gpr_file] is indexed by
      [regidx] and complete, so no membership obligation; [rd <> 0] is kept
      (the write to x0 is a no-op). *)
-  Lemma wp_lui_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_lui_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rd : mword 5)
       (imm : mword 20) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     ↑minstretN ⊆ E ->
@@ -55,23 +55,23 @@ Section WpLuiGpr.
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
+    instr pc is_rvc (UTYPE (imm, Regidx rd, LUI)) -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
-      pc_is (add_vec_int pc 4) -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc false (UTYPE (imm, Regidx rd, LUI)) pmpcfg0
+    iApply (wp_instr E Φ pc is_rvc (UTYPE (imm, Regidx rd, LUI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
     (* tick nextPC; PC is unchanged, still [pc] *)
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     (* write rd (rd <> 0, so its entry is the real register points-to) *)
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
@@ -82,12 +82,12 @@ Section WpLuiGpr.
                  with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+    iExists (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg (luival imm))).
     iSplitR.
     { iPureIntro. rewrite Hpceq.
-      rewrite (exec_execute_UTYPE_LUI_gpr rd imm (set_reg σ nextPC (add_vec_int pc 4))).
+      rewrite (exec_execute_UTYPE_LUI_gpr rd imm (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))).
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       reflexivity. }
     iSplitL "Hreg Hmem".
@@ -95,10 +95,10 @@ Section WpLuiGpr.
     (* continuation: PC/nextPC are both pc+4; hand everything back *)
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
+             (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (luival imm))).(sregs)
-             = add_vec_int pc 4).
+             = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold set_reg; cbn [sregs].
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
@@ -113,9 +113,9 @@ End WpLuiGpr.
 Section WpLuiGprDemo.
   Context `{!riscvGS Σ}.
   Definition wp_lui_x5  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 20) :=
-    wp_lui_gpr E Φ pc (mword_of_int 5) imm.
+    wp_lui_gpr E Φ pc false (mword_of_int 5) imm.
   Definition wp_lui_x28 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 20) :=
-    wp_lui_gpr E Φ pc (mword_of_int 28) imm.
+    wp_lui_gpr E Φ pc false (mword_of_int 28) imm.
   Goal gpr_of_Z (uint (mword_of_int 5 : mword 5)) = x5
     /\ gpr_of_Z (uint (mword_of_int 28 : mword 5)) = x28
     /\ uint (mword_of_int 5 : mword 5) <> 0.

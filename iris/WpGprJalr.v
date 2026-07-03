@@ -137,7 +137,7 @@ Section WpJalrGpr.
      [pc_is] is the JUMP TARGET.  JALR's execute reads mseccfg.MLPE (for the
      Zicfilp check) and cur_privilege; these cells are held separately from
      [mmode_config] (which [wp_instr] takes) and handed back to the caller. *)
-  Lemma wp_jalr_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5)
+  Lemma wp_jalr_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) :
     ↑minstretN ⊆ E ->
@@ -148,11 +148,11 @@ Section WpJalrGpr.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc false (JALR (imm, Regidx rs1, Regidx rd)) -∗
+    instr pc is_rvc (JALR (imm, Regidx rs1, Regidx rd)) -∗
     ( mmode_config (DfracOwn 1) -∗
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pc_is (jalr_target (m !!! Regidx rs1) imm) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc (if is_rvc then 2 else 4))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -168,7 +168,7 @@ Section WpJalrGpr.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np)".
     (* wp_instr ties pmpcfg's fraction to mmode_config's, so split it too *)
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iApply (wp_instr E Φ pc false (JALR (imm, Regidx rs1, Regidx rd)) pmpcfg0
+    iApply (wp_instr E Φ pc is_rvc (JALR (imm, Regidx rs1, Regidx rd)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -179,8 +179,8 @@ Section WpJalrGpr.
     (* cur_privilege / mseccfg from the kept mmode_config half + hw_config *)
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmseccfg") as %Lsec.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (σ' := set_reg σ nextPC (add_vec_int pc 4)).
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (σ' := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) σ' with "Hreg Hr1c") as %Hrv.
     iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
@@ -194,22 +194,22 @@ Section WpJalrGpr.
         rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ].
       - subst σ'. unfold set_reg; cbn [sregs].
         rewrite irrelevant_register_set; [ rewrite Lsec; exact Hmlpe | vm_compute; reflexivity ]. }
-    assert (Hlink : register_lookup nextPC σ'.(sregs) = add_vec_int pc 4).
+    assert (Hlink : register_lookup nextPC σ'.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { subst σ'. unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ nextPC _ (jalr_target (m !!! Regidx rs1) imm)
             with "Hreg Hnpc") as "[Hreg Hnpc]".
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec_int pc 4))
+            (regval_into_reg (add_vec_int pc (if is_rvc then 2 else 4)))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (add_vec_int pc 4))
+    iDestruct ("Hfins" $! (regval_into_reg (add_vec_int pc (if is_rvc then 2 else 4)))
                  with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg (set_reg σ' nextPC (jalr_target (m !!! Regidx rs1) imm))
                (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec_int pc 4))).
+               (regval_into_reg (add_vec_int pc (if is_rvc then 2 else 4)))).
     iSplitR.
     { iPureIntro. rewrite Hpceq.
       change (execute (JALR (imm, Regidx rs1, Regidx rd)))
@@ -225,7 +225,7 @@ Section WpJalrGpr.
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ' nextPC (jalr_target (m !!! Regidx rs1) imm))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec_int pc 4))).(sregs)
+                (regval_into_reg (add_vec_int pc (if is_rvc then 2 else 4)))).(sregs)
              = jalr_target (m !!! Regidx rs1) imm).
     { unfold set_reg; cbn [sregs].
       tmig. rewrite register_lookup_set. reflexivity. }
@@ -248,9 +248,9 @@ End WpJalrGpr.
 Section WpJalrGprDemo.
   Context `{!riscvGS Σ}.
   Definition wp_jalr_x1_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_jalr_gpr E Φ pc (mword_of_int 1) (mword_of_int 5) imm.   (* jalr x5, imm(x1) *)
+    wp_jalr_gpr E Φ pc false (mword_of_int 1) (mword_of_int 5) imm.   (* jalr x5, imm(x1) *)
   Definition wp_jalr_x6_x28 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_jalr_gpr E Φ pc (mword_of_int 6) (mword_of_int 28) imm.  (* jalr x28, imm(x6) *)
+    wp_jalr_gpr E Φ pc false (mword_of_int 6) (mword_of_int 28) imm.  (* jalr x28, imm(x6) *)
   Goal gpr_of_Z (uint (mword_of_int 1 : mword 5)) = x1
     /\ gpr_of_Z (uint (mword_of_int 5 : mword 5)) = x5
     /\ gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6

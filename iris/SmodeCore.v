@@ -43,7 +43,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpFetch WpDecode WpLeafCommon WpEntry WpLoad WpGprCsrwB WpEntryNew.
+Require Import WpFetch WpDecode WpLeafCommon WpEntry WpLoad WpGprCsrwB WpGprRvc WpEntryNew.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -2224,10 +2224,11 @@ Section SmodeCoreIris.
     misa ↦ᵣ{ dqm } misa0 -∗
     instr pc is_rvc i -∗
     ⌜ if is_rvc
-      then ∃ h : half,
+      then ∃ (h : half) (i0 : instruction),
              exec (fetch tt) σ = Some (F_RVC h, σ) /\
-             exec (decode_fetch (F_RVC h)) σ = Some (i, σ) /\
-             is_lpad_instruction i = false
+             exec (decode_fetch (F_RVC h)) σ = Some (i0, σ) /\
+             is_lpad_instruction i0 = false /\
+             (forall s : mstate, exec (execute i0) s = Some (ExecuteAs i, s))
       else ∃ w : word,
              exec (fetch tt) σ = Some (F_Base w, σ) /\
              exec (decode_fetch (F_Base w)) σ = Some (i, σ) /\
@@ -2248,14 +2249,15 @@ Section SmodeCoreIris.
                  Hpma HmisaC HSXL0 Hmode Hasid Hvec Hgeom HgeomB' Hpmp
                  with "Hsi Hpc Hpriv Hms Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hbytes") as %Hfetch.
     iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec0.
-    assert (Hdec : exec (decode_fetch r) σ = Some (i, σ))
-      by (apply Hdec0; [rewrite Lpriv; reflexivity | rewrite Lmisa; exact HmisaC]).
+    specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)).
     destruct r as [e | w | h | erx].
     - iDestruct "Hbytes" as %[_ []].
-    - cbn [fetch_is_rvc] in Hrvc. subst is_rvc. iPureIntro.
-      exists w. split; [exact Hfetch | split; [exact Hdec | exact Hnlpad]].
-    - cbn [fetch_is_rvc] in Hrvc. subst is_rvc. iPureIntro.
-      exists h. split; [exact Hfetch | split; [exact Hdec | exact Hnlpad]].
+    - cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc. iPureIntro.
+      exists w. split; [exact Hfetch | split; [exact Hdec0 | exact Hnlpad]].
+    - cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc.
+      destruct Hdec0 as (i0 & Hdec & Hnlpad0 & Hexp). iPureIntro.
+      exists h, i0.
+      split; [exact Hfetch | split; [exact Hdec | split; [exact Hnlpad0 | exact Hexp]]].
     - iDestruct "Hbytes" as %[_ []].
   Qed.
 
@@ -2285,18 +2287,10 @@ Section SmodeCoreIris.
     (∀ σ ns κs nt (Hpceq : register_lookup PC σ.(sregs) = pc),
        state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
-         (if is_rvc
-          then ∃ other : instruction,
-              ⌜ exec (execute i)
-                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
-                  = Some (ExecuteAs other,
-                          set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2)) ⌝ ∗
-              ⌜ exec (execute other)
-                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
-                  = Some (RETIRE_SUCCESS, s_exec) ⌝
-          else ⌜ exec (execute i)
-                      (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 4))
-                   = Some (RETIRE_SUCCESS, s_exec) ⌝) ∗
+         ⌜ exec (execute i)
+                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
+                                     (if is_rvc then 2 else 4)))
+             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          state_interp s_exec ns κs nt ∗
          (smode_config dq satp0 -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
@@ -2343,19 +2337,21 @@ Section SmodeCoreIris.
       iApply (smode_config_rebuild dq satp0 mstatus0 mie_v mdv0 menvcfg0
                 Hmode Hasid HSIE HMPRV HSXL Hmm HPBMTE
                 with "Hhw Hinv Hhs' Hpriv Hsatp Hmstatus Hmiec Hmdlc Hmenvc"). }
+    iDestruct "Hexec" as %Hexec.
     destruct is_rvc.
-    - (* RVC: instr_lift_s gives F_RVC h *)
-      destruct Hlift as (h & Hfetch & Hdec & Hnlpad).
-      iModIntro. iExists (F_RVC h), i, σ, s_exec.
+    - (* RVC: instr_lift_s gives F_RVC h decoding to i0 with the state-generic
+         [ExecuteAs i] expansion; caller's Hexec is the TARGET execute. *)
+      destruct Hlift as (h & i0 & Hfetch & Hdec & Hnlpad0 & Hexp).
+      iModIntro. iExists (F_RVC h), i0, σ, s_exec.
       iSplitR; [iPureIntro; exact Hpriv_σ |].
       iSplitR; [iPureIntro; exact Hdisp |].
       iSplitR; [iPureIntro; exact Hfetch |].
       iSplitR; [iPureIntro; exact Hdec |].
       iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitL "Hexec".
+      iSplitR.
       { iSplitR.
         { iPureIntro. apply exec_currentlyEnabled_Zca. rewrite Hmisa_σ. exact HmisaC. }
-        iExact "Hexec". }
+        iExists i. iSplit; iPureIntro; [apply Hexp | exact Hexec]. }
       rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
     - (* F_Base: instr_lift_s gives F_Base w *)
       destruct Hlift as (w & Hfetch & Hdec & Hnlpad).
@@ -2365,8 +2361,8 @@ Section SmodeCoreIris.
       iSplitR; [iPureIntro; exact Hfetch |].
       iSplitR; [iPureIntro; exact Hdec |].
       iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitL "Hexec".
-      { iSplitR; [iPureIntro; exact Hnlpad |]. iExact "Hexec". }
+      iSplitR.
+      { iSplitR; [iPureIntro; exact Hnlpad |]. iPureIntro; exact Hexec. }
       rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
   Qed.
 
@@ -2649,18 +2645,10 @@ Section SmodeCoreIris.
     (∀ σf ns κs nt (Hpceq : register_lookup PC σf.(sregs) = pc),
        state_interp σf ns κs nt ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
-         (if is_rvc
-          then ∃ other : instruction,
-              ⌜ exec (execute i)
-                     (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 2))
-                  = Some (ExecuteAs other,
-                          set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 2)) ⌝ ∗
-              ⌜ exec (execute other)
-                     (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 2))
-                  = Some (RETIRE_SUCCESS, s_exec) ⌝
-          else ⌜ exec (execute i)
-                      (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 4))
-                   = Some (RETIRE_SUCCESS, s_exec) ⌝) ∗
+         ⌜ exec (execute i)
+                (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs))
+                                     (if is_rvc then 2 else 4)))
+             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          state_interp s_exec ns κs nt ∗
          (smode_config dq satp0 -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
@@ -2715,8 +2703,8 @@ Section SmodeCoreIris.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σf.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σf.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σf.
-    assert (Hdec : exec (decode_fetch r) σf = Some (i, σf))
-      by (apply Hdec0; [rewrite Hpriv_σf; reflexivity | rewrite Hmisa_σf; exact HmisaC]).
+    specialize (Hdec0 ltac:(rewrite Hpriv_σf; reflexivity)
+                      ltac:(rewrite Hmisa_σf; exact HmisaC)).
     assert (Lpc_σf : register_lookup PC σf.(sregs) = pc).
     { unfold σf, pw_filled, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
@@ -2732,31 +2720,33 @@ Section SmodeCoreIris.
       iApply (smode_config_rebuild dq satp0 mstatus0 mie_v mdv0 menvcfg0
                 Hmode Hasid HSIE HMPRV HSXL Hmm HPBMTE
                 with "Hhw Hinv Hhs' Hpriv Hsatp Hmstatus Hmiec Hmdlc Hmenvc"). }
+    iDestruct "Hexec" as %Hexec.
     destruct r as [e | w | h | erx].
     - iDestruct "Hbytes" as "[_ %Hbf]". done.
-    - (* F_Base w *)
-      cbn [fetch_is_rvc] in Hrvc. subst is_rvc.
+    - (* F_Base w : direct decode *)
+      cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc.
       iModIntro. iExists (F_Base w), i, σf, s_exec.
       iSplitR; [iPureIntro; exact Hpriv_σ |].
       iSplitR; [iPureIntro; exact Hdisp |].
       iSplitR; [iPureIntro; exact Hfetch |].
-      iSplitR; [iPureIntro; exact Hdec |].
+      iSplitR; [iPureIntro; exact Hdec0 |].
       iSplitR; [iPureIntro; rewrite Help_σf; exact Help_np |].
-      iSplitL "Hexec".
-      { iSplitR; [iPureIntro; exact Hnlpad |]. iExact "Hexec". }
+      iSplitR.
+      { iSplitR; [iPureIntro; exact Hnlpad |]. iPureIntro; exact Hexec. }
       rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
-    - (* F_RVC h *)
-      cbn [fetch_is_rvc] in Hrvc. subst is_rvc.
-      iModIntro. iExists (F_RVC h), i, σf, s_exec.
+    - (* F_RVC h : indirect decode (i0 ExecuteAs-expands to the target i) *)
+      cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc.
+      destruct Hdec0 as (i0 & Hdec & Hnlpad0 & Hexp).
+      iModIntro. iExists (F_RVC h), i0, σf, s_exec.
       iSplitR; [iPureIntro; exact Hpriv_σ |].
       iSplitR; [iPureIntro; exact Hdisp |].
       iSplitR; [iPureIntro; exact Hfetch |].
       iSplitR; [iPureIntro; exact Hdec |].
       iSplitR; [iPureIntro; rewrite Help_σf; exact Help_np |].
-      iSplitL "Hexec".
+      iSplitR.
       { iSplitR.
         { iPureIntro. apply exec_currentlyEnabled_Zca. rewrite Hmisa_σf. exact HmisaC. }
-        iExact "Hexec". }
+        iExists i. iSplit; iPureIntro; [apply Hexp | exact Hexec]. }
       rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont'".
     - iDestruct "Hbytes" as "[_ %Hbf]". done.
   Qed.
@@ -2835,9 +2825,9 @@ Section SmodeDemo.
      an S-mode chain lifts it with [instr_lift_s] / steps it with
      [wp_instr_s] instead of [instr_lift] / [wp_instr]. *)
   Lemma kv_instr1 :
-    kernel_text -∗ instr kv_pc1 true (C_ADDI16SP kv_imm1).
+    kernel_text -∗ instr kv_pc1 true (ITYPE (caddi16sp_imm kv_imm1, sp, sp, ADDI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (C_ADDI16SP kv_imm1) = false)
+    assert (Hlpad : is_lpad_instruction (ITYPE (caddi16sp_imm kv_imm1, sp, sp, ADDI)) = false)
       by (vm_compute; reflexivity).
     assert (H2al : is_aligned_vaddr (Virtaddr kv_pc1) 2 = true) by (vm_compute; reflexivity).
     assert (H4al : is_aligned_vaddr (Virtaddr kv_pc1) 4 = true) by (vm_compute; reflexivity).
@@ -2855,8 +2845,11 @@ Section SmodeDemo.
     iSplitL "".
     - iApply (instr_bytes_rvc4 kv_pc1 kv_h1 kv_w1 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms.kernelvec) kv_w1 4 kv_pc1 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
-      exact (kv_decode1 σ HmisaC).
+    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+      exists (C_ADDI16SP kv_imm1).
+      split; [exact (kv_decode1 σ HmisaC) |].
+      split; [vm_compute; reflexivity |].
+      intro s. exact (exec_execute_C_ADDI16SP kv_imm1 s).
   Qed.
 
 End SmodeDemo.
