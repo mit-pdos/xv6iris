@@ -30,13 +30,13 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew.
-Require Import WpGpr WpGprAddi WpGprRvc.
+Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr.
 Require Import SmodeCore WpSmodeGpr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -119,6 +119,278 @@ Section WpMemsetS.
       iApply (kernel_window_pc KernelSyms.memset w_memset0 4 pc_memset eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
       rewrite <- rsd_memset0_sp. exact (decode_memset_addi σ HmisaC).
+  Qed.
+
+  (* =================================================================== *)
+  (*  Register-only S-mode leaf WPs that memset needs beyond c.addi /     *)
+  (*  c.sdsp / c.ldsp.  Each wraps [wp_rvc_gpr_write_s] with the existing  *)
+  (*  ExecuteAs expansion + base [_gpr] value lemma, exactly as            *)
+  (*  [wp_caddi16sp_gpr_s] does.  All are register-only (no data page).    *)
+  (* =================================================================== *)
+
+  (* ---- c.addi4spn rd', sp, nzimm  (rd' := sp + nzimm) ---- *)
+  Lemma wp_caddi4spn_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    creg2reg_idx rdc = Regidx rd ->
+    uint rd <> 0 ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (C_ADDI4SPN (rdc, nzimm)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrdc Hrd Hvec Hgeom Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc rd csp_rs1 csp_rs1
+              (C_ADDI4SPN (rdc, nzimm))
+              (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI))
+              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))
+              m satp0 pmpcfg0 pmpaddr00 tlbvec q HN Hvec Hgeom Hpmp Hrd _ _
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont").
+    - intro s. rewrite <- Hrdc. exact (exec_execute_C_ADDI4SPN rdc nzimm s).
+    - intros s_pc Hnpc Hva _.
+      change sp with (Regidx csp_rs1).
+      rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 rd (caddi4spn_imm nzimm) s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_addi_val. rewrite Hva. reflexivity.
+  Qed.
+
+  (* ---- c.mv rd, rs2  (rd := rs2, via RTYPE ADD rd, x0, rs2) ---- *)
+  Lemma wp_cmv_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs2 : mword 5)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (C_MV (Regidx rd, Regidx rs2)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (add_vec zero_reg (m !!! Regidx rs2))]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hvec Hgeom Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc rd rs2 rs2
+              (C_MV (Regidx rd, Regidx rs2))
+              (RTYPE (Regidx rs2, zreg, Regidx rd, ADD))
+              (add_vec zero_reg (m !!! Regidx rs2))
+              m satp0 pmpcfg0 pmpaddr00 tlbvec q HN Hvec Hgeom Hpmp Hrd _ _
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont").
+    - intro s. exact (exec_execute_C_MV (Regidx rd) (Regidx rs2) s).
+    - intros s_pc Hnpc Hva _.
+      change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
+      change (execute (RTYPE (Regidx rs2, Regidx (zero_extend' 5 ('b"00") : mword 5), Regidx rd, ADD)))
+        with (execute_RTYPE (Regidx rs2) (Regidx (zero_extend' 5 ('b"00") : mword 5)) (Regidx rd) ADD).
+      rewrite (exec_execute_RTYPE_ADD_gpr rs2 (zero_extend' 5 ('b"00") : mword 5) rd s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_rd_val.
+      replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true by (vm_compute; reflexivity).
+      rewrite Hva. reflexivity.
+  Qed.
+
+  (* ---- c.slli rsd, shamt  (rsd := rsd << shamt) ---- *)
+  Lemma wp_cslli_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rsd : regidx) (rd : mword 5) (shamt : mword 6)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    rsd = Regidx rd ->
+    uint rd <> 0 ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (C_SLLI (shamt, rsd)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (shift_bits_left (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrsd Hrd Hvec Hgeom Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc rd rd rd
+              (C_SLLI (shamt, rsd))
+              (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI))
+              (shift_bits_left (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
+              m satp0 pmpcfg0 pmpaddr00 tlbvec q HN Hvec Hgeom Hpmp Hrd _ _
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont").
+    - intro s. rewrite Hrsd. exact (exec_execute_C_SLLI shamt (Regidx rd) s).
+    - intros s_pc Hnpc Hva _.
+      rewrite (exec_execute_SHIFTIOP_SLLI_gpr rd rd shamt s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_slli_val, gpr_src. rewrite Hva. reflexivity.
+  Qed.
+
+  (* ---- c.srli rd', shamt  (rd' := rd' >>u shamt) ---- *)
+  Lemma wp_csrli_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (crsd : cregidx) (rd : mword 5) (shamt : mword 6)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    creg2reg_idx crsd = Regidx rd ->
+    uint rd <> 0 ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (C_SRLI (shamt, crsd)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (shift_bits_right (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hcrsd Hrd Hvec Hgeom Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc rd rd rd
+              (C_SRLI (shamt, crsd))
+              (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI))
+              (shift_bits_right (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
+              m satp0 pmpcfg0 pmpaddr00 tlbvec q HN Hvec Hgeom Hpmp Hrd _ _
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont").
+    - intro s. rewrite <- Hcrsd. exact (exec_execute_C_SRLI shamt crsd s).
+    - intros s_pc Hnpc Hva _.
+      rewrite (exec_execute_SHIFTIOP_SRLI_gpr rd rd shamt s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_srli_val, gpr_src. rewrite Hva. reflexivity.
+  Qed.
+
+  (* =================================================================== *)
+  (*  Base (4-byte) register-write S-mode engine -- the [is_rvc = false]   *)
+  (*  analogue of [wp_rvc_gpr_write_s]: any base instruction [i] that       *)
+  (*  writes ONE gpr [rd := wval].  Used for memset's [add a4,a2,a0].       *)
+  (*  Extra premise: the SECOND fetch half also has fetch geometry.         *)
+  (* =================================================================== *)
+  Lemma wp_base_gpr_write_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rsa rsb : mword 5) (i : instruction) (wval : mword 64)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    kv_fetch_geom (add_vec_int pc 2) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    uint rd <> 0 ->
+    (forall s_pc : mstate,
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
+       (if Z.eqb (uint rsa) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = m !!! Regidx rsa ->
+       (if Z.eqb (uint rsb) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = m !!! Regidx rsb ->
+       exec (execute i) s_pc
+       = Some (RETIRE_SUCCESS,
+               set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc false i -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hvec Hgeom HgeomB Hpmp Hrd Hbexec)
+      "Hsm Hpmpc Hpmpa Htlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_s root_ppn E Φ pc false i satp0 pmpcfg0 pmpaddr00 tlbvec HN Hvec Hgeom
+              (fun _ => HgeomB) Hpmp with "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmb : m !! Regidx rsb = Some (m !!! Regidx rsb))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rsa (m !!! Regidx rsa) s_pc with "Hreg Hrac") as %Lva0.
+    iDestruct ("Hfba" with "Hrac") as "Hfmap".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rsb (m !!! Regidx rsb) s_pc with "Hreg Hrbc") as %Lvb0.
+    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg wval)
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg wval) with "[Hrdc]") as "Hfmap".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).(sregs)
+             = add_vec_int pc 4).
+    { tmig. exact Lnpc0. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' Htlb' [$Hpc' $Hnpc] [Hfmap]").
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
   Qed.
 
   (* =================================================================== *)
