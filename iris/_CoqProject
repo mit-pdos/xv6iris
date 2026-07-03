@@ -58,3 +58,4 @@ WpIntrBits.v
 WpIntrCore.v
 WpKvHit.v
 WpIntrStep.v
+WpIntrInv.v
