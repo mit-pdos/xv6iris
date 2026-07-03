@@ -2865,4 +2865,274 @@ Section WpMemsetS.
     iApply ("Hcont" with "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile Hbra Hbs0").
   Qed.
 
+  (* =================================================================== *)
+  (*  THE END-TO-END THEOREM: a WP for the entire [memset], 0xccc through   *)
+  (*  its return to the caller (PC = ra0 with the low bit cleared).         *)
+  (*  It fuses the three committed segments:                                *)
+  (*     wp_memset_prefix (0xccc..0xcdc)  -- frame setup + loop bounds       *)
+  (*   ∘ wp_memset_loop   (0xce0..0xce6)  -- the byte-fill loop              *)
+  (*   ∘ wp_memset_suffix (0xcea..0xcf0)  -- restore + return.               *)
+  (*  n = zext32(count) = N >= 1 (the nonzero, in-range case).              *)
+  (* =================================================================== *)
+  Lemma wp_memset_s_full (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (m0 : gmap regidx (mword 64)) (N : nat)
+      (imm_entry shamt_l shamt_r imm_dealloc : mword 6) (nzimm_s0 imm8_beqz : mword 8)
+      (i_add : instruction) (wval_add : mword 64) (imm_bne : mword 13)
+      (svpn svpn_ra svpn_s0 : mword 27) (olds : nat -> bv 8)
+      (satp0 mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dq dqt : dfrac} :
+    let ra_idx : mword 5 := mword_of_int 1 in
+    let s0_idx : mword 5 := mword_of_int 8 in
+    let a0_idx : mword 5 := mword_of_int 10 in
+    let a1_idx : mword 5 := mword_of_int 11 in
+    let a2_idx : mword 5 := mword_of_int 12 in
+    let a4_idx : mword 5 := mword_of_int 14 in
+    let a5_idx : mword 5 := mword_of_int 15 in
+    let pcE := mword_of_int 0x80000ccc in
+    let pc0L := mword_of_int 0x80000ce0 in
+    let pcLS := mword_of_int 0x80000cea in
+    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
+    let ra0 := m0 !!! Regidx ra_idx in
+    let s00 := m0 !!! Regidx s0_idx in
+    let p := m0 !!! Regidx a0_idx in
+    let e := wval_add in
+    let cval := m0 !!! Regidx a1_idx in
+    let ea_ra := add_vec sp' (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))) in
+    let a8_ra := sign_extend' 64 (subrange_vec_dec ea_ra (xlen - 0 - 1) 0) in
+    let pa_ra := zero_extend' 64 (add_vec_int a8_ra (0 * 8)) in
+    let ea_s0 := add_vec sp' (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))) in
+    let a8_s0 := sign_extend' 64 (subrange_vec_dec ea_s0 (xlen - 0 - 1) 0) in
+    let pa_s0 := zero_extend' 64 (add_vec_int a8_s0 (0 * 8)) in
+    let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
+    let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
+    let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2 in
+    let m4 := <[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3 in
+    let m5 := <[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4 in
+    let m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5 in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+    ↑minstretN ⊆ E ->
+    (1 <= N)%nat ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (* fetch geometry + PMP: prefix (0..18), loop (ce0-relative), suffix (cea-relative) *)
+    kv_fetch_geom pcE -> kv_fetch_geom (add_vec_int pcE 2) -> kv_fetch_geom (add_vec_int pcE 4) ->
+    kv_fetch_geom (add_vec_int pcE 6) -> kv_fetch_geom (add_vec_int pcE 8) -> kv_fetch_geom (add_vec_int pcE 10) ->
+    kv_fetch_geom (add_vec_int pcE 12) -> kv_fetch_geom (add_vec_int pcE 14) ->
+    kv_fetch_geom (add_vec_int pcE 16) -> kv_fetch_geom (add_vec_int pcE 18) ->
+    kv_fetch_geom pc0L -> kv_fetch_geom (add_vec_int pc0L 2) -> kv_fetch_geom (add_vec_int pc0L 4) ->
+    kv_fetch_geom (add_vec_int pc0L 6) -> kv_fetch_geom (add_vec_int pc0L 8) ->
+    kv_fetch_geom pcLS -> kv_fetch_geom (add_vec_int pcLS 2) ->
+    kv_fetch_geom (add_vec_int pcLS 4) -> kv_fetch_geom (add_vec_int pcLS 6) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pcE ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 2) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 4) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 6) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 8) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 10) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 12) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 14) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 16) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc0L ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pc0L 4) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pc0L 6) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pcLS ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 2) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 4) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 6) ->
+    (* the add reduces to a4 := wval_add (end pointer) *)
+    (forall s_pc : mstate,
+       register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
+       (if Z.eqb (uint a2_idx) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a2_idx))) s_pc.(sregs)) = m5 !!! Regidx a2_idx ->
+       (if Z.eqb (uint a0_idx) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a0_idx))) s_pc.(sregs)) = m5 !!! Regidx a0_idx ->
+       exec (execute i_add) s_pc
+       = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint a4_idx))) (regval_into_reg wval_add))) ->
+    (* stack-slot (identity superpage) geometry, shared by the saves and the restores *)
+    neq_vec (bits_of_virtaddr (Virtaddr a8_ra))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_ra)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_ra)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn_ra ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn_ra)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_ra)) (Z.sub pagesize_bits 1) 0)) = a8_ra ->
+    and_vec (sign_extend' (57 - 12) svpn_ra) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) svpn_ra) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa_ra) (uint (to_bits 64 8)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    is_aligned_vaddr (Virtaddr a8_ra) 8 = true ->
+    is_aligned_paddr (Physaddr pa_ra) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr a8_s0))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_s0)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_s0)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn_s0 ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn_s0)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_s0)) (Z.sub pagesize_bits 1) 0)) = a8_s0 ->
+    and_vec (sign_extend' (57 - 12) svpn_s0) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) svpn_s0) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa_s0) (uint (to_bits 64 8)) = PMP_Match ->
+    is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
+    is_aligned_paddr (Physaddr pa_s0) 8 = true ->
+    (* n <> 0 (fall through the c.beqz) *)
+    eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
+    (* return-target low bits (2-aligned) *)
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec ret_tgt 1) = false ->
+    (* loop: bne target and pc0 alignment, buffer page geometry *)
+    add_vec (add_vec_int pc0L 6) (sign_extend' 64 imm_bne) = pc0L ->
+    eq_vec (access_vec_dec pc0L 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec pc0L 1) = false ->
+    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (forall j : nat, (j < N)%nat ->
+       neq_vec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j))))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0)) = false) ->
+    (forall j : nat, (j < N)%nat ->
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn) ->
+    (forall j : nat, (j < N)%nat ->
+       zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
+    (forall j : nat, (j < N)%nat ->
+       pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+         (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
+         (uint (ms_pa (ms_addr p j))) (uint (to_bits 64 1)) = PMP_Match) ->
+    (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
+    (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
+    (⊢ kernel_text -∗ instr pc0L false (STORE (mword_of_int 0, Regidx a1_idx, Regidx a5_idx, 1))) ->
+    (⊢ kernel_text -∗ instr (add_vec_int pc0L 4) true (C_ADDI (mword_of_int 1, Regidx a5_idx))) ->
+    (⊢ kernel_text -∗ instr (add_vec_int pc0L 6) false (BTYPE (imm_bne, Regidx a4_idx, Regidx a5_idx, BNE))) ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ satp ↦ᵣ{ dq } satp0 -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb ↦ᵣ{ dqt } tlbvec -∗
+    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
+    instr pcE true (C_ADDI (imm_entry, Regidx csp_rs1)) -∗
+    instr (add_vec_int pcE 2) true (C_SDSP (mword_of_int 1, Regidx ra_idx)) -∗
+    instr (add_vec_int pcE 4) true (C_SDSP (mword_of_int 0, Regidx s0_idx)) -∗
+    instr (add_vec_int pcE 6) true (C_ADDI4SPN (Cregidx (mword_of_int 0), nzimm_s0)) -∗
+    instr (add_vec_int pcE 8) true (C_BEQZ (imm8_beqz, Cregidx (mword_of_int 4))) -∗
+    instr (add_vec_int pcE 10) true (C_MV (Regidx a5_idx, Regidx a0_idx)) -∗
+    instr (add_vec_int pcE 12) true (C_SLLI (shamt_l, Regidx a2_idx)) -∗
+    instr (add_vec_int pcE 14) true (C_SRLI (shamt_r, Cregidx (mword_of_int 4))) -∗
+    instr (add_vec_int pcE 16) false i_add -∗
+    instr pcLS true (C_LDSP (mword_of_int 1, Regidx ra_idx)) -∗
+    instr (add_vec_int pcLS 2) true (C_LDSP (mword_of_int 0, Regidx s0_idx)) -∗
+    instr (add_vec_int pcLS 4) true (C_ADDI (imm_dealloc, Regidx csp_rs1)) -∗
+    instr (add_vec_int pcLS 6) true (C_JR (Regidx ra_idx)) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte (bv_0 64) j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte (bv_0 64) j) -∗
+    ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ satp ↦ᵣ{ dq } satp0 -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is ret_tgt -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte ra0 j) -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte s00 j) -∗
+      ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros ra_idx s0_idx a0_idx a1_idx a2_idx a4_idx a5_idx pcE pc0L pcLS
+      sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
+      m1 m2 m3 m4 m5 m6 ret_tgt cbyte
+      HN HNge1 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hlpe Hvec5
+      Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18
+      HgL0 HgL2 HgL4 HgL6 HgL8 HgS0 HgS2 HgS4 HgS6
+      Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
+      HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6
+      Hbexec_add
+      HcanonR HvpnR HidentR HmaskR HvecstR HrangeR HW_R HR_R HalignR HpalignR
+      HcanonS HvpnS HidentS HmaskS HvecstS HrangeS HalignS HpalignS
+      Hn0 Hret0 Hret1 Hbne HpcL0 HpcL1 Hmask_b Hvecst_b
+      Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
+      Hext0 Hext4 Hext6.
+    (* interface: register file at the loop top and the suffix top *)
+    assert (Hcur : m6 !!! Regidx a5_idx = ms_addr p 0).
+    { unfold m6, m5, m4, m3, m2, m1.
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite lookup_total_insert.
+      unfold regval_into_reg. rewrite add_vec_zero_l.
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      unfold ms_addr, p. change (Z.of_nat 0) with 0%Z. symmetry. exact (avi0 (m0 !!! Regidx a0_idx)). }
+    assert (Hm4 : m6 !!! Regidx a4_idx = e)
+      by (unfold m6, e; rewrite lookup_total_insert; unfold regval_into_reg; reflexivity).
+    assert (Hm1 : m6 !!! Regidx a1_idx = cval).
+    { unfold m6, m5, m4, m3, m2, m1.
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+      unfold cval; reflexivity. }
+    assert (Hsuf_sp : (<[Regidx a5_idx := regval_into_reg (ms_addr p N)]> m6) !!! Regidx csp_rs1 = sp').
+    { unfold m6, m5, m4, m3, m2, m1.
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+      rewrite lookup_total_insert; unfold regval_into_reg; reflexivity. }
+    assert (Hsuf_ra : (<[Regidx a5_idx := regval_into_reg (ms_addr p N)]> m6) !!! Regidx ra_idx = ra0).
+    { unfold m6, m5, m4, m3, m2, m1.
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+      unfold ra0; reflexivity. }
+    assert (Hpc1 : add_vec_int pcE 20 = pc0L) by (vm_compute; reflexivity).
+    assert (Hpc2 : add_vec_int (add_vec_int pc0L 6) 4 = pcLS) by (vm_compute; reflexivity).
+    iIntros "#Hhw #Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb
+             #Htext Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16
+             HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 Hbuf Hcont".
+    (* --- PREFIX: 0xccc..0xcdc --- *)
+    iApply (wp_memset_prefix root_ppn E Φ m0 imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
+              i_add wval_add svpn_ra svpn_s0 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hvec5
+              Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18
+              Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
+              Hn0 Hbexec_add
+              HcanonR HvpnR HidentR HmaskR HvecstR HrangeR HW_R HalignR HpalignR
+              HcanonS HvpnS HidentS HmaskS HvecstS HrangeS HalignS HpalignS
+              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile
+                    Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 [-]").
+    iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile Hbra Hbs0".
+    iEval (rewrite Hpc1) in "Hpc".
+    (* --- LOOP: 0xce0..0xce6 --- *)
+    iApply (wp_memset_loop root_ppn E Φ N p e cval a1_idx a4_idx a5_idx imm_bne svpn
+              satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec olds (dq:=dq)(dqt:=dqt)
+              HN ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hvec5
+              HgL0 HgL2 HgL4 HgL6 HgL8 HpL0 HpL4 HpL6
+              Hbne HpcL0 HpcL1 Hmask_b Hvecst_b HW_R
+              Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              Hext0 Hext4 Hext6
+              N 0%nat m6 ltac:(reflexivity) HNge1 Hcur Hm4 Hm1
+              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Htext Hpc Hfile Hbuf [-]").
+    iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile Hbuf".
+    iEval (rewrite Hpc2) in "Hpc".
+    (* --- SUFFIX: 0xcea..ret --- *)
+    iApply (wp_memset_suffix root_ppn E Φ sp' ra0 s00 ra_idx s0_idx imm_dealloc svpn_ra svpn_s0
+              (<[Regidx a5_idx := regval_into_reg (ms_addr p N)]> m6)
+              satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)(dqm:=DfracOwn 1)
+              HN ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              Hsuf_sp Hsuf_ra
+              Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hlpe Hvec5
+              HgS0 HgS2 HgS4 HgS6 HpS0 HpS2 HpS4 HpS6 Hret0 Hret1
+              HcanonR HvpnR HidentR HmaskR HvecstR HrangeR HR_R HalignR HpalignR
+              HcanonS HvpnS HidentS HmaskS HvecstS HrangeS HalignS HpalignS
+              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile
+                    HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 [-]").
+    iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hbra Hbs0".
+    iApply ("Hcont" with "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hbra Hbs0 Hbuf").
+  Qed.
+
 End WpMemsetS.
