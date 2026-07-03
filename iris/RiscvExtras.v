@@ -160,6 +160,52 @@ Proof.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
+(* adding an offset that's a multiple of 8 to an 8-aligned vaddr/paddr keeps
+   it 8-aligned -- used to derive every non-slot-0 saved-register-slot
+   address's alignment from slot 0's (kernelvec/kerneltrap), instead of
+   requiring each slot's alignment as an independent hypothesis. *)
+Lemma align8_add_offset_unsigned (x off : mword 64) (k : Z) :
+  bv_unsigned off = 8 * k ->
+  Z.rem (bv_unsigned x) 8 = 0 ->
+  Z.rem (bv_unsigned (add_vec x off)) 8 = 0.
+Proof.
+  intros Hoff H.
+  apply Zrem_divides in H. destruct H as [k' Hk'].
+  cbv [add_vec Operators_mwords.word_binop Operators_mwords.with_word'
+       SailStdpp.Values.with_word to_word get_word MachineWord.MachineWord.add].
+  apply Zrem_divides.
+  rewrite bv_add_unsigned. unfold bv_wrap, bv_modulus.
+  rewrite Hk' Hoff.
+  replace (8 * k' + 8 * k) with (8 * (k' + k)) by ring.
+  change (Z.of_N 64) with 64.
+  replace (2 ^ 64) with (8 * 2305843009213693952) by (vm_compute; reflexivity).
+  assert (Hmm : (8 * (k' + k)) mod (8 * 2305843009213693952)
+                = 8 * ((k' + k) mod 2305843009213693952)).
+  { apply Z.mul_mod_distr_l; lia. }
+  rewrite Hmm.
+  eexists. reflexivity.
+Qed.
+
+Lemma align8_vaddr_add_offset (x off : mword 64) (k : Z) :
+  bv_unsigned off = 8 * k ->
+  is_aligned_vaddr (Virtaddr x) 8 = true ->
+  is_aligned_vaddr (Virtaddr (add_vec x off)) 8 = true.
+Proof.
+  unfold is_aligned_vaddr. intros Hoff H%Z.eqb_eq.
+  rewrite uint_unsigned in H. rewrite uint_unsigned.
+  apply Z.eqb_eq. apply (align8_add_offset_unsigned x off k Hoff H).
+Qed.
+
+Lemma align8_paddr_add_offset (x off : mword 64) (k : Z) :
+  bv_unsigned off = 8 * k ->
+  is_aligned_paddr (Physaddr x) 8 = true ->
+  is_aligned_paddr (Physaddr (add_vec x off)) 8 = true.
+Proof.
+  unfold is_aligned_paddr. intros Hoff H%Z.eqb_eq.
+  rewrite uint_unsigned in H. rewrite uint_unsigned.
+  apply Z.eqb_eq. apply (align8_add_offset_unsigned x off k Hoff H).
+Qed.
+
 (* 4-byte alignment of PC (one fact) implies its low-two-bits-zero forms:
    the Sail fetch path checks bit 0 and bit 1 of PC separately, but both
    follow from [is_aligned_vaddr (Virtaddr pc) 4]. *)
