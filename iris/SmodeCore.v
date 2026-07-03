@@ -2160,7 +2160,7 @@ Section SmodeCoreIris.
          state_interp s_exec ns κs nt ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN) "Hinv Hhs H".
@@ -2303,7 +2303,7 @@ Section SmodeCoreIris.
           pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
           tlb ↦ᵣ{ dqt } tlbvec -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN Hvec Hgeom HgeomB Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr H".
@@ -2336,7 +2336,7 @@ Section SmodeCoreIris.
        continuation: everything is held at a fraction and only read. *)
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[- Hpc' Hpmpc Hpmpa Htlb] Hpmpc Hpmpa Htlb Hpc'").
@@ -2668,7 +2668,7 @@ Section SmodeCoreIris.
           tlb ↦ᵣ tlbfilled -∗
           pte_super_bytes root_ppn dqb -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (tlbfilled HN Hppn Hvec Hgeom Hshape Hpmp Hpmpp Hpteregion Halignp)
@@ -2725,7 +2725,7 @@ Section SmodeCoreIris.
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[- Hpc' Hpmpc Hpmpa Htlb Hpbytes] Hpmpc Hpmpa Htlb Hpbytes Hpc'").

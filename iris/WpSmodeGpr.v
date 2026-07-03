@@ -1694,7 +1694,7 @@ Section WpInstrSConfig.
          state_interp s_exec ns κs nt ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN Hmode Hasid HSIE HMPRV HSXL Hmm Hvec Hgeom HgeomB Hpmp)

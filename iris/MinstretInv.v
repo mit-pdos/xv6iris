@@ -120,6 +120,16 @@ Section MinstretInv.
      writes it, so the caller may retain the complementary fraction throughout
      the instruction to keep reasoning about hart_state.  Returned to the
      continuation unchanged. *)
+  (* The continuation lands on [▷ WP Loop], not [WP Loop]: this rule hands the
+     step's OWN later back to the caller rather than consuming it internally.  A
+     straight-line client doesn't care -- it [iNext]s the [▷] away and keeps its
+     (timeless) resources -- but a client that closes a LOOP back onto the SAME
+     [WP Loop] (the [spin] self-jump, proved by iLöb) needs exactly this later to
+     strip its induction hypothesis.  To thread it, we tick PC / bump minstret
+     UNDER the outer (reflexive) fupd and apply [Hcont] there -- yielding a
+     [▷ WP Loop] hypothesis -- BEFORE the single [iNext] that discharges
+     [wp_exec_step_minstret]'s [▷]; that [iNext] then strips the [Hcont]-produced
+     later in lock-step with the step's, so no second later is needed. *)
   Lemma wp_exec_step_hart_active_inv E Φ {dq : dfrac} :
     ↑minstretN ⊆ E →
     minstret_inv -∗
@@ -133,7 +143,7 @@ Section MinstretInv.
          state_interp s_exec ns κs nt ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN) "#Hinv Hhs H".
@@ -157,12 +167,8 @@ Section MinstretInv.
         = HART_ACTIVE tt).
     { unfold set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-    iModIntro. iExists _. iSplitR.
-    { iPureIntro.
-      exact (exec_riscv_step_hart_active σ s_exec retval b
-               Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
-    iNext.
-    (* POST: tick PC, bump minstret by [b], hand both counter cells back *)
+    (* POST: tick PC and (if b) bump minstret UNDER the outer fupd, then apply the
+       caller's continuation to obtain [HWP : ▷ WP Loop] -- BEFORE the [iNext]. *)
     iDestruct (reg_valid with "Hreg Hmst") as %Lmst_e.
     iMod (reg_update _ PC _ (register_lookup nextPC s_exec.(sregs)) with "Hreg Hpc")
       as "[Hreg Hpc]".
@@ -171,18 +177,29 @@ Section MinstretInv.
         (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs) = mst).
     { unfold set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lmst_e | reflexivity]. }
+    iDestruct ("Hcont" with "Hhs Hpc") as "HWP".
     destruct b.
     - iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst")
         as "[Hreg Hmst]".
+      iModIntro. iExists _. iSplitR.
+      { iPureIntro.
+        exact (exec_riscv_step_hart_active σ s_exec retval true
+                 Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
+      iNext.  (* strips HWP's later in lock-step with the step's later *)
       iModIntro. cbn [sregs mem]. rewrite Hmst_tick.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists (add_vec_int mst 1), true. iFrame. }
-      iApply ("Hcont" with "Hhs Hpc").
-    - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iExact "HWP".
+    - iModIntro. iExists _. iSplitR.
+      { iPureIntro.
+        exact (exec_riscv_step_hart_active σ s_exec retval false
+                 Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
+      iNext.
+      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists mst, false. iFrame. }
-      iApply ("Hcont" with "Hhs Hpc").
+      iExact "HWP".
   Qed.
 
 End MinstretInv.

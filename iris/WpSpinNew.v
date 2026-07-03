@@ -142,12 +142,11 @@ Section WpSpin.
   (*  There is NO postcondition continuation: [spin] never leaves the  *)
   (*  self-jump, so the only way to discharge [WP Loop] is coinductive *)
   (*  -- a Löb-induction hypothesis [IH : ▷ (resources -∗ WP Loop)].   *)
-  (*  We take ONE fetch/decode/execute step of [c.j spin] (which lands *)
-  (*  back on [pc_spin] with every resource unchanged) and close the   *)
-  (*  loop with [IH].  Built on [wp_exec_step_minstret] rather than the *)
-  (*  [wp_instr] leaf layer, because only there is the step's [▷]       *)
-  (*  exposed to the caller (the higher layers strip it internally,     *)
-  (*  leaving no later to feed [IH]).                                   *)
+  (*  We take ONE fetch/decode/execute step of [c.j spin] with the     *)
+  (*  ordinary leaf engine [wp_instr]; because [wp_instr]'s continuation *)
+  (*  now lands on [▷ WP Loop] (it exposes the step's later instead of   *)
+  (*  stripping it internally), that later strips [IH] and closes the    *)
+  (*  loop back onto [pc_spin] with every resource unchanged.           *)
   (* ================================================================= *)
   Lemma wp_spin E (Φ : mval -> iProp Σ) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
@@ -165,138 +164,62 @@ Section WpSpin.
     assert (Htgt : add_vec pc_spin (sign_extend' 64 jimm_spin) = pc_spin)
       by (apply bv_eq; vm_compute; reflexivity).
     iIntros (HN Hpmp) "Hmm Hpmpc Hpc Hfile #Htext".
-    (* pull the (persistent, constant) hardware config out once, so its facts
-       survive the Löb induction. *)
+    (* pull the (persistent, constant) misa.C fact out once, so it survives Löb *)
     iDestruct "Hmm" as "(#Hhw & Hmmrest)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU &
-        %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iAssert (mmode_config (DfracOwn q)) with "[Hmmrest]" as "Hmm".
     { rewrite /mmode_config. iFrame "Hhw". iExact "Hmmrest". }
-    (* Löb: assume the loop already runs from any resource snapshot at pc_spin. *)
+    (* Löb: assume the loop already runs from any resource snapshot at pc_spin *)
     iRevert "Hmm Hpmpc Hpc Hfile".
     iLöb as "IH".
     iIntros "Hmm Hpmpc Hpc Hfile".
-    iDestruct "Hmm" as "(_ & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL)".
-    iDestruct "Hpc" as "[Hpc Hnpc]".
     iPoseProof (spin_instr with "Htext") as "Hinstr".
-    (* ---- take ONE real step, at the layer that exposes the step's later ---- *)
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) Φ HN with "Hinv").
-    iIntros (σ ns κs nt) "Hsi Hbody".
-    iDestruct "Hbody" as (mst mi_old) "[Hmst_c Hmi]".
-    (* cur_privilege at σ (feeds should_inc_minstret) *)
-    iDestruct (state_interp_reg_dq σ ns κs nt cur_privilege (DfracOwn q) Machine
-                 with "Hsi Hpriv") as %Lpriv_σ.
-    destruct (exec_should_inc_minstret_Some (register_lookup cur_privilege σ.(sregs)) σ)
-      as [b Hsi_b].
-    (* PRE: minstret_increment := b (borrowed from the invariant body) *)
+    iDestruct "Hpc" as "[Hpc Hnpc]".
+    (* one leaf step of [c.j spin]; [wp_instr] hands back [▷ WP Loop] *)
+    iApply (wp_instr E Φ pc_spin true (C_J imm_spin) pmpcfg0 HN Hpmp
+              with "Hmm Hpmpc Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    set (s_a := set_reg σ (R_bool minstret_increment) b).
-    iAssert (reg_interp s_a.(sregs) ∗ gen_heap_interp s_a.(mem))%I
-      with "[Hreg Hmem]" as "Hsi".
-    { unfold s_a, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    (* fetch/decode + dispatchInterrupt + register reads, all at s_a *)
-    iDestruct (instr_lift s_a ns κs nt pc_spin true (C_J imm_spin) pmpcfg0 pmar0 misa0
-                 Hpmp Hpma_all HmisaC
-                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr") as %Hlift.
-    iDestruct (dispatchInterrupt_none_from_regs s_a ns κs nt misa0 mstatus0 HmisaS HmIE
-                 with "Hsi Hmisa Hmstatus") as %Hdisp.
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv_sa.
-    iDestruct (reg_valid_dq with "Hreg Help")  as %Lelp_sa.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa_sa.
-    iDestruct (reg_valid_dq with "Hreg Hhs")   as %Lhs_sa.
-    iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc_sa.
-    destruct Hlift as (h & Hfetch & Hdec & Hnlpad).
-    (* the [run_hart_active] result via exec_hart_active_progress_RVC *)
-    set (s_pc := set_reg s_a nextPC (add_vec_int pc_spin 2)).
-    set (s_exec := set_reg s_pc nextPC pc_spin).
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update _ nextPC _ (add_vec_int pc_spin 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc_spin 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc_spin).
     { unfold s_pc, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Lpc_sa | vm_compute; reflexivity]. }
+      rewrite irrelevant_register_set; [exact Hpceq | vm_compute; reflexivity]. }
     assert (HzcaC : eq_vec (_get_Misa_C (register_lookup misa s_pc.(sregs))) ('b"1") = true).
     { unfold s_pc, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [rewrite Lmisa_sa; exact HmisaC | vm_compute; reflexivity]. }
-    assert (Hzca_sa : exec (currentlyEnabled Ext_Zca) s_a = Some (true, s_a)).
-    { apply exec_currentlyEnabled_Zca. rewrite Lmisa_sa. exact HmisaC. }
+      rewrite irrelevant_register_set; [rewrite Lmisa; exact HmisaC | vm_compute; reflexivity]. }
     assert (Halign_spc : eq_vec (access_vec_dec
               (add_vec (register_lookup PC s_pc.(sregs)) (sign_extend' 64 jimm_spin)) 0)
               ('b"0") = true).
     { rewrite Hpcv. rewrite Htgt. exact Hbit0. }
-    assert (Hexec1 : exec (execute (C_J imm_spin)) s_pc
-                       = Some (ExecuteAs (JAL (jimm_spin, zreg)), s_pc)).
-    { apply exec_execute_C_J. }
-    assert (Hexec2 : exec (execute (JAL (jimm_spin, zreg))) s_pc
-                       = Some (RETIRE_SUCCESS, s_exec)).
+    assert (Hexec_spc :
+      exec (execute (JAL (jimm_spin, zreg))) s_pc
+      = Some (RETIRE_SUCCESS, set_reg s_pc nextPC pc_spin)).
     { change (execute (JAL (jimm_spin, zreg))) with (execute_JAL jimm_spin zreg).
       rewrite (exec_execute_JAL_zreg_zca jimm_spin s_pc Halign_spc
                  (exec_currentlyEnabled_Zca s_pc HzcaC)).
-      unfold s_exec. rewrite Hpcv. rewrite Htgt. reflexivity. }
-    assert (Hlpad_sa : eq_vec (register_lookup elp s_a.(sregs))
-                              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { rewrite Lelp_sa. exact Help_np. }
-    assert (Hha : exec (run_hart_active 0) s_a
-                  = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 h), s_exec)).
-    { exact (exec_hart_active_progress_RVC s_a s_exec h (C_J imm_spin) (JAL (jimm_spin, zreg))
-               pc_spin RETIRE_SUCCESS
-               Lpriv_sa Hdisp Hfetch Hdec Hlpad_sa Lpc_sa Hzca_sa Hexec1 Hexec2). }
-    (* hart_state / minstret_increment at s_exec (unchanged by the nextPC ticks) *)
-    assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt) by exact Lhs_sa.
-    assert (Hhart_exec : register_lookup hart_state s_exec.(sregs) = HART_ACTIVE tt).
-    { unfold s_exec, s_pc, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [| vm_compute; reflexivity].
-      rewrite irrelevant_register_set; [exact Lhs_sa | vm_compute; reflexivity]. }
-    assert (Hmi_exec : register_lookup (R_bool minstret_increment) s_exec.(sregs) = b).
-    { unfold s_exec, s_pc, s_a, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [| vm_compute; reflexivity].
-      rewrite irrelevant_register_set; [| vm_compute; reflexivity].
-      rewrite register_lookup_set. reflexivity. }
-    (* the whole [riscv_step] wrapper reduces to [s_final] *)
-    assert (Lnpc_exec : register_lookup nextPC s_exec.(sregs) = pc_spin).
-    { unfold s_exec, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    iModIntro.
-    iExists (if b then set_reg (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs)))
-                         minstret (add_vec_int (register_lookup minstret
-                           (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs)) 1)
-                  else set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).
-    iSplitR.
-    { iPureIntro.
-      exact (exec_riscv_step_hart_active σ s_exec (zero_extend' 32 h) b
-               Hsi_b Hhart_a Hha Hhart_exec Hmi_exec). }
-    (* ---- the step's later: HERE [iNext] makes [IH] usable ---- *)
-    iNext.
-    (* POST: tick nextPC (pc+2 then pc_spin), tick PC := nextPC, bump minstret. *)
-    iMod (reg_update _ nextPC _ (add_vec_int pc_spin 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+      rewrite Hpcv. rewrite Htgt. reflexivity. }
     iMod (reg_update _ nextPC _ pc_spin with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iMod (reg_update _ PC _ (register_lookup nextPC s_exec.(sregs)) with "Hreg Hpc")
-      as "[Hreg Hpc]".
-    iEval (rewrite Lnpc_exec) in "Hpc".
-    destruct b.
-    - iMod (reg_update _ minstret _
-              (add_vec_int (register_lookup minstret
-                 (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs)) 1)
-              with "Hreg Hmst_c") as "[Hreg Hmst_c]".
-      iModIntro.
-      iSplitL "Hreg Hmem".
-      { unfold s_exec, s_pc, s_a, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-      iSplitL "Hmst_c Hmi".
-      { iExists _, true. iFrame "Hmst_c Hmi". }
-      iApply ("IH" with "[Hhs Hpriv Hmstatus] Hpmpc [$Hpc $Hnpc] Hfile").
-      rewrite /mmode_config. iFrame "Hhw Hinv Hhs Hpriv".
-      iExists mstatus0. iFrame "Hmstatus".
-      iSplitR; [iPureIntro; exact HmIE|]. iSplitR; iPureIntro; [exact HMPRV | exact HSXL].
-    - iModIntro.
-      iSplitL "Hreg Hmem".
-      { unfold s_exec, s_pc, s_a, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-      iSplitL "Hmst_c Hmi".
-      { iExists mst, false. iFrame "Hmst_c Hmi". }
-      iApply ("IH" with "[Hhs Hpriv Hmstatus] Hpmpc [$Hpc $Hnpc] Hfile").
-      rewrite /mmode_config. iFrame "Hhw Hinv Hhs Hpriv".
-      iExists mstatus0. iFrame "Hmstatus".
-      iSplitR; [iPureIntro; exact HmIE|]. iSplitR; iPureIntro; [exact HMPRV | exact HSXL].
+    iModIntro.
+    iExists (set_reg s_pc nextPC pc_spin).
+    iSplitR.
+    { iExists (JAL (jimm_spin, zreg)). iSplitR.
+      - iPureIntro. rewrite Hpceq. fold s_pc. apply exec_execute_C_J.
+      - iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    (* continuation: PC (from wp_instr) = nextPC of s_exec = pc_spin; close the
+       loop with the Löb hypothesis (its later is stripped by [wp_instr]'s). *)
+    iIntros "Hmm' Hpmpc' Hpc'".
+    assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC pc_spin).(sregs) = pc_spin).
+    { rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    (* strip [wp_instr]'s exposed later: it discharges [IH]'s. *)
+    iNext.
+    iApply ("IH" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
   Qed.
 
 End WpSpin.

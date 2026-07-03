@@ -612,7 +612,7 @@ Section InstrBytes.
          state_interp s_exec ns κs nt ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN) "Hinv Hhs H".
@@ -824,7 +824,7 @@ Section InstrBytes.
          (mmode_config dq -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN Hpmp) "Hmm Hpmpc Hpc Hinstr H".
@@ -851,10 +851,11 @@ Section InstrBytes.
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     (* Reassemble [mmode_config dq] + pmpcfg for the caller's continuation.
        cur_privilege / mstatus / pmpcfg / hart_state are all held at fraction
-       [dq] and only read, so the step can't touch them. *)
+       [dq] and only read, so the step can't touch them.  The continuation now
+       lands on [▷ WP Loop] (the later exposed by the step rules below). *)
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hpmpc]" as "Hcont'".
     { iIntros "Hhs' Hpc'". iApply ("Hcont" with "[- Hpc' Hpmpc] Hpmpc Hpc'").
       iFrame "Hhw Hinv Hhs' Hpriv".
@@ -940,7 +941,7 @@ Section InstrBytes.
          state_interp s_exec ns κs nt ∗
          (hart_state ↦ᵣ HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv Hmstatus Hpmpc Hpc Hinstr H".
