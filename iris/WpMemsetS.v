@@ -41,6 +41,7 @@ Require Import SmodeCore WpSmodeGpr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+Import Defs.
 
 Section WpMemsetS.
   Context `{!riscvGS Σ}.
@@ -813,6 +814,144 @@ Section WpMemsetS.
     iApply ("Hcont" with "Hhs' Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb [$Hpc' $Hnpc] [Hfmap]").
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
+
+  (* =================================================================== *)
+  (*  Width-1 (store-byte) low-level data-path primitives -- ports of the  *)
+  (*  width-8 store primitives in WpSmodeGpr Part A with width := 1.        *)
+  (*  (within_clint/sig/htif are width-generic and reused directly.)       *)
+  (* =================================================================== *)
+
+  Lemma exec_write_ram_plain_1 (addr : mword 64) (data : bv 8) s :
+    exec (write_ram rv64d_types.Write_plain (Physaddr addr) 1 data tt) s
+    = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 1 data)).
+  Proof.
+    unfold write_ram. cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+    unfold Defs.sail_mem_write. cbn beta zeta iota match.
+    unfold Defs.bind. cbn [Interface.iMon_bind]. cbn match. reflexivity.
+  Qed.
+
+  Lemma exec_pmaCheck_ram_store_1 (addr : mword 64) (pbmt : page_based_mem_type)
+      (region : PMA_Region) s :
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 1 = Some region ->
+    is_aligned_paddr (Physaddr addr) 1 = true ->
+    (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+    exec (pmaCheck (Physaddr addr) 1 (Store Data) pbmt false) s = Some (None, s).
+  Proof.
+    intros Hmatch Halign Hwrite.
+    unfold pmaCheck.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
+    rewrite Hmatch.
+    destruct region as [rbase rsize rattr rdtree].
+    cbn [PMA_Region_attributes] in Hwrite |- *.
+    rewrite Halign. cbn [Riscv.rv64d.not negb].
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
+    cbn match beta.
+    change (assert_exp' true "sys/mem.sail:106.61-106.62" >>=
+            (fun _ : true = true => returnM (PMA_writable (override_PMA rattr pbmt))))
+      with (returnM (PMA_writable (override_PMA rattr pbmt)) : M bool).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
+    rewrite Hwrite. cbn match.
+    apply exec_returnM.
+  Qed.
+
+  Lemma exec_checked_mem_write_ram_store_S_1 (pbmt : page_based_mem_type) (addr : mword 64)
+      (region : PMA_Region) (data : bv 8) s :
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+      (uint addr) (uint (to_bits 64 1)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 1 = Some region ->
+    is_aligned_paddr (Physaddr addr) 1 = true ->
+    (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+    exec (within_clint (Physaddr addr) 1) s = Some (false, s) ->
+    exec (within_sig (Physaddr addr) 1) s = Some (false, s) ->
+    exec (within_htif_writable (Physaddr addr) 1) s = Some (false, s) ->
+    exec (checked_mem_write (Physaddr addr) 1 data (Store Data) pbmt Supervisor tt false false false) s
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 1 data)).
+  Proof.
+    intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh.
+    unfold checked_mem_write.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
+    2:{ unfold phys_access_check.
+        rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_supervisor_grant_store addr 1 s HA Hord Hrange HW)).
+        cbn match.
+        rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_store_1 addr pbmt region s Hmatch Halign Hwrite)).
+        cbn match. apply exec_returnM. }
+    cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (within_mmio_writable (Physaddr addr) 1) s = Some (false, s))).
+    2:{ unfold within_mmio_writable. cbn [get_config_rvfi].
+        rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+        rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+        rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+    cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (write_kind_of_flags false false false) s = Some (rv64d_types.Write_plain, s))).
+    2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_plain_1 addr data s)).
+    apply exec_returnM.
+  Qed.
+
+  Lemma exec_mem_write_value_1_S (pbmt : page_based_mem_type) (addr : mword 64)
+      (region : PMA_Region) (data : bv 8) (m : mword 64) s :
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+      (uint addr) (uint (to_bits 64 1)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 1 = Some region ->
+    is_aligned_paddr (Physaddr addr) 1 = true ->
+    (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+    exec (within_clint (Physaddr addr) 1) s = Some (false, s) ->
+    exec (within_sig (Physaddr addr) 1) s = Some (false, s) ->
+    exec (within_htif_writable (Physaddr addr) 1) s = Some (false, s) ->
+    register_lookup mstatus s.(sregs) = m ->
+    eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    exec (mem_write_value (Physaddr addr) 1 data (Store Data) pbmt false false false) s
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 1 data)).
+  Proof.
+    intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hms Hmprv Hpriv.
+    unfold mem_write_value, mem_write_value_meta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite Hpriv. rewrite Hms.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_store_S m s Hmprv)).
+    unfold mem_write_value_priv_meta. cbn [orb andb].
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_store_S_1 pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh)).
+    cbn match. unfold mem_write_callback. apply exec_returnm.
+  Qed.
+
+  (* width-1 split_misaligned: a 1-byte access is always aligned -> 1 chunk. *)
+  Lemma exec_split_misaligned_aligned_1 (vaddr : virtaddr) s :
+    is_aligned_vaddr vaddr 1 = true ->
+    exec (split_misaligned vaddr 1) s = Some ((1, 1), s).
+  Proof.
+    intro H. unfold split_misaligned. rewrite H. cbn [orb]. apply exec_returnm.
+  Qed.
+
+  Lemma exec_mem_write_ea_1 (addr : mword 64) s :
+    exec (mem_write_ea (Physaddr addr) 1 false false false) s = Some (Ok tt, s).
+  Proof.
+    unfold mem_write_ea. cbn [orb andb].
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (write_kind_of_flags false false false) s = Some (rv64d_types.Write_plain, s))).
+    2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
+    apply exec_returnM.
+  Qed.
+
+  Lemma is_aligned_vaddr_1 (vaddr : virtaddr) : is_aligned_vaddr vaddr 1 = true.
+  Proof. destruct vaddr as [addr]. unfold is_aligned_vaddr. rewrite Z.rem_1_r. reflexivity. Qed.
+
+  Lemma is_aligned_paddr_1 (paddr : physaddr) : is_aligned_paddr paddr 1 = true.
+  Proof. destruct paddr as [addr]. unfold is_aligned_paddr. rewrite Z.rem_1_r. reflexivity. Qed.
 
   (* =================================================================== *)
   (*  THE THEOREM: [memset]'s entry step in S-mode allocates its frame.  *)
