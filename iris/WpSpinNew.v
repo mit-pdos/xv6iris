@@ -11,6 +11,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import MinstretInv InstrBytes WpEntryNew.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 Section WpSpin.
@@ -20,7 +21,7 @@ Section WpSpin.
      compressed self-jump [c.j spin] = [0xa001], the halt loop each hart runs
      forever once start() returns.  It decodes to [C_J imm_spin] whose 11-bit
      immediate is all-zero (jump offset 0), so it targets its own PC. *)
-  Definition pc_spin : mword 64 := mword_of_int 0x8000001a.
+  Definition pc_spin : mword 64 := mword_of_int KernelSyms.spin.
   Definition h_spin : mword 16 := mword_of_int 0xa001.
   Definition imm_spin : mword 11 :=
     concat_vec (concat_vec (concat_vec (concat_vec (concat_vec (concat_vec
@@ -121,7 +122,7 @@ Section WpSpin.
     assert (H4al : is_aligned_vaddr (Virtaddr pc_spin) 4 = false) by (vm_compute; reflexivity).
     assert (Hrvc : isRVC h_spin = true) by (vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (0x8000001a + Z.of_nat j)%Z = Some (nth_byte h_spin j)).
+        KernelInstrs.kernel_bytes !! (KernelSyms.spin + Z.of_nat j)%Z = Some (nth_byte h_spin j)).
     { intros j Hj;
         do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -130,7 +131,7 @@ Section WpSpin.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_spin h_spin H2al H4al Hrvc).
-      iApply (kernel_window_pc 0x8000001a h_spin 2 pc_spin eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc KernelSyms.spin h_spin 2 pc_spin eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
       exact (decode_C_J σ HmisaC).
   Qed.
