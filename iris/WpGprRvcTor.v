@@ -16,7 +16,7 @@
      2. [_chk] clones of the 8-byte read/write exec chains of WpLoad.v /
         WpGprLoad.v / WpGprStore.v, with the per-entry all-OFF hypothesis
         replaced by the abstract pmpCheck fact.
-     3. [wp_rvc_store_gpr_tor] / [wp_rvc_ld_gpr_tor] engines + the
+     3. [wp_store_gpr_tor] / [wp_ld_gpr_tor] (is_rvc-generic base) engines + the
         [wp_csdsp_gpr_tor] / [wp_cldsp_gpr_tor] wrappers. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
@@ -657,8 +657,8 @@ End ExecLoadGchk.
 Section RvcTorEngines.
   Context `{!riscvGS Σ}.
 
-  Lemma wp_rvc_ld_gpr_tor E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5)
-      (imm : mword 12) (ci : instruction) (m : gmap regidx (mword 64)) (v : bv 64)
+  Lemma wp_ld_gpr_tor E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
+      (imm : mword 12) (m : gmap regidx (mword 64)) (v : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) {dq : dfrac} :
     let offset := sign_extend' 64 imm in
@@ -668,25 +668,23 @@ Section RvcTorEngines.
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
-    (forall s : mstate,
-       exec (execute ci) s = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)), s)) ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true ci -∗
+    instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
-      pc_is (add_vec_int pc 2) -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea HN Hpmp Htor Hrd Halign Hexp.
+    intros offset ea HN Hpmp Htor Hrd Halign.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -697,7 +695,8 @@ Section RvcTorEngines.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
-    iApply (wp_instr E Φ pc true ci pmpcfg0 HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr E Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
+              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -725,8 +724,8 @@ Section RvcTorEngines.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
     assert (Hbase : (if Z.eqb (uint rs1) 0 then zero_reg
                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                     = m !!! Regidx rs1).
@@ -800,16 +799,14 @@ Section RvcTorEngines.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg v)).
     iSplitR.
-    { iExists (LOAD (imm, Regidx rs1, Regidx rd, false, 8)). iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc. apply Hexp.
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
+    { iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg v)).(sregs)
-             = add_vec_int pc 2).
+             = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
@@ -823,8 +820,8 @@ Section RvcTorEngines.
     iExact "Hfmap".
   Qed.
 
-  Lemma wp_rvc_store_gpr_tor E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rs2 : mword 5)
-      (imm : mword 12) (ci : instruction) (m : gmap regidx (mword 64)) (vold : bv 64)
+  Lemma wp_store_gpr_tor E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
+      (imm : mword 12) (m : gmap regidx (mword 64)) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) :
     let offset := sign_extend' 64 imm in
@@ -833,25 +830,23 @@ Section RvcTorEngines.
     pmp_allows_all pmpcfg0 ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
-    (forall s : mstate,
-       exec (execute ci) s = Some (ExecuteAs (STORE (imm, Regidx rs2, Regidx rs1, 8)), s)) ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true ci -∗
+    instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
-      pc_is (add_vec_int pc 2) -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea HN Hpmp Htor Halign Hexp.
+    intros offset ea HN Hpmp Htor Halign.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -862,7 +857,8 @@ Section RvcTorEngines.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite).
-    iApply (wp_instr E Φ pc true ci pmpcfg0 HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
+              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -876,8 +872,8 @@ Section RvcTorEngines.
       by (apply lookup_lookup_total_dom; apply Hdom).
     assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
       by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hr1c") as %Lrs1v.
     iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
@@ -948,13 +944,11 @@ Section RvcTorEngines.
     iModIntro.
     iExists s_x.
     iSplitR.
-    { iExists (STORE (imm, Regidx rs2, Regidx rs1, 8)). iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc. apply Hexp.
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
+    { iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
     iSplitL "Hreg Hmem".
     { unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 2).
+    assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
@@ -983,7 +977,7 @@ Section RvcTorEngines.
     mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
-    instr pc true (C_LDSP (uimm, Regidx rd)) -∗
+    instr pc true (LOAD (imm, Regidx csp_rs1, Regidx rd, false, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
@@ -995,10 +989,9 @@ Section RvcTorEngines.
   Proof.
     intros imm ea HN Hpmp Htor Hrd Halign.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
-    unshelve iApply (wp_rvc_ld_gpr_tor E Φ pc csp_rs1 rd imm (C_LDSP (uimm, Regidx rd)) m v
-              pmpcfg0 pmpaddrs q HN Hpmp Htor Hrd Halign _
+    iApply (wp_ld_gpr_tor E Φ pc true csp_rs1 rd imm m v
+              pmpcfg0 pmpaddrs q HN Hpmp Htor Hrd Halign
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
-    intro s. change sp with (Regidx csp_rs1). apply (exec_execute_C_LDSP uimm (Regidx rd) s).
   Qed.
 
   (* ---- c.sdsp rs2, uimm(sp), TOR-aware ---- *)
@@ -1015,7 +1008,7 @@ Section RvcTorEngines.
     mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
-    instr pc true (C_SDSP (uimm, Regidx rs2)) -∗
+    instr pc true (STORE (imm, Regidx rs2, Regidx csp_rs1, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
@@ -1027,10 +1020,9 @@ Section RvcTorEngines.
   Proof.
     intros imm ea HN Hpmp Htor Halign.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
-    unshelve iApply (wp_rvc_store_gpr_tor E Φ pc csp_rs1 rs2 imm (C_SDSP (uimm, Regidx rs2)) m vold
-              pmpcfg0 pmpaddrs q HN Hpmp Htor Halign _
+    iApply (wp_store_gpr_tor E Φ pc true csp_rs1 rs2 imm m vold
+              pmpcfg0 pmpaddrs q HN Hpmp Htor Halign
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
-    intro s. change sp with (Regidx csp_rs1). apply (exec_execute_C_SDSP uimm (Regidx rs2) s).
   Qed.
 
 End RvcTorEngines.

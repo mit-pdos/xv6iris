@@ -551,9 +551,9 @@ Section WpStoreGpr.
      alignment; the config the translation / PMP checks read is recovered from the
      KEPT half of [mmode_config] + [hw_config].  No register is written ([gpr_file]
      is handed back UNCHANGED). *)
-  Lemma wp_store_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rs2 : mword 5)
+  Lemma wp_store_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
       (imm : mword 12) (m : gmap regidx (mword 64)) (vold : bv 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
     ↑minstretN ⊆ E ->
@@ -563,15 +563,15 @@ Section WpStoreGpr.
        side uses [pmp_all_off_allows_all]. *)
     pmp_all_off pmpcfg0 ->
     is_aligned_paddr (Physaddr ea) 8 = true ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
-    ( mmode_config (DfracOwn 1) -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
-      pc_is (add_vec_int pc 4) -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
       ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -579,7 +579,7 @@ Section WpStoreGpr.
   Proof.
     intros offset ea HN Hpmp Halign.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
-    iDestruct (mmode_config_split_half with "Hmm") as "[Hmm_wp Hmm_k]".
+    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
     iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
@@ -588,7 +588,7 @@ Section WpStoreGpr.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite).
-    iApply (wp_instr E Φ pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
+    iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
               HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -602,8 +602,8 @@ Section WpStoreGpr.
       by (apply lookup_lookup_total_dom; apply Hdom).
     assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
       by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
     (* read rs1 (base) -- borrow, read, return *)
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hr1c") as %Lrs1v.
@@ -677,13 +677,13 @@ Section WpStoreGpr.
     iSplitL "Hreg Hmem".
     { unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 4).
+    assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (1/2)))%I
+    iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
-    iDestruct (mmode_config_combine_half with "Hmm' Hmm_k'") as "Hmm''".
+    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbytes").
     iSplitR.
@@ -701,10 +701,10 @@ Section WpStoreGprDemo.
   Context `{!riscvGS Σ}.
   (* `sd ra, imm(sp)` : rs2=ra(x1), rs1=sp(x2). *)
   Definition wp_store_ra_sp (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_store_gpr E Φ pc (mword_of_int 2) (mword_of_int 1) imm.
+    wp_store_gpr E Φ pc false (mword_of_int 2) (mword_of_int 1) imm.
   (* `sd a0, imm(a1)` : rs2=a0(x10), rs1=a1(x11).  SAME lemma, different regs. *)
   Definition wp_store_a0_a1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_store_gpr E Φ pc (mword_of_int 11) (mword_of_int 10) imm.
+    wp_store_gpr E Φ pc false (mword_of_int 11) (mword_of_int 10) imm.
 
   Goal gpr_of_Z (uint (mword_of_int 1 : mword 5)) = x1
     /\ gpr_of_Z (uint (mword_of_int 2 : mword 5)) = x2

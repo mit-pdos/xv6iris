@@ -421,7 +421,7 @@ Section WpTimerinit.
   (* ---- constructor templates (side conditions all vm_compute) ---- *)
 
   (* 4-aligned RVC: 4-byte window word [w], low 16 bits = the encoding [h]. *)
-  Local Ltac ti_mk_rvc4 A h w pc ast decname :=
+  Local Ltac ti_mk_rvc4 A h w pc ast decname expname :=
     let Hlpad := fresh "Hlpad" in
     let H2al := fresh "H2al" in
     let H4al := fresh "H4al" in
@@ -444,10 +444,13 @@ Section WpTimerinit.
     iSplitL "";
     [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+      eexists; (split; [ apply decname; assumption
+                       | split; [ vm_compute; reflexivity
+                                | intro; apply expname ] ]) ].
 
   (* 2-aligned (not 4-aligned) RVC: 2-byte window of the halfword [h]. *)
-  Local Ltac ti_mk_rvc2 A h pc ast decname :=
+  Local Ltac ti_mk_rvc2 A h pc ast decname expname :=
     let Hlpad := fresh "Hlpad" in
     let H2al := fresh "H2al" in
     let H4al := fresh "H4al" in
@@ -468,7 +471,10 @@ Section WpTimerinit.
     iSplitL "";
     [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
       iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+      eexists; (split; [ apply decname; assumption
+                       | split; [ vm_compute; reflexivity
+                                | intro; apply expname ] ]) ].
 
   (* 32-bit F_Base at any 2-aligned pc. *)
   Local Ltac ti_mk_base A w pc ast decname :=
@@ -493,36 +499,36 @@ Section WpTimerinit.
     | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
 
   Lemma ti_instr9 :
-    kernel_text -∗ instr ti_pc9 true (C_ADDI (i9, Regidx csp_rs1)).
-  Proof. ti_mk_rvc4 (KernelSyms.timerinit) ti_h9 ti_w9 ti_pc9 (C_ADDI (i9, Regidx csp_rs1)) ti_decode9. Qed.
+    kernel_text -∗ instr ti_pc9 true (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit) ti_h9 ti_w9 ti_pc9 (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)) ti_decode9 exec_execute_C_ADDI. Qed.
 
   Lemma ti_instr10 :
-    kernel_text -∗ instr ti_pc10 true (C_SDSP (u10, Regidx ti_ra)).
-  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x2) ti_h10 ti_pc10 (C_SDSP (u10, Regidx ti_ra)) ti_decode10. Qed.
+    kernel_text -∗ instr ti_pc10 true (STORE (zero_extend' 12 (concat_vec u10 ('b"000")), Regidx ti_ra, Regidx csp_rs1, 8)).
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x2) ti_h10 ti_pc10 (STORE (zero_extend' 12 (concat_vec u10 ('b"000")), Regidx ti_ra, Regidx csp_rs1, 8)) ti_decode10 exec_execute_C_SDSP. Qed.
 
   Lemma ti_instr11 :
-    kernel_text -∗ instr ti_pc11 true (C_SDSP (u11, Regidx ti_s0)).
-  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x4) ti_h11 ti_w11 ti_pc11 (C_SDSP (u11, Regidx ti_s0)) ti_decode11. Qed.
+    kernel_text -∗ instr ti_pc11 true (STORE (zero_extend' 12 (concat_vec u11 ('b"000")), Regidx ti_s0, Regidx csp_rs1, 8)).
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x4) ti_h11 ti_w11 ti_pc11 (STORE (zero_extend' 12 (concat_vec u11 ('b"000")), Regidx ti_s0, Regidx csp_rs1, 8)) ti_decode11 exec_execute_C_SDSP. Qed.
 
   Lemma ti_instr12 :
-    kernel_text -∗ instr ti_pc12 true (C_ADDI4SPN (ti_cs0, nz12)).
-  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x6) ti_h12 ti_pc12 (C_ADDI4SPN (ti_cs0, nz12)) ti_decode12. Qed.
+    kernel_text -∗ instr ti_pc12 true (ITYPE (caddi4spn_imm nz12, Regidx csp_rs1, Regidx ti_s0, ADDI)).
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x6) ti_h12 ti_pc12 (ITYPE (caddi4spn_imm nz12, Regidx csp_rs1, Regidx ti_s0, ADDI)) ti_decode12 exec_execute_C_ADDI4SPN. Qed.
 
   Lemma ti_instr13 :
     kernel_text -∗ instr ti_pc13 false (CSRReg (WpGprCsrrB.csr_menvcfg, zreg, Regidx ti_a5, CSRRS)).
   Proof. ti_mk_base (KernelSyms.timerinit + 0x8) ti_w13 ti_pc13 (CSRReg (WpGprCsrrB.csr_menvcfg, zreg, Regidx ti_a5, CSRRS)) ti_decode13. Qed.
 
   Lemma ti_instr14 :
-    kernel_text -∗ instr ti_pc14 true (C_LI (i14, Regidx ti_a4)).
-  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0xc) ti_h14 ti_w14 ti_pc14 (C_LI (i14, Regidx ti_a4)) ti_decode14. Qed.
+    kernel_text -∗ instr ti_pc14 true (ITYPE (sign_extend' 12 i14, Regidx cli_rs1, Regidx ti_a4, ADDI)).
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0xc) ti_h14 ti_w14 ti_pc14 (ITYPE (sign_extend' 12 i14, Regidx cli_rs1, Regidx ti_a4, ADDI)) ti_decode14 exec_execute_C_LI. Qed.
 
   Lemma ti_instr15 :
-    kernel_text -∗ instr ti_pc15 true (C_SLLI (sh15, Regidx ti_a4)).
-  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0xe) ti_h15 ti_pc15 (C_SLLI (sh15, Regidx ti_a4)) ti_decode15. Qed.
+    kernel_text -∗ instr ti_pc15 true (SHIFTIOP (sh15, Regidx ti_a4, Regidx ti_a4, SLLI)).
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0xe) ti_h15 ti_pc15 (SHIFTIOP (sh15, Regidx ti_a4, Regidx ti_a4, SLLI)) ti_decode15 exec_execute_C_SLLI. Qed.
 
   Lemma ti_instr16 :
-    kernel_text -∗ instr ti_pc16 true (C_OR (ti_ca5, ti_ca4)).
-  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x10) ti_h16 ti_w16 ti_pc16 (C_OR (ti_ca5, ti_ca4)) ti_decode16. Qed.
+    kernel_text -∗ instr ti_pc16 true (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR)).
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x10) ti_h16 ti_w16 ti_pc16 (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, OR)) ti_decode16 exec_execute_C_OR. Qed.
 
   Lemma ti_instr17 :
     kernel_text -∗ instr ti_pc17 false (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx ti_a5, zreg, CSRRW)).
@@ -553,28 +559,28 @@ Section WpTimerinit.
   Proof. ti_mk_base (KernelSyms.timerinit + 0x2a) ti_w23 ti_pc23 (ITYPE (i23, Regidx ti_a4, Regidx ti_a4, ADDI)) ti_decode23. Qed.
 
   Lemma ti_instr24 :
-    kernel_text -∗ instr ti_pc24 true (C_ADD (Regidx ti_a5, Regidx ti_a4)).
-  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x2e) ti_h24 ti_pc24 (C_ADD (Regidx ti_a5, Regidx ti_a4)) ti_decode24. Qed.
+    kernel_text -∗ instr ti_pc24 true (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, ADD)).
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x2e) ti_h24 ti_pc24 (RTYPE (Regidx ti_a4, Regidx ti_a5, Regidx ti_a5, ADD)) ti_decode24 exec_execute_C_ADD. Qed.
 
   Lemma ti_instr25 :
     kernel_text -∗ instr ti_pc25 false (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx ti_a5, zreg, CSRRW)).
   Proof. ti_mk_base (KernelSyms.timerinit + 0x30) ti_w25 ti_pc25 (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx ti_a5, zreg, CSRRW)) ti_decode25. Qed.
 
   Lemma ti_instr26 :
-    kernel_text -∗ instr ti_pc26 true (C_LDSP (u10, Regidx ti_ra)).
-  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x34) ti_h26 ti_w26 ti_pc26 (C_LDSP (u10, Regidx ti_ra)) ti_decode26. Qed.
+    kernel_text -∗ instr ti_pc26 true (LOAD (zero_extend' 12 (concat_vec u10 ('b"000")), Regidx csp_rs1, Regidx ti_ra, false, 8)).
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x34) ti_h26 ti_w26 ti_pc26 (LOAD (zero_extend' 12 (concat_vec u10 ('b"000")), Regidx csp_rs1, Regidx ti_ra, false, 8)) ti_decode26 exec_execute_C_LDSP. Qed.
 
   Lemma ti_instr27 :
-    kernel_text -∗ instr ti_pc27 true (C_LDSP (u11, Regidx ti_s0)).
-  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x36) ti_h27 ti_pc27 (C_LDSP (u11, Regidx ti_s0)) ti_decode27. Qed.
+    kernel_text -∗ instr ti_pc27 true (LOAD (zero_extend' 12 (concat_vec u11 ('b"000")), Regidx csp_rs1, Regidx ti_s0, false, 8)).
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x36) ti_h27 ti_pc27 (LOAD (zero_extend' 12 (concat_vec u11 ('b"000")), Regidx csp_rs1, Regidx ti_s0, false, 8)) ti_decode27 exec_execute_C_LDSP. Qed.
 
   Lemma ti_instr28 :
-    kernel_text -∗ instr ti_pc28 true (C_ADDI (i28, Regidx csp_rs1)).
-  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x38) ti_h28 ti_w28 ti_pc28 (C_ADDI (i28, Regidx csp_rs1)) ti_decode28. Qed.
+    kernel_text -∗ instr ti_pc28 true (ITYPE (sign_extend' 12 i28, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x38) ti_h28 ti_w28 ti_pc28 (ITYPE (sign_extend' 12 i28, Regidx csp_rs1, Regidx csp_rs1, ADDI)) ti_decode28 exec_execute_C_ADDI. Qed.
 
   Lemma ti_instr29 :
-    kernel_text -∗ instr ti_pc29 true (C_JR (Regidx ti_ra)).
-  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x3a) ti_h29 ti_pc29 (C_JR (Regidx ti_ra)) ti_decode29. Qed.
+    kernel_text -∗ instr ti_pc29 true (JALR (zeros' 12, Regidx ti_ra, zreg)).
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x3a) ti_h29 ti_pc29 (JALR (zeros' 12, Regidx ti_ra, zreg)) ti_decode29 exec_execute_C_JR. Qed.
 
 End WpTimerinit.
 
@@ -792,10 +798,11 @@ Section WpTimerinitThm.
     pose proof (ti_sp_restore sp0) as Hspres.
 
     (* ---- 9. c.addi sp, -16 ---- *)
-    iApply (wp_caddi_gpr E Φ ti_pc9 csp_rs1 i9 m pmpcfg1 q HN Hpmp Hnz_sp
+    iApply (wp_addi_gpr E Φ ti_pc9 true csp_rs1 csp_rs1 (sign_extend' 12 i9) m pmpcfg1 q
+              HN Hpmp Hnz_sp
               with "Hmm Hpmpc Hpc Hfile Hi9").
-    iEval (rewrite P0). iIntros "Hmm Hpmpc Hpc Hfile".
-    iEval (rewrite Hsp) in "Hfile".
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P0). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (rewrite sext6_12_64 Hsp) in "Hfile".
     iEval (change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 i9))]> m)
              with (ti_m1 m sp0)) in "Hfile".
 
@@ -842,10 +849,10 @@ Section WpTimerinitThm.
     iEval (rewrite P2 Hea_s01 Ls01). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0".
 
     (* ---- 12. c.addi4spn s0, sp, 16 ---- *)
-    iApply (wp_caddi4spn_gpr E Φ ti_pc12 nz12 ti_cs0 ti_s0 (ti_m1 m sp0) pmpcfg1 q
-              HN Hpmp Hnz_s0 Hcreg12
+    iApply (wp_addi_gpr E Φ ti_pc12 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (ti_m1 m sp0) pmpcfg1 q
+              HN Hpmp Hnz_s0
               with "Hmm Hpmpc Hpc Hfile Hi12").
-    iEval (rewrite P3 Lsp1). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P3 Lsp1). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_s0 := regval_into_reg
                       (add_vec (ti_sp1 sp0) (sign_extend' 64 (caddi4spn_imm nz12)))]> (ti_m1 m sp0))
              with (ti_m12 m sp0)) in "Hfile".
@@ -859,20 +866,22 @@ Section WpTimerinitThm.
              with (ti_m13 m sp0 menv0)) in "Hfile".
 
     (* ---- 14. c.li a4, -1 ---- *)
-    iApply (wp_cli_gpr E Φ ti_pc14 ti_a4 i14 (ti_m13 m sp0 menv0) pmpcfg1 q
+    iDestruct (gpr_file_x0 (ti_m13 m sp0 menv0) cli_rs1 ltac:(vm_compute; reflexivity)
+                 with "Hfile") as "[%Hx0_14 Hfile]".
+    iApply (wp_addi_gpr E Φ ti_pc14 true cli_rs1 ti_a4 (sign_extend' 12 i14) (ti_m13 m sp0 menv0) pmpcfg1 q
               HN Hpmp Hnz_a4
               with "Hmm Hpmpc Hpc Hfile Hi14").
-    iEval (rewrite P5). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P5 Hx0_14 add_vec_zero_l sext6_12_64). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (cli_wval i14)]> (ti_m13 m sp0 menv0))
              with (ti_m14 m sp0 menv0)) in "Hfile".
 
     (* ---- 15. c.slli a4, 63 ---- *)
     assert (L15a4 : ti_m14 m sp0 menv0 !!! Regidx ti_a4 = cli_wval i14)
       by (ti_unfold; ti_look).
-    iApply (wp_cslli_gpr E Φ ti_pc15 ti_a4 sh15 (ti_m14 m sp0 menv0) pmpcfg1 q
+    iApply (wp_slli_gpr E Φ ti_pc15 true ti_a4 ti_a4 sh15 (ti_m14 m sp0 menv0) pmpcfg1 q
               HN Hpmp Hnz_a4
               with "Hmm Hpmpc Hpc Hfile Hi15").
-    iEval (rewrite P6 L15a4 Hb63). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P6 L15a4 Hb63). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg ti_bit63]> (ti_m14 m sp0 menv0))
              with (ti_m15 m sp0 menv0)) in "Hfile".
 
@@ -881,10 +890,10 @@ Section WpTimerinitThm.
       by (ti_unfold; ti_look).
     assert (L16a4 : ti_m15 m sp0 menv0 !!! Regidx ti_a4 = ti_bit63)
       by (ti_unfold; ti_look).
-    iApply (wp_cor_gpr E Φ ti_pc16 ti_ca5 ti_ca4 ti_a5 ti_a4 (ti_m15 m sp0 menv0) pmpcfg1 q
-              HN Hpmp Hnz_a5 Hcreg16d Hcreg16s
+    iApply (wp_or_gpr E Φ ti_pc16 true ti_a4 ti_a5 ti_a5 (ti_m15 m sp0 menv0) pmpcfg1 q
+              HN Hpmp Hnz_a5
               with "Hmm Hpmpc Hpc Hfile Hi16").
-    iEval (rewrite P7 L16a5 L16a4). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P7 L16a5 L16a4). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (or_vec menv0 ti_bit63)]> (ti_m15 m sp0 menv0))
              with (ti_m16 m sp0 menv0)) in "Hfile".
 
@@ -933,10 +942,10 @@ Section WpTimerinitThm.
              with (ti_m21 m sp0 menv0 mcen0 mtime0)) in "Hfile".
 
     (* ---- 22. lui a4, 0xf4 ---- *)
-    iApply (wp_lui_gpr E Φ ti_pc22 ti_a4 i22 (ti_m21 m sp0 menv0 mcen0 mtime0) pmpcfg1 q
+    iApply (wp_lui_gpr E Φ ti_pc22 false ti_a4 i22 (ti_m21 m sp0 menv0 mcen0 mtime0) pmpcfg1 q
               HN Hpmp Hnz_a4
               with "Hmm Hpmpc Hpc Hfile Hi22").
-    iEval (rewrite P13). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if false then 2%Z else 4%Z) with 4%Z). iEval (rewrite P13). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (luival i22)]>
                      (ti_m21 m sp0 menv0 mcen0 mtime0))
              with (ti_m22 m sp0 menv0 mcen0 mtime0)) in "Hfile".
@@ -944,10 +953,10 @@ Section WpTimerinitThm.
     (* ---- 23. addi a4, a4, 576 ---- *)
     assert (L23a4 : ti_m22 m sp0 menv0 mcen0 mtime0 !!! Regidx ti_a4 = luival i22)
       by (ti_unfold; ti_look).
-    iApply (wp_addi_gpr E Φ ti_pc23 ti_a4 ti_a4 i23 (ti_m22 m sp0 menv0 mcen0 mtime0) pmpcfg1 q
+    iApply (wp_addi_gpr E Φ ti_pc23 false ti_a4 ti_a4 i23 (ti_m22 m sp0 menv0 mcen0 mtime0) pmpcfg1 q
               HN Hpmp Hnz_a4
               with "Hmm Hpmpc Hpc Hfile Hi23").
-    iEval (rewrite P14 L23a4 Hival). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if false then 2%Z else 4%Z) with 4%Z). iEval (rewrite P14 L23a4 Hival). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg ti_interval]>
                      (ti_m22 m sp0 menv0 mcen0 mtime0))
              with (ti_m23 m sp0 menv0 mcen0 mtime0)) in "Hfile".
@@ -957,10 +966,10 @@ Section WpTimerinitThm.
       by (ti_unfold; ti_look).
     assert (L24a4 : ti_m23 m sp0 menv0 mcen0 mtime0 !!! Regidx ti_a4 = ti_interval)
       by (ti_unfold; ti_look).
-    iApply (wp_cadd_gpr E Φ ti_pc24 ti_a5 ti_a4 (ti_m23 m sp0 menv0 mcen0 mtime0) pmpcfg1 q
+    iApply (wp_add_gpr E Φ ti_pc24 true ti_a4 ti_a5 ti_a5 (ti_m23 m sp0 menv0 mcen0 mtime0) pmpcfg1 q
               HN Hpmp Hnz_a5
               with "Hmm Hpmpc Hpc Hfile Hi24").
-    iEval (rewrite P15 L24a5 L24a4). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P15 L24a5 L24a4). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (add_vec mtime0 ti_interval)]>
                      (ti_m23 m sp0 menv0 mcen0 mtime0))
              with (ti_m24 m sp0 menv0 mcen0 mtime0)) in "Hfile".
@@ -1020,10 +1029,11 @@ Section WpTimerinitThm.
     (* ---- 28. c.addi sp, 16 ---- *)
     assert (L28sp : ti_m27 m sp0 menv0 mcen0 mtime0 ra0 s00 !!! Regidx csp_rs1 = ti_sp1 sp0)
       by (ti_unfold; ti_look).
-    iApply (wp_caddi_gpr E Φ ti_pc28 csp_rs1 i28 (ti_m27 m sp0 menv0 mcen0 mtime0 ra0 s00) pmpcfg1 q
+    iApply (wp_addi_gpr E Φ ti_pc28 true csp_rs1 csp_rs1 (sign_extend' 12 i28)
+              (ti_m27 m sp0 menv0 mcen0 mtime0 ra0 s00) pmpcfg1 q
               HN Hpmp Hnz_sp
               with "Hmm Hpmpc Hpc Hfile Hi28").
-    iEval (rewrite P19 L28sp Hspres). iIntros "Hmm Hpmpc Hpc Hfile".
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite sext6_12_64 P19 L28sp Hspres). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx csp_rs1 := regval_into_reg sp0]>
                      (ti_m27 m sp0 menv0 mcen0 mtime0 ra0 s00))
              with (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00)) in "Hfile".

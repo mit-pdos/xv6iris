@@ -1679,18 +1679,10 @@ Section WpInstrSConfig.
        tlb ↦ᵣ{ dqt } tlbvec -∗
        state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
-         (if is_rvc
-          then ∃ other : instruction,
-              ⌜ exec (execute i)
-                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
-                  = Some (ExecuteAs other,
-                          set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2)) ⌝ ∗
-              ⌜ exec (execute other)
-                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
-                  = Some (RETIRE_SUCCESS, s_exec) ⌝
-          else ⌜ exec (execute i)
-                      (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 4))
-                   = Some (RETIRE_SUCCESS, s_exec) ⌝) ∗
+         ⌜ exec (execute i)
+                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
+                                     (if is_rvc then 2 else 4)))
+             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          state_interp s_exec ns κs nt ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
@@ -1721,19 +1713,21 @@ Section WpInstrSConfig.
             with "Hpriv Hsatp Hmstatus Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb [$Hreg $Hmem]")
       as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
+    iDestruct "Hexec" as %Hexec.
     destruct is_rvc.
-    - (* RVC: instr_lift_s gives F_RVC h *)
-      destruct Hlift as (h & Hfetch & Hdec & Hnlpad).
-      iModIntro. iExists (F_RVC h), i, σ, s_exec.
+    - (* RVC: instr_lift_s gives F_RVC h decoding to i0 with the state-generic
+         [ExecuteAs i] expansion; caller's Hexec is the TARGET execute. *)
+      destruct Hlift as (h & i0 & Hfetch & Hdec & Hnlpad0 & Hexp).
+      iModIntro. iExists (F_RVC h), i0, σ, s_exec.
       iSplitR; [iPureIntro; exact Hpriv_σ |].
       iSplitR; [iPureIntro; exact Hdisp |].
       iSplitR; [iPureIntro; exact Hfetch |].
       iSplitR; [iPureIntro; exact Hdec |].
       iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitL "Hexec".
+      iSplitR.
       { iSplitR.
         { iPureIntro. apply exec_currentlyEnabled_Zca. rewrite Hmisa_σ. exact HmisaC. }
-        iExact "Hexec". }
+        iExists i. iSplit; iPureIntro; [apply Hexp | exact Hexec]. }
       rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont".
     - (* F_Base *)
       destruct Hlift as (w & Hfetch & Hdec & Hnlpad).
@@ -1743,8 +1737,8 @@ Section WpInstrSConfig.
       iSplitR; [iPureIntro; exact Hfetch |].
       iSplitR; [iPureIntro; exact Hdec |].
       iSplitR; [iPureIntro; rewrite Help_σ; exact Help_np |].
-      iSplitL "Hexec".
-      { iSplitR; [iPureIntro; exact Hnlpad |]. iExact "Hexec". }
+      iSplitR.
+      { iSplitR; [iPureIntro; exact Hnlpad |]. iPureIntro; exact Hexec. }
       rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont".
   Qed.
 
@@ -1762,7 +1756,7 @@ Section SmodeGprClients.
   (* ------------------------------------------------------------------- *)
   Lemma wp_rvc_gpr_write_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5)
-      (ci base : instruction) (wval : mword 64)
+      (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64)) (satp0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
@@ -1771,7 +1765,6 @@ Section SmodeGprClients.
     kv_fetch_geom pc ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
     uint rd <> 0 ->
-    (forall s : mstate, exec (execute ci) s = Some (ExecuteAs base, s)) ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
        (if Z.eqb (uint rsa) 0 then zero_reg
@@ -1787,7 +1780,7 @@ Section SmodeGprClients.
     tlb ↦ᵣ{ dqt } tlbvec -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true ci -∗
+    instr pc true base -∗
     ( smode_config (DfracOwn q) satp0 -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
@@ -1797,9 +1790,9 @@ Section SmodeGprClients.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hvec Hgeom Hpmp Hrd Hexp Hbexec)
+    iIntros (HN Hvec Hgeom Hpmp Hrd Hbexec)
       "Hsm Hpmpc Hpmpa Htlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s root_ppn E Φ pc true ci satp0 pmpcfg0 pmpaddr00 tlbvec HN Hvec Hgeom
+    iApply (wp_instr_s root_ppn E Φ pc true base satp0 pmpcfg0 pmpaddr00 tlbvec HN Hvec Hgeom
               ltac:(discriminate) Hpmp with "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -1829,9 +1822,9 @@ Section SmodeGprClients.
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
     iSplitR.
-    { iExists base. iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc. apply Hexp.
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
+    { iPureIntro. rewrite Hpceq.
+      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc.
+      exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpc'".
@@ -1862,7 +1855,7 @@ Section SmodeGprClients.
     tlb ↦ᵣ{ dqt } tlbvec -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true (C_ADDI16SP imm6) -∗
+    instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
     ( smode_config (DfracOwn q) satp0 -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
@@ -1876,10 +1869,9 @@ Section SmodeGprClients.
     iIntros (HN Hvec Hgeom Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
     unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc csp_rs1 csp_rs1 csp_rs1
-              (C_ADDI16SP imm6) (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
+              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
-              m satp0 pmpcfg0 pmpaddr00 tlbvec q HN Hvec Hgeom Hpmp Hsp
-              (fun s => exec_execute_C_ADDI16SP imm6 s) _
+              m satp0 pmpcfg0 pmpaddr00 tlbvec q HN Hvec Hgeom Hpmp Hsp _
               with "Hsm Hpmpc Hpmpa Htlb Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     change sp with (Regidx csp_rs1).
@@ -1896,7 +1888,7 @@ Section SmodeGprClients.
   (* ------------------------------------------------------------------- *)
   Lemma wp_rvc_gpr_write_s_fill (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5)
-      (ci base : instruction) (wval : mword 64)
+      (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64)) (satp0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (region_pte : PMA_Region)
@@ -1913,7 +1905,6 @@ Section SmodeGprClients.
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     uint rd <> 0 ->
-    (forall s : mstate, exec (execute ci) s = Some (ExecuteAs base, s)) ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
        (if Z.eqb (uint rsa) 0 then zero_reg
@@ -1930,7 +1921,7 @@ Section SmodeGprClients.
     pte_super_bytes root_ppn dqb -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true ci -∗
+    instr pc true base -∗
     ( smode_config (DfracOwn q) satp0 -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
@@ -1942,9 +1933,9 @@ Section SmodeGprClients.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros tlbfilled.
-    iIntros (HN Hppn Hvec Hgeom Hpmp Hpmpp Hpteregion Halignp Hrd Hexp Hbexec)
+    iIntros (HN Hppn Hvec Hgeom Hpmp Hpmpp Hpteregion Halignp Hrd Hbexec)
       "Hsm Hpmpc Hpmpa Htlb Hpbytes [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_fill root_ppn E Φ pc true ci satp0 pmpcfg0 pmpaddr00 region_pte tlbvec
+    iApply (wp_instr_s_fill root_ppn E Φ pc true base satp0 pmpcfg0 pmpaddr00 region_pte tlbvec
               HN Hppn Hvec Hgeom (or_introl eq_refl) Hpmp Hpmpp Hpteregion Halignp
               with "Hsm Hpmpc Hpmpa Htlb Hpbytes Hpc Hinstr").
     iIntros (σf ns κs nt Hpceq) "Hsi".
@@ -1974,9 +1965,9 @@ Section SmodeGprClients.
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
     iSplitR.
-    { iExists base. iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc. apply Hexp.
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
+    { iPureIntro. rewrite Hpceq.
+      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc.
+      exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpbytes' Hpc'".
@@ -2016,7 +2007,7 @@ Section SmodeGprClients.
     pte_super_bytes root_ppn dqb -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true (C_ADDI16SP imm6) -∗
+    instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
     ( smode_config (DfracOwn q) satp0 -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
@@ -2033,11 +2024,10 @@ Section SmodeGprClients.
       "Hsm Hpmpc Hpmpa Htlb Hpbytes Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
     unshelve iApply (wp_rvc_gpr_write_s_fill root_ppn E Φ pc csp_rs1 csp_rs1 csp_rs1
-              (C_ADDI16SP imm6) (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
+              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
               m satp0 pmpcfg0 pmpaddr00 region_pte tlbvec q
-              HN Hppn Hvec Hgeom Hpmp Hpmpp Hpteregion Halignp Hsp
-              (fun s => exec_execute_C_ADDI16SP imm6 s) _
+              HN Hppn Hvec Hgeom Hpmp Hpmpp Hpteregion Halignp Hsp _
               with "Hsm Hpmpc Hpmpa Htlb Hpbytes Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     change sp with (Regidx csp_rs1).
@@ -2201,7 +2191,7 @@ Section SmodeGprClients.
     tlb ↦ᵣ{ dqt } tlbvec -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true (C_SDSP (uimm, Regidx rs2)) -∗
+    instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -2231,7 +2221,7 @@ Section SmodeGprClients.
     destruct (Hpma_all pa 8) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
     pose proof Hpmp as Hpmp_copy.
     destruct Hpmp_copy as [(HA0 & Hord0 & _ & _) _].
-    iApply (wp_instr_s_config root_ppn E Φ pc true (C_SDSP (uimm, Regidx rs2))
+    iApply (wp_instr_s_config root_ppn E Φ pc true (STORE (imm, Regidx rs2, sp, 8))
               satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec
               HN Hmode Hasid HSIE HMPRV HSXL Hmm Hvec5 Hgeom ltac:(discriminate) Hpmp
               with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hinstr").
@@ -2316,9 +2306,8 @@ Section SmodeGprClients.
     iModIntro.
     iExists s_x.
     iSplitR.
-    { iExists (STORE (imm, Regidx rs2, sp, 8)). iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc. apply exec_execute_C_SDSP.
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact Hstore. }
+    { iPureIntro. rewrite Hpceq.
+      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hstore. }
     iSplitL "Hreg Hmem".
     { unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
@@ -2404,7 +2393,7 @@ Section SmodeGprClients.
     pte_super_bytes root_ppn dqb -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true (C_SDSP (uimm, Regidx rs2)) -∗
+    instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -2438,7 +2427,7 @@ Section SmodeGprClients.
     destruct Hpmp_copy as [(HA0 & Hord0 & _ & _) _].
     pose proof Hpmpp as Hpmpp_copy.
     destruct Hpmpp_copy as (_ & _ & Hrangep & HRp).
-    iApply (wp_instr_s_config root_ppn E Φ pc true (C_SDSP (uimm, Regidx rs2))
+    iApply (wp_instr_s_config root_ppn E Φ pc true (STORE (imm, Regidx rs2, sp, 8))
               satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec
               HN Hmode Hasid HSIE HMPRV HSXL Hmm Hvec5 Hgeom ltac:(discriminate) Hpmp
               with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hinstr").
@@ -2557,9 +2546,8 @@ Section SmodeGprClients.
     iModIntro.
     iExists s_x.
     iSplitR.
-    { iExists (STORE (imm, Regidx rs2, sp, 8)). iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc. apply exec_execute_C_SDSP.
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact Hstore. }
+    { iPureIntro. rewrite Hpceq.
+      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hstore. }
     iSplitL "Hreg Hmem".
     { unfold s_x, s_f, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
@@ -2632,7 +2620,7 @@ Section SmodeGprClients.
     tlb ↦ᵣ{ dqt } tlbvec -∗
     pc_is pc -∗
     gpr_file m -∗
-    instr pc true (C_LDSP (uimm, Regidx rd)) -∗
+    instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ{ dqm } nth_byte v j) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
@@ -2662,7 +2650,7 @@ Section SmodeGprClients.
     destruct (Hpma_all pa 8) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     pose proof Hpmp as Hpmp_copy.
     destruct Hpmp_copy as [(HA0 & Hord0 & _ & _) _].
-    iApply (wp_instr_s_config root_ppn E Φ pc true (C_LDSP (uimm, Regidx rd))
+    iApply (wp_instr_s_config root_ppn E Φ pc true (LOAD (imm, sp, Regidx rd, false, 8))
               satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec
               HN Hmode Hasid HSIE HMPRV HSXL Hmm Hvec5 Hgeom ltac:(discriminate) Hpmp
               with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hinstr").
@@ -2759,11 +2747,8 @@ Section SmodeGprClients.
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v)).
     iSplitR.
-    { iExists (LOAD (imm, sp, Regidx rd, false, 8)). iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc.
-        change sp with (Regidx csp_rs1).
-        apply (exec_execute_C_LDSP uimm (Regidx rd)).
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact Hload. }
+    { iPureIntro. rewrite Hpceq.
+      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hload. }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".

@@ -114,9 +114,9 @@ Section WpSpin.
 
   (* ---- the [instr] fact for the spin instruction, off the kernel text ---- *)
   Lemma spin_instr :
-    kernel_text -∗ instr pc_spin true (C_J imm_spin).
+    kernel_text -∗ instr pc_spin true (JAL (jimm_spin, zreg)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (C_J imm_spin) = false)
+    assert (Hlpad : is_lpad_instruction (JAL (jimm_spin, zreg)) = false)
       by (vm_compute; reflexivity).
     assert (H2al : is_aligned_vaddr (Virtaddr pc_spin) 2 = true) by (vm_compute; reflexivity).
     assert (H4al : is_aligned_vaddr (Virtaddr pc_spin) 4 = false) by (vm_compute; reflexivity).
@@ -132,8 +132,11 @@ Section WpSpin.
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_spin h_spin H2al H4al Hrvc).
       iApply (kernel_window_pc KernelSyms.spin h_spin 2 pc_spin eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
-      exact (decode_C_J σ HmisaC).
+    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+      exists (C_J imm_spin).
+      split; [exact (decode_C_J σ HmisaC) |].
+      split; [vm_compute; reflexivity |].
+      intro s. exact (exec_execute_C_J imm_spin s).
   Qed.
 
   (* ================================================================= *)
@@ -178,7 +181,7 @@ Section WpSpin.
     iPoseProof (spin_instr with "Htext") as "Hinstr".
     iDestruct "Hpc" as "[Hpc Hnpc]".
     (* one leaf step of [c.j spin]; [wp_instr] hands back [▷ WP Loop] *)
-    iApply (wp_instr E Φ pc_spin true (C_J imm_spin) pmpcfg0 HN Hpmp
+    iApply (wp_instr E Φ pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 HN Hpmp
               with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ ns κs nt Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -206,9 +209,8 @@ Section WpSpin.
     iModIntro.
     iExists (set_reg s_pc nextPC pc_spin).
     iSplitR.
-    { iExists (JAL (jimm_spin, zreg)). iSplitR.
-      - iPureIntro. rewrite Hpceq. fold s_pc. apply exec_execute_C_J.
-      - iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
+    { iPureIntro. rewrite Hpceq.
+      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hexec_spc. }
     iSplitL "Hreg Hmem".
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     (* continuation: PC (from wp_instr) = nextPC of s_exec = pc_spin; close the
