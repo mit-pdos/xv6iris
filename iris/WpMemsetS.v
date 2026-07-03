@@ -306,6 +306,284 @@ Section WpMemsetS.
   Qed.
 
   (* =================================================================== *)
+  (*  Branch execute-reductions (BTYPE), from scratch against the model's  *)
+  (*  [execute_BTYPE]: read rs1/rs2, compare, and either fall through      *)
+  (*  (RETIRE_SUCCESS, state unchanged) or jump to PC + sext(imm).         *)
+  (* =================================================================== *)
+
+  (* register value as [rX_bits] reads it (x0 -> zero_reg). *)
+  Definition rvv (r : mword 5) (s : mstate) : mword 64 :=
+    if Z.eqb (uint r) 0 then zero_reg
+    else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s.(sregs).
+
+  (* the comparison prefix of [execute_BTYPE] for BNE / BEQ evaluates to the
+     boolean [taken], leaving the state unchanged. *)
+  Lemma exec_BTYPE_cmp_BNE (rs2 rs1 : mword 5) s :
+    exec (Defs.bind (rX_bits (Regidx rs1))
+            (fun w2 => Defs.bind (rX_bits (Regidx rs2))
+               (fun w3 => returnM (neq_vec w2 w3)))) s
+      = Some (neq_vec (rvv rs1 s) (rvv rs2 s), s).
+  Proof.
+    unfold rvv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+    apply exec_returnM.
+  Qed.
+
+  Lemma exec_BTYPE_cmp_BEQ (rs2 rs1 : mword 5) s :
+    exec (Defs.bind (rX_bits (Regidx rs1))
+            (fun w2 => Defs.bind (rX_bits (Regidx rs2))
+               (fun w3 => returnM (eq_vec w2 w3)))) s
+      = Some (eq_vec (rvv rs1 s) (rvv rs2 s), s).
+  Proof.
+    unfold rvv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+    apply exec_returnM.
+  Qed.
+
+  Lemma exec_execute_BTYPE_BNE_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
+    neq_vec (rvv rs1 s) (rvv rs2 s) = false ->
+    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))) s
+      = Some (RETIRE_SUCCESS, s).
+  Proof.
+    intro Hfall.
+    unfold execute. cbn match. unfold execute_BTYPE.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BNE rs2 rs1 s)).
+    rewrite Hfall. apply exec_returnM.
+  Qed.
+
+  Lemma exec_execute_BTYPE_BEQ_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
+    eq_vec (rvv rs1 s) (rvv rs2 s) = false ->
+    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))) s
+      = Some (RETIRE_SUCCESS, s).
+  Proof.
+    intro Hfall.
+    unfold execute. cbn match. unfold execute_BTYPE.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BEQ rs2 rs1 s)).
+    rewrite Hfall. apply exec_returnM.
+  Qed.
+
+  Lemma exec_execute_BTYPE_BNE_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
+    neq_vec (rvv rs1 s) (rvv rs2 s) = true ->
+    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
+    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))) s
+      = Some (RETIRE_SUCCESS,
+              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+  Proof.
+    intros Htaken Halign Hbit1.
+    unfold execute. cbn match. unfold execute_BTYPE.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BNE rs2 rs1 s)).
+    rewrite Htaken.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+    exact (exec_jump_to _ s Halign Hbit1).
+  Qed.
+
+  Lemma exec_execute_C_BEQZ (imm : mword 8) (rs : cregidx) s :
+    exec (execute (C_BEQZ (imm, rs))) s
+      = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BEQ)), s).
+  Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed.
+
+  (* ---- bne rs1,rs2  NOT taken (rs1 == rs2): fall through to pc+4 ---- *)
+  Lemma wp_bne_fall_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    kv_fetch_geom (add_vec_int pc 2) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file m -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hvec Hgeom HgeomB Hpmp Hrs1 Hrs2 Hcmp)
+      "Hsm Hpmpc Hpmpa Htlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_s root_ppn E Φ pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
+              satp0 pmpcfg0 pmpaddr00 tlbvec HN Hvec Hgeom (fun _ => HgeomB) Hpmp
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct ("Hfba" with "Hrac") as "Hfmap".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
+    iModIntro. iExists s_pc.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      apply exec_execute_BTYPE_BNE_fall. unfold rvv. rewrite Lva Lvb. exact Hcmp. }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' Htlb' [$Hpc' $Hnpc] [Hfmap]").
+    iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+  Qed.
+
+  (* ---- bne rs1,rs2  TAKEN (rs1 <> rs2): jump to pc + sext(imm) ---- *)
+  Lemma wp_bne_taken_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    kv_fetch_geom (add_vec_int pc 2) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 1) = false ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
+      gpr_file m -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hvec Hgeom HgeomB Hpmp Hrs1 Hrs2 Hcmp Hal0 Hal1)
+      "Hsm Hpmpc Hpmpa Htlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_s root_ppn E Φ pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
+              satp0 pmpcfg0 pmpaddr00 tlbvec HN Hvec Hgeom (fun _ => HgeomB) Hpmp
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
+    { unfold s_pc, set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct ("Hfba" with "Hrac") as "Hfmap".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
+    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iModIntro.
+    iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      assert (Htk : neq_vec (rvv rs1 s_pc) (rvv rs2 s_pc) = true)
+        by (unfold rvv; rewrite Lva Lvb; exact Hcmp).
+      epose proof (exec_execute_BTYPE_BNE_taken imm rs2 rs1 s_pc Htk) as Hred.
+      rewrite Hpcv in Hred. exact (Hred Hal0 Hal1). }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).(sregs)
+             = add_vec pc (sign_extend' 64 imm))
+      by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' Htlb' [$Hpc' $Hnpc] [Hfmap]").
+    iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+  Qed.
+
+  (* ---- beqz rs (c.beqz) NOT taken (rs <> 0): fall through to pc+2 ---- *)
+  Lemma wp_cbeqz_fall_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
+      (m : gmap regidx (mword 64)) (satp0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (q : Qp) {dqt : dfrac} :
+    ↑minstretN ⊆ E ->
+    creg2reg_idx rs = Regidx rd1 ->
+    uint rd1 <> 0 ->
+    eq_vec (m !!! Regidx rd1) zero_reg = false ->
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    smode_config (DfracOwn q) satp0 -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (C_BEQZ (imm8, rs)) -∗
+    ( smode_config (DfracOwn q) satp0 -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file m -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrs Hrd1 Hcmp Hvec Hgeom Hpmp)
+      "Hsm Hpmpc Hpmpa Htlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_s root_ppn E Φ pc true (C_BEQZ (imm8, rs))
+              satp0 pmpcfg0 pmpaddr00 tlbvec HN Hvec Hgeom ltac:(discriminate) Hpmp
+              with "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct ("Hfba" with "Hrac") as "Hfmap".
+    iModIntro. iExists s_pc.
+    iSplitR.
+    { iExists (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ)).
+      iSplitR.
+      { iPureIntro. rewrite Hpceq. fold s_pc. apply exec_execute_C_BEQZ. }
+      iPureIntro. rewrite Hpceq. fold s_pc. rewrite Hrs.
+      change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
+      apply exec_execute_BTYPE_BEQ_fall. unfold rvv.
+      rewrite Lva.
+      replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
+        by (vm_compute; reflexivity).
+      cbn match. exact Hcmp. }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' Htlb' [$Hpc' $Hnpc] [Hfmap]").
+    iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+  Qed.
+
+  (* =================================================================== *)
   (*  Base (4-byte) register-write S-mode engine -- the [is_rvc = false]   *)
   (*  analogue of [wp_rvc_gpr_write_s]: any base instruction [i] that       *)
   (*  writes ONE gpr [rd := wval].  Used for memset's [add a4,a2,a0].       *)
