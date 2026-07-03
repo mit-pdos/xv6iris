@@ -34,6 +34,7 @@ Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpKvInstr.
 From Kernel Require KernelInstrs.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -75,17 +76,17 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* jal target / link-value arithmetic. *)
 Lemma kv_jal_tgt :
-  add_vec (mword_of_int 0x80005404 : mword 64)
+  add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
           (sign_extend' 64 (mword_of_int 0x1fd29e : mword 21))
-  = (mword_of_int 0x800026a2 : mword 64).
+  = (mword_of_int (KernelSyms.kerneltrap) : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma kv_ra_val :
-  add_vec_int (mword_of_int 0x80005404 : mword 64) 4 = (mword_of_int 0x80005408 : mword 64).
+  add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) 4 = (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma kv_rvr :
-  regval_into_reg (mword_of_int 0x80005408 : mword 64) = (mword_of_int 0x80005408 : mword 64).
+  regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) = (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64).
 Proof. reflexivity. Qed.
 
 (* ---- JAL to a 2-byte-aligned target with the C extension enabled (the
@@ -160,7 +161,7 @@ Qed.
 
 (* pc range of the kernelvec text (for the quantified PMP fetch premise). *)
 Definition kv_text_pc (A : Z) : bool :=
-  andb (Z.leb 0x800053e0 A) (Z.leb A 0x8000542c).
+  andb (Z.leb (KernelSyms.kernelvec) A) (Z.leb A (KernelSyms.kernelvec + 0x4c)).
 
 (* sp after the prologue c.addi16sp (the value the whole frame is based on). *)
 Definition kv_sp1 (m : gmap regidx (mword 64)) : mword 64 :=
@@ -170,7 +171,7 @@ Definition kv_sp1 (m : gmap regidx (mword 64)) : mword 64 :=
 Definition kv_m1 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
   <[Regidx csp_rs1 := kv_sp1 m]> m.
 Definition kv_m2 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
-  <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mword_of_int 0x80005408 : mword 64)]> (kv_m1 m).
+  <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)]> (kv_m1 m).
 
 (* ===================================================================== *)
 (* kv_cell + kt_clobbered + THE kerneltrap axiom.                        *)
@@ -245,7 +246,7 @@ Axiom kerneltrap_returns :
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pmpaddr_n ↦ᵣ pmpaddr00 -∗
     tlb ↦ᵣ tlbvec -∗
-    pc_is (mword_of_int 0x800026a2 : mword 64) -∗
+    pc_is (mword_of_int (KernelSyms.kerneltrap) : mword 64) -∗
     gpr_file m -∗
     kv_cell pa1 v1 -∗ kv_cell pa2 v2 -∗ kv_cell pa3 v3 -∗ kv_cell pa4 v4 -∗
     kv_cell pa5 v5 -∗ kv_cell pa6 v6 -∗ kv_cell pa7 v7 -∗ kv_cell pa8 v8 -∗
@@ -648,7 +649,7 @@ Section WpKernelvecNew.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pmpaddr_n ↦ᵣ pmpaddr00 -∗
     tlb ↦ᵣ tlbvec -∗
-    pc_is (mword_of_int 0x800053e0 : mword 64) -∗
+    pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
     pte_super_bytes root_ppn dqb -∗
@@ -679,7 +680,7 @@ Section WpKernelvecNew.
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pmpaddr_n ↦ᵣ pmpaddr00 -∗
       tlb ↦ᵣ tlbf2 -∗
-      pc_is (mword_of_int 0x800026a2 : mword 64) -∗
+      pc_is (mword_of_int (KernelSyms.kerneltrap) : mword 64) -∗
       gpr_file (kv_m2 m) -∗
       pte_super_bytes root_ppn dqb -∗
       ([∗ list] j ∈ seq 0 8, (pa_add (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
@@ -715,12 +716,12 @@ Section WpKernelvecNew.
       as "(Hsm & Hpmpc1 & Hpmpa1 & Hhs2 & Hpriv2 & Hsatp2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2 & Hpmpc2 & Hpmpa2)".
     (* ---- #1: c.addi16sp sp,-256 @ 0x800053e0 (fetch page-walk, fills slot 5) ---- *)
     iPoseProof (kv_instr1 with "Htext") as "Hi1".
-    assert (Hg1 : kv_fetch_geom (mword_of_int 0x800053e0 : mword 64)) by kv_geom.
-    assert (Hpc1 : add_vec_int (mword_of_int 0x800053e0 : mword 64) 2 = (mword_of_int 0x800053e2 : mword 64))
+    assert (Hg1 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec) : mword 64)) by kv_geom.
+    assert (Hpc1 : add_vec_int (mword_of_int (KernelSyms.kernelvec) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64))
       by (vm_compute; reflexivity).
-    iApply (wp_caddi16sp_gpr_s_fill root_ppn E Φ (mword_of_int 0x800053e0) kv_imm1 m
+    iApply (wp_caddi16sp_gpr_s_fill root_ppn E Φ (mword_of_int (KernelSyms.kernelvec)) kv_imm1 m
               satp0 pmpcfg0 pmpaddr00 region_pte tlbvec (1/2)%Qp
-              HN Hppn Hvec5 Hg1 (Hpmpf 0x800053e0 eq_refl) Hpmpp Hpteregion Halignp
+              HN Hppn Hvec5 Hg1 (Hpmpf (KernelSyms.kernelvec) eq_refl) Hpmpp Hpteregion Halignp
               with "Hsm Hpmpc1 Hpmpa1 Htlb Hpte Hpc Hfile Hi1").
     iEval (rewrite Hpc1).
     iIntros "Hsm Hpmpc1 Hpmpa1 Htlb Hpte Hpc Hfile".
@@ -763,13 +764,13 @@ Section WpKernelvecNew.
       by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
     (* ---- #2: c.sdsp x1, 0(sp) @ 0x800053e2 -- the data WALK, fills slot tlb_hash svpn ---- *)
     iPoseProof (kv_i2 with "Htext") as "Hi2".
-    assert (Hg2 : kv_fetch_geom (mword_of_int 0x800053e2 : mword 64)) by kv_geom.
-    assert (Hpc2 : add_vec_int (mword_of_int 0x800053e2 : mword 64) 2 = (mword_of_int 0x800053e4 : mword 64))
+    assert (Hg2 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64)) by kv_geom.
+    assert (Hpc2 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw1".
-    iApply (wp_csdsp_gpr_s_fill root_ppn E Φ (mword_of_int 0x800053e2) (mword_of_int 0) (mword_of_int 1) svpn
+    iApply (wp_csdsp_gpr_s_fill root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2)) (mword_of_int 0) (mword_of_int 1) svpn
               (kv_m1 m) vold1 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte tlbf
-              HN Hmode Hppn Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Htlbf5 Hg2 (Hpmpf 0x800053e2 eq_refl)
+              HN Hmode Hppn Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Htlbf5 Hg2 (Hpmpf (KernelSyms.kernelvec + 0x2) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon1) ltac:(rewrite Hm1sp; exact Hvpn1)
               ltac:(rewrite Hm1sp; exact Hidf) Hhash0 Hsvpn2 Hmvpn Hmppn Hpmpp Hpteregion Halignp
               ltac:(rewrite Hm1sp; exact Hrange1) HW
@@ -780,13 +781,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr1) in "Hw1".
     (* ---- #3: c.sdsp x3, 16(sp) @ 0x800053e4 (TLB hits) ---- *)
     iPoseProof (kv_i3 with "Htext") as "Hi3".
-    assert (Hg3 : kv_fetch_geom (mword_of_int 0x800053e4 : mword 64)) by kv_geom.
-    assert (Hpc3 : add_vec_int (mword_of_int 0x800053e4 : mword 64) 2 = (mword_of_int 0x800053e6 : mword 64))
+    assert (Hg3 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x4) : mword 64)) by kv_geom.
+    assert (Hpc3 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x4) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x6) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw2".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053e4) (mword_of_int 2) (mword_of_int 3) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x4)) (mword_of_int 2) (mword_of_int 3) svpn
               (kv_m1 m) vold2 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg3 (Hpmpf 0x800053e4 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg3 (Hpmpf (KernelSyms.kernelvec + 0x4) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon2) ltac:(rewrite Hm1sp; exact Hvpn2)
               ltac:(rewrite Hm1sp; exact Hident2) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange2) HW
@@ -797,13 +798,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr2) in "Hw2".
     (* ---- #4: c.sdsp x5, 32(sp) @ 0x800053e6 (TLB hits) ---- *)
     iPoseProof (kv_i4 with "Htext") as "Hi4".
-    assert (Hg4 : kv_fetch_geom (mword_of_int 0x800053e6 : mword 64)) by kv_geom.
-    assert (Hpc4 : add_vec_int (mword_of_int 0x800053e6 : mword 64) 2 = (mword_of_int 0x800053e8 : mword 64))
+    assert (Hg4 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x6) : mword 64)) by kv_geom.
+    assert (Hpc4 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x6) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x8) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw3".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053e6) (mword_of_int 4) (mword_of_int 5) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x6)) (mword_of_int 4) (mword_of_int 5) svpn
               (kv_m1 m) vold3 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg4 (Hpmpf 0x800053e6 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg4 (Hpmpf (KernelSyms.kernelvec + 0x6) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon3) ltac:(rewrite Hm1sp; exact Hvpn3)
               ltac:(rewrite Hm1sp; exact Hident3) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange3) HW
@@ -814,13 +815,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr3) in "Hw3".
     (* ---- #5: c.sdsp x6, 40(sp) @ 0x800053e8 (TLB hits) ---- *)
     iPoseProof (kv_i5 with "Htext") as "Hi5".
-    assert (Hg5 : kv_fetch_geom (mword_of_int 0x800053e8 : mword 64)) by kv_geom.
-    assert (Hpc5 : add_vec_int (mword_of_int 0x800053e8 : mword 64) 2 = (mword_of_int 0x800053ea : mword 64))
+    assert (Hg5 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x8) : mword 64)) by kv_geom.
+    assert (Hpc5 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x8) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0xa) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw4".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053e8) (mword_of_int 5) (mword_of_int 6) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x8)) (mword_of_int 5) (mword_of_int 6) svpn
               (kv_m1 m) vold4 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg5 (Hpmpf 0x800053e8 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg5 (Hpmpf (KernelSyms.kernelvec + 0x8) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon4) ltac:(rewrite Hm1sp; exact Hvpn4)
               ltac:(rewrite Hm1sp; exact Hident4) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange4) HW
@@ -831,13 +832,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr4) in "Hw4".
     (* ---- #6: c.sdsp x7, 48(sp) @ 0x800053ea (TLB hits) ---- *)
     iPoseProof (kv_i6 with "Htext") as "Hi6".
-    assert (Hg6 : kv_fetch_geom (mword_of_int 0x800053ea : mword 64)) by kv_geom.
-    assert (Hpc6 : add_vec_int (mword_of_int 0x800053ea : mword 64) 2 = (mword_of_int 0x800053ec : mword 64))
+    assert (Hg6 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0xa) : mword 64)) by kv_geom.
+    assert (Hpc6 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0xa) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0xc) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw5".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053ea) (mword_of_int 6) (mword_of_int 7) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xa)) (mword_of_int 6) (mword_of_int 7) svpn
               (kv_m1 m) vold5 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg6 (Hpmpf 0x800053ea eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg6 (Hpmpf (KernelSyms.kernelvec + 0xa) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon5) ltac:(rewrite Hm1sp; exact Hvpn5)
               ltac:(rewrite Hm1sp; exact Hident5) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange5) HW
@@ -848,13 +849,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr5) in "Hw5".
     (* ---- #7: c.sdsp x10, 72(sp) @ 0x800053ec (TLB hits) ---- *)
     iPoseProof (kv_i7 with "Htext") as "Hi7".
-    assert (Hg7 : kv_fetch_geom (mword_of_int 0x800053ec : mword 64)) by kv_geom.
-    assert (Hpc7 : add_vec_int (mword_of_int 0x800053ec : mword 64) 2 = (mword_of_int 0x800053ee : mword 64))
+    assert (Hg7 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0xc) : mword 64)) by kv_geom.
+    assert (Hpc7 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0xc) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0xe) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw6".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053ec) (mword_of_int 9) (mword_of_int 10) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xc)) (mword_of_int 9) (mword_of_int 10) svpn
               (kv_m1 m) vold6 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg7 (Hpmpf 0x800053ec eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg7 (Hpmpf (KernelSyms.kernelvec + 0xc) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon6) ltac:(rewrite Hm1sp; exact Hvpn6)
               ltac:(rewrite Hm1sp; exact Hident6) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange6) HW
@@ -865,13 +866,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr6) in "Hw6".
     (* ---- #8: c.sdsp x11, 80(sp) @ 0x800053ee (TLB hits) ---- *)
     iPoseProof (kv_i8 with "Htext") as "Hi8".
-    assert (Hg8 : kv_fetch_geom (mword_of_int 0x800053ee : mword 64)) by kv_geom.
-    assert (Hpc8 : add_vec_int (mword_of_int 0x800053ee : mword 64) 2 = (mword_of_int 0x800053f0 : mword 64))
+    assert (Hg8 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0xe) : mword 64)) by kv_geom.
+    assert (Hpc8 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0xe) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x10) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw7".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053ee) (mword_of_int 10) (mword_of_int 11) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xe)) (mword_of_int 10) (mword_of_int 11) svpn
               (kv_m1 m) vold7 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg8 (Hpmpf 0x800053ee eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg8 (Hpmpf (KernelSyms.kernelvec + 0xe) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon7) ltac:(rewrite Hm1sp; exact Hvpn7)
               ltac:(rewrite Hm1sp; exact Hident7) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange7) HW
@@ -882,13 +883,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr7) in "Hw7".
     (* ---- #9: c.sdsp x12, 88(sp) @ 0x800053f0 (TLB hits) ---- *)
     iPoseProof (kv_i9 with "Htext") as "Hi9".
-    assert (Hg9 : kv_fetch_geom (mword_of_int 0x800053f0 : mword 64)) by kv_geom.
-    assert (Hpc9 : add_vec_int (mword_of_int 0x800053f0 : mword 64) 2 = (mword_of_int 0x800053f2 : mword 64))
+    assert (Hg9 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x10) : mword 64)) by kv_geom.
+    assert (Hpc9 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x10) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x12) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw8".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053f0) (mword_of_int 11) (mword_of_int 12) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x10)) (mword_of_int 11) (mword_of_int 12) svpn
               (kv_m1 m) vold8 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg9 (Hpmpf 0x800053f0 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg9 (Hpmpf (KernelSyms.kernelvec + 0x10) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon8) ltac:(rewrite Hm1sp; exact Hvpn8)
               ltac:(rewrite Hm1sp; exact Hident8) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange8) HW
@@ -899,13 +900,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr8) in "Hw8".
     (* ---- #10: c.sdsp x13, 96(sp) @ 0x800053f2 (TLB hits) ---- *)
     iPoseProof (kv_i10 with "Htext") as "Hi10".
-    assert (Hg10 : kv_fetch_geom (mword_of_int 0x800053f2 : mword 64)) by kv_geom.
-    assert (Hpc10 : add_vec_int (mword_of_int 0x800053f2 : mword 64) 2 = (mword_of_int 0x800053f4 : mword 64))
+    assert (Hg10 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x12) : mword 64)) by kv_geom.
+    assert (Hpc10 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x12) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x14) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw9".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053f2) (mword_of_int 12) (mword_of_int 13) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x12)) (mword_of_int 12) (mword_of_int 13) svpn
               (kv_m1 m) vold9 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg10 (Hpmpf 0x800053f2 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg10 (Hpmpf (KernelSyms.kernelvec + 0x12) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon9) ltac:(rewrite Hm1sp; exact Hvpn9)
               ltac:(rewrite Hm1sp; exact Hident9) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange9) HW
@@ -916,13 +917,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr9) in "Hw9".
     (* ---- #11: c.sdsp x14, 104(sp) @ 0x800053f4 (TLB hits) ---- *)
     iPoseProof (kv_i11 with "Htext") as "Hi11".
-    assert (Hg11 : kv_fetch_geom (mword_of_int 0x800053f4 : mword 64)) by kv_geom.
-    assert (Hpc11 : add_vec_int (mword_of_int 0x800053f4 : mword 64) 2 = (mword_of_int 0x800053f6 : mword 64))
+    assert (Hg11 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x14) : mword 64)) by kv_geom.
+    assert (Hpc11 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x14) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x16) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw10".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053f4) (mword_of_int 13) (mword_of_int 14) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x14)) (mword_of_int 13) (mword_of_int 14) svpn
               (kv_m1 m) vold10 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg11 (Hpmpf 0x800053f4 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg11 (Hpmpf (KernelSyms.kernelvec + 0x14) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon10) ltac:(rewrite Hm1sp; exact Hvpn10)
               ltac:(rewrite Hm1sp; exact Hident10) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange10) HW
@@ -933,13 +934,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr10) in "Hw10".
     (* ---- #12: c.sdsp x15, 112(sp) @ 0x800053f6 (TLB hits) ---- *)
     iPoseProof (kv_i12 with "Htext") as "Hi12".
-    assert (Hg12 : kv_fetch_geom (mword_of_int 0x800053f6 : mword 64)) by kv_geom.
-    assert (Hpc12 : add_vec_int (mword_of_int 0x800053f6 : mword 64) 2 = (mword_of_int 0x800053f8 : mword 64))
+    assert (Hg12 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x16) : mword 64)) by kv_geom.
+    assert (Hpc12 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x16) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x18) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw11".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053f6) (mword_of_int 14) (mword_of_int 15) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x16)) (mword_of_int 14) (mword_of_int 15) svpn
               (kv_m1 m) vold11 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg12 (Hpmpf 0x800053f6 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg12 (Hpmpf (KernelSyms.kernelvec + 0x16) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon11) ltac:(rewrite Hm1sp; exact Hvpn11)
               ltac:(rewrite Hm1sp; exact Hident11) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange11) HW
@@ -950,13 +951,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr11) in "Hw11".
     (* ---- #13: c.sdsp x16, 120(sp) @ 0x800053f8 (TLB hits) ---- *)
     iPoseProof (kv_i13 with "Htext") as "Hi13".
-    assert (Hg13 : kv_fetch_geom (mword_of_int 0x800053f8 : mword 64)) by kv_geom.
-    assert (Hpc13 : add_vec_int (mword_of_int 0x800053f8 : mword 64) 2 = (mword_of_int 0x800053fa : mword 64))
+    assert (Hg13 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x18) : mword 64)) by kv_geom.
+    assert (Hpc13 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x18) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x1a) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw12".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053f8) (mword_of_int 15) (mword_of_int 16) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x18)) (mword_of_int 15) (mword_of_int 16) svpn
               (kv_m1 m) vold12 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg13 (Hpmpf 0x800053f8 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg13 (Hpmpf (KernelSyms.kernelvec + 0x18) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon12) ltac:(rewrite Hm1sp; exact Hvpn12)
               ltac:(rewrite Hm1sp; exact Hident12) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange12) HW
@@ -967,13 +968,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr12) in "Hw12".
     (* ---- #14: c.sdsp x17, 128(sp) @ 0x800053fa (TLB hits) ---- *)
     iPoseProof (kv_i14 with "Htext") as "Hi14".
-    assert (Hg14 : kv_fetch_geom (mword_of_int 0x800053fa : mword 64)) by kv_geom.
-    assert (Hpc14 : add_vec_int (mword_of_int 0x800053fa : mword 64) 2 = (mword_of_int 0x800053fc : mword 64))
+    assert (Hg14 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x1a) : mword 64)) by kv_geom.
+    assert (Hpc14 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x1a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x1c) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw13".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053fa) (mword_of_int 16) (mword_of_int 17) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1a)) (mword_of_int 16) (mword_of_int 17) svpn
               (kv_m1 m) vold13 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg14 (Hpmpf 0x800053fa eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg14 (Hpmpf (KernelSyms.kernelvec + 0x1a) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon13) ltac:(rewrite Hm1sp; exact Hvpn13)
               ltac:(rewrite Hm1sp; exact Hident13) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange13) HW
@@ -984,13 +985,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr13) in "Hw13".
     (* ---- #15: c.sdsp x28, 216(sp) @ 0x800053fc (TLB hits) ---- *)
     iPoseProof (kv_i15 with "Htext") as "Hi15".
-    assert (Hg15 : kv_fetch_geom (mword_of_int 0x800053fc : mword 64)) by kv_geom.
-    assert (Hpc15 : add_vec_int (mword_of_int 0x800053fc : mword 64) 2 = (mword_of_int 0x800053fe : mword 64))
+    assert (Hg15 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x1c) : mword 64)) by kv_geom.
+    assert (Hpc15 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x1c) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x1e) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw14".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053fc) (mword_of_int 27) (mword_of_int 28) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1c)) (mword_of_int 27) (mword_of_int 28) svpn
               (kv_m1 m) vold14 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg15 (Hpmpf 0x800053fc eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg15 (Hpmpf (KernelSyms.kernelvec + 0x1c) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon14) ltac:(rewrite Hm1sp; exact Hvpn14)
               ltac:(rewrite Hm1sp; exact Hident14) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange14) HW
@@ -1001,13 +1002,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr14) in "Hw14".
     (* ---- #16: c.sdsp x29, 224(sp) @ 0x800053fe (TLB hits) ---- *)
     iPoseProof (kv_i16 with "Htext") as "Hi16".
-    assert (Hg16 : kv_fetch_geom (mword_of_int 0x800053fe : mword 64)) by kv_geom.
-    assert (Hpc16 : add_vec_int (mword_of_int 0x800053fe : mword 64) 2 = (mword_of_int 0x80005400 : mword 64))
+    assert (Hg16 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x1e) : mword 64)) by kv_geom.
+    assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x1e) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x20) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw15".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x800053fe) (mword_of_int 28) (mword_of_int 29) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1e)) (mword_of_int 28) (mword_of_int 29) svpn
               (kv_m1 m) vold15 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg16 (Hpmpf 0x800053fe eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg16 (Hpmpf (KernelSyms.kernelvec + 0x1e) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon15) ltac:(rewrite Hm1sp; exact Hvpn15)
               ltac:(rewrite Hm1sp; exact Hident15) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange15) HW
@@ -1018,13 +1019,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr15) in "Hw15".
     (* ---- #17: c.sdsp x30, 232(sp) @ 0x80005400 (TLB hits) ---- *)
     iPoseProof (kv_i17 with "Htext") as "Hi17".
-    assert (Hg17 : kv_fetch_geom (mword_of_int 0x80005400 : mword 64)) by kv_geom.
-    assert (Hpc17 : add_vec_int (mword_of_int 0x80005400 : mword 64) 2 = (mword_of_int 0x80005402 : mword 64))
+    assert (Hg17 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x20) : mword 64)) by kv_geom.
+    assert (Hpc17 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x20) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x22) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw16".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x80005400) (mword_of_int 29) (mword_of_int 30) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x20)) (mword_of_int 29) (mword_of_int 30) svpn
               (kv_m1 m) vold16 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg17 (Hpmpf 0x80005400 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg17 (Hpmpf (KernelSyms.kernelvec + 0x20) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon16) ltac:(rewrite Hm1sp; exact Hvpn16)
               ltac:(rewrite Hm1sp; exact Hident16) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange16) HW
@@ -1035,13 +1036,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr16) in "Hw16".
     (* ---- #18: c.sdsp x31, 240(sp) @ 0x80005402 (TLB hits) ---- *)
     iPoseProof (kv_i18 with "Htext") as "Hi18".
-    assert (Hg18 : kv_fetch_geom (mword_of_int 0x80005402 : mword 64)) by kv_geom.
-    assert (Hpc18 : add_vec_int (mword_of_int 0x80005402 : mword 64) 2 = (mword_of_int 0x80005404 : mword 64))
+    assert (Hg18 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x22) : mword 64)) by kv_geom.
+    assert (Hpc18 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x22) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64))
       by (vm_compute; reflexivity).
     iEval (rewrite <- Hm1sp) in "Hw17".
-    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int 0x80005402) (mword_of_int 30) (mword_of_int 31) svpn
+    iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x22)) (mword_of_int 30) (mword_of_int 31) svpn
               (kv_m1 m) vold17 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg18 (Hpmpf 0x80005402 eq_refl)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlbf2_5 Hg18 (Hpmpf (KernelSyms.kernelvec + 0x22) eq_refl)
               ltac:(rewrite Hm1sp; exact Hcanon17) ltac:(rewrite Hm1sp; exact Hvpn17)
               ltac:(rewrite Hm1sp; exact Hident17) Hmask Htlbf2_hash
               ltac:(rewrite Hm1sp; exact Hrange17) HW
@@ -1052,15 +1053,15 @@ Section WpKernelvecNew.
     iEval (rewrite Hm1sp Hmr17) in "Hw17".
     (* ---- #19: jal ra, kerneltrap @ 0x80005404 ---- *)
     iPoseProof (kv_i19 with "Htext") as "Hi19".
-    assert (Hg19 : kv_fetch_geom (mword_of_int 0x80005404 : mword 64)) by kv_geom.
-    assert (Hg19b : kv_fetch_geom (add_vec_int (mword_of_int 0x80005404 : mword 64) 2)) by kv_geom.
+    assert (Hg19 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)) by kv_geom.
+    assert (Hg19b : kv_fetch_geom (add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) 2)) by kv_geom.
     assert (Hrd19 : uint (mword_of_int 1 : mword 5) <> 0) by (vm_compute; discriminate).
-    assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int 0x80005404 : mword 64)
+    assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
                       (sign_extend' 64 (mword_of_int 0x1fd29e : mword 21))) 0) ('b"0") = true)
       by (vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s2 root_ppn E Φ (mword_of_int 0x80005404) (mword_of_int 1) (mword_of_int 0x1fd29e)
+    iApply (wp_jal_gpr_s2 root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd29e)
               (kv_m1 m) satp0 pmpcfg0 pmpaddr00 tlbf2 (1/2)%Qp
-              HN Htlbf2_5 Hg19 Hg19b (Hpmpf 0x80005404 eq_refl) Hrd19 Hal19
+              HN Htlbf2_5 Hg19 Hg19b (Hpmpf (KernelSyms.kernelvec + 0x24) eq_refl) Hrd19 Hal19
               with "Hhw Hsm Hpmpc1 Hpmpa1 Htlb Hpc Hfile Hi19").
     iEval (rewrite kv_jal_tgt kv_ra_val).
     iIntros "Hsm Hpmpc1 Hpmpa1 Htlb Hpc Hfile".
@@ -1233,7 +1234,7 @@ Section WpKernelvecNew.
     pmpaddr_n ↦ᵣ pmpaddr00 -∗
     tlb ↦ᵣ tlbv -∗
     sepc ↦ᵣ sepc0 -∗
-    pc_is (mword_of_int 0x80005408 : mword 64) -∗
+    pc_is (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) -∗
     gpr_file mt -∗
     kernel_text -∗
     ([∗ list] j ∈ seq 0 8, (pa_add (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec spv (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) j) ↦ₘ nth_byte v1 j) -∗
@@ -1293,14 +1294,14 @@ Section WpKernelvecNew.
              #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hcont".
     (* ---- #20: c.ldsp x1, 0(sp) @ 0x80005408 ---- *)
     iPoseProof (kv_i20 with "Htext") as "Hi20".
-    assert (Hg20 : kv_fetch_geom (mword_of_int 0x80005408 : mword 64)) by kv_geom.
-    assert (Hpc20 : add_vec_int (mword_of_int 0x80005408 : mword 64) 2 = (mword_of_int 0x8000540a : mword 64))
+    assert (Hg20 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)) by kv_geom.
+    assert (Hpc20 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2a) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd20 : uint (mword_of_int 1 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp0) in "Hv1".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005408) (mword_of_int 0) (mword_of_int 1) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x28)) (mword_of_int 0) (mword_of_int 1) svpn
               mt v1 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd20 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg20 (Hpmpf 0x80005408 eq_refl)
+              HN Hrd20 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg20 (Hpmpf (KernelSyms.kernelvec + 0x28) eq_refl)
               ltac:(rewrite Hsp0; exact Hcanon1) ltac:(rewrite Hsp0; exact Hvpn1)
               ltac:(rewrite Hsp0; exact Hident1) Hmask Hhash
               ltac:(rewrite Hsp0; exact Hrange1) HR
@@ -1314,14 +1315,14 @@ Section WpKernelvecNew.
     set (mt1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg v1]> mt) in *.
     (* ---- #21: c.ldsp x3, 16(sp) @ 0x8000540a ---- *)
     iPoseProof (kv_i21 with "Htext") as "Hi21".
-    assert (Hg21 : kv_fetch_geom (mword_of_int 0x8000540a : mword 64)) by kv_geom.
-    assert (Hpc21 : add_vec_int (mword_of_int 0x8000540a : mword 64) 2 = (mword_of_int 0x8000540c : mword 64))
+    assert (Hg21 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x2a) : mword 64)) by kv_geom.
+    assert (Hpc21 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x2a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2c) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd21 : uint (mword_of_int 3 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp1) in "Hv2".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x8000540a) (mword_of_int 2) (mword_of_int 3) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2a)) (mword_of_int 2) (mword_of_int 3) svpn
               mt1 v2 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd21 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg21 (Hpmpf 0x8000540a eq_refl)
+              HN Hrd21 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg21 (Hpmpf (KernelSyms.kernelvec + 0x2a) eq_refl)
               ltac:(rewrite Hsp1; exact Hcanon2) ltac:(rewrite Hsp1; exact Hvpn2)
               ltac:(rewrite Hsp1; exact Hident2) Hmask Hhash
               ltac:(rewrite Hsp1; exact Hrange2) HR
@@ -1335,14 +1336,14 @@ Section WpKernelvecNew.
     set (mt2 := <[Regidx (mword_of_int 3 : mword 5) := regval_into_reg v2]> mt1) in *.
     (* ---- #22: c.ldsp x5, 32(sp) @ 0x8000540c ---- *)
     iPoseProof (kv_i22 with "Htext") as "Hi22".
-    assert (Hg22 : kv_fetch_geom (mword_of_int 0x8000540c : mword 64)) by kv_geom.
-    assert (Hpc22 : add_vec_int (mword_of_int 0x8000540c : mword 64) 2 = (mword_of_int 0x8000540e : mword 64))
+    assert (Hg22 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x2c) : mword 64)) by kv_geom.
+    assert (Hpc22 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x2c) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2e) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd22 : uint (mword_of_int 5 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp2) in "Hv3".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x8000540c) (mword_of_int 4) (mword_of_int 5) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2c)) (mword_of_int 4) (mword_of_int 5) svpn
               mt2 v3 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd22 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg22 (Hpmpf 0x8000540c eq_refl)
+              HN Hrd22 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg22 (Hpmpf (KernelSyms.kernelvec + 0x2c) eq_refl)
               ltac:(rewrite Hsp2; exact Hcanon3) ltac:(rewrite Hsp2; exact Hvpn3)
               ltac:(rewrite Hsp2; exact Hident3) Hmask Hhash
               ltac:(rewrite Hsp2; exact Hrange3) HR
@@ -1356,14 +1357,14 @@ Section WpKernelvecNew.
     set (mt3 := <[Regidx (mword_of_int 5 : mword 5) := regval_into_reg v3]> mt2) in *.
     (* ---- #23: c.ldsp x6, 40(sp) @ 0x8000540e ---- *)
     iPoseProof (kv_i23 with "Htext") as "Hi23".
-    assert (Hg23 : kv_fetch_geom (mword_of_int 0x8000540e : mword 64)) by kv_geom.
-    assert (Hpc23 : add_vec_int (mword_of_int 0x8000540e : mword 64) 2 = (mword_of_int 0x80005410 : mword 64))
+    assert (Hg23 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x2e) : mword 64)) by kv_geom.
+    assert (Hpc23 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x2e) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x30) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd23 : uint (mword_of_int 6 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp3) in "Hv4".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x8000540e) (mword_of_int 5) (mword_of_int 6) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2e)) (mword_of_int 5) (mword_of_int 6) svpn
               mt3 v4 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd23 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg23 (Hpmpf 0x8000540e eq_refl)
+              HN Hrd23 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg23 (Hpmpf (KernelSyms.kernelvec + 0x2e) eq_refl)
               ltac:(rewrite Hsp3; exact Hcanon4) ltac:(rewrite Hsp3; exact Hvpn4)
               ltac:(rewrite Hsp3; exact Hident4) Hmask Hhash
               ltac:(rewrite Hsp3; exact Hrange4) HR
@@ -1377,14 +1378,14 @@ Section WpKernelvecNew.
     set (mt4 := <[Regidx (mword_of_int 6 : mword 5) := regval_into_reg v4]> mt3) in *.
     (* ---- #24: c.ldsp x7, 48(sp) @ 0x80005410 ---- *)
     iPoseProof (kv_i24 with "Htext") as "Hi24".
-    assert (Hg24 : kv_fetch_geom (mword_of_int 0x80005410 : mword 64)) by kv_geom.
-    assert (Hpc24 : add_vec_int (mword_of_int 0x80005410 : mword 64) 2 = (mword_of_int 0x80005412 : mword 64))
+    assert (Hg24 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x30) : mword 64)) by kv_geom.
+    assert (Hpc24 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x30) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x32) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd24 : uint (mword_of_int 7 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp4) in "Hv5".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005410) (mword_of_int 6) (mword_of_int 7) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x30)) (mword_of_int 6) (mword_of_int 7) svpn
               mt4 v5 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd24 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg24 (Hpmpf 0x80005410 eq_refl)
+              HN Hrd24 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg24 (Hpmpf (KernelSyms.kernelvec + 0x30) eq_refl)
               ltac:(rewrite Hsp4; exact Hcanon5) ltac:(rewrite Hsp4; exact Hvpn5)
               ltac:(rewrite Hsp4; exact Hident5) Hmask Hhash
               ltac:(rewrite Hsp4; exact Hrange5) HR
@@ -1398,14 +1399,14 @@ Section WpKernelvecNew.
     set (mt5 := <[Regidx (mword_of_int 7 : mword 5) := regval_into_reg v5]> mt4) in *.
     (* ---- #25: c.ldsp x10, 72(sp) @ 0x80005412 ---- *)
     iPoseProof (kv_i25 with "Htext") as "Hi25".
-    assert (Hg25 : kv_fetch_geom (mword_of_int 0x80005412 : mword 64)) by kv_geom.
-    assert (Hpc25 : add_vec_int (mword_of_int 0x80005412 : mword 64) 2 = (mword_of_int 0x80005414 : mword 64))
+    assert (Hg25 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x32) : mword 64)) by kv_geom.
+    assert (Hpc25 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x32) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x34) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd25 : uint (mword_of_int 10 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp5) in "Hv6".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005412) (mword_of_int 9) (mword_of_int 10) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x32)) (mword_of_int 9) (mword_of_int 10) svpn
               mt5 v6 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd25 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg25 (Hpmpf 0x80005412 eq_refl)
+              HN Hrd25 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg25 (Hpmpf (KernelSyms.kernelvec + 0x32) eq_refl)
               ltac:(rewrite Hsp5; exact Hcanon6) ltac:(rewrite Hsp5; exact Hvpn6)
               ltac:(rewrite Hsp5; exact Hident6) Hmask Hhash
               ltac:(rewrite Hsp5; exact Hrange6) HR
@@ -1419,14 +1420,14 @@ Section WpKernelvecNew.
     set (mt6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg v6]> mt5) in *.
     (* ---- #26: c.ldsp x11, 80(sp) @ 0x80005414 ---- *)
     iPoseProof (kv_i26 with "Htext") as "Hi26".
-    assert (Hg26 : kv_fetch_geom (mword_of_int 0x80005414 : mword 64)) by kv_geom.
-    assert (Hpc26 : add_vec_int (mword_of_int 0x80005414 : mword 64) 2 = (mword_of_int 0x80005416 : mword 64))
+    assert (Hg26 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x34) : mword 64)) by kv_geom.
+    assert (Hpc26 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x34) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x36) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd26 : uint (mword_of_int 11 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp6) in "Hv7".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005414) (mword_of_int 10) (mword_of_int 11) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x34)) (mword_of_int 10) (mword_of_int 11) svpn
               mt6 v7 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd26 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg26 (Hpmpf 0x80005414 eq_refl)
+              HN Hrd26 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg26 (Hpmpf (KernelSyms.kernelvec + 0x34) eq_refl)
               ltac:(rewrite Hsp6; exact Hcanon7) ltac:(rewrite Hsp6; exact Hvpn7)
               ltac:(rewrite Hsp6; exact Hident7) Hmask Hhash
               ltac:(rewrite Hsp6; exact Hrange7) HR
@@ -1440,14 +1441,14 @@ Section WpKernelvecNew.
     set (mt7 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg v7]> mt6) in *.
     (* ---- #27: c.ldsp x12, 88(sp) @ 0x80005416 ---- *)
     iPoseProof (kv_i27 with "Htext") as "Hi27".
-    assert (Hg27 : kv_fetch_geom (mword_of_int 0x80005416 : mword 64)) by kv_geom.
-    assert (Hpc27 : add_vec_int (mword_of_int 0x80005416 : mword 64) 2 = (mword_of_int 0x80005418 : mword 64))
+    assert (Hg27 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x36) : mword 64)) by kv_geom.
+    assert (Hpc27 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x36) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x38) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd27 : uint (mword_of_int 12 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp7) in "Hv8".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005416) (mword_of_int 11) (mword_of_int 12) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x36)) (mword_of_int 11) (mword_of_int 12) svpn
               mt7 v8 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd27 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg27 (Hpmpf 0x80005416 eq_refl)
+              HN Hrd27 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg27 (Hpmpf (KernelSyms.kernelvec + 0x36) eq_refl)
               ltac:(rewrite Hsp7; exact Hcanon8) ltac:(rewrite Hsp7; exact Hvpn8)
               ltac:(rewrite Hsp7; exact Hident8) Hmask Hhash
               ltac:(rewrite Hsp7; exact Hrange8) HR
@@ -1461,14 +1462,14 @@ Section WpKernelvecNew.
     set (mt8 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg v8]> mt7) in *.
     (* ---- #28: c.ldsp x13, 96(sp) @ 0x80005418 ---- *)
     iPoseProof (kv_i28 with "Htext") as "Hi28".
-    assert (Hg28 : kv_fetch_geom (mword_of_int 0x80005418 : mword 64)) by kv_geom.
-    assert (Hpc28 : add_vec_int (mword_of_int 0x80005418 : mword 64) 2 = (mword_of_int 0x8000541a : mword 64))
+    assert (Hg28 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x38) : mword 64)) by kv_geom.
+    assert (Hpc28 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x38) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x3a) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd28 : uint (mword_of_int 13 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp8) in "Hv9".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005418) (mword_of_int 12) (mword_of_int 13) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x38)) (mword_of_int 12) (mword_of_int 13) svpn
               mt8 v9 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd28 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg28 (Hpmpf 0x80005418 eq_refl)
+              HN Hrd28 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg28 (Hpmpf (KernelSyms.kernelvec + 0x38) eq_refl)
               ltac:(rewrite Hsp8; exact Hcanon9) ltac:(rewrite Hsp8; exact Hvpn9)
               ltac:(rewrite Hsp8; exact Hident9) Hmask Hhash
               ltac:(rewrite Hsp8; exact Hrange9) HR
@@ -1482,14 +1483,14 @@ Section WpKernelvecNew.
     set (mt9 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg v9]> mt8) in *.
     (* ---- #29: c.ldsp x14, 104(sp) @ 0x8000541a ---- *)
     iPoseProof (kv_i29 with "Htext") as "Hi29".
-    assert (Hg29 : kv_fetch_geom (mword_of_int 0x8000541a : mword 64)) by kv_geom.
-    assert (Hpc29 : add_vec_int (mword_of_int 0x8000541a : mword 64) 2 = (mword_of_int 0x8000541c : mword 64))
+    assert (Hg29 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x3a) : mword 64)) by kv_geom.
+    assert (Hpc29 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x3a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x3c) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd29 : uint (mword_of_int 14 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp9) in "Hv10".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x8000541a) (mword_of_int 13) (mword_of_int 14) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3a)) (mword_of_int 13) (mword_of_int 14) svpn
               mt9 v10 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd29 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg29 (Hpmpf 0x8000541a eq_refl)
+              HN Hrd29 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg29 (Hpmpf (KernelSyms.kernelvec + 0x3a) eq_refl)
               ltac:(rewrite Hsp9; exact Hcanon10) ltac:(rewrite Hsp9; exact Hvpn10)
               ltac:(rewrite Hsp9; exact Hident10) Hmask Hhash
               ltac:(rewrite Hsp9; exact Hrange10) HR
@@ -1503,14 +1504,14 @@ Section WpKernelvecNew.
     set (mt10 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg v10]> mt9) in *.
     (* ---- #30: c.ldsp x15, 112(sp) @ 0x8000541c ---- *)
     iPoseProof (kv_i30 with "Htext") as "Hi30".
-    assert (Hg30 : kv_fetch_geom (mword_of_int 0x8000541c : mword 64)) by kv_geom.
-    assert (Hpc30 : add_vec_int (mword_of_int 0x8000541c : mword 64) 2 = (mword_of_int 0x8000541e : mword 64))
+    assert (Hg30 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x3c) : mword 64)) by kv_geom.
+    assert (Hpc30 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x3c) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x3e) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd30 : uint (mword_of_int 15 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp10) in "Hv11".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x8000541c) (mword_of_int 14) (mword_of_int 15) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3c)) (mword_of_int 14) (mword_of_int 15) svpn
               mt10 v11 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd30 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg30 (Hpmpf 0x8000541c eq_refl)
+              HN Hrd30 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg30 (Hpmpf (KernelSyms.kernelvec + 0x3c) eq_refl)
               ltac:(rewrite Hsp10; exact Hcanon11) ltac:(rewrite Hsp10; exact Hvpn11)
               ltac:(rewrite Hsp10; exact Hident11) Hmask Hhash
               ltac:(rewrite Hsp10; exact Hrange11) HR
@@ -1524,14 +1525,14 @@ Section WpKernelvecNew.
     set (mt11 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v11]> mt10) in *.
     (* ---- #31: c.ldsp x16, 120(sp) @ 0x8000541e ---- *)
     iPoseProof (kv_i31 with "Htext") as "Hi31".
-    assert (Hg31 : kv_fetch_geom (mword_of_int 0x8000541e : mword 64)) by kv_geom.
-    assert (Hpc31 : add_vec_int (mword_of_int 0x8000541e : mword 64) 2 = (mword_of_int 0x80005420 : mword 64))
+    assert (Hg31 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x3e) : mword 64)) by kv_geom.
+    assert (Hpc31 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x3e) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x40) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd31 : uint (mword_of_int 16 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp11) in "Hv12".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x8000541e) (mword_of_int 15) (mword_of_int 16) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3e)) (mword_of_int 15) (mword_of_int 16) svpn
               mt11 v12 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd31 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg31 (Hpmpf 0x8000541e eq_refl)
+              HN Hrd31 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg31 (Hpmpf (KernelSyms.kernelvec + 0x3e) eq_refl)
               ltac:(rewrite Hsp11; exact Hcanon12) ltac:(rewrite Hsp11; exact Hvpn12)
               ltac:(rewrite Hsp11; exact Hident12) Hmask Hhash
               ltac:(rewrite Hsp11; exact Hrange12) HR
@@ -1545,14 +1546,14 @@ Section WpKernelvecNew.
     set (mt12 := <[Regidx (mword_of_int 16 : mword 5) := regval_into_reg v12]> mt11) in *.
     (* ---- #32: c.ldsp x17, 128(sp) @ 0x80005420 ---- *)
     iPoseProof (kv_i32 with "Htext") as "Hi32".
-    assert (Hg32 : kv_fetch_geom (mword_of_int 0x80005420 : mword 64)) by kv_geom.
-    assert (Hpc32 : add_vec_int (mword_of_int 0x80005420 : mword 64) 2 = (mword_of_int 0x80005422 : mword 64))
+    assert (Hg32 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x40) : mword 64)) by kv_geom.
+    assert (Hpc32 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x40) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x42) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd32 : uint (mword_of_int 17 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp12) in "Hv13".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005420) (mword_of_int 16) (mword_of_int 17) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x40)) (mword_of_int 16) (mword_of_int 17) svpn
               mt12 v13 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd32 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg32 (Hpmpf 0x80005420 eq_refl)
+              HN Hrd32 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg32 (Hpmpf (KernelSyms.kernelvec + 0x40) eq_refl)
               ltac:(rewrite Hsp12; exact Hcanon13) ltac:(rewrite Hsp12; exact Hvpn13)
               ltac:(rewrite Hsp12; exact Hident13) Hmask Hhash
               ltac:(rewrite Hsp12; exact Hrange13) HR
@@ -1566,14 +1567,14 @@ Section WpKernelvecNew.
     set (mt13 := <[Regidx (mword_of_int 17 : mword 5) := regval_into_reg v13]> mt12) in *.
     (* ---- #33: c.ldsp x28, 216(sp) @ 0x80005422 ---- *)
     iPoseProof (kv_i33 with "Htext") as "Hi33".
-    assert (Hg33 : kv_fetch_geom (mword_of_int 0x80005422 : mword 64)) by kv_geom.
-    assert (Hpc33 : add_vec_int (mword_of_int 0x80005422 : mword 64) 2 = (mword_of_int 0x80005424 : mword 64))
+    assert (Hg33 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x42) : mword 64)) by kv_geom.
+    assert (Hpc33 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x42) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x44) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd33 : uint (mword_of_int 28 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp13) in "Hv14".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005422) (mword_of_int 27) (mword_of_int 28) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x42)) (mword_of_int 27) (mword_of_int 28) svpn
               mt13 v14 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd33 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg33 (Hpmpf 0x80005422 eq_refl)
+              HN Hrd33 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg33 (Hpmpf (KernelSyms.kernelvec + 0x42) eq_refl)
               ltac:(rewrite Hsp13; exact Hcanon14) ltac:(rewrite Hsp13; exact Hvpn14)
               ltac:(rewrite Hsp13; exact Hident14) Hmask Hhash
               ltac:(rewrite Hsp13; exact Hrange14) HR
@@ -1587,14 +1588,14 @@ Section WpKernelvecNew.
     set (mt14 := <[Regidx (mword_of_int 28 : mword 5) := regval_into_reg v14]> mt13) in *.
     (* ---- #34: c.ldsp x29, 224(sp) @ 0x80005424 ---- *)
     iPoseProof (kv_i34 with "Htext") as "Hi34".
-    assert (Hg34 : kv_fetch_geom (mword_of_int 0x80005424 : mword 64)) by kv_geom.
-    assert (Hpc34 : add_vec_int (mword_of_int 0x80005424 : mword 64) 2 = (mword_of_int 0x80005426 : mword 64))
+    assert (Hg34 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x44) : mword 64)) by kv_geom.
+    assert (Hpc34 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x44) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x46) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd34 : uint (mword_of_int 29 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp14) in "Hv15".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005424) (mword_of_int 28) (mword_of_int 29) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x44)) (mword_of_int 28) (mword_of_int 29) svpn
               mt14 v15 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd34 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg34 (Hpmpf 0x80005424 eq_refl)
+              HN Hrd34 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg34 (Hpmpf (KernelSyms.kernelvec + 0x44) eq_refl)
               ltac:(rewrite Hsp14; exact Hcanon15) ltac:(rewrite Hsp14; exact Hvpn15)
               ltac:(rewrite Hsp14; exact Hident15) Hmask Hhash
               ltac:(rewrite Hsp14; exact Hrange15) HR
@@ -1608,14 +1609,14 @@ Section WpKernelvecNew.
     set (mt15 := <[Regidx (mword_of_int 29 : mword 5) := regval_into_reg v15]> mt14) in *.
     (* ---- #35: c.ldsp x30, 232(sp) @ 0x80005426 ---- *)
     iPoseProof (kv_i35 with "Htext") as "Hi35".
-    assert (Hg35 : kv_fetch_geom (mword_of_int 0x80005426 : mword 64)) by kv_geom.
-    assert (Hpc35 : add_vec_int (mword_of_int 0x80005426 : mword 64) 2 = (mword_of_int 0x80005428 : mword 64))
+    assert (Hg35 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x46) : mword 64)) by kv_geom.
+    assert (Hpc35 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x46) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x48) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd35 : uint (mword_of_int 30 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp15) in "Hv16".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005426) (mword_of_int 29) (mword_of_int 30) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x46)) (mword_of_int 29) (mword_of_int 30) svpn
               mt15 v16 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd35 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg35 (Hpmpf 0x80005426 eq_refl)
+              HN Hrd35 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg35 (Hpmpf (KernelSyms.kernelvec + 0x46) eq_refl)
               ltac:(rewrite Hsp15; exact Hcanon16) ltac:(rewrite Hsp15; exact Hvpn16)
               ltac:(rewrite Hsp15; exact Hident16) Hmask Hhash
               ltac:(rewrite Hsp15; exact Hrange16) HR
@@ -1629,14 +1630,14 @@ Section WpKernelvecNew.
     set (mt16 := <[Regidx (mword_of_int 30 : mword 5) := regval_into_reg v16]> mt15) in *.
     (* ---- #36: c.ldsp x31, 240(sp) @ 0x80005428 ---- *)
     iPoseProof (kv_i36 with "Htext") as "Hi36".
-    assert (Hg36 : kv_fetch_geom (mword_of_int 0x80005428 : mword 64)) by kv_geom.
-    assert (Hpc36 : add_vec_int (mword_of_int 0x80005428 : mword 64) 2 = (mword_of_int 0x8000542a : mword 64))
+    assert (Hg36 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x48) : mword 64)) by kv_geom.
+    assert (Hpc36 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x48) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64))
       by (vm_compute; reflexivity).
     assert (Hrd36 : uint (mword_of_int 31 : mword 5) <> 0) by (vm_compute; discriminate).
     iEval (rewrite <- Hsp16) in "Hv17".
-    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int 0x80005428) (mword_of_int 30) (mword_of_int 31) svpn
+    iApply (wp_cldsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x48)) (mword_of_int 30) (mword_of_int 31) svpn
               mt16 v17 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbv
-              HN Hrd36 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg36 (Hpmpf 0x80005428 eq_refl)
+              HN Hrd36 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Htlb5 Hg36 (Hpmpf (KernelSyms.kernelvec + 0x48) eq_refl)
               ltac:(rewrite Hsp16; exact Hcanon17) ltac:(rewrite Hsp16; exact Hvpn17)
               ltac:(rewrite Hsp16; exact Hident17) Hmask Hhash
               ltac:(rewrite Hsp16; exact Hrange17) HR
@@ -1650,16 +1651,16 @@ Section WpKernelvecNew.
     set (mt17 := <[Regidx (mword_of_int 31 : mword 5) := regval_into_reg v17]> mt16) in *.
     (* ---- #37: c.addi16sp sp,+256 @ 0x8000542a ---- *)
     iPoseProof (kv_i37 with "Htext") as "Hi37".
-    assert (Hg37 : kv_fetch_geom (mword_of_int 0x8000542a : mword 64)) by kv_geom.
-    assert (Hpc37 : add_vec_int (mword_of_int 0x8000542a : mword 64) 2 = (mword_of_int 0x8000542c : mword 64))
+    assert (Hg37 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64)) by kv_geom.
+    assert (Hpc37 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64))
       by (vm_compute; reflexivity).
     iPoseProof (kv_cfg_split satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00
                   Hmode Hasid HSIE HMPRV HSXL Hmm HPBMTE
                   with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa")
       as "(Hsm & Hpmpc1 & Hpmpa1 & Hhs2 & Hpriv2 & Hsatp2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2 & Hpmpc2 & Hpmpa2)".
-    iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int 0x8000542a) (mword_of_int 16) mt17
+    iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
               satp0 pmpcfg0 pmpaddr00 tlbv (1/2)%Qp
-              HN Htlb5 Hg37 (Hpmpf 0x8000542a eq_refl)
+              HN Htlb5 Hg37 (Hpmpf (KernelSyms.kernelvec + 0x4a) eq_refl)
               with "Hsm Hpmpc1 Hpmpa1 Htlb Hpc Hfile Hi37").
     iEval (rewrite Hpc37).
     iIntros "Hsm Hpmpc1 Hpmpa1 Htlb Hpc Hfile".
@@ -1669,13 +1670,13 @@ Section WpKernelvecNew.
     iEval (rewrite Hsp17) in "Hfile".
     (* ---- #38: sret @ 0x8000542c ---- *)
     iPoseProof (kv_i38 with "Htext") as "Hi38".
-    assert (Hg38 : kv_fetch_geom (mword_of_int 0x8000542c : mword 64)) by kv_geom.
-    assert (Hg38b : kv_fetch_geom (add_vec_int (mword_of_int 0x8000542c : mword 64) 2)) by kv_geom.
-    iApply (wp_sret_gpr root_ppn E Φ (mword_of_int 0x8000542c)
+    assert (Hg38 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64)) by kv_geom.
+    assert (Hg38b : kv_fetch_geom (add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) 2)) by kv_geom.
+    iApply (wp_sret_gpr root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x4c))
               satp0 mstatus0 mie_v mdv0 menvcfg0 sepc0
               (<[Regidx csp_rs1 := regval_into_reg (add_vec spv (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> mt17)
               pmpcfg0 pmpaddr00 tlbv
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm Htlb5 Hg38 Hg38b (Hpmpf 0x8000542c eq_refl) HTSR Hsup Hlpe0
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm Htlb5 Hg38 Hg38b (Hpmpf (KernelSyms.kernelvec + 0x4c) eq_refl) HTSR Hsup Hlpe0
               with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hsepc Hpc Hfile Hi38").
     iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hsepc Hpc Hfile".
     iApply ("Hcont" with "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hsepc Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17").
@@ -1868,7 +1869,7 @@ Section WpKernelvecNew.
     pmpaddr_n ↦ᵣ pmpaddr00 -∗
     tlb ↦ᵣ tlbvec -∗
     sepc ↦ᵣ sepc0 -∗
-    pc_is (mword_of_int 0x800053e0 : mword 64) -∗
+    pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
     pte_super_bytes root_ppn dqb -∗
@@ -1947,10 +1948,10 @@ Section WpKernelvecNew.
     assert (Hsp_l : kv_m2 m !! Regidx csp_rs1 = Some (kv_sp1 m)).
     { unfold kv_m2. rewrite lookup_insert_ne; [| kv_regne]. unfold kv_m1. apply lookup_insert. }
     assert (Hra_l : kv_m2 m !! Regidx (mword_of_int 1 : mword 5)
-                    = Some (regval_into_reg (mword_of_int 0x80005408 : mword 64))).
+                    = Some (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))).
     { unfold kv_m2. apply lookup_insert. }
     iApply (kerneltrap_returns (kv_m2 m) (kv_sp1 m)
-              (regval_into_reg (mword_of_int 0x80005408 : mword 64))
+              (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))
               satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbf2
               (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8))) (zero_extend' 64 (add_vec_int (sign_extend' 64 (subrange_vec_dec (add_vec (kv_sp1 m) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))) (xlen - 0 - 1) 0)) (0 * 8)))
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))

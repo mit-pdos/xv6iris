@@ -45,6 +45,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import MinstretInv InstrBytes.
 Require Import WpFetch WpDecode WpLeafCommon WpEntry WpLoad WpGprCsrwB WpEntryNew.
 From Kernel Require Import KernelInstrs.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -2827,7 +2828,7 @@ Qed.
 Section SmodeDemo.
   Context `{!riscvGS Σ}.
 
-  Definition kv_pc1 : mword 64 := mword_of_int 0x800053e0.
+  Definition kv_pc1 : mword 64 := mword_of_int (KernelSyms.kernelvec).
 
   (* the [instr] constructor for kernelvec's first instruction, from the
      whole-kernel text image -- the SAME predicate the M-mode chains use;
@@ -2844,7 +2845,7 @@ Section SmodeDemo.
     assert (Hsub : subrange_vec_dec kv_w1 15 0 = kv_h1)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x800053e0 + Z.of_nat j)%Z = Some (nth_byte kv_w1 j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms.kernelvec) + Z.of_nat j)%Z = Some (nth_byte kv_w1 j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -2853,7 +2854,7 @@ Section SmodeDemo.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_rvc4 kv_pc1 kv_h1 kv_w1 H2al H4al Hrvc Hsub).
-      iApply (kernel_window_pc 0x800053e0 kv_w1 4 kv_pc1 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms.kernelvec) kv_w1 4 kv_pc1 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
       exact (kv_decode1 σ HmisaC).
   Qed.

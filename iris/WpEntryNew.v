@@ -39,6 +39,7 @@ Require Import WpAuipc WpGprAuipc WpGprLoad WpGprMul WpGprCsrr WpGprJal WpGprRvc
 Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 (* Moved here from WpDecode.v via the late KernelBoot.v (this file is now their
@@ -56,15 +57,15 @@ Section WpEntryNew.
   Context `{!riscvGS Σ}.
 
   (* PCs of the eight instructions. *)
-  Definition pc_e0 : mword 64 := mword_of_int 0x80000000.  (* AUIPC  *)
-  Definition pc_e1 : mword 64 := mword_of_int 0x80000004.  (* LOAD   *)
-  Definition pc_e2 : mword 64 := mword_of_int 0x80000008.  (* C.LUI  *)
-  Definition pc_e3 : mword 64 := mword_of_int 0x8000000a.  (* CSRRS  *)
-  Definition pc_e4 : mword 64 := mword_of_int 0x8000000e.  (* C.ADDI *)
-  Definition pc_e5 : mword 64 := mword_of_int 0x80000010.  (* MUL    *)
-  Definition pc_e6 : mword 64 := mword_of_int 0x80000014.  (* C.ADD  *)
-  Definition pc_e7 : mword 64 := mword_of_int 0x80000016.  (* JAL    *)
-  Definition pc_start : mword 64 := mword_of_int 0x80000058. (* start() *)
+  Definition pc_e0 : mword 64 := mword_of_int (KernelSyms._entry).  (* AUIPC  *)
+  Definition pc_e1 : mword 64 := mword_of_int (KernelSyms._entry + 0x4).  (* LOAD   *)
+  Definition pc_e2 : mword 64 := mword_of_int (KernelSyms._entry + 0x8).  (* C.LUI  *)
+  Definition pc_e3 : mword 64 := mword_of_int (KernelSyms._entry + 0xa).  (* CSRRS  *)
+  Definition pc_e4 : mword 64 := mword_of_int (KernelSyms._entry + 0xe).  (* C.ADDI *)
+  Definition pc_e5 : mword 64 := mword_of_int (KernelSyms._entry + 0x10).  (* MUL    *)
+  Definition pc_e6 : mword 64 := mword_of_int (KernelSyms._entry + 0x14).  (* C.ADD  *)
+  Definition pc_e7 : mword 64 := mword_of_int (KernelSyms._entry + 0x16).  (* JAL    *)
+  Definition pc_start : mword 64 := mword_of_int (KernelSyms.start). (* start() *)
 
   (* The value AUIPC writes to sp (= pc0 + (imm_auipc<<12) = 0x8000a000). *)
   Definition entry_sp1 : mword 64 := add_vec pc_e0 (auipc_off imm_auipc).
@@ -221,7 +222,7 @@ Section WpEntryNew.
     assert (H2al : is_aligned_vaddr (Virtaddr pc_e0) 2 = true) by (vm_compute; reflexivity).
     assert (Hnrvc : isRVC (subrange_vec_dec w_auipc 15 0) = false) by (vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x80000000 + Z.of_nat j)%Z = Some (nth_byte w_auipc j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry) + Z.of_nat j)%Z = Some (nth_byte w_auipc j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -230,7 +231,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_base pc_e0 w_auipc H2al Hnrvc).
-      iApply (kernel_window_pc 0x80000000 w_auipc 4 pc_e0 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry) w_auipc 4 pc_e0 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
       exact (decode_auipc σ Hpriv).
   Qed.
@@ -243,7 +244,7 @@ Section WpEntryNew.
     assert (H2al : is_aligned_vaddr (Virtaddr pc_e1) 2 = true) by (vm_compute; reflexivity).
     assert (Hnrvc : isRVC (subrange_vec_dec w_ld 15 0) = false) by (vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x80000004 + Z.of_nat j)%Z = Some (nth_byte w_ld j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x4) + Z.of_nat j)%Z = Some (nth_byte w_ld j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -252,7 +253,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_base pc_e1 w_ld H2al Hnrvc).
-      iApply (kernel_window_pc 0x80000004 w_ld 4 pc_e1 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry + 0x4) w_ld 4 pc_e1 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
       exact (decode_ld σ Hpriv).
   Qed.
@@ -268,7 +269,7 @@ Section WpEntryNew.
     assert (Hsub : subrange_vec_dec w_lui4 15 0 = h_lui)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x80000008 + Z.of_nat j)%Z = Some (nth_byte w_lui4 j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x8) + Z.of_nat j)%Z = Some (nth_byte w_lui4 j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -277,7 +278,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_rvc4 pc_e2 h_lui w_lui4 H2al H4al Hrvc Hsub).
-      iApply (kernel_window_pc 0x80000008 w_lui4 4 pc_e2 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry + 0x8) w_lui4 4 pc_e2 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
       exact (decode_C_lui σ HmisaC).
   Qed.
@@ -291,7 +292,7 @@ Section WpEntryNew.
     assert (Hnrvc : isRVC (subrange_vec_dec w_csrr 15 0) = false) by (vm_compute; reflexivity).
     assert (Hz : zreg = Regidx i_rs1_csrr) by (vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x8000000a + Z.of_nat j)%Z = Some (nth_byte w_csrr j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0xa) + Z.of_nat j)%Z = Some (nth_byte w_csrr j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -300,7 +301,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_base pc_e3 w_csrr H2al Hnrvc).
-      iApply (kernel_window_pc 0x8000000a w_csrr 4 pc_e3 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry + 0xa) w_csrr 4 pc_e3 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
       rewrite Hz. exact (decode_csrr σ Hpriv).
   Qed.
@@ -314,7 +315,7 @@ Section WpEntryNew.
     assert (H4al : is_aligned_vaddr (Virtaddr pc_e4) 4 = false) by (vm_compute; reflexivity).
     assert (Hrvc : isRVC h_addi = true) by (vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (0x8000000e + Z.of_nat j)%Z = Some (nth_byte h_addi j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0xe) + Z.of_nat j)%Z = Some (nth_byte h_addi j)).
     { intros j Hj;
         do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -323,7 +324,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_e4 h_addi H2al H4al Hrvc).
-      iApply (kernel_window_pc 0x8000000e h_addi 2 pc_e4 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry + 0xe) h_addi 2 pc_e4 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
       exact (decode_C_ADDI σ HmisaC).
   Qed.
@@ -338,7 +339,7 @@ Section WpEntryNew.
     assert (H2al : is_aligned_vaddr (Virtaddr pc_e5) 2 = true) by (vm_compute; reflexivity).
     assert (Hnrvc : isRVC (subrange_vec_dec w_mul 15 0) = false) by (vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x80000010 + Z.of_nat j)%Z = Some (nth_byte w_mul j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x10) + Z.of_nat j)%Z = Some (nth_byte w_mul j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Hhw #Ht".
@@ -350,7 +351,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_base pc_e5 w_mul H2al Hnrvc).
-      iApply (kernel_window_pc 0x80000010 w_mul 4 pc_e5 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry + 0x10) w_mul 4 pc_e5 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "Hsi".
       iDestruct (state_interp_reg_dq σ ns κs nt misa DfracDiscarded misa0
                    with "Hsi Hmisa") as %Lmisa.
@@ -371,7 +372,7 @@ Section WpEntryNew.
     assert (Hsub : subrange_vec_dec w_add4 15 0 = h_add)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x80000014 + Z.of_nat j)%Z = Some (nth_byte w_add4 j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x14) + Z.of_nat j)%Z = Some (nth_byte w_add4 j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -380,7 +381,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_rvc4 pc_e6 h_add w_add4 H2al H4al Hrvc Hsub).
-      iApply (kernel_window_pc 0x80000014 w_add4 4 pc_e6 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry + 0x14) w_add4 4 pc_e6 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC.
       exact (decode_C_ADD σ HmisaC).
   Qed.
@@ -393,7 +394,7 @@ Section WpEntryNew.
     assert (H2al : is_aligned_vaddr (Virtaddr pc_e7) 2 = true) by (vm_compute; reflexivity).
     assert (Hnrvc : isRVC (subrange_vec_dec w_jal 15 0) = false) by (vm_compute; reflexivity).
     assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (0x80000016 + Z.of_nat j)%Z = Some (nth_byte w_jal j)).
+        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x16) + Z.of_nat j)%Z = Some (nth_byte w_jal j)).
     { intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
     iIntros "#Ht". rewrite /instr.
@@ -402,7 +403,7 @@ Section WpEntryNew.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitL "".
     - iApply (instr_bytes_base pc_e7 w_jal H2al Hnrvc).
-      iApply (kernel_window_pc 0x80000016 w_jal 4 pc_e7 eq_refl Hbytes with "Ht").
+      iApply (kernel_window_pc (KernelSyms._entry + 0x16) w_jal 4 pc_e7 eq_refl Hbytes with "Ht").
     - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
       exact (decode_jal σ Hpriv).
   Qed.

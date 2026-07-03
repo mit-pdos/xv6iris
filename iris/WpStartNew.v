@@ -64,6 +64,7 @@ Require Import WpGprMret WpGprMretWp WpGprMretNew.
 Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -441,40 +442,40 @@ Section WpStartInstr.
   Context `{!riscvGS Σ}.
 
   (* PCs of the 34 instructions. *)
-  Definition st_pc30 : mword 64 := mword_of_int 0x80000058.
-  Definition st_pc31 : mword 64 := mword_of_int 0x8000005a.
-  Definition st_pc32 : mword 64 := mword_of_int 0x8000005c.
-  Definition st_pc33 : mword 64 := mword_of_int 0x8000005e.
-  Definition st_pc34 : mword 64 := mword_of_int 0x80000060.
-  Definition st_pc35 : mword 64 := mword_of_int 0x80000064.
-  Definition st_pc36 : mword 64 := mword_of_int 0x80000066.
-  Definition st_pc37 : mword 64 := mword_of_int 0x8000006a.
-  Definition st_pc38 : mword 64 := mword_of_int 0x8000006c.
-  Definition st_pc39 : mword 64 := mword_of_int 0x8000006e.
-  Definition st_pc40 : mword 64 := mword_of_int 0x80000072.
-  Definition st_pc41 : mword 64 := mword_of_int 0x80000074.
-  Definition st_pc42 : mword 64 := mword_of_int 0x80000078.
-  Definition st_pc43 : mword 64 := mword_of_int 0x8000007c.
-  Definition st_pc44 : mword 64 := mword_of_int 0x80000080.
-  Definition st_pc45 : mword 64 := mword_of_int 0x80000084.
-  Definition st_pc46 : mword 64 := mword_of_int 0x80000086.
-  Definition st_pc47 : mword 64 := mword_of_int 0x8000008a.
-  Definition st_pc48 : mword 64 := mword_of_int 0x8000008c.
-  Definition st_pc49 : mword 64 := mword_of_int 0x8000008e.
-  Definition st_pc50 : mword 64 := mword_of_int 0x80000092.
-  Definition st_pc51 : mword 64 := mword_of_int 0x80000096.
-  Definition st_pc52 : mword 64 := mword_of_int 0x8000009a.
-  Definition st_pc53 : mword 64 := mword_of_int 0x8000009e.
-  Definition st_pc54 : mword 64 := mword_of_int 0x800000a2.
-  Definition st_pc55 : mword 64 := mword_of_int 0x800000a4.
-  Definition st_pc56 : mword 64 := mword_of_int 0x800000a6.
-  Definition st_pc57 : mword 64 := mword_of_int 0x800000aa.
-  Definition st_pc58 : mword 64 := mword_of_int 0x800000ac.
-  Definition st_pc59 : mword 64 := mword_of_int 0x800000b0.
-  Definition st_pc60 : mword 64 := mword_of_int 0x800000b4.
-  Definition st_pc61 : mword 64 := mword_of_int 0x800000b8.
-  Definition st_pc62 : mword 64 := mword_of_int 0x800000ba.
-  Definition st_pc63 : mword 64 := mword_of_int 0x800000bc.
+  Definition st_pc30 : mword 64 := mword_of_int (KernelSyms.start).
+  Definition st_pc31 : mword 64 := mword_of_int (KernelSyms.start + 0x2).
+  Definition st_pc32 : mword 64 := mword_of_int (KernelSyms.start + 0x4).
+  Definition st_pc33 : mword 64 := mword_of_int (KernelSyms.start + 0x6).
+  Definition st_pc34 : mword 64 := mword_of_int (KernelSyms.start + 0x8).
+  Definition st_pc35 : mword 64 := mword_of_int (KernelSyms.start + 0xc).
+  Definition st_pc36 : mword 64 := mword_of_int (KernelSyms.start + 0xe).
+  Definition st_pc37 : mword 64 := mword_of_int (KernelSyms.start + 0x12).
+  Definition st_pc38 : mword 64 := mword_of_int (KernelSyms.start + 0x14).
+  Definition st_pc39 : mword 64 := mword_of_int (KernelSyms.start + 0x16).
+  Definition st_pc40 : mword 64 := mword_of_int (KernelSyms.start + 0x1a).
+  Definition st_pc41 : mword 64 := mword_of_int (KernelSyms.start + 0x1c).
+  Definition st_pc42 : mword 64 := mword_of_int (KernelSyms.start + 0x20).
+  Definition st_pc43 : mword 64 := mword_of_int (KernelSyms.start + 0x24).
+  Definition st_pc44 : mword 64 := mword_of_int (KernelSyms.start + 0x28).
+  Definition st_pc45 : mword 64 := mword_of_int (KernelSyms.start + 0x2c).
+  Definition st_pc46 : mword 64 := mword_of_int (KernelSyms.start + 0x2e).
+  Definition st_pc47 : mword 64 := mword_of_int (KernelSyms.start + 0x32).
+  Definition st_pc48 : mword 64 := mword_of_int (KernelSyms.start + 0x34).
+  Definition st_pc49 : mword 64 := mword_of_int (KernelSyms.start + 0x36).
+  Definition st_pc50 : mword 64 := mword_of_int (KernelSyms.start + 0x3a).
+  Definition st_pc51 : mword 64 := mword_of_int (KernelSyms.start + 0x3e).
+  Definition st_pc52 : mword 64 := mword_of_int (KernelSyms.start + 0x42).
+  Definition st_pc53 : mword 64 := mword_of_int (KernelSyms.start + 0x46).
+  Definition st_pc54 : mword 64 := mword_of_int (KernelSyms.start + 0x4a).
+  Definition st_pc55 : mword 64 := mword_of_int (KernelSyms.start + 0x4c).
+  Definition st_pc56 : mword 64 := mword_of_int (KernelSyms.start + 0x4e).
+  Definition st_pc57 : mword 64 := mword_of_int (KernelSyms.start + 0x52).
+  Definition st_pc58 : mword 64 := mword_of_int (KernelSyms.start + 0x54).
+  Definition st_pc59 : mword 64 := mword_of_int (KernelSyms.start + 0x58).
+  Definition st_pc60 : mword 64 := mword_of_int (KernelSyms.start + 0x5c).
+  Definition st_pc61 : mword 64 := mword_of_int (KernelSyms.start + 0x60).
+  Definition st_pc62 : mword 64 := mword_of_int (KernelSyms.start + 0x62).
+  Definition st_pc63 : mword 64 := mword_of_int (KernelSyms.start + 0x64).
 
   (* ---- constructor templates (copied from WpTimerinit; file-local) ---- *)
   Local Ltac st_mk_rvc4 A h w pc ast decname :=
@@ -548,139 +549,139 @@ Section WpStartInstr.
 
   Lemma st_instr30 :
     kernel_text -∗ instr st_pc30 true (C_ADDI (i9, Regidx csp_rs1)).
-  Proof. st_mk_rvc4 0x80000058 ti_h9 st_w30 st_pc30 (C_ADDI (i9, Regidx csp_rs1)) ti_decode9. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start) ti_h9 st_w30 st_pc30 (C_ADDI (i9, Regidx csp_rs1)) ti_decode9. Qed.
 
   Lemma st_instr31 :
     kernel_text -∗ instr st_pc31 true (C_SDSP (u10, Regidx ti_ra)).
-  Proof. st_mk_rvc2 0x8000005a ti_h10 st_pc31 (C_SDSP (u10, Regidx ti_ra)) ti_decode10. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x2) ti_h10 st_pc31 (C_SDSP (u10, Regidx ti_ra)) ti_decode10. Qed.
 
   Lemma st_instr32 :
     kernel_text -∗ instr st_pc32 true (C_SDSP (u11, Regidx ti_s0)).
-  Proof. st_mk_rvc4 0x8000005c ti_h11 st_w32 st_pc32 (C_SDSP (u11, Regidx ti_s0)) ti_decode11. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start + 0x4) ti_h11 st_w32 st_pc32 (C_SDSP (u11, Regidx ti_s0)) ti_decode11. Qed.
 
   Lemma st_instr33 :
     kernel_text -∗ instr st_pc33 true (C_ADDI4SPN (ti_cs0, nz12)).
-  Proof. st_mk_rvc2 0x8000005e ti_h12 st_pc33 (C_ADDI4SPN (ti_cs0, nz12)) ti_decode12. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x6) ti_h12 st_pc33 (C_ADDI4SPN (ti_cs0, nz12)) ti_decode12. Qed.
 
   Lemma st_instr34 :
     kernel_text -∗ instr st_pc34 false (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS)).
-  Proof. st_mk_base 0x80000060 st_w34 st_pc34 (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS)) st_decode34. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x8) st_w34 st_pc34 (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS)) st_decode34. Qed.
 
   Lemma st_instr35 :
     kernel_text -∗ instr st_pc35 true (C_LUI (si35, Regidx ti_a4)).
-  Proof. st_mk_rvc4 0x80000064 st_h35 st_w35 st_pc35 (C_LUI (si35, Regidx ti_a4)) st_decode35. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start + 0xc) st_h35 st_w35 st_pc35 (C_LUI (si35, Regidx ti_a4)) st_decode35. Qed.
 
   Lemma st_instr36 :
     kernel_text -∗ instr st_pc36 false (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI)).
-  Proof. st_mk_base 0x80000066 st_w36 st_pc36 (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI)) st_decode36. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0xe) st_w36 st_pc36 (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI)) st_decode36. Qed.
 
   Lemma st_instr37 :
     kernel_text -∗ instr st_pc37 true (C_AND (ti_ca5, ti_ca4)).
-  Proof. st_mk_rvc2 0x8000006a st_h37 st_pc37 (C_AND (ti_ca5, ti_ca4)) st_decode37. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x12) st_h37 st_pc37 (C_AND (ti_ca5, ti_ca4)) st_decode37. Qed.
 
   Lemma st_instr38 :
     kernel_text -∗ instr st_pc38 true (C_LUI (si38, Regidx ti_a4)).
-  Proof. st_mk_rvc4 0x8000006c st_h38 st_w38 st_pc38 (C_LUI (si38, Regidx ti_a4)) st_decode38. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start + 0x14) st_h38 st_w38 st_pc38 (C_LUI (si38, Regidx ti_a4)) st_decode38. Qed.
 
   Lemma st_instr39 :
     kernel_text -∗ instr st_pc39 false (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI)).
-  Proof. st_mk_base 0x8000006e st_w39 st_pc39 (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI)) st_decode39. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x16) st_w39 st_pc39 (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI)) st_decode39. Qed.
 
   Lemma st_instr40 :
     kernel_text -∗ instr st_pc40 true (C_OR (ti_ca5, ti_ca4)).
-  Proof. st_mk_rvc2 0x80000072 ti_h16 st_pc40 (C_OR (ti_ca5, ti_ca4)) ti_decode16. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x1a) ti_h16 st_pc40 (C_OR (ti_ca5, ti_ca4)) ti_decode16. Qed.
 
   Lemma st_instr41 :
     kernel_text -∗ instr st_pc41 false (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x80000074 st_w41 st_pc41 (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW)) st_decode41. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x1c) st_w41 st_pc41 (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW)) st_decode41. Qed.
 
   Lemma st_instr42 :
     kernel_text -∗ instr st_pc42 false (UTYPE (si42, Regidx ti_a5, AUIPC)).
-  Proof. st_mk_base 0x80000078 st_w42 st_pc42 (UTYPE (si42, Regidx ti_a5, AUIPC)) st_decode42. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x20) st_w42 st_pc42 (UTYPE (si42, Regidx ti_a5, AUIPC)) st_decode42. Qed.
 
   Lemma st_instr43 :
     kernel_text -∗ instr st_pc43 false (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI)).
-  Proof. st_mk_base 0x8000007c st_w43 st_pc43 (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI)) st_decode43. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x24) st_w43 st_pc43 (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI)) st_decode43. Qed.
 
   Lemma st_instr44 :
     kernel_text -∗ instr st_pc44 false (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x80000080 st_w44 st_pc44 (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW)) st_decode44. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x28) st_w44 st_pc44 (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW)) st_decode44. Qed.
 
   Lemma st_instr45 :
     kernel_text -∗ instr st_pc45 true (C_LI (si45, Regidx ti_a5)).
-  Proof. st_mk_rvc4 0x80000084 st_h45 st_w45 st_pc45 (C_LI (si45, Regidx ti_a5)) st_decode45. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start + 0x2c) st_h45 st_w45 st_pc45 (C_LI (si45, Regidx ti_a5)) st_decode45. Qed.
 
   Lemma st_instr46 :
     kernel_text -∗ instr st_pc46 false (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x80000086 st_w46 st_pc46 (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW)) st_decode46. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x2e) st_w46 st_pc46 (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW)) st_decode46. Qed.
 
   Lemma st_instr47 :
     kernel_text -∗ instr st_pc47 true (C_LUI (si47, Regidx ti_a5)).
-  Proof. st_mk_rvc2 0x8000008a st_h47 st_pc47 (C_LUI (si47, Regidx ti_a5)) st_decode47. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x32) st_h47 st_pc47 (C_LUI (si47, Regidx ti_a5)) st_decode47. Qed.
 
   Lemma st_instr48 :
     kernel_text -∗ instr st_pc48 true (C_ADDI (si48, Regidx ti_a5)).
-  Proof. st_mk_rvc4 0x8000008c st_h48 st_w48 st_pc48 (C_ADDI (si48, Regidx ti_a5)) st_decode48. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start + 0x34) st_h48 st_w48 st_pc48 (C_ADDI (si48, Regidx ti_a5)) st_decode48. Qed.
 
   Lemma st_instr49 :
     kernel_text -∗ instr st_pc49 false (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x8000008e st_w49 st_pc49 (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW)) st_decode49. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x36) st_w49 st_pc49 (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW)) st_decode49. Qed.
 
   Lemma st_instr50 :
     kernel_text -∗ instr st_pc50 false (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x80000092 st_w50 st_pc50 (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW)) st_decode50. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x3a) st_w50 st_pc50 (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW)) st_decode50. Qed.
 
   Lemma st_instr51 :
     kernel_text -∗ instr st_pc51 false (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS)).
-  Proof. st_mk_base 0x80000096 st_w51 st_pc51 (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS)) st_decode51. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x3e) st_w51 st_pc51 (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS)) st_decode51. Qed.
 
   Lemma st_instr52 :
     kernel_text -∗ instr st_pc52 false (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI)).
-  Proof. st_mk_base 0x8000009a st_w52 st_pc52 (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI)) st_decode52. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x42) st_w52 st_pc52 (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI)) st_decode52. Qed.
 
   Lemma st_instr53 :
     kernel_text -∗ instr st_pc53 false (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x8000009e st_w53 st_pc53 (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW)) st_decode53. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x46) st_w53 st_pc53 (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW)) st_decode53. Qed.
 
   Lemma st_instr54 :
     kernel_text -∗ instr st_pc54 true (C_LI (si54, Regidx ti_a5)).
-  Proof. st_mk_rvc2 0x800000a2 st_h54 st_pc54 (C_LI (si54, Regidx ti_a5)) st_decode54. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x4a) st_h54 st_pc54 (C_LI (si54, Regidx ti_a5)) st_decode54. Qed.
 
   Lemma st_instr55 :
     kernel_text -∗ instr st_pc55 true (C_SRLI (ssh55, ti_ca5)).
-  Proof. st_mk_rvc4 0x800000a4 st_h55 st_w55 st_pc55 (C_SRLI (ssh55, ti_ca5)) st_decode55. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start + 0x4c) st_h55 st_w55 st_pc55 (C_SRLI (ssh55, ti_ca5)) st_decode55. Qed.
 
   Lemma st_instr56 :
     kernel_text -∗ instr st_pc56 false (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x800000a6 st_w56 st_pc56 (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW)) st_decode56. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x4e) st_w56 st_pc56 (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW)) st_decode56. Qed.
 
   Lemma st_instr57 :
     kernel_text -∗ instr st_pc57 true (C_LI (si57, Regidx ti_a5)).
-  Proof. st_mk_rvc2 0x800000aa st_h57 st_pc57 (C_LI (si57, Regidx ti_a5)) st_decode57. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x52) st_h57 st_pc57 (C_LI (si57, Regidx ti_a5)) st_decode57. Qed.
 
   Lemma st_instr58 :
     kernel_text -∗ instr st_pc58 false (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW)).
-  Proof. st_mk_base 0x800000ac st_w58 st_pc58 (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW)) st_decode58. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x54) st_w58 st_pc58 (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW)) st_decode58. Qed.
 
   Lemma st_instr59 :
     kernel_text -∗ instr st_pc59 false (JAL (sjimm59, Regidx ti_ra)).
-  Proof. st_mk_base 0x800000b0 st_w59 st_pc59 (JAL (sjimm59, Regidx ti_ra)) st_decode59. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x58) st_w59 st_pc59 (JAL (sjimm59, Regidx ti_ra)) st_decode59. Qed.
 
   Lemma st_instr60 :
     kernel_text -∗ instr st_pc60 false (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)).
-  Proof. st_mk_base 0x800000b4 st_w60 st_pc60 (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)) st_decode60. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x5c) st_w60 st_pc60 (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)) st_decode60. Qed.
 
   Lemma st_instr61 :
     kernel_text -∗ instr st_pc61 true (C_ADDIW (si61, Regidx ti_a5)).
-  Proof. st_mk_rvc4 0x800000b8 st_h61 st_w61 st_pc61 (C_ADDIW (si61, Regidx ti_a5)) st_decode61. Qed.
+  Proof. st_mk_rvc4 (KernelSyms.start + 0x60) st_h61 st_w61 st_pc61 (C_ADDIW (si61, Regidx ti_a5)) st_decode61. Qed.
 
   Lemma st_instr62 :
     kernel_text -∗ instr st_pc62 true (C_MV (Regidx st_tp, Regidx ti_a5)).
-  Proof. st_mk_rvc2 0x800000ba st_h62 st_pc62 (C_MV (Regidx st_tp, Regidx ti_a5)) st_decode62. Qed.
+  Proof. st_mk_rvc2 (KernelSyms.start + 0x62) st_h62 st_pc62 (C_MV (Regidx st_tp, Regidx ti_a5)) st_decode62. Qed.
 
   Lemma st_instr63 :
     kernel_text -∗ instr st_pc63 false (MRET tt).
-  Proof. st_mk_base 0x800000bc w_mret st_pc63 (MRET tt) decode_mret. Qed.
+  Proof. st_mk_base (KernelSyms.start + 0x64) w_mret st_pc63 (MRET tt) decode_mret. Qed.
 
 End WpStartInstr.
 
@@ -702,10 +703,10 @@ Definition st_va5_40 (ms : mword 64) : mword 64 :=
 Definition st_ms1 (ms : mword 64) : mword 64 := mstatus_legalized ms (st_va5_40 ms).
 
 Definition st_a42v : mword 64 := mword_of_int 0x80001078.  (* auipc a5,1 *)
-Definition st_main : mword 64 := mword_of_int 0x80000e82.  (* <main> *)
+Definition st_main : mword 64 := mword_of_int (KernelSyms.main).  (* <main> *)
 Definition st_ffff : mword 64 := mword_of_int 0xffff.      (* medeleg/mideleg wval *)
 Definition st_pmpw : mword 64 := mword_of_int 0x3fffffffffffff. (* pmpaddr0 wval *)
-Definition st_ra_link : mword 64 := mword_of_int 0x800000b4.    (* jal link *)
+Definition st_ra_link : mword 64 := mword_of_int (KernelSyms.start + 0x5c).    (* jal link *)
 
 Definition st_mdl1 (mdl0 : mword 64) : mword 64 := mideleg_legalized mdl0 st_ffff.
 Definition st_va5_52 (mie0 mdl0 : mword 64) : mword 64 :=

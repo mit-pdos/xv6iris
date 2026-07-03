@@ -51,6 +51,7 @@ Require Import WpGprCsrrCommon WpGprCsrrA WpGprCsrrB WpGprCsrwCommon WpGprCsrwA 
 Require Import MinstretInv InstrBytes WpEntryNew.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -395,27 +396,27 @@ Section WpTimerinit.
   Context `{!riscvGS Σ}.
 
   (* PCs of the 21 instructions. *)
-  Definition ti_pc9  : mword 64 := mword_of_int 0x8000001c.
-  Definition ti_pc10 : mword 64 := mword_of_int 0x8000001e.
-  Definition ti_pc11 : mword 64 := mword_of_int 0x80000020.
-  Definition ti_pc12 : mword 64 := mword_of_int 0x80000022.
-  Definition ti_pc13 : mword 64 := mword_of_int 0x80000024.
-  Definition ti_pc14 : mword 64 := mword_of_int 0x80000028.
-  Definition ti_pc15 : mword 64 := mword_of_int 0x8000002a.
-  Definition ti_pc16 : mword 64 := mword_of_int 0x8000002c.
-  Definition ti_pc17 : mword 64 := mword_of_int 0x8000002e.
-  Definition ti_pc18 : mword 64 := mword_of_int 0x80000032.
-  Definition ti_pc19 : mword 64 := mword_of_int 0x80000036.
-  Definition ti_pc20 : mword 64 := mword_of_int 0x8000003a.
-  Definition ti_pc21 : mword 64 := mword_of_int 0x8000003e.
-  Definition ti_pc22 : mword 64 := mword_of_int 0x80000042.
-  Definition ti_pc23 : mword 64 := mword_of_int 0x80000046.
-  Definition ti_pc24 : mword 64 := mword_of_int 0x8000004a.
-  Definition ti_pc25 : mword 64 := mword_of_int 0x8000004c.
-  Definition ti_pc26 : mword 64 := mword_of_int 0x80000050.
-  Definition ti_pc27 : mword 64 := mword_of_int 0x80000052.
-  Definition ti_pc28 : mword 64 := mword_of_int 0x80000054.
-  Definition ti_pc29 : mword 64 := mword_of_int 0x80000056.
+  Definition ti_pc9  : mword 64 := mword_of_int (KernelSyms.timerinit).
+  Definition ti_pc10 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x2).
+  Definition ti_pc11 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x4).
+  Definition ti_pc12 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x6).
+  Definition ti_pc13 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x8).
+  Definition ti_pc14 : mword 64 := mword_of_int (KernelSyms.timerinit + 0xc).
+  Definition ti_pc15 : mword 64 := mword_of_int (KernelSyms.timerinit + 0xe).
+  Definition ti_pc16 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x10).
+  Definition ti_pc17 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x12).
+  Definition ti_pc18 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x16).
+  Definition ti_pc19 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x1a).
+  Definition ti_pc20 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x1e).
+  Definition ti_pc21 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x22).
+  Definition ti_pc22 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x26).
+  Definition ti_pc23 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x2a).
+  Definition ti_pc24 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x2e).
+  Definition ti_pc25 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x30).
+  Definition ti_pc26 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x34).
+  Definition ti_pc27 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x36).
+  Definition ti_pc28 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x38).
+  Definition ti_pc29 : mword 64 := mword_of_int (KernelSyms.timerinit + 0x3a).
 
   (* ---- constructor templates (side conditions all vm_compute) ---- *)
 
@@ -493,87 +494,87 @@ Section WpTimerinit.
 
   Lemma ti_instr9 :
     kernel_text -∗ instr ti_pc9 true (C_ADDI (i9, Regidx csp_rs1)).
-  Proof. ti_mk_rvc4 0x8000001c ti_h9 ti_w9 ti_pc9 (C_ADDI (i9, Regidx csp_rs1)) ti_decode9. Qed.
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit) ti_h9 ti_w9 ti_pc9 (C_ADDI (i9, Regidx csp_rs1)) ti_decode9. Qed.
 
   Lemma ti_instr10 :
     kernel_text -∗ instr ti_pc10 true (C_SDSP (u10, Regidx ti_ra)).
-  Proof. ti_mk_rvc2 0x8000001e ti_h10 ti_pc10 (C_SDSP (u10, Regidx ti_ra)) ti_decode10. Qed.
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x2) ti_h10 ti_pc10 (C_SDSP (u10, Regidx ti_ra)) ti_decode10. Qed.
 
   Lemma ti_instr11 :
     kernel_text -∗ instr ti_pc11 true (C_SDSP (u11, Regidx ti_s0)).
-  Proof. ti_mk_rvc4 0x80000020 ti_h11 ti_w11 ti_pc11 (C_SDSP (u11, Regidx ti_s0)) ti_decode11. Qed.
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x4) ti_h11 ti_w11 ti_pc11 (C_SDSP (u11, Regidx ti_s0)) ti_decode11. Qed.
 
   Lemma ti_instr12 :
     kernel_text -∗ instr ti_pc12 true (C_ADDI4SPN (ti_cs0, nz12)).
-  Proof. ti_mk_rvc2 0x80000022 ti_h12 ti_pc12 (C_ADDI4SPN (ti_cs0, nz12)) ti_decode12. Qed.
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x6) ti_h12 ti_pc12 (C_ADDI4SPN (ti_cs0, nz12)) ti_decode12. Qed.
 
   Lemma ti_instr13 :
     kernel_text -∗ instr ti_pc13 false (CSRReg (WpGprCsrrB.csr_menvcfg, zreg, Regidx ti_a5, CSRRS)).
-  Proof. ti_mk_base 0x80000024 ti_w13 ti_pc13 (CSRReg (WpGprCsrrB.csr_menvcfg, zreg, Regidx ti_a5, CSRRS)) ti_decode13. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x8) ti_w13 ti_pc13 (CSRReg (WpGprCsrrB.csr_menvcfg, zreg, Regidx ti_a5, CSRRS)) ti_decode13. Qed.
 
   Lemma ti_instr14 :
     kernel_text -∗ instr ti_pc14 true (C_LI (i14, Regidx ti_a4)).
-  Proof. ti_mk_rvc4 0x80000028 ti_h14 ti_w14 ti_pc14 (C_LI (i14, Regidx ti_a4)) ti_decode14. Qed.
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0xc) ti_h14 ti_w14 ti_pc14 (C_LI (i14, Regidx ti_a4)) ti_decode14. Qed.
 
   Lemma ti_instr15 :
     kernel_text -∗ instr ti_pc15 true (C_SLLI (sh15, Regidx ti_a4)).
-  Proof. ti_mk_rvc2 0x8000002a ti_h15 ti_pc15 (C_SLLI (sh15, Regidx ti_a4)) ti_decode15. Qed.
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0xe) ti_h15 ti_pc15 (C_SLLI (sh15, Regidx ti_a4)) ti_decode15. Qed.
 
   Lemma ti_instr16 :
     kernel_text -∗ instr ti_pc16 true (C_OR (ti_ca5, ti_ca4)).
-  Proof. ti_mk_rvc4 0x8000002c ti_h16 ti_w16 ti_pc16 (C_OR (ti_ca5, ti_ca4)) ti_decode16. Qed.
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x10) ti_h16 ti_w16 ti_pc16 (C_OR (ti_ca5, ti_ca4)) ti_decode16. Qed.
 
   Lemma ti_instr17 :
     kernel_text -∗ instr ti_pc17 false (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx ti_a5, zreg, CSRRW)).
-  Proof. ti_mk_base 0x8000002e ti_w17 ti_pc17 (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx ti_a5, zreg, CSRRW)) ti_decode17. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x12) ti_w17 ti_pc17 (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx ti_a5, zreg, CSRRW)) ti_decode17. Qed.
 
   Lemma ti_instr18 :
     kernel_text -∗ instr ti_pc18 false (CSRReg (WpGprCsrrA.csr_mcounteren, zreg, Regidx ti_a5, CSRRS)).
-  Proof. ti_mk_base 0x80000032 ti_w18 ti_pc18 (CSRReg (WpGprCsrrA.csr_mcounteren, zreg, Regidx ti_a5, CSRRS)) ti_decode18. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x16) ti_w18 ti_pc18 (CSRReg (WpGprCsrrA.csr_mcounteren, zreg, Regidx ti_a5, CSRRS)) ti_decode18. Qed.
 
   Lemma ti_instr19 :
     kernel_text -∗ instr ti_pc19 false (ITYPE (i19, Regidx ti_a5, Regidx ti_a5, ORI)).
-  Proof. ti_mk_base 0x80000036 ti_w19 ti_pc19 (ITYPE (i19, Regidx ti_a5, Regidx ti_a5, ORI)) ti_decode19. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x1a) ti_w19 ti_pc19 (ITYPE (i19, Regidx ti_a5, Regidx ti_a5, ORI)) ti_decode19. Qed.
 
   Lemma ti_instr20 :
     kernel_text -∗ instr ti_pc20 false (CSRReg (WpGprCsrwA.csr_mcounteren, Regidx ti_a5, zreg, CSRRW)).
-  Proof. ti_mk_base 0x8000003a ti_w20 ti_pc20 (CSRReg (WpGprCsrwA.csr_mcounteren, Regidx ti_a5, zreg, CSRRW)) ti_decode20. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x1e) ti_w20 ti_pc20 (CSRReg (WpGprCsrwA.csr_mcounteren, Regidx ti_a5, zreg, CSRRW)) ti_decode20. Qed.
 
   Lemma ti_instr21 :
     kernel_text -∗ instr ti_pc21 false (CSRReg (WpGprCsrrB.csr_time, zreg, Regidx ti_a5, CSRRS)).
-  Proof. ti_mk_base 0x8000003e ti_w21 ti_pc21 (CSRReg (WpGprCsrrB.csr_time, zreg, Regidx ti_a5, CSRRS)) ti_decode21. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x22) ti_w21 ti_pc21 (CSRReg (WpGprCsrrB.csr_time, zreg, Regidx ti_a5, CSRRS)) ti_decode21. Qed.
 
   Lemma ti_instr22 :
     kernel_text -∗ instr ti_pc22 false (UTYPE (i22, Regidx ti_a4, LUI)).
-  Proof. ti_mk_base 0x80000042 ti_w22 ti_pc22 (UTYPE (i22, Regidx ti_a4, LUI)) ti_decode22. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x26) ti_w22 ti_pc22 (UTYPE (i22, Regidx ti_a4, LUI)) ti_decode22. Qed.
 
   Lemma ti_instr23 :
     kernel_text -∗ instr ti_pc23 false (ITYPE (i23, Regidx ti_a4, Regidx ti_a4, ADDI)).
-  Proof. ti_mk_base 0x80000046 ti_w23 ti_pc23 (ITYPE (i23, Regidx ti_a4, Regidx ti_a4, ADDI)) ti_decode23. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x2a) ti_w23 ti_pc23 (ITYPE (i23, Regidx ti_a4, Regidx ti_a4, ADDI)) ti_decode23. Qed.
 
   Lemma ti_instr24 :
     kernel_text -∗ instr ti_pc24 true (C_ADD (Regidx ti_a5, Regidx ti_a4)).
-  Proof. ti_mk_rvc2 0x8000004a ti_h24 ti_pc24 (C_ADD (Regidx ti_a5, Regidx ti_a4)) ti_decode24. Qed.
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x2e) ti_h24 ti_pc24 (C_ADD (Regidx ti_a5, Regidx ti_a4)) ti_decode24. Qed.
 
   Lemma ti_instr25 :
     kernel_text -∗ instr ti_pc25 false (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx ti_a5, zreg, CSRRW)).
-  Proof. ti_mk_base 0x8000004c ti_w25 ti_pc25 (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx ti_a5, zreg, CSRRW)) ti_decode25. Qed.
+  Proof. ti_mk_base (KernelSyms.timerinit + 0x30) ti_w25 ti_pc25 (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx ti_a5, zreg, CSRRW)) ti_decode25. Qed.
 
   Lemma ti_instr26 :
     kernel_text -∗ instr ti_pc26 true (C_LDSP (u10, Regidx ti_ra)).
-  Proof. ti_mk_rvc4 0x80000050 ti_h26 ti_w26 ti_pc26 (C_LDSP (u10, Regidx ti_ra)) ti_decode26. Qed.
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x34) ti_h26 ti_w26 ti_pc26 (C_LDSP (u10, Regidx ti_ra)) ti_decode26. Qed.
 
   Lemma ti_instr27 :
     kernel_text -∗ instr ti_pc27 true (C_LDSP (u11, Regidx ti_s0)).
-  Proof. ti_mk_rvc2 0x80000052 ti_h27 ti_pc27 (C_LDSP (u11, Regidx ti_s0)) ti_decode27. Qed.
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x36) ti_h27 ti_pc27 (C_LDSP (u11, Regidx ti_s0)) ti_decode27. Qed.
 
   Lemma ti_instr28 :
     kernel_text -∗ instr ti_pc28 true (C_ADDI (i28, Regidx csp_rs1)).
-  Proof. ti_mk_rvc4 0x80000054 ti_h28 ti_w28 ti_pc28 (C_ADDI (i28, Regidx csp_rs1)) ti_decode28. Qed.
+  Proof. ti_mk_rvc4 (KernelSyms.timerinit + 0x38) ti_h28 ti_w28 ti_pc28 (C_ADDI (i28, Regidx csp_rs1)) ti_decode28. Qed.
 
   Lemma ti_instr29 :
     kernel_text -∗ instr ti_pc29 true (C_JR (Regidx ti_ra)).
-  Proof. ti_mk_rvc2 0x80000056 ti_h29 ti_pc29 (C_JR (Regidx ti_ra)) ti_decode29. Qed.
+  Proof. ti_mk_rvc2 (KernelSyms.timerinit + 0x3a) ti_h29 ti_pc29 (C_JR (Regidx ti_ra)) ti_decode29. Qed.
 
 End WpTimerinit.
 
