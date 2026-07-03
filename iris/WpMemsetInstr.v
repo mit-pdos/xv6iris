@@ -169,7 +169,11 @@ Proof. intro Hpriv. decode_any s Hpriv. Qed.
 Section WpMemsetInstr.
   Context `{!riscvGS Σ}.
 
-  Local Ltac mk_rvc4 A h w pc ast decname :=
+  (* rvc constructors now target the ExecuteAs-EXPANDED base instruction:
+     [instr pc true base], where [decname] decodes the compressed form i0 and
+     [expname] is i0's [exec_execute_C_*] ExecuteAs-expansion into [base].
+     (Mirrors WpKvInstr.kv_mk_rvc4 / kv_mk_rvc2.) *)
+  Local Ltac mk_rvc4 A h w pc ast decname expname :=
     let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
     let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
     let Hsub := fresh "Hsub" in let Hbytes := fresh "Hbytes" in
@@ -189,9 +193,12 @@ Section WpMemsetInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+      eexists; (split; [ apply decname; assumption
+                       | split; [ vm_compute; reflexivity
+                                | intro; apply expname ] ]) ].
 
-  Local Ltac mk_rvc2 A h pc ast decname :=
+  Local Ltac mk_rvc2 A h pc ast decname expname :=
     let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
     let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
     let Hbytes := fresh "Hbytes" in
@@ -210,7 +217,10 @@ Section WpMemsetInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
       iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+      eexists; (split; [ apply decname; assumption
+                       | split; [ vm_compute; reflexivity
+                                | intro; apply expname ] ]) ].
 
   Local Ltac mk_base A w pc ast decname :=
     let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
@@ -231,69 +241,93 @@ Section WpMemsetInstr.
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
     | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
 
-  Lemma minstr_ccc : kernel_text -∗ instr (mword_of_int 0x80000ccc : mword 64) true (C_ADDI (mword_of_int 48, Regidx csp_rs1)).
-  Proof. mk_rvc4 (0x80000ccc)%Z (mword_of_int 0x1141 : mword 16) (mword_of_int 0xe4061141 : mword 32)
-           (mword_of_int 0x80000ccc : mword 64) (C_ADDI (mword_of_int 48, Regidx csp_rs1)) mdec_ccc. Qed.
+  (* Addresses are given as [KernelSyms.memset + offset]; the constructor names
+     carry the concrete low-byte address in the relocated image (memset = 0xcba).
+     The mod-4 alignment of the base changed from 0 (old 0xccc) to 2 (0xcba), so
+     the rvc2 (2-byte window) / rvc4 (4-byte cross-boundary window) choice, and
+     the 4-byte window values, differ from an unrelocated version.  The [mdec_*]
+     decode lemmas are keyed by instruction BITS (address-independent), so they
+     are reused as-is under their original names. *)
 
-  Lemma minstr_cce : kernel_text -∗ instr (mword_of_int 0x80000cce : mword 64) true (C_SDSP (mword_of_int 1, Regidx (mword_of_int 1))).
-  Proof. mk_rvc2 (0x80000cce)%Z (mword_of_int 0xe406 : mword 16)
-           (mword_of_int 0x80000cce : mword 64) (C_SDSP (mword_of_int 1, Regidx (mword_of_int 1))) mdec_cce. Qed.
+  (* +0x00  c.addi16sp sp,-16  ->  addi sp,sp,-16   (2-aligned -> rvc2) *)
+  Lemma minstr_cba : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof. mk_rvc2 (KernelSyms.memset + 0x00)%Z (mword_of_int 0x1141 : mword 16)
+           (mword_of_int (KernelSyms.memset + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_ccc exec_execute_C_ADDI. Qed.
 
-  Lemma minstr_cd0 : kernel_text -∗ instr (mword_of_int 0x80000cd0 : mword 64) true (C_SDSP (mword_of_int 0, Regidx (mword_of_int 8))).
-  Proof. mk_rvc4 (0x80000cd0)%Z (mword_of_int 0xe022 : mword 16) (mword_of_int 0x0800e022 : mword 32)
-           (mword_of_int 0x80000cd0 : mword 64) (C_SDSP (mword_of_int 0, Regidx (mword_of_int 8))) mdec_cd0. Qed.
+  (* +0x02  c.sdsp ra,8(sp)  ->  sd ra,8(sp)   (4-aligned -> rvc4) *)
+  Lemma minstr_cbc : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
+  Proof. mk_rvc4 (KernelSyms.memset + 0x02)%Z (mword_of_int 0xe406 : mword 16) (mword_of_int 0xe022e406 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) mdec_cce exec_execute_C_SDSP. Qed.
 
-  Lemma minstr_cd2 : kernel_text -∗ instr (mword_of_int 0x80000cd2 : mword 64) true (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4)).
-  Proof. mk_rvc2 (0x80000cd2)%Z (mword_of_int 0x0800 : mword 16)
-           (mword_of_int 0x80000cd2 : mword 64) (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4)) mdec_cd2. Qed.
+  (* +0x04  c.sdsp s0,0(sp)  ->  sd s0,0(sp)   (2-aligned -> rvc2) *)
+  Lemma minstr_cbe : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
+  Proof. mk_rvc2 (KernelSyms.memset + 0x04)%Z (mword_of_int 0xe022 : mword 16)
+           (mword_of_int (KernelSyms.memset + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) mdec_cd0 exec_execute_C_SDSP. Qed.
 
-  Lemma minstr_cd4 : kernel_text -∗ instr (mword_of_int 0x80000cd4 : mword 64) true (C_BEQZ (mword_of_int 11, Cregidx (mword_of_int 4))).
-  Proof. mk_rvc4 (0x80000cd4)%Z (mword_of_int 0xca19 : mword 16) (mword_of_int 0x87aaca19 : mword 32)
-           (mword_of_int 0x80000cd4 : mword 64) (C_BEQZ (mword_of_int 11, Cregidx (mword_of_int 4))) mdec_cd4. Qed.
+  (* +0x06  c.addi4spn s0,sp,16  ->  addi s0,sp,16   (4-aligned -> rvc4) *)
+  Lemma minstr_cc0 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x06) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
+  Proof. mk_rvc4 (KernelSyms.memset + 0x06)%Z (mword_of_int 0x0800 : mword 16) (mword_of_int 0xca190800 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) mdec_cd2 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma minstr_cd6 : kernel_text -∗ instr (mword_of_int 0x80000cd6 : mword 64) true (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 10))).
-  Proof. mk_rvc2 (0x80000cd6)%Z (mword_of_int 0x87aa : mword 16)
-           (mword_of_int 0x80000cd6 : mword 64) (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 10))) mdec_cd6. Qed.
+  (* +0x08  c.beqz a2,+0x1e  ->  beq a2,x0,+0x1e   (2-aligned -> rvc2) *)
+  Lemma minstr_cc2 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x08) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 11 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 4)), BEQ)).
+  Proof. mk_rvc2 (KernelSyms.memset + 0x08)%Z (mword_of_int 0xca19 : mword 16)
+           (mword_of_int (KernelSyms.memset + 0x08) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 11 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 4)), BEQ)) mdec_cd4 exec_execute_C_BEQZ. Qed.
 
-  Lemma minstr_cd8 : kernel_text -∗ instr (mword_of_int 0x80000cd8 : mword 64) true (C_SLLI (mword_of_int 32, Regidx (mword_of_int 12))).
-  Proof. mk_rvc4 (0x80000cd8)%Z (mword_of_int 0x1602 : mword 16) (mword_of_int 0x92011602 : mword 32)
-           (mword_of_int 0x80000cd8 : mword 64) (C_SLLI (mword_of_int 32, Regidx (mword_of_int 12))) mdec_cd8. Qed.
+  (* +0x0a  c.mv a5,a0  ->  add a5,x0,a0   (4-aligned -> rvc4) *)
+  Lemma minstr_cc4 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)).
+  Proof. mk_rvc4 (KernelSyms.memset + 0x0a)%Z (mword_of_int 0x87aa : mword 16) (mword_of_int 0x160287aa : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)) mdec_cd6 exec_execute_C_MV. Qed.
 
-  Lemma minstr_cda : kernel_text -∗ instr (mword_of_int 0x80000cda : mword 64) true (C_SRLI (mword_of_int 32, Cregidx (mword_of_int 4))).
-  Proof. mk_rvc2 (0x80000cda)%Z (mword_of_int 0x9201 : mword 16)
-           (mword_of_int 0x80000cda : mword 64) (C_SRLI (mword_of_int 32, Cregidx (mword_of_int 4))) mdec_cda. Qed.
+  (* +0x0c  c.slli a2,32  ->  slli a2,a2,32   (2-aligned -> rvc2) *)
+  Lemma minstr_cc6 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x0c) : mword 64) true (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 12), Regidx (mword_of_int 12), SLLI)).
+  Proof. mk_rvc2 (KernelSyms.memset + 0x0c)%Z (mword_of_int 0x1602 : mword 16)
+           (mword_of_int (KernelSyms.memset + 0x0c) : mword 64) (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 12), Regidx (mword_of_int 12), SLLI)) mdec_cd8 exec_execute_C_SLLI. Qed.
 
-  Lemma minstr_cdc : kernel_text -∗ instr (mword_of_int 0x80000cdc : mword 64) false (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)).
-  Proof. mk_base (0x80000cdc)%Z (mword_of_int 0x00a60733 : mword 32)
-           (mword_of_int 0x80000cdc : mword 64) (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)) mdec_cdc. Qed.
+  (* +0x0e  c.srli a2,32  ->  srli a2,a2,32   (4-aligned -> rvc4) *)
+  Lemma minstr_cc8 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x0e) : mword 64) true (SHIFTIOP (mword_of_int 32 : mword 6, creg2reg_idx (Cregidx (mword_of_int 4)), creg2reg_idx (Cregidx (mword_of_int 4)), SRLI)).
+  Proof. mk_rvc4 (KernelSyms.memset + 0x0e)%Z (mword_of_int 0x9201 : mword 16) (mword_of_int 0x07339201 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x0e) : mword 64) (SHIFTIOP (mword_of_int 32 : mword 6, creg2reg_idx (Cregidx (mword_of_int 4)), creg2reg_idx (Cregidx (mword_of_int 4)), SRLI)) mdec_cda exec_execute_C_SRLI. Qed.
 
-  Lemma minstr_ce0 : kernel_text -∗ instr (mword_of_int 0x80000ce0 : mword 64) false (STORE (mword_of_int 0, Regidx (mword_of_int 11), Regidx (mword_of_int 15), 1)).
-  Proof. mk_base (0x80000ce0)%Z (mword_of_int 0x00b78023 : mword 32)
-           (mword_of_int 0x80000ce0 : mword 64) (STORE (mword_of_int 0, Regidx (mword_of_int 11), Regidx (mword_of_int 15), 1)) mdec_ce0. Qed.
+  (* +0x10  add a4,a2,a0        (base, 2-aligned) *)
+  Lemma minstr_cca : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x10) : mword 64) false (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)).
+  Proof. mk_base (KernelSyms.memset + 0x10)%Z (mword_of_int 0x00a60733 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x10) : mword 64) (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)) mdec_cdc. Qed.
 
-  Lemma minstr_ce4 : kernel_text -∗ instr (mword_of_int 0x80000ce4 : mword 64) true (C_ADDI (mword_of_int 1, Regidx (mword_of_int 15))).
-  Proof. mk_rvc4 (0x80000ce4)%Z (mword_of_int 0x0785 : mword 16) (mword_of_int 0x9de30785 : mword 32)
-           (mword_of_int 0x80000ce4 : mword 64) (C_ADDI (mword_of_int 1, Regidx (mword_of_int 15))) mdec_ce4. Qed.
+  (* +0x14  sb a1,0(a5)  [LOOP head]  (base, 2-aligned) *)
+  Lemma minstr_cce : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x14) : mword 64) false (STORE (mword_of_int 0, Regidx (mword_of_int 11), Regidx (mword_of_int 15), 1)).
+  Proof. mk_base (KernelSyms.memset + 0x14)%Z (mword_of_int 0x00b78023 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x14) : mword 64) (STORE (mword_of_int 0, Regidx (mword_of_int 11), Regidx (mword_of_int 15), 1)) mdec_ce0. Qed.
 
-  Lemma minstr_ce6 : kernel_text -∗ instr (mword_of_int 0x80000ce6 : mword 64) false (BTYPE (mword_of_int 0x1ffa, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BNE)).
-  Proof. mk_base (0x80000ce6)%Z (mword_of_int 0xfee79de3 : mword 32)
-           (mword_of_int 0x80000ce6 : mword 64) (BTYPE (mword_of_int 0x1ffa, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BNE)) mdec_ce6. Qed.
+  (* +0x18  c.addi a5,1  ->  addi a5,a5,1   (2-aligned -> rvc2) *)
+  Lemma minstr_cd2 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_rvc2 (KernelSyms.memset + 0x18)%Z (mword_of_int 0x0785 : mword 16)
+           (mword_of_int (KernelSyms.memset + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) mdec_ce4 exec_execute_C_ADDI. Qed.
 
-  Lemma minstr_cea : kernel_text -∗ instr (mword_of_int 0x80000cea : mword 64) true (C_LDSP (mword_of_int 1, Regidx (mword_of_int 1))).
-  Proof. mk_rvc2 (0x80000cea)%Z (mword_of_int 0x60a2 : mword 16)
-           (mword_of_int 0x80000cea : mword 64) (C_LDSP (mword_of_int 1, Regidx (mword_of_int 1))) mdec_cea. Qed.
+  (* +0x1a  bne a5,a4,+0x14     (base, 4-aligned) *)
+  Lemma minstr_cd4 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x1a) : mword 64) false (BTYPE (mword_of_int 0x1ffa, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BNE)).
+  Proof. mk_base (KernelSyms.memset + 0x1a)%Z (mword_of_int 0xfee79de3 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x1a) : mword 64) (BTYPE (mword_of_int 0x1ffa, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BNE)) mdec_ce6. Qed.
 
-  Lemma minstr_cec : kernel_text -∗ instr (mword_of_int 0x80000cec : mword 64) true (C_LDSP (mword_of_int 0, Regidx (mword_of_int 8))).
-  Proof. mk_rvc4 (0x80000cec)%Z (mword_of_int 0x6402 : mword 16) (mword_of_int 0x01416402 : mword 32)
-           (mword_of_int 0x80000cec : mword 64) (C_LDSP (mword_of_int 0, Regidx (mword_of_int 8))) mdec_cec. Qed.
+  (* +0x1e  c.ldsp ra,8(sp)  ->  ld ra,8(sp)   (4-aligned -> rvc4) *)
+  Lemma minstr_cd8 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
+  Proof. mk_rvc4 (KernelSyms.memset + 0x1e)%Z (mword_of_int 0x60a2 : mword 16) (mword_of_int 0x640260a2 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) mdec_cea exec_execute_C_LDSP. Qed.
 
-  Lemma minstr_cee : kernel_text -∗ instr (mword_of_int 0x80000cee : mword 64) true (C_ADDI (mword_of_int 16, Regidx csp_rs1)).
-  Proof. mk_rvc2 (0x80000cee)%Z (mword_of_int 0x0141 : mword 16)
-           (mword_of_int 0x80000cee : mword 64) (C_ADDI (mword_of_int 16, Regidx csp_rs1)) mdec_cee. Qed.
+  (* +0x20  c.ldsp s0,0(sp)  ->  ld s0,0(sp)   (2-aligned -> rvc2) *)
+  Lemma minstr_cda : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x20) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
+  Proof. mk_rvc2 (KernelSyms.memset + 0x20)%Z (mword_of_int 0x6402 : mword 16)
+           (mword_of_int (KernelSyms.memset + 0x20) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) mdec_cec exec_execute_C_LDSP. Qed.
 
-  Lemma minstr_cf0 : kernel_text -∗ instr (mword_of_int 0x80000cf0 : mword 64) true (C_JR (Regidx (mword_of_int 1))).
-  Proof. mk_rvc4 (0x80000cf0)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int 0x11418082 : mword 32)
-           (mword_of_int 0x80000cf0 : mword 64) (C_JR (Regidx (mword_of_int 1))) mdec_cf0. Qed.
+  (* +0x22  c.addi16sp sp,16  ->  addi sp,sp,16   (4-aligned -> rvc4) *)
+  Lemma minstr_cdc : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x22) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof. mk_rvc4 (KernelSyms.memset + 0x22)%Z (mword_of_int 0x0141 : mword 16) (mword_of_int 0x80820141 : mword 32)
+           (mword_of_int (KernelSyms.memset + 0x22) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_cee exec_execute_C_ADDI. Qed.
+
+  (* +0x24  c.jr ra  (ret)  ->  jalr x0,0(ra)   (2-aligned -> rvc2) *)
+  Lemma minstr_cde : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x24) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
+  Proof. mk_rvc2 (KernelSyms.memset + 0x24)%Z (mword_of_int 0x8082 : mword 16)
+           (mword_of_int (KernelSyms.memset + 0x24) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
 
   (* =================================================================== *)
   (*  THE CAPSTONE: [wp_memset_s_full] with the sixteen instruction        *)
@@ -313,9 +347,9 @@ Section WpMemsetInstr.
     let a2_idx : mword 5 := mword_of_int 12 in
     let a4_idx : mword 5 := mword_of_int 14 in
     let a5_idx : mword 5 := mword_of_int 15 in
-    let pcE := mword_of_int 0x80000ccc in
-    let pc0L := mword_of_int 0x80000ce0 in
-    let pcLS := mword_of_int 0x80000cea in
+    let pcE := mword_of_int KernelSyms.memset in
+    let pc0L := mword_of_int (KernelSyms.memset + 0x14) in
+    let pcLS := mword_of_int (KernelSyms.memset + 0x1e) in
     let imm_entry : mword 6 := mword_of_int 48 in
     let shamt_l : mword 6 := mword_of_int 32 in
     let shamt_r : mword 6 := mword_of_int 32 in
@@ -330,12 +364,12 @@ Section WpMemsetInstr.
     let p := m0 !!! Regidx a0_idx in
     let e := wval_add in
     let cval := m0 !!! Regidx a1_idx in
-    let ea_ra := add_vec sp' (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))) in
-    let a8_ra := sign_extend' 64 (subrange_vec_dec ea_ra (xlen - 0 - 1) 0) in
-    let pa_ra := zero_extend' 64 (add_vec_int a8_ra (0 * 8)) in
-    let ea_s0 := add_vec sp' (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))) in
-    let a8_s0 := sign_extend' 64 (subrange_vec_dec ea_s0 (xlen - 0 - 1) 0) in
-    let pa_s0 := zero_extend' 64 (add_vec_int a8_s0 (0 * 8)) in
+    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
+    let a8_ra := ea_ra in
+    let pa_ra := a8_ra in
+    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
+    let a8_s0 := ea_s0 in
+    let pa_s0 := a8_s0 in
     let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
     let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
     let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2 in
@@ -419,7 +453,6 @@ Section WpMemsetInstr.
     bit_to_bool (access_vec_dec ret_tgt 1) = false ->
     add_vec (add_vec_int pc0L 6) (sign_extend' 64 imm_bne) = pc0L ->
     eq_vec (access_vec_dec pc0L 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec pc0L 1) = false ->
     and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
     vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     (forall j : nat, (j < N)%nat ->
@@ -469,24 +502,24 @@ Section WpMemsetInstr.
       Hbexec_add
       HcanonR HvpnR HidentR HmaskR HvecstR HrangeR HW_R HR_R HalignR HpalignR
       HcanonS HvpnS HidentS HmaskS HvecstS HrangeS HalignS HpalignS
-      Hn0 Hret0 Hret1 Hbne HpcL0 HpcL1 Hmask_b Hvecst_b
+      Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvecst_b
       Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp.
     iIntros "#Hhw #Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb
              #Htext Hpc Hfile Hbra Hbs0 Hbuf Hcont".
     (* derive the thirteen prefix/suffix instr resources from the text image *)
-    iPoseProof (minstr_ccc with "Htext") as "Hi0".
-    iPoseProof (minstr_cce with "Htext") as "Hi2".
-    iPoseProof (minstr_cd0 with "Htext") as "Hi4".
-    iPoseProof (minstr_cd2 with "Htext") as "Hi6".
-    iPoseProof (minstr_cd4 with "Htext") as "Hi8".
-    iPoseProof (minstr_cd6 with "Htext") as "Hi10".
-    iPoseProof (minstr_cd8 with "Htext") as "Hi12".
-    iPoseProof (minstr_cda with "Htext") as "Hi14".
-    iPoseProof (minstr_cdc with "Htext") as "Hi16".
-    iPoseProof (minstr_cea with "Htext") as "HiL0".
-    iPoseProof (minstr_cec with "Htext") as "HiL2".
-    iPoseProof (minstr_cee with "Htext") as "HiL4".
-    iPoseProof (minstr_cf0 with "Htext") as "HiL6".
+    iPoseProof (minstr_cba with "Htext") as "Hi0".
+    iPoseProof (minstr_cbc with "Htext") as "Hi2".
+    iPoseProof (minstr_cbe with "Htext") as "Hi4".
+    iPoseProof (minstr_cc0 with "Htext") as "Hi6".
+    iPoseProof (minstr_cc2 with "Htext") as "Hi8".
+    iPoseProof (minstr_cc4 with "Htext") as "Hi10".
+    iPoseProof (minstr_cc6 with "Htext") as "Hi12".
+    iPoseProof (minstr_cc8 with "Htext") as "Hi14".
+    iPoseProof (minstr_cca with "Htext") as "Hi16".
+    iPoseProof (minstr_cd8 with "Htext") as "HiL0".
+    iPoseProof (minstr_cda with "Htext") as "HiL2".
+    iPoseProof (minstr_cdc with "Htext") as "HiL4".
+    iPoseProof (minstr_cde with "Htext") as "HiL6".
     iApply (wp_memset_s_full root_ppn E Φ m0 N imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz
               i_add wval_add imm_bne svpn svpn_ra svpn_s0 olds
               satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)
@@ -498,9 +531,9 @@ Section WpMemsetInstr.
               Hbexec_add
               HcanonR HvpnR HidentR HmaskR HvecstR HrangeR HW_R HR_R HalignR HpalignR
               HcanonS HvpnS HidentS HmaskS HvecstS HrangeS HalignS HpalignS
-              Hn0 Hret0 Hret1 Hbne HpcL0 HpcL1 Hmask_b Hvecst_b
+              Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvecst_b
               Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
-              minstr_ce0 minstr_ce4 minstr_ce6
+              minstr_cce minstr_cd2 minstr_cd4
               with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb
                     Htext Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16
                     HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 Hbuf Hcont").
