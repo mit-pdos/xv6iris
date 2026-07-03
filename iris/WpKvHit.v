@@ -61,12 +61,12 @@ Section WpKvHit.
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
     (* slot 1: x1 at sp+0 *)
-    neq_vec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub pagesize_bits 1) 0)) = (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))) ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8))) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))))) 8 = true ->
-    is_aligned_paddr (Physaddr (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8))) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub pagesize_bits 1) 0)) = ((kv_sp1 m)) ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (add_vec_int (((kv_sp1 m))) (0 * 8))) (uint (to_bits 64 8)) = PMP_Match ->
+    is_aligned_vaddr (Virtaddr (((kv_sp1 m)))) 8 = true ->
+    is_aligned_paddr (Physaddr (add_vec_int (((kv_sp1 m))) (0 * 8))) 8 = true ->
     (* slot 2: x3 at sp+16 *)
     neq_vec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
@@ -193,7 +193,7 @@ Section WpKvHit.
     pc_is (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold1 j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int (((kv_sp1 m))) (0 * 8)) j) ↦ₘ nth_byte vold1 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold2 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold3 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold4 j) -∗
@@ -222,7 +222,7 @@ Section WpKvHit.
       tlb ↦ᵣ tlbvec -∗
       pc_is (mword_of_int KernelSyms.kerneltrap : mword 64) -∗
       gpr_file (kv_m2 m) -∗
-        ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int (((kv_sp1 m))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 3 : mword 5)) j) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 5 : mword 5)) j) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 6 : mword 5)) j) -∗
@@ -306,18 +306,21 @@ Section WpKvHit.
     assert (Hg2 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64)) by kv_geom.
     assert (Hpc2 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4) : mword 64))
       by (vm_compute; reflexivity).
+    assert (Heq0f : kv_sp1 m = add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))
+      by (symmetry; apply add_vec_slot0_zero).
+    iEval (rewrite Heq0f) in "Hw1".
     iEval (rewrite <- Hm1sp) in "Hw1".
     iApply (wp_csdsp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2)) (mword_of_int 0) (mword_of_int 1) svpn
               (kv_m1 m) vold1 satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec
               HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hhit5 Hg2 (Hpmpf (KernelSyms.kernelvec + 0x2) eq_refl)
-              ltac:(rewrite Hm1sp; exact Hcanon1) ltac:(rewrite Hm1sp; exact Hvpn1)
-              ltac:(rewrite Hm1sp; exact Hident1) Hmask Hhith
-              ltac:(rewrite Hm1sp; exact Hrange1) HW
-              ltac:(rewrite Hm1sp; exact Halv1) ltac:(rewrite Hm1sp; exact Halp1)
+              ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Hcanon1) ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Hvpn1)
+              ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Hident1) Hmask Hhith
+              ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Hrange1) HW
+              ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Halv1) ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Halp1)
               with "Hhw Hinv Hhs2 Hpriv2 Hsatp2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlb Hpc Hfile Hi2 Hw1").
     iEval (rewrite Hpc2).
     iIntros "Hhs2 Hpriv2 Hsatp2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlb Hpc Hfile Hw1".
-    iEval (rewrite Hm1sp Hmr1) in "Hw1".
+    iEval (rewrite Hm1sp add_vec_slot0_zero Hmr1) in "Hw1".
     (* ---- #3: c.sdsp x3, 16(sp) @ 0x800053e4 (TLB hits) ---- *)
     iPoseProof (kv_i3 with "Htext") as "Hi3".
     assert (Hg3 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x4) : mword 64)) by kv_geom.
@@ -646,12 +649,12 @@ Section WpKvHit.
     sret_newpriv mstatus0 = Supervisor ->
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
     (* slot 1: x1 at sp+0 *)
-    neq_vec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub pagesize_bits 1) 0)) = (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))) ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8))) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))))) 8 = true ->
-    is_aligned_paddr (Physaddr (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8))) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub pagesize_bits 1) 0)) = ((kv_sp1 m)) ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (add_vec_int (((kv_sp1 m))) (0 * 8))) (uint (to_bits 64 8)) = PMP_Match ->
+    is_aligned_vaddr (Virtaddr (((kv_sp1 m)))) 8 = true ->
+    is_aligned_paddr (Physaddr (add_vec_int (((kv_sp1 m))) (0 * 8))) 8 = true ->
     (* slot 2: x3 at sp+16 *)
     neq_vec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
@@ -779,7 +782,7 @@ Section WpKvHit.
     pc_is (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold1 j) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int (((kv_sp1 m))) (0 * 8)) j) ↦ₘ nth_byte vold1 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold2 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold3 j) -∗
     ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte vold4 j) -∗
@@ -809,7 +812,7 @@ Section WpKvHit.
       sepc ↦ᵣ sepc0 -∗
       pc_is (sret_tgt sepc0) -∗
       gpr_file m -∗
-        ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
+        ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int (((kv_sp1 m))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 3 : mword 5)) j) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 5 : mword 5)) j) -∗
       ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 6 : mword 5)) j) -∗
@@ -858,7 +861,7 @@ Section WpKvHit.
     iApply (kerneltrap_returns (kv_m2 m) (kv_sp1 m)
               (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))
               satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec
-              (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))) (0 * 8))
+              (add_vec_int (((kv_sp1 m))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))))) (0 * 8)) (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))) (0 * 8))
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
               E Φ Hsp_l Hra_l
               with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").

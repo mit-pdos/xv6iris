@@ -50,6 +50,13 @@ Proof.
   lia.
 Qed.
 
+(* the byte offset for saved-register slot 0 (register index 0) is the
+   literal 0, so adding it to any base is a noop -- used by the
+   [kernelvec]/[kerneltrap] slot-0 (sp+0) address computation. *)
+Lemma add_vec_slot0_zero (x : mword 64) :
+  add_vec x (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = x.
+Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* should_inc_minstret is state-pure: its result is fully determined by    *)
 (* the mcountinhibit and minstretcfg cells.  Owning those two CSRs thus     *)

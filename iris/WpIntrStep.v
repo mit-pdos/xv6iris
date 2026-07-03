@@ -92,7 +92,7 @@ Section WpIntrStep.
      pmpaddr_n ↦ᵣ pmpaddr00 ∗
      tlb ↦ᵣ tlbvec ∗
      (∃ w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : bv 64,
-        ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte w1 j) ∗
+        ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int (((kv_sp1 m))) (0 * 8)) j) ↦ₘ nth_byte w1 j) ∗
         ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte w2 j) ∗
         ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte w3 j) ∗
         ([∗ list] j ∈ seq 0 8, (pa_add (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) (0 * 8)) j) ↦ₘ nth_byte w4 j) ∗
@@ -142,12 +142,12 @@ Section WpIntrStep.
     (* SRET *)
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
     (* slot 1: x1 at sp+0 *)
-    neq_vec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))))) (Z.sub pagesize_bits 1) 0)) = (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))) ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8))) (uint (to_bits 64 8)) = PMP_Match ->
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))))) 8 = true ->
-    is_aligned_paddr (Physaddr (add_vec_int ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))) (0 * 8))) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr (((kv_sp1 m))))) (Z.sub pagesize_bits 1) 0)) = ((kv_sp1 m)) ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (add_vec_int (((kv_sp1 m))) (0 * 8))) (uint (to_bits 64 8)) = PMP_Match ->
+    is_aligned_vaddr (Virtaddr (((kv_sp1 m)))) 8 = true ->
+    is_aligned_paddr (Physaddr (add_vec_int (((kv_sp1 m))) (0 * 8))) 8 = true ->
     (* slot 2: x3 at sp+16 *)
     neq_vec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
