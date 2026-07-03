@@ -1707,6 +1707,217 @@ Section WpMemsetS.
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (*  The memset fill loop, 0xce0..0xce6:                                  *)
+  (*     ce0:  sb   a1, 0(a5)        (store the fill byte at a5)           *)
+  (*     ce4:  c.addi a5, a5, 1      (a5 := a5 + 1)                        *)
+  (*     ce6:  bne  a5, a4, ce0      (loop while a5 <> a4)                 *)
+  (*  Runs [rem] iterations, filling the [rem] pending bytes at a5..a4-1   *)
+  (*  with a1's low byte, ending (bne falls through) at 0xcea with a5=a4.  *)
+  (*  Proved by induction on [rem]; the whole body runs on the unbundled   *)
+  (*  cell interface (wp_sb_s ; wp_caddi_gpr_s_config ; wp_bne_*_s_config) *)
+  (*  so no smode_config round-trip loses the store's MXR/PMM facts.       *)
+  (*  The per-byte Sv39/PMP geometry and the pointer arithmetic (byte j's  *)
+  (*  address, a5+1 vs a4) are provided as hypotheses quantified over the  *)
+  (*  byte offset; the loop-INDUCTION structure is what is proved here.    *)
+  (* ------------------------------------------------------------------- *)
+
+  (* the store's translated (identity) byte address for a5-value [cur]. *)
+  Definition ms_a8 (cur : mword 64) : mword 64 :=
+    sign_extend' 64 (subrange_vec_dec (add_vec cur (sign_extend' 64 (mword_of_int 0 : mword 12)))
+                       (xlen - 0 - 1) 0).
+  Definition ms_pa (cur : mword 64) : mword 64 :=
+    zero_extend' 64 (add_vec_int (ms_a8 cur) (0 * 1)).
+  (* the j-th byte's a5-value, from base [p]. *)
+  Definition ms_addr (p : mword 64) (j : nat) : mword 64 :=
+    add_vec p (mword_of_int (Z.of_nat j)).
+  (* c.addi a5,a5,1 increments a5 by exactly one. *)
+  Definition ms_incr1 : mword 64 := sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)).
+
+  Lemma seq_cons (a b : nat) : seq a (S b) = a :: seq (S a) b.
+  Proof. reflexivity. Qed.
+
+  Lemma wp_memset_loop (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13) (svpn : mword 27)
+      (satp0 mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (olds : nat -> bv 8) {dq dqt : dfrac} :
+    let pc0 := mword_of_int 0x80000ce0 in
+    let pc4 := add_vec_int pc0 4 in
+    let pc6 := add_vec_int pc0 6 in
+    let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+    ↑minstretN ⊆ E ->
+    (* register indices distinct from x0 *)
+    uint ra1 <> 0 -> uint ra4 <> 0 -> uint ra5 <> 0 ->
+    (* shared S-mode config facts *)
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    (* fetch: TLB slot 5 + geometry for each of the three instructions *)
+    vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    kv_fetch_geom pc0 -> kv_fetch_geom (add_vec_int pc0 2) ->
+    kv_fetch_geom pc4 ->
+    kv_fetch_geom pc6 -> kv_fetch_geom (add_vec_int pc6 2) ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc0 ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc4 ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc6 ->
+    (* bne target = loop top pc0, and its low bits (4-aligned) *)
+    add_vec pc6 (sign_extend' 64 imm_bne) = pc0 ->
+    eq_vec (access_vec_dec pc0 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec pc0 1) = false ->
+    (* store page-level geometry *)
+    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    (* per-byte store geometry, for each byte offset j < N (a5-value ms_addr p j) *)
+    (forall j : nat, (j < N)%nat ->
+       neq_vec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j))))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0)) = false) ->
+    (forall j : nat, (j < N)%nat ->
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn) ->
+    (forall j : nat, (j < N)%nat ->
+       zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
+    (forall j : nat, (j < N)%nat ->
+       pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+         (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
+         (uint (ms_pa (ms_addr p j))) (uint (to_bits 64 1)) = PMP_Match) ->
+    (* pointer arithmetic: c.addi advances offset; bne compares a5+1 vs a4=e *)
+    (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
+    (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
+    (* register indices of a1/a4 are distinct from a5 (so c.addi a5 leaves them) *)
+    Regidx ra4 <> Regidx ra5 -> Regidx ra1 <> Regidx ra5 ->
+    (* the three loop instructions, fetched fresh each iteration from kernel_text *)
+    (⊢ kernel_text -∗ instr pc0 false (STORE (mword_of_int 0, Regidx ra1, Regidx ra5, 1))) ->
+    (⊢ kernel_text -∗ instr pc4 true (C_ADDI (mword_of_int 1, Regidx ra5))) ->
+    (⊢ kernel_text -∗ instr pc6 false (BTYPE (imm_bne, Regidx ra4, Regidx ra5, BNE))) ->
+    forall (rem off : nat) (m : gmap regidx (mword 64)),
+    (off + rem = N)%nat -> (1 <= rem)%nat ->
+    m !!! Regidx ra5 = ms_addr p off ->
+    m !!! Regidx ra4 = e ->
+    m !!! Regidx ra1 = cval ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ satp ↦ᵣ{ dq } satp0 -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb ↦ᵣ{ dqt } tlbvec -∗
+    kernel_text -∗
+    pc_is pc0 -∗ gpr_file m -∗
+    ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ satp ↦ᵣ{ dq } satp0 -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb ↦ᵣ{ dqt } tlbvec -∗
+      pc_is (add_vec_int pc6 4) -∗
+      gpr_file (<[Regidx ra5 := regval_into_reg (ms_addr p N)]> m) -∗
+      ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros pc0 pc4 pc6 cbyte HN Hra1 Hra4 Hra5 Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm
+      Hvec5 Hg0 Hg0' Hg4 Hg6 Hg6' Hpmp0 Hpmp4 Hpmp6 Hback Hal0 Hal1 Hmask Hvecst HW
+      Hcanon Hvpn Hident Hrange Hincr Hcmp Hra4ne Hra1ne Hext0 Hext4 Hext6.
+    induction rem as [|rem' IH]; intros off m Hoff Hrem Hcur Hm4 Hm1;
+      [ exfalso; lia | ].
+    iIntros "#Hhw #Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb
+             #Htext Hpc Hfile Hbuf Hcont".
+    iPoseProof (Hext0 with "Htext") as "Hi0".
+    iPoseProof (Hext4 with "Htext") as "Hi4".
+    iPoseProof (Hext6 with "Htext") as "Hi6".
+    (* off < N, and the current byte is offset off *)
+    assert (HoffN : (off < N)%nat) by lia.
+    (* peel the head byte of the pending buffer *)
+    rewrite (seq_cons off rem').
+    rewrite big_sepL_cons.
+    iDestruct "Hbuf" as "[Hb0 Hbuf]".
+    (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
+    iApply (wp_sb_s root_ppn E Φ pc0 ra1 ra5 (mword_of_int 0) svpn m (olds off)
+              satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm HMXR Hpmm Hvec5 Hg0 Hg0' Hpmp0
+              ltac:(rewrite Hcur; apply (Hcanon off HoffN))
+              ltac:(rewrite Hcur; apply (Hvpn off HoffN))
+              ltac:(rewrite Hcur; apply (Hident off HoffN))
+              Hmask Hvecst
+              ltac:(rewrite Hcur; apply (Hrange off HoffN))
+              HW
+              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile Hi0 [Hb0]").
+    { (* the byte points-to at ms_pa (m!!!ra5) = ms_pa (ms_addr p off) *)
+      unfold ms_pa, ms_a8. rewrite Hcur. iExact "Hb0". }
+    iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile Hb0".
+    (* --- 0xce4: c.addi a5, a5, 1 : a5 := a5 + 1 --- *)
+    iApply (wp_caddi_gpr_s_config root_ppn E Φ pc4 ra5 (mword_of_int 1)
+              m satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)
+              HN Hmode Hasid HSIE HMPRV HSXL Hmm Hvec5 Hg4 Hpmp4 Hra5
+              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb [Hpc] Hfile Hi4 [-]").
+    { unfold pc4. iExact "Hpc". }
+    iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile".
+    (* the new a5 value = ms_addr p (S off) *)
+    set (m' := <[Regidx ra5 := regval_into_reg
+          (add_vec (m !!! Regidx ra5) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> m).
+    assert (Hm'a5 : m' !!! Regidx ra5 = ms_addr p (S off)).
+    { unfold m'. rewrite lookup_total_insert. unfold regval_into_reg. rewrite Hcur.
+      change (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) with ms_incr1.
+      apply Hincr. }
+    assert (Hm'a4 : m' !!! Regidx ra4 = e).
+    { unfold m'. rewrite lookup_total_insert_ne; [ exact Hm4 | exact (not_eq_sym Hra4ne) ]. }
+    assert (Hm'a1 : m' !!! Regidx ra1 = cval).
+    { unfold m'. rewrite lookup_total_insert_ne; [ exact Hm1 | exact (not_eq_sym Hra1ne) ]. }
+    (* --- 0xce6: bne a5, a4, ce0 --- *)
+    destruct rem' as [|rem''].
+    - (* last iteration: S off = N, bne falls through to 0xcea *)
+      assert (HSN : (S off = N)%nat) by lia.
+      iApply (wp_bne_fall_s_config root_ppn E Φ pc6 imm_bne ra4 ra5
+                m' satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)
+                HN Hmode Hasid HSIE HMPRV HSXL Hmm Hvec5 Hg6 Hg6' Hpmp6 Hra5 Hra4
+                ltac:(rewrite Hm'a5 Hm'a4; rewrite (Hcmp off HoffN); rewrite HSN Nat.eqb_refl; reflexivity)
+                with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb [Hpc] Hfile Hi6 [-]").
+      { unfold pc6. iExact "Hpc". }
+      iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile".
+      iApply ("Hcont" with "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc [Hfile] [Hb0 Hbuf]").
+      + (* gpr_file m' = <[ra5 := ms_addr p N]> m *)
+        rewrite HSN in Hm'a5. unfold m'.
+        replace (ms_addr p N) with
+          (add_vec (m !!! Regidx ra5) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))).
+        2:{ change (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) with ms_incr1.
+            rewrite Hcur. rewrite Hincr. rewrite HSN. reflexivity. }
+        iExact "Hfile".
+      + (* buffer: seq off 1 = [off], the single filled byte *)
+        cbn [seq]. rewrite big_sepL_cons.
+        iSplitL "Hb0"; [ iEval (rewrite Hcur; rewrite Hm1) in "Hb0"; iExact "Hb0" | done ].
+    - (* more iterations: S off < N, bne taken back to 0xce0 *)
+      assert (HSN : (S off < N)%nat) by lia.
+      iApply (wp_bne_taken_s_config root_ppn E Φ pc6 imm_bne ra4 ra5
+                m' satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 tlbvec (dq:=dq)(dqt:=dqt)
+                HN Hmode Hasid HSIE HMPRV HSXL Hmm Hvec5 Hg6 Hg6' Hpmp6 Hra5 Hra4
+                ltac:(rewrite Hm'a5 Hm'a4; rewrite (Hcmp off HoffN);
+                      replace (Nat.eqb (S off) N) with false by (symmetry; apply Nat.eqb_neq; lia); reflexivity)
+                ltac:(rewrite Hback; exact Hal0) ltac:(rewrite Hback; exact Hal1)
+                with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb [Hpc] Hfile Hi6 [-]").
+      { unfold pc6. iExact "Hpc". }
+      iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile".
+      rewrite Hback.
+      (* apply the induction hypothesis for rem' = S rem'', off' = S off *)
+      iApply (IH (S off) m' ltac:(lia) ltac:(lia) Hm'a5 Hm'a4 Hm'a1
+                with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Htext Hpc Hfile [Hbuf] [Hb0 Hcont]").
+      + iExact "Hbuf".
+      + (* recombine: the just-filled byte [off] + IH's continuation gives seq off (S(S rem'')) filled *)
+        iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile Hbuf'".
+        assert (Hmeq : <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m'
+                     = <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m)
+          by (unfold m'; apply insert_insert).
+        iEval (rewrite Hmeq) in "Hfile".
+        iApply ("Hcont" with "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpc Hfile [Hb0 Hbuf']").
+        change (seq off (S (S rem''))) with (off :: seq (S off) (S rem'')).
+        rewrite big_sepL_cons.
+        iSplitL "Hb0"; [ iEval (rewrite Hcur; rewrite Hm1) in "Hb0"; iExact "Hb0" | iExact "Hbuf'" ].
+  Qed.
+
   (* =================================================================== *)
   (*  THE THEOREM: [memset]'s entry step in S-mode allocates its frame.  *)
   (* =================================================================== *)
