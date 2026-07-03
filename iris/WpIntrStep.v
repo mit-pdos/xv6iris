@@ -38,6 +38,7 @@ Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpKvInstr.
 Require Import WpKernelvecNew WpKvHit.
 Require Import WpIntrBits WpIntrCore.
 From Kernel Require KernelInstrs.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -83,7 +84,7 @@ Section WpIntrStep.
      mip ↦ᵣ mip_v ∗
      sig_meip ↦ᵣ meip ∗
      sig_seip ↦ᵣ seip ∗
-     stvec ↦ᵣ (mword_of_int 0x800053e0 : mword 64) ∗
+     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) ∗
      (∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -266,7 +267,7 @@ Section WpIntrStep.
     pc_is acq_pc1 -∗
     gpr_file m -∗
     ( acq_frame m satp0 mie_v mdv0 menvcfg0 mip_v meip seip pmpcfg0 pmpaddr00 tlbvec -∗
-      pc_is (mword_of_int 0x80000c06 : mword 64) -∗
+      pc_is (mword_of_int (KernelSyms.acquire + 0x2) : mword 64) -∗
       gpr_file (acq_m1 m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
@@ -311,11 +312,11 @@ Section WpIntrStep.
       assert (HmisaS' : eq_vec (_get_Misa_S (register_lookup misa σ.(sregs))) ('b"1") = true)
         by (rewrite Lmisa; exact HmisaS).
       assert (Htvd : trapVectorMode_forwards
-                       (_get_Mtvec_Mode (mword_of_int 0x800053e0 : mword 64)) = TV_Direct)
+                       (_get_Mtvec_Mode (mword_of_int KernelSyms.kernelvec : mword 64)) = TV_Direct)
         by (vm_compute; reflexivity).
       pose proof (exec_run_hart_active_pending σ i Supervisor Lpriv Hdisp0) as Hha.
       pose proof (exec_handle_interrupt_S σ i acq_pc1 ms scause_old
-                    (mword_of_int 0x800053e0) elp0
+                    (mword_of_int KernelSyms.kernelvec) elp0
                     Lpriv Lms Lsc Lstvec Lelp HmisaS' Htvd Lpc) as Hhi.
       match type of Hhi with _ = Some (_, ?T) => set (s_trap := T) in Hhi end.
       (* thread the trap's writes through the ghost cells, in tower order *)
@@ -340,7 +341,7 @@ Section WpIntrStep.
       iMod (reg_update _ stval _ (zeros' 64) with "Hreg Hstval") as "[Hreg Hstval]".
       iMod (reg_update _ sepc _ acq_pc1 with "Hreg Hsepc") as "[Hreg Hsepc]".
       iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-      iMod (reg_update _ nextPC _ (stvec_base (mword_of_int 0x800053e0 : mword 64))
+      iMod (reg_update _ nextPC _ (stvec_base (mword_of_int KernelSyms.kernelvec : mword 64))
               with "Hreg Hnpc") as "[Hreg Hnpc]".
       iModIntro.
       iExists i, Supervisor, s_trap.
@@ -355,10 +356,10 @@ Section WpIntrStep.
       iNext.
       iIntros "Hhs Hpcr".
       assert (LnT : register_lookup nextPC s_trap.(sregs)
-                    = stvec_base (mword_of_int 0x800053e0 : mword 64)).
+                    = stvec_base (mword_of_int KernelSyms.kernelvec : mword 64)).
       { unfold s_trap. lk. reflexivity. }
-      assert (Hsb : stvec_base (mword_of_int 0x800053e0 : mword 64)
-                    = (mword_of_int 0x800053e0 : mword 64))
+      assert (Hsb : stvec_base (mword_of_int KernelSyms.kernelvec : mword 64)
+                    = (mword_of_int KernelSyms.kernelvec : mword 64))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite LnT Hsb) in "Hpcr".
       iEval (rewrite Hsb) in "Hnpc".
