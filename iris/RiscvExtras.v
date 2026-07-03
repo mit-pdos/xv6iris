@@ -206,6 +206,14 @@ Proof.
   apply Z.eqb_eq. apply (align8_add_offset_unsigned x off k Hoff H).
 Qed.
 
+(* is_aligned_vaddr and is_aligned_paddr are the same check on the same
+   underlying bits (both just [Z.rem (uint addr) width = 0]) -- so a vaddr
+   and paddr alignment hypothesis about the same value are duplicates of
+   each other, not independent facts. *)
+Lemma is_aligned_vaddr_paddr (x : mword 64) (w : Z) :
+  is_aligned_vaddr (Virtaddr x) w = is_aligned_paddr (Physaddr x) w.
+Proof. reflexivity. Qed.
+
 (* 4-byte alignment of PC (one fact) implies its low-two-bits-zero forms:
    the Sail fetch path checks bit 0 and bit 1 of PC separately, but both
    follow from [is_aligned_vaddr (Virtaddr pc) 4]. *)
