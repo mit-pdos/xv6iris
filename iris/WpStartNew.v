@@ -18,7 +18,7 @@
      40 0x80000072 0x8fd9     c.or    a5, a4           [RVC]
      41 0x80000074 0x30079073 csrw    mstatus, a5      [F_Base, 4-aligned]
      42 0x80000078 0x00001797 auipc   a5, 0x1          [F_Base, 4-aligned]
-     43 0x8000007c 0xe0a78793 addi    a5, a5, -502     [F_Base, 4-aligned]
+     43 0x8000007c 0xdf878793 addi    a5, a5, -520     [F_Base, 4-aligned]
      44 0x80000080 0x34179073 csrw    mepc, a5         [F_Base, 4-aligned]
      45 0x80000084 0x4781     c.li    a5, 0            [RVC]
      46 0x80000086 0x18079073 csrw    satp, a5         [F_Base, 2-aligned]
@@ -79,7 +79,7 @@ Definition si36 : mword 12 := mword_of_int 2047.  (* addi a4, 2047 *)
 Definition si38 : mword 6  := mword_of_int 1.     (* c.lui a4, 1 *)
 Definition si39 : mword 12 := mword_of_int 2048.  (* addi a4, -2048 (bits 0x800) *)
 Definition si42 : mword 20 := mword_of_int 1.     (* auipc a5, 1 *)
-Definition si43 : mword 12 := mword_of_int 3594.  (* addi a5, -502 (bits 0xe0a) *)
+Definition si43 : mword 12 := mword_of_int 3576.  (* addi a5, -520 (bits 0xdf8) *)
 Definition si45 : mword 6  := mword_of_int 0.     (* c.li a5, 0 *)
 Definition si47 : mword 6  := mword_of_int 16.    (* c.lui a5, 0x10 *)
 Definition si48 : mword 6  := mword_of_int 63.    (* c.addi a5, -1 *)
@@ -106,7 +106,7 @@ Definition st_w38 : mword 32 := mword_of_int 0x07136705.
 Definition st_w39 : mword 32 := mword_of_int 0x80070713.
 Definition st_w41 : mword 32 := mword_of_int 0x30079073.
 Definition st_w42 : mword 32 := mword_of_int 0x00001797.
-Definition st_w43 : mword 32 := mword_of_int 0xe0a78793.
+Definition st_w43 : mword 32 := mword_of_int 0xdf878793.
 Definition st_w44 : mword 32 := mword_of_int 0x34179073.
 Definition st_h45 : mword 16 := mword_of_int 0x4781.
 Definition st_w45 : mword 32 := mword_of_int 0x90734781.

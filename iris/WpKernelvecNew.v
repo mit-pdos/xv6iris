@@ -77,7 +77,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* jal target / link-value arithmetic. *)
 Lemma kv_jal_tgt :
   add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
-          (sign_extend' 64 (mword_of_int 0x1fd29e : mword 21))
+          (sign_extend' 64 (mword_of_int 0x1fd246 : mword 21))
   = (mword_of_int (KernelSyms.kerneltrap) : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -1057,9 +1057,9 @@ Section WpKernelvecNew.
     assert (Hg19b : kv_fetch_geom (add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) 2)) by kv_geom.
     assert (Hrd19 : uint (mword_of_int 1 : mword 5) <> 0) by (vm_compute; discriminate).
     assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
-                      (sign_extend' 64 (mword_of_int 0x1fd29e : mword 21))) 0) ('b"0") = true)
+                      (sign_extend' 64 (mword_of_int 0x1fd246 : mword 21))) 0) ('b"0") = true)
       by (vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s2 root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd29e)
+    iApply (wp_jal_gpr_s2 root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd246)
               (kv_m1 m) satp0 pmpcfg0 pmpaddr00 tlbf2 (1/2)%Qp
               HN Htlbf2_5 Hg19 Hg19b (Hpmpf (KernelSyms.kernelvec + 0x24) eq_refl) Hrd19 Hal19
               with "Hhw Hsm Hpmpc1 Hpmpa1 Htlb Hpc Hfile Hi19").

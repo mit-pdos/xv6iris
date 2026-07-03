@@ -285,10 +285,14 @@ Definition imm_auipc : mword 20 := subrange_vec_dec w_auipc 31 12.
 Definition i_auipc : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_auipc 11 7) (regidx_bit_width - 1) 0).
 
-(* decode_auipc / decode_ld moved to KernelBoot.v (their only user)
-   to keep this shared-prefix file cheap. *)
+(* decode_auipc / decode_ld now live in WpEntryNew.v (their only user), to
+   keep this shared-prefix file cheap. *)
 
-Definition w_ld : mword 32 := mword_of_int 0x1d813103.
+(* [ld sp, N(sp)] loading the boot stack pointer via a GOT-relative offset
+   from _entry's auipc; N tracks wherever the linker places the GOT/stack0
+   data, so this literal must be re-synced whenever the kernel image's data
+   segment shifts (last synced: N = 0x208, i.e. stack0's current GOT slot). *)
+Definition w_ld : mword 32 := mword_of_int 0x20813103.
 
 Definition imm_ld : mword 12 := subrange_vec_dec w_ld 31 20.
 Definition i_ld : mword 5 :=
