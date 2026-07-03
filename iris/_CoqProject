@@ -46,6 +46,7 @@ WpEntryNew.v
 WpSpinNew.v
 SmodeCore.v
 WpSmodeGpr.v
+WpMemsetS.v
 WpSmodeSret.v
 WpTimerinit.v
 WpStartNew.v
