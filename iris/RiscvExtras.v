@@ -129,6 +129,12 @@ Qed.
 Lemma pa_add_0 (a : Arch.pa) : pa_add a 0 = a.
 Proof. unfold pa_add. change (Z.of_nat 0) with 0%Z. apply avi0. Qed.
 
+(* the kernelvec/kerneltrap saved-register-slot address computation always
+   writes its (always-zero) sub-word byte offset as the literal product
+   "0 * 8" rather than a bare 0. *)
+Lemma avi0_mul8 (a : mword 64) : add_vec_int a (0 * 8) = a.
+Proof. change (0 * 8) with 0. apply avi0. Qed.
+
 (* add_vec_int (mword_of_int A) k = mword_of_int (A + k) : the model's mword
    addition agrees with Z addition (everything reduces mod 2^64). *)
 Lemma avi_mword (A k : Z) :

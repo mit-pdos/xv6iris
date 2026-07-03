@@ -2146,7 +2146,7 @@ Section SmodeGprClients.
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let a8 := ea in
-    let pa := add_vec_int a8 (0 * 8) in
+    let pa := a8 in
     ↑minstretN ⊆ E ->
     (* S-mode config facts (explicit mstatus/menvcfg values) *)
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
@@ -2277,11 +2277,11 @@ Section SmodeGprClients.
     pose proof (within_sig_false pa 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
     pose proof (within_htif_writable_false pa 8 s_pc Lhtif_pc) as Hwh.
     (* the data-address translation: TLB HIT at tlb_hash svpn *)
-    assert (Htr_pc : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Store Data)) s_pc
+    assert (Htr_pc : exec (translateAddr (Virtaddr ((bits_of_virtaddr (Virtaddr a8)))) (Store Data)) s_pc
                      = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s_pc)).
-    { replace (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8)) with a8
-        by (cbn [bits_of_virtaddr]; change (0 * 8) with 0; rewrite avi0; reflexivity).
-      replace pa with a8 by (unfold pa; change (0 * 8) with 0; rewrite avi0; reflexivity).
+    { replace ((bits_of_virtaddr (Virtaddr a8))) with a8
+        by (cbn [bits_of_virtaddr]; reflexivity).
+      replace pa with a8 by (unfold pa; reflexivity).
       apply (exec_translateAddr_store_hit root_ppn a8 svpn satp0 tlbvec s_pc
                Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) ltac:(rewrite Lms_pc; exact HMPRV)
                Lsatp_pc Hmode Hasid Hcanon Hvpn_def Hident Ltlb_pc Hvecst Hmask). }
@@ -2293,15 +2293,15 @@ Section SmodeGprClients.
                  Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode
                  ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
                  ltac:(rewrite Lmenv_pc; exact Hpmm)
-                 ltac:(rewrite Lva subrange_id sign_extend'_id sext9_12_64; exact Halign8) ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Htr_pc)
+                 ltac:(rewrite Lva subrange_id sign_extend'_id sext9_12_64; exact Halign8) ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Htr_pc)
                  ltac:(rewrite Lpmpc_pc; exact HA0) ltac:(rewrite Lpmpaddr_pc; exact Hord0)
-                 ltac:(rewrite Lpmpaddr_pc Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hrange_st) ltac:(rewrite Lpmpc_pc; exact HW)
-                 ltac:(rewrite Lpma_pc Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hmatch_st0)
-                 ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hpalign8)
-                 Hwrite_st ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hwc)
-                 ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hws)
-                 ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hwh)).
-      subst s_x. do 3 f_equal. rewrite Lva Lv2 zero_extend'_id subrange_id sign_extend'_id sext9_12_64. reflexivity. }
+                 ltac:(rewrite Lpmpaddr_pc Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hrange_st) ltac:(rewrite Lpmpc_pc; exact HW)
+                 ltac:(rewrite Lpma_pc Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hmatch_st0)
+                 ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hpalign8)
+                 Hwrite_st ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hwc)
+                 ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hws)
+                 ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hwh)).
+      subst s_x. do 3 f_equal. rewrite Lva Lv2 zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64. reflexivity. }
     iMod (upd_window_8 σ.(mem) pa (m !!! Regidx rs2) vold with "Hmem Hbytes") as "[Hmem Hbytes]".
     iModIntro.
     iExists s_x.
@@ -2336,7 +2336,7 @@ Section SmodeGprClients.
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let a8 := ea in
-    let pa := add_vec_int a8 (0 * 8) in
+    let pa := a8 in
     let tlbf := vec_update_dec tlbvec (tlb_hash (__id 39) svpn) (Some (pw_tlb_entry root_ppn (mword_of_int 0))) in
     ↑minstretN ⊆ E ->
     (* S-mode config facts *)
@@ -2509,11 +2509,11 @@ Section SmodeGprClients.
     pose proof (within_sig_false (pte_paddr root_ppn) 8 s_pc (proj2 Hramp) ltac:(lia)) as Hwsp.
     pose proof (within_htif_false (pte_paddr root_ppn) 8 s_pc Lhtif_pc) as Hwhp.
     (* the data-address translation: the WALK, filling the TLB at tlb_hash svpn *)
-    assert (Htr_pc : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Store Data)) s_pc
+    assert (Htr_pc : exec (translateAddr (Virtaddr ((bits_of_virtaddr (Virtaddr a8)))) (Store Data)) s_pc
                      = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s_f)).
-    { replace (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8)) with a8
-        by (cbn [bits_of_virtaddr]; change (0 * 8) with 0; rewrite avi0; reflexivity).
-      replace pa with a8 by (unfold pa; change (0 * 8) with 0; rewrite avi0; reflexivity).
+    { replace ((bits_of_virtaddr (Virtaddr a8))) with a8
+        by (cbn [bits_of_virtaddr]; reflexivity).
+      replace pa with a8 by (unfold pa; reflexivity).
       apply (exec_translateAddr_store_walk root_ppn a8 svpn region_pte menvcfg0 satp0 tlbvec s_pc
                Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) ltac:(rewrite Lms_pc; exact HMPRV)
                Lsatp_pc Hmode Hppn Hasid Hcanon Hvpn_def Hident Ltlb_pc Hvecst
@@ -2530,16 +2530,16 @@ Section SmodeGprClients.
                  Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode
                  ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
                  ltac:(rewrite Lmenv_pc; exact Hpmm)
-                 ltac:(rewrite Lva subrange_id sign_extend'_id sext9_12_64; exact Halign8) ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Htr_pc)
+                 ltac:(rewrite Lva subrange_id sign_extend'_id sext9_12_64; exact Halign8) ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Htr_pc)
                  Lpriv_f ltac:(rewrite Lms_f; exact HMPRV)
                  ltac:(rewrite Lpmpc_f; exact HA0) ltac:(rewrite Lpmpaddr_f; exact Hord0)
-                 ltac:(rewrite Lpmpaddr_f Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hrange_st) ltac:(rewrite Lpmpc_f; exact HW)
-                 ltac:(rewrite Lpma_f Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hmatch_st0)
-                 ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hpalign8)
-                 Hwrite_st ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hwc)
-                 ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hws)
-                 ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hwh)).
-      subst s_x. do 3 f_equal. rewrite Lva Lv2 zero_extend'_id subrange_id sign_extend'_id sext9_12_64. reflexivity. }
+                 ltac:(rewrite Lpmpaddr_f Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hrange_st) ltac:(rewrite Lpmpc_f; exact HW)
+                 ltac:(rewrite Lpma_f Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hmatch_st0)
+                 ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hpalign8)
+                 Hwrite_st ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hwc)
+                 ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hws)
+                 ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hwh)).
+      subst s_x. do 3 f_equal. rewrite Lva Lv2 zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64. reflexivity. }
     (* the TLB FILL, mirrored on the ghost cell (full ownership) *)
     iMod (reg_update _ tlb _ tlbf with "Hreg Htlb") as "[Hreg Htlb]".
     iMod (upd_window_8 σ.(mem) pa (m !!! Regidx rs2) vold with "Hmem Hbytes") as "[Hmem Hbytes]".
@@ -2574,7 +2574,7 @@ Section SmodeGprClients.
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let a8 := ea in
-    let pa := add_vec_int a8 (0 * 8) in
+    let pa := a8 in
     ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     (* S-mode config facts *)
@@ -2707,11 +2707,11 @@ Section SmodeGprClients.
     pose proof (within_sig_false pa 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
     pose proof (within_htif_false pa 8 s_pc Lhtif_pc) as Hwh.
     (* the data-address translation: TLB HIT at tlb_hash svpn *)
-    assert (Htr_pc : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Load Data)) s_pc
+    assert (Htr_pc : exec (translateAddr (Virtaddr ((bits_of_virtaddr (Virtaddr a8)))) (Load Data)) s_pc
                      = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s_pc)).
-    { replace (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8)) with a8
-        by (cbn [bits_of_virtaddr]; change (0 * 8) with 0; rewrite avi0; reflexivity).
-      replace pa with a8 by (unfold pa; change (0 * 8) with 0; rewrite avi0; reflexivity).
+    { replace ((bits_of_virtaddr (Virtaddr a8))) with a8
+        by (cbn [bits_of_virtaddr]; reflexivity).
+      replace pa with a8 by (unfold pa; reflexivity).
       apply (exec_translateAddr_load_hit root_ppn a8 svpn satp0 tlbvec s_pc
                Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) ltac:(rewrite Lms_pc; exact HMPRV)
                Lsatp_pc Hmode Hasid Hcanon Hvpn_def Hident Ltlb_pc Hvecst Hmask). }
@@ -2728,15 +2728,15 @@ Section SmodeGprClients.
                Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode
                ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
                ltac:(rewrite Lmenv_pc; exact Hpmm)
-               ltac:(rewrite Lva subrange_id sign_extend'_id sext9_12_64; exact Halign8) ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Htr_pc)
+               ltac:(rewrite Lva subrange_id sign_extend'_id sext9_12_64; exact Halign8) ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Htr_pc)
                ltac:(rewrite Lpmpc_pc; exact HA0) ltac:(rewrite Lpmpaddr_pc; exact Hord0)
-               ltac:(rewrite Lpmpaddr_pc Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hrange_ld) ltac:(rewrite Lpmpc_pc; exact HR)
-               ltac:(rewrite Lpma_pc Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hmatch_ld0)
-               ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hpalign8)
-               Hread_ld ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hwc)
-               ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hws)
-               ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; apply Hwh)
-               ltac:(rewrite Lva zero_extend'_id subrange_id sign_extend'_id sext9_12_64; exact Hbytesf)). }
+               ltac:(rewrite Lpmpaddr_pc Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hrange_ld) ltac:(rewrite Lpmpc_pc; exact HR)
+               ltac:(rewrite Lpma_pc Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hmatch_ld0)
+               ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hpalign8)
+               Hread_ld ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hwc)
+               ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hws)
+               ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; apply Hwh)
+               ltac:(rewrite Lva zero_extend'_id avi0_mul8 subrange_id sign_extend'_id sext9_12_64; exact Hbytesf)). }
     (* write rd := v *)
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
