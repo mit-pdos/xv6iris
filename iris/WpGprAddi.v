@@ -209,6 +209,7 @@ End CleanAddiGpr.
 (* ====================================================================== *)
 Section WpAddiGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* [instr]/[mmode_config]-formulated register-generic ADDI WP, built on
@@ -241,7 +242,7 @@ Section WpAddiGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     (* completeness gives the (total) lookups for rs1 and rd *)
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
@@ -300,6 +301,7 @@ End WpAddiGpr.
 (* ADDIW WP -- moved here from WpGprShift (add-immediate variant). *)
 Section WpAddiwGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Lemma wp_addiw_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (immv : mword 12)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
@@ -323,7 +325,7 @@ Section WpAddiwGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (ADDIW (immv, Regidx rs1, Regidx rd)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -384,6 +386,7 @@ End WpAddiwGpr.
 (* Demonstration: ONE lemma [wp_addi_gpr] serves many (rd,rs1) pairs. *)
 Section WpAddiGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Definition wp_addi_x5_x6 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
     wp_addi_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) imm.   (* addi x5, x6, imm *)

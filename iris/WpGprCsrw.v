@@ -19,6 +19,7 @@ Require Export WpGprCsrwCommon WpGprCsrwA WpGprCsrwB.
 (* Demonstration: each ONE register-generic csrw WP serves any source reg. *)
 Section WpCsrwGprNewDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   (* csrw medeleg, x5  and  csrw mepc, x28  (source register generalized) *)
   Definition wp_csrw_medeleg_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) :=
     wp_csrw_medeleg_gpr E Φ pc (mword_of_int 5).

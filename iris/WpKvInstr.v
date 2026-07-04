@@ -344,6 +344,7 @@ Qed.
 (* ===================================================================== *)
 Section WpKvInstr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Local Ltac kv_mk_rvc4 A h w pc ast decname expname :=
     let Hlpad := fresh "Hlpad" in
@@ -368,7 +369,7 @@ Section WpKvInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -394,7 +395,7 @@ Section WpKvInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
       iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -418,7 +419,7 @@ Section WpKvInstr.
     iSplitL "";
     [ iApply (instr_bytes_base pc w H2al Hnrvc);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
 
   Lemma kv_i2 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 1 : mword 5), sp, 8)).

@@ -656,6 +656,7 @@ End ExecLoadGchk.
 (* ===================================================================== *)
 Section RvcTorEngines.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Lemma wp_ld_gpr_tor E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : gmap regidx (mword 64)) (v : bv 64)
@@ -697,7 +698,7 @@ Section RvcTorEngines.
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
     iApply (wp_instr E Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
@@ -859,7 +860,7 @@ Section RvcTorEngines.
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite).
     iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.

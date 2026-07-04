@@ -85,6 +85,7 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
 (* ====================================================================== *)
 Section HwConfig.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* mcountinhibit / minstretcfg are no longer bundled here (the minstret step
      no longer needs their values -- [should_inc] is total).  [elp] IS bundled,

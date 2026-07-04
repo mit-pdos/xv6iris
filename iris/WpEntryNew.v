@@ -55,6 +55,7 @@ Proof. intro Hpriv. unfold imm_ld, i_ld. decode_any s Hpriv. Qed.
 
 Section WpEntryNew.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* PCs of the eight instructions. *)
   Definition pc_e0 : mword 64 := mword_of_int (KernelSyms._entry).  (* AUIPC  *)
@@ -232,7 +233,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e0 w_auipc H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry) w_auipc 4 pc_e0 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
+    - iIntros (σ) "_". iPureIntro. intros Hpriv _.
       exact (decode_auipc σ Hpriv).
   Qed.
 
@@ -254,7 +255,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e1 w_ld H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0x4) w_ld 4 pc_e1 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
+    - iIntros (σ) "_". iPureIntro. intros Hpriv _.
       exact (decode_ld σ Hpriv).
   Qed.
 
@@ -279,7 +280,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_rvc4 pc_e2 h_lui w_lui4 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms._entry + 0x8) w_lui4 4 pc_e2 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
       exists (C_LUI (imm_clui, rd_clui)).
       split; [exact (decode_C_lui σ HmisaC) |].
       split; [vm_compute; reflexivity |].
@@ -305,7 +306,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e3 w_csrr H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0xa) w_csrr 4 pc_e3 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
+    - iIntros (σ) "_". iPureIntro. intros Hpriv _.
       rewrite Hz. exact (decode_csrr σ Hpriv).
   Qed.
 
@@ -328,7 +329,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_e4 h_addi H2al H4al Hrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0xe) h_addi 2 pc_e4 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
       exists (C_ADDI (imm_caddi, rsd_caddi)).
       split; [exact (decode_C_ADDI σ HmisaC) |].
       split; [vm_compute; reflexivity |].
@@ -358,8 +359,8 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e5 w_mul H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0x10) w_mul 4 pc_e5 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "Hsi".
-      iDestruct (state_interp_reg_dq σ ns κs nt misa DfracDiscarded misa0
+    - iIntros (σ) "Hsi".
+      iDestruct (state_interp_reg_dq σ misa DfracDiscarded misa0
                    with "Hsi Hmisa") as %Lmisa.
       iPureIntro. intros Hpriv _.
       assert (HmisaMs : eq_vec (_get_Misa_M (register_lookup misa σ.(sregs))) ('b"1") = true)
@@ -388,7 +389,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_rvc4 pc_e6 h_add w_add4 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms._entry + 0x14) w_add4 4 pc_e6 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
       exists (C_ADD (rsd_cadd, rs2_cadd)).
       split; [exact (decode_C_ADD σ HmisaC) |].
       split; [vm_compute; reflexivity |].
@@ -413,7 +414,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e7 w_jal H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0x16) w_jal 4 pc_e7 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros Hpriv _.
+    - iIntros (σ) "_". iPureIntro. intros Hpriv _.
       exact (decode_jal σ Hpriv).
   Qed.
 

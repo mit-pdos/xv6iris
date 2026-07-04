@@ -44,6 +44,7 @@ Import Defs.
 
 Section WpIntrStep.
   Context `{!riscvGS Sig}.
+  Context `{CID : CpuId}.
 
   (* the mstatus fact set carried through the round trip *)
   Definition acq_ms_facts (ms : mword 64) : Prop :=
@@ -296,8 +297,8 @@ Section WpIntrStep.
       pose proof (elp_no_lp elp0 Help_np) as Help0.
       iDestruct "Hpc" as "[Hpcr Hnpc]".
       iApply (wp_exec_step_interrupt_inv E Phi HN with "Hinv Hhs").
-      iIntros (σ ns κs nt) "Hsi".
-      iDestruct (dispatch_S_from_regs σ ns κs nt misa0 mip_v mie_v mdv0 ms meip seip
+      iIntros (σ) "Hsi".
+      iDestruct (dispatch_S_from_regs σ misa0 mip_v mie_v mdv0 ms meip seip
                    HmisaS Hmm
                    with "Hsi Hmisa Hmip Hmeip Hseip Hmie Hmdl Hms") as %Hdisp0.
       rewrite Hdres in Hdisp0.

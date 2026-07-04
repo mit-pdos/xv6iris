@@ -27,6 +27,7 @@ Local Open Scope Z_scope.
 
 Section WpFetch.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* ====================================================================== *)

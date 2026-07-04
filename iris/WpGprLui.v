@@ -39,6 +39,7 @@ Qed.
 
 Section WpLuiGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic LUI WP, built on
      [wp_instr] -- stated exactly like [wp_auipc_gpr] but the written value is
@@ -66,7 +67,7 @@ Section WpLuiGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (UTYPE (imm, Regidx rd, LUI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -112,6 +113,7 @@ End WpLuiGpr.
 (* Demonstration: ONE lemma [wp_lui_gpr] serves many destination regs. *)
 Section WpLuiGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Definition wp_lui_x5  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 20) :=
     wp_lui_gpr E Φ pc false (mword_of_int 5) imm.
   Definition wp_lui_x28 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 20) :=

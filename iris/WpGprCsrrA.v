@@ -216,6 +216,7 @@ Proof. unfold mcounteren_rdval, set_reg; cbn [sregs].
 (* ====================================================================== *)
 Section WpCsrrMhartidGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Lemma wp_csrr_mhartid_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (mhartid_in : mword 64) (m : gmap regidx (mword 64))
@@ -249,7 +250,7 @@ Section WpCsrrMhartidGpr.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     (* the destination entry is a real register (rd <> 0) *)
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
@@ -314,6 +315,7 @@ End WpCsrrMhartidGpr.
 (* Demonstration: ONE lemma [wp_csrr_mhartid_gpr] serves many destination regs. *)
 Section WpCsrrMhartidGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Definition wp_csrr_mhartid_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64)
       (mhartid_in : mword 64) :=
     wp_csrr_mhartid_gpr E Φ pc (mword_of_int 5) mhartid_in.   (* csrr x5, mhartid *)
@@ -340,6 +342,7 @@ End WpCsrrMhartidGprDemo.
 (* ====================================================================== *)
 Section WpCsrrGprA.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* mstatus (0x300): machine CSR, no extra gate. *)
   (* [dqm]-generic mstatus cell: mstatus lives INSIDE [mmode_config], so a
@@ -378,7 +381,7 @@ Section WpCsrrGprA.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -464,7 +467,7 @@ Section WpCsrrGprA.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).

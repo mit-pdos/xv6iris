@@ -185,6 +185,7 @@ End ForwardAUIPC.
 
 Section StepAUIPC.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_step_auipc (pc : mword 64) (w_a : mword 32) (imm_a : mword 20)
       (i_a : mword 5) (b1 : bool) (sp0a npc0a mstatus0a misa0 mdv0 : mword 64)
@@ -229,7 +230,7 @@ Section StepAUIPC.
       "#Hinv Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
-    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
+    iIntros (s) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.

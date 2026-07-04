@@ -421,7 +421,7 @@ Qed.
 (* ---- satp forward/clean/wp: writes satp; reads mstatus (MIE + SXL) ---- *)
 
 (* PROBE: does reg_update work on a VEC register (pmpaddr_n)? *)
-Lemma probe_vec_reg_update `{!riscvGS Σ} rs
+Lemma probe_vec_reg_update `{!riscvGS Σ} `{CpuId} rs
     (v v' : type_of_register pmpaddr_n) :
   reg_interp rs -∗ pmpaddr_n ↦ᵣ v ==∗
     reg_interp (register_set pmpaddr_n v' rs) ∗ pmpaddr_n ↦ᵣ v'.
@@ -649,6 +649,7 @@ Qed.
 
 Section WpCsrwGprNewB.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   (* ---- mideleg ---- *)
   Lemma wp_csrw_mideleg_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : gmap regidx (mword 64)) (mideleg0 : type_of_register mideleg)
@@ -681,7 +682,7 @@ Section WpCsrwGprNewB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_mideleg, Regidx rs1, zreg, CSRRW)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmisa")   as %Lmisa.
@@ -766,7 +767,7 @@ Section WpCsrwGprNewB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmisa")   as %Lmisa.
@@ -853,7 +854,7 @@ Section WpCsrwGprNewB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_sie, Regidx rs1, zreg, CSRRW)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmisa")   as %Lmisa.
@@ -942,7 +943,7 @@ Section WpCsrwGprNewB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmisa")   as %Lmisa.
@@ -1032,7 +1033,7 @@ Section WpCsrwGprNewB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_pmpaddr0, Regidx rs1, zreg, CSRRW)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hpmpc_k") as %Lpmpc.

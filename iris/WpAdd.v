@@ -40,6 +40,7 @@ Ltac trans_mi := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
 Section FinalWP.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Context (b : bool) (pc a0 a1 mst0 npc v2old : mword 64) (mi0 : bool)
           (w : mword 32) (rs2 rs1 rd : mword 5).
@@ -258,7 +259,7 @@ Section FinalWP.
     (* this leaf opens no further invariant, so take the inner mask = E∖↑minstretN
        (both fupds then reflexive, discharged by iModIntro) *)
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
-    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
+    iIntros (s) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hx10")  as %Lx10.
     iDestruct (reg_valid_dq with "Hreg Hx11")  as %Lx11.
     iDestruct (reg_valid_dq with "Hreg Hpc")   as %Lpc.
@@ -288,12 +289,12 @@ Section FinalWP.
     - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1)
               with "Hreg Hmst") as "[Hreg Hmst]".
       iModIntro.
-      unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
       iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes").
     - iModIntro.
-      unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists mst, false. iFrame. }
       iApply ("Hcont" with "Hx10 Hx11 Hx12 Hpc Hnpc Hpriv Hhs Hmdl Hmst' Hmisa Help Hpmpc Hpma Hhtif Hibytes").

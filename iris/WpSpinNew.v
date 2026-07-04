@@ -16,6 +16,7 @@ Local Open Scope Z_scope.
 
 Section WpSpin.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* The [spin] symbol at 0x8000001a (just past _entry's [jal start]): a single
      compressed self-jump [c.j spin] = [0xa001], the halt loop each hart runs
@@ -132,7 +133,7 @@ Section WpSpin.
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_spin h_spin H2al H4al Hrvc).
       iApply (kernel_window_pc KernelSyms.spin h_spin 2 pc_spin eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
       exists (C_J imm_spin).
       split; [exact (decode_C_J σ HmisaC) |].
       split; [vm_compute; reflexivity |].
@@ -183,7 +184,7 @@ Section WpSpin.
     (* one leaf step of [c.j spin]; [wp_instr] hands back [▷ WP Loop] *)
     iApply (wp_instr E Φ pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 HN Hpmp
               with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iMod (reg_update _ nextPC _ (add_vec_int pc_spin 2) with "Hreg Hnpc") as "[Hreg Hnpc]".

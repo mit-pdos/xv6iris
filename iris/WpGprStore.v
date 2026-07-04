@@ -499,6 +499,7 @@ End ExecStoreG.
 (* ====================================================================== *)
 Section MemUpdate.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* single-byte update (no [mem_update] exists in RiscvPtsto). *)
@@ -539,6 +540,7 @@ End MemUpdate.
 (* ====================================================================== *)
 Section WpStoreGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* reg_pointsto fractional instances + mmode_config_split_half /
      mmode_config_combine_half now live in InstrBytes.v (shared). *)
@@ -590,7 +592,7 @@ Section WpStoreGpr.
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite).
     iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
               HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
@@ -699,6 +701,7 @@ End WpStoreGpr.
 (* ====================================================================== *)
 Section WpStoreGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   (* `sd ra, imm(sp)` : rs2=ra(x1), rs1=sp(x2). *)
   Definition wp_store_ra_sp (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
     wp_store_gpr E Φ pc false (mword_of_int 2) (mword_of_int 1) imm.

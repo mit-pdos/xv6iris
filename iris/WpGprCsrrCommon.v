@@ -160,6 +160,7 @@ Proof. unfold set_reg; cbn [sregs].
    mmode_config half-split/combine), moved out of Section WpCsrrMhartidGpr. *)
 Section WpCsrrGprShared.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Global Instance reg_pointsto_fractional_csrr (r : register) (v : type_of_register r) :
     Fractional (fun q => reg_pointsto r (DfracOwn q) v).

@@ -251,6 +251,7 @@ Proof. unfold time_rdval, set_reg; cbn [sregs].
 (* ====================================================================== *)
 Section WpCsrrGprB.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* time (0xC01): Ext_Zicntr-gated, no misa premise needed (holds for any state). *)
   Lemma wp_csrr_time_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
@@ -285,7 +286,7 @@ Section WpCsrrGprB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -372,7 +373,7 @@ Section WpCsrrGprB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -466,7 +467,7 @@ Section WpCsrrGprB.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_instr E Φ pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).

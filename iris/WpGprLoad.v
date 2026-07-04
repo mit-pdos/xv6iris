@@ -258,6 +258,7 @@ End ForwardLDg.
 (* ====================================================================== *)
 Section WpLdGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* reg_pointsto Fractional/AsFractional, reg_pointsto_agree, and
      mmode_config_split_half / mmode_config_combine_half now live in InstrBytes.v
@@ -307,7 +308,7 @@ Section WpLdGpr.
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
     iApply (wp_instr E Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.

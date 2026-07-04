@@ -394,6 +394,7 @@ Proof. intro Hpriv. decode_any s Hpriv. Qed.
 (* ===================================================================== *)
 Section WpTimerinit.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* PCs of the 21 instructions. *)
   Definition ti_pc9  : mword 64 := mword_of_int (KernelSyms.timerinit).
@@ -444,7 +445,7 @@ Section WpTimerinit.
     iSplitL "";
     [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -471,7 +472,7 @@ Section WpTimerinit.
     iSplitL "";
     [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
       iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -496,7 +497,7 @@ Section WpTimerinit.
     iSplitL "";
     [ iApply (instr_bytes_base pc w H2al Hnrvc);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
 
   Lemma ti_instr9 :
     kernel_text -∗ instr ti_pc9 true (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
@@ -685,6 +686,7 @@ Local Ltac ti_unfold :=
 (* ===================================================================== *)
 Section WpTimerinitThm.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Lemma wp_timerinit E (Φ : mval -> iProp Σ) (q : Qp)
       (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)

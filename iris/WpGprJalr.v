@@ -130,6 +130,7 @@ Qed.
 (* ====================================================================== *)
 Section WpJalrGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic JALR WP, built on
      [wp_instr].  Like [wp_addi_gpr] it reads rs1 off the [gpr_file] and writes
@@ -170,7 +171,7 @@ Section WpJalrGpr.
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iApply (wp_instr E Φ pc is_rvc (JALR (imm, Regidx rs1, Regidx rd)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -247,6 +248,7 @@ End WpJalrGpr.
    exec-level [exec_execute_JALR_ret] covers the ret = jalr x0,0(ra) shape. *)
 Section WpJalrGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Definition wp_jalr_x1_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
     wp_jalr_gpr E Φ pc false (mword_of_int 1) (mword_of_int 5) imm.   (* jalr x5, imm(x1) *)
   Definition wp_jalr_x6_x28 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=

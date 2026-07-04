@@ -102,6 +102,7 @@ Proof. unfold gpr_of_Z, gpr_set; repeat case_match; set_solver. Qed.
 
 Section GprFile.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   (* Backing of register index [r].  Indexing by [regidx] (not
      register_bitvector_64) means index 0 = x0 is a genuine key even though

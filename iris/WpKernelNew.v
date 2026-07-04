@@ -32,6 +32,7 @@ Local Open Scope Z_scope.
 
 Section WpKernelNew.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Lemma wp_kernel E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (v_stack0 : bv 64) (mhartid_in : mword 64)

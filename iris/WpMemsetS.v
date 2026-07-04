@@ -45,6 +45,7 @@ Import Defs.
 
 Section WpMemsetS.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Definition pc_memset : mword 64 := mword_of_int KernelSyms.memset.
   (* the entry halfword [c.addi sp,sp,-16], and the 4-byte fetch window it sits
@@ -120,7 +121,7 @@ Section WpMemsetS.
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_memset h_memset0 H2al H4al Hrvc).
       iApply (kernel_window_pc KernelSyms.memset h_memset0 2 pc_memset eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
       eexists. split; [ exact (decode_memset_addi σ HmisaC)
                       | split; [ vm_compute; reflexivity | intro; apply exec_execute_C_ADDI ] ].
   Qed.
@@ -381,7 +382,7 @@ Section WpMemsetS.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom ltac:(discriminate) Hpmp Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
@@ -1133,7 +1134,7 @@ Section WpMemsetS.
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom (fun _ => Hgeom2) Hpmp
               Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
@@ -1373,7 +1374,7 @@ Section WpMemsetS.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom ltac:(discriminate) Hpmp Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
@@ -1517,7 +1518,7 @@ Section WpMemsetS.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom (fun _ => Hgeom2) Hpmp Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
@@ -1599,7 +1600,7 @@ Section WpMemsetS.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom (fun _ => Hgeom2) Hpmp Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
@@ -1696,7 +1697,7 @@ Section WpMemsetS.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom (fun _ => Hgeom2) Hpmp Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
@@ -1787,7 +1788,7 @@ Section WpMemsetS.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom ltac:(discriminate) Hpmp Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))

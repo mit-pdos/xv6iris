@@ -85,6 +85,7 @@ Qed.
 (* ===== slli ===== *)
 Section Wp_slli.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_slli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
@@ -109,7 +110,7 @@ Section Wp_slli.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -164,6 +165,7 @@ End Wp_slli.
 (* ===== srli ===== *)
 Section Wp_srli.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_srli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
@@ -188,7 +190,7 @@ Section Wp_srli.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -244,6 +246,7 @@ End Wp_srli.
 (* Demonstrations: ONE lemma per type serves many register operands. *)
 Section WpGprShiftDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Definition wp_slli_x5_x6  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
     wp_slli_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) sh.    (* slli x5, x6, sh *)

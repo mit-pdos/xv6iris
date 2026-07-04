@@ -73,6 +73,7 @@ Qed.
 (* ====================================================================== *)
 Section WpMulGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* [instr]/[mmode_config]-formulated register-generic MUL WP, built on
@@ -110,7 +111,7 @@ Section WpMulGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     (* completeness gives the (total) lookups for rs1, rs2 and rd *)
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
@@ -196,6 +197,7 @@ End WpMulGpr.
 (* ====================================================================== *)
 Section WpMulGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   (* `mul x5, x6, x7` : rd=x5, rs1=x6, rs2=x7. *)
   Definition wp_mul_x5_x6_x7 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) :=

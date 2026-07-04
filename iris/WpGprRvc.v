@@ -168,6 +168,7 @@ Proof. reflexivity. Qed.
    so they need its value pinned; formerly the per-RVC WPs baked the zero in. *)
 Section GprFileX0.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Lemma gpr_file_x0 (m : gmap regidx (mword 64)) (i : mword 5) :
     uint i = 0 ->
@@ -198,6 +199,7 @@ End GprFileX0.
 (* ===================================================================== *)
 Section RvcRet.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Definition cret_target (vra : mword 64) : mword 64 :=
     update_vec_dec (add_vec vra (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0").
@@ -231,7 +233,7 @@ Section RvcRet.
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iApply (wp_instr E Φ pc true (JALR (zeros' 12, Regidx ra, zreg)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx ra = Some (m !!! Regidx ra))
       by (apply lookup_lookup_total_dom; apply Hdom).

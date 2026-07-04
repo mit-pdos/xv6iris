@@ -183,6 +183,7 @@ End ForwardMRET.
 (* ====================================================================== *)
 Section StepMRET.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* Clean MRET post-state in terms of the OWNED register values             *)
@@ -288,7 +289,7 @@ Section StepMRET.
       "#Hinv Hpc Hnpc Hpriv Hhs Hmdl Hms Hmisa Hmepc Help Hmcinh Hmcfg Hpmpc Hpma Hhtif Hibytes Hcont".
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
-    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
+    iIntros (s) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hhs")    as %Lhs.

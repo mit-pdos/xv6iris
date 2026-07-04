@@ -19,6 +19,7 @@ Local Open Scope Z_scope.
 
 Section InstrBytes.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* The instruction at [pc] is [r] (bytes + geometry, in duplicable [↦ₘ□]).
      [pc] is always (at least) 2-aligned -- that single fact is hoisted out of
@@ -263,13 +264,13 @@ Section InstrBytes.
      the PMP/PMA/C-extension config, and the geometry is derived from the
      2-alignment fact in [instr_bytes] (via the pure lemmas above). *)
   Lemma fetch_from_instr_bytes
-      (σ : mstate) ns κs nt (pc : mword 64) (r : FetchResult)
+      (σ : mstate) (pc : mword 64) (r : FetchResult)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (misa0 : mword 64) {dqp dqc dqa dqh dqm : dfrac} :
     pmp_allows_all pmpcfg0 ->
     pma_allows_all pmar0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Machine -∗
     pmpcfg_n ↦ᵣ{ dqc } pmpcfg0 -∗
@@ -439,10 +440,10 @@ Section InstrBytes.
      WP client can discharge its [dispatchInterrupt Machine = None] obligation
      straight from [hw_config]'s misa plus a mstatus.MIE fact. *)
   Lemma dispatchInterrupt_none_from_regs
-      (σ : mstate) ns κs nt (misa0 mstatus0 : mword 64) {dqm dqs : dfrac} :
+      (σ : mstate) (misa0 mstatus0 : mword 64) {dqm dqs : dfrac} :
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     misa ↦ᵣ{ dqm } misa0 -∗
     mstatus ↦ᵣ{ dqs } mstatus0 -∗
     ⌜ exec (dispatchInterrupt Machine) σ = Some (None, σ) ⌝.
@@ -475,9 +476,9 @@ Section InstrBytes.
      is its first conjunct).  Lets holders of [state_interp σ] extract
      [register_lookup r σ.(sregs) = v] from a fractional points-to without
      destructuring the state interpretation at their own level. *)
-  Lemma state_interp_reg_dq (σ : mstate) ns κs nt
+  Lemma state_interp_reg_dq (σ : mstate)
       (r : register) (dq : dfrac) (v : type_of_register r) :
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     r ↦ᵣ{ dq } v -∗
     ⌜ register_lookup r σ.(sregs) = v ⌝.
   Proof.
@@ -529,7 +530,7 @@ Section InstrBytes.
      ∃ r : FetchResult,
        ⌜ fetch_is_rvc r = is_rvc ⌝ ∗
        instr_bytes pc r ∗
-       (∀ σ ns κs nt, state_interp σ ns κs nt -∗
+       (∀ σ, mstate_interp σ -∗
           ⌜ priv_mSU (register_lookup cur_privilege σ.(sregs)) = true ->
             eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ->
             if fetch_is_rvc r
@@ -545,13 +546,13 @@ Section InstrBytes.
      config (PC / privilege / PMP / PMA / htif / misa) is threaded in and, being
      used only to prove [⌜..⌝], is returned to the caller unchanged. *)
   Lemma instr_lift
-      (σ : mstate) ns κs nt (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (σ : mstate) (pc : mword 64) (is_rvc : bool) (i : instruction)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmar0 : list PMA_Region)
       (misa0 : mword 64) {dqp dqc dqa dqh dqm : dfrac} :
     pmp_allows_all pmpcfg0 ->
     pma_allows_all pmar0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Machine -∗
     pmpcfg_n ↦ᵣ{ dqc } pmpcfg0 -∗
@@ -573,14 +574,14 @@ Section InstrBytes.
     iIntros (Hpmp Hpma HmisaC) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iDestruct (state_interp_reg_dq σ ns κs nt cur_privilege dqp Machine
+    iDestruct (state_interp_reg_dq σ cur_privilege dqp Machine
                  with "Hsi Hpriv") as %Lpriv.
-    iDestruct (state_interp_reg_dq σ ns κs nt misa dqm misa0
+    iDestruct (state_interp_reg_dq σ misa dqm misa0
                  with "Hsi Hmisa") as %Lmisa.
-    iDestruct (fetch_from_instr_bytes σ ns κs nt pc r pmpcfg0 pmar0 misa0
+    iDestruct (fetch_from_instr_bytes σ pc r pmpcfg0 pmar0 misa0
                  Hpmp Hpma HmisaC
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes") as %Hfetch.
-    iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec0.
+    iDestruct ("Hdec" $! σ with "Hsi") as %Hdec0.
     specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)).
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: instr_bytes is 2-aligned ∗ False *)
@@ -611,7 +612,7 @@ Section InstrBytes.
     ↑minstretN ⊆ E →
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ ns κs nt, state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+    (∀ σ, mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (r : FetchResult) (i : instruction) (s_exec : mstate),
          ⌜ register_lookup cur_privilege σ.(sregs) = Machine ⌝ ∗
          ⌜ exec (dispatchInterrupt Machine) σ = Some (None, σ) ⌝ ∗
@@ -638,7 +639,7 @@ Section InstrBytes.
           | _ => False
           end) ∗
          PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
@@ -646,8 +647,8 @@ Section InstrBytes.
   Proof.
     iIntros (HN) "Hinv Hhs H".
     iApply (wp_exec_step_hart_active_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ ns κs nt) "Hsi".
-    iMod ("H" $! σ ns κs nt with "Hsi") as (r i s_exec)
+    iIntros (σ) "Hsi".
+    iMod ("H" $! σ with "Hsi") as (r i s_exec)
       "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: unreachable *) iDestruct "Hrest" as %[].
@@ -837,14 +838,14 @@ Section InstrBytes.
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
-    (∀ σ ns κs nt (Hpceq : register_lookup PC σ.(sregs) = pc),
-       state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (mmode_config dq -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
@@ -859,18 +860,18 @@ Section InstrBytes.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ ns κs nt) "Hsi".
-    iDestruct (instr_lift σ ns κs nt pc is_rvc i pmpcfg0 pmar0 misa0
+    iIntros (σ) "Hsi".
+    iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0
                  Hpmp Hpma_all HmisaC
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr") as %Hlift.
-    iDestruct (dispatchInterrupt_none_from_regs σ ns κs nt misa0 mstatus0 HmisaS HmIE
+    iDestruct (dispatchInterrupt_none_from_regs σ misa0 mstatus0 HmisaS HmIE
                  with "Hsi Hmisa Hmstatus") as %Hdisp.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σ.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σ.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σ.
     iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
-    iMod ("H" $! σ ns κs nt Lpc with "[$Hreg $Hmem]")
+    iMod ("H" $! σ Lpc with "[$Hreg $Hmem]")
       as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     (* Reassemble [mmode_config dq] + pmpcfg for the caller's continuation.
@@ -948,17 +949,17 @@ Section InstrBytes.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
-    (∀ σ ns κs nt (Hpceq : register_lookup PC σ.(sregs) = pc),
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
        cur_privilege ↦ᵣ Machine -∗
        mstatus ↦ᵣ ms0 -∗
        pmpcfg_n ↦ᵣ pmpcfg0 -∗
-       state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (hart_state ↦ᵣ HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
@@ -970,18 +971,18 @@ Section InstrBytes.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ ns κs nt) "Hsi".
-    iDestruct (instr_lift σ ns κs nt pc is_rvc i pmpcfg0 pmar0 misa0
+    iIntros (σ) "Hsi".
+    iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0
                  Hpmp Hpma_all HmisaC
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr") as %Hlift.
-    iDestruct (dispatchInterrupt_none_from_regs σ ns κs nt misa0 ms0 HmisaS HmIE
+    iDestruct (dispatchInterrupt_none_from_regs σ misa0 ms0 HmisaS HmIE
                  with "Hsi Hmisa Hmstatus") as %Hdisp.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σ.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σ.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σ.
     iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
-    iMod ("H" $! σ ns κs nt Lpc
+    iMod ("H" $! σ Lpc
             with "Hpriv Hmstatus Hpmpc [$Hreg $Hmem]")
       as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.

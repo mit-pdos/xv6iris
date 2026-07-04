@@ -224,6 +224,7 @@ End ExecSRET.
 (* ===================================================================== *)
 Section WpSretGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
 
   (* ------------------------------------------------------------------- *)
@@ -307,7 +308,7 @@ Section WpSretGpr.
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom (fun _ => Hgeom2) Hpmp
               Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
+    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.

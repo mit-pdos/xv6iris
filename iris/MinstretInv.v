@@ -27,6 +27,7 @@ Local Open Scope Z_scope.
 
 Section MinstretInv.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Definition minstretN : namespace := nroot .@ "minstret".
 
@@ -74,22 +75,22 @@ Section MinstretInv.
   Lemma wp_exec_step_minstret E Ei Φ :
     ↑minstretN ⊆ E →
     minstret_inv -∗
-    (∀ σ ns κs nt, state_interp σ ns κs nt -∗ minstret_inv_body
+    (∀ σ, mstate_interp σ -∗ minstret_inv_body
          ={E ∖ ↑minstretN, Ei}=∗
        ∃ σ', ⌜exec riscv_step σ = Some (tt, σ')⌝ ∗
           ▷ (|={Ei, E ∖ ↑minstretN}=>
-               state_interp σ' (S ns) κs nt ∗ minstret_inv_body ∗
+               mstate_interp σ' ∗ minstret_inv_body ∗
                WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros (HN) "#Hinv H".
     iApply wp_exec_step.
-    iIntros (σ ns κs nt) "Hsi".
+    iIntros (σ) "Hsi".
     (* open the minstret invariant ([={E, E∖↑minstretN}]); the caller's fupd
        supplies [={E∖↑minstretN, Ei}], and a [fupd_mask_intro] bridges [Ei→∅] to
        meet [wp_exec_step]'s [={E,∅}] obligation. *)
     iInv "Hinv" as ">Hbody" "Hclose".
-    iMod ("H" $! σ ns κs nt with "Hsi Hbody") as (σ') "[%Hexec Hk]".
+    iMod ("H" $! σ with "Hsi Hbody") as (σ') "[%Hexec Hk]".
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
     iExists σ'. iSplit; first done.
     iNext.
@@ -134,13 +135,13 @@ Section MinstretInv.
     ↑minstretN ⊆ E →
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ ns κs nt,
-       state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+    (∀ σ,
+       mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (retval : mword 32) (s_exec : mstate),
          ⌜ exec (run_hart_active 0) σ
              = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
          PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
@@ -148,7 +149,7 @@ Section MinstretInv.
   Proof.
     iIntros (HN) "#Hinv Hhs H".
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) Φ HN with "Hinv").
-    iIntros (σ ns κs nt) "[Hreg Hmem] Hbody".
+    iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
     (* should_inc returns SOME [b]; we neither know nor care which *)
@@ -156,9 +157,9 @@ Section MinstretInv.
                 (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
     (* PRE: minstret_increment := b (cell borrowed from the invariant) *)
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) ns κs nt with "[Hreg Hmem]")
+    iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
       as (retval s_exec) "(%Hha & Hpc & [Hreg Hmem] & Hcont)".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     (* wrapper's post-step reads, off the still-owned counter cells *)
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_exec.
     iDestruct (reg_valid with "Hreg Hmi") as %Hmi_exec.
@@ -186,7 +187,7 @@ Section MinstretInv.
         exact (exec_riscv_step_hart_active σ s_exec retval true
                  Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
       iNext.  (* strips HWP's later in lock-step with the step's later *)
-      iModIntro. cbn [sregs mem]. rewrite Hmst_tick.
+      iModIntro. rewrite /mstate_interp. cbn [sregs mem]. rewrite Hmst_tick.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists (add_vec_int mst 1), true. iFrame. }
@@ -196,7 +197,7 @@ Section MinstretInv.
         exact (exec_riscv_step_hart_active σ s_exec retval false
                  Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
       iNext.
-      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iModIntro. rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists mst, false. iFrame. }
       iExact "HWP".

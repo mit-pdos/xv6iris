@@ -112,26 +112,40 @@ Qed.
 
 Section WPExec.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
+  (* The single per-hart framing point: [wp_lift_step] hands us the GLOBAL
+     [state_interp] (all harts' register bridges + shared memory); we focus the
+     ambient hart [cpu_id]'s bridge via [gregs_interp_acc], run one step against
+     that hart's [mstate] view, and restore the global bridge afterwards.  Every
+     leaf WP is written in terms of the single-hart [mstate_interp] and never
+     sees [gregs]. *)
   Lemma wp_exec_step E Φ :
-    (∀ σ ns κs nt, state_interp σ ns κs nt ={E,∅}=∗
+    (∀ σ, mstate_interp σ ={E,∅}=∗
        ∃ σ', ⌜exec riscv_step σ = Some (tt, σ')⌝ ∗
-          ▷ (|={∅,E}=> state_interp σ' (S ns) κs nt ∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))
+          ▷ (|={∅,E}=> mstate_interp σ' ∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))
     ⊢ WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
-    iIntros (σ ns κ κs nt) "Hσ".
-    iMod ("H" with "Hσ") as (σ') "[%Hexec H]".
+    iIntros (g ns κ κs nt) "[Hgr Hmem]".
+    iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
+    iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem)) with "[Hri Hmem]") as (σ') "[%Hexec Hk]".
+    { rewrite /mstate_interp /=. iFrame "Hri Hmem". }
     pose proof (exec_run_det _ _ _ _ Hexec) as [Hrun Huniq].
     iModIntro. iSplitR.
-    { iPureIntro. exists [], Loop, σ', []. red.
-      split; [done|]. split; [done|]. split; [done|]. split; [done|].
-      exists tt. exact Hrun. }
-    iIntros (e2 σ2 efs Hstep) "!>".
-    destruct Hstep as (_ & -> & _ & -> & u & Hr2).
-    destruct (Huniq _ _ Hr2) as [_ ->].
-    iMod "H" as "[$ $]". iIntros "_ !>". done.
+    { iPureIntro.
+      exists [], (LoopE cpu_id),
+             (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem)), []. red.
+      exists cpu_id. split; [done|]. split; [done|]. split; [done|]. split; [done|].
+      exists tt, σ'. split; [exact Hrun|done]. }
+    iIntros (e2 g2 efs Hstep) "!>".
+    destruct Hstep as (cpu2 & Hcpu2 & -> & _ & -> & u2 & σ2' & Hrun2 & ->).
+    injection Hcpu2 as <-.
+    destruct (Huniq _ _ Hrun2) as [_ ->].
+    iMod "Hk" as "[[Hri' Hmem'] HWP]".
+    iDestruct ("Hclose" with "Hri'") as "Hgr'".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' HWP".
   Qed.
 
 End WPExec.
@@ -442,6 +456,7 @@ Qed.
 (* [exec_riscv_step_hart_active]. *)
 Section WPHartActive.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Lemma wp_exec_step_hart_active E Φ
       (mst : mword 64) (mi_old : bool) (opc : mword 64) :
@@ -449,12 +464,12 @@ Section WPHartActive.
     minstret ↦ᵣ mst -∗
     (R_bool minstret_increment) ↦ᵣ mi_old -∗
     PC ↦ᵣ opc -∗
-    (∀ σ ns κs nt,
-       state_interp σ ns κs nt ={E}=∗
+    (∀ σ,
+       mstate_interp σ ={E}=∗
        ∃ (retval : mword 32) (s_exec : mstate),
          ⌜ exec (run_hart_active 0) σ
              = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (∀ (mst' : mword 64) (mi' : bool),
           hart_state ↦ᵣ HART_ACTIVE tt -∗
           minstret ↦ᵣ mst' -∗
@@ -465,18 +480,18 @@ Section WPHartActive.
   Proof.
     iIntros "Hhs Hmst Hmi Hpc H".
     iApply wp_exec_step.
-    iIntros (s ns κs nt) "[Hreg Hmem]".
+    iIntros (s) "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hhs") as %Lhs.
     (* [should_inc] returns SOME [b]; we neither know nor care which *)
     destruct (exec_should_inc_minstret_Some
                 (register_lookup cur_privilege s.(sregs)) s) as [b Hsi].
     (* PRE: minstret_increment := b; the caller's [σ] is this post-update state *)
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod ("H" $! (set_reg s (R_bool minstret_increment) b) ns κs nt with "[Hreg Hmem]")
+    iMod ("H" $! (set_reg s (R_bool minstret_increment) b) with "[Hreg Hmem]")
       as (retval s_exec) "(%Hha & [Hreg Hmem] & Hcont)".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     (* the wrapper's post-step reads, recovered from the still-owned points-to
-       against the returned [state_interp s_exec] -- no caller-side equalities *)
+       against the returned [mstate_interp s_exec] -- no caller-side equalities *)
     iDestruct (reg_valid with "Hreg Hhs") as %Hhart_exec.
     iDestruct (reg_valid with "Hreg Hmi") as %Hmi_exec.
     assert (Hhart_a :
@@ -505,10 +520,10 @@ Section WPHartActive.
     destruct b.
     - iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst")
         as "[Hreg Hmst]".
-      iMod "Hcl" as "_". iModIntro. cbn [sregs mem]. rewrite Hmst_tick.
+      iMod "Hcl" as "_". iModIntro. rewrite /mstate_interp. cbn [sregs mem]. rewrite Hmst_tick.
       unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iApply ("Hcont" $! (add_vec_int mst 1) true with "Hhs Hmst Hmi Hpc").
-    - iMod "Hcl" as "_". iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+    - iMod "Hcl" as "_". iModIntro. rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iApply ("Hcont" $! mst false with "Hhs Hmst Hmi Hpc").
   Qed.
 

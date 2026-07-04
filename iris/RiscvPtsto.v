@@ -1,6 +1,6 @@
 (* RiscvPtsto.v -- riscvGS, register/memory points-to, the regstate/heap bridge. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics finite.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
@@ -65,15 +65,25 @@ Qed.
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_invGS :: invGS Σ;
   riscv_regGS :: ghost_mapG Σ register (sigT type_of_register);
-  riscv_reg_name : gname;
+  (* one register-map ghost name PER hart.  A [ghost_map] element on
+     [cpu_reg_name c] owns a register of hart [c].  The function is total (every
+     [CPU] is a real hart) and its per-hart authoritative maps are threaded by
+     [gregs_interp] below. *)
+  cpu_reg_name : CPU -> gname;
   riscv_memGS :: gen_heapGS Arch.pa (bv 8) Σ;
 }.
 
-(* register points-to: [r |->r v] owns register [r] holding [v].  Backed by a
-   [ghost_map] element on the register map [riscv_reg_name]. *)
-Definition reg_pointsto `{!riscvGS Σ} (r : register) (dq : dfrac)
+(* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
+   what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks
+   about, so those keep their single-CPU spelling: which hart they concern is
+   selected by the surrounding [CpuId] instance, never written out. *)
+Definition reg_name `{!riscvGS Σ} `{CpuId} : gname := cpu_reg_name cpu_id.
+
+(* register points-to: [r |->r v] owns register [r] (of the ambient hart)
+   holding [v].  Backed by a [ghost_map] element on [reg_name]. *)
+Definition reg_pointsto `{!riscvGS Σ} `{CpuId} (r : register) (dq : dfrac)
     (v : type_of_register r) : iProp Σ :=
-  ghost_map_elem riscv_reg_name r dq (existT r v).
+  ghost_map_elem reg_name r dq (existT r v).
 
 Notation "r ↦ᵣ{ dq } v" := (reg_pointsto r dq v)
   (at level 20, format "r  ↦ᵣ{ dq }  v") : bi_scope.
@@ -122,20 +132,59 @@ Definition reg_agree (m : gmap register (sigT type_of_register))
     (rs : regstate) : Prop :=
   forall r dv, m !! r = Some dv -> dv = existT r (register_lookup r rs).
 
-Definition reg_interp `{!riscvGS Σ} (rs : regstate) : iProp Σ :=
-  (∃ m, ghost_map_auth riscv_reg_name 1 m ∗ ⌜reg_agree m rs⌝)%I.
+(* the register bridge for a GIVEN hart's ghost name [γ]. *)
+Definition reg_interp_at `{!riscvGS Σ} (γ : gname) (rs : regstate) : iProp Σ :=
+  (∃ m, ghost_map_auth γ 1 m ∗ ⌜reg_agree m rs⌝)%I.
+
+(* the bridge for the AMBIENT hart -- what the WPs manipulate.  Original arity
+   ([rs] only): the hart is [cpu_id], carried by [reg_name]. *)
+Definition reg_interp `{!riscvGS Σ} `{CpuId} (rs : regstate) : iProp Σ :=
+  reg_interp_at reg_name rs.
+
+(* one hart's view (its registers + the shared memory); the single-CPU
+   [state_interp σ ns κs nt] of the leaf lemmas is replaced by [mstate_interp σ]. *)
+Definition mstate_interp `{!riscvGS Σ} `{CpuId} (σ : mstate) : iProp Σ :=
+  (reg_interp σ.(sregs) ∗ gen_heap_interp σ.(mem))%I.
+
+(* the GLOBAL register bridge: one authoritative map per hart, over the whole
+   finite [CPU] set.  [gregs] is a total function, so there is no membership
+   side condition -- [gregs_interp_acc] focuses any [cpu_id] unconditionally. *)
+Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
+  ([∗ set] cpu ∈ (fin_to_set CPU : gset CPU), reg_interp_at (cpu_reg_name cpu) (gr cpu))%I.
 
 (* ---------------------------------------------------------------------- *)
-(* 3. irisGS instance: state_interp = (register bridge) * (memory heap).   *)
+(* 3. irisGS instance: state_interp = (per-hart register bridges) * memory. *)
 (* ---------------------------------------------------------------------- *)
 
 Global Program Instance riscv_irisGS `{!riscvGS Σ} : irisGS riscv_lang Σ := {
   iris_invGS := riscv_invGS;
-  state_interp s _ _ _ := (reg_interp s.(sregs) ∗ gen_heap_interp s.(mem))%I;
+  state_interp g _ _ _ := (gregs_interp g.(gregs) ∗ gen_heap_interp g.(gmem))%I;
   fork_post _ := True%I;
   num_laters_per_step _ := 0%nat;
 }.
 Next Obligation. intros. iIntros "H". by iModIntro. Qed.
+
+(* Focus the ambient hart's register bridge out of the global one, with a
+   frame-preserving update handle to put an updated bridge back.  This is the
+   single point where per-hart framing happens; leaf WPs never see it. *)
+Lemma gregs_interp_acc `{!riscvGS Σ} `{CpuId} (gr : CPU -> regstate) :
+  gregs_interp gr ⊢ reg_interp (gr cpu_id) ∗
+    (∀ rs', reg_interp rs' -∗ gregs_interp (<[cpu_id := rs']> gr)).
+Proof.
+  rewrite /gregs_interp /reg_interp /reg_name.
+  iIntros "H".
+  iDestruct (big_sepS_delete _ _ cpu_id with "H") as "[Hcur Hrest]";
+    [ apply elem_of_fin_to_set |].
+  iFrame "Hcur".
+  iIntros (rs') "Hrs'".
+  iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
+  rewrite /insert /greg_insert decide_True //.
+  iFrame "Hrs'".
+  iApply (big_sepS_mono with "Hrest").
+  intros cpu Hcpu. apply elem_of_difference in Hcpu as [_ Hne].
+  rewrite decide_False; [ done | ].
+  intros ->. apply Hne, elem_of_singleton. reflexivity.
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. Bridge lemmas.                                                       *)
@@ -143,12 +192,13 @@ Next Obligation. intros. iIntros "H". by iModIntro. Qed.
 
 Section Bridge.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* reading a register cell agrees with the model's [register_lookup]. *)
   Lemma reg_valid rs r v :
     reg_interp rs -∗ r ↦ᵣ v -∗ ⌜register_lookup r rs = v⌝.
   Proof.
-    rewrite /reg_pointsto /reg_interp.
+    rewrite /reg_pointsto /reg_interp /reg_interp_at.
     iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
     iDestruct (ghost_map_lookup with "Hm Hr") as %Hlk.
     iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
@@ -159,7 +209,7 @@ Section Bridge.
     reg_interp rs -∗ r ↦ᵣ v ==∗
       reg_interp (register_set r v' rs) ∗ r ↦ᵣ v'.
   Proof.
-    rewrite /reg_pointsto /reg_interp.
+    rewrite /reg_pointsto /reg_interp /reg_interp_at.
     iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
     iMod (ghost_map_update (existT r v') with "Hm Hr") as "[Hm $]".
     iModIntro. iExists (<[r := existT r v']> m). iFrame "Hm".
@@ -177,7 +227,7 @@ Section Bridge.
   Lemma reg_valid_dq rs r dq v :
     reg_interp rs -∗ reg_pointsto r dq v -∗ ⌜register_lookup r rs = v⌝.
   Proof.
-    rewrite /reg_pointsto /reg_interp.
+    rewrite /reg_pointsto /reg_interp /reg_interp_at.
     iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
     iDestruct (ghost_map_lookup with "Hm Hr") as %Hlk.
     iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).

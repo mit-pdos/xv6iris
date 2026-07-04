@@ -217,6 +217,7 @@ Qed.
 (* ====================================================================== *)
 Section WpLogicRTypeGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma wp_or_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
@@ -240,7 +241,7 @@ Section WpLogicRTypeGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -314,7 +315,7 @@ Section WpLogicRTypeGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -388,7 +389,7 @@ Section WpLogicRTypeGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, XOR)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -464,7 +465,7 @@ Section WpLogicRTypeGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -531,6 +532,7 @@ End WpLogicRTypeGpr.
 (* ====================================================================== *)
 Section WpLogicITypeGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma wp_ori_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5)
@@ -554,7 +556,7 @@ Section WpLogicITypeGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -624,7 +626,7 @@ Section WpLogicITypeGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -694,7 +696,7 @@ Section WpLogicITypeGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc false (ITYPE (imm, Regidx rs1, Regidx rd, XORI)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -749,6 +751,7 @@ End WpLogicITypeGpr.
 (* ====================================================================== *)
 Section WpLogicGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   (* `or x5, x6, x7` : rd=x5, rs1=x6, rs2=x7. *)
   Definition wp_or_x5_x6_x7 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) :=

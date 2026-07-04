@@ -581,6 +581,7 @@ End ForwardADDI.
 (* ====================================================================== *)
 Section WpFetchRVC.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma fetch_from_pts_minstret_RVC4
@@ -652,6 +653,7 @@ End WpFetchRVC.
 
 Section StepLUI.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Section CleanLUI.
@@ -692,6 +694,7 @@ End StepLUI.
 
 Section StepADD.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma addval_eq (s : mstate) (pc : mword 64) (b : bool) (v2 v10 : mword 64) :
@@ -746,6 +749,7 @@ End StepADD.
 
 Section StepMUL.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma mulprod_eq (s : mstate) (pc : mword 64) (b : bool) (a0 a1 : mword 64) :
@@ -888,6 +892,7 @@ End ForwardCSRR.
 
 Section WpFetchRVC2.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma fetch_from_pts_minstret_RVC2
@@ -969,6 +974,7 @@ End WpFetchRVC2.
 
 Section StepADDI.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma addival_eq (s : mstate) (pc : mword 64) (b : bool) (a1 : mword 64) :
@@ -1022,6 +1028,7 @@ End StepADDI.
 
 Section StepCSRR.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma mhartid_eq (s : mstate) (pc : mword 64) (b : bool) (v : mword 64) :
@@ -1074,6 +1081,7 @@ End StepCSRR.
 
 Section StepJAL2.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Section CleanJAL.

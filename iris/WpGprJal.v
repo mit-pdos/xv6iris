@@ -41,6 +41,7 @@ Qed.
 
 Section WpJalGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic JAL WP, built on
      [wp_instr] -- stated like [wp_auipc_gpr] (no source register) BUT it is a
@@ -77,7 +78,7 @@ Section WpJalGpr.
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
     iApply (wp_instr E Φ pc false (JAL (imm, Regidx rd)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -142,6 +143,7 @@ End WpJalGpr.
 (* Demonstration: ONE lemma [wp_jal_gpr] serves many link registers. *)
 Section WpJalGprDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Definition wp_jal_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 21) :=
     wp_jal_gpr E Φ pc (mword_of_int 1) imm.   (* jal x1, off *)
   Definition wp_jal_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 21) :=

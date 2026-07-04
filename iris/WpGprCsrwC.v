@@ -288,6 +288,7 @@ Qed.
 (* ====================================================================== *)
 Section WpCsrwGprNewC.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* ---- csrw mstatus (0x300): the continuation receives the RAW UNBUNDLED
      cells with the EXPLICIT legalized mstatus value, universally quantified
@@ -328,7 +329,7 @@ Section WpCsrwGprNewC.
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 HN Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hpriv Hms Hpmpc Hsi".
+    iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -406,7 +407,7 @@ Section WpCsrwGprNewC.
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 HN Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hpriv Hms Hpmpc Hsi".
+    iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hpmpc") as %Lcfg.
@@ -482,7 +483,7 @@ Section WpCsrwGprNewC.
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 HN Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hpriv Hms Hpmpc Hsi".
+    iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -563,7 +564,7 @@ Section WpCsrwGprNewC.
     iApply (wp_instr_config E Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 HN Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hpriv Hms Hpmpc Hsi".
+    iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hpmpc") as %Lcfg.

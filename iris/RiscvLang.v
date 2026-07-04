@@ -9,7 +9,7 @@
 (* ============================================================== *)
 
 From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics finite.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap.
 From iris.program_logic Require Import language weakestpre lifting.
@@ -130,26 +130,62 @@ Definition riscv_step : M unit :=
   Defs.bind (try_step 0%Z false) (fun _ : bool => Defs.returnm tt).
 
 (* ---------------------------------------------------------------------- *)
-(* 4. The argument-free language (same trivial Loop shape as before).      *)
+(* 3b. Multi-hart global state.                                             *)
+(*                                                                          *)
+(*   [CPU] is the FINITE type of valid HART ids -- every element is a real   *)
+(*   hart that is always present.  [gstate] stores one [regstate] per hart   *)
+(*   as a TOTAL function [CPU -> regstate] (no partiality, so no membership  *)
+(*   side conditions ever arise) together with the single shared byte        *)
+(*   memory.  An [mstate] is one hart's view: its own registers paired with  *)
+(*   the shared memory.                                                       *)
 (* ---------------------------------------------------------------------- *)
 
-Inductive mexpr := Loop.
+Definition NCPU : nat := 8.
+Definition CPU : Type := fin NCPU.
+
+Record gstate := GState {
+  gregs : CPU -> regstate;
+  gmem  : gmap Arch.pa (bv 8);
+}.
+
+(* pointwise update of a single hart's register file *)
+Global Instance greg_insert : Insert CPU regstate (CPU -> regstate) :=
+  fun cpu rs gr c => if decide (c = cpu) then rs else gr c.
+
+(* ---------------------------------------------------------------------- *)
+(* 4. The language.  The program [Loop] steps ONE hart forever; which hart   *)
+(*    is selected AMBIENTLY: the constructor [LoopE] carries the hart id and  *)
+(*    the [Loop] notation fills it in from the surrounding [CpuId] instance.  *)
+(*    Every WP therefore keeps the argument-free spelling [WP Loop {{...}}],  *)
+(*    while [prim_step] over [gstate] reads the selected hart's registers,    *)
+(*    pairs them with [gmem] to reconstruct that hart's [mstate], runs one    *)
+(*    [riscv_step], and writes the resulting registers and memory back.       *)
+(* ---------------------------------------------------------------------- *)
+
+Class CpuId := cpu_id : CPU.
+
+Inductive mexpr := LoopE (cpu : CPU).
 Definition mval := Empty_set.
 Definition mobs := Empty_set.
 Definition of_val (v : mval) : mexpr := match v with end.
 Definition to_val (_ : mexpr) : option mval := None.
 
+Notation Loop := (LoopE cpu_id).
+
 Definition prim_step
-    (e : mexpr) (s : mstate) (κ : list mobs)
-    (e' : mexpr) (s' : mstate) (efs : list mexpr) : Prop :=
-  e = Loop /\ e' = Loop /\ κ = [] /\ efs = [] /\ exists u, run riscv_step s u s'.
+    (e : mexpr) (g : gstate) (κ : list mobs)
+    (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
+  exists cpu, e = LoopE cpu /\ e' = LoopE cpu /\ κ = [] /\ efs = [] /\
+    exists (u : unit) (s' : mstate),
+      run riscv_step (MState (g.(gregs) cpu) g.(gmem)) u s' /\
+      g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem).
 
 Lemma riscv_lang_mixin : LanguageMixin of_val to_val prim_step.
 Proof.
   split.
   - intros [].
   - intros e v Hv. discriminate Hv.
-  - intros e s κ e' s' efs _. reflexivity.
+  - intros e s κ e' s' efs (cpu & -> & _). reflexivity.
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.

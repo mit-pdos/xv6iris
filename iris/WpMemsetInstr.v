@@ -168,6 +168,7 @@ Proof. intro Hpriv. decode_any s Hpriv. Qed.
 (* ===================================================================== *)
 Section WpMemsetInstr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* rvc constructors now target the ExecuteAs-EXPANDED base instruction:
      [instr pc true base], where [decname] decodes the compressed form i0 and
@@ -193,7 +194,7 @@ Section WpMemsetInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -217,7 +218,7 @@ Section WpMemsetInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
       iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -239,7 +240,7 @@ Section WpMemsetInstr.
     iSplitL "";
     [ iApply (instr_bytes_base pc w H2al Hnrvc);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
 
   (* Addresses are given as [KernelSyms.memset + offset]; the constructor names
      carry the concrete low-byte address in the relocated image (memset = 0xcba).

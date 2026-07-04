@@ -613,6 +613,7 @@ End ForwardLD.
 
 Section StepLD.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_step_ld (pc : mword 64) (w_l : mword 32) (imm_l : mword 12)
       (i_l : mword 5) (b1 : bool) (v : bv 64)
@@ -678,7 +679,7 @@ Section StepLD.
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
     iIntros "#Hinv Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
-    iIntros (s ns κs nt) "[Hreg Hmem] Hbody".
+    iIntros (s) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Lmisa.
     iDestruct (reg_valid_dq with "Hreg Hx2")    as %Lx2.

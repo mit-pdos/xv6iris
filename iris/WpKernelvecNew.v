@@ -178,6 +178,7 @@ Definition kv_m2 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
 (* ===================================================================== *)
 Section KvCell.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
   (* the 8-byte stack cell at address [a] currently holding [v] *)
   Definition kv_cell (a : mword 64) (v : bv 64) : iProp Σ :=
     ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ nth_byte v j)%I.
@@ -225,7 +226,7 @@ Definition kv_saved : gset regidx :=
    (kerneltrap saves and restores it), so it frames around the call --
    exactly as in the old axiom. *)
 Axiom kerneltrap_returns :
-  forall `{!riscvGS Σ}
+  forall `{!riscvGS Σ} `{CpuId}
     (m : gmap regidx (mword 64)) (spv rava : mword 64)
     (satp0 mstatus0 mie_v mdv0 menvcfg0 : mword 64)
     (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
@@ -278,6 +279,7 @@ Axiom kerneltrap_returns :
 
 Section WpKernelvecNew.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* =================================================================== *)
   (* Fraction choreography (the wp_start recipe): full raw cells <->     *)
@@ -415,7 +417,7 @@ Section WpKernelvecNew.
     iApply (wp_instr_s_tlbinv root_ppn E Φ pc false (JAL (imm, Regidx rd)) pmpcfg0 pmpaddr00 region_pte
               HN Hgeom (fun _ => Hgeom2) Hpmp Hpmpp Hpteregion Halignp
               with "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))

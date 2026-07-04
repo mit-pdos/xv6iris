@@ -49,6 +49,7 @@ Import Defs.
 
 Section WpIntrInv.
   Context `{!riscvGS Sig}.
+  Context `{CID : CpuId}.
 
   (* The mstatus fact set carried across the round trip: SIE=1 (interrupts
      enabled), MPRV=0, SXL=2, MXR=0, TSR=0.  Reused from WpIntrStep. *)
@@ -399,8 +400,8 @@ Section WpIntrInv.
         iDestruct "Hstval" as (stval_old) "Hstval".
         iDestruct "Hpc" as "[Hpcr Hnpc]".
         iApply (wp_exec_step_interrupt_inv E Φ HN with "Hinv Hhs").
-        iIntros (σ ns κs nt) "Hsi".
-        iDestruct (dispatch_S_from_regs σ ns κs nt misa0 mip_v mie_v mdv0 ms meip seip
+        iIntros (σ) "Hsi".
+        iDestruct (dispatch_S_from_regs σ misa0 mip_v mie_v mdv0 ms meip seip
                      HmisaS Hmm
                      with "Hsi Hmisa Hmip Hmeip Hseip Hmie Hmdl Hms") as %Hdisp0.
         rewrite Hdres in Hdisp0.

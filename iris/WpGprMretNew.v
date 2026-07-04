@@ -59,7 +59,7 @@ Qed.
    ghost register bridge is preserved by [register_set r v] with NO ghost
    update -- the agreement map is untouched.  This absorbs MRET's elp write
    (elp is persistently pinned, so no full-ownership cell exists to update). *)
-Lemma reg_interp_set_same `{!riscvGS Σ} (rs : regstate) (r : register)
+Lemma reg_interp_set_same `{!riscvGS Σ} `{CpuId} (rs : regstate) (r : register)
     (v : type_of_register r) :
   register_lookup r rs = v ->
   reg_interp rs -∗ reg_interp (register_set r v rs).
@@ -96,6 +96,7 @@ Qed.
 
 Section WpMretGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* wp_mret_gpr: the new-layer MRET WP.  Unbundled config premises with the
      mstatus value [ms_cur] explicit; premises mirror [wp_mret]'s execute
@@ -145,7 +146,7 @@ Section WpMretGpr.
       by (rewrite Hsup; vm_compute; reflexivity).
     iApply (wp_instr_config E Φ pc false (MRET tt) pmpcfg0 ms_cur HN Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv Hms Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hpriv Hms Hpmpc Hsi".
+    iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &

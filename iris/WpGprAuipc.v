@@ -37,6 +37,7 @@ Qed.
 
 Section WpAuipcGpr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic AUIPC WP, built on
      [wp_instr] -- stated exactly like [wp_addi_gpr] but with no source
@@ -64,7 +65,7 @@ Section WpAuipcGpr.
     iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr E Φ pc false (UTYPE (imm, Regidx rd, AUIPC)) pmpcfg0
               HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq) "Hsi".
+    iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).

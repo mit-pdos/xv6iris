@@ -440,6 +440,7 @@ Proof. intro Hpriv. decode_any s Hpriv. Qed.
 (* ===================================================================== *)
 Section WpStartInstr.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* PCs of the 34 instructions. *)
   Definition st_pc30 : mword 64 := mword_of_int (KernelSyms.start).
@@ -501,7 +502,7 @@ Section WpStartInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -527,7 +528,7 @@ Section WpStartInstr.
     iSplitL "";
     [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
       iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
       eexists; (split; [ apply decname; assumption
                        | split; [ vm_compute; reflexivity
                                 | intro; apply expname ] ]) ].
@@ -551,7 +552,7 @@ Section WpStartInstr.
     iSplitL "";
     [ iApply (instr_bytes_base pc w H2al Hnrvc);
       iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (? ? ? ?) "_"; iPureIntro; intros; apply decname; assumption ].
+    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
 
   Lemma st_instr30 :
     kernel_text -∗ instr st_pc30 true (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
@@ -1157,6 +1158,7 @@ Local Ltac st_unfold :=
 (* ===================================================================== *)
 Section WpStartThm.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   (* two halves of a register cell rejoin to the full cell. *)
   Lemma reg_half_join (r : register) (v : type_of_register r) :

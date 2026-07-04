@@ -1968,6 +1968,7 @@ End SFetchWalk.
 
 Section SmodeCoreIris.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Definition smode_config (dq : dfrac) : iProp Σ :=
     (hw_config ∗ minstret_inv ∗
@@ -2099,12 +2100,12 @@ Section SmodeCoreIris.
      misa.S (hw_config), the no-M-destined-pending mie/mideleg fact, and
      mstatus.SIE = 0. *)
   Lemma dispatchInterrupt_none_S_from_regs
-      (σ : mstate) ns κs nt (misa0 mstatus0 mie_v mdv0 : mword 64)
+      (σ : mstate) (misa0 mstatus0 mie_v mdv0 : mword 64)
       {dqm dqs dqi dqd : dfrac} :
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     misa ↦ᵣ{ dqm } misa0 -∗
     mstatus ↦ᵣ{ dqs } mstatus0 -∗
     mie ↦ᵣ{ dqi } mie_v -∗
@@ -2137,7 +2138,7 @@ Section SmodeCoreIris.
   (* NO state change.                                                     *)
   (* =================================================================== *)
   Lemma fetch_from_instr_bytes_s (root_ppn : mword 44)
-      (σ : mstate) ns κs nt (pc : mword 64) (r : FetchResult)
+      (σ : mstate) (pc : mword 64) (r : FetchResult)
       (satp0 mstatus0 misa0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
@@ -2151,7 +2152,7 @@ Section SmodeCoreIris.
     kv_fetch_geom pc ->
     (fetch_is_rvc r = false -> kv_fetch_geom (add_vec_int pc 2)) ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Supervisor -∗
     mstatus ↦ᵣ{ dqs } mstatus0 -∗
@@ -2359,7 +2360,7 @@ Section SmodeCoreIris.
     ↑minstretN ⊆ E →
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ ns κs nt, state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+    (∀ σ, mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (r : FetchResult) (i : instruction) (σf s_exec : mstate),
          ⌜ register_lookup cur_privilege σ.(sregs) = p ⌝ ∗
          ⌜ exec (dispatchInterrupt p) σ = Some (None, σ) ⌝ ∗
@@ -2386,7 +2387,7 @@ Section SmodeCoreIris.
           | _ => False
           end) ∗
          PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
@@ -2394,8 +2395,8 @@ Section SmodeCoreIris.
   Proof.
     iIntros (HN) "Hinv Hhs H".
     iApply (wp_exec_step_hart_active_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ ns κs nt) "Hsi".
-    iMod ("H" $! σ ns κs nt with "Hsi") as (r i σf s_exec)
+    iIntros (σ) "Hsi".
+    iMod ("H" $! σ with "Hsi") as (r i σf s_exec)
       "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: unreachable *) iDestruct "Hrest" as %[].
@@ -2426,7 +2427,7 @@ Section SmodeCoreIris.
   (* TLB-hit fact instead of M-mode's identity translation).              *)
   (* =================================================================== *)
   Lemma instr_lift_s (root_ppn : mword 44)
-      (σ : mstate) ns κs nt (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (σ : mstate) (pc : mword 64) (is_rvc : bool) (i : instruction)
       (satp0 mstatus0 misa0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
@@ -2440,7 +2441,7 @@ Section SmodeCoreIris.
     kv_fetch_geom pc ->
     (is_rvc = false -> kv_fetch_geom (add_vec_int pc 2)) ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Supervisor -∗
     mstatus ↦ᵣ{ dqs } mstatus0 -∗
@@ -2467,17 +2468,17 @@ Section SmodeCoreIris.
       "Hsi Hpc Hpriv Hms Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hinstr".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iDestruct (state_interp_reg_dq σ ns κs nt cur_privilege dqp Supervisor
+    iDestruct (state_interp_reg_dq σ cur_privilege dqp Supervisor
                  with "Hsi Hpriv") as %Lpriv.
-    iDestruct (state_interp_reg_dq σ ns κs nt misa dqm misa0
+    iDestruct (state_interp_reg_dq σ misa dqm misa0
                  with "Hsi Hmisa") as %Lmisa.
     assert (HgeomB' : fetch_is_rvc r = false -> kv_fetch_geom (add_vec_int pc 2))
       by (rewrite Hrvc; exact HgeomB).
-    iDestruct (fetch_from_instr_bytes_s root_ppn σ ns κs nt pc r satp0 mstatus0 misa0
+    iDestruct (fetch_from_instr_bytes_s root_ppn σ pc r satp0 mstatus0 misa0
                  pmpcfg0 pmpaddr00 pmar0 tlbvec
                  Hpma HmisaC HSXL0 Hmode Hasid Hvec Hgeom HgeomB' Hpmp
                  with "Hsi Hpc Hpriv Hms Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hbytes") as %Hfetch.
-    iDestruct ("Hdec" $! σ ns κs nt with "Hsi") as %Hdec0.
+    iDestruct ("Hdec" $! σ with "Hsi") as %Hdec0.
     specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)).
     destruct r as [e | w | h | erx].
     - iDestruct "Hbytes" as %[_ []].
@@ -2516,14 +2517,14 @@ Section SmodeCoreIris.
     tlb ↦ᵣ{ dqt } tlbvec -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
-    (∀ σ ns κs nt (Hpceq : register_lookup PC σ.(sregs) = pc),
-       state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (smode_config dq -∗
           satp ↦ᵣ{ dqsa } satp0 -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
@@ -2543,12 +2544,12 @@ Section SmodeCoreIris.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
     iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
-    iIntros (σ ns κs nt) "Hsi".
-    iDestruct (instr_lift_s root_ppn σ ns κs nt pc is_rvc i satp0 mstatus0 misa0
+    iIntros (σ) "Hsi".
+    iDestruct (instr_lift_s root_ppn σ pc is_rvc i satp0 mstatus0 misa0
                  pmpcfg0 pmpaddr00 pmar0 tlbvec
                  Hpma_all HmisaC HSXL Hmode Hasid Hvec Hgeom HgeomB Hpmp
                  with "Hsi Hpc Hpriv Hmstatus Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hinstr") as %Hlift.
-    iDestruct (dispatchInterrupt_none_S_from_regs σ ns κs nt misa0 mstatus0 mie_v mdv0
+    iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
                  HmisaS Hmm HSIE
                  with "Hsi Hmisa Hmstatus Hmiec Hmdlc") as %Hdisp.
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -2556,7 +2557,7 @@ Section SmodeCoreIris.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σ.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σ.
     iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
-    iMod ("H" $! σ ns κs nt Lpc with "[$Hreg $Hmem]")
+    iMod ("H" $! σ Lpc with "[$Hreg $Hmem]")
       as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     (* Reassemble [smode_config dq satp0] + the pmp/tlb cells for the caller's
@@ -2672,7 +2673,7 @@ Section SmodeCoreIris.
   Proof. apply tlb_inv_intro. Qed.
 
   Lemma fetch_from_instr_bytes_s_walk (root_ppn : mword 44)
-      (σ : mstate) ns κs nt (pc : mword 64) (r : FetchResult)
+      (σ : mstate) (pc : mword 64) (r : FetchResult)
       (satp0 mstatus0 misa0 menvcfg0 : mword 64) (region_pte : PMA_Region)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (pmar0 : list PMA_Region) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
@@ -2692,7 +2693,7 @@ Section SmodeCoreIris.
     matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte ->
     (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true ->
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    state_interp σ ns κs nt -∗
+    mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Supervisor -∗
     mstatus ↦ᵣ{ dqs } mstatus0 -∗
@@ -3004,14 +3005,14 @@ Section SmodeCoreIris.
     pte_super_bytes root_ppn dqb -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
-    (∀ σf ns κs nt (Hpceq : register_lookup PC σf.(sregs) = pc),
-       state_interp σf ns κs nt ={E ∖ ↑minstretN}=∗
+    (∀ σf (Hpceq : register_lookup PC σf.(sregs) = pc),
+       mstate_interp σf ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs))
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (smode_config dq -∗
           satp ↦ᵣ{ dqsa } satp0 -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
@@ -3038,14 +3039,14 @@ Section SmodeCoreIris.
     assert (HgeomB' : fetch_is_rvc r = false -> kv_fetch_geom (add_vec_int pc 2))
       by (rewrite Hrvc; exact HgeomB).
     iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
-    iIntros (σ ns κs nt) "Hsi".
-    iDestruct (fetch_from_instr_bytes_s_walk root_ppn σ ns κs nt pc r
+    iIntros (σ) "Hsi".
+    iDestruct (fetch_from_instr_bytes_s_walk root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 region_pte pmpcfg0 pmpaddr00 pmar0 tlbvec
                  Hpma_all HmisaC HSXL Hmode Hppn Hasid Hvec HPBMTE Hgeom HgeomB' Hpmp Hpmpp
                  Hmatchp0 Hptep Halignp
                  with "Hsi Hpc Hpriv Hmstatus Hsatp Htlb Hmenvc Hpmpc Hpmpa Hpma Hhtif Hmisa Hpbytes Hbytes")
       as %Hfetch.
-    iDestruct (dispatchInterrupt_none_S_from_regs σ ns κs nt misa0 mstatus0 mie_v mdv0
+    iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
                  HmisaS Hmm HSIE
                  with "Hsi Hmisa Hmstatus Hmiec Hmdlc") as %Hdisp.
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -3056,12 +3057,12 @@ Section SmodeCoreIris.
     iDestruct (reg_valid    with "Hreg Htlb")  as %Ltlb.
     (* the TLB FILL: the fetch's state change, performed on the ghost state *)
     iMod (reg_update _ tlb _ tlbfilled with "Hreg Htlb") as "[Hreg Htlb]".
-    set (σf := pw_filled root_ppn tlbvec σ : state riscv_lang).
+    set (σf := pw_filled root_ppn tlbvec σ : mstate).
     assert (Hσf : set_reg σ tlb tlbfilled = σf) by reflexivity.
     (* decode + landing-pad + Zca facts at the FILLED state σf *)
-    iAssert (state_interp σf ns κs nt) with "[Hreg Hmem]" as "Hsi".
+    iAssert (mstate_interp σf) with "[Hreg Hmem]" as "Hsi".
     { unfold σf, pw_filled, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iDestruct ("Hdec" $! σf ns κs nt with "Hsi") as %Hdec0.
+    iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σf.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σf.
@@ -3071,7 +3072,7 @@ Section SmodeCoreIris.
     assert (Lpc_σf : register_lookup PC σf.(sregs) = pc).
     { unfold σf, pw_filled, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
-    iMod ("H" $! σf ns κs nt Lpc_σf with "[$Hreg $Hmem]")
+    iMod ("H" $! σf Lpc_σf with "[$Hreg $Hmem]")
       as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -3143,14 +3144,14 @@ Section SmodeCoreIris.
     tlb_inv root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
-    (∀ σ ns κs nt (Hpceq : register_lookup PC σ.(sregs) = pc),
-       state_interp σ ns κs nt ={E ∖ ↑minstretN}=∗
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         state_interp s_exec ns κs nt ∗
+         mstate_interp s_exec ∗
          (smode_config dq -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
           pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
@@ -3169,8 +3170,8 @@ Section SmodeCoreIris.
       iApply (wp_instr_s_fill root_ppn E Φ pc is_rvc i satp0 pmpcfg0 pmpaddr00 region_pte tlbvec
                 HN Hppn Hvec5 Hgeom HgeomB Hpmp Hpmpp Hpteregion Halignp Hmode Hasid
                 with "Hsm Hsatp Hpmpc Hpmpa Htlb Hpbytes Hpc Hinstr").
-      iIntros (σf ns κs nt Hpceq) "Hsi".
-      iMod ("H" $! σf ns κs nt Hpceq with "Hsi") as (s_exec) "(Hexec & Hsi' & Hcont)".
+      iIntros (σf Hpceq) "Hsi".
+      iMod ("H" $! σf Hpceq with "Hsi") as (s_exec) "(Hexec & Hsi' & Hcont)".
       iModIntro. iExists s_exec. iFrame "Hexec Hsi'".
       iIntros "Hsm' Hsatp' Hpmpc' Hpmpa' Htlb' Hpbytes' Hpc'".
       iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' [Hsatp' Htlb' Hpbytes'] Hpc'").
@@ -3183,8 +3184,8 @@ Section SmodeCoreIris.
     - (* slot 5 RESIDENT: by consistency, the identity entry -> TLB hit *)
       iApply (wp_instr_s root_ppn E Φ pc is_rvc i satp0 pmpcfg0 pmpaddr00 tlbvec
                 HN Hmode Hasid Hvec5 Hgeom HgeomB Hpmp with "Hsm Hsatp Hpmpc Hpmpa Htlb Hpc Hinstr").
-      iIntros (σ ns κs nt Hpceq) "Hsi".
-      iMod ("H" $! σ ns κs nt Hpceq with "Hsi") as (s_exec) "(Hexec & Hsi' & Hcont)".
+      iIntros (σ Hpceq) "Hsi".
+      iMod ("H" $! σ Hpceq with "Hsi") as (s_exec) "(Hexec & Hsi' & Hcont)".
       iModIntro. iExists s_exec. iFrame "Hexec Hsi'".
       iIntros "Hsm' Hsatp' Hpmpc' Hpmpa' Htlb' Hpc'".
       iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' [Hsatp' Htlb' Hpbytes] Hpc'").
@@ -3258,6 +3259,7 @@ Qed.
 
 Section SmodeDemo.
   Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
 
   Definition kv_pc1 : mword 64 := mword_of_int (KernelSyms.kernelvec).
 
@@ -3286,7 +3288,7 @@ Section SmodeDemo.
     iSplitL "".
     - iApply (instr_bytes_rvc4 kv_pc1 kv_h1 kv_w1 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms.kernelvec) kv_w1 4 kv_pc1 eq_refl Hbytes with "Ht").
-    - iIntros (σ ns κs nt) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
       exists (C_ADDI16SP kv_imm1).
       split; [exact (kv_decode1 σ HmisaC) |].
       split; [vm_compute; reflexivity |].
