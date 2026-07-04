@@ -49,7 +49,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry.
-Require Import WpGpr WpGprAddi WpGprLoad WpGprStore WpGprJal WpGprRvc.
+Require Import WpGpr WpGprAddi WpGprLoad WpGprStore WpGprJal WpGprRvc WpGprRvcTor.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
 Local Open Scope Z_scope.
@@ -1293,6 +1293,37 @@ Proof.
            change (2 ^ 30) with 1073741824. rewrite Hd30. reflexivity.
         -- apply (proj1 (Z.bounded_iff_bits_nonneg 32 (bv_unsigned a) ltac:(lia) ltac:(lia))
                     ltac:(change (2 ^ 32) with 4294967296; lia) i ltac:(lia)).
+Qed.
+
+(* [uint] of a small offset from a base that does not wrap: used to turn the
+   RAM-ness of an access's LAST byte into the fit bound [uint a + 8 <= ram top]
+   that [ram_pmp_match] needs. *)
+Lemma uint_pa_add (a : mword 64) (j : nat) :
+  (uint a + Z.of_nat j < 18446744073709551616)%Z ->
+  uint (pa_add a j) = uint a + Z.of_nat j.
+Proof.
+  intro Hlt. rewrite !uint_unsigned in Hlt |- *.
+  unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  assert (Hj : bv_unsigned (mword_of_int (Z.of_nat j) : mword 64) = Z.of_nat j).
+  { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+    pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
+    assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+    split.
+    - apply Nat2Z.is_nonneg.
+    - apply Z.le_lt_trans with (bv_unsigned a + Z.of_nat j).
+      + rewrite <- (Z.add_0_l (Z.of_nat j)) at 1. apply Z.add_le_mono_r. exact Har.
+      + exact Hlt. }
+  rewrite Hj.
+  apply bv_wrap_small.
+  pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
+  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+  split.
+  - apply Z.add_nonneg_nonneg. exact Har. apply Nat2Z.is_nonneg.
+  - exact Hlt.
 Qed.
 
 
@@ -3608,6 +3639,192 @@ Section SmodeGprClients.
       iSplitR.
       { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
       iExact "Hfmap".
+  Qed.
+
+  (* ==================================================================== *)
+  (* RAM wrappers: the whole S-mode superpage-identity geometry (Sv39      *)
+  (* canonicality, VPN=svpn, identity translation, the gigapage masks) and *)
+  (* the store/load PMP match are DISCHARGED from the owned points-to      *)
+  (* (addr_is_ram, via [mem_ram] on bytes 0 and 7) using the ram_* lemmas. *)
+  (* Callers need only own the frame bytes + one "PMP covers RAM" fact     *)
+  (* ([pmpaddr00[0]*4 >= ram top]) and the sp-alignment; they no longer    *)
+  (* carry the per-address translation preconditions.                      *)
+  (* ==================================================================== *)
+
+  Lemma wp_csdsp_gpr_s_ram (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
+      (m : gmap regidx (mword 64)) (vold : bv 64)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (region_pte : PMA_Region) {dq : dfrac} :
+    let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
+    let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
+    let a8 := ea in
+    let pa := a8 in
+    ↑minstretN ⊆ E ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
+       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
+    (* the single "PMP TOR entry 0 covers all of RAM" config fact *)
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    is_aligned_vaddr (Virtaddr a8) 8 = true ->
+    is_aligned_paddr (Physaddr pa) 8 = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file m -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros imm ea a8 pa HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+      Hgeom Hpmp Hpmpp Hpteregion Halignp Hpmpcov HW Halign8 Hpalign8.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr Hbytes Hcont".
+    iAssert (⌜addr_is_ram pa⌝)%I as %Hr0.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr. rewrite pa_add_0 in Hr. iPureIntro. exact Hr. }
+    iAssert (⌜addr_is_ram (pa_add pa 7)⌝)%I as %Hr7.
+    { iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbytes") as "Hb7".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb7") as %Hr. iPureIntro. exact Hr. }
+    assert (Hlo : (ram_base <= uint pa)%Z) by (destruct Hr0 as [H _]; exact H).
+    assert (Hfit : (uint pa + 8 <= ram_base + ram_size)%Z).
+    { assert (Hnw : (uint pa + Z.of_nat 7 < 18446744073709551616)%Z).
+      { destruct Hr0 as [_ Hh]. unfold ram_base, ram_size in Hh. change (Z.of_nat 7) with 7. lia. }
+      pose proof (uint_pa_add pa 7 Hnw) as Heq.
+      destruct Hr7 as [_ Hhi7]. rewrite Heq in Hhi7. change (Z.of_nat 7) with 7 in Hhi7.
+      unfold ram_base, ram_size in *. lia. }
+    iApply (wp_csdsp_gpr_s root_ppn E Φ pc uimm rs2 (svpn_of a8) m vold
+              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hgeom Hpmp
+              (ram_canonical a8 Hr0) ltac:(reflexivity) (ram_ident root_ppn a8 Hr0)
+              (ram_mask a8 Hr0) (ram_svpn2 a8 Hr0) (ram_mvpn a8 Hr0) (ram_mppn a8 Hr0)
+              Hpmpp Hpteregion Halignp
+              (ram_pmp_match a8 (vec_access_dec pmpaddr00 0) Hlo Hfit Hpmpcov) HW Halign8 Hpalign8
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr Hbytes Hcont").
+  Qed.
+
+  Lemma wp_cldsp_gpr_s_ram (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (uimm : mword 6) (rd : mword 5)
+      (m : gmap regidx (mword 64)) (v : bv 64)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (region_pte : PMA_Region) {dq dqm : dfrac} :
+    let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
+    let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
+    let a8 := ea in
+    let pa := a8 in
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    kv_fetch_geom pc ->
+    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
+       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    is_aligned_vaddr (Virtaddr a8) 8 = true ->
+    is_aligned_paddr (Physaddr pa) 8 = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ{ dqm } nth_byte v j) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
+      pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
+      ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ{ dqm } nth_byte v j) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros imm ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+      Hgeom Hpmp Hpmpp Hpteregion Halignp Hpmpcov HR Halign8 Hpalign8.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr Hbytes Hcont".
+    iAssert (⌜addr_is_ram pa⌝)%I as %Hr0.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr. rewrite pa_add_0 in Hr. iPureIntro. exact Hr. }
+    iAssert (⌜addr_is_ram (pa_add pa 7)⌝)%I as %Hr7.
+    { iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbytes") as "Hb7".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb7") as %Hr. iPureIntro. exact Hr. }
+    assert (Hlo : (ram_base <= uint pa)%Z) by (destruct Hr0 as [H _]; exact H).
+    assert (Hfit : (uint pa + 8 <= ram_base + ram_size)%Z).
+    { assert (Hnw : (uint pa + Z.of_nat 7 < 18446744073709551616)%Z).
+      { destruct Hr0 as [_ Hh]. unfold ram_base, ram_size in Hh. change (Z.of_nat 7) with 7. lia. }
+      pose proof (uint_pa_add pa 7 Hnw) as Heq.
+      destruct Hr7 as [_ Hhi7]. rewrite Heq in Hhi7. change (Z.of_nat 7) with 7 in Hhi7.
+      unfold ram_base, ram_size in *. lia. }
+    iApply (wp_cldsp_gpr_s root_ppn E Φ pc uimm rd (svpn_of a8) m v
+              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
+              HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hgeom Hpmp
+              (ram_canonical a8 Hr0) ltac:(reflexivity) (ram_ident root_ppn a8 Hr0)
+              (ram_mask a8 Hr0) (ram_svpn2 a8 Hr0) (ram_mvpn a8 Hr0) (ram_mppn a8 Hr0)
+              Hpmpp Hpteregion Halignp
+              (ram_pmp_match a8 (vec_access_dec pmpaddr00 0) Hlo Hfit Hpmpcov) HR Halign8 Hpalign8
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr Hbytes Hcont").
   Qed.
 
 End SmodeGprClients.
