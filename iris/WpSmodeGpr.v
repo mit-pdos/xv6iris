@@ -1134,6 +1134,167 @@ Proof.
     + rewrite andb_false_r. reflexivity.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* RAM-range geometry for the S-mode gigapage identity map: the remaining  *)
+(* two per-address obligations that need [sdata_ppn_out]/[tlb_get_ppn_pw]  *)
+(* (the others -- ram_canonical, ram_svpn2, ram_mask, ram_mvpn,            *)
+(* svpn_of_unsigned -- live in RiscvExtras).  Together they let the S-mode *)
+(* load/store WPs discharge the whole superpage-identity geometry from an  *)
+(* owned points-to (addr_is_ram) instead of taking it as preconditions.    *)
+(* ---------------------------------------------------------------------- *)
+
+(* superpage mask fact, output-PPN side. *)
+Lemma ram_mppn (a : mword 64) :
+  addr_is_ram a ->
+  zero_extend' 44 (and_vec (sdata_ppn_out (svpn_of a)) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44).
+Proof.
+  intros _.
+  generalize (svpn_of a). intro vpn.
+  unfold sdata_ppn_out.
+  cbv [and_vec or_vec not_vec sign_extend' zero_extend' concat_vec subrange_vec_dec
+       Operators_mwords.sign_extend Operators_mwords.zero_extend Operators_mwords.exts_vec
+       Operators_mwords.extz_vec Operators_mwords.word_binop Operators_mwords.word_unop
+       Operators_mwords.with_word' SailStdpp.Values.with_word to_word get_word autocast].
+  cbn.
+  change (43 - 18 + 1) with 26.
+  change (17 - 0 + 1) with 18.
+  cbn.
+  change (Z.of_N (26 + 18)) with 44.
+  change ((26 + 18)%N) with 44%N.
+  cbn.
+  change (26 + 18) with 44.
+  cbn.
+  cbv [MachineWord.slice MachineWord.or MachineWord.and MachineWord.not MachineWord.zero_extend
+       MachineWord.sign_extend MachineWord.concat MachineWord.Z_to_word mword_of_int Values.mword_of_int].
+  apply bv_eq.
+  rewrite (@bv_zero_extend_unsigned 44 44 _ ltac:(lia)).
+  rewrite bv_and_unsigned.
+  rewrite (@bv_concat_unsigned 26 44 18 _ _ eq_refl).
+  rewrite bv_not_unsigned.
+  rewrite (@bv_zero_extend_unsigned 18 44 _ ltac:(lia)).
+  rewrite !bv_extract_unsigned.
+  rewrite !Z_to_bv_unsigned.
+  assert (Hb1 : bv_wrap 26 (bv_wrap (MachineWord.MachineWord.Z_idx 44) 524288 ≫ Z.of_N 18) = 2)
+    by (vm_compute; reflexivity).
+  rewrite Hb1.
+  assert (Hz : bv_wrap 18 (Z.lnot (bv_unsigned (zeros 18))) = 262143) by (vm_compute; reflexivity).
+  rewrite Hz.
+  rewrite Z.shiftr_0_r.
+  assert (Hsh : (2 ≪ Z.of_N 18) = 524288) by (vm_compute; reflexivity).
+  rewrite Hsh.
+  assert (Hrhs : bv_wrap (MachineWord.MachineWord.Z_idx 44) 524288 = 524288) by (vm_compute; reflexivity).
+  rewrite Hrhs.
+  apply Z.bits_inj'. intros i Hi.
+  rewrite Z.land_spec. rewrite Z.lor_spec.
+  rewrite (bv_wrap_spec 44 (Z.lnot 262143) i Hi).
+  rewrite (bv_wrap_spec 18 (bv_unsigned vpn) i Hi).
+  rewrite (Z.lnot_spec 262143 i ltac:(lia)).
+  change 262143 with (Z.ones 18).
+  rewrite (Z.testbit_ones_nonneg 18 i ltac:(lia) Hi).
+  change 524288 with (2 ^ 19).
+  rewrite (Z.pow2_bits_eqb 19 i ltac:(lia)).
+  destruct (Z.ltb_spec i 18) as [Hlt | Hge].
+  - replace (i <? 18) with true by (symmetry; apply Z.ltb_lt; lia).
+    replace (19 =? i) with false by (symmetry; apply Z.eqb_neq; lia).
+    cbn [negb]. rewrite !andb_false_r. reflexivity.
+  - rewrite (bool_decide_false (i < Z.of_N 18) ltac:(lia)).
+    replace (i <? 18) with false by (symmetry; apply Z.ltb_ge; lia).
+    cbn [negb]. rewrite andb_false_l. rewrite orb_false_r. rewrite andb_true_r.
+    destruct (Z.eqb_spec 19 i) as [He | Hne].
+    + rewrite (bool_decide_true (i < Z.of_N 44) ltac:(lia)). reflexivity.
+    + reflexivity.
+Qed.
+
+(* the gigapage identity translation: a RAM vaddr walks to itself. *)
+Lemma ram_ident (root_ppn : mword 44) (a : mword 64) :
+  addr_is_ram a ->
+  zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) (svpn_of a))
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub pagesize_bits 1) 0)) = a.
+Proof.
+  intros Hram. pose proof Hram as [Hlo Hhi]. rewrite uint_unsigned in Hlo, Hhi. unfold ram_base, ram_size in *.
+  rewrite tlb_get_ppn_pw. unfold sdata_ppn_out.
+  cbn [bits_of_virtaddr]. unfold pagesize_bits.
+  apply bv_eq. symmetry.
+  cbv [trunc vector_truncate slice or_vec and_vec sign_extend' zero_extend'
+       concat_vec subrange_vec_dec Operators_mwords.sign_extend Operators_mwords.zero_extend
+       Operators_mwords.exts_vec Operators_mwords.extz_vec
+       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
+       SailStdpp.Values.with_word autocast].
+  cbn.
+  change (12 - 1 - 0 + 1) with 12.
+  change (43 - 18 + 1) with 26.
+  change (17 - 0 + 1) with 18.
+  cbn.
+  change (Z.of_N (26 + 18)) with 44.
+  change ((26 + 18)%N) with 44%N.
+  change (Z.of_N (44 + 12)) with 56.
+  change ((44 + 12)%N) with 56%N.
+  cbn.
+  change (26 + 18) with 44.
+  change (44 + 12) with 56.
+  cbn.
+  cbv [MachineWord.slice MachineWord.or MachineWord.zero_extend MachineWord.concat
+       MachineWord.Z_to_word mword_of_int Values.mword_of_int].
+  rewrite (@bv_zero_extend_unsigned (44 + 12)%N 64 _ ltac:(lia)).
+  rewrite (@bv_concat_unsigned 44 (44 + 12) 12 _ _ eq_refl).
+  rewrite (@bv_concat_unsigned 26 (26 + 18) 18 _ _ eq_refl).
+  rewrite !bv_extract_unsigned.
+  rewrite !Z_to_bv_unsigned.
+  change (bv_unsigned (get_word (bits_of_virtaddr (Virtaddr a)))) with (bv_unsigned a).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
+  change (Z.of_N 0) with 0.
+  change (Z.of_N 18) with 18.
+  change (Z.of_N 12) with 12.
+  rewrite !Z.shiftr_0_r.
+  change (MachineWord.MachineWord.Z_idx (39 - 1 - 0 + 1)) with 39%N.
+  assert (Hconst : bv_wrap 26 (bv_wrap 44 524288 ≫ 18) ≪ 18 = 524288) by (vm_compute; reflexivity).
+  rewrite Hconst.
+  assert (E39 : bv_wrap 39 (bv_unsigned a) = bv_unsigned a).
+  { apply bv_wrap_small. assert (bv_modulus 39 = 549755813888) as -> by (vm_compute; reflexivity). lia. }
+  rewrite E39.
+  assert (E27 : bv_wrap 27 (bv_unsigned a ≫ 12) = bv_unsigned a ≫ 12).
+  { apply bv_wrap_small.
+    rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 12 ltac:(lia)). change (2 ^ 12) with 4096.
+    assert (bv_modulus 27 = 134217728) as -> by (vm_compute; reflexivity).
+    split. apply Z.div_pos. lia. lia. apply Z.div_lt_upper_bound. lia. lia. }
+  rewrite E27.
+  assert (Hd31 : bv_unsigned a / 2147483648 = 1).
+  { assert (1 <= bv_unsigned a / 2147483648) by (apply Z.div_le_lower_bound; lia).
+    assert (bv_unsigned a / 2147483648 < 2) by (apply Z.div_lt_upper_bound; lia). lia. }
+  assert (Hd30 : bv_unsigned a / 1073741824 = 2).
+  { assert (2 <= bv_unsigned a / 1073741824) by (apply Z.div_le_lower_bound; lia).
+    assert (bv_unsigned a / 1073741824 < 3) by (apply Z.div_lt_upper_bound; lia). lia. }
+  apply Z.bits_inj'. intros i Hi.
+  rewrite Z.lor_spec.
+  rewrite (Z.shiftl_spec _ 12 i Hi).
+  rewrite (bv_wrap_spec 12 (bv_unsigned a) i Hi).
+  destruct (Z.ltb_spec i 12) as [Hi12 | Hi12].
+  - rewrite (bool_decide_true (i < Z.of_N 12) ltac:(lia)). rewrite andb_true_l.
+    rewrite (Z.testbit_neg_r _ (i - 12) ltac:(lia)). rewrite orb_false_l. reflexivity.
+  - rewrite (bool_decide_false (i < Z.of_N 12) ltac:(lia)). rewrite andb_false_l. rewrite orb_false_r.
+    rewrite Z.lor_spec.
+    rewrite (bv_wrap_spec 18 (bv_unsigned a ≫ 12) (i - 12) ltac:(lia)).
+    rewrite (Z.shiftr_spec (bv_unsigned a) 12 (i - 12) ltac:(lia)).
+    replace (i - 12 + 12) with i by lia.
+    change 524288 with (2 ^ 19).
+    rewrite (Z.pow2_bits_eqb 19 (i - 12) ltac:(lia)).
+    destruct (Z.ltb_spec (i - 12) 18) as [Hlt | Hge].
+    + rewrite (bool_decide_true (i - 12 < Z.of_N 18) ltac:(lia)). rewrite andb_true_l.
+      replace (19 =? i - 12) with false by (symmetry; apply Z.eqb_neq; lia).
+      rewrite orb_false_l. reflexivity.
+    + rewrite (bool_decide_false (i - 12 < Z.of_N 18) ltac:(lia)). rewrite andb_false_l. rewrite orb_false_r.
+      destruct (Z.eqb_spec 19 (i - 12)) as [He | Hne].
+      * assert (i = 31) as -> by lia.
+        apply (proj2 (Z.testbit_true (bv_unsigned a) 31 ltac:(lia))).
+        change (2 ^ 31) with 2147483648. rewrite Hd31. reflexivity.
+      * assert (i = 30 \/ i >= 32) as [-> | Hge32] by lia.
+        -- apply (proj2 (Z.testbit_false (bv_unsigned a) 30 ltac:(lia))).
+           change (2 ^ 30) with 1073741824. rewrite Hd30. reflexivity.
+        -- apply (proj1 (Z.bounded_iff_bits_nonneg 32 (bv_unsigned a) ltac:(lia) ltac:(lia))
+                    ltac:(change (2 ^ 32) with 4294967296; lia) i ltac:(lia)).
+Qed.
+
 
 (* ===================================================================== *)
 (* Part A.3 -- S-mode LOAD read path (PMP R grant for (Load Data),        *)
