@@ -7,7 +7,7 @@
 From Stdlib Require Import Eqdep_dec ZArith Zquot Lia.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
+From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -716,7 +716,7 @@ Section InstrBytes.
     reg_pointsto r dq1 v1 -∗ reg_pointsto r dq2 v2 -∗ ⌜ v1 = v2 ⌝.
   Proof.
     rewrite /reg_pointsto. iIntros "H1 H2".
-    iDestruct (pointsto_agree with "H1 H2") as %Heq.
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Heq.
     iPureIntro. exact (Eqdep_dec.inj_pair2_eq_dec _ Decidable_eq_register _ r v1 v2 Heq).
   Qed.
 

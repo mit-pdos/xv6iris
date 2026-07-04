@@ -2,7 +2,7 @@
 From Stdlib Require Import Eqdep_dec ZArith Lia.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
+From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -56,19 +56,24 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. Ghost state: a register heap (dependent values) and a memory heap.   *)
+(* 1. Ghost state: a register map ([ghost_map]) and a memory heap           *)
+(*    ([gen_heap]).  The registers use [ghost_map] -- an explicitly-named   *)
+(*    authoritative gmap ([riscv_reg_name]) with per-key elements -- rather *)
+(*    than [gen_heap]; the byte memory keeps its [gen_heap].                *)
 (* ---------------------------------------------------------------------- *)
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_invGS :: invGS Σ;
-  riscv_regGS :: gen_heapGS register (sigT type_of_register) Σ;
+  riscv_regGS :: ghost_mapG Σ register (sigT type_of_register);
+  riscv_reg_name : gname;
   riscv_memGS :: gen_heapGS Arch.pa (bv 8) Σ;
 }.
 
-(* register points-to: [r |->r v] owns register [r] holding [v]. *)
+(* register points-to: [r |->r v] owns register [r] holding [v].  Backed by a
+   [ghost_map] element on the register map [riscv_reg_name]. *)
 Definition reg_pointsto `{!riscvGS Σ} (r : register) (dq : dfrac)
     (v : type_of_register r) : iProp Σ :=
-  pointsto (L:=register) (V:=sigT type_of_register) r dq (existT r v).
+  ghost_map_elem riscv_reg_name r dq (existT r v).
 
 Notation "r ↦ᵣ{ dq } v" := (reg_pointsto r dq v)
   (at level 20, format "r  ↦ᵣ{ dq }  v") : bi_scope.
@@ -118,7 +123,7 @@ Definition reg_agree (m : gmap register (sigT type_of_register))
   forall r dv, m !! r = Some dv -> dv = existT r (register_lookup r rs).
 
 Definition reg_interp `{!riscvGS Σ} (rs : regstate) : iProp Σ :=
-  (∃ m, gen_heap_interp m ∗ ⌜reg_agree m rs⌝)%I.
+  (∃ m, ghost_map_auth riscv_reg_name 1 m ∗ ⌜reg_agree m rs⌝)%I.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. irisGS instance: state_interp = (register bridge) * (memory heap).   *)
@@ -145,7 +150,7 @@ Section Bridge.
   Proof.
     rewrite /reg_pointsto /reg_interp.
     iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
-    iDestruct (gen_heap_valid with "Hm Hr") as %Hlk.
+    iDestruct (ghost_map_lookup with "Hm Hr") as %Hlk.
     iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
   Qed.
 
@@ -156,7 +161,7 @@ Section Bridge.
   Proof.
     rewrite /reg_pointsto /reg_interp.
     iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
-    iMod (gen_heap_update _ r _ (existT r v') with "Hm Hr") as "[Hm $]".
+    iMod (ghost_map_update (existT r v') with "Hm Hr") as "[Hm $]".
     iModIntro. iExists (<[r := existT r v']> m). iFrame "Hm".
     iPureIntro. intros k dv Hk.
     destruct (decide (k = r)) as [->|Hne].
@@ -174,7 +179,7 @@ Section Bridge.
   Proof.
     rewrite /reg_pointsto /reg_interp.
     iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
-    iDestruct (gen_heap_valid with "Hm Hr") as %Hlk.
+    iDestruct (ghost_map_lookup with "Hm Hr") as %Hlk.
     iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
   Qed.
 
@@ -186,7 +191,7 @@ Section Bridge.
 
   (* discard the fraction: turn an owned register cell into the persistent one. *)
   Lemma reg_pointsto_persist r dq v : reg_pointsto r dq v ==∗ r ↦ᵣ□ v.
-  Proof. rewrite /reg_pointsto. iIntros "Hr". by iMod (pointsto_persist with "Hr"). Qed.
+  Proof. rewrite /reg_pointsto. iIntros "Hr". by iMod (ghost_map_elem_persist with "Hr"). Qed.
 
   (* reading a memory byte (at ANY fraction) agrees with the byte heap. *)
   Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a dq b :
