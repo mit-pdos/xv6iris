@@ -63,16 +63,14 @@ Section WpIntrInv.
      whole.  hw_config / minstret_inv / kernel_text are persistent. *)
   Definition F_kv (root_ppn : mword 44) (svpn : mword 27)
       (m : gmap regidx (mword 64))
-      (satp0 menvcfg0 : mword 64)
+      (menvcfg0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (dqb : dfrac) : iProp Sig :=
+      : iProp Sig :=
     (hw_config ∗ minstret_inv ∗ kernel_text ∗
-     satp ↦ᵣ satp0 ∗
      menvcfg ↦ᵣ menvcfg0 ∗
      pmpcfg_n ↦ᵣ pmpcfg0 ∗
      pmpaddr_n ↦ᵣ pmpaddr00 ∗
      tlb_inv root_ppn ∗
-     pte_super_bytes root_ppn dqb ∗
      gpr_file m ∗
      (∃ w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : bv 64,
         ([∗ list] j ∈ seq 0 8, (pa_add ((((kv_sp1 m)))) j) ↦ₘ nth_byte w1 j) ∗
@@ -165,14 +163,11 @@ Section WpIntrInv.
      collapses to [pc0] under the instruction-alignment premise. *)
   Lemma kernelvec_handler_spec (root_ppn : mword 44) (svpn : mword 27)
       (m : gmap regidx (mword 64))
-      (satp0 menvcfg0 : mword 64)
+      (menvcfg0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dqb : dfrac} :
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+      (region_pte : PMA_Region) :
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     (* the walk's PTE read *)
     pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
     (forall pmar0, pma_allows_all pmar0 ->
@@ -277,36 +272,36 @@ Section WpIntrInv.
     zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn) (subrange_vec_dec (bits_of_virtaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))))) (Z.sub pagesize_bits 1) 0)) = (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))) ->
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))))) (uint (to_bits 64 8)) = PMP_Match ->
     ⊢ intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64)
-        (F_kv root_ppn svpn m satp0 menvcfg0 pmpcfg0 pmpaddr00 dqb).
+        (F_kv root_ppn svpn m menvcfg0 pmpcfg0 pmpaddr00).
   Proof.
-    intros Hmode Hasid HPBMTE Hpmm Hppn Hpmpp Hpteregion Halignp Hpmpf HW HR Hmask Hsvpn2 Hmvpn Hmppn Hlpe0
+    intros HPBMTE Hpmm Hpmpp Hpteregion Halignp Hpmpf HW HR Hmask Hsvpn2 Hmvpn Hmppn Hlpe0
       Hcanon1 Hvpn1 Hident1 Hrange1 Halv1 Hcanon2 Hvpn2 Hident2 Hrange2 Hcanon3 Hvpn3 Hident3 Hrange3 Hcanon4 Hvpn4 Hident4 Hrange4 Hcanon5 Hvpn5 Hident5 Hrange5 Hcanon6 Hvpn6 Hident6 Hrange6 Hcanon7 Hvpn7 Hident7 Hrange7 Hcanon8 Hvpn8 Hident8 Hrange8 Hcanon9 Hvpn9 Hident9 Hrange9 Hcanon10 Hvpn10 Hident10 Hrange10 Hcanon11 Hvpn11 Hident11 Hrange11 Hcanon12 Hvpn12 Hident12 Hrange12 Hcanon13 Hvpn13 Hident13 Hrange13 Hcanon14 Hvpn14 Hident14 Hrange14 Hcanon15 Hvpn15 Hident15 Hrange15 Hcanon16 Hvpn16 Hident16 Hrange16 Hcanon17 Hvpn17 Hident17 Hrange17.
     iModIntro. iIntros (elp_v ms pc0 mie_v mdv0 E Φ) "%HN %Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hstvec Hpc HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR).
-    iDestruct "HF" as "(#Hhw & #Hinv & #Htext & Hsatp & Hmenv & Hpmpc & Hpmpa & Htlbinv & Hpte & Hfile & Hwins)".
+    iDestruct "HF" as "(#Hhw & #Hinv & #Htext & Hmenv & Hpmpc & Hpmpa & Htlbinv & Hfile & Hwins)".
     iDestruct "Hwins" as (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17)
       "(Hw1 & Hw2 & Hw3 & Hw4 & Hw5 & Hw6 & Hw7 & Hw8 & Hw9 & Hw10 & Hw11 & Hw12 & Hw13 & Hw14 & Hw15 & Hw16 & Hw17)".
-    iApply (wp_kernelvec root_ppn svpn m satp0 (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
+    iApply (wp_kernelvec root_ppn svpn m (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
               pmpcfg0 pmpaddr00 region_pte w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 E Φ
-              HN Hmode Hasid
+              HN
               (trap_ms_SIE_false elp_v ms)
               (trap_ms_MPRV_false elp_v ms HMPRV0)
               (trap_ms_SXL_eq elp_v ms HSXL)
               Hmm HPBMTE
               (trap_ms_MXR_true elp_v ms HMXR)
-              Hpmm Hppn Hpmpp Hpteregion Halignp Hpmpf HW HR Hmask Hsvpn2 Hmvpn Hmppn
+              Hpmm Hpmpp Hpteregion Halignp Hpmpf HW HR Hmask Hsvpn2 Hmvpn Hmppn
               (trap_ms_TSR_false elp_v ms HTSR)
               (sret_newpriv_trap_ms elp_v ms)
               Hlpe0
               Hcanon1 Hvpn1 Hident1 Hrange1 Halv1 Hcanon2 Hvpn2 Hident2 Hrange2 Hcanon3 Hvpn3 Hident3 Hrange3 Hcanon4 Hvpn4 Hident4 Hrange4 Hcanon5 Hvpn5 Hident5 Hrange5 Hcanon6 Hvpn6 Hident6 Hrange6 Hcanon7 Hvpn7 Hident7 Hrange7 Hcanon8 Hvpn8 Hident8 Hrange8 Hcanon9 Hvpn9 Hident9 Hrange9 Hcanon10 Hvpn10 Hident10 Hrange10 Hcanon11 Hvpn11 Hident11 Hrange11 Hcanon12 Hvpn12 Hident12 Hrange12 Hcanon13 Hvpn13 Hident13 Hrange13 Hcanon14 Hvpn14 Hident14 Hrange14 Hcanon15 Hvpn15 Hident15 Hrange15 Hcanon16 Hvpn16 Hident16 Hrange16 Hcanon17 Hvpn17 Hident17 Hrange17
-              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc
-                    Hpc Hfile Htext Hpte Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
-    iIntros "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile Hpte
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc
+                    Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile
              Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     iEval (rewrite Hpc0) in "Hpc".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hstvec Hpc [-]").
     { iExists pc0. iFrame "Hsepc". }
-    iFrame "Hhw Hinv Htext Hsatp Hmenv Hpmpc Hpmpa Htlbinv Hpte Hfile".
+    iFrame "Hhw Hinv Htext Hmenv Hpmpc Hpmpa Htlbinv Hfile".
     iExists (m !!! Regidx (mword_of_int 1 : mword 5)), (m !!! Regidx (mword_of_int 3 : mword 5)), (m !!! Regidx (mword_of_int 5 : mword 5)), (m !!! Regidx (mword_of_int 6 : mword 5)), (m !!! Regidx (mword_of_int 7 : mword 5)), (m !!! Regidx (mword_of_int 10 : mword 5)), (m !!! Regidx (mword_of_int 11 : mword 5)), (m !!! Regidx (mword_of_int 12 : mword 5)), (m !!! Regidx (mword_of_int 13 : mword 5)), (m !!! Regidx (mword_of_int 14 : mword 5)), (m !!! Regidx (mword_of_int 15 : mword 5)), (m !!! Regidx (mword_of_int 16 : mword 5)), (m !!! Regidx (mword_of_int 17 : mword 5)), (m !!! Regidx (mword_of_int 28 : mword 5)), (m !!! Regidx (mword_of_int 29 : mword 5)), (m !!! Regidx (mword_of_int 30 : mword 5)), (m !!! Regidx (mword_of_int 31 : mword 5)).
     iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
   Qed.

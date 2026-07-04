@@ -1969,13 +1969,10 @@ End SFetchWalk.
 Section SmodeCoreIris.
   Context `{!riscvGS Σ}.
 
-  Definition smode_config (dq : dfrac) (satp0 : mword 64) : iProp Σ :=
+  Definition smode_config (dq : dfrac) : iProp Σ :=
     (hw_config ∗ minstret_inv ∗
      hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
      cur_privilege ↦ᵣ{ dq } Supervisor ∗
-     satp ↦ᵣ{ dq } satp0 ∗
-     ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
-     ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
      (∃ mstatus0 : mword 64,
         mstatus ↦ᵣ{ dq } mstatus0 ∗
         ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ ∗
@@ -1989,14 +1986,11 @@ Section SmodeCoreIris.
         ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝))%I.
 
   (* unbundle: expose the raw cells + the pure facts. *)
-  Lemma smode_config_unbundle (dq : dfrac) (satp0 : mword 64) :
-    smode_config dq satp0 -∗
+  Lemma smode_config_unbundle (dq : dfrac) :
+    smode_config dq -∗
     hw_config ∗ minstret_inv ∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
     cur_privilege ↦ᵣ{ dq } Supervisor ∗
-    satp ↦ᵣ{ dq } satp0 ∗
-    ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
-    ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
     (∃ mstatus0 : mword 64,
        mstatus ↦ᵣ{ dq } mstatus0 ∗
        ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ ∗
@@ -2011,9 +2005,7 @@ Section SmodeCoreIris.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* rebuild from raw cells + the pure facts (inverse of unbundle). *)
-  Lemma smode_config_rebuild (dq : dfrac) (satp0 mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+  Lemma smode_config_rebuild (dq : dfrac) (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -2023,18 +2015,15 @@ Section SmodeCoreIris.
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    satp ↦ᵣ{ dq } satp0 -∗
     mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    smode_config dq satp0.
+    smode_config dq.
   Proof.
-    iIntros (Hmode Hasid HSIE HMPRV HSXL Hmie HPBMTE)
-            "#Hhw #Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv".
-    iFrame "Hhw Hinv Hhs Hpriv Hsatp".
-    iSplitR; [iPureIntro; exact Hmode |].
-    iSplitR; [iPureIntro; exact Hasid |].
+    iIntros (HSIE HMPRV HSXL Hmie HPBMTE)
+            "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv".
+    iFrame "Hhw Hinv Hhs Hpriv".
     iSplitL "Hms".
     { iExists mstatus0. iFrame "Hms". iPureIntro. exact (conj HSIE (conj HMPRV HSXL)). }
     iSplitL "Hmie Hmdl".
@@ -2043,42 +2032,37 @@ Section SmodeCoreIris.
   Qed.
 
   (* fraction-generic split/combine (mirrors mmode_config_split/_combine). *)
-  Lemma smode_config_split (q : Qp) (satp0 : mword 64) :
-    smode_config (DfracOwn q) satp0 ⊢
-      smode_config (DfracOwn (q/2)) satp0 ∗ smode_config (DfracOwn (q/2)) satp0.
+  Lemma smode_config_split (q : Qp) :
+    smode_config (DfracOwn q) ⊢
+      smode_config (DfracOwn (q/2)) ∗ smode_config (DfracOwn (q/2)).
   Proof.
-    iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hsatp & %Hmode & %Hasid & Hmst & Hmie & Hmenv)".
+    iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
     iDestruct "Hmst" as (ms0) "(Hms & %HSIE & %HMPRV & %HSXL)".
     iDestruct "Hmie" as (mie_v mdv0) "(Hmi & Hmd & %Hmm)".
     iDestruct "Hmenv" as (menvcfg0) "(Hme & %HPBMTE)".
     iDestruct "Hhs" as "[Hhs1 Hhs2]".
     iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
-    iDestruct "Hsatp" as "[Hsatp1 Hsatp2]".
     iDestruct "Hms" as "[Hms1 Hms2]".
     iDestruct "Hmi" as "[Hmi1 Hmi2]".
     iDestruct "Hmd" as "[Hmd1 Hmd2]".
     iDestruct "Hme" as "[Hme1 Hme2]".
-    iSplitL "Hhs1 Hpriv1 Hsatp1 Hms1 Hmi1 Hmd1 Hme1".
-    - iFrame "Hhw Hinv Hhs1 Hpriv1 Hsatp1".
-      iSplitR; [iPureIntro; exact Hmode |].
-      iSplitR; [iPureIntro; exact Hasid |].
+    iSplitL "Hhs1 Hpriv1 Hms1 Hmi1 Hmd1 Hme1".
+    - iFrame "Hhw Hinv Hhs1 Hpriv1".
       iSplitL "Hms1". { iExists ms0. iFrame "Hms1 %". }
       iSplitL "Hmi1 Hmd1". { iExists mie_v, mdv0. iFrame "Hmi1 Hmd1 %". }
       iExists menvcfg0. iFrame "Hme1 %".
-    - iFrame "Hhw Hinv Hhs2 Hpriv2 Hsatp2".
-      iSplitR; [iPureIntro; exact Hmode |].
-      iSplitR; [iPureIntro; exact Hasid |].
+    - iFrame "Hhw Hinv Hhs2 Hpriv2".
       iSplitL "Hms2". { iExists ms0. iFrame "Hms2 %". }
       iSplitL "Hmi2 Hmd2". { iExists mie_v, mdv0. iFrame "Hmi2 Hmd2 %". }
       iExists menvcfg0. iFrame "Hme2 %".
   Qed.
 
-  Lemma smode_config_combine (q : Qp) (satp0 : mword 64) :
-    smode_config (DfracOwn (q/2)) satp0 -∗ smode_config (DfracOwn (q/2)) satp0 -∗
-    smode_config (DfracOwn q) satp0.
+  Lemma smode_config_combine (q : Qp) :
+    smode_config (DfracOwn (q/2)) -∗ smode_config (DfracOwn (q/2)) -∗
+    smode_config (DfracOwn q).
   Proof.
-    iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hsatp1 & %Hmode & %Hasid & Hmst1 & Hmie1 & Hmenv1)
-             (_ & _ & Hhs2 & Hpriv2 & Hsatp2 & _ & _ & Hmst2 & Hmie2 & Hmenv2)".
+    iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1 & Hmie1 & Hmenv1)
+             (_ & _ & Hhs2 & Hpriv2 & Hmst2 & Hmie2 & Hmenv2)".
     iDestruct "Hmst1" as (ms0) "(Hms1 & %HSIE & %HMPRV & %HSXL)".
     iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
     iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %<-.
@@ -2091,27 +2075,24 @@ Section SmodeCoreIris.
     iDestruct (reg_pointsto_agree with "Hme1 Hme2") as %<-.
     iCombine "Hhs1 Hhs2" as "Hhs".
     iCombine "Hpriv1 Hpriv2" as "Hpriv".
-    iCombine "Hsatp1 Hsatp2" as "Hsatp".
     iCombine "Hms1 Hms2" as "Hms".
     iCombine "Hmi1 Hmi2" as "Hmi".
     iCombine "Hmd1 Hmd2" as "Hmd".
     iCombine "Hme1 Hme2" as "Hme".
-    iFrame "Hhw Hinv Hhs Hpriv Hsatp".
-    iSplitR; [iPureIntro; exact Hmode |].
-    iSplitR; [iPureIntro; exact Hasid |].
+    iFrame "Hhw Hinv Hhs Hpriv".
     iSplitL "Hms". { iExists ms0. iFrame "Hms %". }
     iSplitL "Hmi Hmd". { iExists mie_v, mdv0. iFrame "Hmi Hmd %". }
     iExists menvcfg0. iFrame "Hme %".
   Qed.
 
-  Lemma smode_config_split_half (satp0 : mword 64) :
-    smode_config (DfracOwn 1) satp0 ⊢
-      smode_config (DfracOwn (1/2)) satp0 ∗ smode_config (DfracOwn (1/2)) satp0.
+  Lemma smode_config_split_half :
+    smode_config (DfracOwn 1) ⊢
+      smode_config (DfracOwn (1/2)) ∗ smode_config (DfracOwn (1/2)).
   Proof. apply smode_config_split. Qed.
 
-  Lemma smode_config_combine_half (satp0 : mword 64) :
-    smode_config (DfracOwn (1/2)) satp0 -∗ smode_config (DfracOwn (1/2)) satp0 -∗
-    smode_config (DfracOwn 1) satp0.
+  Lemma smode_config_combine_half :
+    smode_config (DfracOwn (1/2)) -∗ smode_config (DfracOwn (1/2)) -∗
+    smode_config (DfracOwn 1).
   Proof. apply smode_config_combine. Qed.
 
   (* dispatchInterrupt = None in S-mode, off owned (dfrac-generic) cells:
@@ -2520,13 +2501,16 @@ Section SmodeCoreIris.
   Lemma wp_instr_s (root_ppn : mword 44) E Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) (satp0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dq dqt : dfrac} :
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dq dqsa dqt : dfrac} :
     ↑minstretN ⊆ E →
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     vec_access_dec tlbvec 5 = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
     kv_fetch_geom pc ->
     (is_rvc = false -> kv_fetch_geom (add_vec_int pc 2)) ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
-    smode_config dq satp0 -∗
+    smode_config dq -∗
+    satp ↦ᵣ{ dqsa } satp0 -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb ↦ᵣ{ dqt } tlbvec -∗
@@ -2540,7 +2524,8 @@ Section SmodeCoreIris.
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          state_interp s_exec ns κs nt ∗
-         (smode_config dq satp0 -∗
+         (smode_config dq -∗
+          satp ↦ᵣ{ dqsa } satp0 -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
           pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
           tlb ↦ᵣ{ dqt } tlbvec -∗
@@ -2548,8 +2533,8 @@ Section SmodeCoreIris.
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hvec Hgeom HgeomB Hpmp) "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr H".
-    iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hsatp & %Hmode & %Hasid & Hmst & Hmie & Hmenv)".
+    iIntros (HN Hmode Hasid Hvec Hgeom HgeomB Hpmp) "Hsm Hsatp Hpmpc Hpmpa Htlb Hpc Hinstr H".
+    iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
     iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HSIE & %HMPRV & %HSXL)".
     iDestruct "Hmie" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
     iDestruct "Hmenv" as (menvcfg0) "(Hmenvc & %HPBMTE)".
@@ -2581,10 +2566,10 @@ Section SmodeCoreIris.
              ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
-      iApply ("Hcont" with "[- Hpc' Hpmpc Hpmpa Htlb] Hpmpc Hpmpa Htlb Hpc'").
-      iApply (smode_config_rebuild dq satp0 mstatus0 mie_v mdv0 menvcfg0
-                Hmode Hasid HSIE HMPRV HSXL Hmm HPBMTE
-                with "Hhw Hinv Hhs' Hpriv Hsatp Hmstatus Hmiec Hmdlc Hmenvc"). }
+      iApply ("Hcont" with "[- Hpc' Hsatp Hpmpc Hpmpa Htlb] Hsatp Hpmpc Hpmpa Htlb Hpc'").
+      iApply (smode_config_rebuild dq mstatus0 mie_v mdv0 menvcfg0
+                HSIE HMPRV HSXL Hmm HPBMTE
+                with "Hhw Hinv Hhs' Hpriv Hmstatus Hmiec Hmdlc Hmenvc"). }
     iDestruct "Hexec" as %Hexec.
     destruct is_rvc.
     - (* RVC: instr_lift_s gives F_RVC h decoding to i0 with the state-generic
@@ -2633,14 +2618,58 @@ Section SmodeCoreIris.
   (* contents.  S-mode WPs take [tlb_inv root_ppn] instead of an explicit *)
   (* tlbvec + slot facts, and hand it back re-established.                *)
   (* =================================================================== *)
+  (* SATP is READ-ONLY in S-mode execution and the single super-PTE is read *)
+  (* on every walk but never written, so both are folded INTO the invariant *)
+  (* at FULL fraction alongside the tlb cell + consistency.  satp0 is now    *)
+  (* EXISTENTIAL (its Sv39 mode / asid=0 / ppn=root_ppn facts are all that   *)
+  (* matters); [root_ppn] stays the parameter (clients + geometry name it).  *)
   Definition tlb_inv (root_ppn : mword 44) : iProp Σ :=
-    (∃ tlbvec : vec (option TLB_Entry) (2 ^ 6),
-       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_pt_consistent root_ppn tlbvec ⌝)%I.
+    (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+       satp ↦ᵣ satp0 ∗
+       ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+       ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
+       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_pt_consistent root_ppn tlbvec ⌝ ∗
+       pte_super_bytes root_ppn (DfracOwn 1))%I.
 
-  Lemma tlb_inv_intro (root_ppn : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  (* introduce from the raw pieces (satp + facts + tlb + consistency + pte). *)
+  Lemma tlb_inv_intro (root_ppn : mword 44) (satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_pt_consistent root_ppn tlbvec ->
-    tlb ↦ᵣ tlbvec -∗ tlb_inv root_ppn.
-  Proof. intros Hc. iIntros "Htlb". iExists tlbvec. iFrame "Htlb". iPureIntro. exact Hc. Qed.
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ pte_super_bytes root_ppn (DfracOwn 1) -∗
+    tlb_inv root_ppn.
+  Proof.
+    intros Hmode Hasid Hppn Hc. iIntros "Hsatp Htlb Hpte".
+    iExists satp0, tlbvec. iFrame "Hsatp Htlb Hpte". iPureIntro. tauto.
+  Qed.
+
+  (* open: expose satp cell + the three SATP facts + tlb cell + consistency  *)
+  (* + the owned super-PTE bytes.                                            *)
+  Lemma tlb_inv_open (root_ppn : mword 44) :
+    tlb_inv root_ppn -∗
+    ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+      satp ↦ᵣ satp0 ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
+      tlb ↦ᵣ tlbvec ∗ ⌜ tlb_pt_consistent root_ppn tlbvec ⌝ ∗
+      pte_super_bytes root_ppn (DfracOwn 1).
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* close: re-seal after a read/fill that preserves consistency and does    *)
+  (* not change satp / the pte bytes.                                        *)
+  Lemma tlb_inv_close (root_ppn : mword 44) (satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
+    tlb_pt_consistent root_ppn tlbvec ->
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ pte_super_bytes root_ppn (DfracOwn 1) -∗
+    tlb_inv root_ppn.
+  Proof. apply tlb_inv_intro. Qed.
 
   Lemma fetch_from_instr_bytes_s_walk (root_ppn : mword 44)
       (σ : mstate) ns κs nt (pc : mword 64) (r : FetchResult)
@@ -2952,7 +2981,7 @@ Section SmodeCoreIris.
       (pc : mword 64) (is_rvc : bool) (i : instruction) (satp0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (region_pte : PMA_Region)
-      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dq dqb : dfrac} :
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dq dqsa dqb : dfrac} :
     let tlbfilled := vec_update_dec tlbvec 5 (Some (pw_tlb_entry root_ppn (mword_of_int 0))) in
     ↑minstretN ⊆ E →
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
@@ -2965,7 +2994,10 @@ Section SmodeCoreIris.
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    smode_config dq satp0 -∗
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    smode_config dq -∗
+    satp ↦ᵣ{ dqsa } satp0 -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb ↦ᵣ tlbvec -∗
@@ -2980,7 +3012,8 @@ Section SmodeCoreIris.
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          state_interp s_exec ns κs nt ∗
-         (smode_config dq satp0 -∗
+         (smode_config dq -∗
+          satp ↦ᵣ{ dqsa } satp0 -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
           pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
           tlb ↦ᵣ tlbfilled -∗
@@ -2989,9 +3022,9 @@ Section SmodeCoreIris.
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (tlbfilled HN Hppn Hvec Hgeom HgeomB Hpmp Hpmpp Hpteregion Halignp)
-      "Hsm Hpmpc Hpmpa Htlb Hpbytes Hpc Hinstr H".
-    iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hsatp & %Hmode & %Hasid & Hmst & Hmie & Hmenv)".
+    iIntros (tlbfilled HN Hppn Hvec Hgeom HgeomB Hpmp Hpmpp Hpteregion Halignp Hmode Hasid)
+      "Hsm Hsatp Hpmpc Hpmpa Htlb Hpbytes Hpc Hinstr H".
+    iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
     iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HSIE & %HMPRV & %HSXL)".
     iDestruct "Hmie" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
     iDestruct "Hmenv" as (menvcfg0) "(Hmenvc & %HPBMTE)".
@@ -3046,10 +3079,10 @@ Section SmodeCoreIris.
              ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
-      iApply ("Hcont" with "[- Hpc' Hpmpc Hpmpa Htlb Hpbytes] Hpmpc Hpmpa Htlb Hpbytes Hpc'").
-      iApply (smode_config_rebuild dq satp0 mstatus0 mie_v mdv0 menvcfg0
-                Hmode Hasid HSIE HMPRV HSXL Hmm HPBMTE
-                with "Hhw Hinv Hhs' Hpriv Hsatp Hmstatus Hmiec Hmdlc Hmenvc"). }
+      iApply ("Hcont" with "[- Hpc' Hsatp Hpmpc Hpmpa Htlb Hpbytes] Hsatp Hpmpc Hpmpa Htlb Hpbytes Hpc'").
+      iApply (smode_config_rebuild dq mstatus0 mie_v mdv0 menvcfg0
+                HSIE HMPRV HSXL Hmm HPBMTE
+                with "Hhw Hinv Hhs' Hpriv Hmstatus Hmiec Hmdlc Hmenvc"). }
     iDestruct "Hexec" as %Hexec.
     destruct r as [e | w | h | erx].
     - iDestruct "Hbytes" as "[_ %Hbf]". done.
@@ -3092,11 +3125,10 @@ Section SmodeCoreIris.
   (* (walk), which become internal to this engine.                        *)
   (* =================================================================== *)
   Lemma wp_instr_s_tlbinv (root_ppn : mword 44) E Φ
-      (pc : mword 64) (is_rvc : bool) (i : instruction) (satp0 : mword 64)
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq dqb : dfrac} :
+      (region_pte : PMA_Region) {dq : dfrac} :
     ↑minstretN ⊆ E →
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     kv_fetch_geom pc ->
     (is_rvc = false -> kv_fetch_geom (add_vec_int pc 2)) ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
@@ -3105,11 +3137,10 @@ Section SmodeCoreIris.
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    smode_config dq satp0 -∗
+    smode_config dq -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb_inv root_ppn -∗
-    pte_super_bytes root_ppn dqb -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ ns κs nt (Hpceq : register_lookup PC σ.(sregs) = pc),
@@ -3120,41 +3151,45 @@ Section SmodeCoreIris.
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          state_interp s_exec ns κs nt ∗
-         (smode_config dq satp0 -∗
+         (smode_config dq -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
           pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
           tlb_inv root_ppn -∗
-          pte_super_bytes root_ppn dqb -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hppn Hgeom HgeomB Hpmp Hpmpp Hpteregion Halignp)
-      "Hsm Hpmpc Hpmpa Htlbinv Hpbytes Hpc Hinstr H".
-    iDestruct "Htlbinv" as (tlbvec) "[Htlb %Hcons]".
+    iIntros (HN Hgeom HgeomB Hpmp Hpmpp Hpteregion Halignp)
+      "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr H".
+    (* open the invariant: satp cell + the three SATP facts + tlb + pte bytes *)
+    iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes)".
     destruct (Hcons 5 ltac:(vm_compute; split; [discriminate | reflexivity])) as [Hvec5 | Hvec5].
     - (* slot 5 EMPTY: the walk engine; the fill preserves consistency *)
       iApply (wp_instr_s_fill root_ppn E Φ pc is_rvc i satp0 pmpcfg0 pmpaddr00 region_pte tlbvec
-                HN Hppn Hvec5 Hgeom HgeomB Hpmp Hpmpp Hpteregion Halignp
-                with "Hsm Hpmpc Hpmpa Htlb Hpbytes Hpc Hinstr").
+                HN Hppn Hvec5 Hgeom HgeomB Hpmp Hpmpp Hpteregion Halignp Hmode Hasid
+                with "Hsm Hsatp Hpmpc Hpmpa Htlb Hpbytes Hpc Hinstr").
       iIntros (σf ns κs nt Hpceq) "Hsi".
       iMod ("H" $! σf ns κs nt Hpceq with "Hsi") as (s_exec) "(Hexec & Hsi' & Hcont)".
       iModIntro. iExists s_exec. iFrame "Hexec Hsi'".
-      iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpbytes' Hpc'".
-      iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' [Htlb'] Hpbytes' Hpc'").
-      iExists (vec_update_dec tlbvec 5 (Some (pw_tlb_entry root_ppn (mword_of_int 0)))).
-      iFrame "Htlb'". iPureIntro.
-      exact (tlb_pt_consistent_fill root_ppn tlbvec 5
-               ltac:(vm_compute; split; [discriminate | reflexivity]) Hcons).
+      iIntros "Hsm' Hsatp' Hpmpc' Hpmpa' Htlb' Hpbytes' Hpc'".
+      iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' [Hsatp' Htlb' Hpbytes'] Hpc'").
+      iApply (tlb_inv_close root_ppn satp0
+                (vec_update_dec tlbvec 5 (Some (pw_tlb_entry root_ppn (mword_of_int 0))))
+                Hmode Hasid Hppn
+                (tlb_pt_consistent_fill root_ppn tlbvec 5
+                   ltac:(vm_compute; split; [discriminate | reflexivity]) Hcons)
+                with "Hsatp' Htlb' Hpbytes'").
     - (* slot 5 RESIDENT: by consistency, the identity entry -> TLB hit *)
       iApply (wp_instr_s root_ppn E Φ pc is_rvc i satp0 pmpcfg0 pmpaddr00 tlbvec
-                HN Hvec5 Hgeom HgeomB Hpmp with "Hsm Hpmpc Hpmpa Htlb Hpc Hinstr").
+                HN Hmode Hasid Hvec5 Hgeom HgeomB Hpmp with "Hsm Hsatp Hpmpc Hpmpa Htlb Hpc Hinstr").
       iIntros (σ ns κs nt Hpceq) "Hsi".
       iMod ("H" $! σ ns κs nt Hpceq with "Hsi") as (s_exec) "(Hexec & Hsi' & Hcont)".
       iModIntro. iExists s_exec. iFrame "Hexec Hsi'".
-      iIntros "Hsm' Hpmpc' Hpmpa' Htlb' Hpc'".
-      iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' [Htlb'] Hpbytes Hpc'").
-      iExists tlbvec. iFrame "Htlb'". iPureIntro. exact Hcons.
+      iIntros "Hsm' Hsatp' Hpmpc' Hpmpa' Htlb' Hpc'".
+      iApply ("Hcont" with "Hsm' Hpmpc' Hpmpa' [Hsatp' Htlb' Hpbytes] Hpc'").
+      iApply (tlb_inv_close root_ppn satp0 tlbvec Hmode Hasid Hppn Hcons
+                with "Hsatp' Htlb' Hpbytes").
   Qed.
 
 End SmodeCoreIris.

@@ -234,15 +234,12 @@ Section WpSretGpr.
   (* ------------------------------------------------------------------- *)
   Lemma wp_sret_gpr (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (pc : mword 64)
-      (satp0 mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dqb : dfrac} :
+      (region_pte : PMA_Region) :
     ↑minstretN ⊆ E ->
     (* S-mode config facts *)
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
-    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -266,7 +263,6 @@ Section WpSretGpr.
     minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
-    satp ↦ᵣ satp0 -∗
     mstatus ↦ᵣ mstatus0 -∗
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
@@ -274,14 +270,12 @@ Section WpSretGpr.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pmpaddr_n ↦ᵣ pmpaddr00 -∗
     tlb_inv root_ppn -∗
-    pte_super_bytes root_ppn dqb -∗
     sepc ↦ᵣ sepc0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc false (SRET tt) -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
-      satp ↦ᵣ satp0 -∗
       mstatus ↦ᵣ sret_ms5 mstatus0 -∗
       mie ↦ᵣ mie_v -∗
       mideleg ↦ᵣ mdv0 -∗
@@ -289,16 +283,15 @@ Section WpSretGpr.
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pmpaddr_n ↦ᵣ pmpaddr00 -∗
       tlb_inv root_ppn -∗
-      pte_super_bytes root_ppn dqb -∗
       sepc ↦ᵣ sepc0 -∗
       pc_is (sret_tgt sepc0) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hmode Hppn Hasid HSIE HMPRV HSXL Hmm HPBMTE Hgeom Hgeom2 Hpmp
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom Hgeom2 Hpmp
              Hpmpp Hpteregion Halignp HTSR Hsup Hlpe0)
-      "#Hhw #Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpbytes Hsepc
+      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc
        [Hpc Hnpc] Hfile Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -310,11 +303,11 @@ Section WpSretGpr.
               exec (get_xLPE (sret_newpriv mstatus0)) sz = Some (false, sz)).
     { intros sz Hm. rewrite Hsup. apply exec_get_xLPE_S. rewrite Hm. exact Hlpe0. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (SRET tt)
-              satp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hmode Hasid HSIE HMPRV HSXL Hmm HPBMTE Hppn Hgeom (fun _ => Hgeom2) Hpmp
+              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom (fun _ => Hgeom2) Hpmp
               Hpmpp Hpteregion Halignp
-              with "Hhw Hinv Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpbytes Hpc Hinstr").
-    iIntros (σ ns κs nt Hpceq tlbvec_f Hconsf)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+    iIntros (σ ns κs nt Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
@@ -385,9 +378,10 @@ Section WpSretGpr.
     assert (Lnpc : register_lookup nextPC sX.(sregs) = sret_tgt sepc0)
       by (unfold sX, set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Htlb] Hpbytes Hsepc
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes] Hsepc
                           [$Hpc' $Hnpc] Hfile").
-    iExists tlbvec_f. iFrame "Htlb". iPureIntro. exact Hconsf.
+    iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
+              with "Hsatp Htlb Hpbytes").
   Qed.
 
 End WpSretGpr.
