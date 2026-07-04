@@ -353,8 +353,8 @@ Section WpLdGpr.
       by (unfold s_pc; tmig; exact Lpma).
     assert (Lhtifp : register_lookup htif_tohost_base s_pc.(sregs) = None)
       by (unfold s_pc; tmig; exact Lhtif).
-    pose proof (within_clint_false ea 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
-    pose proof (within_sig_false ea 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_clint_false ea 8 s_pc (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false ea 8 s_pc (addr_is_ram_not_in_sig _ Hrampa) ltac:(lia)) as Hws.
     pose proof (within_htif_false ea 8 s_pc Lhtifp) as Hwh.
     (* [extend_value false] is the identity here (the value is already 64-bit). *)
     assert (Hev : extend_value false

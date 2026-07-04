@@ -727,8 +727,8 @@ Section StepLD.
     { unfold s_pc; trans_mi; trans_mi; exact Lhtif. }
     (* discharge the MMIO-range checks: clint/sig from [pa] being RAM, htif
        from [htif_tohost_base = None]. *)
-    pose proof (within_clint_false pa 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
-    pose proof (within_sig_false pa 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_clint_false pa 8 s_pc (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false pa 8 s_pc (addr_is_ram_not_in_sig _ Hrampa) ltac:(lia)) as Hws.
     pose proof (within_htif_false pa 8 s_pc Lhtifp) as Hwh.
     assert (Hexec_spc :
       exec (execute (LOAD (imm_l, Regidx i_l, Regidx i_l, false, 8))) s_pc

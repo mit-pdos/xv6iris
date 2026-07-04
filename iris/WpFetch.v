@@ -83,7 +83,7 @@ Section WpFetch.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     iPureIntro.
-    unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
+    pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
     (* transfer the owned CSR values into [exec_fetch_done]'s register-lookup form *)
     assert (Hpmp : forall i,
               pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false)
@@ -146,7 +146,7 @@ Section WpFetch.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     iPureIntro.
-    unfold addr_is_ram in Hram. destruct Hram as [Hnc Hns].
+    pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
     set (t := set_reg s (R_bool minstret_increment) b).
     assert (Ltpc : register_lookup PC t.(sregs) = pc).
     { unfold t, set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }

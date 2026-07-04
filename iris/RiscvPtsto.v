@@ -85,19 +85,50 @@ Notation "r ↦ᵣ v" := (reg_pointsto r (DfracOwn 1) v)
    through (or returned by) every WP -- see [hw_config] in RiscvFetchExec.v. *)
 Notation "r ↦ᵣ□ v" := (reg_pointsto r DfracDiscarded v)
   (at level 20, format "r  ↦ᵣ□  v") : bi_scope.
-(* A physical byte address lies in "real" RAM iff it is outside the platform
-   MMIO ranges.  We capture the two PURE (state-independent) ranges checked by
-   the model's [within_clint]/[within_sig]: an access fully inside one of those
-   ranges is treated as MMIO.  Owning a memory points-to will require the byte
-   to be RAM, which discharges [within_clint]/[within_sig] (see
-   [within_clint_false]/[within_sig_false]).  ([within_htif] depends on the
-   [htif_tohost_base] register, not the address, so it is handled separately by
-   owning that register.) *)
+(* The concrete physical RAM of the platform: a single DRAM bank of
+   [ram_size] bytes based at [ram_base] (0x80000000), matching the executable
+   [ramRegion] PMA and the QEMU/xv6 memory map.  We fix the size at 256 MiB
+   for now. *)
+Definition ram_base : Z := 0x80000000.       (* 2147483648 *)
+Definition ram_size : Z := 0x10000000.       (* 268435456 = 256 MiB *)
+
+(* A physical byte address is "real" RAM iff it lies inside that DRAM bank.
+   This is STRICTLY stronger than merely being outside the platform MMIO
+   ranges: the whole bank sits above every MMIO window (CLINT ends at
+   0x20C0000, SIG at 0xC000020, both far below 0x80000000), so being RAM
+   discharges the model's [within_clint]/[within_sig] MMIO checks (see
+   [addr_is_ram_not_in_clint]/[addr_is_ram_not_in_sig] below, which feed
+   [within_clint_false]/[within_sig_false]).  Being a concrete range it also
+   pins the address's high bits (bits 63:31 are 0b1..., bits 63:39 = 0), which
+   lets the higher-level WPs discharge their per-address geometry obligations
+   (Sv39 canonicality, identity translation, PMP TOR match) purely from an
+   owned points-to rather than carrying them as explicit preconditions.
+   ([within_htif] depends on the [htif_tohost_base] register, not the address,
+   so it is handled separately by owning that register.) *)
+Definition addr_is_ram (a : Arch.pa) : Prop :=
+  (ram_base <= uint a < ram_base + ram_size)%Z.
+
+(* The two legacy MMIO-disjointness predicates, kept as the interface the
+   model discharges ([within_clint_false]/[within_sig_false] consume them). *)
 Definition not_in_clint (a : Arch.pa) : Prop :=
   (uint a < uint plat_clint_base \/ uint plat_clint_base + uint plat_clint_size <= uint a)%Z.
 Definition not_in_sig (a : Arch.pa) : Prop :=
   (uint a < uint plat_sig_base \/ uint plat_sig_base + uint plat_sig_size <= uint a)%Z.
-Definition addr_is_ram (a : Arch.pa) : Prop := not_in_clint a /\ not_in_sig a.
+
+(* Being RAM implies being outside each MMIO window: the bank is above both. *)
+Lemma addr_is_ram_not_in_clint a : addr_is_ram a -> not_in_clint a.
+Proof.
+  intros [Hlo _]. right.
+  assert (uint plat_clint_base + uint plat_clint_size = 34340864)%Z as -> by (vm_compute; reflexivity).
+  unfold ram_base in Hlo. lia.
+Qed.
+
+Lemma addr_is_ram_not_in_sig a : addr_is_ram a -> not_in_sig a.
+Proof.
+  intros [Hlo _]. right.
+  assert (uint plat_sig_base + uint plat_sig_size = 201326624)%Z as -> by (vm_compute; reflexivity).
+  unfold ram_base in Hlo. lia.
+Qed.
 
 (* memory points-to: owns byte [a |-> v] at fraction [dq] AND records that [a]
    is real RAM.  [dq] is a [dfrac]: [DfracOwn 1] = full (writable) ownership,
