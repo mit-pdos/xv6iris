@@ -66,6 +66,25 @@ Proof.
   reflexivity.
 Qed.
 
+(* PMP TOR entry 0 (base 0) grants an 8-byte RAM access, provided the entry's
+   top bound [pmpaddr0 * 4] covers all of RAM.  This discharges the
+   [pmpRangeMatch ... = PMP_Match] obligation of the S-mode load/store WPs
+   from the owned points-to ([ram_base <= uint a], [uint a + 8 <= ram top]
+   from owning all 8 bytes) plus the single "PMP covers RAM" config fact. *)
+Lemma ram_pmp_match (a : mword 64) (pmpaddr0 : mword 64) :
+  ram_base <= uint a ->
+  uint a + 8 <= ram_base + ram_size ->
+  ram_base + ram_size <= uint pmpaddr0 * 4 ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint pmpaddr0) 4)
+    (uint a) (uint (to_bits 64 8)) = PMP_Match.
+Proof.
+  intros Hlo Hfit Hcov.
+  assert (Hz : uint (zeros' 64 : mword 64) = 0) by (vm_compute; reflexivity).
+  assert (Hw : uint (to_bits 64 8) = 8) by (vm_compute; reflexivity).
+  rewrite Hz Hw. rewrite Z.mul_0_l.
+  apply pmpRangeMatch_full; unfold ram_base, ram_size in *; lia.
+Qed.
+
 (* pmpMatchAddr, entry-0 TOR shape (prev = zeros): the access [a, a+w) fully
    inside [0, uint paddr * 4) is a (full) PMP_Match, with no state change. *)
 Lemma exec_pmpMatchAddr_tor0_match (a : mword 64) (wbv : mword 64) (ent : mword 8)
@@ -746,8 +765,8 @@ Section RvcTorEngines.
       by (unfold s_pc; tmig; exact Lpma).
     assert (Lhtifp : register_lookup htif_tohost_base s_pc.(sregs) = None)
       by (unfold s_pc; tmig; exact Lhtif).
-    pose proof (within_clint_false ea 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
-    pose proof (within_sig_false ea 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_clint_false ea 8 s_pc (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false ea 8 s_pc (addr_is_ram_not_in_sig _ Hrampa) ltac:(lia)) as Hws.
     pose proof (within_htif_false ea 8 s_pc Lhtifp) as Hwh.
     (* THE pmpCheck fact at the ticked state, from the TOR-entry-0 predicate. *)
     assert (Hpmpchk_ea : exec (pmpCheck (Physaddr ea) 8 (Load Data) Machine) s_pc
@@ -908,8 +927,8 @@ Section RvcTorEngines.
       by (unfold s_pc; tmig; exact Lpma).
     assert (Lhtifp : register_lookup htif_tohost_base s_pc.(sregs) = None)
       by (unfold s_pc; tmig; exact Lhtif).
-    pose proof (within_clint_false ea 8 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
-    pose proof (within_sig_false ea 8 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+    pose proof (within_clint_false ea 8 s_pc (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
+    pose proof (within_sig_false ea 8 s_pc (addr_is_ram_not_in_sig _ Hrampa) ltac:(lia)) as Hws.
     pose proof (within_htif_writable_false ea 8 s_pc Lhtifp) as Hwh.
     assert (Hpmpchk_ea : exec (pmpCheck (Physaddr ea) 8 (Store Data) Machine) s_pc
                          = Some (None, s_pc)).

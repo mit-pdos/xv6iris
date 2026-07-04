@@ -1206,11 +1206,11 @@ Section WpMemsetS.
         by (unfold s_f; tmig; exact Lpma_pc).
       assert (Lhtif_f : register_lookup htif_tohost_base s_f.(sregs) = None)
         by (unfold s_f; tmig; exact Lhtif_pc).
-      pose proof (within_clint_false pa 1 s_f (proj1 Hrampa) ltac:(lia)) as Hwc.
-      pose proof (within_sig_false pa 1 s_f (proj2 Hrampa) ltac:(lia)) as Hws.
+      pose proof (within_clint_false pa 1 s_f (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
+      pose proof (within_sig_false pa 1 s_f (addr_is_ram_not_in_sig _ Hrampa) ltac:(lia)) as Hws.
       pose proof (within_htif_writable_false pa 1 s_f Lhtif_f) as Hwh.
-      pose proof (within_clint_false (pte_paddr root_ppn) 8 s_pc (proj1 Hramp) ltac:(lia)) as Hwcp.
-      pose proof (within_sig_false (pte_paddr root_ppn) 8 s_pc (proj2 Hramp) ltac:(lia)) as Hwsp.
+      pose proof (within_clint_false (pte_paddr root_ppn) 8 s_pc (addr_is_ram_not_in_clint _ Hramp) ltac:(lia)) as Hwcp.
+      pose proof (within_sig_false (pte_paddr root_ppn) 8 s_pc (addr_is_ram_not_in_sig _ Hramp) ltac:(lia)) as Hwsp.
       pose proof (within_htif_false (pte_paddr root_ppn) 8 s_pc Lhtif_pc) as Hwhp.
       assert (Htr_pc : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 1))) (Store Data)) s_pc
                        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s_f)).
@@ -1260,8 +1260,8 @@ Section WpMemsetS.
                   with "Hsatp Htlb Hpbytes"). }
       iSplitR; [ iPureIntro; exact Hdom | iExact "Hfmap" ].
     - (* ---- data slot RESIDENT: TLB hit (state-preserving) ---- *)
-      pose proof (within_clint_false pa 1 s_pc (proj1 Hrampa) ltac:(lia)) as Hwc.
-      pose proof (within_sig_false pa 1 s_pc (proj2 Hrampa) ltac:(lia)) as Hws.
+      pose proof (within_clint_false pa 1 s_pc (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
+      pose proof (within_sig_false pa 1 s_pc (addr_is_ram_not_in_sig _ Hrampa) ltac:(lia)) as Hws.
       pose proof (within_htif_writable_false pa 1 s_pc Lhtif_pc) as Hwh.
       assert (Htr_pc : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 1))) (Store Data)) s_pc
                        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s_pc)).

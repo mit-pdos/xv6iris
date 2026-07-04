@@ -160,6 +160,94 @@ Proof.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* RAM-range geometry: facts about an address DERIVABLE from [addr_is_ram] *)
+(* (the concrete range [ram_base, ram_base + ram_size)).  These let the    *)
+(* higher-level S-mode WPs discharge their per-address geometry            *)
+(* obligations from an owned points-to instead of carrying them as         *)
+(* explicit preconditions.                                                 *)
+(* ---------------------------------------------------------------------- *)
+
+(* the low 39 bits of a RAM address are the address itself (as a bv 39):
+   [uint a < 2^39], so the [subrange 38:0] extraction loses nothing. *)
+Lemma ram_subrange_unsigned (a : mword 64) :
+  addr_is_ram a ->
+  bv_unsigned (subrange_vec_dec a (Z.sub 39 1) 0) = uint a.
+Proof.
+  intros [Hlo Hhi]. rewrite uint_unsigned in Hlo, Hhi |- *. unfold ram_base, ram_size in *.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  rewrite bv_extract_0_unsigned.
+  change (MachineWord.MachineWord.Z_idx (Z.sub 39 1 - 0 + 1)) with 39%N.
+  apply bv_wrap_small. pose proof (bv_unsigned_in_range 64 a).
+  change (bv_modulus 39) with 549755813888. lia.
+Qed.
+
+(* Sv39 canonicality of any RAM address: since [uint a < 0x90000000 < 2^38],
+   bit 38 (and every bit >= 39) is 0, so sign-extending the low 39 bits back
+   to 64 returns [a] unchanged.  This is exactly the [neq_vec ... = false]
+   canonicality check the S-mode [translateAddr] lemmas demand. *)
+Lemma ram_canonical (a : mword 64) :
+  addr_is_ram a ->
+  neq_vec (bits_of_virtaddr (Virtaddr a))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) = false.
+Proof.
+  intros Hram. pose proof Hram as [Hlo Hhi].
+  rewrite uint_unsigned in Hlo, Hhi. unfold ram_base, ram_size in *.
+  cbn [bits_of_virtaddr].
+  unfold neq_vec. rewrite negb_false_iff. unfold eq_vec.
+  rewrite MachineWord.MachineWord.eqb_true_iff. apply bv_eq. symmetry.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+       MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  unfold bv_signed.
+  rewrite (ram_subrange_unsigned a Hram).
+  assert (Hsw : bv_swrap (39 - 0) (uint a) = uint a).
+  { apply bv_swrap_small. rewrite uint_unsigned.
+    assert (bv_half_modulus (39 - 0) = 274877906944) as -> by (vm_compute; reflexivity). lia. }
+  rewrite Hsw. rewrite uint_unsigned.
+  apply bv_wrap_small.
+  pose proof (bv_unsigned_in_range 64 a) as Hr.
+  assert (bv_modulus 64 = 18446744073709551616) as E by (vm_compute; reflexivity).
+  rewrite E in Hr |- *. lia.
+Qed.
+
+(* the Sv39 VPN (bits 38:12) of an address, as a 27-bit word.  This is the
+   [svpn] the S-mode WPs abstract over; defining it as the extraction lets the
+   [Hvpn_def] premise ([autocast (subrange (subrange a 38 0) 38 12) = svpn])
+   hold by [reflexivity], and pins its value via [svpn_of_unsigned]. *)
+Definition svpn_of (a : mword 64) : mword 27 :=
+  autocast (T := mword) (subrange_vec_dec
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits).
+
+Lemma svpn_of_unsigned (a : mword 64) :
+  addr_is_ram a ->
+  bv_unsigned (svpn_of a) = Z.shiftr (uint a) 12.
+Proof.
+  intros Hram. pose proof Hram as [Hlo Hhi].
+  rewrite uint_unsigned in Hlo, Hhi. unfold ram_base, ram_size in *.
+  unfold svpn_of. cbn [bits_of_virtaddr]. rewrite autocast_id.
+  unfold subrange_vec_dec at 1. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx pagesize_bits) with 12%N.
+  rewrite bv_extract_unsigned.
+  fold (subrange_vec_dec a (Z.sub 39 1) 0).
+  rewrite (ram_subrange_unsigned a Hram).
+  change (MachineWord.MachineWord.Z_idx (Z.sub 39 1 - pagesize_bits + 1)) with 27%N.
+  rewrite bv_wrap_small.
+  - rewrite uint_unsigned. reflexivity.
+  - rewrite uint_unsigned.
+    assert (bv_modulus (MachineWord.MachineWord.Z_idx 27) = 134217728) as -> by (vm_compute; reflexivity).
+    rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 12 ltac:(lia)).
+    change (2 ^ 12) with 4096.
+    split.
+    + apply Z.div_pos. lia. lia.
+    + apply Z.div_lt_upper_bound. lia. lia.
+Qed.
+
 (* adding an offset that's a multiple of 8 to an 8-aligned vaddr/paddr keeps
    it 8-aligned -- used to derive every non-slot-0 saved-register-slot
    address's alignment from slot 0's (kernelvec/kerneltrap), instead of

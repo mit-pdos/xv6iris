@@ -1532,7 +1532,7 @@ Section AcqIris.
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
         iPureIntro. exact Hr0. }
-      iPureIntro. destruct Hram as [Hnc Hns].
+      iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
       destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
       assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                 (Physaddr pc) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -1558,7 +1558,7 @@ Section AcqIris.
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
         iPureIntro. exact Hr0. }
-      iPureIntro. destruct Hram as [Hnc Hns].
+      iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
       destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
       assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                 (Physaddr pc) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -1656,7 +1656,7 @@ Section AcqIris.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
-    iPureIntro. destruct Hram as [Hnc Hns].
+    iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
     destruct (Hpma0 pc 2) as (region & Hmatch0 & Hexec0 & _ & _).
     assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
               (Physaddr pc) 2 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -1746,7 +1746,7 @@ Section AcqIris.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
-    destruct Hramp as [Hncp Hnsp].
+    pose proof (addr_is_ram_not_in_clint _ Hramp) as Hncp; pose proof (addr_is_ram_not_in_sig _ Hramp) as Hnsp.
     assert (HR' : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
       by (rewrite Lpmpc; exact HRp).
     assert (Hrangep' : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -1792,7 +1792,7 @@ Section AcqIris.
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
         iPureIntro. exact Hr0. }
-      iPureIntro. destruct Hram as [Hnc Hns].
+      iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
       destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
       assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                 (Physaddr pc) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -1832,7 +1832,7 @@ Section AcqIris.
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
         iPureIntro. exact Hr0. }
-      iPureIntro. destruct Hram as [Hnc Hns].
+      iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
       destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
       assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                 (Physaddr pc) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -1937,7 +1937,7 @@ Section AcqIris.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
-    destruct Hramp as [Hncp Hnsp].
+    pose proof (addr_is_ram_not_in_clint _ Hramp) as Hncp; pose proof (addr_is_ram_not_in_sig _ Hramp) as Hnsp.
     assert (HR' : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
       by (rewrite Lpmpc; exact HRp).
     assert (Hrangep' : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -1983,7 +1983,7 @@ Section AcqIris.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
-    iPureIntro. destruct Hram as [Hnc Hns].
+    iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
     destruct (Hpma0 pc 2) as (region & Hmatch0 & Hexec0 & _ & _).
     assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
               (Physaddr pc) 2 = Some region) by (rewrite Lpma; exact Hmatch0).

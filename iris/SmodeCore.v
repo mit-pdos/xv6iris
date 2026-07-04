@@ -2225,7 +2225,7 @@ Section SmodeCoreIris.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
-        iPureIntro. destruct Hram as [Hnc Hns].
+        iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                   (Physaddr pc) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -2262,7 +2262,7 @@ Section SmodeCoreIris.
           iDestruct (mem_ram with "Hb2") as %Hr2.
           iPureIntro. unfold pa_add in Hr2. change (Z.of_nat 2) with 2 in Hr2. exact Hr2. }
         iPureIntro.
-        destruct Hraml as [Hncl Hnsl]. destruct Hramh as [Hnch Hnsh].
+        pose proof (addr_is_ram_not_in_clint _ Hraml) as Hncl; pose proof (addr_is_ram_not_in_sig _ Hraml) as Hnsl; pose proof (addr_is_ram_not_in_clint _ Hramh) as Hnch; pose proof (addr_is_ram_not_in_sig _ Hramh) as Hnsh.
         destruct (Hpma0 pc 2) as (regl & Hml0 & Hxl & _ & _).
         destruct (Hpma0 (add_vec_int pc 2) 2) as (regh & Hmh0 & Hxh & _ & _).
         assert (Hml : matching_pma_region (register_lookup pma_regions σ.(sregs))
@@ -2305,7 +2305,7 @@ Section SmodeCoreIris.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
-        iPureIntro. destruct Hram as [Hnc Hns].
+        iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                   (Physaddr pc) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -2332,7 +2332,7 @@ Section SmodeCoreIris.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
-        iPureIntro. destruct Hram as [Hnc Hns].
+        iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 pc 2) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                   (Physaddr pc) 2 = Some region) by (rewrite Lpma; exact Hmatch0).
@@ -2737,7 +2737,7 @@ Section SmodeCoreIris.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
-    destruct Hramp as [Hncp Hnsp].
+    pose proof (addr_is_ram_not_in_clint _ Hramp) as Hncp; pose proof (addr_is_ram_not_in_sig _ Hramp) as Hnsp.
     (* register_lookup forms at σ *)
     assert (HA' : pmpAddrMatchType_encdec_backwards
               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
@@ -2797,7 +2797,7 @@ Section SmodeCoreIris.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
-        iPureIntro. destruct Hram as [Hnc Hns].
+        iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (iHrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
                   (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sf.(sregs)) 0)) 4)
@@ -2848,7 +2848,7 @@ Section SmodeCoreIris.
           iDestruct (mem_ram with "Hb2") as %Hr2.
           iPureIntro. unfold pa_add in Hr2. change (Z.of_nat 2) with 2 in Hr2. exact Hr2. }
         iPureIntro.
-        destruct Hraml as [Hncl Hnsl]. destruct Hramh as [Hnch Hnsh].
+        pose proof (addr_is_ram_not_in_clint _ Hraml) as Hncl; pose proof (addr_is_ram_not_in_sig _ Hraml) as Hnsl; pose proof (addr_is_ram_not_in_clint _ Hramh) as Hnch; pose proof (addr_is_ram_not_in_sig _ Hramh) as Hnsh.
         destruct (Hpma0 pc 2) as (regl & Hml0 & Hxl & _ & _).
         destruct (Hpma0 (add_vec_int pc 2) 2) as (regh & Hmh0 & Hxh & _ & _).
         assert (iHrangeL : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -2905,7 +2905,7 @@ Section SmodeCoreIris.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
-        iPureIntro. destruct Hram as [Hnc Hns].
+        iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (iHrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
                   (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sf.(sregs)) 0)) 4)
@@ -2944,7 +2944,7 @@ Section SmodeCoreIris.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
-        iPureIntro. destruct Hram as [Hnc Hns].
+        iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 pc 2) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (iHrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
                   (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sf.(sregs)) 0)) 4)
