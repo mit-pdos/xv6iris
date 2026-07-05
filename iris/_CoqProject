@@ -1,6 +1,12 @@
 -R . xv6iris
 -R ../model-xv6iris Riscv
 -R ../kernel-rocq Kernel
+# SailStdpp.ConcurrencyInterfaceBuiltins and SailStdpp.Base (which pulls in
+# Prompt_monad) both bind ">>=" etc. to their own monad's `bind`; harmless but
+# noisy once both are in scope (as they are throughout this proof), so silence
+# the resulting "notation was already used" warning project-wide.
+-arg -w
+-arg -notation-overridden
 RiscvModelBytes.v
 RiscvLang.v
 RiscvPtsto.v

@@ -1,4 +1,8 @@
 -R . Riscv
+# see iris/_CoqProject for why: SailStdpp.ConcurrencyInterfaceBuiltins and
+# SailStdpp.Base/Prompt_monad both bind ">>=" etc. to their own monad's `bind`.
+-arg -w
+-arg -notation-overridden
 rv64d_types.v
 riscv_extras.v
 rv64d.v
