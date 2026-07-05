@@ -2434,6 +2434,7 @@ Section SmodeCoreIris.
       {dqp dqs dqsa dqt dqc dqpa dqa dqh dqm : dfrac} :
     pma_allows_all pmar0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_A misa0) ('b"1") = true ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
@@ -2464,7 +2465,7 @@ Section SmodeCoreIris.
              exec (decode_fetch (F_Base w)) σ = Some (i, σ) /\
              is_lpad_instruction i = false ⌝.
   Proof.
-    iIntros (Hpma HmisaC HSXL0 Hmode Hasid Hvec Hgeom HgeomB Hpmp)
+    iIntros (Hpma HmisaC HmisaA HSXL0 Hmode Hasid Hvec Hgeom HgeomB Hpmp)
       "Hsi Hpc Hpriv Hms Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hinstr".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
@@ -2479,7 +2480,8 @@ Section SmodeCoreIris.
                  Hpma HmisaC HSXL0 Hmode Hasid Hvec Hgeom HgeomB' Hpmp
                  with "Hsi Hpc Hpriv Hms Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hbytes") as %Hfetch.
     iDestruct ("Hdec" $! σ with "Hsi") as %Hdec0.
-    specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)).
+    specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)
+                      ltac:(rewrite Lmisa; exact HmisaA)).
     destruct r as [e | w | h | erx].
     - iDestruct "Hbytes" as %[_ []].
     - cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc. iPureIntro.
@@ -2542,12 +2544,12 @@ Section SmodeCoreIris.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift_s root_ppn σ pc is_rvc i satp0 mstatus0 misa0
                  pmpcfg0 pmpaddr00 pmar0 tlbvec
-                 Hpma_all HmisaC HSXL Hmode Hasid Hvec Hgeom HgeomB Hpmp
+                 Hpma_all HmisaC HmisaA HSXL Hmode Hasid Hvec Hgeom HgeomB Hpmp
                  with "Hsi Hpc Hpriv Hmstatus Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hinstr") as %Hlift.
     iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
                  HmisaS Hmm HSIE
@@ -3032,7 +3034,7 @@ Section SmodeCoreIris.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
@@ -3068,7 +3070,8 @@ Section SmodeCoreIris.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σf.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σf.
     specialize (Hdec0 ltac:(rewrite Hpriv_σf; reflexivity)
-                      ltac:(rewrite Hmisa_σf; exact HmisaC)).
+                      ltac:(rewrite Hmisa_σf; exact HmisaC)
+                      ltac:(rewrite Hmisa_σf; exact HmisaA)).
     assert (Lpc_σf : register_lookup PC σf.(sregs) = pc).
     { unfold σf, pw_filled, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
@@ -3288,7 +3291,7 @@ Section SmodeDemo.
     iSplitL "".
     - iApply (instr_bytes_rvc4 kv_pc1 kv_h1 kv_w1 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms.kernelvec) kv_w1 4 kv_pc1 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _. cbn [fetch_is_rvc].
       exists (C_ADDI16SP kv_imm1).
       split; [exact (kv_decode1 σ HmisaC) |].
       split; [vm_compute; reflexivity |].

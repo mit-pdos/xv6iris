@@ -1238,7 +1238,7 @@ Section WpPushOffMem.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 4) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     pose proof Hpmp as Hpmp_copy.
@@ -1517,7 +1517,7 @@ Section WpPushOffMem.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 4) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     pose proof Hpmp as Hpmp_copy.

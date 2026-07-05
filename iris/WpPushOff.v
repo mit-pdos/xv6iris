@@ -616,7 +616,7 @@ Section WpPushOff.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (JAL (jimm, zreg))
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom ltac:(discriminate) Hpmp Hpmpp Hpteregion Halignp

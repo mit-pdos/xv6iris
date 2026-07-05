@@ -413,7 +413,7 @@ Section WpKernelvecNew.
       "#Hhw Hsm Hpmpc Hpmpa Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_instr_s_tlbinv root_ppn E Φ pc false (JAL (imm, Regidx rd)) pmpcfg0 pmpaddr00 region_pte
               HN Hgeom (fun _ => Hgeom2) Hpmp Hpmpp Hpteregion Halignp
               with "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr").

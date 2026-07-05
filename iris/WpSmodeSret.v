@@ -297,7 +297,7 @@ Section WpSretGpr.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     pose proof (mword1_not_lp elp0 Help_np) as Help0.
     assert (Hxlpe : forall sz : mstate,
               register_lookup menvcfg sz.(sregs) = menvcfg0 ->

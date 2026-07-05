@@ -133,7 +133,7 @@ Section WpSpin.
     iSplitL "".
     - iApply (instr_bytes_rvc2 pc_spin h_spin H2al H4al Hrvc).
       iApply (kernel_window_pc KernelSyms.spin h_spin 2 pc_spin eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _. cbn [fetch_is_rvc].
       exists (C_J imm_spin).
       split; [exact (decode_C_J σ HmisaC) |].
       split; [vm_compute; reflexivity |].

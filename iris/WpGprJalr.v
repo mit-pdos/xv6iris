@@ -166,7 +166,7 @@ Section WpJalrGpr.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np & %HmisaA)".
     (* wp_instr ties pmpcfg's fraction to mmode_config's, so split it too *)
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iApply (wp_instr E Φ pc is_rvc (JALR (imm, Regidx rs1, Regidx rd)) pmpcfg0

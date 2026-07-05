@@ -2449,12 +2449,12 @@ Section WpInstrSConfig.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift_s root_ppn σ pc is_rvc i satp0 mstatus0 misa0
                  pmpcfg0 pmpaddr00 pmar0 tlbvec
-                 Hpma_all HmisaC HSXL Hmode Hasid Hvec Hgeom HgeomB Hpmp
+                 Hpma_all HmisaC HmisaA HSXL Hmode Hasid Hvec Hgeom HgeomB Hpmp
                  with "Hsi Hpc Hpriv Hmstatus Hsatp Htlb Hpmpc Hpmpa Hpma Hhtif Hmisa Hinstr") as %Hlift.
     iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
                  HmisaS Hmm HSIE
@@ -2573,7 +2573,7 @@ Section WpInstrSConfig.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
@@ -2605,7 +2605,8 @@ Section WpInstrSConfig.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σf.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σf.
     specialize (Hdec0 ltac:(rewrite Hpriv_σf; reflexivity)
-                      ltac:(rewrite Hmisa_σf; exact HmisaC)).
+                      ltac:(rewrite Hmisa_σf; exact HmisaC)
+                      ltac:(rewrite Hmisa_σf; exact HmisaA)).
     assert (Lpc_σf : register_lookup PC σf.(sregs) = pc).
     { unfold σf, pw_filled, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
@@ -3129,7 +3130,7 @@ Section SmodeGprClients.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 8) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     pose proof Hpmp as Hpmp_copy.
@@ -3415,7 +3416,7 @@ Section SmodeGprClients.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 8) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     pose proof Hpmp as Hpmp_copy.

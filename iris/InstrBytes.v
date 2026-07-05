@@ -533,6 +533,7 @@ Section InstrBytes.
        (∀ σ, mstate_interp σ -∗
           ⌜ priv_mSU (register_lookup cur_privilege σ.(sregs)) = true ->
             eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ->
+            eq_vec (_get_Misa_A (register_lookup misa σ.(sregs))) ('b"1") = true ->
             if fetch_is_rvc r
             then ∃ i0 : instruction,
                    exec (decode_fetch r) σ = Some (i0, σ) /\
@@ -552,6 +553,7 @@ Section InstrBytes.
     pmp_allows_all pmpcfg0 ->
     pma_allows_all pmar0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_A misa0) ('b"1") = true ->
     mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Machine -∗
@@ -571,7 +573,7 @@ Section InstrBytes.
              exec (decode_fetch (F_Base w)) σ = Some (i, σ) /\
              is_lpad_instruction i = false ⌝.
   Proof.
-    iIntros (Hpmp Hpma HmisaC) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr".
+    iIntros (Hpmp Hpma HmisaC HmisaA) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iDestruct (state_interp_reg_dq σ cur_privilege dqp Machine
@@ -582,7 +584,8 @@ Section InstrBytes.
                  Hpmp Hpma HmisaC
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes") as %Hfetch.
     iDestruct ("Hdec" $! σ with "Hsi") as %Hdec0.
-    specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)).
+    specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)
+                      ltac:(rewrite Lmisa; exact HmisaA)).
     destruct r as [e | w | h | erx].
     - (* F_Ext_Error: instr_bytes is 2-aligned ∗ False *)
       iDestruct "Hbytes" as %[_ []].
@@ -858,11 +861,11 @@ Section InstrBytes.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0
-                 Hpmp Hpma_all HmisaC
+                 Hpmp Hpma_all HmisaC HmisaA
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr") as %Hlift.
     iDestruct (dispatchInterrupt_none_from_regs σ misa0 mstatus0 HmisaS HmIE
                  with "Hsi Hmisa Hmstatus") as %Hdisp.
@@ -969,11 +972,11 @@ Section InstrBytes.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0
-                 Hpmp Hpma_all HmisaC
+                 Hpmp Hpma_all HmisaC HmisaA
                  with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hinstr") as %Hlift.
     iDestruct (dispatchInterrupt_none_from_regs σ misa0 ms0 HmisaS HmIE
                  with "Hsi Hmisa Hmstatus") as %Hdisp.

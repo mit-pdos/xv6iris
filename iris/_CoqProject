@@ -69,3 +69,7 @@ WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
 WpPushOffTop.v
+WpAmo.v
+WpAcquireMem.v
+WpHolding.v
+WpAcquireTop.v

@@ -384,7 +384,6 @@ Section WpMycpu.
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec ret_tgt 1) = false ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* the single "PMP TOR entry 0 covers all of RAM" config fact *)
@@ -420,7 +419,7 @@ Section WpMycpu.
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
       Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18 Hg20 Hg22 Hg24 Hg26 Hg28 Hg30
       Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp18 Hp22 Hp24 Hp26 Hp28 Hp30
-      Hpmpp Hpteregion Halignp Hal0 Hal1 HW HR Hramcov
+      Hpmpp Hpteregion Halignp Hal0 HW HR Hramcov
       HalignR HpalignR HalignS HpalignS.
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp')
       by (unfold m1; rewrite lookup_total_insert; reflexivity).
@@ -575,10 +574,10 @@ Section WpMycpu.
       unfold m10. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       unfold m9. rewrite lookup_total_insert. reflexivity. }
     (* +0x1e c.ret : PC := ra0 (low bit cleared) *)
-    iApply (wp_cret_s root_ppn E Φ (add_vec_int pcE 30) ra_idx m11
+    iApply (wp_cret_s_zca root_ppn E Φ (add_vec_int pcE 30) ra_idx m11
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HPBMTE Hg30 Hp30 Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate) Hlpe
-              ltac:(rewrite Hra_final; exact Hal0) ltac:(rewrite Hra_final; exact Hal1)
+              ltac:(rewrite Hra_final; exact Hal0)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi1e [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
     iEval (rewrite Hra_final) in "Hpc".

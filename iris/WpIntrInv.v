@@ -322,7 +322,7 @@ Section WpIntrInv.
         iPoseProof "Hhw" as "#Hhwc".
         iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
           "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-            %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np)".
+            %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
         pose proof (elp_no_lp elp0 Help_np) as Help0.
         iDestruct "Hsepc" as (sepc_old) "Hsepc".
         iDestruct "Hscause" as (scause_old) "Hscause".

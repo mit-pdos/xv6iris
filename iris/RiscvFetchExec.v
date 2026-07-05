@@ -104,7 +104,8 @@ Section HwConfig.
      ⌜ pma_allows_all pmar0 ⌝ ∗
      ⌜ pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ⌝ ∗
      ⌜ bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ⌝ ∗
-     ⌜ eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ⌝)%I.
+     ⌜ eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ⌝ ∗
+     ⌜ eq_vec (_get_Misa_A misa0) ('b"1") = true ⌝)%I.
 
   Global Instance hw_config_persistent : Persistent hw_config.
   Proof. apply _. Qed.
