@@ -1689,8 +1689,6 @@ Proof.
   rewrite Hloop. cbn match. reflexivity.
 Qed.
 
-Print Assumptions exec_pmpCheck_machine_none.
-
 (* ---------------------------------------------------------------------- *)
 (* NEW CENTERPIECE (unlocked PMP): in MACHINE mode, if every PMP entry is  *)
 (* UNLOCKED (L = 0) -- regardless of its A-field and of the pmpaddr        *)
@@ -1877,8 +1875,6 @@ Proof.
   end;
   rewrite Hloop; cbn match; reflexivity.
 Qed.
-
-Print Assumptions exec_pmpCheck_machine_unlocked.
 
 (* ===== RiscvModelFetchAsm ===== *)
 (* ====================================================================== *)
@@ -2244,8 +2240,6 @@ Section Fetch.
     cbv iota beta. rewrite HnotRVC. cbv iota beta. apply runR_returnR_fwd.
   Qed.
 End Fetch.
-
-Print Assumptions run_fetch_F_Base.
 
 (* ===== RiscvModelCycle ===== *)
 (* ====================================================================== *)

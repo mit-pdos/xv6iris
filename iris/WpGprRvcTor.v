@@ -174,8 +174,6 @@ Proof.
   rewrite Hloop. cbn match. reflexivity.
 Qed.
 
-Print Assumptions exec_pmpCheck_machine_tor0.
-
 (* ===================================================================== *)
 (* 2a. STORE chain [_chk] clones (WpGprStore.v), with the per-entry        *)
 (* all-OFF hypothesis replaced by the abstract pmpCheck fact.  Everything  *)

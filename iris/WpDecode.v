@@ -248,9 +248,9 @@ Ltac decode_finish s :=
 Ltac decode_pause_prefix s Hpriv :=
   unfold ext_decode, encdec_backwards; cbv beta; cbn zeta;
   skip_pure_clause; skip_pure_clause;
-  match goal with |- context[eq_vec ?w (?c : mword 32)] =>
+  match goal with |- context[eq_vec ?w ?c] =>
     replace (eq_vec w c) with false by (vm_compute; reflexivity) end;
-  match goal with |- context[eq_vec (subrange_vec_dec ?w 11 0) (?c : mword 12)] =>
+  match goal with |- context[eq_vec (subrange_vec_dec ?w 11 0) ?c] =>
     replace (eq_vec (subrange_vec_dec w 11 0) c) with false by (vm_compute; reflexivity) end;
   let HA1 := fresh "HA1" in
   assert (HA1 : exec (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM false)) s
