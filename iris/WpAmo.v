@@ -1160,10 +1160,9 @@ Section WpAmoswap.
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    (* fetch (4-byte base instruction) *)
-    kv_fetch_geom pc ->
-    kv_fetch_geom (add_vec_int pc 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    (* fetch (4-byte base instruction): X-bit + RAM coverage + same-page.
+       The RAM/PMP fetch geometry is derived internally from [instr_bytes]. *)
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     svpn_of (add_vec_int pc 2) = svpn_of pc ->
     (* data address: superpage-identity geometry at tlb_hash svpn *)
@@ -1231,9 +1230,8 @@ Section WpAmoswap.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hgeom Hgeom2 Hpmp Hcov Hsp2 Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
+      HX Hcov Hsp2 Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
       Hpmpp Hpteregion Halignp Hrange_amo HR HW Hpma_amo Halign4 Hpalign4.
-    pose proof (proj2 (proj2 (proj2 (proj1 Hpmp)))) as HX.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -1242,10 +1240,8 @@ Section WpAmoswap.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_amo pmar0 Hpma_all) as (region_amo & Hmatch_amo & Hread_amo & Hwrite_amo & Hatomic_amo).
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
-    pose proof Hpmp as Hpmp_copy.
-    destruct Hpmp_copy as [(HA0 & Hord0 & _ & _) _].
     pose proof Hpmpp as Hpmpp_copy.
-    destruct Hpmpp_copy as (_ & _ & Hrangep & HRp).
+    destruct Hpmpp_copy as (HA0 & Hord0 & Hrangep & HRp).
     assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
               (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
     { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
