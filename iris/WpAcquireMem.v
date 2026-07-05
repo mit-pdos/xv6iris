@@ -47,6 +47,7 @@ Section WpAcquireMem.
     (* fetch *)
     kv_fetch_geom pc ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* data address: superpage-identity geometry at tlb_hash svpn *)
     neq_vec (bits_of_virtaddr (Virtaddr a8))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
@@ -102,8 +103,9 @@ Section WpAcquireMem.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea a8 pa storeval HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hgeom Hpmp Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
+      Hgeom Hpmp Hcov Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
       Hpmpp Hpteregion Halignp Hrange_st HW Halign4 Hpalign4.
+    pose proof (proj2 (proj2 (proj2 (proj1 Hpmp)))) as HX.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -121,7 +123,7 @@ Section WpAcquireMem.
     { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (STORE (imm, Regidx rs2, Regidx rs1, 8))
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom ltac:(discriminate) Hpmp
+              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov ltac:(discriminate)
               Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
@@ -322,6 +324,7 @@ Section WpAcquireMem.
     (* fetch *)
     kv_fetch_geom pc ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* data address: superpage-identity geometry at tlb_hash svpn *)
     neq_vec (bits_of_virtaddr (Virtaddr a8))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
@@ -377,8 +380,9 @@ Section WpAcquireMem.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hgeom Hpmp Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
+      Hgeom Hpmp Hcov Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
       Hpmpp Hpteregion Halignp Hrange_ld HR Halign4 Hpalign4.
+    pose proof (proj2 (proj2 (proj2 (proj1 Hpmp)))) as HX.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -396,7 +400,7 @@ Section WpAcquireMem.
     { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom ltac:(discriminate) Hpmp
+              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov ltac:(discriminate)
               Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)

@@ -459,37 +459,7 @@ Proof.
 Qed.
 
 Definition po_mycpu_geom (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n) : Prop :=
-  let pcMC := mword_of_int KernelSyms.mycpu in
-  kv_fetch_geom pcMC /\
-  kv_fetch_geom (add_vec_int pcMC 2) /\
-  kv_fetch_geom (add_vec_int pcMC 4) /\
-  kv_fetch_geom (add_vec_int pcMC 6) /\
-  kv_fetch_geom (add_vec_int pcMC 8) /\
-  kv_fetch_geom (add_vec_int pcMC 10) /\
-  kv_fetch_geom (add_vec_int pcMC 12) /\
-  kv_fetch_geom (add_vec_int pcMC 14) /\
-  kv_fetch_geom (add_vec_int pcMC 16) /\
-  kv_fetch_geom (add_vec_int pcMC 18) /\
-  kv_fetch_geom (add_vec_int pcMC 20) /\
-  kv_fetch_geom (add_vec_int pcMC 22) /\
-  kv_fetch_geom (add_vec_int pcMC 24) /\
-  kv_fetch_geom (add_vec_int pcMC 26) /\
-  kv_fetch_geom (add_vec_int pcMC 28) /\
-  kv_fetch_geom (add_vec_int pcMC 30) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pcMC /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 2) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 4) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 6) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 8) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 10) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 12) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 14) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 18) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 22) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 24) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 26) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 28) /\
-  pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcMC 30).
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true.
 
 Section WpPushOffTop.
   Context `{!riscvGS Σ}.
@@ -709,9 +679,8 @@ Section WpPushOffTop.
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
     add_vec P (sign_extend' 64 jimm) = pcE ->
-    kv_fetch_geom P ->
-    kv_fetch_geom (add_vec_int P 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 P ->
+    po_mycpu_geom pmpcfg0 pmpaddr00 ->
+    svpn_of (add_vec_int P 2) = svpn_of P ->
     eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -721,26 +690,6 @@ Section WpPushOffTop.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    kv_fetch_geom pcE -> kv_fetch_geom (add_vec_int pcE 2) -> kv_fetch_geom (add_vec_int pcE 4) ->
-    kv_fetch_geom (add_vec_int pcE 6) -> kv_fetch_geom (add_vec_int pcE 8) -> kv_fetch_geom (add_vec_int pcE 10) ->
-    kv_fetch_geom (add_vec_int pcE 12) -> kv_fetch_geom (add_vec_int pcE 14) -> kv_fetch_geom (add_vec_int pcE 16) ->
-    kv_fetch_geom (add_vec_int pcE 18) -> kv_fetch_geom (add_vec_int pcE 20) -> kv_fetch_geom (add_vec_int pcE 22) ->
-    kv_fetch_geom (add_vec_int pcE 24) -> kv_fetch_geom (add_vec_int pcE 26) -> kv_fetch_geom (add_vec_int pcE 28) ->
-    kv_fetch_geom (add_vec_int pcE 30) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pcE ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 4) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 6) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 8) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 10) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 12) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 14) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 18) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 22) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 24) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 26) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 28) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 30) ->
     pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
@@ -777,10 +726,8 @@ Section WpPushOffTop.
       imm_auipc imm_addi shamt_slli imm_addiw sp' ra0 s00
       ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
-      HN Htarget Hgeom_P Hgeom_P2 Hpmp_P Halign_tgt
+      HN Htarget Hmyg Hsp2_P Halign_tgt
       HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18 Hg20 Hg22 Hg24 Hg26 Hg28 Hg30
-      Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp18 Hp22 Hp24 Hp26 Hp28 Hp30
       Hpmpp Hpteregion Halignp Hal0 HW HR Hramcov
       HalignRb HalignSb.
     destruct HalignRb as [HalignR HpalignR].
@@ -790,7 +737,7 @@ Section WpPushOffTop.
                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa")
       as "(Hsm & Hpca & Hpaa & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2 & Hpcb & Hpab)".
     iApply (wp_jal_gpr_s2 root_ppn E Φ P (mword_of_int 1) jimm m pmpcfg0 pmpaddr00 region_pte (1/2)%Qp
-              HN Hgeom_P Hgeom_P2 Hpmp_P Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              HN Hmyg Hramcov Hsp2_P Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
               with "Hhw Hsm Hpca Hpaa Htlbinv Hpc Hfile Hjal [-]").
     iIntros "Hsm Hpca Hpaa Htlbinv Hpc Hfile".
@@ -800,8 +747,7 @@ Section WpPushOffTop.
       as "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv & Hpmpc & Hpmpa)".
     iApply (wp_mycpu root_ppn E Φ m0 raold s0old mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18 Hg20 Hg22 Hg24 Hg26 Hg28 Hg30
-              Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp18 Hp22 Hp24 Hp26 Hp28 Hp30
+              Hmyg
               Hpmpp Hpteregion Halignp Hal0 HW HR Hramcov
               HalignR HpalignR HalignS HpalignS
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile Hbra Hbs0 Hcont").
@@ -865,25 +811,6 @@ Section WpPushOffTop.
     po_slot_align a8_p24 8 ->
     po_slot_align a8_p16 8 ->
     po_slot_align a8_p8 8 ->
-    kv_fetch_geom P ->
-    kv_fetch_geom (add_vec_int P 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 P ->
-    kv_fetch_geom (mword_of_int (PO + 0x1c) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x1c) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x1e) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x1e) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x20) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x20) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x22) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x22) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x24) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x24) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x26) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x26) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x28) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x28) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x2a) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x2a) : mword 64) ->
     eq_vec (access_vec_dec cret_tgt 0) ('b"0") = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -920,9 +847,7 @@ Section WpPushOffTop.
       M2 M3 storeval M4 M5 M6 M7 cret_tgt
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hpmpp Hpteregion Halignp HW HR Hramcov
       Hmyg Hg_ra Hg_s0 Hg_noff Hg_p24 Hg_p16 Hg_p8
-      Hg18 Hg1a Hp18 Hg1c Hp1c Hg1e Hp1e Hg20 Hp20 Hg22 Hp22 Hg24 Hp24
-      Hg26 Hp26 Hg28 Hp28 Hg2a Hp2a Hret0.
-    destruct Hmyg as (Hmg0 & Hmg2 & Hmg4 & Hmg6 & Hmg8 & Hmg10 & Hmg12 & Hmg14 & Hmg16 & Hmg18 & Hmg20 & Hmg22 & Hmg24 & Hmg26 & Hmg28 & Hmg30 & Hmp0 & Hmp2 & Hmp4 & Hmp6 & Hmp8 & Hmp10 & Hmp12 & Hmp14 & Hmp18 & Hmp22 & Hmp24 & Hmp26 & Hmp28 & Hmp30).
+      Hret0.
     destruct Hg_ra as (HalignR & HpalignR).
     destruct Hg_s0 as (HalignS & HpalignS).
     assert (Hm0sp : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> ms) !!! Regidx csp_rs1 = spm)
@@ -931,10 +856,8 @@ Section WpPushOffTop.
     iPoseProof (poi_18 with "Htext") as "Hi18".
     iApply (wp_pushoff_call_mycpu root_ppn E Φ P (mword_of_int 0xcfe : mword 21) ms raold s0old
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hg18 Hg1a Hp18 ltac:(vm_compute; reflexivity)
+              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              Hmg0 Hmg2 Hmg4 Hmg6 Hmg8 Hmg10 Hmg12 Hmg14 Hmg16 Hmg18 Hmg20 Hmg22 Hmg24 Hmg26 Hmg28 Hmg30
-              Hmp0 Hmp2 Hmp4 Hmp6 Hmp8 Hmp10 Hmp12 Hmp14 Hmp18 Hmp22 Hmp24 Hmp26 Hmp28 Hmp30
               Hpmpp Hpteregion Halignp
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               HW HR Hramcov
@@ -955,7 +878,7 @@ Section WpPushOffTop.
     iApply (wp_clw_s root_ppn E Φ (mword_of_int (PO + 0x1c)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) svpn_noff M1 noff mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg1c Hp1c
+              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Ncanon Nvpn Nident Nmask Nvpn2 Nmvpn Nmppn Hpmpp Hpteregion Halignp Nrange HR Nalign Npalign
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi1c Hnoff [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hnoff".
@@ -966,7 +889,7 @@ Section WpPushOffTop.
     iPoseProof (poi_1e with "Htext") as "Hi1e".
     iApply (wp_caddiw_s root_ppn E Φ (mword_of_int (PO + 0x1e)) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 6)
               M2 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hg1e Hp1e Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi1e [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
     assert (Hpc20 : add_vec_int (mword_of_int (PO + 0x1e) : mword 64) 2 = mword_of_int (PO + 0x20))
@@ -980,7 +903,7 @@ Section WpPushOffTop.
     iApply (wp_csw_s root_ppn E Φ (mword_of_int (PO + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) svpn_noff M3 noff mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg20 Hp20
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               ltac:(rewrite Hm310; exact Ncanon) ltac:(rewrite Hm310; exact Nvpn) ltac:(rewrite Hm310; exact Nident)
               Nmask Nvpn2 Nmvpn Nmppn Hpmpp Hpteregion Halignp ltac:(rewrite Hm310; exact Nrange) HW
               ltac:(rewrite Hm310; exact Nalign) ltac:(rewrite Hm310; exact Npalign)
@@ -999,7 +922,7 @@ Section WpPushOffTop.
     iPoseProof (poi_22 with "Htext") as "Hi22".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (PO + 0x22)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               M3 ra0e mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg22 Hp22
+              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
               ltac:(rewrite Hcsp3; exact P24align) ltac:(rewrite Hcsp3; exact P24palign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi22 [Hpp24] [-]").
@@ -1015,7 +938,7 @@ Section WpPushOffTop.
     iPoseProof (poi_24 with "Htext") as "Hi24".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (PO + 0x24)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               M4 s00e mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg24 Hp24
+              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
               ltac:(rewrite Hcsp4; exact P16align) ltac:(rewrite Hcsp4; exact P16palign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi24 [Hpp16] [-]").
@@ -1031,7 +954,7 @@ Section WpPushOffTop.
     iPoseProof (poi_26 with "Htext") as "Hi26".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (PO + 0x26)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               M5 s10e mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg26 Hp26
+              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
               ltac:(rewrite Hcsp5; exact P8align) ltac:(rewrite Hcsp5; exact P8palign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi26 [Hpp8] [-]").
@@ -1046,7 +969,7 @@ Section WpPushOffTop.
                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa")
       as "(Hsm & Hpca & Hpaa & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2 & Hpcb & Hpab)".
     iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int (PO + 0x28)) (mword_of_int 2 : mword 6) M6
-              pmpcfg0 pmpaddr00 region_pte (1/2)%Qp HN Hg28 Hp28 Hpmpp Hpteregion Halignp
+              pmpcfg0 pmpaddr00 region_pte (1/2)%Qp HN Hmyg Hramcov Hpmpp Hpteregion Halignp
               with "Hsm Hpca Hpaa Htlbinv Hpc Hfile Hi28 [-]").
     iIntros "Hsm Hpca Hpaa Htlbinv Hpc Hfile".
     iDestruct (kv_cfg_recombine mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00
@@ -1064,7 +987,7 @@ Section WpPushOffTop.
     iPoseProof (poi_2a with "Htext") as "Hi2a".
     iApply (wp_cret_s_zca root_ppn E Φ (mword_of_int (PO + 0x2a)) (mword_of_int 1 : mword 5) M7
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hg2a Hp2a Hpmpp Hpteregion Halignp
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp
               ltac:(vm_compute; discriminate) Hlpe
               ltac:(rewrite Hra7; exact Hret0)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2a [-]").
@@ -1171,35 +1094,6 @@ Section WpPushOffTop.
     po_slot_align a_fs0 8 ->
     po_slot_geom root_ppn pmpaddr00 svpn_noff a_noff 4 ->
     po_slot_geom root_ppn pmpaddr00 svpn_intena a_intena 4 ->
-    kv_fetch_geom (mword_of_int (PO + 0x00) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x00) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x02) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x02) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x04) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x04) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x06) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x06) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x08) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x08) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x0a) : mword 64) -> kv_fetch_geom (mword_of_int (PO + 0x0c) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x0a) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x0e) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x0e) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x10) : mword 64) -> kv_fetch_geom (mword_of_int (PO + 0x12) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x10) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x14) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x14) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x16) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x16) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x18) : mword 64) -> kv_fetch_geom (add_vec_int (mword_of_int (PO + 0x18) : mword 64) 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x18) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x1c) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x1c) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x1e) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x1e) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x20) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x20) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x22) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x22) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x24) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x24) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x26) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x26) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x28) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x28) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x2a) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x2a) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x2c) : mword 64) -> kv_fetch_geom (mword_of_int (PO + 0x2e) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x2c) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x30) : mword 64) -> kv_fetch_geom (mword_of_int (PO + 0x32) : mword 64) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x30) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x34) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x34) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x36) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x36) : mword 64) ->
-    kv_fetch_geom (mword_of_int (PO + 0x38) : mword 64) -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int (PO + 0x38) : mword 64) ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
@@ -1238,11 +1132,7 @@ Section WpPushOffTop.
       a_r24 a_r16 a_r8 a_fra a_fs0 a_noff a_intena caller_ret
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hpmpp Hpteregion Halignp HW HR Hramcov
       Hlegal Himm5 Hcret0 Ha0_10 Ha0_2c Ha0_18f Ha0_18t
-      Hmyg Hg_r24 Hg_r16 Hg_r8 Hg_fra Hg_fs0 Hg_noff Hg_intena
-      Hg00 Hp00 Hg02 Hp02 Hg04 Hp04 Hg06 Hp06 Hg08 Hp08 Hg0a Hg0c Hp0a Hg0e Hp0e
-      Hg10 Hg12 Hp10 Hg14 Hp14 Hg16 Hp16 Hg18 Hg1a Hp18 Hg1c Hp1c Hg1e Hp1e
-      Hg20 Hp20 Hg22 Hp22 Hg24 Hp24 Hg26 Hp26 Hg28 Hp28 Hg2a Hp2a
-      Hg2c Hg2e Hp2c Hg30 Hg32 Hp30 Hg34 Hp34 Hg36 Hp36 Hg38 Hp38.
+      Hmyg Hg_r24 Hg_r16 Hg_r8 Hg_fra Hg_fs0 Hg_noff Hg_intena.
     pose proof Hg_r24 as Hg_r24C. destruct Hg_r24C as (R24align & R24palign).
     pose proof Hg_r16 as Hg_r16C. destruct Hg_r16C as (R16align & R16palign).
     pose proof Hg_r8 as Hg_r8C. destruct Hg_r8C as (R8align & R8palign).
@@ -1252,7 +1142,7 @@ Section WpPushOffTop.
     iPoseProof (poi_00 with "Htext") as "Hi00".
     iApply (wp_caddi_gpr_s_config root_ppn E Φ (mword_of_int (PO + 0x00)) csp_rs1 (mword_of_int 32 : mword 6) m
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hg00 Hp00 Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi00 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
     assert (Hpp02 : add_vec_int (mword_of_int (PO + 0x00) : mword 64) 2 = mword_of_int (PO + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1261,7 +1151,7 @@ Section WpPushOffTop.
     iPoseProof (poi_02 with "Htext") as "Hi02".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (PO + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               N0 vr24 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg02 Hp02
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
               ltac:(rewrite Hcsp0; exact R24align) ltac:(rewrite Hcsp0; exact R24palign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi02 [Hr24] [-]").
@@ -1273,7 +1163,7 @@ Section WpPushOffTop.
     iPoseProof (poi_04 with "Htext") as "Hi04".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (PO + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               N0 vr16 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg04 Hp04
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
               ltac:(rewrite Hcsp0; exact R16align) ltac:(rewrite Hcsp0; exact R16palign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi04 [Hr16] [-]").
@@ -1285,7 +1175,7 @@ Section WpPushOffTop.
     iPoseProof (poi_06 with "Htext") as "Hi06".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (PO + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               N0 vr8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg06 Hp06
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
               ltac:(rewrite Hcsp0; exact R8align) ltac:(rewrite Hcsp0; exact R8palign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi06 [Hr8] [-]").
@@ -1297,7 +1187,7 @@ Section WpPushOffTop.
     iPoseProof (poi_08 with "Htext") as "Hi08".
     iApply (wp_caddi4spn_gpr_s_config root_ppn E Φ (mword_of_int (PO + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
               N0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hg08 Hp08 Hpmpp Hpteregion Halignp
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi08 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
@@ -1307,7 +1197,7 @@ Section WpPushOffTop.
     iPoseProof (poi_0a with "Htext") as "Hi0a".
     iApply (wp_csrrci_sstatus_s root_ppn E Φ (mword_of_int (PO + 0x0a)) (mword_of_int 15 : mword 5) (mword_of_int 2 : mword 5)
               N1 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hg0a Hg0c Hp0a Hpmpp Hpteregion Halignp
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov ltac:(vm_compute; reflexivity) Hpmpp Hpteregion Halignp
               ltac:(vm_compute; discriminate) Himm5 Hlegal
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0a [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
@@ -1317,7 +1207,7 @@ Section WpPushOffTop.
     iPoseProof (poi_0e with "Htext") as "Hi0e".
     iApply (wp_cmv_gpr_s_config root_ppn E Φ (mword_of_int (PO + 0x0e)) (mword_of_int 9 : mword 5) (mword_of_int 15 : mword 5)
               N2 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hg0e Hp0e Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0e [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
     assert (Hpp10 : add_vec_int (mword_of_int (PO + 0x0e) : mword 64) 2 = mword_of_int (PO + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1329,17 +1219,13 @@ Section WpPushOffTop.
       rewrite /N1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hcsp0. }
     assert (Hm0csp10 : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (PO + 0x10) : mword 64) 4)]> N3) !!! Regidx csp_rs1 = spd)
       by (rewrite lookup_total_insert_ne; [ exact Hcsp3n | vm_compute; discriminate ]).
-    pose proof Hmyg as HmygC.
-    destruct HmygC as (Cg0 & Cg2 & Cg4 & Cg6 & Cg8 & Cg10 & Cg12 & Cg14 & Cg16 & Cg18 & Cg20 & Cg22 & Cg24 & Cg26 & Cg28 & Cg30 & Cp0 & Cp2 & Cp4 & Cp6 & Cp8 & Cp10 & Cp12 & Cp14 & Cp18 & Cp22 & Cp24 & Cp26 & Cp28 & Cp30).
     pose proof Hg_fra as Hg_fraC. destruct Hg_fraC as (FRAalign & FRApalign).
     pose proof Hg_fs0 as Hg_fs0C. destruct Hg_fs0C as (FS0align & FS0palign).
     iPoseProof (poi_10 with "Htext") as "Hi10".
     iApply (wp_pushoff_call_mycpu root_ppn E Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3 raold0 s0old0
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hg10 Hg12 Hp10 ltac:(vm_compute; reflexivity)
+              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              Cg0 Cg2 Cg4 Cg6 Cg8 Cg10 Cg12 Cg14 Cg16 Cg18 Cg20 Cg22 Cg24 Cg26 Cg28 Cg30
-              Cp0 Cp2 Cp4 Cp6 Cp8 Cp10 Cp12 Cp14 Cp18 Cp22 Cp24 Cp26 Cp28 Cp30
               Hpmpp Hpteregion Halignp
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               HW HR Hramcov
@@ -1360,7 +1246,7 @@ Section WpPushOffTop.
     iApply (wp_clw_s root_ppn E Φ (mword_of_int (PO + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) svpn_noff N4 noff mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg14 Hp14
+              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               ltac:(rewrite Hnoffaddr; exact Ncanon) ltac:(rewrite Hnoffaddr; exact Nvpn) ltac:(rewrite Hnoffaddr; exact Nident)
               Nmask Nvpn2 Nmvpn Nmppn Hpmpp Hpteregion Halignp ltac:(rewrite Hnoffaddr; exact Nrange) HR
               ltac:(rewrite Hnoffaddr; exact Nalign) ltac:(rewrite Hnoffaddr; exact Npalign)
@@ -1391,7 +1277,7 @@ Section WpPushOffTop.
     - (* ===== TAKEN arm: noff == 0 ===== *)
       iApply (wp_cbeqz_taken_s root_ppn E Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) N5 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hg16 Hp16 Hpmpp Hpteregion Halignp
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rewrite Ha5; exact Hcond)
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi16 [-]").
@@ -1406,10 +1292,8 @@ Section WpPushOffTop.
       iPoseProof (poi_2c with "Htext") as "Hi2c".
       iApply (wp_pushoff_call_mycpu root_ppn E Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5 _ _
                 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-                HN ltac:(apply bv_eq; vm_compute; reflexivity) Hg2c Hg2e Hp2c ltac:(vm_compute; reflexivity)
+                HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-                Cg0 Cg2 Cg4 Cg6 Cg8 Cg10 Cg12 Cg14 Cg16 Cg18 Cg20 Cg22 Cg24 Cg26 Cg28 Cg30
-                Cp0 Cp2 Cp4 Cp6 Cp8 Cp10 Cp12 Cp14 Cp18 Cp22 Cp24 Cp26 Cp28 Cp30
                 Hpmpp Hpteregion Halignp
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
                 HW HR Hramcov
@@ -1428,7 +1312,7 @@ Section WpPushOffTop.
       iPoseProof (poi_30 with "Htext") as "Hi30".
       iApply (wp_srli4_s root_ppn E Φ (mword_of_int (PO + 0x30)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (mword_of_int 1 : mword 6) N6 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hg30 Hg32 Hp30 Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov ltac:(vm_compute; reflexivity) Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi30 [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
       assert (Hpc34 : add_vec_int (mword_of_int (PO + 0x30) : mword 64) 4 = mword_of_int (PO + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1437,7 +1321,7 @@ Section WpPushOffTop.
       iPoseProof (poi_34 with "Htext") as "Hi34".
       iApply (wp_candi_s root_ppn E Φ (mword_of_int (PO + 0x34)) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 6)
                 N7 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hg34 Hp34 Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi34 [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
       assert (Hpc36 : add_vec_int (mword_of_int (PO + 0x34) : mword 64) 2 = mword_of_int (PO + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1450,7 +1334,7 @@ Section WpPushOffTop.
       iPoseProof (poi_36 with "Htext") as "Hi36".
       iApply (wp_csw_s root_ppn E Φ (mword_of_int (PO + 0x36)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
                 (mword_of_int 124 : mword 12) svpn_intena N8 intena_old mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-                HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg36 Hp36
+                HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
                 ltac:(rewrite Hintaddr; exact INTcanon) ltac:(rewrite Hintaddr; exact INTvpn) ltac:(rewrite Hintaddr; exact INTident)
                 INTmask INTvpn2 INTmvpn INTmppn Hpmpp Hpteregion Halignp ltac:(rewrite Hintaddr; exact INTrange) HW
                 ltac:(rewrite Hintaddr; exact INTalign) ltac:(rewrite Hintaddr; exact INTpalign)
@@ -1464,7 +1348,7 @@ Section WpPushOffTop.
       iPoseProof (poi_38 with "Htext") as "Hi38".
       iApply (wp_cj_s root_ppn E Φ (mword_of_int (PO + 0x38)) (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")))
                 N8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hg38 Hp38 Hpmpp Hpteregion Halignp ltac:(vm_compute; reflexivity)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; reflexivity)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi38 [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
       assert (Htgt18t : add_vec (mword_of_int (PO + 0x38) : mword 64)
@@ -1482,7 +1366,6 @@ Section WpPushOffTop.
                 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hpmpp Hpteregion Halignp HW HR Hramcov Hmyg
                 ltac:(rewrite HcspN8; exact Hg_fra) ltac:(rewrite HcspN8; exact Hg_fs0) ltac:(rewrite Ha0_18t; exact Hg_noff)
                 ltac:(rewrite HcspN8; exact Hg_r24) ltac:(rewrite HcspN8; exact Hg_r16) ltac:(rewrite HcspN8; exact Hg_r8)
-                Hg18 Hg1a Hp18 Hg1c Hp1c Hg1e Hp1e Hg20 Hp20 Hg22 Hp22 Hg24 Hp24 Hg26 Hp26 Hg28 Hp28 Hg2a Hp2a
                 Hcret0
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile [Hfra] [Hfs0] [Hnoff] [Hr24] [Hr16] [Hr8] [-]").
       { iEval (rewrite HcspN8). iExact "Hfra". }
@@ -1518,7 +1401,7 @@ Section WpPushOffTop.
     - (* ===== FALL arm: noff <> 0 ===== *)
       iApply (wp_cbeqz_fall_s_config root_ppn E Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) N5 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hg16 Hp16 Hpmpp Hpteregion Halignp
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rewrite Ha5; exact Hcond)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi16 [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
@@ -1531,7 +1414,6 @@ Section WpPushOffTop.
                 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hpmpp Hpteregion Halignp HW HR Hramcov Hmyg
                 ltac:(rewrite HcspN5; exact Hg_fra) ltac:(rewrite HcspN5; exact Hg_fs0) ltac:(rewrite Ha0_18f; exact Hg_noff)
                 ltac:(rewrite HcspN5; exact Hg_r24) ltac:(rewrite HcspN5; exact Hg_r16) ltac:(rewrite HcspN5; exact Hg_r8)
-                Hg18 Hg1a Hp18 Hg1c Hp1c Hg1e Hp1e Hg20 Hp20 Hg22 Hp22 Hg24 Hp24 Hg26 Hp26 Hg28 Hp28 Hg2a Hp2a
                 Hcret0
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile [Hfra] [Hfs0] [Hnoff] [Hr24] [Hr16] [Hr8] [-]").
       { iEval (rewrite HcspN5). iExact "Hfra". }

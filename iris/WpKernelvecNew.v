@@ -382,9 +382,9 @@ Section WpKernelvecNew.
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (region_pte : PMA_Region) (q : Qp) :
     ↑minstretN ⊆ E ->
-    kv_fetch_geom pc ->
-    kv_fetch_geom (add_vec_int pc 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
+    svpn_of (add_vec_int pc 2) = svpn_of pc ->
     pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
@@ -409,13 +409,13 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hgeom Hgeom2 Hpmp Hpmpp Hpteregion Halignp Hrd Halign0)
+    iIntros (HN HX Hcov Hsp2 Hpmpp Hpteregion Halignp Hrd Halign0)
       "#Hhw Hsm Hpmpc Hpmpa Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_instr_s_tlbinv root_ppn E Φ pc false (JAL (imm, Regidx rd)) pmpcfg0 pmpaddr00 region_pte
-              HN Hgeom (fun _ => Hgeom2) Hpmp Hpmpp Hpteregion Halignp
+              HN HX Hcov (fun _ => Hsp2) Hpmpp Hpteregion Halignp
               with "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -638,6 +638,7 @@ Section WpKernelvecNew.
     { rewrite <- is_aligned_vaddr_paddr. exact Halv17. }
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
+    pose proof (proj2 (proj2 (proj2 (proj1 (Hpmpf KernelSyms.kernelvec eq_refl))))) as HX.
     (* split: bundle(1/2) for the caddi16sp/jal WPs + retained halves *)
     iPoseProof (kv_cfg_split mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00
                   HSIE HMPRV HSXL Hmm HPBMTE
@@ -650,7 +651,7 @@ Section WpKernelvecNew.
       by (vm_compute; reflexivity).
     iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec)) kv_imm1 m
               pmpcfg0 pmpaddr00 region_pte (1/2)%Qp
-              HN Hg1 (Hpmpf (KernelSyms.kernelvec) eq_refl) Hpmpp Hpteregion Halignp
+              HN HX Hpmpcov Hpmpp Hpteregion Halignp
               with "Hsm Hpmpc1 Hpmpa1 Htlbinv Hpc Hfile Hi1").
     iEval (rewrite Hpc1).
     iIntros "Hsm Hpmpc1 Hpmpa1 Htlbinv Hpc Hfile".
@@ -702,7 +703,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw1".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2)) (mword_of_int 0) (mword_of_int 1)
               (kv_m1 m) vold1 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg2 (Hpmpf (KernelSyms.kernelvec + 0x2) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Halv1) ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Halp1)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi2 Hw1").
@@ -717,7 +718,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw2".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x4)) (mword_of_int 2) (mword_of_int 3)
               (kv_m1 m) vold2 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg3 (Hpmpf (KernelSyms.kernelvec + 0x4) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv2) ltac:(rewrite Hm1sp; exact Halp2)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi3 Hw2").
@@ -732,7 +733,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw3".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x6)) (mword_of_int 4) (mword_of_int 5)
               (kv_m1 m) vold3 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg4 (Hpmpf (KernelSyms.kernelvec + 0x6) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv3) ltac:(rewrite Hm1sp; exact Halp3)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi4 Hw3").
@@ -747,7 +748,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw4".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x8)) (mword_of_int 5) (mword_of_int 6)
               (kv_m1 m) vold4 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg5 (Hpmpf (KernelSyms.kernelvec + 0x8) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv4) ltac:(rewrite Hm1sp; exact Halp4)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi5 Hw4").
@@ -762,7 +763,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw5".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xa)) (mword_of_int 6) (mword_of_int 7)
               (kv_m1 m) vold5 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg6 (Hpmpf (KernelSyms.kernelvec + 0xa) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv5) ltac:(rewrite Hm1sp; exact Halp5)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi6 Hw5").
@@ -777,7 +778,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw6".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xc)) (mword_of_int 9) (mword_of_int 10)
               (kv_m1 m) vold6 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg7 (Hpmpf (KernelSyms.kernelvec + 0xc) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv6) ltac:(rewrite Hm1sp; exact Halp6)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi7 Hw6").
@@ -792,7 +793,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw7".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xe)) (mword_of_int 10) (mword_of_int 11)
               (kv_m1 m) vold7 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg8 (Hpmpf (KernelSyms.kernelvec + 0xe) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv7) ltac:(rewrite Hm1sp; exact Halp7)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi8 Hw7").
@@ -807,7 +808,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw8".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x10)) (mword_of_int 11) (mword_of_int 12)
               (kv_m1 m) vold8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg9 (Hpmpf (KernelSyms.kernelvec + 0x10) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv8) ltac:(rewrite Hm1sp; exact Halp8)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi9 Hw8").
@@ -822,7 +823,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw9".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x12)) (mword_of_int 12) (mword_of_int 13)
               (kv_m1 m) vold9 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg10 (Hpmpf (KernelSyms.kernelvec + 0x12) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv9) ltac:(rewrite Hm1sp; exact Halp9)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi10 Hw9").
@@ -837,7 +838,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw10".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x14)) (mword_of_int 13) (mword_of_int 14)
               (kv_m1 m) vold10 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg11 (Hpmpf (KernelSyms.kernelvec + 0x14) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv10) ltac:(rewrite Hm1sp; exact Halp10)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi11 Hw10").
@@ -852,7 +853,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw11".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x16)) (mword_of_int 14) (mword_of_int 15)
               (kv_m1 m) vold11 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg12 (Hpmpf (KernelSyms.kernelvec + 0x16) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv11) ltac:(rewrite Hm1sp; exact Halp11)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi12 Hw11").
@@ -867,7 +868,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw12".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x18)) (mword_of_int 15) (mword_of_int 16)
               (kv_m1 m) vold12 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg13 (Hpmpf (KernelSyms.kernelvec + 0x18) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv12) ltac:(rewrite Hm1sp; exact Halp12)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi13 Hw12").
@@ -882,7 +883,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw13".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1a)) (mword_of_int 16) (mword_of_int 17)
               (kv_m1 m) vold13 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg14 (Hpmpf (KernelSyms.kernelvec + 0x1a) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv13) ltac:(rewrite Hm1sp; exact Halp13)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi14 Hw13").
@@ -897,7 +898,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw14".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1c)) (mword_of_int 27) (mword_of_int 28)
               (kv_m1 m) vold14 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg15 (Hpmpf (KernelSyms.kernelvec + 0x1c) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv14) ltac:(rewrite Hm1sp; exact Halp14)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi15 Hw14").
@@ -912,7 +913,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw15".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1e)) (mword_of_int 28) (mword_of_int 29)
               (kv_m1 m) vold15 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg16 (Hpmpf (KernelSyms.kernelvec + 0x1e) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv15) ltac:(rewrite Hm1sp; exact Halp15)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi16 Hw15").
@@ -927,7 +928,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw16".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x20)) (mword_of_int 29) (mword_of_int 30)
               (kv_m1 m) vold16 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg17 (Hpmpf (KernelSyms.kernelvec + 0x20) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv16) ltac:(rewrite Hm1sp; exact Halp16)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi17 Hw16").
@@ -942,7 +943,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw17".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x22)) (mword_of_int 30) (mword_of_int 31)
               (kv_m1 m) vold17 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg18 (Hpmpf (KernelSyms.kernelvec + 0x22) eq_refl)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
               ltac:(rewrite Hm1sp; exact Halv17) ltac:(rewrite Hm1sp; exact Halp17)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi18 Hw17").
@@ -959,7 +960,7 @@ Section WpKernelvecNew.
       by (vm_compute; reflexivity).
     iApply (wp_jal_gpr_s2 root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd246)
               (kv_m1 m) pmpcfg0 pmpaddr00 region_pte (1/2)%Qp
-              HN Hg19 Hg19b (Hpmpf (KernelSyms.kernelvec + 0x24) eq_refl) Hpmpp Hpteregion Halignp Hrd19 Hal19
+              HN HX Hpmpcov ltac:(vm_compute; reflexivity) Hpmpp Hpteregion Halignp Hrd19 Hal19
               with "Hhw Hsm Hpmpc1 Hpmpa1 Htlbinv Hpc Hfile Hi19").
     iEval (rewrite kv_jal_tgt kv_ra_val).
     iIntros "Hsm Hpmpc1 Hpmpa1 Htlbinv Hpc Hfile".
@@ -1138,6 +1139,7 @@ Section WpKernelvecNew.
     { rewrite <- is_aligned_vaddr_paddr. exact Halv17. }
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile
              #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hcont".
+    pose proof (proj2 (proj2 (proj2 (proj1 (Hpmpf (KernelSyms.kernelvec + 0x28) eq_refl))))) as HX.
     (* ---- #20: c.ldsp x1, 0(sp) @ 0x80005408 ---- *)
     iPoseProof (kv_i20 with "Htext") as "Hi20".
     assert (Hg20 : kv_fetch_geom (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)) by kv_geom.
@@ -1150,7 +1152,7 @@ Section WpKernelvecNew.
     iEval (rewrite Heq0g) in "Hv1".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x28)) (mword_of_int 0) (mword_of_int 1)
               mt v1 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd20 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg20 (Hpmpf (KernelSyms.kernelvec + 0x28) eq_refl)
+              HN Hrd20 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp0 add_vec_slot0_zero; exact Halv1) ltac:(rewrite Hsp0 add_vec_slot0_zero; exact Halp1)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi20 Hv1").
@@ -1169,7 +1171,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp1) in "Hv2".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2a)) (mword_of_int 2) (mword_of_int 3)
               mt1 v2 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd21 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg21 (Hpmpf (KernelSyms.kernelvec + 0x2a) eq_refl)
+              HN Hrd21 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp1; exact Halv2) ltac:(rewrite Hsp1; exact Halp2)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi21 Hv2").
@@ -1188,7 +1190,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp2) in "Hv3".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2c)) (mword_of_int 4) (mword_of_int 5)
               mt2 v3 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd22 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg22 (Hpmpf (KernelSyms.kernelvec + 0x2c) eq_refl)
+              HN Hrd22 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp2; exact Halv3) ltac:(rewrite Hsp2; exact Halp3)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi22 Hv3").
@@ -1207,7 +1209,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp3) in "Hv4".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2e)) (mword_of_int 5) (mword_of_int 6)
               mt3 v4 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd23 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg23 (Hpmpf (KernelSyms.kernelvec + 0x2e) eq_refl)
+              HN Hrd23 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp3; exact Halv4) ltac:(rewrite Hsp3; exact Halp4)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi23 Hv4").
@@ -1226,7 +1228,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp4) in "Hv5".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x30)) (mword_of_int 6) (mword_of_int 7)
               mt4 v5 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd24 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg24 (Hpmpf (KernelSyms.kernelvec + 0x30) eq_refl)
+              HN Hrd24 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp4; exact Halv5) ltac:(rewrite Hsp4; exact Halp5)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi24 Hv5").
@@ -1245,7 +1247,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp5) in "Hv6".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x32)) (mword_of_int 9) (mword_of_int 10)
               mt5 v6 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd25 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg25 (Hpmpf (KernelSyms.kernelvec + 0x32) eq_refl)
+              HN Hrd25 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp5; exact Halv6) ltac:(rewrite Hsp5; exact Halp6)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi25 Hv6").
@@ -1264,7 +1266,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp6) in "Hv7".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x34)) (mword_of_int 10) (mword_of_int 11)
               mt6 v7 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd26 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg26 (Hpmpf (KernelSyms.kernelvec + 0x34) eq_refl)
+              HN Hrd26 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp6; exact Halv7) ltac:(rewrite Hsp6; exact Halp7)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi26 Hv7").
@@ -1283,7 +1285,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp7) in "Hv8".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x36)) (mword_of_int 11) (mword_of_int 12)
               mt7 v8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd27 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg27 (Hpmpf (KernelSyms.kernelvec + 0x36) eq_refl)
+              HN Hrd27 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp7; exact Halv8) ltac:(rewrite Hsp7; exact Halp8)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi27 Hv8").
@@ -1302,7 +1304,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp8) in "Hv9".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x38)) (mword_of_int 12) (mword_of_int 13)
               mt8 v9 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd28 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg28 (Hpmpf (KernelSyms.kernelvec + 0x38) eq_refl)
+              HN Hrd28 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp8; exact Halv9) ltac:(rewrite Hsp8; exact Halp9)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi28 Hv9").
@@ -1321,7 +1323,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp9) in "Hv10".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3a)) (mword_of_int 13) (mword_of_int 14)
               mt9 v10 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd29 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg29 (Hpmpf (KernelSyms.kernelvec + 0x3a) eq_refl)
+              HN Hrd29 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp9; exact Halv10) ltac:(rewrite Hsp9; exact Halp10)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi29 Hv10").
@@ -1340,7 +1342,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp10) in "Hv11".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3c)) (mword_of_int 14) (mword_of_int 15)
               mt10 v11 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd30 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg30 (Hpmpf (KernelSyms.kernelvec + 0x3c) eq_refl)
+              HN Hrd30 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp10; exact Halv11) ltac:(rewrite Hsp10; exact Halp11)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi30 Hv11").
@@ -1359,7 +1361,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp11) in "Hv12".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3e)) (mword_of_int 15) (mword_of_int 16)
               mt11 v12 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd31 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg31 (Hpmpf (KernelSyms.kernelvec + 0x3e) eq_refl)
+              HN Hrd31 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp11; exact Halv12) ltac:(rewrite Hsp11; exact Halp12)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi31 Hv12").
@@ -1378,7 +1380,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp12) in "Hv13".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x40)) (mword_of_int 16) (mword_of_int 17)
               mt12 v13 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd32 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg32 (Hpmpf (KernelSyms.kernelvec + 0x40) eq_refl)
+              HN Hrd32 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp12; exact Halv13) ltac:(rewrite Hsp12; exact Halp13)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi32 Hv13").
@@ -1397,7 +1399,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp13) in "Hv14".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x42)) (mword_of_int 27) (mword_of_int 28)
               mt13 v14 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd33 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg33 (Hpmpf (KernelSyms.kernelvec + 0x42) eq_refl)
+              HN Hrd33 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp13; exact Halv14) ltac:(rewrite Hsp13; exact Halp14)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi33 Hv14").
@@ -1416,7 +1418,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp14) in "Hv15".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x44)) (mword_of_int 28) (mword_of_int 29)
               mt14 v15 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd34 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg34 (Hpmpf (KernelSyms.kernelvec + 0x44) eq_refl)
+              HN Hrd34 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp14; exact Halv15) ltac:(rewrite Hsp14; exact Halp15)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi34 Hv15").
@@ -1435,7 +1437,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp15) in "Hv16".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x46)) (mword_of_int 29) (mword_of_int 30)
               mt15 v16 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd35 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg35 (Hpmpf (KernelSyms.kernelvec + 0x46) eq_refl)
+              HN Hrd35 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp15; exact Halv16) ltac:(rewrite Hsp15; exact Halp16)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi35 Hv16").
@@ -1454,7 +1456,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp16) in "Hv17".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x48)) (mword_of_int 30) (mword_of_int 31)
               mt16 v17 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN Hrd36 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg36 (Hpmpf (KernelSyms.kernelvec + 0x48) eq_refl)
+              HN Hrd36 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
               ltac:(rewrite Hsp16; exact Halv17) ltac:(rewrite Hsp16; exact Halp17)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi36 Hv17").
@@ -1475,7 +1477,7 @@ Section WpKernelvecNew.
       as "(Hsm & Hpmpc1 & Hpmpa1 & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2 & Hpmpc2 & Hpmpa2)".
     iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
               pmpcfg0 pmpaddr00 region_pte (1/2)%Qp
-              HN Hg37 (Hpmpf (KernelSyms.kernelvec + 0x4a) eq_refl) Hpmpp Hpteregion Halignp
+              HN HX Hpmpcov Hpmpp Hpteregion Halignp
               with "Hsm Hpmpc1 Hpmpa1 Htlbinv Hpc Hfile Hi37").
     iEval (rewrite Hpc37).
     iIntros "Hsm Hpmpc1 Hpmpa1 Htlbinv Hpc Hfile".
@@ -1491,7 +1493,7 @@ Section WpKernelvecNew.
               mstatus0 mie_v mdv0 menvcfg0 sepc0
               (<[Regidx csp_rs1 := regval_into_reg (add_vec spv (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> mt17)
               pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hg38 Hg38b (Hpmpf (KernelSyms.kernelvec + 0x4c) eq_refl) Hpmpp Hpteregion Halignp HTSR Hsup Hlpe0
+              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hpmpcov ltac:(vm_compute; reflexivity) Hpmpp Hpteregion Halignp HTSR Hsup Hlpe0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile Hi38").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17").

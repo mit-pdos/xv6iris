@@ -350,8 +350,8 @@ Section WpMemsetInstr.
     let a4_idx : mword 5 := mword_of_int 14 in
     let a5_idx : mword 5 := mword_of_int 15 in
     let pcE := mword_of_int KernelSyms.memset in
-    let pc0L := mword_of_int (KernelSyms.memset + 0x14) in
-    let pcLS := mword_of_int (KernelSyms.memset + 0x1e) in
+    let pc0L : mword 64 := mword_of_int (KernelSyms.memset + 0x14) in
+    let pcLS : mword 64 := mword_of_int (KernelSyms.memset + 0x1e) in
     let imm_entry : mword 6 := mword_of_int 48 in
     let shamt_l : mword 6 := mword_of_int 32 in
     let shamt_r : mword 6 := mword_of_int 32 in
@@ -390,30 +390,8 @@ Section WpMemsetInstr.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    kv_fetch_geom pcE -> kv_fetch_geom (add_vec_int pcE 2) -> kv_fetch_geom (add_vec_int pcE 4) ->
-    kv_fetch_geom (add_vec_int pcE 6) -> kv_fetch_geom (add_vec_int pcE 8) -> kv_fetch_geom (add_vec_int pcE 10) ->
-    kv_fetch_geom (add_vec_int pcE 12) -> kv_fetch_geom (add_vec_int pcE 14) ->
-    kv_fetch_geom (add_vec_int pcE 16) -> kv_fetch_geom (add_vec_int pcE 18) ->
-    kv_fetch_geom pc0L -> kv_fetch_geom (add_vec_int pc0L 2) -> kv_fetch_geom (add_vec_int pc0L 4) ->
-    kv_fetch_geom (add_vec_int pc0L 6) -> kv_fetch_geom (add_vec_int pc0L 8) ->
-    kv_fetch_geom pcLS -> kv_fetch_geom (add_vec_int pcLS 2) ->
-    kv_fetch_geom (add_vec_int pcLS 4) -> kv_fetch_geom (add_vec_int pcLS 6) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pcE ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 4) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 6) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 8) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 10) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 12) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 14) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcE 16) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pc0L ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pc0L 4) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pc0L 6) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 pcLS ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 2) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 4) ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (add_vec_int pcLS 6) ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
@@ -483,10 +461,7 @@ Section WpMemsetInstr.
       sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
       HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18
-      HgL0 HgL2 HgL4 HgL6 HgL8 HgS0 HgS2 HgS4 HgS6
-      Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
-      HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6 Hpmpp Hpteregion Halignp
+      HX Hcov Hpmpp Hpteregion Halignp
       Hbexec_add
       Hpmpcov HW_R HR_R HalignR HpalignR HalignS HpalignS
       Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
@@ -511,10 +486,7 @@ Section WpMemsetInstr.
               i_add wval_add imm_bne svpn olds
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18
-              HgL0 HgL2 HgL4 HgL6 HgL8 HgS0 HgS2 HgS4 HgS6
-              Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
-              HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6 Hpmpp Hpteregion Halignp
+              HX Hcov Hpmpp Hpteregion Halignp
               Hbexec_add
               Hpmpcov HW_R HR_R HalignR HpalignR HalignS HpalignS
               Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
