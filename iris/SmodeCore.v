@@ -1622,6 +1622,71 @@ Section KVTranslate.
     reflexivity.
   Qed.
 
+  (* ---- Combined per-address fetch translate (HIT or WALK) ----
+     Given the slot is TLB-consistent (empty, or already holding the canonical
+     superpage entry), together with the [va] geometry and the PTE-read facts
+     (the latter consumed only in the empty/None branch), the fetch translation
+     succeeds, and the resulting state is either unchanged (hit) or the filled
+     state [pw_filled svpn tlbvec s] (walk).  This is the reusable per-chunk
+     unit both fetch halves call. *)
+  Lemma exec_translateAddr_fetch_S (va : mword 64) (svpn : mword 27) (region : PMA_Region)
+        (menvcfg0 satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+    register_lookup satp s.(sregs) = satp0 ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    register_lookup tlb s.(sregs) = tlbvec ->
+    (* TLB consistency for this slot: empty, or the canonical superpage entry *)
+    (vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = None \/
+     vec_access_dec tlbvec (tlb_hash (__id 39) svpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0))) ->
+    (* geometry of [va], phrased over [svpn] (= svpn_of va) *)
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
+    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
+    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
+    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
+    zero_extend' 44 (and_vec (sfetch_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
+    (* PTE-read facts, consumed only in the None (walk) branch *)
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
+    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
+    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
+    register_lookup menvcfg s.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    exists s', exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+                 = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), s')
+               /\ (s' = s \/ s' = pw_filled svpn tlbvec s).
+  Proof.
+    intros Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hcons Hcanon Hvpn_def Hident Hmask
+           Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    destruct Hcons as [Hvec | Hvec].
+    - eexists. split.
+      + exact (exec_translateAddr_fetch_walk va svpn region menvcfg0 satp0 tlbvec s
+                 Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hvec Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
+                 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE).
+      + right. reflexivity.
+    - eexists. split.
+      + exact (exec_translateAddr_fetch_hit_g va svpn satp0 tlbvec s
+                 Hcp HSXL Hsatp Hmode Hasid Htlb Hvec Hcanon Hvpn_def Hident Hmask).
+      + left. reflexivity.
+  Qed.
+
   (* ===================================================================== *)
   (* 6. The S-mode fetch reductions (TLB hit), one per instr_bytes geometry. *)
   (* ===================================================================== *)
@@ -2049,6 +2114,159 @@ Section SFetchHitOuter.
 End SFetchHitOuter.
 
 (* ===================================================================== *)
+(* 6b. State-polymorphic 2+2 F_Base fetch composition.  The two halfword  *)
+(* translations are ABSTRACT (given as [Htrl]/[Htrh]) and may land in      *)
+(* DIFFERENT states [s -> s1 -> s2]; no same-page/[svpn] assumption. Both   *)
+(* the hit (s1=s2=s) and walk (s1=s2=sf) F_Base_2 lemmas are instances.     *)
+(* ===================================================================== *)
+
+Lemma exec_fetch_F_Base_2_S_gen
+      (va : mword 64) (w : mword 32) (s s1 s2 : mstate) (regl regh : PMA_Region) :
+  let ilo : mword 16 := subrange_vec_dec w 15 0 in
+  let ihi : mword 16 := subrange_vec_dec w 31 16 in
+  let vah : mword 64 := add_vec_int va 2 in
+  register_lookup PC s.(sregs) = va ->
+  register_lookup PC s1.(sregs) = va ->
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  neq_vec (access_vec_dec va 0) ('b"0") = false ->
+  neq_vec (access_vec_dec va 1) ('b"0") = true ->
+  is_aligned_vaddr (Virtaddr va) 4 = false ->
+  (* the two abstract halfword translations, threading s -> s1 -> s2 *)
+  exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+    = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), s1) ->
+  exec (translateAddr (Virtaddr vah) (InstructionFetch tt)) s1
+    = Some (Ok (Physaddr vah, PBMT_PMA, init_ext_ptw), s2) ->
+  (* low halfword mem-read facts, at s1 *)
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s1.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0)) 4)
+    (uint va) (uint (to_bits 64 2)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s1.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s1.(sregs)) (Physaddr va) 2 = Some regl ->
+  is_aligned_paddr (Physaddr va) 2 = true ->
+  (override_PMA (PMA_Region_attributes regl) PBMT_PMA).(PMA_executable) = true ->
+  exec (within_clint (Physaddr va) 2) s1 = Some (false, s1) ->
+  exec (within_sig (Physaddr va) 2) s1 = Some (false, s1) ->
+  exec (within_htif_readable (Physaddr va) 2) s1 = Some (false, s1) ->
+  (forall j : nat, (N.of_nat j < 2)%N -> s1.(mem) !! (pa_add va j) = Some (nth_byte ilo j)) ->
+  register_lookup cur_privilege s1.(sregs) = Supervisor ->
+  (* high halfword mem-read facts, at s2 *)
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s2.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s2.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s2.(sregs)) 0)) 4)
+    (uint vah) (uint (to_bits 64 2)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s2.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s2.(sregs)) (Physaddr vah) 2 = Some regh ->
+  is_aligned_paddr (Physaddr vah) 2 = true ->
+  (override_PMA (PMA_Region_attributes regh) PBMT_PMA).(PMA_executable) = true ->
+  exec (within_clint (Physaddr vah) 2) s2 = Some (false, s2) ->
+  exec (within_sig (Physaddr vah) 2) s2 = Some (false, s2) ->
+  exec (within_htif_readable (Physaddr vah) 2) s2 = Some (false, s2) ->
+  (forall j : nat, (N.of_nat j < 2)%N -> s2.(mem) !! (pa_add vah j) = Some (nth_byte ihi j)) ->
+  register_lookup cur_privilege s2.(sregs) = Supervisor ->
+  isRVC ilo = false ->
+  concat_vec ihi ilo = w ->
+  exec (fetch tt) s = Some (F_Base w, s2).
+Proof.
+  intros ilo ihi vah HpcPC HpcPC1 HmisaC Hbit0 Hbit1 Hvalign4 Htrl Htrh
+         iHAL iHordL iHrangeL iHXL iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHbytesL iHprivL
+         iHAH iHordH iHrangeH iHXH iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHbytesH iHprivH
+         HnotRVC Hconcat.
+  assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
+  { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
+  assert (HrdPC1 : exec (Defs.read_reg PC) s1 = Some (va, s1)).
+  { rewrite (exec_read_reg PC s1). rewrite HpcPC1. reflexivity. }
+  (* first halfword: fetch_bytes at [s] that lands in [s1] *)
+  assert (Hfb2l : exec (fetch_bytes va va 2) s = Some (@FetchBytes_Success 2 ilo, s1)).
+  { unfold fetch_bytes.
+    rewrite exec_catch_early_return.
+    change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+              (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
+           = Some (inr (Ok (Physaddr va, PBMT_PMA, init_ext_ptw)), s1))).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+        rewrite execR_liftR. rewrite Htrl. cbn match. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr va, PBMT_PMA) s1)).
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr va) 2 false false false)) s1
+           = Some (inr (Ok ilo), s1))).
+    2:{ rewrite execR_liftR.
+        rewrite (exec_mem_read_fetch_2_S PBMT_PMA va regl ilo s1
+                   iHAL iHordL iHrangeL iHXL iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHbytesL iHprivL).
+        cbn match. reflexivity. }
+    cbv iota beta. rewrite autocast_mword_id_16.
+    rewrite execR_returnR_fwd. cbn match. reflexivity. }
+  (* second halfword: fetch_bytes at [s1] that lands in [s2] *)
+  assert (Hfb2h : exec (fetch_bytes va vah 2) s1 = Some (@FetchBytes_Success 2 ihi, s2)).
+  { unfold fetch_bytes.
+    rewrite exec_catch_early_return.
+    change (ext_fetch_check_pc va vah) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+              (Defs.liftR (translateAddr (Virtaddr vah) (InstructionFetch tt)))) s1
+           = Some (inr (Ok (Physaddr vah, PBMT_PMA, init_ext_ptw)), s2))).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s1)).
+        rewrite execR_liftR. rewrite Htrh. cbn match. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr vah, PBMT_PMA) s2)).
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr vah) 2 false false false)) s2
+           = Some (inr (Ok ihi), s2))).
+    2:{ rewrite execR_liftR.
+        rewrite (exec_mem_read_fetch_2_S PBMT_PMA vah regh ihi s2
+                   iHAH iHordH iHrangeH iHXH iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHbytesH iHprivH).
+        cbn match. reflexivity. }
+    cbv iota beta. rewrite autocast_mword_id_16.
+    rewrite execR_returnR_fwd. cbn match. reflexivity. }
+  (* assemble the outer fetch: PC read at s pre-checks + low read; PC read at s1
+     before the high read *)
+  unfold fetch.
+  rewrite exec_catch_early_return.
+  change (get_config_rvfi tt) with false. cbv iota beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ false s).
+  2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      unfold or_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit0. apply execR_returnR_fwd. }
+      cbv iota beta.
+      unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ true s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit1. apply execR_returnR_fwd. }
+      cbv iota beta.
+      rewrite (execR_bind_Some _ _ _ true s).
+      2:{ rewrite execR_liftR. rewrite (exec_currentlyEnabled_Zca s HmisaC). cbn match.
+          apply execR_returnR_fwd. }
+      cbv iota beta. reflexivity. }
+  cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ false s).
+  2:{ unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hvalign4. apply execR_returnR_fwd. }
+      cbv iota beta. reflexivity. }
+  cbv iota beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hfb2l).
+  cbv iota beta. rewrite HnotRVC. cbv iota beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC1).
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC1).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hfb2h).
+  cbv iota beta. rewrite execR_returnR_fwd. cbn match.
+  rewrite Hconcat. reflexivity.
+Qed.
+
+(* ===================================================================== *)
 (* 6c. The S-mode fetch reductions with an EMPTY TLB slot 5: the page     *)
 (* walk reads the PTE (at the pre-fetch state s) and FILLS the TLB; the   *)
 (* instruction bytes are then read at the filled state sf.  Single-read   *)
@@ -2361,9 +2579,12 @@ Section SFetchWalk.
     Hypothesis HnotRVC : isRVC ilo = false.
     Hypothesis Hconcat : concat_vec ihi ilo = w.
 
+    (* Thin corollary of the state-polymorphic [exec_fetch_F_Base_2_S_gen]:
+       the low half WALKS (s -> sf), the high half HITS the just-filled slot
+       (sf -> sf).  Instantiate [s1 := sf], [s2 := sf]. *)
     Lemma exec_fetch_F_Base_2_S_walk : exec (fetch tt) s = Some (F_Base w, sf).
     Proof using All.
-      (* register/TLB facts at the FILLED state sf *)
+      (* register/TLB facts at the FILLED state sf, to drive the high-half hit *)
       assert (HSXLf : _get_Mstatus_SXL (register_lookup mstatus sf.(sregs)) = 'b"10").
       { unfold sf, pw_filled, set_reg; cbn [sregs].
         rewrite irrelevant_register_set; [exact HSXL | vm_compute; reflexivity]. }
@@ -2380,97 +2601,17 @@ Section SFetchWalk.
       assert (HpcPCf : register_lookup PC sf.(sregs) = va).
       { unfold sf, pw_filled, set_reg; cbn [sregs].
         rewrite irrelevant_register_set; [exact HpcPC | vm_compute; reflexivity]. }
-      assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
-      { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
-      assert (HrdPCf : exec (Defs.read_reg PC) sf = Some (va, sf)).
-      { rewrite (exec_read_reg PC sf). rewrite HpcPCf. reflexivity. }
-      (* first halfword: the 2-byte fetch_bytes that WALKS (s -> sf) *)
-      assert (Hfb2l : exec (fetch_bytes va va 2) s = Some (@FetchBytes_Success 2 ilo, sf)).
-      { unfold fetch_bytes.
-        rewrite exec_catch_early_return.
-        change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
-        rewrite (execR_bind_Some _ _ _ _ _
-          (_ : execR (Defs.bind0 (Defs.returnR _ tt)
-                  (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
-               = Some (inr (Ok (Physaddr va, PBMT_PMA, init_ext_ptw)), sf))).
-        2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-            rewrite execR_liftR. rewrite Htrwalk. cbn match. reflexivity. }
-        cbv iota beta.
-        rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr va, PBMT_PMA) sf)).
-        cbv iota beta.
-        rewrite (execR_bind_Some _ _ _ _ _
-          (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr va) 2 false false false)) sf
-               = Some (inr (Ok ilo), sf))).
-        2:{ rewrite execR_liftR.
-            rewrite (exec_mem_read_fetch_2_S PBMT_PMA va regl ilo sf
-                       iHA iHord iHrangeL iHX iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHbytesL iHpriv).
-            cbn match. reflexivity. }
-        cbv iota beta. rewrite autocast_mword_id_16.
-        rewrite execR_returnR_fwd. cbn match. reflexivity. }
-      (* second halfword: fetch_bytes at sf, HIT on the filled slot 5 *)
-      assert (Hfb2h : exec (fetch_bytes va vah 2) sf = Some (@FetchBytes_Success 2 ihi, sf)).
-      { unfold fetch_bytes.
-        rewrite exec_catch_early_return.
-        change (ext_fetch_check_pc va vah) with (@None unit). cbv iota beta.
-        rewrite (execR_bind_Some _ _ _ _ _
-          (_ : execR (Defs.bind0 (Defs.returnR _ tt)
-                  (Defs.liftR (translateAddr (Virtaddr vah) (InstructionFetch tt)))) sf
-               = Some (inr (Ok (Physaddr vah, PBMT_PMA, init_ext_ptw)), sf))).
-        2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt sf)).
-            rewrite execR_liftR.
-            rewrite (exec_translateAddr_fetch_hit_g root_ppn vah svpn satp0
-                       (vec_update_dec tlbvec (tlb_hash (__id 39) svpn) (Some (pw_tlb_entry root_ppn (mword_of_int 0)))) sf
-                       iHpriv HSXLf Hsatpf Hmode Hasid Htlbf Hvec5f Hcanonh Hvpn_defh Hidenth Hmask).
-            cbn match. reflexivity. }
-        cbv iota beta.
-        rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr vah, PBMT_PMA) sf)).
-        cbv iota beta.
-        rewrite (execR_bind_Some _ _ _ _ _
-          (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr vah) 2 false false false)) sf
-               = Some (inr (Ok ihi), sf))).
-        2:{ rewrite execR_liftR.
-            rewrite (exec_mem_read_fetch_2_S PBMT_PMA vah regh ihi sf
-                       iHA iHord iHrangeH iHX iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHbytesH iHpriv).
-            cbn match. reflexivity. }
-        cbv iota beta. rewrite autocast_mword_id_16.
-        rewrite execR_returnR_fwd. cbn match. reflexivity. }
-      (* assemble the outer fetch (state changes s -> sf at the FIRST read) *)
-      unfold fetch.
-      rewrite exec_catch_early_return.
-      change (get_config_rvfi tt) with false. cbv iota beta.
-      rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
-      rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
-      change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ false s).
-      2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-          unfold or_boolM.
-          rewrite (execR_bind_Some _ _ _ false s).
-          2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit0. apply execR_returnR_fwd. }
-          cbv iota beta.
-          unfold and_boolM.
-          rewrite (execR_bind_Some _ _ _ true s).
-          2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit1. apply execR_returnR_fwd. }
-          cbv iota beta.
-          rewrite (execR_bind_Some _ _ _ true s).
-          2:{ rewrite execR_liftR. rewrite (exec_currentlyEnabled_Zca s HmisaC). cbn match.
-              apply execR_returnR_fwd. }
-          cbv iota beta. reflexivity. }
-      cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ false s).
-      2:{ unfold and_boolM.
-          rewrite (execR_bind_Some _ _ _ false s).
-          2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hvalign4. apply execR_returnR_fwd. }
-          cbv iota beta. reflexivity. }
-      cbv iota beta.
-      rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
-      rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
-      rewrite (execR_liftR_seq _ _ _ _ _ Hfb2l).
-      cbv iota beta. rewrite HnotRVC. cbv iota beta.
-      rewrite (execR_liftR_seq _ _ _ _ _ HrdPCf).
-      rewrite (execR_liftR_seq _ _ _ _ _ HrdPCf).
-      rewrite (execR_liftR_seq _ _ _ _ _ Hfb2h).
-      cbv iota beta. rewrite execR_returnR_fwd. cbn match.
-      rewrite Hconcat. reflexivity.
+      (* the high-half translation HITS the just-filled slot *)
+      assert (Htrh : exec (translateAddr (Virtaddr vah) (InstructionFetch tt)) sf
+                     = Some (Ok (Physaddr vah, PBMT_PMA, init_ext_ptw), sf)).
+      { exact (exec_translateAddr_fetch_hit_g root_ppn vah svpn satp0
+                 (vec_update_dec tlbvec (tlb_hash (__id 39) svpn) (Some (pw_tlb_entry root_ppn (mword_of_int 0)))) sf
+                 iHpriv HSXLf Hsatpf Hmode Hasid Htlbf Hvec5f Hcanonh Hvpn_defh Hidenth Hmask). }
+      exact (exec_fetch_F_Base_2_S_gen va w s sf sf regl regh
+               HpcPC HpcPCf HmisaC Hbit0 Hbit1 Hvalign4 Htrwalk Htrh
+               iHA iHord iHrangeL iHX iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHbytesL iHpriv
+               iHA iHord iHrangeH iHX iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHbytesH iHpriv
+               HnotRVC Hconcat).
     Qed.
   End WalkFBase2.
 End SFetchWalk.
