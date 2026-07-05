@@ -680,7 +680,6 @@ Section WpPushOffTop.
     ↑minstretN ⊆ E ->
     add_vec P (sign_extend' 64 jimm) = pcE ->
     po_mycpu_geom pmpcfg0 pmpaddr00 ->
-    svpn_of (add_vec_int P 2) = svpn_of P ->
     eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -726,7 +725,7 @@ Section WpPushOffTop.
       imm_auipc imm_addi shamt_slli imm_addiw sp' ra0 s00
       ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
-      HN Htarget Hmyg Hsp2_P Halign_tgt
+      HN Htarget Hmyg Halign_tgt
       HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
       Hpmpp Hpteregion Halignp Hal0 HW HR Hramcov
       HalignRb HalignSb.
@@ -737,7 +736,7 @@ Section WpPushOffTop.
                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa")
       as "(Hsm & Hpca & Hpaa & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2 & Hpcb & Hpab)".
     iApply (wp_jal_gpr_s2 root_ppn E Φ P (mword_of_int 1) jimm m pmpcfg0 pmpaddr00 region_pte (1/2)%Qp
-              HN Hmyg Hramcov Hsp2_P Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              HN Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
               with "Hhw Hsm Hpca Hpaa Htlbinv Hpc Hfile Hjal [-]").
     iIntros "Hsm Hpca Hpaa Htlbinv Hpc Hfile".
@@ -856,7 +855,7 @@ Section WpPushOffTop.
     iPoseProof (poi_18 with "Htext") as "Hi18".
     iApply (wp_pushoff_call_mycpu root_ppn E Φ P (mword_of_int 0xcfe : mword 21) ms raold s0old
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               Hpmpp Hpteregion Halignp
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
@@ -1197,7 +1196,7 @@ Section WpPushOffTop.
     iPoseProof (poi_0a with "Htext") as "Hi0a".
     iApply (wp_csrrci_sstatus_s root_ppn E Φ (mword_of_int (PO + 0x0a)) (mword_of_int 15 : mword 5) (mword_of_int 2 : mword 5)
               N1 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov ltac:(vm_compute; reflexivity) Hpmpp Hpteregion Halignp
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp
               ltac:(vm_compute; discriminate) Himm5 Hlegal
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0a [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
@@ -1224,7 +1223,7 @@ Section WpPushOffTop.
     iPoseProof (poi_10 with "Htext") as "Hi10".
     iApply (wp_pushoff_call_mycpu root_ppn E Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3 raold0 s0old0
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               Hpmpp Hpteregion Halignp
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
@@ -1292,7 +1291,7 @@ Section WpPushOffTop.
       iPoseProof (poi_2c with "Htext") as "Hi2c".
       iApply (wp_pushoff_call_mycpu root_ppn E Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5 _ _
                 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-                HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg ltac:(vm_compute; reflexivity)
                 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
                 Hpmpp Hpteregion Halignp
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
@@ -1312,7 +1311,7 @@ Section WpPushOffTop.
       iPoseProof (poi_30 with "Htext") as "Hi30".
       iApply (wp_srli4_s root_ppn E Φ (mword_of_int (PO + 0x30)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (mword_of_int 1 : mword 6) N6 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov ltac:(vm_compute; reflexivity) Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi30 [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
       assert (Hpc34 : add_vec_int (mword_of_int (PO + 0x30) : mword 64) 4 = mword_of_int (PO + 0x34)) by (apply bv_eq; vm_compute; reflexivity).

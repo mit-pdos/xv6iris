@@ -249,7 +249,6 @@ Section WpSretGpr.
     (* fetch: page-table geometry (SRET is a 4-byte F_Base) *)
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    svpn_of (add_vec_int pc 2) = svpn_of pc ->
     (* the walk's PTE read *)
     pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
     (forall pmar0, pma_allows_all pmar0 ->
@@ -290,7 +289,7 @@ Section WpSretGpr.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hsp2
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov
              Hpmpp Hpteregion Halignp HTSR Hsup Hlpe0)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc
        [Hpc Hnpc] Hfile Hinstr Hcont".
@@ -305,7 +304,7 @@ Section WpSretGpr.
     { intros sz Hm. rewrite Hsup. apply exec_get_xLPE_S. rewrite Hm. exact Hlpe0. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (SRET tt)
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov (fun _ => Hsp2)
+              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov
               Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)

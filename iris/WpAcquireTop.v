@@ -530,7 +530,7 @@ Section WpAcquireTop.
               svpn_lk (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) (mword_of_int 1)
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX
-              Hcov ltac:(vm_compute; reflexivity)
+              Hcov
               ltac:(rewrite (Hs1any v1) HAlk2; exact Lcanon)
               ltac:(rewrite (Hs1any v1) HAlk2; exact Lvpn)
               ltac:(rewrite (Hs1any v1) HAlk2; exact Lident)
@@ -564,7 +564,7 @@ Section WpAcquireTop.
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ (mword_of_int (AQ + 0x22)) true
               (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE))
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov ltac:(discriminate) Hpmpp Hpteregion Halignp
+              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hj22").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
@@ -899,7 +899,7 @@ Section WpAcquireTop.
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_jal_gpr_s root_ppn E Φ (mword_of_int (AQ + 0x0c)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fffba : mword 21)
               A2 pmpcfg0 pmpaddr00 region_pte (1/2)%Qp
-              HN Hmyg Hramcov ltac:(apply bv_eq; vm_compute; reflexivity) Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              HN Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
               with "Hsm Hpca Hpaa Htlbinv Hpc Hfile Hi0c [-]").
     iIntros "Hsm Hpca Hpaa Htlbinv Hpc Hfile".
@@ -976,7 +976,7 @@ Section WpAcquireTop.
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_jal_gpr_s root_ppn E Φ (mword_of_int (AQ + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff88 : mword 21)
               B1 pmpcfg0 pmpaddr00 region_pte (1/2)%Qp
-              HN Hmyg Hramcov ltac:(apply bv_eq; vm_compute; reflexivity) Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              HN Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
               with "Hsm Hpca Hpaa Htlbinv Hpc Hfile Hi12 [-]").
     iIntros "Hsm Hpca Hpaa Htlbinv Hpc Hfile".
@@ -1117,7 +1117,7 @@ Section WpAcquireTop.
     iApply (wp_amoswap_w_s root_ppn E Φ (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
               svpn_lk B6 lockv mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg
-              Hramcov ltac:(apply bv_eq; vm_compute; reflexivity)
+              Hramcov
               ltac:(rewrite HAlk2; exact Lcanon) ltac:(rewrite HAlk2; exact Lvpn) ltac:(rewrite HAlk2; exact Lident)
               Lmask Lvpn2 Lmvpn Lmppn Hpmpp Hpteregion Halignp
               ltac:(rewrite HAlk2; exact Lrange) HR HW
@@ -1224,7 +1224,7 @@ Section WpAcquireTop.
               w24 w16
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN ltac:(apply bv_eq; vm_compute; reflexivity) Hmyg
-              ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               Hpmpp Hpteregion Halignp
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
