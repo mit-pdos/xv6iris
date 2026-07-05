@@ -129,7 +129,6 @@ Section WpIntrStep.
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 acq_pc1 ->
     pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
@@ -202,7 +201,7 @@ Section WpIntrStep.
       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros HN Hmm HPBMTE Hpmm HX HW HR Hpmpacq Hpmpp Hpteregion Halignp Hpmpcov Hlpe0
+    intros HN Hmm HPBMTE Hpmm HX HW HR Hpmpp Hpteregion Halignp Hpmpcov Hlpe0
       Halv1 Halp1 Halv2 Halp2 Halv3 Halp3 Halv4 Halp4 Halv5 Halp5 Halv6 Halp6 Halv7 Halp7 Halv8 Halp8 Halv9 Halp9 Halv10 Halp10 Halv11 Halp11 Halv12 Halp12 Halv13 Halp13 Halv14 Halp14 Halv15 Halp15 Halv16 Halp16 Halv17 Halp17.
     iIntros "#Hhw #Hinv #Htext HP Hpc Hfile Hcont".
     iRevert "HP Hpc Hfile Hcont".
@@ -328,7 +327,7 @@ Section WpIntrStep.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     - (* ---- no interrupt: the instruction executes ---- *)
       iApply (wp_acq_caddi_intr root_ppn E Phi m ms mie_v mdv0 menvcfg0 mip_v meip seip
-                pmpcfg0 pmpaddr00 region_pte HN HSXL Hmm Hdres HPBMTE Hpmpacq Hpmpp Hpteregion Halignp
+                pmpcfg0 pmpaddr00 region_pte HN HSXL Hmm Hdres HPBMTE HX Hpmpcov Hpmpp Hpteregion Halignp
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Hpmpc Hpmpa
                       Htlbinv Hpc Hfile Htext").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Hpmpc Hpmpa Htlbinv Hpc Hfile".
