@@ -58,3 +58,8 @@ WpIntrBits.v
 WpIntrCore.v
 WpIntrStep.v
 WpIntrInv.v
+WpPushOff.v
+WpPushOffMem.v
+WpPushOffCsr.v
+WpMycpu.v
+WpPushOffTop.v
