@@ -126,7 +126,7 @@ Section WpIntrStep.
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     (* PMP: kernelvec text + frame + the acquire pc *)
-    (forall A : Z, kv_text_pc A = true -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int A)) ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 acq_pc1 ->
@@ -202,7 +202,7 @@ Section WpIntrStep.
       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros HN Hmm HPBMTE Hpmm Hpmpf HW HR Hpmpacq Hpmpp Hpteregion Halignp Hpmpcov Hlpe0
+    intros HN Hmm HPBMTE Hpmm HX HW HR Hpmpacq Hpmpp Hpteregion Halignp Hpmpcov Hlpe0
       Halv1 Halp1 Halv2 Halp2 Halv3 Halp3 Halv4 Halp4 Halv5 Halp5 Halv6 Halp6 Halv7 Halp7 Halv8 Halp8 Halv9 Halp9 Halv10 Halp10 Halv11 Halp11 Halv12 Halp12 Halv13 Halp13 Halv14 Halp14 Halv15 Halp15 Halv16 Halp16 Halv17 Halp17.
     iIntros "#Hhw #Hinv #Htext HP Hpc Hfile Hcont".
     iRevert "HP Hpc Hfile Hcont".
@@ -305,7 +305,7 @@ Section WpIntrStep.
                 (trap_ms_SXL_eq elp0 ms HSXL)
                 Hmm HPBMTE
                 (trap_ms_MXR_true elp0 ms HMXR)
-                Hpmm Hpmpp Hpteregion Halignp Hpmpcov Hpmpf HW HR
+                Hpmm Hpmpp Hpteregion Halignp Hpmpcov HX HW HR
                 (trap_ms_TSR_false elp0 ms HTSR)
                 (sret_newpriv_trap_ms elp0 ms)
                 Hlpe0

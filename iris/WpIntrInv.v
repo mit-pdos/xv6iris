@@ -177,7 +177,7 @@ Section WpIntrInv.
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* PMP: TOR entry 0 grants X on the whole kernelvec text + R/W on the frame *)
-    (forall A : Z, kv_text_pc A = true -> pmp_tor0_sfetch_all pmpcfg0 pmpaddr00 (mword_of_int A)) ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* stack-page geometry (symbolic sp; svpn = its Sv39 VPN) *)
@@ -204,7 +204,7 @@ Section WpIntrInv.
     ⊢ intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64)
         (F_kv root_ppn svpn m menvcfg0 pmpcfg0 pmpaddr00).
   Proof.
-    intros HPBMTE Hpmm Hpmpp Hpteregion Halignp Hpmpcov Hpmpf HW HR Hlpe0
+    intros HPBMTE Hpmm Hpmpp Hpteregion Halignp Hpmpcov HX HW HR Hlpe0
       Halv1.
     iModIntro. iIntros (elp_v ms pc0 mie_v mdv0 E Φ) "%HN %Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hstvec Hpc HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR).
@@ -219,7 +219,7 @@ Section WpIntrInv.
               (trap_ms_SXL_eq elp_v ms HSXL)
               Hmm HPBMTE
               (trap_ms_MXR_true elp_v ms HMXR)
-              Hpmm Hpmpp Hpteregion Halignp Hpmpcov Hpmpf HW HR
+              Hpmm Hpmpp Hpteregion Halignp Hpmpcov HX HW HR
               (trap_ms_TSR_false elp_v ms HTSR)
               (sret_newpriv_trap_ms elp_v ms)
               Hlpe0
