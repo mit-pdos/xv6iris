@@ -338,7 +338,7 @@ Section WpMemsetInstr.
 
   Lemma wp_memset_s_full_kt (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (N : nat) (wval_add : mword 64)
-      (svpn svpn_ra svpn_s0 : mword 27) (olds : nat -> bv 8)
+      (svpn : mword 27) (olds : nat -> bv 8)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (region_pte : PMA_Region) {dq : dfrac} :
@@ -427,34 +427,11 @@ Section WpMemsetInstr.
         else register_lookup (R_bitvector_64 (gpr_of_Z (uint a0_idx))) s_pc.(sregs)) = m5 !!! Regidx a0_idx ->
        exec (execute i_add) s_pc
        = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint a4_idx))) (regval_into_reg wval_add))) ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_ra))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_ra)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_ra)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn_ra ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn_ra)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_ra)) (Z.sub pagesize_bits 1) 0)) = a8_ra ->
-    and_vec (sign_extend' (57 - 12) svpn_ra) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn_ra 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn_ra (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn_ra) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa_ra) (uint (to_bits 64 8)) = PMP_Match ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     is_aligned_vaddr (Virtaddr a8_ra) 8 = true ->
     is_aligned_paddr (Physaddr pa_ra) 8 = true ->
-    neq_vec (bits_of_virtaddr (Virtaddr a8_s0))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_s0)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_s0)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn_s0 ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn_s0)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8_s0)) (Z.sub pagesize_bits 1) 0)) = a8_s0 ->
-    and_vec (sign_extend' (57 - 12) svpn_s0) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn_s0 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn_s0 (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn_s0) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4) (uint pa_s0) (uint (to_bits 64 8)) = PMP_Match ->
     is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
     is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
@@ -511,8 +488,7 @@ Section WpMemsetInstr.
       Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
       HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6 Hpmpp Hpteregion Halignp
       Hbexec_add
-      HcanonR HvpnR HidentR HmaskR Hvpn2R HmvpnR HmppnR HrangeR HW_R HR_R HalignR HpalignR
-      HcanonS HvpnS HidentS HmaskS Hvpn2S HmvpnS HmppnS HrangeS HalignS HpalignS
+      Hpmpcov HW_R HR_R HalignR HpalignR HalignS HpalignS
       Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
@@ -532,7 +508,7 @@ Section WpMemsetInstr.
     iPoseProof (minstr_cdc with "Htext") as "HiL4".
     iPoseProof (minstr_cde with "Htext") as "HiL6".
     iApply (wp_memset_s_full root_ppn E Φ m0 N imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz
-              i_add wval_add imm_bne svpn svpn_ra svpn_s0 olds
+              i_add wval_add imm_bne svpn olds
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               Hg0 Hg2 Hg4 Hg6 Hg8 Hg10 Hg12 Hg14 Hg16 Hg18
@@ -540,8 +516,7 @@ Section WpMemsetInstr.
               Hp0 Hp2 Hp4 Hp6 Hp8 Hp10 Hp12 Hp14 Hp16
               HpL0 HpL4 HpL6 HpS0 HpS2 HpS4 HpS6 Hpmpp Hpteregion Halignp
               Hbexec_add
-              HcanonR HvpnR HidentR HmaskR Hvpn2R HmvpnR HmppnR HrangeR HW_R HR_R HalignR HpalignR
-              HcanonS HvpnS HidentS HmaskS Hvpn2S HmvpnS HmppnS HrangeS HalignS HpalignS
+              Hpmpcov HW_R HR_R HalignR HpalignR HalignS HpalignS
               Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
               Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
               minstr_cce minstr_cd2 minstr_cd4
