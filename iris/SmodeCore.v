@@ -44,6 +44,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpFetch WpDecode WpLeafCommon WpEntry WpLoad WpGprCsrwB WpGprRvc WpEntryNew.
+Require Import WpRvcBridge.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -3385,13 +3386,7 @@ Lemma kv_decode1 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed kv_h1) s = Some (C_ADDI16SP kv_imm1, s).
 Proof.
-  intro HmisaC.
-  kv_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. kv_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 Section SmodeDemo.

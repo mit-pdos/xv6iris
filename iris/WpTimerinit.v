@@ -49,6 +49,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import WpGprLoad WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprJalr WpGprStore WpGprRvc WpGprRvcTor.
 Require Import WpGprCsrrCommon WpGprCsrrA WpGprCsrrB WpGprCsrwCommon WpGprCsrwA WpGprCsrwB.
 Require Import MinstretInv InstrBytes WpEntryNew.
+Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -147,15 +148,7 @@ Lemma ti_decode9 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h9) s = Some (C_ADDI (i9, Regidx csp_rs1), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h9 11 7 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 10: 0xe406 -> c.sdsp ra, 8(sp) ---- *)
@@ -163,15 +156,7 @@ Lemma ti_decode10 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h10) s = Some (C_SDSP (u10, Regidx ti_ra), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h10 6 2 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 11: 0xe022 -> c.sdsp s0, 0(sp) ---- *)
@@ -179,15 +164,7 @@ Lemma ti_decode11 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h11) s = Some (C_SDSP (u11, Regidx ti_s0), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h11 6 2 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 12: 0x0800 -> c.addi4spn s0, sp, 16 ---- *)
@@ -195,13 +172,7 @@ Lemma ti_decode12 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h12) s = Some (C_ADDI4SPN (ti_cs0, nz12), s).
 Proof.
-  intro HmisaC.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 14: 0x577d -> c.li a4, -1 ---- *)
@@ -209,14 +180,7 @@ Lemma ti_decode14 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h14) s = Some (C_LI (i14, Regidx ti_a4), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h14 11 7 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (currentlyEnabled Ext_Zca) s = Some (true, s))).
-  2:{ apply (exec_currentlyEnabled_Zca s HmisaC). }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 15: 0x177e -> c.slli a4, 63 ---- *)
@@ -224,15 +188,7 @@ Lemma ti_decode15 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h15) s = Some (C_SLLI (sh15, Regidx ti_a4), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h15 11 7 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 16: 0x8fd9 -> c.or a5, a4 ---- *)
@@ -240,12 +196,7 @@ Lemma ti_decode16 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h16) s = Some (C_OR (ti_ca5, ti_ca4), s).
 Proof.
-  intro HmisaC.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (currentlyEnabled Ext_Zca) s = Some (true, s))).
-  2:{ apply (exec_currentlyEnabled_Zca s HmisaC). }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 24: 0x97ba -> c.add a5, a4 ---- *)
@@ -253,17 +204,7 @@ Lemma ti_decode24 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h24) s = Some (C_ADD (Regidx ti_a5, Regidx ti_a4), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr1 ti_h24 11 7 s.
-  reg_step Hr2 ti_h24 6 2 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 26: 0x60a2 -> c.ldsp ra, 8(sp) ---- *)
@@ -271,17 +212,7 @@ Lemma ti_decode26 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h26) s = Some (C_LDSP (u10, Regidx ti_ra), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h26 11 7 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _)
-                          (currentlyEnabled Ext_Zca))) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 27: 0x6402 -> c.ldsp s0, 0(sp) ---- *)
@@ -289,17 +220,7 @@ Lemma ti_decode27 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h27) s = Some (C_LDSP (u11, Regidx ti_s0), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h27 11 7 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _)
-                          (currentlyEnabled Ext_Zca))) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 28: 0x0141 -> c.addi sp, 16 ---- *)
@@ -307,15 +228,7 @@ Lemma ti_decode28 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h28) s = Some (C_ADDI (i28, Regidx csp_rs1), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h28 11 7 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 29: 0x8082 -> c.ret = c.jr ra ---- *)
@@ -323,15 +236,7 @@ Lemma ti_decode29 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed ti_h29) s = Some (C_JR (Regidx ti_ra), s).
 Proof.
-  intro HmisaC.
-  reg_step Hr ti_h29 11 7 s.
-  open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. ti_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- the nine 32-bit instructions: one-shot [decode_any] ---- *)

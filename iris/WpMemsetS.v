@@ -38,6 +38,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew.
 Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore.
 Require Import SmodeCore WpSmodeGpr.
+Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -71,27 +72,8 @@ Section WpMemsetS.
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed h_memset0) s = Some (C_ADDI (imm_memset0, rsd_memset0), s).
   Proof.
-    intro HmisaC. unfold imm_memset0, rsd_memset0.
-    assert (Hrsd : exec (encdec_reg_backwards (subrange_vec_dec h_memset0 11 7)) s
-                = Some (Regidx (autocast (T := mword)
-                          (subrange_vec_dec (subrange_vec_dec h_memset0 11 7)
-                             (Z.sub regidx_bit_width 1) 0)), s)).
-    { unfold encdec_reg_backwards.
-      match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-        replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
-    unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
-    skip_pure_clause.
-    cwalk s HmisaC.
-    match goal with |- context[if ?g then _ else returnM None] =>
-      replace g with true by (vm_compute; reflexivity) end.
-    cbn match. rewrite exec_bind.
-    rewrite (exec_bind_Some _ _ _ _ _ Hrsd). cbn beta.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-    2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-        apply exec_currentlyEnabled_Zca; exact HmisaC. }
-    cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
-  Qed.
+  intro HmisaC. rvc_oneshot s HmisaC.
+Qed.
 
   (* ---- the [instr] fact at [memset]'s entry (4-aligned RVC) ---- *)
   (* Under the post-refactor [instr], the RVC arm carries the ExecuteAs-EXPANDED

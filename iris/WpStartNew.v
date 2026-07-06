@@ -62,6 +62,7 @@ Require Import WpAuipc WpGprAuipc WpGprLoad WpGprLui WpGprAddi WpGprShift WpGprL
 Require Import WpGprCsrrCommon WpGprCsrrA WpGprCsrrB WpGprCsrwCommon WpGprCsrwA WpGprCsrwB WpGprCsrwC.
 Require Import WpGprMret WpGprMretWp WpGprMretNew.
 Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit.
+Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -190,11 +191,7 @@ Lemma st_decode35 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h35) s = Some (C_LUI (si35, Regidx ti_a4), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h35 11 7 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close2 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 37: 0x8ff9 -> c.and a5, a4 ---- *)
@@ -202,9 +199,7 @@ Lemma st_decode37 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h37) s = Some (C_AND (ti_ca5, ti_ca4), s).
 Proof.
-  intro HmisaC.
-  st_open_rvc s HmisaC.
-  st_close0 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 38: 0x6705 -> c.lui a4, 1 ---- *)
@@ -212,11 +207,7 @@ Lemma st_decode38 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h38) s = Some (C_LUI (si38, Regidx ti_a4), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h38 11 7 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close2 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 45: 0x4781 -> c.li a5, 0 ---- *)
@@ -224,11 +215,7 @@ Lemma st_decode45 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h45) s = Some (C_LI (si45, Regidx ti_a5), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h45 11 7 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close0 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 47: 0x67c1 -> c.lui a5, 16 ---- *)
@@ -236,11 +223,7 @@ Lemma st_decode47 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h47) s = Some (C_LUI (si47, Regidx ti_a5), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h47 11 7 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close2 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 48: 0x17fd -> c.addi a5, -1 ---- *)
@@ -248,11 +231,7 @@ Lemma st_decode48 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h48) s = Some (C_ADDI (si48, Regidx ti_a5), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h48 11 7 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close1 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 54: 0x57fd -> c.li a5, -1 ---- *)
@@ -260,11 +239,7 @@ Lemma st_decode54 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h54) s = Some (C_LI (si54, Regidx ti_a5), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h54 11 7 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close0 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 55: 0x83a9 -> c.srli a5, 10 ---- *)
@@ -272,9 +247,7 @@ Lemma st_decode55 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h55) s = Some (C_SRLI (ssh55, ti_ca5), s).
 Proof.
-  intro HmisaC.
-  st_open_rvc s HmisaC.
-  st_close1 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 57: 0x47bd -> c.li a5, 15 ---- *)
@@ -282,11 +255,7 @@ Lemma st_decode57 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h57) s = Some (C_LI (si57, Regidx ti_a5), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h57 11 7 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close0 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 61: 0x2781 -> c.addiw a5, 0 ---- *)
@@ -298,21 +267,7 @@ Lemma st_decode61 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h61) s = Some (C_ADDIW (si61, Regidx ti_a5), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr st_h61 11 7 s.
-  st_open_rvc s HmisaC.
-  match goal with |- context[Defs.and_boolM (Defs.and_boolM (returnM ?b32) (currentlyEnabled Ext_Zca)) (returnM ?p)] =>
-    assert (HJ : exec (Defs.and_boolM (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) (returnM p)) s = Some (false, s))
-      by (rewrite (exec_and_boolM_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) s = Some (false, s)));
-          [ reflexivity
-          | rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM b32 s));
-            replace b32 with false by (vm_compute; reflexivity); reflexivity ])
-  end.
-  rewrite HJ. cbn match.
-  rewrite exec_bind.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  st_close2 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- idx 62: 0x823e -> c.mv tp, a5 ---- *)
@@ -320,13 +275,7 @@ Lemma st_decode62 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed st_h62) s = Some (C_MV (Regidx st_tp, Regidx ti_a5), s).
 Proof.
-  intro HmisaC.
-  st_reg_step Hr1 st_h62 11 7 s.
-  st_reg_step Hr2 st_h62 6 2 s.
-  st_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  st_close1 s HmisaC.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ---- the sixteen 32-bit instructions: one-shot [decode_any] ---- *)

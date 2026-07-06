@@ -35,6 +35,7 @@ Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpA
 Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLogic WpGprAuipc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
 Require Import WpTimerinit WpMemsetInstr.
+Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -87,12 +88,7 @@ Lemma mydec_mv s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x8792 : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 4)), s).
 Proof.
-  intro H. my_reg_step Hr1 (mword_of_int 0x8792 : mword 16) 11 7 s.
-  my_reg_step Hr2 (mword_of_int 0x8792 : mword 16) 6 2 s.
-  my_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  my_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x0a  2781  c.addiw a5,0 (sext.w) *)
@@ -100,20 +96,7 @@ Lemma mydec_addiw s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   exec (ext_decode_compressed (mword_of_int 0x2781 : mword 16)) s
   = Some (C_ADDIW (mword_of_int 0, Regidx (mword_of_int 15)), s).
 Proof.
-  intro H. my_reg_step Hr (mword_of_int 0x2781 : mword 16) 11 7 s.
-  my_open_rvc s H.
-  match goal with |- context[Defs.and_boolM (Defs.and_boolM (returnM ?b32) (currentlyEnabled Ext_Zca)) (returnM ?p)] =>
-    assert (HJ : exec (Defs.and_boolM (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) (returnM p)) s = Some (false, s))
-      by (rewrite (exec_and_boolM_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) s = Some (false, s)));
-          [ reflexivity
-          | rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM b32 s));
-            replace b32 with false by (vm_compute; reflexivity); reflexivity ])
-  end.
-  rewrite HJ. cbn match.
-  rewrite exec_bind.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  my_close2 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x0c  079e  c.slli a5,7 *)
@@ -121,10 +104,7 @@ Lemma mydec_slli s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   exec (ext_decode_compressed (mword_of_int 0x079e : mword 16)) s
   = Some (C_SLLI (mword_of_int 7, Regidx (mword_of_int 15)), s).
 Proof.
-  intro H. my_reg_step Hr (mword_of_int 0x079e : mword 16) 11 7 s.
-  my_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  my_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x16  953e  c.add a0,a0,a5 *)
@@ -132,12 +112,7 @@ Lemma mydec_add s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0x953e : mword 16)) s
   = Some (C_ADD (Regidx (mword_of_int 10), Regidx (mword_of_int 15)), s).
 Proof.
-  intro H. my_reg_step Hr1 (mword_of_int 0x953e : mword 16) 11 7 s.
-  my_reg_step Hr2 (mword_of_int 0x953e : mword 16) 6 2 s.
-  my_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  my_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x0e  00011517  auipc a0,0x11 *)

@@ -20,6 +20,7 @@ Require Import WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpAuipc.
 Require Import WpGpr WpGprRvc WpGprStore.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew.
 Require Import WpPushOff WpPushOffMem WpPushOffCsr WpMycpu.
+Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -79,8 +80,7 @@ Lemma podec_00 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x1101 : mword 16)) s
   = Some (C_ADDI (mword_of_int 32, Regidx csp_rs1), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0x1101 : mword 16) 11 7 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x02  0xec06  c.sdsp ra,24(sp) *)
@@ -88,8 +88,7 @@ Lemma podec_02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0xec06 : mword 16)) s
   = Some (C_SDSP (mword_of_int 3, Regidx (mword_of_int 1)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0xec06 : mword 16) 6 2 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x04  0xe822  c.sdsp s0,16(sp) *)
@@ -97,8 +96,7 @@ Lemma podec_04 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0xe822 : mword 16)) s
   = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 8)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0xe822 : mword 16) 6 2 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x06  0xe426  c.sdsp s1,8(sp) *)
@@ -106,8 +104,7 @@ Lemma podec_06 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0xe426 : mword 16)) s
   = Some (C_SDSP (mword_of_int 1, Regidx (mword_of_int 9)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0xe426 : mword 16) 6 2 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x08  0x1000  c.addi4spn s0,sp,32 *)
@@ -115,7 +112,7 @@ Lemma podec_08 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x1000 : mword 16)) s
   = Some (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 8), s).
 Proof.
-  intro H. po_open_rvc s H. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x0e  0x84be  c.mv s1,a5 *)
@@ -123,11 +120,7 @@ Lemma podec_0e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x84be : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 15)), s).
 Proof.
-  intro H. po_reg_step Hr1 (mword_of_int 0x84be : mword 16) 11 7 s.
-  po_reg_step Hr2 (mword_of_int 0x84be : mword 16) 6 2 s.
-  po_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x14/+0x1c  0x5d3c  c.lw a5,120(a0) *)
@@ -135,7 +128,7 @@ Lemma podec_lw s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x5d3c : mword 16)) s
   = Some (C_LW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. po_open_rvc s H. po_close0 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x16  0xcb99  c.beqz a5,80000bec *)
@@ -143,7 +136,7 @@ Lemma podec_16 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0xcb99 : mword 16)) s
   = Some (C_BEQZ (mword_of_int 11, Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. po_open_rvc s H. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x1e  0x2785  c.addiw a5,a5,1 *)
@@ -151,25 +144,7 @@ Lemma podec_1e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x2785 : mword 16)) s
   = Some (C_ADDIW (mword_of_int 1, Regidx (mword_of_int 15)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0x2785 : mword 16) 11 7 s.
-  po_open_rvc s H.
-  match goal with |- context[Defs.and_boolM (Defs.and_boolM (returnM ?b32) (currentlyEnabled Ext_Zca)) (returnM ?p)] =>
-    assert (HJ : exec (Defs.and_boolM (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) (returnM p)) s = Some (false, s))
-      by (rewrite (exec_and_boolM_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM b32) (currentlyEnabled Ext_Zca)) s = Some (false, s)));
-          [ reflexivity
-          | rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM b32 s));
-            replace b32 with false by (vm_compute; reflexivity); reflexivity ])
-  end.
-  rewrite HJ. cbn match. rewrite exec_bind.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _)
-                          (currentlyEnabled Ext_Zca))) s = Some (true, s)));
-  [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; po_ast
-  | apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
-    apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
-    apply exec_currentlyEnabled_Zca; exact H ].
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x20  0xdd3c  c.sw a5,120(a0) *)
@@ -177,7 +152,7 @@ Lemma podec_sw120 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   exec (ext_decode_compressed (mword_of_int 0xdd3c : mword 16)) s
   = Some (C_SW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. po_open_rvc s H. po_close0 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x36  0xdd7c  c.sw a5,124(a0) *)
@@ -185,7 +160,7 @@ Lemma podec_sw124 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   exec (ext_decode_compressed (mword_of_int 0xdd7c : mword 16)) s
   = Some (C_SW (mword_of_int 31, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. po_open_rvc s H. po_close0 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x22  0x60e2  c.ldsp ra,24(sp) *)
@@ -193,8 +168,7 @@ Lemma podec_22 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x60e2 : mword 16)) s
   = Some (C_LDSP (mword_of_int 3, Regidx (mword_of_int 1)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0x60e2 : mword 16) 11 7 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close_ld s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x24  0x6442  c.ldsp s0,16(sp) *)
@@ -202,8 +176,7 @@ Lemma podec_24 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x6442 : mword 16)) s
   = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 8)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0x6442 : mword 16) 11 7 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close_ld s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x26  0x64a2  c.ldsp s1,8(sp) *)
@@ -211,8 +184,7 @@ Lemma podec_26 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x64a2 : mword 16)) s
   = Some (C_LDSP (mword_of_int 1, Regidx (mword_of_int 9)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0x64a2 : mword 16) 11 7 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close_ld s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x28  0x6105  c.addi16sp sp,32 *)
@@ -220,7 +192,7 @@ Lemma podec_28 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x6105 : mword 16)) s
   = Some (C_ADDI16SP (mword_of_int 2 : mword 6), s).
 Proof.
-  intro H. po_open_rvc s H. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x2a  0x8082  c.ret *)
@@ -228,8 +200,7 @@ Lemma podec_2a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x8082 : mword 16)) s
   = Some (C_JR (Regidx (mword_of_int 1)), s).
 Proof.
-  intro H. po_reg_step Hr (mword_of_int 0x8082 : mword 16) 11 7 s.
-  po_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x34  0x8b85  c.andi a5,a5,1 *)
@@ -237,7 +208,7 @@ Lemma podec_34 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0x8b85 : mword 16)) s
   = Some (C_ANDI (mword_of_int 1, Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. po_open_rvc s H. po_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x38  0xb7c5  c.j 80000bd8 *)
@@ -245,15 +216,7 @@ Lemma podec_38 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0xb7c5 : mword 16)) s
   = Some (C_J (mword_of_int 2032 : mword 11), s).
 Proof.
-  intro H.
-  unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
-  skip_pure_clause. cwalk s H.
-  rewrite (exec_bind_Some _ _ _ _ _
-    (exec_andM_true _ _ s (exec_currentlyEnabled_Zca s H)
-       (exec_returnM_true _ s ltac:(vm_compute; reflexivity)))).
-  cbv iota beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  cbv iota beta. rewrite exec_returnM. po_ast.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* ---- base (4-byte) decodes ----

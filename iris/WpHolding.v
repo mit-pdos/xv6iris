@@ -25,6 +25,7 @@ Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpA
 Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLogic WpGprAuipc WpGprLoad.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
 Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpAcquireMem.
+Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -73,7 +74,7 @@ Lemma hdec_lw s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0x411c : mword 16)) s
   = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. h_open_rvc s H. h_close0 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x2  0xe399  c.bnez a5,+0x8 *)
@@ -81,7 +82,7 @@ Lemma hdec_bnez s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0xe399 : mword 16)) s
   = Some (C_BNEZ (mword_of_int 3, Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. h_open_rvc s H. h_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x4  0x4501  c.li a0,0 *)
@@ -89,8 +90,7 @@ Lemma hdec_li s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0x4501 : mword 16)) s
   = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 10)), s).
 Proof.
-  intro H. h_reg_step Hr (mword_of_int 0x4501 : mword 16) 11 7 s.
-  h_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. h_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x6  0x8082  c.ret: reuse WpPushOffTop.podec_2a *)
@@ -129,12 +129,7 @@ Lemma hdec_ld s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0x691c : mword 16)) s
   = Some (C_LD (mword_of_int 2, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. h_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s)));
-  [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; h_ast
-  | apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
-    apply exec_currentlyEnabled_Zca; exact H ].
+  intro H. rvc_oneshot s H.
 Qed.
 
 Lemma h_imm16 : zero_extend' 12 (concat_vec (mword_of_int 2 : mword 5) ('b"000")) = (mword_of_int 16 : mword 12).

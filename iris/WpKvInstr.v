@@ -18,6 +18,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import MinstretInv InstrBytes.
 Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry.
 Require Import WpGpr WpGprRvc.
+Require Import WpRvcBridge.
 Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -49,29 +50,11 @@ Local Ltac kv_ast :=
         | repeat f_equal;
           first [ reflexivity | apply bv_eq; vm_compute; reflexivity ] ].
 
-Local Ltac kv_dec_sd h s HmisaC :=
-  let Hr := fresh "Hr" in
-  kv_reg_step Hr h 6 2 s;
-  kv_open_rvc s HmisaC;
-  rewrite (exec_bind_Some _ _ _ _ _ Hr); cbn beta;
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s)));
-  [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; kv_ast
-  | apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
-    apply exec_currentlyEnabled_Zca; exact HmisaC ].
-
-Local Ltac kv_dec_ld h s HmisaC :=
-  let Hr := fresh "Hr" in
-  kv_reg_step Hr h 11 7 s;
-  kv_open_rvc s HmisaC;
-  rewrite (exec_bind_Some _ _ _ _ _ Hr); cbn beta;
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _)
-                          (currentlyEnabled Ext_Zca))) s = Some (true, s)));
-  [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; kv_ast
-  | apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
-    apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
-    apply exec_currentlyEnabled_Zca; exact HmisaC ].
+(* One-shot decode via the symbolic bridge (WpRvcBridge): rewrite the decoder
+   to its read-free form and vm_compute it (~0.01s), instead of walking the
+   ~55-clause compressed-decode match by hand.  [h] is now implicit in the goal. *)
+Local Ltac kv_dec_sd h s HmisaC := rvc_oneshot s HmisaC.
+Local Ltac kv_dec_ld h s HmisaC := rvc_oneshot s HmisaC.
 
 Lemma kv_dec2 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -288,13 +271,7 @@ Lemma kv_dec37 s :
   exec (ext_decode_compressed (mword_of_int 0x6111 : mword 16)) s
   = Some (C_ADDI16SP (mword_of_int 16 : mword 6), s).
 Proof.
-  intro HmisaC.
-  kv_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. kv_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* SRET decode: mirror of WpGprMretWp's [decode_mret] with the SRET clause

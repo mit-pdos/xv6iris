@@ -21,6 +21,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpMemsetS WpTimerinit.
+Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -102,46 +103,35 @@ Proof. intro H. exact (ti_decode29 s H). Qed.
 Lemma mdec_cd6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x87aa : mword 16)) s = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
 Proof.
-  intro H. m_reg_step Hr1 (mword_of_int 0x87aa : mword 16) 11 7 s.
-  m_reg_step Hr2 (mword_of_int 0x87aa : mword 16) 6 2 s.
-  m_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  m_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* cd8: 0x1602 -> c.slli a2,32 *)
 Lemma mdec_cd8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x1602 : mword 16)) s = Some (C_SLLI (mword_of_int 32, Regidx (mword_of_int 12)), s).
 Proof.
-  intro H. m_reg_step Hr (mword_of_int 0x1602 : mword 16) 11 7 s.
-  m_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  m_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* cda: 0x9201 -> c.srli a2,32 *)
 Lemma mdec_cda s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x9201 : mword 16)) s = Some (C_SRLI (mword_of_int 32, Cregidx (mword_of_int 4)), s).
 Proof.
-  intro H. m_open_rvc s H. m_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* cd4: 0xca19 -> c.beqz a2,cea *)
 Lemma mdec_cd4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xca19 : mword 16)) s = Some (C_BEQZ (mword_of_int 11, Cregidx (mword_of_int 4)), s).
 Proof.
-  intro H. m_open_rvc s H. m_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* ce4: 0x0785 -> c.addi a5,1 *)
 Lemma mdec_ce4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x0785 : mword 16)) s = Some (C_ADDI (mword_of_int 1, Regidx (mword_of_int 15)), s).
 Proof.
-  intro H. m_reg_step Hr (mword_of_int 0x0785 : mword 16) 11 7 s.
-  m_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  m_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* ---- the three base decodes (one-shot decode_any) ---- *)

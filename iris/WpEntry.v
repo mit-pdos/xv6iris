@@ -13,6 +13,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode.
 Require Import MinstretInv.
+Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 Require Export WpLeafCommon.
 
@@ -72,38 +73,7 @@ Lemma decode_C_lui s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed h_lui) s = Some (C_LUI (imm_clui, rd_clui), s).
 Proof.
-  intro HmisaC. unfold imm_clui, rd_clui.
-  unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
-  skip_pure_clause.                 (* C_NTL: pure guard false (flat) *)
-  do 11 (cstep s HmisaC); cbn match.   (* cbn deferred out of cstep, flush once *)
-  (* encdec_reg_backwards (subrange 11 7) -> Regidx rd, reduced in ISOLATION
-     (so it stays folded in the main goal and cbn match below cannot drive
-     exec through it into cE Zca). *)
-  assert (Hrd : exec (encdec_reg_backwards (subrange_vec_dec h_lui 11 7)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec h_lui 11 7)
-                           (Z.sub regidx_bit_width 1) 0)), s)).
-  { unfold encdec_reg_backwards.
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end.
-    cbn match. apply exec_returnM. }
-  (* C_LUI clause: outer guard true -> BODY ; cbn match stops at folded encdec_reg *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match.
-  (* peel the OUTER clause bind (the [match Some/None]) to expose the body *)
-  rewrite exec_bind.
-  (* body: peel encdec_reg (folded -> via Hrd), then the w51 and_boolM (=true) *)
-  rewrite (exec_bind_Some _ _ _ _ _ Hrd). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (Defs.and_boolM (returnM _)
-                          (currentlyEnabled Ext_Zca))) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply (exec_currentlyEnabled_Zca s HmisaC). }
-  cbn beta iota.
-  (* body = returnM (Some C_LUI) ; collapse the outer match -> returnM C_LUI *)
-  rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 (* ==== execute lemmas (generic register write) ==== *)
@@ -154,33 +124,7 @@ Lemma decode_C_ADD s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed h_add) s = Some (C_ADD (rsd_cadd, rs2_cadd), s).
 Proof.
-  intro HmisaC. unfold rsd_cadd, rs2_cadd.
-  assert (Hrsd : exec (encdec_reg_backwards (subrange_vec_dec h_add 11 7)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec h_add 11 7) (Z.sub regidx_bit_width 1) 0)), s)).
-  { unfold encdec_reg_backwards.
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
-  assert (Hrs2 : exec (encdec_reg_backwards (subrange_vec_dec h_add 6 2)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec h_add 6 2) (Z.sub regidx_bit_width 1) 0)), s)).
-  { unfold encdec_reg_backwards.
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
-  unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
-  skip_pure_clause.
-  do 16 (cstep s HmisaC); cbn match.   (* cbn deferred out of cstep, flush once *)
-  (* C_ADD clause: guard true *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match. rewrite exec_bind.
-  rewrite (exec_bind_Some _ _ _ _ _ Hrsd). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hrs2). cbn beta. cbn iota.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 
@@ -385,27 +329,7 @@ Lemma decode_C_ADDI s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed h_addi) s = Some (C_ADDI (imm_caddi, rsd_caddi), s).
 Proof.
-  intro HmisaC. unfold imm_caddi, rsd_caddi.
-  assert (Hrsd : exec (encdec_reg_backwards (subrange_vec_dec h_addi 11 7)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec h_addi 11 7)
-                           (Z.sub regidx_bit_width 1) 0)), s)).
-  { unfold encdec_reg_backwards.
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
-  unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
-  skip_pure_clause.
-  cwalk s HmisaC.
-  (* C_ADDI clause: outer guard true *)
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end.
-  cbn match. rewrite exec_bind.
-  rewrite (exec_bind_Some _ _ _ _ _ Hrsd). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. reflexivity.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 Definition i_addi : mword 5 :=

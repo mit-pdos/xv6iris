@@ -50,6 +50,7 @@ Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLog
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
 Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop.
 Require Import WpAmo WpAcquireMem WpHolding.
+Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -101,12 +102,7 @@ Lemma aqdec_mv_s1_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) (
   exec (ext_decode_compressed (mword_of_int 0x84aa : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 10)), s).
 Proof.
-  intro H. aq_reg_step Hr1 (mword_of_int 0x84aa : mword 16) 11 7 s.
-  aq_reg_step Hr2 (mword_of_int 0x84aa : mword 16) 6 2 s.
-  aq_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  aq_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x10  0x8526  c.mv a0,s1 *)
@@ -114,12 +110,7 @@ Lemma aqdec_mv_a0_s1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) (
   exec (ext_decode_compressed (mword_of_int 0x8526 : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 9)), s).
 Proof.
-  intro H. aq_reg_step Hr1 (mword_of_int 0x8526 : mword 16) 11 7 s.
-  aq_reg_step Hr2 (mword_of_int 0x8526 : mword 16) 6 2 s.
-  aq_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  aq_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x1a  0x87ba  c.mv a5,a4 *)
@@ -127,12 +118,7 @@ Lemma aqdec_mv_a5_a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) (
   exec (ext_decode_compressed (mword_of_int 0x87ba : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
 Proof.
-  intro H. aq_reg_step Hr1 (mword_of_int 0x87ba : mword 16) 11 7 s.
-  aq_reg_step Hr2 (mword_of_int 0x87ba : mword 16) 6 2 s.
-  aq_open_rvc s H.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr1). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr2). cbn beta.
-  aq_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x16  0x4705  c.li a4,1 *)
@@ -140,8 +126,7 @@ Lemma aqdec_li_a4_1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('
   exec (ext_decode_compressed (mword_of_int 0x4705 : mword 16)) s
   = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 14)), s).
 Proof.
-  intro H. aq_reg_step Hr (mword_of_int 0x4705 : mword 16) 11 7 s.
-  aq_open_rvc s H. rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta. aq_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x18  0xed11  c.bnez a0,+0x1c *)
@@ -149,7 +134,7 @@ Lemma aqdec_bnez_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('
   exec (ext_decode_compressed (mword_of_int 0xed11 : mword 16)) s
   = Some (C_BNEZ (mword_of_int 14, Cregidx (mword_of_int 2)), s).
 Proof.
-  intro H. aq_open_rvc s H. aq_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x22  0xffe5  c.bnez a5,-8 *)
@@ -157,7 +142,7 @@ Lemma aqdec_bnez_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('
   exec (ext_decode_compressed (mword_of_int 0xffe5 : mword 16)) s
   = Some (C_BNEZ (mword_of_int 252, Cregidx (mword_of_int 7)), s).
 Proof.
-  intro H. aq_open_rvc s H. aq_close1 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* +0x28  0xe888  c.sd a0,16(s1) *)
@@ -165,7 +150,7 @@ Lemma aqdec_sd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   exec (ext_decode_compressed (mword_of_int 0xe888 : mword 16)) s
   = Some (C_SD (mword_of_int 2, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
 Proof.
-  intro H. aq_open_rvc s H. aq_close0 s H.
+  intro H. rvc_oneshot s H.
 Qed.
 
 (* ---- base (4-byte) decodes: the three jal's ---- *)

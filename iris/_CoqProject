@@ -20,6 +20,7 @@ WpAuipc.v
 WpLoad.v
 WpFetch.v
 WpDecode.v
+WpRvcBridge.v
 WpLeafCommon.v
 WpEntry.v
 WpGpr.v

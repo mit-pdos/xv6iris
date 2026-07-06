@@ -52,6 +52,7 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 Require Import WpIntrBits.
+Require Import WpRvcBridge.
 
 (* ===================================================================== *)
 (* §2 dispatchInterrupt determinism in Supervisor mode.                   *)
@@ -619,15 +620,7 @@ Lemma acq_decode1 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed acq_h1) s = Some (C_ADDI (acq_i1, Regidx csp_rs1), s).
 Proof.
-  intro HmisaC.
-  acq_reg_step Hr acq_h1 11 7 s.
-  acq_open_rvc s HmisaC.
-  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.and_boolM (returnM _) (currentlyEnabled Ext_Zca)) s = Some (true, s))).
-  2:{ apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |].
-      apply exec_currentlyEnabled_Zca; exact HmisaC. }
-  cbn beta iota. rewrite exec_returnM. cbn beta iota. rewrite exec_returnM. acq_ast.
+  intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
 Section AcqInstr.

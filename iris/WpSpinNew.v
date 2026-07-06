@@ -9,6 +9,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpEntry WpGpr WpLeafCommon.
 Require Import MinstretInv InstrBytes WpEntryNew.
+Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -38,17 +39,8 @@ Section WpSpin.
     eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed h_spin) s = Some (C_J imm_spin, s).
   Proof.
-    intro HmisaC. unfold imm_spin.
-    unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
-    skip_pure_clause.
-    cwalk s HmisaC.
-    rewrite (exec_bind_Some _ _ _ _ _
-      (exec_andM_true _ _ s (exec_currentlyEnabled_Zca s HmisaC)
-         (exec_returnM_true _ s ltac:(vm_compute; reflexivity)))).
-    cbv iota beta.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-    cbv iota beta. apply exec_returnM.
-  Qed.
+  intro HmisaC. rvc_oneshot s HmisaC.
+Qed.
 
   (* ---- the two execute steps (C_J -> JAL x0 -> nextPC := PC) ---- *)
   Lemma exec_execute_C_J (imm : mword 11) s :
