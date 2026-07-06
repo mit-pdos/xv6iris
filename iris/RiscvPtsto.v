@@ -304,3 +304,12 @@ Section Bridge.
 
 End Bridge.
 
+(* Seal [mem_pointsto] for typeclass (Frame) resolution: without this, [iFrame]
+   over a large memory region unfolds every [a ↦ₘ v] into its [pointsto ∗ ⌜..⌝]
+   conjunction and recursively re-searches the [Frame] instance per byte.  Making
+   it typeclass-opaque keeps each [a ↦ₘ v] an atomic frameable unit (~37% off the
+   big region [iFrame]s).  Placed AFTER [End Bridge] so the bridge lemmas above,
+   which destruct the raw conjunction, still typecheck.  [Typeclasses Opaque]
+   (not [Opaque]) leaves [rewrite /mem_pointsto] / [unfold] working. *)
+Typeclasses Opaque mem_pointsto.
+

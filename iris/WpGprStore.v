@@ -506,7 +506,9 @@ Section MemUpdate.
   Lemma mem_update (mm : _) (a : Arch.pa) (v v' : bv 8) :
     gen_heap_interp (hG:=riscv_memGS) mm -∗ a ↦ₘ v ==∗ gen_heap_interp (hG:=riscv_memGS) (<[a := v']> mm) ∗ a ↦ₘ v'.
   Proof.
-    iIntros "Hm [Ha %Hram]".
+    (* [mem_pointsto] is [Typeclasses Opaque] (sealed in RiscvPtsto); unfold it
+       here so the raw [pointsto ∗ ⌜addr_is_ram⌝] conjunction can be destructed. *)
+    rewrite /mem_pointsto. iIntros "Hm [Ha %Hram]".
     iMod (gen_heap_update with "Hm Ha") as "[Hm Ha]".
     iModIntro. iFrame "Hm Ha". iPureIntro. exact Hram.
   Qed.
