@@ -25,31 +25,6 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* ===================================================================== *)
-(* Decode templates (WpTimerinit's reg_step / open_rvc / ast).           *)
-(* ===================================================================== *)
-Local Ltac kv_reg_step name w hi lo s :=
-  assert (name : exec (encdec_reg_backwards (subrange_vec_dec w hi lo)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec w hi lo)
-                           (Z.sub regidx_bit_width 1) 0)), s));
-  [ unfold encdec_reg_backwards;
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end; cbn match; apply exec_returnM
-  | idtac ].
-
-Local Ltac kv_open_rvc s HmisaC :=
-  unfold ext_decode_compressed, encdec_compressed_backwards; cbv beta; cbn zeta;
-  skip_pure_clause; cwalk s HmisaC;
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end;
-  cbn match; rewrite exec_bind.
-
-Local Ltac kv_ast :=
-  first [ reflexivity
-        | repeat f_equal;
-          first [ reflexivity | apply bv_eq; vm_compute; reflexivity ] ].
-
 (* One-shot decode via the symbolic bridge (WpRvcBridge): rewrite the decoder
    to its read-free form and vm_compute it (~0.01s), instead of walking the
    ~55-clause compressed-decode match by hand.  [h] is now implicit in the goal. *)

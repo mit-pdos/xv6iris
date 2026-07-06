@@ -111,37 +111,9 @@ Definition ti_w28 : mword 32 := mword_of_int 0x80820141.
 Definition ti_h29 : mword 16 := mword_of_int 0x8082.
 
 (* ===================================================================== *)
-(* Decode lemmas.  RVC: the WpEntry clause-walkers (skip_pure_clause /     *)
-(* dstep) + per-clause closes, following the recipe of WpEntry's           *)
-(* decode_C_ADDI; the decoded operand fields (autocast subranges of the    *)
-(* concrete halfword) are normalized to the canonical literals above by    *)
-(* [ti_ast].  32-bit: [decode_any] one-shot.                               *)
+(* Decode lemmas.  RVC: concrete compressed words decode through            *)
+(* [rvc_oneshot] (WpRvcBridge); 32-bit: [decode_any] one-shot.             *)
 (* ===================================================================== *)
-
-(* discharge encdec_reg_backwards (subrange w hi lo) -> Regidx ... *)
-Local Ltac reg_step name w hi lo s :=
-  assert (name : exec (encdec_reg_backwards (subrange_vec_dec w hi lo)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec w hi lo)
-                           (Z.sub regidx_bit_width 1) 0)), s));
-  [ unfold encdec_reg_backwards;
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end; cbn match; apply exec_returnM
-  | idtac ].
-
-Local Ltac open_rvc s HmisaC :=
-  unfold ext_decode_compressed, encdec_compressed_backwards; cbv beta; cbn zeta;
-  skip_pure_clause; cwalk s HmisaC;
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end;
-  cbn match; rewrite exec_bind.
-
-(* close [Some (decoded ast, s) = Some (canonical ast, s)]: peel the
-   constructors with f_equal, then each mword/creg leaf by bv_eq+vm_compute. *)
-Local Ltac ti_ast :=
-  first [ reflexivity
-        | repeat f_equal;
-          first [ reflexivity | apply bv_eq; vm_compute; reflexivity ] ].
 
 (* ---- idx 9: 0x1141 -> c.addi sp, -16 ---- *)
 Lemma ti_decode9 s :

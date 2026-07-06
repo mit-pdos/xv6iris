@@ -3359,29 +3359,6 @@ Definition kv_imm1 : mword 6 :=
       (concat_vec (subrange_vec_dec kv_h1 5 5)
         (concat_vec (subrange_vec_dec kv_h1 2 2) (subrange_vec_dec kv_h1 6 6)))).
 
-(* discharge encdec_reg_backwards (subrange w hi lo) -> Regidx ... *)
-Local Ltac kv_reg_step name w hi lo s :=
-  assert (name : exec (encdec_reg_backwards (subrange_vec_dec w hi lo)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec w hi lo)
-                           (Z.sub regidx_bit_width 1) 0)), s));
-  [ unfold encdec_reg_backwards;
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end; cbn match; apply exec_returnM
-  | idtac ].
-
-Local Ltac kv_open_rvc s HmisaC :=
-  unfold ext_decode_compressed, encdec_compressed_backwards; cbv beta; cbn zeta;
-  skip_pure_clause; cwalk s HmisaC;
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end;
-  cbn match; rewrite exec_bind.
-
-Local Ltac kv_ast :=
-  first [ reflexivity
-        | repeat f_equal;
-          first [ reflexivity | apply bv_eq; vm_compute; reflexivity ] ].
-
 Lemma kv_decode1 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed kv_h1) s = Some (C_ADDI16SP kv_imm1, s).

@@ -34,23 +34,6 @@ Import Defs.
 (* ===================================================================== *)
 (* Decode lemmas (podec-style; the tactics mirror WpPushOffTop's).        *)
 (* ===================================================================== *)
-Local Ltac h_reg_step name w hi lo s :=
-  assert (name : exec (encdec_reg_backwards (subrange_vec_dec w hi lo)) s
-              = Some (Regidx (autocast (T := mword)
-                        (subrange_vec_dec (subrange_vec_dec w hi lo)
-                           (Z.sub regidx_bit_width 1) 0)), s));
-  [ unfold encdec_reg_backwards;
-    match goal with |- context[if ?g then returnM (Regidx _) else _] =>
-      replace g with true by (vm_compute; reflexivity) end; cbn match; apply exec_returnM
-  | idtac ].
-
-Local Ltac h_open_rvc s HmisaC :=
-  unfold ext_decode_compressed, encdec_compressed_backwards; cbv beta; cbn zeta;
-  skip_pure_clause; cwalk s HmisaC;
-  match goal with |- context[if ?g then _ else returnM None] =>
-    replace g with true by (vm_compute; reflexivity) end;
-  cbn match; rewrite exec_bind.
-
 Local Ltac h_ast :=
   first [ reflexivity
         | repeat f_equal;
