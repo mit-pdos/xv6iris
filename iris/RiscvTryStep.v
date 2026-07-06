@@ -494,26 +494,8 @@ Qed.
 (* Pure sub-functions on the fetch path reduce to a value (no effects).    *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_effectivePrivilege_fetch (m : mword 64) (p : Privilege) s :
-  run (effectivePrivilege (InstructionFetch tt) m p) s p s.
-Proof.
-  unfold effectivePrivilege.
-  replace (generic_neq (InstructionFetch tt) (InstructionFetch tt)) with false
-    by (vm_compute; reflexivity).
-  apply run_returnM_fwd.
-Qed.
 
-Lemma run_translationMode_M s :
-  run (translationMode Machine) s Bare s.
-Proof.
-  unfold translationMode.
-  replace (generic_eq Machine Machine) with true by (vm_compute; reflexivity).
-  apply run_returnM_fwd.
-Qed.
 
-Lemma run_is_shadow_stack_fetch s :
-  run (is_shadow_stack_access (InstructionFetch tt)) s false s.
-Proof. unfold is_shadow_stack_access. apply run_returnM_fwd. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* MAIN: translateAddr is the identity in Machine mode (Bare paging).      *)
@@ -1752,37 +1734,6 @@ Qed.
 (* 3. Pinned checked_mem_read: result is exactly [Ok (w, default_meta)].   *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_checked_mem_read_ram_pin
-    (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region) (w : bv 32) s :
-  (forall i, pmpAddrMatchType_encdec_backwards
-               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-             = OFF) ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
-    = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
-  run (within_clint (Physaddr addr) 4) s false s ->
-  run (within_sig (Physaddr addr) 4) s false s ->
-  run (within_htif_readable (Physaddr addr) 4) s false s ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  run (checked_mem_read (InstructionFetch tt) pbmt Machine (Physaddr addr) 4 false false false false)
-      s (Ok (w, default_meta)) s.
-Proof.
-  intros Hpmp Hmatch Halign Hexec Hc Hsig Hh Hbytes.
-  unfold checked_mem_read.
-  apply (proj2 (run_bind _ _ _ _ _)). exists None, s. split.
-  { apply run_phys_access_check_none.
-    - apply run_pmpCheck_machine_none; exact Hpmp.
-    - apply run_pmaCheck_ram with (region := region); assumption. }
-  apply (proj2 (run_bind _ _ _ _ _)). exists false, s. split.
-  { apply run_within_mmio_readable_false; assumption. }
-  apply (proj2 (run_bind _ _ _ _ _)). exists Read_plain, s. split.
-  { unfold read_kind_of_flags. apply run_returnM_fwd. }
-  apply (proj2 (run_bind _ _ _ _ _)). exists (w, default_meta), s. split.
-  { apply run_read_ram_plain_4_pin; exact Hbytes. }
-  apply run_returnM_fwd.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. mem_read for an InstructionFetch in Machine mode reduces to [Ok w].  *)

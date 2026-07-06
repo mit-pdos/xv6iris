@@ -81,9 +81,6 @@ Section ForwardAddiGpr.
 
   Definition sAi : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pci : mstate := set_reg sAi nextPC (add_vec_int pc 4).
-  Definition sXi : mstate :=
-    set_reg s_pci (R_bitvector_64 (gpr_of_Z (uint rd)))
-      (regval_into_reg (gpr_addi_val rs1 imm s_pci)).
 
 End ForwardAddiGpr.
 

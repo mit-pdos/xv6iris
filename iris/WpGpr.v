@@ -151,9 +151,6 @@ Section ForwardAddGpr.
 
   Definition sAg : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pcg : mstate := set_reg sAg nextPC (add_vec_int pc 4).
-  Definition sXg : mstate :=
-    set_reg s_pcg (R_bitvector_64 (gpr_of_Z (uint rd)))
-      (regval_into_reg (gpr_rd_val rs2 rs1 s_pcg)).
 
 End ForwardAddGpr.
 

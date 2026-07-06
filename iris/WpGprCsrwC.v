@@ -752,8 +752,6 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 (* Sanity: the boot all-zero pmpcfg is [pmp_all_off] (hence unlocked), and *)
 (* the xv6 write on top of it stays [pmp_allows_all].                       *)
-(* ---------------------------------------------------------------------- *)
-Definition pmpcfg_zero : type_of_register pmpcfg_n := vector_init 64 (zeros' 8).
 
 
 

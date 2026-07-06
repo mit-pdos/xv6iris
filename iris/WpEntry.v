@@ -142,7 +142,6 @@ Section ForwardLUI.
 
   Definition sAlu : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pclu : mstate := set_reg sAlu nextPC (add_vec_int pc 2).
-  Definition sXlu : mstate := set_reg s_pclu (R_bitvector_64 x10) (regval_into_reg luival).
 
 End ForwardLUI.
 
@@ -200,7 +199,6 @@ Section ForwardADD.
   Definition addval : mword 64 :=
     add_vec (register_lookup (R_bitvector_64 x2) s_pcad.(sregs))
             (register_lookup (R_bitvector_64 x10) s_pcad.(sregs)).
-  Definition sXad : mstate := set_reg s_pcad (R_bitvector_64 x2) (regval_into_reg addval).
 
 End ForwardADD.
 
@@ -237,8 +235,6 @@ Section ForwardJAL.
   Definition jtgt : mword 64 :=
     add_vec (register_lookup PC s_pcj.(sregs)) (sign_extend' 64 imm_jal).
   Definition jlink : mword 64 := register_lookup nextPC s_pcj.(sregs).
-  Definition sXj : mstate :=
-    set_reg (set_reg s_pcj nextPC jtgt) (R_bitvector_64 x1) (regval_into_reg jlink).
 
 End ForwardJAL.
 
@@ -369,8 +365,6 @@ Section ForwardMUL.
 
   Definition sAm : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pcm : mstate := set_reg sAm nextPC (add_vec_int pc 4).
-  Definition sXm : mstate :=
-    set_reg s_pcm (R_bitvector_64 x10) (regval_into_reg (mulprod s_pcm)).
 
 End ForwardMUL.
 
@@ -454,7 +448,6 @@ Section ForwardADDI.
   Definition addival : mword 64 :=
     add_vec (register_lookup (R_bitvector_64 x11) s_pcai.(sregs))
             (sign_extend' 64 (sign_extend' 12 imm_caddi)).
-  Definition sXai : mstate := set_reg s_pcai (R_bitvector_64 x11) (regval_into_reg addival).
 
 End ForwardADDI.
 
@@ -538,8 +531,6 @@ Section ForwardCSRR.
 
   Definition sAc : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pcc : mstate := set_reg sAc nextPC (add_vec_int pc 4).
-  Definition sXc : mstate :=
-    set_reg s_pcc (R_bitvector_64 x11) (regval_into_reg (register_lookup mhartid s_pcc.(sregs))).
 
 End ForwardCSRR.
 
