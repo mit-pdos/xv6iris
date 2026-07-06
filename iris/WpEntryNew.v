@@ -475,14 +475,13 @@ Section WpEntryNew.
        on [pmp_all_off] in RiscvFetchExec.v.  It holds of the boot-time
        all-zero pmpcfg by vm_compute. *)
     pmp_all_off pmpcfg0 ->
-    is_aligned_paddr (Physaddr entry_ld_ea) 8 = true ->
     mmode_config (DfracOwn 1) -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     pc_is pc_e0 -∗
     gpr_file m -∗
     mhartid ↦ᵣ mhartid_in -∗
     (* the stack0 pointer word sitting at the load effective address *)
-    ([∗ list] j ∈ seq 0 8, (pa_add entry_ld_ea j) ↦ₘ{ dq } nth_byte v_stack0 j) -∗
+    entry_ld_ea ↦₈{ dq } v_stack0 -∗
     (* the kernel text image: the eight decoded [instr] facts are derived from
        it inside the proof via the [entry_instr_*] constructors ([kernel_text]
        is persistent, so one copy feeds all eight) *)
@@ -492,11 +491,11 @@ Section WpEntryNew.
       pc_is pc_start -∗
       gpr_file (m_jal m v_stack0 mhartid_in) -∗
       mhartid ↦ᵣ mhartid_in -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add entry_ld_ea j) ↦ₘ{ dq } nth_byte v_stack0 j) -∗
+      entry_ld_ea ↦₈{ dq } v_stack0 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hld_al)
+    iIntros (HN Hpmp)
       "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Htext Hcont".
     pose proof (pmp_all_off_allows_all _ Hpmp) as HpmpU.
     (* derive the eight [instr] facts off the (persistent) text image; MUL's
@@ -540,15 +539,11 @@ Section WpEntryNew.
     { unfold entry_ld_ea, entry_sp1, m_auipc.
       rewrite reg_ld_auipc.
       rewrite lookup_total_insert. reflexivity. }
-    assert (Hea_al : is_aligned_paddr
-              (Physaddr (add_vec (m_auipc m !!! Regidx i_ld) (sign_extend' 64 imm_ld))) 8
-              = true).
-    { rewrite Hea. exact Hld_al. }
     iApply (wp_ld_gpr E Φ pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
               (dq := dq) HN Hpmp Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
-    { rewrite /word_pointsto. iSplitR; [iPureIntro; exact Hea_al | rewrite Hea; iExact "Hbytes"]. }
+    { rewrite Hea. iExact "Hbytes". }
     iEval (rewrite pc_e1_e2).
-    iIntros "Hmm Hpmpc Hpc Hfile Hbtw". iDestruct "Hbtw" as "(_ & Hbytes)".
+    iIntros "Hmm Hpmpc Hpc Hfile Hbytes".
     iEval (rewrite Hea) in "Hbytes".
     iEval (change (<[Regidx i_ld := regval_into_reg v_stack0]> (m_auipc m))
              with (m_ld m v_stack0)) in "Hfile".

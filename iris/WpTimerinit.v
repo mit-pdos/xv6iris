@@ -576,8 +576,6 @@ Section WpTimerinitThm.
     (* data side: TOR entry 0 grants both 8-byte stack slots. *)
     pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_ra sp0) 8 ->
     pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_s0 sp0) 8 ->
-    is_aligned_paddr (Physaddr (ti_ea_ra sp0)) 8 = true ->
-    is_aligned_paddr (Physaddr (ti_ea_s0 sp0)) 8 = true ->
     (* the return target (= ra0 with bit 0 cleared) is 4-aligned. *)
     is_aligned_paddr (Physaddr (cret_target ra0)) 4 = true ->
     (* entry register file: sp/ra/s0 (ra0 stays SYMBOLIC -- the caller's
@@ -596,8 +594,8 @@ Section WpTimerinitThm.
     stimecmp ↦ᵣ stimecmp0 -∗
     (* the 16-byte stack frame [sp0-16, sp0): two 8-byte slots, old
        contents arbitrary. *)
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte vold_ra j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte vold_s0 j) -∗
+    ti_ea_ra sp0 ↦₈ vold_ra -∗
+    ti_ea_s0 sp0 ↦₈ vold_s0 -∗
     kernel_text -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg1 -∗
@@ -608,12 +606,12 @@ Section WpTimerinitThm.
       mcounteren ↦ᵣ legalize_mcounteren mcen0 (ti_mcen1 mcen0) -∗
       mtime ↦ᵣ mtime0 -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte ra0 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte s00 j) -∗
+      ti_ea_ra sp0 ↦₈ ra0 -∗
+      ti_ea_s0 sp0 ↦₈ s00 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hpmp Htor_ra Htor_s0 Hal_ra Hal_s0 Hret_al Hsp Hra Hs0.
+    intros HN Hpmp Htor_ra Htor_s0 Hret_al Hsp Hra Hs0.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hmtime Hstc Hstkra Hstks0 #Htext Hcont".
     (* the 21 [instr] facts, off the persistent text image *)
     iPoseProof (ti_instr9  with "Htext") as "Hi9".
@@ -699,12 +697,8 @@ Section WpTimerinitThm.
               (add_vec (ti_m1 m sp0 !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000"))))) 8)
       by (rewrite Hea_ra1; exact Htor_ra).
-    assert (Hal10 : is_aligned_paddr (Physaddr
-              (add_vec (ti_m1 m sp0 !!! Regidx csp_rs1)
-                 (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))))) 8 = true)
-      by (rewrite Hea_ra1; exact Hal_ra).
     iApply (wp_csdsp_gpr_tor E Φ ti_pc10 u10 ti_ra (ti_m1 m sp0) vold_ra pmpcfg1 pmpaddrs q
-              HN Hpmp Htor10 Hal10
+              HN Hpmp Htor10
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hi10 [Hstkra]").
     { rewrite Hea_ra1. iExact "Hstkra". }
     iEval (rewrite P1 Hea_ra1 Lra1). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra".
@@ -717,12 +711,8 @@ Section WpTimerinitThm.
               (add_vec (ti_m1 m sp0 !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000"))))) 8)
       by (rewrite Hea_s01; exact Htor_s0).
-    assert (Hal11 : is_aligned_paddr (Physaddr
-              (add_vec (ti_m1 m sp0 !!! Regidx csp_rs1)
-                 (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))))) 8 = true)
-      by (rewrite Hea_s01; exact Hal_s0).
     iApply (wp_csdsp_gpr_tor E Φ ti_pc11 u11 ti_s0 (ti_m1 m sp0) vold_s0 pmpcfg1 pmpaddrs q
-              HN Hpmp Htor11 Hal11
+              HN Hpmp Htor11
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hi11 [Hstks0]").
     { rewrite Hea_s01. iExact "Hstks0". }
     iEval (rewrite P2 Hea_s01 Ls01). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0".
@@ -871,12 +861,8 @@ Section WpTimerinitThm.
               (add_vec (ti_m24 m sp0 menv0 mcen0 mtime0 !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000"))))) 8)
       by (rewrite Hea_ra26; exact Htor_ra).
-    assert (Hal26 : is_aligned_paddr (Physaddr
-              (add_vec (ti_m24 m sp0 menv0 mcen0 mtime0 !!! Regidx csp_rs1)
-                 (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))))) 8 = true)
-      by (rewrite Hea_ra26; exact Hal_ra).
     iApply (wp_cldsp_gpr_tor E Φ ti_pc26 u10 ti_ra (ti_m24 m sp0 menv0 mcen0 mtime0) ra0
-              pmpcfg1 pmpaddrs q HN Hpmp Htor26 Hnz_ra Hal26
+              pmpcfg1 pmpaddrs q HN Hpmp Htor26 Hnz_ra
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hi26 [Hstkra]").
     { rewrite Hea_ra26. iExact "Hstkra". }
     iEval (rewrite P17 Hea_ra26). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra".
@@ -893,12 +879,8 @@ Section WpTimerinitThm.
               (add_vec (ti_m26 m sp0 menv0 mcen0 mtime0 ra0 !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000"))))) 8)
       by (rewrite Hea_s027; exact Htor_s0).
-    assert (Hal27 : is_aligned_paddr (Physaddr
-              (add_vec (ti_m26 m sp0 menv0 mcen0 mtime0 ra0 !!! Regidx csp_rs1)
-                 (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))))) 8 = true)
-      by (rewrite Hea_s027; exact Hal_s0).
     iApply (wp_cldsp_gpr_tor E Φ ti_pc27 u11 ti_s0 (ti_m26 m sp0 menv0 mcen0 mtime0 ra0) s00
-              pmpcfg1 pmpaddrs q HN Hpmp Htor27 Hnz_s0 Hal27
+              pmpcfg1 pmpaddrs q HN Hpmp Htor27 Hnz_s0
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hi27 [Hstks0]").
     { rewrite Hea_s027. iExact "Hstks0". }
     iEval (rewrite P18 Hea_s027). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0".

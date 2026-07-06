@@ -1013,8 +1013,6 @@ Section WpPopOffTopSec.
     po_mycpu_geom pmpcfg0 pmpaddr00 ->
     po_slot_geom root_ppn pmpaddr00 svpn_noff a_noff 4 ->
     po_slot_geom root_ppn pmpaddr00 svpn_int a_int 4 ->
-    po_slot_align a_p8 8 -> po_slot_align a_p0 8 ->
-    po_slot_align a_fra 8 -> po_slot_align a_fs0 8 ->
     (* interrupts are off: sstatus & 2 = 0 *)
     neq_vec (and_vec (sstatus_read mstatus0) (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false ->
     (* noff >= 1 (signed) *)
@@ -1028,10 +1026,10 @@ Section WpPopOffTopSec.
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_p8 j) ↦ₘ nth_byte vp8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_p0 j) ↦ₘ nth_byte vp0 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_fra j) ↦ₘ nth_byte vfra j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_fs0 j) ↦ₘ nth_byte vfs0 j) -∗
+    a_p8 ↦₈ vp8 -∗
+    a_p0 ↦₈ vp0 -∗
+    a_fra ↦₈ vfra -∗
+    a_fs0 ↦₈ vfs0 -∗
     ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noffv j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -1049,16 +1047,16 @@ Section WpPopOffTopSec.
       ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte storeval j) -∗
       ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
       (∃ (w8 w0 wra ws0 : bv 64),
-        ([∗ list] j ∈ seq 0 8, (pa_add a_p8 j) ↦ₘ nth_byte w8 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_p0 j) ↦ₘ nth_byte w0 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_fra j) ↦ₘ nth_byte wra j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_fs0 j) ↦ₘ nth_byte ws0 j)) -∗
+        a_p8 ↦₈ w8 ∗
+        a_p0 ↦₈ w0 ∗
+        a_fra ↦₈ wra ∗
+        a_fs0 ↦₈ ws0) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hpmpp Hpteregion Halignp HW HR Hramcov
-      Hmyg Hg_noff Hg_int Hg_p8 Hg_p0 Hg_fra Hg_fs0 Hsst2 Hnoffpos Hint Hal0.
+      Hmyg Hg_noff Hg_int Hsst2 Hnoffpos Hint Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              #Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Hint Hcont".
     iPoseProof (ppi_00 with "Htext") as "Hi00".
@@ -1080,8 +1078,6 @@ Section WpPopOffTopSec.
     iPoseProof (ppi_2a with "Htext") as "Hi2a".
     iPoseProof (ppi_2c with "Htext") as "Hi2c".
     iPoseProof (ppi_2e with "Htext") as "Hi2e".
-    pose proof Hg_p8 as [A8 P8]. pose proof Hg_p0 as [A0 P0].
-    pose proof Hg_fra as [FRAa FRAp]. pose proof Hg_fs0 as [FS0a FS0p].
     (* +0x00 c.addi sp,-16 *)
     iApply (wp_caddi_gpr_s_config root_ppn E Φ pcE csp_rs1 (mword_of_int 48 : mword 6) m
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
@@ -1098,7 +1094,6 @@ Section WpPopOffTopSec.
               P1 vp8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite HspP1; exact A8) ltac:(rewrite HspP1; exact P8)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi02 [Hp8] [-]").
     { iEval (rewrite HspP1). iExact "Hp8". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hp8".
@@ -1112,7 +1107,6 @@ Section WpPopOffTopSec.
               P1 vp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite HspP1; exact A0) ltac:(rewrite HspP1; exact P0)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi04 [Hp0] [-]").
     { iEval (rewrite HspP1). iExact "Hp0". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hp0".
@@ -1144,8 +1138,6 @@ Section WpPopOffTopSec.
               Hpmpp Hpteregion Halignp
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               HW HR Hramcov
-              ltac:(rewrite HspP2r; exact (conj FRAa FRAp))
-              ltac:(rewrite HspP2r; exact (conj FS0a FS0p))
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
     { iEval (rewrite HspP2r). iExact "Hfra". }
     { iEval (rewrite HspP2r). iExact "Hfs0". }
@@ -1290,7 +1282,6 @@ Section WpPopOffTopSec.
                 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
                 Hpmpp Hpteregion Halignp Hramcov HR
-                ltac:(rewrite HspP6; exact A8) ltac:(rewrite HspP6; exact P8)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi28 [Hp8]").
       { iEval (rewrite HspP6). iExact "Hp8". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hp8".
@@ -1305,7 +1296,6 @@ Section WpPopOffTopSec.
                 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
                 Hpmpp Hpteregion Halignp Hramcov HR
-                ltac:(rewrite HspQ1; exact A0) ltac:(rewrite HspQ1; exact P0)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2a [Hp0]").
       { iEval (rewrite HspQ1). iExact "Hp0". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hp0".
@@ -1430,7 +1420,6 @@ Section WpPopOffTopSec.
                 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
                 Hpmpp Hpteregion Halignp Hramcov HR
-                ltac:(rewrite HspP7; exact A8) ltac:(rewrite HspP7; exact P8)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi28 [Hp8]").
       { iEval (rewrite HspP7). iExact "Hp8". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hp8".
@@ -1445,7 +1434,6 @@ Section WpPopOffTopSec.
                 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
                 Hpmpp Hpteregion Halignp Hramcov HR
-                ltac:(rewrite HspQ1; exact A0) ltac:(rewrite HspQ1; exact P0)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2a [Hp0]").
       { iEval (rewrite HspQ1). iExact "Hp0". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hp0".

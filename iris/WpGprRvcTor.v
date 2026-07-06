@@ -685,25 +685,25 @@ Section RvcTorEngines.
     pmp_allows_all pmpcfg0 ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     uint rd <> 0 ->
-    is_aligned_paddr (Physaddr ea) 8 = true ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
+    ea ↦₈{ dq } v -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
+      ea ↦₈{ dq } v -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea HN Hpmp Htor Hrd Halign.
+    intros offset ea HN Hpmp Htor Hrd.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+    iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
@@ -832,7 +832,9 @@ Section RvcTorEngines.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] [Hfmap] Hbytes").
+    iAssert (ea ↦₈{ dq } v)%I with "[Hbytes]" as "Hbw".
+    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
+    iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] [Hfmap] Hbw").
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
@@ -847,25 +849,25 @@ Section RvcTorEngines.
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
-    is_aligned_paddr (Physaddr ea) 8 = true ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
+    ea ↦₈ vold -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
+      ea ↦₈ (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea HN Hpmp Htor Halign.
+    intros offset ea HN Hpmp Htor.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+    iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
@@ -974,7 +976,9 @@ Section RvcTorEngines.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] [Hfmap] Hbytes").
+    iAssert (ea ↦₈ (m !!! Regidx rs2))%I with "[Hbytes]" as "Hbw".
+    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
+    iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] [Hfmap] Hbw").
     iSplitR.
     { iPureIntro. exact Hdom. }
     iExact "Hfmap".
@@ -991,24 +995,23 @@ Section RvcTorEngines.
     pmp_allows_all pmpcfg0 ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     uint rd <> 0 ->
-    is_aligned_paddr (Physaddr ea) 8 = true ->
     mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, Regidx csp_rs1, Regidx rd, false, 8)) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
+    ea ↦₈{ dq } v -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
+      ea ↦₈{ dq } v -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros imm ea HN Hpmp Htor Hrd Halign.
+    intros imm ea HN Hpmp Htor Hrd.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
     iApply (wp_ld_gpr_tor E Φ pc true csp_rs1 rd imm m v
-              pmpcfg0 pmpaddrs q HN Hpmp Htor Hrd Halign
+              pmpcfg0 pmpaddrs q HN Hpmp Htor Hrd
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
   Qed.
 
@@ -1022,24 +1025,23 @@ Section RvcTorEngines.
     ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
-    is_aligned_paddr (Physaddr ea) 8 = true ->
     mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx csp_rs1, 8)) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte vold j) -∗
+    ea ↦₈ vold -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ nth_byte (m !!! Regidx rs2) j) -∗
+      ea ↦₈ (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros imm ea HN Hpmp Htor Halign.
+    intros imm ea HN Hpmp Htor.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
     iApply (wp_store_gpr_tor E Φ pc true csp_rs1 rs2 imm m vold
-              pmpcfg0 pmpaddrs q HN Hpmp Htor Halign
+              pmpcfg0 pmpaddrs q HN Hpmp Htor
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
   Qed.
 

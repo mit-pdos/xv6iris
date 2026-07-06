@@ -432,9 +432,6 @@ Section WpReleaseTop.
     po_slot_geom root_ppn pmpaddr00 svpn_cpu a_cpu 8 ->
     po_slot_geom root_ppn pmpaddr00 svpn_noff a_noff 4 ->
     po_slot_geom root_ppn pmpaddr00 svpn_int a_int 4 ->
-    po_slot_align a_r24 8 -> po_slot_align a_r16 8 -> po_slot_align a_r8 8 ->
-    po_slot_align a_h24 8 -> po_slot_align a_h16 8 -> po_slot_align a_h8 8 ->
-    po_slot_align a_h0 8 -> po_slot_align a_hfra 8 -> po_slot_align a_hfs0 8 ->
     (* THIS cpu holds the lock: lk->cpu = mycpu() *)
     eq_vec cpuold cpuv = true ->
     (* pop_off preconditions *)
@@ -451,18 +448,18 @@ Section WpReleaseTop.
     is_lock γ lka R -∗
     locked γ -∗
     R -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_cpu j) ↦ₘ nth_byte cpuold j) -∗
+    a_cpu ↦₈ cpuold -∗
     ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noffv j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_r24 j) ↦ₘ nth_byte vr24 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_r16 j) ↦ₘ nth_byte vr16 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_r8 j) ↦ₘ nth_byte vr8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_h24 j) ↦ₘ nth_byte vh24 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_h16 j) ↦ₘ nth_byte vh16 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_h8 j) ↦ₘ nth_byte vh8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_h0 j) ↦ₘ nth_byte vh0 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_hfra j) ↦ₘ nth_byte vhra j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_hfs0 j) ↦ₘ nth_byte vhs0 j) -∗
+    a_r24 ↦₈ vr24 -∗
+    a_r16 ↦₈ vr16 -∗
+    a_r8 ↦₈ vr8 -∗
+    a_h24 ↦₈ vh24 -∗
+    a_h16 ↦₈ vh16 -∗
+    a_h8 ↦₈ vh8 -∗
+    a_h0 ↦₈ vh0 -∗
+    a_hfra ↦₈ vhra -∗
+    a_hfs0 ↦₈ vhs0 -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
@@ -474,19 +471,19 @@ Section WpReleaseTop.
           mr !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
           mr !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
           mr !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) ⌝) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add a_cpu j) ↦ₘ nth_byte (zero_reg : mword 64) j) -∗
+      a_cpu ↦₈ (zero_reg : mword 64) -∗
       ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte storeval_noff j) -∗
       ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
       (∃ (u1 u2 u3 u4 u5 u6 u7 u8 u9 : bv 64),
-        ([∗ list] j ∈ seq 0 8, (pa_add a_r24 j) ↦ₘ nth_byte u1 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_r16 j) ↦ₘ nth_byte u2 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_r8 j) ↦ₘ nth_byte u3 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_h24 j) ↦ₘ nth_byte u4 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_h16 j) ↦ₘ nth_byte u5 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_h8 j) ↦ₘ nth_byte u6 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_h0 j) ↦ₘ nth_byte u7 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_hfra j) ↦ₘ nth_byte u8 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_hfs0 j) ↦ₘ nth_byte u9 j)) -∗
+        a_r24 ↦₈ u1 ∗
+        a_r16 ↦₈ u2 ∗
+        a_r8 ↦₈ u3 ∗
+        a_h24 ↦₈ u4 ∗
+        a_h16 ↦₈ u5 ∗
+        a_h8 ↦₈ u6 ∗
+        a_h0 ↦₈ u7 ∗
+        a_hfra ↦₈ u8 ∗
+        a_hfs0 ↦₈ u9) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -494,9 +491,7 @@ Section WpReleaseTop.
       cpuv a_noff a_int nv1 storeval_noff ret_tgt
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HFIOM Hlpe Hpmpp Hpteregion Halignp HW HR Hramcov
       Hmyg Hlkeq Hg_lk Hg_cpu Hg_noff Hg_int
-      Hg_r24 Hg_r16 Hg_r8 Hg_h24 Hg_h16 Hg_h8 Hg_h0 Hg_hfra Hg_hfs0
       Hmine Hsst2 Hnoffpos Hint Hal0.
-    pose proof Hg_r24 as [AR24 PR24]. pose proof Hg_r16 as [AR16 PR16]. pose proof Hg_r8 as [AR8 PR8].
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              #Htext Hpc Hfile #Hlock Htok HRes Hcpu Hnoff Hint
              Hr24 Hr16 Hr8 Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0 Hcont".
@@ -533,7 +528,6 @@ Section WpReleaseTop.
               R1 vr24 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite HspR1; exact AR24) ltac:(rewrite HspR1; exact PR24)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi02 [Hr24] [-]").
     { iEval (rewrite HspR1). iExact "Hr24". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr24".
@@ -547,7 +541,6 @@ Section WpReleaseTop.
               R1 vr16 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite HspR1; exact AR16) ltac:(rewrite HspR1; exact PR16)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi04 [Hr16] [-]").
     { iEval (rewrite HspR1). iExact "Hr16". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr16".
@@ -561,7 +554,6 @@ Section WpReleaseTop.
               R1 vr8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite HspR1; exact AR8) ltac:(rewrite HspR1; exact PR8)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi06 [Hr8] [-]").
     { iEval (rewrite HspR1). iExact "Hr8". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr8".
@@ -624,8 +616,6 @@ Section WpReleaseTop.
       rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     assert (HraR4 : R4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RL + 0x0c) : mword 64) 4)
       by (rewrite /R4; apply lookup_total_insert).
-    pose proof Hg_h24 as [AH24 PH24]. pose proof Hg_h16 as [AH16 PH16]. pose proof Hg_h8 as [AH8 PH8].
-    pose proof Hg_hfra as [AHFRA PHFRA]. pose proof Hg_hfs0 as [AHFS0 PHFS0].
     iApply (wp_holding_lockinv_locked root_ppn E Φ γ lka R R4 svpn_lk svpn_cpu cpuold
               vh24 vh16 vh8 vhra vhs0
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dqc:=DfracOwn 1)
@@ -634,11 +624,6 @@ Section WpReleaseTop.
               Hmyg
               ltac:(rewrite Ha0R4 Hlkeq; exact Hg_lk)
               ltac:(rewrite Ha0R4; exact Hg_cpu)
-              ltac:(rewrite HspR4; exact Hg_h24)
-              ltac:(rewrite HspR4; exact Hg_h16)
-              ltac:(rewrite HspR4; exact Hg_h8)
-              ltac:(rewrite HspR4; exact Hg_hfra)
-              ltac:(rewrite HspR4; exact Hg_hfs0)
               ltac:(rewrite HtpR4; exact Hmine)
               ltac:(rewrite HraR4; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile Hlock Htok
@@ -687,7 +672,6 @@ Section WpReleaseTop.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               ltac:(rewrite HAcpu; exact Ccanon) ltac:(rewrite HAcpu; exact Cvpn) ltac:(rewrite HAcpu; exact Cident)
               Cmask Cvpn2 Cmvpn Cmppn Hpmpp Hpteregion Halignp ltac:(rewrite HAcpu; exact Crange) HW
-              ltac:(rewrite HAcpu; exact Calign) ltac:(rewrite HAcpu; exact Cpalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi12 [Hcpu] [-]").
     { iEval (rewrite HAcpu). iExact "Hcpu". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hcpu".
@@ -766,10 +750,6 @@ Section WpReleaseTop.
               Hmyg
               ltac:(rewrite HtpM1; exact Hg_noff)
               ltac:(rewrite HtpM1; exact Hg_int)
-              ltac:(rewrite HspM1 EQp8; exact Hg_h24)
-              ltac:(rewrite HspM1 EQp0; exact Hg_h16)
-              ltac:(rewrite HspM1 EQpfra; exact Hg_h8)
-              ltac:(rewrite HspM1 EQpfs0; exact Hg_h0)
               Hsst2 Hnoffpos Hint
               ltac:(rewrite HraM1; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile
@@ -798,7 +778,6 @@ Section WpReleaseTop.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
-              ltac:(rewrite HspMf; exact AR24) ltac:(rewrite HspMf; exact PR24)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi22 [Hr24]").
     { iEval (rewrite HspMf). iExact "Hr24". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr24".
@@ -813,7 +792,6 @@ Section WpReleaseTop.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
-              ltac:(rewrite HspQ1; exact AR16) ltac:(rewrite HspQ1; exact PR16)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi24 [Hr16]").
     { iEval (rewrite HspQ1). iExact "Hr16". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr16".
@@ -828,7 +806,6 @@ Section WpReleaseTop.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
-              ltac:(rewrite HspQ2; exact AR8) ltac:(rewrite HspQ2; exact PR8)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi26 [Hr8]").
     { iEval (rewrite HspQ2). iExact "Hr8". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr8".

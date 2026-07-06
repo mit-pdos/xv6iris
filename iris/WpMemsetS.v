@@ -2472,10 +2472,6 @@ Qed.
        of RAM" fact -- the _ram wrappers derive the rest from the owned points-to. *)
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    is_aligned_vaddr (Virtaddr a8_ra) 8 = true ->
-    is_aligned_paddr (Physaddr pa_ra) 8 = true ->
-    is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
-    is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -2486,15 +2482,15 @@ Qed.
     instr (add_vec_int pcL 2) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx s0_idx, false, 8)) -∗
     instr (add_vec_int pcL 4) true (ITYPE (sign_extend' 12 imm_dealloc, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     instr (add_vec_int pcL 6) true (JALR (zeros' 12, Regidx ra_idx, zreg)) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ{ dqm } nth_byte ra0 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ{ dqm } nth_byte s00 j) -∗
+    pa_ra ↦₈{ dqm } ra0 -∗
+    pa_s0 ↦₈{ dqm } s00 -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ{ dqm } nth_byte ra0 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ{ dqm } nth_byte s00 j) -∗
+      pa_ra ↦₈{ dqm } ra0 -∗
+      pa_s0 ↦₈{ dqm } s00 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -2502,7 +2498,7 @@ Qed.
       HN Hrai Hs0i Hrasp Hs0sp Hs0ra Hsp Hra
       HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
       HX Hcov Hpmpp Hpteregion Halignp Hal0 Hal1
-      Hpmpcov HR HalignR HpalignR HalignS HpalignS.
+      Hpmpcov HR.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hbra Hbs0 Hcont".
     (* cea: c.ldsp ra,8(sp) : ra := ra0 *)
@@ -2510,7 +2506,6 @@ Qed.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)(dqm:=dqm)
               HN Hrai HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               Hpmpcov HR
-              ltac:(rewrite Hsp; exact HalignR) ltac:(rewrite Hsp; exact HpalignR)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0 [Hbra]").
     { rewrite Hsp. iExact "Hbra". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra".
@@ -2523,7 +2518,6 @@ Qed.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)(dqm:=dqm)
               HN Hs0i HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               Hpmpcov HR
-              ltac:(rewrite Hsp1; exact HalignS) ltac:(rewrite Hsp1; exact HpalignS)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2 [Hbs0]").
     { rewrite Hsp1. iExact "Hbs0". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbs0".
@@ -2629,10 +2623,6 @@ Qed.
        the owned points-to (addr_is_ram) themselves. *)
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    is_aligned_vaddr (Virtaddr a8_ra) 8 = true ->
-    is_aligned_paddr (Physaddr pa_ra) 8 = true ->
-    is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
-    is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -2648,15 +2638,15 @@ Qed.
     instr (add_vec_int pcE 12) true (SHIFTIOP (shamt_l, Regidx a2_idx, Regidx a2_idx, SLLI)) -∗
     instr (add_vec_int pcE 14) true (SHIFTIOP (shamt_r, Regidx a2_idx, Regidx a2_idx, SRLI)) -∗
     instr (add_vec_int pcE 16) false i_add -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte (bv_0 64) j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte (bv_0 64) j) -∗
+    pa_ra ↦₈ (bv_0 64) -∗
+    pa_s0 ↦₈ (bv_0 64) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pcE 20) -∗ gpr_file m6 -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte (m0 !!! Regidx ra_idx) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte (m0 !!! Regidx s0_idx) j) -∗
+      pa_ra ↦₈ (m0 !!! Regidx ra_idx) -∗
+      pa_s0 ↦₈ (m0 !!! Regidx s0_idx) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -2665,7 +2655,7 @@ Qed.
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
       HX Hcov Hpmpp Hpteregion Halignp
       Hn0 Hbexec_add
-      Hpmpcov HW_R HalignR HpalignR HalignS HpalignS.
+      Hpmpcov HW_R.
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp') by (unfold m1; rewrite lookup_total_insert; reflexivity).
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 Hcont".
@@ -2682,7 +2672,6 @@ Qed.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               Hpmpcov HW_R
-              ltac:(rewrite Hsp1; exact HalignR) ltac:(rewrite Hsp1; exact HpalignR)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2 [Hbra]").
     { rewrite Hsp1. iExact "Hbra". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra".
@@ -2691,7 +2680,6 @@ Qed.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               Hpmpcov HW_R
-              ltac:(rewrite Hsp1; exact HalignS) ltac:(rewrite Hsp1; exact HpalignS)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi4 [Hbs0]").
     { rewrite Hsp1. iExact "Hbs0". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbs0".
@@ -2833,10 +2821,6 @@ Qed.
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    is_aligned_vaddr (Virtaddr a8_ra) 8 = true ->
-    is_aligned_paddr (Physaddr pa_ra) 8 = true ->
-    is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
-    is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     (* n <> 0 (fall through the c.beqz) *)
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
     (* return-target low bits (2-aligned) *)
@@ -2886,16 +2870,16 @@ Qed.
     instr (add_vec_int pcLS 2) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx s0_idx, false, 8)) -∗
     instr (add_vec_int pcLS 4) true (ITYPE (sign_extend' 12 imm_dealloc, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     instr (add_vec_int pcLS 6) true (JALR (zeros' 12, Regidx ra_idx, zreg)) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte (bv_0 64) j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte (bv_0 64) j) -∗
+    pa_ra ↦₈ (bv_0 64) -∗
+    pa_s0 ↦₈ (bv_0 64) -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte ra0 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte s00 j) -∗
+      pa_ra ↦₈ ra0 -∗
+      pa_s0 ↦₈ s00 -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -2906,7 +2890,7 @@ Qed.
       HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
       HX Hcov Hpmpp Hpteregion Halignp
       Hbexec_add
-      Hpmpcov HW_R HR_R HalignR HpalignR HalignS HpalignS
+      Hpmpcov HW_R HR_R
       Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
       Hext0 Hext4 Hext6.
@@ -2946,7 +2930,7 @@ Qed.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               HX Hcov Hpmpp Hpteregion Halignp
               Hn0 Hbexec_add
-              Hpmpcov HW_R HalignR HpalignR HalignS HpalignS
+              Hpmpcov HW_R
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
                     Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra Hbs0".
@@ -2974,7 +2958,7 @@ Qed.
               Hsuf_sp Hsuf_ra
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               HX Hcov Hpmpp Hpteregion Halignp Hret0 Hret1
-              Hpmpcov HR_R HalignR HpalignR HalignS HpalignS
+              Hpmpcov HR_R
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
                     HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0".

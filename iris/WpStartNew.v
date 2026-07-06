@@ -1117,13 +1117,8 @@ Section WpStartThm.
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx ti_ra = ra0 ->
     m !!! Regidx ti_s0 = s00 ->
-    (* start()'s own frame slots (stored under the all-OFF pmp). *)
-    is_aligned_paddr (Physaddr (ti_ea_ra sp0)) 8 = true ->
-    is_aligned_paddr (Physaddr (ti_ea_s0 sp0)) 8 = true ->
-    (* timerinit's frame slots: 8-aligned + inside the written TOR region
+    (* timerinit's frame slots: inside the written TOR region
        [0, 0xfffffffffffffc). *)
-    is_aligned_paddr (Physaddr (ti_ea_ra (ti_sp1 sp0))) 8 = true ->
-    is_aligned_paddr (Physaddr (ti_ea_s0 (ti_sp1 sp0))) 8 = true ->
     uint (ti_ea_ra (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
     uint (ti_ea_s0 (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
     mmode_config (DfracOwn 1) -∗
@@ -1141,10 +1136,10 @@ Section WpStartThm.
     mcounteren ↦ᵣ mcounteren0 -∗
     mtime ↦ᵣ mtime0 -∗
     stimecmp ↦ᵣ stimecmp0 -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte vsra j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte vss0 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra (ti_sp1 sp0)) j) ↦ₘ nth_byte vtra j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 (ti_sp1 sp0)) j) ↦ₘ nth_byte vts0 j) -∗
+    (ti_ea_ra sp0) ↦₈ vsra -∗
+    (ti_ea_s0 sp0) ↦₈ vss0 -∗
+    (ti_ea_ra (ti_sp1 sp0)) ↦₈ vtra -∗
+    (ti_ea_s0 (ti_sp1 sp0)) ↦₈ vts0 -∗
     kernel_text -∗
     (* the continuation is universally quantified over the (hidden) entry
        mstatus value [ms0] with its mmode_config invariant facts. *)
@@ -1169,14 +1164,14 @@ Section WpStartThm.
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
       mtime ↦ᵣ mtime0 -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte ra0 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte s00 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra (ti_sp1 sp0)) j) ↦ₘ nth_byte st_ra_link j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 (ti_sp1 sp0)) j) ↦ₘ nth_byte sp0 j) -∗
+      (ti_ea_ra sp0) ↦₈ ra0 -∗
+      (ti_ea_s0 sp0) ↦₈ s00 -∗
+      (ti_ea_ra (ti_sp1 sp0)) ↦₈ st_ra_link -∗
+      (ti_ea_s0 (ti_sp1 sp0)) ↦₈ sp0 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hpmp HlpeE Hsp Hra Hs0 Hal_ra Hal_s0 Hal_tra Hal_ts0 Hbnd_ra Hbnd_s0.
+    intros HN Hpmp HlpeE Hsp Hra Hs0 Hbnd_ra Hbnd_s0.
     iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
              Hmtime Hstc Hsra Hss0 Htra Hts0 #Htext Hcont".
     (* the 34 [instr] facts, off the persistent text image *)
@@ -1333,32 +1328,24 @@ Section WpStartThm.
     assert (Hea31 : add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
               (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))) = ti_ea_ra sp0)
       by (rewrite L31sp; reflexivity).
-    assert (Hal31 : is_aligned_paddr (Physaddr
-              (add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
-                 (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))))) 8 = true)
-      by (rewrite Hea31; exact Hal_ra).
     iApply (wp_store_gpr E Φ st_pc31 true csp_rs1 ti_ra
               (zero_extend' 12 (concat_vec u10 ('b"000"))) (st_m30 m sp0) vsra pmpcfg0 (1/2)%Qp
               HN Hpmp with "Hmm HpcfA Hpc Hfile Hi31 [Hsra]").
-    { rewrite /word_pointsto. iSplitR; [iPureIntro; exact Hal31 | rewrite Hea31; iExact "Hsra"]. }
+    { rewrite Hea31. iExact "Hsra". }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P31 Hea31 L31ra).
-    iIntros "Hmm HpcfA Hpc Hfile Hsraw". iDestruct "Hsraw" as "(_ & Hsra)".
+    iIntros "Hmm HpcfA Hpc Hfile Hsra".
 
     (* ---- 32. c.sdsp s0, 0(sp) ---- *)
     assert (L32s0 : st_m30 m sp0 !!! Regidx ti_s0 = s00) by (st_unfold; st_look).
     assert (Hea32 : add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
               (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))) = ti_ea_s0 sp0)
       by (rewrite L31sp; reflexivity).
-    assert (Hal32 : is_aligned_paddr (Physaddr
-              (add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
-                 (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))))) 8 = true)
-      by (rewrite Hea32; exact Hal_s0).
     iApply (wp_store_gpr E Φ st_pc32 true csp_rs1 ti_s0
               (zero_extend' 12 (concat_vec u11 ('b"000"))) (st_m30 m sp0) vss0 pmpcfg0 (1/2)%Qp
               HN Hpmp with "Hmm HpcfA Hpc Hfile Hi32 [Hss0]").
-    { rewrite /word_pointsto. iSplitR; [iPureIntro; exact Hal32 | rewrite Hea32; iExact "Hss0"]. }
+    { rewrite Hea32. iExact "Hss0". }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P32 Hea32 L32s0).
-    iIntros "Hmm HpcfA Hpc Hfile Hss0w". iDestruct "Hss0w" as "(_ & Hss0)".
+    iIntros "Hmm HpcfA Hpc Hfile Hss0".
 
     (* ---- 33. c.addi4spn s0, sp, 16 (s0 := sp0) ---- *)
     iApply (wp_addi_gpr E Φ st_pc33 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (st_m30 m sp0)
@@ -1634,7 +1621,7 @@ Section WpStartThm.
     iApply (wp_timerinit E Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
               st_ra_link sp0 menvcfg0 mtime0 stimecmp0 mcounteren0
               (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) vtra vts0
-              HN Hpmp1 Htor_ra Htor_s0 Hal_tra Hal_ts0 Hcret_al L59sp L59ra L59s0
+              HN Hpmp1 Htor_ra Htor_s0 Hcret_al L59sp L59ra L59s0
               with "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htra Hts0 Htext").
     iEval (rewrite Hcretv).
     iIntros "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htra Hts0".

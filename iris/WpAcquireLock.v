@@ -351,9 +351,6 @@ Section WpAcquireLock.
     (* ---- the lock is not already held by THIS cpu (no panic) ---- *)
     eq_vec (cpuold : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
     (* ---- data-slot geometry ---- *)
-    po_slot_align a_r24 8 -> po_slot_align a_r16 8 -> po_slot_align a_r8 8 ->
-    po_slot_align a_p24 8 -> po_slot_align a_p16 8 -> po_slot_align a_p8 8 ->
-    po_slot_align a_fra 8 -> po_slot_align a_fs0 8 ->
     po_slot_geom root_ppn pmpaddr00 svpn_noff a_noff 4 ->
     po_slot_geom root_ppn pmpaddr00 svpn_intena a_intena 4 ->
     po_slot_geom root_ppn pmpaddr00 svpn_lk lk 4 ->
@@ -366,18 +363,18 @@ Section WpAcquireLock.
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ tlb_inv root_ppn -∗
     kernel_text -∗ pc_is AQw -∗ gpr_file m -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_r24 j) ↦ₘ nth_byte vr24 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_r16 j) ↦ₘ nth_byte vr16 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_r8 j) ↦ₘ nth_byte vr8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_p24 j) ↦ₘ nth_byte pr24 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_p16 j) ↦ₘ nth_byte pr16 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_p8 j) ↦ₘ nth_byte pr8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_fra j) ↦ₘ nth_byte fraold j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_fs0 j) ↦ₘ nth_byte fs0old j) -∗
+    a_r24 ↦₈ vr24 -∗
+    a_r16 ↦₈ vr16 -∗
+    a_r8 ↦₈ vr8 -∗
+    a_p24 ↦₈ pr24 -∗
+    a_p16 ↦₈ pr16 -∗
+    a_p8 ↦₈ pr8 -∗
+    a_fra ↦₈ fraold -∗
+    a_fs0 ↦₈ fs0old -∗
     ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noff j) -∗
     ([∗ list] j ∈ seq 0 4, (pa_add a_intena j) ↦ₘ nth_byte intena_old j) -∗
     is_lock γ lk R -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a_cpu j) ↦ₘ nth_byte cpuold j) -∗
+    a_cpu ↦₈ cpuold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
@@ -391,20 +388,19 @@ Section WpAcquireLock.
           mfin !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
           mfin !!! Regidx (mword_of_int 10 : mword 5)
             = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add a_r24 j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add a_r16 j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 8 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add a_r8 j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 9 : mword 5)) j) -∗
+      a_r24 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      a_r16 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+      a_r8 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
       (∃ (vp24 vp16 vp8 vfra vfs0 : bv 64),
-        ([∗ list] j ∈ seq 0 8, (pa_add a_p24 j) ↦ₘ nth_byte vp24 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_p16 j) ↦ₘ nth_byte vp16 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_p8 j) ↦ₘ nth_byte vp8 j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_fra j) ↦ₘ nth_byte vfra j) ∗
-        ([∗ list] j ∈ seq 0 8, (pa_add a_fs0 j) ↦ₘ nth_byte vfs0 j)) -∗
+        a_p24 ↦₈ vp24 ∗
+        a_p16 ↦₈ vp16 ∗
+        a_p8 ↦₈ vp8 ∗
+        a_fra ↦₈ vfra ∗
+        a_fs0 ↦₈ vfs0) -∗
       ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte po_noff_store j) -∗
       ([∗ list] j ∈ seq 0 4, (pa_add a_intena j) ↦ₘ
           nth_byte (if eq_vec (sign_extend' 64 noff) zero_reg then po_storeval32 else intena_old) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add a_cpu j) ↦ₘ
-          nth_byte (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) j) -∗
+      a_cpu ↦₈ (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -413,7 +409,6 @@ Section WpAcquireLock.
       po_storeval32 po_noff_a5 po_noff_store ret_tgt
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hpmpp Hpteregion Halignp HW HR Hramcov
       Hlegal Hpma_amo Ha0_10 Ha0_2c Ha0_18f Ha0_18t Hmyg Hnotmine
-      Hg_r24 Hg_r16 Hg_r8 Hg_p24 Hg_p16 Hg_p8 Hg_fra Hg_fs0
       Hg_noff Hg_intena Hg_lk Hg_cpu Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv #Htext Hpc Hfile
              Hr24 Hr16 Hr8 Hp24 Hp16 Hp8 Hfra Hfs0 Hnoff Hintena #Hlk Hcpu Hcont".
@@ -444,7 +439,6 @@ Section WpAcquireLock.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite /AQw Hpc00) in "Hpc".
     (* slot-align components *)
-    pose proof Hg_r24 as [R24a R24p]. pose proof Hg_r16 as [R16a R16p]. pose proof Hg_r8 as [R8a R8p].
     (* ---- 0x00: c.addi sp,-32 ---- *)
     iApply (wp_caddi_gpr_s_config root_ppn E Φ (mword_of_int (AQ + 0x00)) csp_rs1 (mword_of_int 32 : mword 6) m
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
@@ -460,7 +454,6 @@ Section WpAcquireLock.
               A0 vr24 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite Hcsp0; exact R24a) ltac:(rewrite Hcsp0; exact R24p)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi02 [Hr24] [-]").
     { iEval (rewrite Hcsp0). iExact "Hr24". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr24".
@@ -474,7 +467,6 @@ Section WpAcquireLock.
               A0 vr16 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite Hcsp0; exact R16a) ltac:(rewrite Hcsp0; exact R16p)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi04 [Hr16] [-]").
     { iEval (rewrite Hcsp0). iExact "Hr16". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr16".
@@ -488,7 +480,6 @@ Section WpAcquireLock.
               A0 vr8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HW
-              ltac:(rewrite Hcsp0; exact R8a) ltac:(rewrite Hcsp0; exact R8p)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi06 [Hr8] [-]").
     { iEval (rewrite Hcsp0). iExact "Hr8". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr8".
@@ -550,8 +541,6 @@ Section WpAcquireLock.
               Hlegal ltac:(vm_compute; reflexivity)
               ltac:(rewrite HP0ra; vm_compute; reflexivity)
               Ha0_10 Ha0_2c Ha0_18f Ha0_18t Hmyg
-              ltac:(rewrite HP0csp; exact Hg_p24) ltac:(rewrite HP0csp; exact Hg_p16) ltac:(rewrite HP0csp; exact Hg_p8)
-              ltac:(rewrite HP0csp; exact Hg_fra) ltac:(rewrite HP0csp; exact Hg_fs0)
               Hg_noff Hg_intena
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile [Hp24] [Hp16] [Hp8] [Hfra] [Hfs0] [Hnoff] [Hintena] [-]").
     { iEval (rewrite HP0csp). iExact "Hp24". }
@@ -653,11 +642,6 @@ Section WpAcquireLock.
               Hmyg
               ltac:(rewrite HAlk; exact Hg_lk)
               ltac:(rewrite HAcpu2; exact Hg_cpu)
-              ltac:(rewrite Hspdh_eq; exact Hg_p24)
-              ltac:(rewrite Hspdh_eq; exact Hg_p16)
-              ltac:(rewrite Hspdh_eq; exact Hg_p8)
-              ltac:(rewrite Hspdh_eq; exact Hg_fra)
-              ltac:(rewrite Hspdh_eq; exact Hg_fs0)
               ltac:(rewrite HB2tp; exact Hnotmine)
               ltac:(rewrite HB2ra; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile
@@ -760,8 +744,6 @@ Section WpAcquireLock.
               Hpmpp Hpteregion Halignp
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               HW HR Hramcov
-              ltac:(rewrite HB9sp Hmra; exact Hg_p24)
-              ltac:(rewrite HB9sp Hms0; exact Hg_p16)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile Hi24 [Hp24] [Hp16] [-]").
     { iEval (rewrite HB9sp Hmra). iExact "Hp24". }
     { iEval (rewrite HB9sp Hms0). iExact "Hp16". }
@@ -786,7 +768,6 @@ Section WpAcquireLock.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               ltac:(rewrite HAcpu; exact Ccanon) ltac:(rewrite HAcpu; exact Cvpn) ltac:(rewrite HAcpu; exact Cident)
               Cmask Cvpn2 Cmvpn Cmppn Hpmpp Hpteregion Halignp ltac:(rewrite HAcpu; exact Crange) HW
-              ltac:(rewrite HAcpu; exact Calign) ltac:(rewrite HAcpu; exact Cpalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi28 [Hcpu] [-]").
     { iEval (rewrite HAcpu). iExact "Hcpu". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hcpu".
@@ -809,7 +790,6 @@ Section WpAcquireLock.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
-              ltac:(rewrite HC1sp; exact R24a) ltac:(rewrite HC1sp; exact R24p)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2a [Hr24]").
     { iEval (rewrite HC1sp). iExact "Hr24". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr24".
@@ -825,7 +805,6 @@ Section WpAcquireLock.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
-              ltac:(rewrite HD1sp; exact R16a) ltac:(rewrite HD1sp; exact R16p)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2c [Hr16]").
     { iEval (rewrite HD1sp). iExact "Hr16". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr16".
@@ -841,7 +820,6 @@ Section WpAcquireLock.
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
               Hpmpp Hpteregion Halignp Hramcov HR
-              ltac:(rewrite HD2sp; exact R8a) ltac:(rewrite HD2sp; exact R8p)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2e [Hr8]").
     { iEval (rewrite HD2sp). iExact "Hr8". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hr8".

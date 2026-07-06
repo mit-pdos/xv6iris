@@ -644,12 +644,10 @@ Section StepLD.
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec (_get_Mstatus_MPRV mstatus0a) ('b"1") = false ->
     pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ->
-    is_aligned_vaddr (Virtaddr a8) 8 = true ->
     (* the 8-byte DATA access needs the stronger all-OFF form: an 8-byte
        window can partially overlap a TOR/NA4 boundary (partial match faults
        even in M-mode), so unlocked-ness alone does not suffice. *)
     pmp_all_off pmpcfg0 ->
-    is_aligned_paddr (Physaddr pa) 8 = true ->
     (* within_clint/within_sig are now discharged from the RAM-constrained bytes,
        and within_htif from the owned [htif_tohost_base |-> None] below. *)
     minstret_inv -∗
@@ -658,7 +656,7 @@ Section StepLD.
     (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
     elp ↦ᵣ elp0a -∗ reg_pointsto mseccfg dqc mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗
     reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗ reg_pointsto htif_tohost_base dqc None -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
+    pa ↦₈ v -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_l j) -∗
     ▷ ( PC ↦ᵣ add_vec_int pc 4 -∗
         (R_bitvector_64 x2) ↦ᵣ regval_into_reg (extend_value false data2) -∗
@@ -668,16 +666,21 @@ Section StepLD.
         (R_bitvector_64 mideleg) ↦ᵣ zeros' 64 -∗ (R_bitvector_64 mstatus) ↦ᵣ mstatus0a -∗
         elp ↦ᵣ elp0a -∗ reg_pointsto mseccfg dqc mseccfg0 -∗ pmpcfg_n ↦ᵣ pmpcfg0 -∗ reg_pointsto pma_regions dqc pmar0 -∗
         reg_pointsto mcountinhibit dqc mc -∗ reg_pointsto minstretcfg dqc mcfg -∗ reg_pointsto htif_tohost_base dqc None -∗
-        ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte v j) -∗
+        pa ↦₈ v -∗
         ([∗ list] j ∈ seq 0 4, (pa_add (fetch_pa pc) j) ↦ₘ{dq} nth_byte w_l j) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros offset ea a8 pa data2 HN Hil Hpmaall Hpmpf Hvalignf HnotRVCf
-      Hdl Hb1 HmIE Help HmisaS HMPRV Hpmm Halign Hpmp Hpalign.
+      Hdl Hb1 HmIE Help HmisaS HMPRV Hpmm Hpmp.
     destruct (Hpmaall (fetch_pa pc) 4) as (region_f & Hmatchf & Hexecf & _ & _).
     destruct (Hpmaall pa 8) as (region & Hmatch & _ & Hread & _).
     iIntros "#Hinv Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes Hcont".
+    iDestruct "Hbytes" as "(%Hpalign & Hbytes)".
+    assert (Ha8pa : a8 = pa).
+    { unfold pa. rewrite avi0_mul8. rewrite zero_extend'_id. reflexivity. }
+    assert (Halign : is_aligned_vaddr (Virtaddr a8) 8 = true).
+    { rewrite Ha8pa. exact Hpalign. }
     iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) with "Hinv"); first done.
     iIntros (s) "[Hreg Hmem] Hbody".
     iDestruct (reg_valid_dq with "Hreg Hpc")    as %Lpc.
@@ -765,14 +768,16 @@ Section StepLD.
     iMod (reg_update _ (R_bitvector_64 x2) _ (regval_into_reg (extend_value false data2))
             with "Hreg Hx2") as "[Hreg Hx2]".
     iMod (reg_update _ PC _ (add_vec_int pc 4) with "Hreg Hpc") as "[Hreg Hpc]".
+    iAssert (pa ↦₈ v)%I with "[Hbytes]" as "Hbw".
+    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign. }
     unfold sFcl, base_upd_l. destruct b1.
     - iMod (reg_update _ minstret _ (add_vec_int (register_lookup minstret s.(sregs)) 1) with "Hreg Hmst") as "[Hreg Hmst]".
       iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi". { iExists (add_vec_int (register_lookup minstret s.(sregs)) 1), true. iFrame. }
-      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
+      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbw Hibytes").
     - iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbytes Hibytes").
+      iApply ("Hcont" with "Hpc Hx2 Hmisa Hnpc Hpriv Hhs Hmdl Hms Help Hsec Hpmpc Hpma Hmcinh Hmcfg Hhtif Hbw Hibytes").
   Qed.
 
 End StepLD.

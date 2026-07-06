@@ -51,10 +51,6 @@ Section WpKernelNew.
     (* stack geometry, over the symbolic sp0: start()'s two frame slots are
        8-aligned; timerinit's two are 8-aligned AND inside the written
        PMP TOR region [0, 0xfffffffffffffc). *)
-    is_aligned_paddr (Physaddr (ti_ea_ra sp0)) 8 = true ->
-    is_aligned_paddr (Physaddr (ti_ea_s0 sp0)) 8 = true ->
-    is_aligned_paddr (Physaddr (ti_ea_ra (ti_sp1 sp0))) 8 = true ->
-    is_aligned_paddr (Physaddr (ti_ea_s0 (ti_sp1 sp0))) 8 = true ->
     uint (ti_ea_ra (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
     uint (ti_ea_s0 (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
     mmode_config (DfracOwn 1) -∗
@@ -73,13 +69,13 @@ Section WpKernelNew.
     mtime ↦ᵣ mtime0 -∗
     stimecmp ↦ᵣ stimecmp0 -∗
     (* the per-CPU stack0 pointer word _entry loads *)
-    ([∗ list] j ∈ seq 0 8, (pa_add entry_ld_ea j) ↦ₘ{ dq } nth_byte v_stack0 j) -∗
+    entry_ld_ea ↦₈{ dq } v_stack0 -∗
     (* start()'s frame slots *)
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte vsra j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte vss0 j) -∗
+    (ti_ea_ra sp0) ↦₈ vsra -∗
+    (ti_ea_s0 sp0) ↦₈ vss0 -∗
     (* timerinit's frame slots *)
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra (ti_sp1 sp0)) j) ↦ₘ nth_byte vtra j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 (ti_sp1 sp0)) j) ↦ₘ nth_byte vts0 j) -∗
+    (ti_ea_ra (ti_sp1 sp0)) ↦₈ vtra -∗
+    (ti_ea_s0 (ti_sp1 sp0)) ↦₈ vts0 -∗
     kernel_text -∗
     ( ∀ (ms0 : mword 64)
         (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
@@ -103,21 +99,19 @@ Section WpKernelNew.
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
       mtime ↦ᵣ mtime0 -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add entry_ld_ea j) ↦ₘ{ dq } nth_byte v_stack0 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra sp0) j) ↦ₘ nth_byte (add_vec_int pc_e7 4) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 sp0) j) ↦ₘ nth_byte (m !!! Regidx ti_s0) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_ra (ti_sp1 sp0)) j) ↦ₘ nth_byte st_ra_link j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (ti_ea_s0 (ti_sp1 sp0)) j) ↦ₘ nth_byte sp0 j) -∗
+      entry_ld_ea ↦₈{ dq } v_stack0 -∗
+      (ti_ea_ra sp0) ↦₈ (add_vec_int pc_e7 4) -∗
+      (ti_ea_s0 sp0) ↦₈ (m !!! Regidx ti_s0) -∗
+      (ti_ea_ra (ti_sp1 sp0)) ↦₈ st_ra_link -∗
+      (ti_ea_s0 (ti_sp1 sp0)) ↦₈ sp0 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros sp0 HN Hpmp HlpeE Hal_ra Hal_s0 Hal_tra Hal_ts0 Hbnd_ra Hbnd_s0.
+    intros sp0 HN Hpmp HlpeE Hbnd_ra Hbnd_s0.
     iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
              Hmtime Hstc Hstk Hsra Hss0 Htra Hts0 #Htext Hcont".
-    assert (Hld_al : is_aligned_paddr (Physaddr entry_ld_ea) 8 = true)
-      by (vm_compute; reflexivity).
     (* ---- _entry: reset -> jal start (PC = 0x80000058) ---- *)
-    iApply (wp_entry E Φ m v_stack0 mhartid_in pmpcfg0 (dq := dq) HN Hpmp Hld_al
+    iApply (wp_entry E Φ m v_stack0 mhartid_in pmpcfg0 (dq := dq) HN Hpmp
               with "Hmm Hpcf Hpc Hfile Hmh Hstk Htext").
     iIntros "Hmm Hpcf Hpc Hfile Hmh Hstk".
     iEval (change pc_start with st_pc30) in "Hpc".
@@ -138,7 +132,7 @@ Section WpKernelNew.
               mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in
               mcounteren0 pmpcfg0 pmpaddr00 vsra vss0 vtra vts0
               HN Hpmp HlpeE eq_refl HEra HEs0
-              Hal_ra Hal_s0 Hal_tra Hal_ts0 Hbnd_ra Hbnd_s0
+              Hbnd_ra Hbnd_s0
               with "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
                     Hmcen Hmtime Hstc Hsra Hss0 Htra Hts0 Htext [Hcont Hstk]").
     iIntros (ms0 HoIE HoPRV HoSXL)

@@ -327,27 +327,21 @@ Section WpMycpu.
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* the single "PMP TOR entry 0 covers all of RAM" config fact *)
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    (* sp-alignment for the ra frame slot (8(sp')) *)
-    is_aligned_vaddr (Virtaddr a8_ra) 8 = true ->
-    is_aligned_paddr (Physaddr pa_ra) 8 = true ->
-    (* sp-alignment for the s0 frame slot (0(sp')) *)
-    is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
-    is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte raold j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte s0old j) -∗
+    pa_ra ↦₈ raold -∗
+    pa_s0 ↦₈ s0old -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
       pc_is ret_tgt -∗ gpr_file m11 -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte ra0 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte s00 j) -∗
+      pa_ra ↦₈ ra0 -∗
+      pa_s0 ↦₈ s00 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -357,8 +351,7 @@ Section WpMycpu.
       m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
       HX
-      Hpmpp Hpteregion Halignp Hal0 HW HR Hramcov
-      HalignR HpalignR HalignS HpalignS.
+      Hpmpp Hpteregion Halignp Hal0 HW HR Hramcov.
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp')
       by (unfold m1; rewrite lookup_total_insert; reflexivity).
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
@@ -391,7 +384,6 @@ Section WpMycpu.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hramcov
               Hpmpp Hpteregion Halignp
               Hramcov HW
-              ltac:(rewrite Hsp1; exact HalignR) ltac:(rewrite Hsp1; exact HpalignR)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi02 [Hbra]").
     { rewrite Hsp1. iExact "Hbra". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra".
@@ -404,7 +396,6 @@ Section WpMycpu.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hramcov
               Hpmpp Hpteregion Halignp
               Hramcov HW
-              ltac:(rewrite Hsp1; exact HalignS) ltac:(rewrite Hsp1; exact HpalignS)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi04 [Hbs0]").
     { rewrite Hsp1. iExact "Hbs0". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbs0".
@@ -478,7 +469,6 @@ Section WpMycpu.
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hramcov
               Hpmpp Hpteregion Halignp
               Hramcov HR
-              ltac:(rewrite Hsp8; exact HalignR) ltac:(rewrite Hsp8; exact HpalignR)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi18 [Hbra]").
     { rewrite Hsp8. iExact "Hbra". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra".
@@ -492,7 +482,6 @@ Section WpMycpu.
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hramcov
               Hpmpp Hpteregion Halignp
               Hramcov HR
-              ltac:(rewrite Hsp9; exact HalignS) ltac:(rewrite Hsp9; exact HpalignS)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi1a [Hbs0]").
     { rewrite Hsp9. iExact "Hbs0". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbs0".

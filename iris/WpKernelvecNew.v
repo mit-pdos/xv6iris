@@ -169,9 +169,10 @@ Definition kv_m2 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
 Section KvCell.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  (* the 8-byte stack cell at address [a] currently holding [v] *)
+  (* the 8-byte stack cell at address [a] currently holding [v]: a
+     doubleword points-to, bundling the 8 byte facts with 8-alignment. *)
   Definition kv_cell (a : mword 64) (v : bv 64) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ nth_byte v j)%I.
+    word_pointsto a (DfracOwn 1) v.
 End KvCell.
 
 (* The caller-saved temporaries a C function (kerneltrap) may clobber:
@@ -493,40 +494,6 @@ Section WpKernelvecNew.
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (* slot 1: x1 at sp+0 *)
-    is_aligned_vaddr (Virtaddr (((kv_sp1 m)))) 8 = true ->
-    (* slot 2: x3 at sp+16 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 3: x5 at sp+32 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 4: x6 at sp+40 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 5: x7 at sp+48 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 6: x10 at sp+72 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 7: x11 at sp+80 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 8: x12 at sp+88 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 9: x13 at sp+96 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 10: x14 at sp+104 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 11: x15 at sp+112 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 12: x16 at sp+120 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 13: x17 at sp+128 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 14: x28 at sp+216 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 15: x29 at sp+224 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 16: x30 at sp+232 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 17: x31 at sp+240 *)
-    is_aligned_vaddr (Virtaddr ((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) 8 = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -540,23 +507,23 @@ Section WpKernelvecNew.
     pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add ((((kv_sp1 m)))) j) ↦ₘ nth_byte vold1 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold2 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold3 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold4 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold5 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold6 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold7 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold9 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold10 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold11 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold12 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold13 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold14 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold15 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold16 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold17 j) -∗
+    ((((kv_sp1 m)))) ↦₈ vold1 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈ vold2 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈ vold3 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈ vold4 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈ vold5 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈ vold6 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈ vold7 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈ vold8 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈ vold9 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈ vold10 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈ vold11 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈ vold12 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈ vold13 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈ vold14 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ vold15 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ vold16 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ vold17 -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ mstatus0 -∗
@@ -568,63 +535,28 @@ Section WpKernelvecNew.
       tlb_inv root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kerneltrap) : mword 64) -∗
       gpr_file (kv_m2 m) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add ((((kv_sp1 m)))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 3 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 5 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 6 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 7 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 10 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 11 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 12 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 13 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 14 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 15 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 16 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 17 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 28 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 29 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 30 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 31 : mword 5)) j) -∗
+      ((((kv_sp1 m)))) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 3 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 5 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 6 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 7 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 11 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 12 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 13 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 14 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 15 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 16 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 17 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 28 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
-      Hpmpp Hpteregion Halignp Hpmpcov HX HW
-      Halv1 Halv2 Halv3 Halv4 Halv5 Halv6 Halv7 Halv8 Halv9 Halv10 Halv11 Halv12 Halv13 Halv14 Halv15 Halv16 Halv17.
-    assert (Halp1 : is_aligned_paddr (Physaddr (kv_sp1 m)) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv1. }
-    assert (Halp2 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv2. }
-    assert (Halp3 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv3. }
-    assert (Halp4 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv4. }
-    assert (Halp5 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv5. }
-    assert (Halp6 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv6. }
-    assert (Halp7 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv7. }
-    assert (Halp8 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv8. }
-    assert (Halp9 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv9. }
-    assert (Halp10 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv10. }
-    assert (Halp11 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv11. }
-    assert (Halp12 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv12. }
-    assert (Halp13 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv13. }
-    assert (Halp14 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv14. }
-    assert (Halp15 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv15. }
-    assert (Halp16 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv16. }
-    assert (Halp17 : is_aligned_paddr (Physaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv17. }
+      Hpmpp Hpteregion Halignp Hpmpcov HX HW.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     (* split: bundle(1/2) for the caddi16sp/jal WPs + retained halves *)
@@ -691,7 +623,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold1 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Halv1) ltac:(rewrite Hm1sp add_vec_slot0_zero; exact Halp1)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi2 Hw1").
     iEval (rewrite Hpc2).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw1".
@@ -705,7 +636,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold2 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv2) ltac:(rewrite Hm1sp; exact Halp2)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi3 Hw2").
     iEval (rewrite Hpc3).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw2".
@@ -719,7 +649,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold3 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv3) ltac:(rewrite Hm1sp; exact Halp3)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi4 Hw3").
     iEval (rewrite Hpc4).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw3".
@@ -733,7 +662,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold4 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv4) ltac:(rewrite Hm1sp; exact Halp4)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi5 Hw4").
     iEval (rewrite Hpc5).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw4".
@@ -747,7 +675,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold5 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv5) ltac:(rewrite Hm1sp; exact Halp5)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi6 Hw5").
     iEval (rewrite Hpc6).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw5".
@@ -761,7 +688,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold6 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv6) ltac:(rewrite Hm1sp; exact Halp6)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi7 Hw6").
     iEval (rewrite Hpc7).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw6".
@@ -775,7 +701,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold7 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv7) ltac:(rewrite Hm1sp; exact Halp7)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi8 Hw7").
     iEval (rewrite Hpc8).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw7".
@@ -789,7 +714,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv8) ltac:(rewrite Hm1sp; exact Halp8)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi9 Hw8").
     iEval (rewrite Hpc9).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw8".
@@ -803,7 +727,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold9 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv9) ltac:(rewrite Hm1sp; exact Halp9)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi10 Hw9").
     iEval (rewrite Hpc10).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw9".
@@ -817,7 +740,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold10 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv10) ltac:(rewrite Hm1sp; exact Halp10)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi11 Hw10").
     iEval (rewrite Hpc11).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw10".
@@ -831,7 +753,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold11 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv11) ltac:(rewrite Hm1sp; exact Halp11)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi12 Hw11").
     iEval (rewrite Hpc12).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw11".
@@ -845,7 +766,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold12 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv12) ltac:(rewrite Hm1sp; exact Halp12)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi13 Hw12").
     iEval (rewrite Hpc13).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw12".
@@ -859,7 +779,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold13 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv13) ltac:(rewrite Hm1sp; exact Halp13)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi14 Hw13").
     iEval (rewrite Hpc14).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw13".
@@ -873,7 +792,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold14 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv14) ltac:(rewrite Hm1sp; exact Halp14)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi15 Hw14").
     iEval (rewrite Hpc15).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw14".
@@ -887,7 +805,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold15 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv15) ltac:(rewrite Hm1sp; exact Halp15)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi16 Hw15").
     iEval (rewrite Hpc16).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw15".
@@ -901,7 +818,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold16 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv16) ltac:(rewrite Hm1sp; exact Halp16)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi17 Hw16").
     iEval (rewrite Hpc17).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw16".
@@ -915,7 +831,6 @@ Section WpKernelvecNew.
               (kv_m1 m) vold17 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HW
-              ltac:(rewrite Hm1sp; exact Halv17) ltac:(rewrite Hm1sp; exact Halp17)
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hi18 Hw17").
     iEval (rewrite Hpc18).
     iIntros "Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Hpmpc2 Hpmpa2 Htlbinv Hpc Hfile Hw17".
@@ -971,40 +886,6 @@ Section WpKernelvecNew.
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
     sret_newpriv mstatus0 = Supervisor ->
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
-    (* slot 1: x1 at sp+0 *)
-    is_aligned_vaddr (Virtaddr ((spv))) 8 = true ->
-    (* slot 2: x3 at sp+16 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 3: x5 at sp+32 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 4: x6 at sp+40 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 5: x7 at sp+48 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 6: x10 at sp+72 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 7: x11 at sp+80 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 8: x12 at sp+88 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 9: x13 at sp+96 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 10: x14 at sp+104 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 11: x15 at sp+112 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 12: x16 at sp+120 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 13: x17 at sp+128 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 14: x28 at sp+216 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 15: x29 at sp+224 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 16: x30 at sp+232 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) 8 = true ->
-    (* slot 17: x31 at sp+240 *)
-    is_aligned_vaddr (Virtaddr ((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) 8 = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -1019,23 +900,23 @@ Section WpKernelvecNew.
     pc_is (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) -∗
     gpr_file mt -∗
     kernel_text -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((spv))) j) ↦ₘ nth_byte v1 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v2 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v3 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v4 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v5 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v6 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v7 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v9 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v10 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v11 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v12 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v13 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v14 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v15 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v16 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v17 j) -∗
+    (((spv))) ↦₈ v1 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈ v2 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈ v3 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈ v4 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈ v5 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈ v6 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈ v7 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈ v8 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈ v9 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈ v10 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈ v11 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈ v12 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈ v13 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈ v14 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ v15 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ v16 -∗
+    (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ v17 -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ sret_ms5 mstatus0 -∗
@@ -1048,63 +929,28 @@ Section WpKernelvecNew.
       sepc ↦ᵣ sepc0 -∗
       pc_is (sret_tgt sepc0) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg (add_vec spv (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> (<[Regidx (mword_of_int 31 : mword 5) := regval_into_reg v17]> (<[Regidx (mword_of_int 30 : mword 5) := regval_into_reg v16]> (<[Regidx (mword_of_int 29 : mword 5) := regval_into_reg v15]> (<[Regidx (mword_of_int 28 : mword 5) := regval_into_reg v14]> (<[Regidx (mword_of_int 17 : mword 5) := regval_into_reg v13]> (<[Regidx (mword_of_int 16 : mword 5) := regval_into_reg v12]> (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v11]> (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg v10]> (<[Regidx (mword_of_int 13 : mword 5) := regval_into_reg v9]> (<[Regidx (mword_of_int 12 : mword 5) := regval_into_reg v8]> (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg v7]> (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg v6]> (<[Regidx (mword_of_int 7 : mword 5) := regval_into_reg v5]> (<[Regidx (mword_of_int 6 : mword 5) := regval_into_reg v4]> (<[Regidx (mword_of_int 5 : mword 5) := regval_into_reg v3]> (<[Regidx (mword_of_int 3 : mword 5) := regval_into_reg v2]> (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg v1]> (mt))))))))))))))))))) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((spv))) j) ↦ₘ nth_byte v1 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v2 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v3 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v4 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v5 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v6 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v7 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v8 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v9 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v10 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v11 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v12 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v13 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v14 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v15 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v16 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte v17 j) -∗
+      (((spv))) ↦₈ v1 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈ v2 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈ v3 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈ v4 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈ v5 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈ v6 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈ v7 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈ v8 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈ v9 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈ v10 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈ v11 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈ v12 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈ v13 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈ v14 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ v15 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ v16 -∗
+      (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ v17 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
-      HX HR Hpmpp Hpteregion Halignp Hpmpcov Hsp0 HTSR Hsup Hlpe0
-      Halv1 Halv2 Halv3 Halv4 Halv5 Halv6 Halv7 Halv8 Halv9 Halv10 Halv11 Halv12 Halv13 Halv14 Halv15 Halv16 Halv17.
-    assert (Halp1 : is_aligned_paddr (Physaddr spv) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv1. }
-    assert (Halp2 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv2. }
-    assert (Halp3 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv3. }
-    assert (Halp4 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv4. }
-    assert (Halp5 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv5. }
-    assert (Halp6 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv6. }
-    assert (Halp7 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv7. }
-    assert (Halp8 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv8. }
-    assert (Halp9 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv9. }
-    assert (Halp10 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv10. }
-    assert (Halp11 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv11. }
-    assert (Halp12 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv12. }
-    assert (Halp13 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv13. }
-    assert (Halp14 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv14. }
-    assert (Halp15 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv15. }
-    assert (Halp16 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv16. }
-    assert (Halp17 : is_aligned_paddr (Physaddr (add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))) 8 = true).
-    { rewrite <- is_aligned_vaddr_paddr. exact Halv17. }
+      HX HR Hpmpp Hpteregion Halignp Hpmpcov Hsp0 HTSR Hsup Hlpe0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile
              #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hcont".
     (* ---- #20: c.ldsp x1, 0(sp) @ 0x80005408 ---- *)
@@ -1120,7 +966,6 @@ Section WpKernelvecNew.
               mt v1 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd20 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp0 add_vec_slot0_zero; exact Halv1) ltac:(rewrite Hsp0 add_vec_slot0_zero; exact Halp1)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi20 Hv1").
     iEval (rewrite Hpc20).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv1".
@@ -1138,7 +983,6 @@ Section WpKernelvecNew.
               mt1 v2 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd21 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp1; exact Halv2) ltac:(rewrite Hsp1; exact Halp2)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi21 Hv2").
     iEval (rewrite Hpc21).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv2".
@@ -1156,7 +1000,6 @@ Section WpKernelvecNew.
               mt2 v3 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd22 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp2; exact Halv3) ltac:(rewrite Hsp2; exact Halp3)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi22 Hv3").
     iEval (rewrite Hpc22).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv3".
@@ -1174,7 +1017,6 @@ Section WpKernelvecNew.
               mt3 v4 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd23 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp3; exact Halv4) ltac:(rewrite Hsp3; exact Halp4)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi23 Hv4").
     iEval (rewrite Hpc23).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv4".
@@ -1192,7 +1034,6 @@ Section WpKernelvecNew.
               mt4 v5 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd24 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp4; exact Halv5) ltac:(rewrite Hsp4; exact Halp5)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi24 Hv5").
     iEval (rewrite Hpc24).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv5".
@@ -1210,7 +1051,6 @@ Section WpKernelvecNew.
               mt5 v6 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd25 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp5; exact Halv6) ltac:(rewrite Hsp5; exact Halp6)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi25 Hv6").
     iEval (rewrite Hpc25).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv6".
@@ -1228,7 +1068,6 @@ Section WpKernelvecNew.
               mt6 v7 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd26 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp6; exact Halv7) ltac:(rewrite Hsp6; exact Halp7)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi26 Hv7").
     iEval (rewrite Hpc26).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv7".
@@ -1246,7 +1085,6 @@ Section WpKernelvecNew.
               mt7 v8 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd27 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp7; exact Halv8) ltac:(rewrite Hsp7; exact Halp8)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi27 Hv8").
     iEval (rewrite Hpc27).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv8".
@@ -1264,7 +1102,6 @@ Section WpKernelvecNew.
               mt8 v9 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd28 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp8; exact Halv9) ltac:(rewrite Hsp8; exact Halp9)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi28 Hv9").
     iEval (rewrite Hpc28).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv9".
@@ -1282,7 +1119,6 @@ Section WpKernelvecNew.
               mt9 v10 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd29 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp9; exact Halv10) ltac:(rewrite Hsp9; exact Halp10)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi29 Hv10").
     iEval (rewrite Hpc29).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv10".
@@ -1300,7 +1136,6 @@ Section WpKernelvecNew.
               mt10 v11 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd30 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp10; exact Halv11) ltac:(rewrite Hsp10; exact Halp11)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi30 Hv11").
     iEval (rewrite Hpc30).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv11".
@@ -1318,7 +1153,6 @@ Section WpKernelvecNew.
               mt11 v12 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd31 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp11; exact Halv12) ltac:(rewrite Hsp11; exact Halp12)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi31 Hv12").
     iEval (rewrite Hpc31).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv12".
@@ -1336,7 +1170,6 @@ Section WpKernelvecNew.
               mt12 v13 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd32 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp12; exact Halv13) ltac:(rewrite Hsp12; exact Halp13)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi32 Hv13").
     iEval (rewrite Hpc32).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv13".
@@ -1354,7 +1187,6 @@ Section WpKernelvecNew.
               mt13 v14 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd33 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp13; exact Halv14) ltac:(rewrite Hsp13; exact Halp14)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi33 Hv14").
     iEval (rewrite Hpc33).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv14".
@@ -1372,7 +1204,6 @@ Section WpKernelvecNew.
               mt14 v15 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd34 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp14; exact Halv15) ltac:(rewrite Hsp14; exact Halp15)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi34 Hv15").
     iEval (rewrite Hpc34).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv15".
@@ -1390,7 +1221,6 @@ Section WpKernelvecNew.
               mt15 v16 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd35 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp15; exact Halv16) ltac:(rewrite Hsp15; exact Halp16)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi35 Hv16").
     iEval (rewrite Hpc35).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv16".
@@ -1408,7 +1238,6 @@ Section WpKernelvecNew.
               mt16 v17 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN Hrd36 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hpmpcov
               Hpmpp Hpteregion Halignp Hpmpcov HR
-              ltac:(rewrite Hsp16; exact Halv17) ltac:(rewrite Hsp16; exact Halp17)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi36 Hv17").
     iEval (rewrite Hpc36).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hv17".
@@ -1486,24 +1315,6 @@ Section WpKernelvecNew.
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
     sret_newpriv mstatus0 = Supervisor ->
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
-    (* slot 1: x1 at sp+0 *)
-    is_aligned_vaddr (Virtaddr (((kv_sp1 m)))) 8 = true ->
-    (* slot 2: x3 at sp+16 *)
-    (* slot 3: x5 at sp+32 *)
-    (* slot 4: x6 at sp+40 *)
-    (* slot 5: x7 at sp+48 *)
-    (* slot 6: x10 at sp+72 *)
-    (* slot 7: x11 at sp+80 *)
-    (* slot 8: x12 at sp+88 *)
-    (* slot 9: x13 at sp+96 *)
-    (* slot 10: x14 at sp+104 *)
-    (* slot 11: x15 at sp+112 *)
-    (* slot 12: x16 at sp+120 *)
-    (* slot 13: x17 at sp+128 *)
-    (* slot 14: x28 at sp+216 *)
-    (* slot 15: x29 at sp+224 *)
-    (* slot 16: x30 at sp+232 *)
-    (* slot 17: x31 at sp+240 *)
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -1518,23 +1329,23 @@ Section WpKernelvecNew.
     pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add ((((kv_sp1 m)))) j) ↦ₘ nth_byte vold1 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold2 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold3 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold4 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold5 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold6 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold7 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold8 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold9 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold10 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold11 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold12 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold13 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold14 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold15 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold16 j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte vold17 j) -∗
+    ((((kv_sp1 m)))) ↦₈ vold1 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈ vold2 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈ vold3 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈ vold4 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈ vold5 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈ vold6 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈ vold7 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈ vold8 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈ vold9 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈ vold10 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈ vold11 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈ vold12 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈ vold13 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈ vold14 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ vold15 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ vold16 -∗
+    (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ vold17 -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ sret_ms5 mstatus0 -∗
@@ -1547,94 +1358,29 @@ Section WpKernelvecNew.
       sepc ↦ᵣ sepc0 -∗
       pc_is (sret_tgt sepc0) -∗
       gpr_file m -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add ((((kv_sp1 m)))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 1 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 3 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 5 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 6 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 7 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 10 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 11 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 12 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 13 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 14 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 15 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 16 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 17 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 28 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 29 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 30 : mword 5)) j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) j) ↦ₘ nth_byte (m !!! Regidx (mword_of_int 31 : mword 5)) j) -∗
+      ((((kv_sp1 m)))) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 3 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 5 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 6 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 7 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 11 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 12 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 13 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 14 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 15 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 16 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 17 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 28 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
+      (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
       Hpmpp Hpteregion Halignp Hpmpcov HX HW HR
-      HTSR Hsup Hlpe0
-      Halv1.
-    assert (Halv2 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) 2).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv3 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) 4).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv4 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) 5).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv5 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))) 6).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv6 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))) 9).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv7 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))) 10).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv8 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))) 11).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv9 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))) 12).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv10 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))) 13).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv11 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))) 14).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv12 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))) 15).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv13 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))) 16).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv14 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))) 27).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv15 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))) 28).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv16 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))) 29).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
-    assert (Halv17 : is_aligned_vaddr (Virtaddr (add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))) 8 = true).
-    { apply (align8_vaddr_add_offset (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))) 30).
-      - vm_compute. reflexivity.
-      - exact Halv1. }
+      HTSR Hsup Hlpe0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     (* totality of the entry file (for the final map_eq) *)
@@ -1646,7 +1392,6 @@ Section WpKernelvecNew.
               pmpcfg0 pmpaddr00 region_pte vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 E Φ
               HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
               Hpmpp Hpteregion Halignp Hpmpcov HX HW
-              Halv1 Halv2 Halv3 Halv4 Halv5 Halv6 Halv7 Halv8 Halv9 Halv10 Halv11 Halv12 Halv13 Halv14 Halv15 Halv16 Halv17
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
@@ -1683,7 +1428,6 @@ Section WpKernelvecNew.
               E Φ
               HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
               HX HR Hpmpp Hpteregion Halignp Hpmpcov Hsp'' HTSR Hsup Hlpe0
-              Halv1 Halv2 Halv3 Halv4 Halv5 Halv6 Halv7 Halv8 Halv9 Halv10 Halv11 Halv12 Halv13 Halv14 Halv15 Halv16 Halv17
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".

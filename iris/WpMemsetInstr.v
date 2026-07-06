@@ -381,10 +381,6 @@ Section WpMemsetInstr.
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    is_aligned_vaddr (Virtaddr a8_ra) 8 = true ->
-    is_aligned_paddr (Physaddr pa_ra) 8 = true ->
-    is_aligned_vaddr (Virtaddr a8_s0) 8 = true ->
-    is_aligned_paddr (Physaddr pa_s0) 8 = true ->
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     bit_to_bool (access_vec_dec ret_tgt 1) = false ->
@@ -415,16 +411,16 @@ Section WpMemsetInstr.
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte (bv_0 64) j) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte (bv_0 64) j) -∗
+    pa_ra ↦₈ (bv_0 64) -∗
+    pa_s0 ↦₈ (bv_0 64) -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_ra j) ↦ₘ nth_byte ra0 j) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add pa_s0 j) ↦ₘ nth_byte s00 j) -∗
+      pa_ra ↦₈ ra0 -∗
+      pa_s0 ↦₈ s00 -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -436,7 +432,7 @@ Section WpMemsetInstr.
       HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
       HX Hcov Hpmpp Hpteregion Halignp
       Hbexec_add
-      Hpmpcov HW_R HR_R HalignR HpalignR HalignS HpalignS
+      Hpmpcov HW_R HR_R
       Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
@@ -461,7 +457,7 @@ Section WpMemsetInstr.
               HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               HX Hcov Hpmpp Hpteregion Halignp
               Hbexec_add
-              Hpmpcov HW_R HR_R HalignR HpalignR HalignS HpalignS
+              Hpmpcov HW_R HR_R
               Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
               Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
               minstr_cce minstr_cd2 minstr_cd4
