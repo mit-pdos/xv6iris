@@ -42,9 +42,31 @@ Section Kalloc.
 
   Definition nullp : mword 64 := mword_of_int 0.
 
+  (* A free page must be exactly what the real [kfree]/[kalloc] enforce: a
+     4096-byte-aligned physical address within [end, PHYSTOP).  kfree PANICS
+     otherwise (bounds + [pa % PGSIZE] checks), and kalloc only ever hands out
+     pages it earlier took in, so the invariant must CARRY this validity to make
+     kalloc's result re-freeable.  [end = 0x80023558], [PHYSTOP = 17 << 27]. *)
+  Definition PGSIZE  : Z := 4096.
+  Definition kmem_lo : Z := 0x80023558.   (* <end> *)
+  Definition kmem_hi : Z := 0x88000000.   (* PHYSTOP = 17 << 27 *)
+  Definition page_aligned (p : mword 64) : Prop := (uint p) mod PGSIZE = 0.
+  Definition page_in_range (p : mword 64) : Prop := kmem_lo <= uint p < kmem_hi.
+  Definition page_valid (p : mword 64) : Prop := page_aligned p /\ page_in_range p.
+
+  (* a valid page is never the null pointer (its address is >= [end] > 0) *)
+  Lemma page_valid_ne_null p : page_valid p -> p <> nullp.
+  Proof.
+    intros [_ [Hlo _]] Heq. subst p. unfold nullp in Hlo.
+    assert (uint (mword_of_int 0 : mword 64) = 0) as H0 by reflexivity.
+    rewrite H0 in Hlo. unfold kmem_lo in Hlo. lia.
+  Qed.
+
   Definition byte_any (a : Arch.pa) : iProp Σ := (∃ b : bv 8, a ↦ₘ b)%I.
+  (* an 8-byte little-endian word, now expressed via the [word_pointsto]
+     abstraction (so it also carries the doubleword-alignment of [a]). *)
   Definition word_at (a : mword 64) (w : mword 64) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ nth_byte w j)%I.
+    word_pointsto a (DfracOwn 1) w.
   Definition page_head8 (p : mword 64) : iProp Σ :=
     ([∗ list] j ∈ seq 0 8, byte_any (pa_add p j))%I.
   Definition page_rest (p : mword 64) : iProp Σ :=
@@ -67,7 +89,7 @@ Section Kalloc.
 
   Lemma word_at_head8 p w : word_at p w ⊢ page_head8 p.
   Proof.
-    rewrite /word_at /page_head8. iIntros "H".
+    rewrite /word_at /page_head8 word_pointsto_unfold. iIntros "[_ H]".
     iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb". iExists _. iExact "Hb".
   Qed.
 
@@ -80,13 +102,13 @@ Section Kalloc.
   Fixpoint freelist_chain (head : mword 64) (pages : list (mword 64)) : iProp Σ :=
     match pages with
     | [] => ⌜head = nullp⌝
-    | p :: ps => ⌜head = p⌝ ∗ ⌜p ≠ nullp⌝ ∗
+    | p :: ps => ⌜head = p⌝ ∗ ⌜page_valid p⌝ ∗
                  (∃ nxt : mword 64, run_page p nxt ∗ freelist_chain nxt ps)
     end%I.
 
   Lemma freelist_chain_cons head p ps :
     freelist_chain head (p :: ps)
-    = (⌜head = p⌝ ∗ ⌜p ≠ nullp⌝ ∗ (∃ nxt : mword 64, run_page p nxt ∗ freelist_chain nxt ps))%I.
+    = (⌜head = p⌝ ∗ ⌜page_valid p⌝ ∗ (∃ nxt : mword 64, run_page p nxt ∗ freelist_chain nxt ps))%I.
   Proof. reflexivity. Qed.
 
   (* the allocator's protected resource: the global freelist head pointer at
@@ -112,7 +134,7 @@ Section Kalloc.
     kmem_res fl ⊢
        (kmem_res fl)
      ∨ (∃ (p nxt : mword 64) (ps : list (mword 64)),
-          ⌜p ≠ nullp⌝ ∗ word_at fl p ∗ run_page p nxt ∗ freelist_chain nxt ps).
+          ⌜page_valid p⌝ ∗ word_at fl p ∗ run_page p nxt ∗ freelist_chain nxt ps).
   Proof.
     iIntros "H". iDestruct "H" as (head pages) "[Hfl Hchain]".
     destruct pages as [|p ps].
@@ -126,7 +148,7 @@ Section Kalloc.
   (* kfree's logical core: after the function has written [p->next := oldhead]
      and [fl := p], the pieces refold into the invariant with [p] prepended. *)
   Lemma kmem_res_push fl p oldhead pages :
-    p ≠ nullp ->
+    page_valid p ->
     word_at fl p ∗ run_page p oldhead ∗ freelist_chain oldhead pages ⊢ kmem_res fl.
   Proof.
     iIntros (Hp) "(Hfl & Hrun & Hchain)".
@@ -137,9 +159,9 @@ Section Kalloc.
 
   (* ---- the caller-facing pre/post conditions ---- *)
   Definition kalloc_post (r : mword 64) : iProp Σ :=
-    (⌜r = nullp⌝ ∨ (⌜r ≠ nullp⌝ ∗ page_own r))%I.
+    (⌜r = nullp⌝ ∨ (⌜page_valid r⌝ ∗ page_own r))%I.
   Definition kfree_pre (p : mword 64) : iProp Σ :=
-    (⌜p ≠ nullp⌝ ∗ page_own p)%I.
+    (⌜page_valid p⌝ ∗ page_own p)%I.
 
   (* Intended Hoare triples -- the operation is the kernel's kalloc/kfree
      instruction stream, discharged by the (later) instruction-level proof,
