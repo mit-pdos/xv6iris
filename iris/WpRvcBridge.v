@@ -3,8 +3,8 @@
    The RVC decoder [ext_decode_compressed] contains a [currentlyEnabled
    Ext_Zca] gate on the taken path.  That gate is an [Acc]-guarded recursion
    that [vm_compute] cannot evaluate, which is why the concrete-word decode
-   proofs walk the ~55-clause match by hand ([cwalk] in WpEntry.v), paying
-   ~2s per instruction.
+   proofs originally walked the ~55-clause match by hand, paying
+   ~2s per instruction (that hand-walk machinery has since been removed).
 
    This file proves ONCE, symbolically in the word, that the decoder is
    exec-equivalent (on any state with misa.C set) to a read-free variant
@@ -237,8 +237,8 @@ Proof.
   cong.
 Qed.
 
-(* drop-in for the [cwalk]-based concrete-word decode proofs: rewrite through
-   the bridge, then [vm_compute] the read-free decoder (~0.01s). *)
+(* one-shot concrete-word decode (the only remaining compressed-decode path):
+   rewrite through the bridge, then [vm_compute] the read-free decoder (~0.01s). *)
 (* After [vm_compute] both sides are canonical up to the well-formedness proof
    carried by each [bv]; close constructor-by-constructor, discharging each [bv]
    leaf with [bv_eq] (unsigned equality) BEFORE [f_equal] would peel into its
