@@ -75,6 +75,7 @@ WpAcquireMem.v
 WpHolding.v
 WpAcquireTop.v
 WpLock.v
+KallocInv.v
 WpLockLeaves.v
 WpHoldingInv.v
 WpPopOff.v
