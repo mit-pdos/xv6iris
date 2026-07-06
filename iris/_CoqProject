@@ -82,3 +82,4 @@ WpPopOff.v
 WpRelease.v
 WpAcquireLock.v
 WpKallocDecode.v
+WpKalloc.v
