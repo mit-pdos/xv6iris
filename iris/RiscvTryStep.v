@@ -75,12 +75,6 @@ Proof.
   - intros (s1 & Hm & Hn). exists tt, s1. auto.
 Qed.
 
-(* Per-effect step lemmas: register read / write through the real
-   [read_reg]/[write_reg] of the model. *)
-Lemma run_read_reg (r : register) s (x : type_of_register r) s' :
-  run (Defs.read_reg r : M _) s x s' <->
-  (x = register_lookup r s.(sregs) /\ s' = s).
-Proof. apply iff_refl. Qed.
 
 
 (* [returnM] is [Defs.returnm] specialised to the model's exception type. *)
@@ -169,50 +163,6 @@ Fixpoint runR {R X} (m : Defs.monadR R exception X)
 
 (* ---- the bridge: catch_early_return turns an early-return body back into *)
 
-(* ---- bind in the early-return monad: short-circuits on early return.    *)
-Lemma runR_bind {R X Y} (m : Defs.monadR R exception Y)
-    (f : Y -> Defs.monadR R exception X) s res s' :
-  runR (Defs.bind m f) s res s' <->
-  ((exists r, res = inl r /\ runR m s (inl r) s')
-   \/ (exists a s1, runR m s (inr a) s1 /\ runR (f a) s1 res s')).
-Proof.
-  unfold Defs.bind. revert s. induction m as [a0 | T oc k IH]; intros s.
-  - split.
-    + intro H. right. exists a0, s. split; [ split; reflexivity | exact H ].
-    + intros [ (r & Hr & [Hc _]) | (a & s1 & [Heq Hs] & Hf) ];
-        [ discriminate Hc | injection Heq as <-; subst s1; exact Hf ].
-  - destruct oc;
-      first
-        [ exact (IH _ _)
-        | (split;
-           [ intros (w & HP & H); apply IH in H;
-             destruct H as [ (r & Hr & Hk) | (a & s1 & Hk & Hf) ];
-             [ left; exists r; split; [exact Hr | exists w; split; [exact HP | exact Hk]]
-             | right; exists a, s1; split; [ exists w; split; [exact HP | exact Hk] | exact Hf ] ]
-           | intros [ (r & Hr & (w & HP & Hk)) | (a & s1 & (w & HP & Hk) & Hf) ];
-             [ exists w; split; [exact HP | apply IH; left; exists r; split; [exact Hr | exact Hk]]
-             | exists w; split; [exact HP | apply IH; right; exists a, s1; split; [exact Hk | exact Hf]] ] ])
-        | (split;
-           [ intros (c & H); apply IH in H;
-             destruct H as [ (r & Hr & Hk) | (a & s1 & Hk & Hf) ];
-             [ left; exists r; split; [exact Hr | exists c; exact Hk]
-             | right; exists a, s1; split; [ exists c; exact Hk | exact Hf ] ]
-           | intros [ (r & Hr & (c & Hk)) | (a & s1 & (c & Hk) & Hf) ];
-             [ exists c; apply IH; left; exists r; split; [exact Hr | exact Hk]
-             | exists c; apply IH; right; exists a, s1; split; [exact Hk | exact Hf] ] ])
-        | (match goal with He : (_ + exception)%type |- _ => destruct He as [r0 | ee] end;
-           [ split;
-             [ intros [Hres Hs]; left; exists r0; split; [exact Hres | split; [reflexivity | exact Hs]]
-             | intros [ (r & Hres & [Heq Hs]) | (a & s1 & Hf0 & _) ];
-               [ injection Heq as <-; split; [exact Hres | exact Hs]
-               | destruct Hf0 as [Hc _]; discriminate Hc ] ]
-           | split;
-             [ intro H; destruct H
-             | intros [ (r & _ & Hf0) | (a & s1 & Hf0 & _) ]; destruct Hf0 ] ])
-        | (split;
-           [ intro H; destruct H
-           | intros [ (r & _ & Hf0) | (a & s1 & Hf0 & _) ]; destruct Hf0 ]) ].
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 
@@ -1102,10 +1052,6 @@ Qed.
 
 
 
-(* returnm = Ret, so runR yields a plain (inr) return with no state change. *)
-Lemma runR_returnm_fwd {R X} (x : X) (s : mstate) :
-  runR (R:=R) (Defs.returnm x : Defs.monadR R exception X) s (inr x) s.
-Proof. split; reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* The loop invariant over the nat-fueled fixpoint [foreach_ZM_up'].       *)
