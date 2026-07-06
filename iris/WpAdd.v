@@ -139,8 +139,6 @@ Section FinalWP.
         (R_bitvector_64 x12) (add_vec a0 a1))
       PC (add_vec_int pc 4).
 
-  Definition sFc (s : mstate) : mstate :=
-    if b then set_reg (base_upd s) minstret (add_vec_int mst0 1) else base_upd s.
 
   Ltac tmiss := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 

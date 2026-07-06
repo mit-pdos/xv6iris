@@ -164,9 +164,6 @@ Section ForwardLDg.
     set_reg (set_reg sAlg nextPC (add_vec_int pc 4)) (R_bitvector_64 (gpr_of_Z (uint rd)))
             (regval_into_reg (extend_value false data)).
   Definition sTlg : mstate := set_reg sXlg PC (register_lookup nextPC sXlg.(sregs)).
-  Definition sFlg : mstate :=
-    if b then set_reg sTlg minstret (add_vec_int (register_lookup minstret sTlg.(sregs)) 1)
-         else sTlg.
 
 
   Variable mst0 : mword 64.
@@ -177,9 +174,6 @@ Section ForwardLDg.
                               nextPC (add_vec_int pc 4))
                      (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value false data)))
             PC (add_vec_int pc 4).
-  Definition sFclg : mstate :=
-    if b then set_reg base_upd_lg minstret (add_vec_int mst0 1)
-         else base_upd_lg.
 
 End ForwardLDg.
 

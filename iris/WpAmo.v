@@ -34,15 +34,6 @@ Import Defs.
 (* Part 1 -- the A-extension enable gate.                                 *)
 (* ===================================================================== *)
 
-Lemma exec_hartSupports_Zaamo s : exec (hartSupports Ext_Zaamo) s = Some (false, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  change (hartSupports_measure Ext_Zaamo) with 0.
-  change (0 >=? 0) with true. cbn match beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)).
-  apply exec_returnM.
-Qed.
 
 Lemma exec_hartSupports_A s : exec (hartSupports Ext_A) s = Some (true, s).
 Proof.
@@ -54,17 +45,6 @@ Proof.
   apply exec_returnM.
 Qed.
 
-Lemma exec_rec_cE_A_misa (k : Z) (acc : Acc (Zwf 0) k) s :
-  Z.geb k 0 = true ->
-  exec (_rec_currentlyEnabled Ext_A k acc) s
-    = Some (eq_vec (_get_Misa_A (register_lookup misa s.(sregs))) ('b"1"), s).
-Proof.
-  intro Hk. destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  rewrite Hk. cbn match beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)). cbn match beta.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_A s)). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s)). apply exec_returnM.
-Qed.
 
 
 (* ===================================================================== *)

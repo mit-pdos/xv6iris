@@ -130,9 +130,6 @@ Section StepGen.
 
 End StepGen.
 
-(* ==== lui exec-step (forward_exec_lui) ==== *)
-Definition i_lui : mword 5 :=
-  autocast (T := mword) (subrange_vec_dec (subrange_vec_dec h_lui 11 7) (Z.sub regidx_bit_width 1) 0).
 
 
 
@@ -147,9 +144,6 @@ Section ForwardLUI.
   Definition s_pclu : mstate := set_reg sAlu nextPC (add_vec_int pc 2).
   Definition sXlu : mstate := set_reg s_pclu (R_bitvector_64 x10) (regval_into_reg luival).
   Definition sTlu : mstate := set_reg sXlu PC (register_lookup nextPC sXlu.(sregs)).
-  Definition sFlu : mstate :=
-    if b then set_reg sTlu minstret (add_vec_int (register_lookup minstret sTlu.(sregs)) 1)
-         else sTlu.
 
 End ForwardLUI.
 
@@ -209,9 +203,6 @@ Section ForwardADD.
             (register_lookup (R_bitvector_64 x10) s_pcad.(sregs)).
   Definition sXad : mstate := set_reg s_pcad (R_bitvector_64 x2) (regval_into_reg addval).
   Definition sTad : mstate := set_reg sXad PC (register_lookup nextPC sXad.(sregs)).
-  Definition sFad : mstate :=
-    if b then set_reg sTad minstret (add_vec_int (register_lookup minstret sTad.(sregs)) 1)
-         else sTad.
 
 End ForwardADD.
 
@@ -251,9 +242,6 @@ Section ForwardJAL.
   Definition sXj : mstate :=
     set_reg (set_reg s_pcj nextPC jtgt) (R_bitvector_64 x1) (regval_into_reg jlink).
   Definition sTj : mstate := set_reg sXj PC (register_lookup nextPC sXj.(sregs)).
-  Definition sFj : mstate :=
-    if b then set_reg sTj minstret (add_vec_int (register_lookup minstret sTj.(sregs)) 1)
-         else sTj.
 
 End ForwardJAL.
 
@@ -387,9 +375,6 @@ Section ForwardMUL.
   Definition sXm : mstate :=
     set_reg s_pcm (R_bitvector_64 x10) (regval_into_reg (mulprod s_pcm)).
   Definition sTm : mstate := set_reg sXm PC (register_lookup nextPC sXm.(sregs)).
-  Definition sFm : mstate :=
-    if b then set_reg sTm minstret (add_vec_int (register_lookup minstret sTm.(sregs)) 1)
-         else sTm.
 
 End ForwardMUL.
 
@@ -475,9 +460,6 @@ Section ForwardADDI.
             (sign_extend' 64 (sign_extend' 12 imm_caddi)).
   Definition sXai : mstate := set_reg s_pcai (R_bitvector_64 x11) (regval_into_reg addival).
   Definition sTai : mstate := set_reg sXai PC (register_lookup nextPC sXai.(sregs)).
-  Definition sFai : mstate :=
-    if b then set_reg sTai minstret (add_vec_int (register_lookup minstret sTai.(sregs)) 1)
-         else sTai.
 
 End ForwardADDI.
 
@@ -505,8 +487,6 @@ Section StepLUI.
                     nextPC (add_vec_int pc 2))
            (R_bitvector_64 x10) (regval_into_reg luival))
         PC (add_vec_int pc 2).
-    Definition sFclu : mstate :=
-      if b then set_reg base_upd_lu minstret (add_vec_int mst0 1) else base_upd_lu.
 
     Ltac tmilu := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -529,8 +509,6 @@ Section StepADD.
                     nextPC (add_vec_int pc 2))
            (R_bitvector_64 x2) (regval_into_reg (addval s pc b)))
         PC (add_vec_int pc 2).
-    Definition sFcad : mstate :=
-      if b then set_reg base_upd_ad minstret (add_vec_int mst0 1) else base_upd_ad.
 
     Ltac tmiad := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -557,8 +535,6 @@ Section StepMUL.
                     nextPC (add_vec_int pc 4))
            (R_bitvector_64 x10) (regval_into_reg (mulprod (s_pcm s pc b))))
         PC (add_vec_int pc 4).
-    Definition sFcm : mstate :=
-      if b then set_reg base_upd_m minstret (add_vec_int mst0 1) else base_upd_m.
 
     Ltac tmim := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -591,9 +567,6 @@ Section ForwardCSRR.
   Definition sXc : mstate :=
     set_reg s_pcc (R_bitvector_64 x11) (regval_into_reg (register_lookup mhartid s_pcc.(sregs))).
   Definition sTc : mstate := set_reg sXc PC (register_lookup nextPC sXc.(sregs)).
-  Definition sFc : mstate :=
-    if b then set_reg sTc minstret (add_vec_int (register_lookup minstret sTc.(sregs)) 1)
-         else sTc.
 
 End ForwardCSRR.
 
@@ -623,8 +596,6 @@ Section StepADDI.
                     nextPC (add_vec_int pc 2))
            (R_bitvector_64 x11) (regval_into_reg (addival s pc b)))
         PC (add_vec_int pc 2).
-    Definition sFcai : mstate :=
-      if b then set_reg base_upd_ai minstret (add_vec_int mst0 1) else base_upd_ai.
 
     Ltac tmiai := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -651,8 +622,6 @@ Section StepCSRR.
                     nextPC (add_vec_int pc 4))
            (R_bitvector_64 x11) (regval_into_reg (register_lookup mhartid (s_pcc s pc b).(sregs))))
         PC (add_vec_int pc 4).
-    Definition sFcc : mstate :=
-      if b then set_reg base_upd_c minstret (add_vec_int mst0 1) else base_upd_c.
 
     Ltac tmic := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -680,8 +649,6 @@ Section StepJAL2.
               nextPC (jtgt s pc b))
            (R_bitvector_64 x1) (regval_into_reg (add_vec_int pc 4)))
         PC (jtgt s pc b).
-    Definition sFcj : mstate :=
-      if b then set_reg base_upd_j minstret (add_vec_int mst0 1) else base_upd_j.
 
     Ltac tmij := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 

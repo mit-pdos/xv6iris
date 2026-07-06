@@ -32,16 +32,6 @@ Proof.
   - apply (exec_wX_bits_gpr rd _ s).
 Qed.
 
-Lemma gpr_addi_val_lookup (rs1 : mword 5) (imm : mword 12) (t : mstate) :
-  uint rs1 <> 0 ->
-  gpr_addi_val rs1 imm t
-  = add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) t.(sregs))
-            (sign_extend' 64 imm).
-Proof.
-  intros H1. unfold gpr_addi_val.
-  replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact H1).
-  reflexivity.
-Qed.
 
 (* ADDIW: sign-extend the low 32 bits of (rs1 + imm).  An add-immediate variant,
    so it lives here rather than in WpGprShift.  Value inlined (like gpr_addi_val),
@@ -95,9 +85,6 @@ Section ForwardAddiGpr.
     set_reg s_pci (R_bitvector_64 (gpr_of_Z (uint rd)))
       (regval_into_reg (gpr_addi_val rs1 imm s_pci)).
   Definition sTi : mstate := set_reg sXi PC (register_lookup nextPC sXi.(sregs)).
-  Definition sFi : mstate :=
-    if b then set_reg sTi minstret (add_vec_int (register_lookup minstret sTi.(sregs)) 1)
-         else sTi.
 
 End ForwardAddiGpr.
 
@@ -112,8 +99,6 @@ Section CleanAddiGpr.
          (R_bitvector_64 (gpr_of_Z (uint rd)))
          (regval_into_reg (gpr_addi_val rs1 imm (s_pci s pc b))))
       PC (add_vec_int pc 4).
-  Definition sFci : mstate :=
-    if b then set_reg base_upd_i minstret (add_vec_int mst0 1) else base_upd_i.
 
 End CleanAddiGpr.
 

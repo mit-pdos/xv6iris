@@ -223,17 +223,6 @@ Proof.
   apply exec_returnM.
 Qed.
 
-(* ---- bit-extraction: bit 1 (SIE) of the read S-status = machine SIE ----
-   [lower_mstatus]'s OUTERMOST field-update is [_update_Sstatus_SIE _ (SIE ms)]
-   at bit 1; every inner update touches a strictly higher bit, so reading bit 1
-   sees exactly the written SIE value.  We only unfold the outer update and use
-   a single-update access lemma -- unfolding the whole 11-update tower makes the
-   testbit search diverge. *)
-Lemma access1_update_subrange11 (v : mword 64) (x : mword 1) :
-  access_vec_dec (update_subrange_vec_dec v 1 1 x) 1 = x.
-Proof.
-  unfold access_vec_dec, access_mword_dec. mw_prep; tb1.
-Qed.
 
 
 Section WpPushOffCsr.

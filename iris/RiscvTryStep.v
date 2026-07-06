@@ -601,8 +601,6 @@ Lemma run_bind_fwd {X Y} (m : M Y) (f : Y -> M X) s y s1 x s' :
 Proof. intros H1 H2. apply (proj2 (run_bind _ _ _ _ _)). exists y, s1. split; assumption. Qed.
 
 
-Lemma run_ret_fwd {X} (x : X) s : run (Defs.returnm x) s x s.
-Proof. apply (proj2 (run_ret _ _ _ _)). split; reflexivity. Qed.
 
 
 Section Pending.
@@ -617,40 +615,7 @@ Section Pending.
   Hypothesis HmIE :
     eq_vec (_get_Mstatus_MIE (register_lookup mstatus s.(sregs))) ('b"1") = false.
 
-  (* The or_boolM guard before assert_exp' evaluates to true. *)
-  Lemma guard_true :
-    run (or_boolM (currentlyEnabled Ext_S)
-                  (Defs.bind (read_reg mideleg)
-                     (fun w1 : mword 64 => returnM (eq_vec w1 (zeros' 64))))) s true s.
-  Proof using All.
-    apply (proj2 (run_or_boolM _ _ _ _ _)). exists cES, s. split; [exact HcES|].
-    destruct cES; [split; reflexivity | discriminate HcEStrue].
-  Qed.
 
-  (* read_mip threads to *some* value (state-preserving); value irrelevant. *)
-  Lemma read_mip_runs : exists v, run (read_mip IncludePlatformInterrupts) s v s.
-  Proof using All.
-    unfold read_mip. cbn match.
-    destruct cES.
-    - eexists.
-      eapply run_bind_fwd; [exact (run_read_reg_fwd mip s)|].
-      eapply run_bind_fwd.
-      { unfold external_interrupts_pending.
-        eapply run_bind_fwd; [exact (run_read_reg_fwd sig_meip s)|].
-        eapply run_bind_fwd; [exact HcES|]. cbn match.
-        eapply run_bind_fwd; [exact (run_read_reg_fwd sig_seip s)|].
-        apply run_returnM_fwd. }
-      apply run_returnM_fwd.
-    - eexists.
-      eapply run_bind_fwd; [exact (run_read_reg_fwd mip s)|].
-      eapply run_bind_fwd.
-      { unfold external_interrupts_pending.
-        eapply run_bind_fwd; [exact (run_read_reg_fwd sig_meip s)|].
-        eapply run_bind_fwd; [exact HcES|]. cbn match.
-        eapply run_bind_fwd; [apply run_returnM_fwd|].
-        apply run_returnM_fwd. }
-      apply run_returnM_fwd.
-  Qed.
 
 
 End Pending.
@@ -817,38 +782,6 @@ Qed.
 (* determinism transfer: execR success => the unique runR.                 *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma execR_runR_det {R X} (m : Defs.monadR R exception X) :
-  forall s res s', execR m s = Some (res, s') ->
-    runR m s res s' /\ (forall res2 s2, runR m s res2 s2 -> res2 = res /\ s2 = s').
-Proof.
-  induction m as [y|T oc k IH]; intros s res s' Hexec.
-  - simpl in Hexec. injection Hexec as <- <-. simpl.
-    split; [done | intros res2 s2 [<- <-]; done].
-  - destruct oc; simpl in Hexec; try discriminate;
-      try (split;
-           [ apply (proj1 (IH _ _ _ _ Hexec))
-           | intros res2 s2 Hr; simpl in Hr; exact (proj2 (IH _ _ _ _ Hexec) _ _ Hr) ]).
-    + (* MemRead *)
-      destruct (read_bytes s.(mem) _ _) as [w0|] eqn:Hrb; [|discriminate].
-      destruct (IH (inl (w0, None)) s res s' Hexec) as [Hrun0 Huniq0].
-      split.
-      * simpl. exists w0. split;
-          [ intros j Hj; apply (read_bytes_spec _ _ _ _ Hrb j Hj) | exact Hrun0 ].
-      * intros res2 s2 Hr. simpl in Hr. destruct Hr as (w & Hbytes & Hrun).
-        assert (Hweq : w = w0).
-        { apply bv_eq_of_bytes. intros j Hj.
-          pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
-          assert (Hw : mem s !! RiscvModelBytes.pa_add (Interface.ReadReq.pa t) j
-                       = Some (RiscvModelBytes.nth_byte w j))
-            by (apply Hbytes; exact Hj).
-          rewrite Hw in H0. apply Some_inj in H0. exact H0. }
-        subst w. exact (Huniq0 _ _ Hrun).
-    + (* ExtraOutcome *)
-      match goal with He : (_ + exception)%type |- _ => destruct He as [r0|ee] end;
-        simpl in Hexec; [|discriminate].
-      injection Hexec as <- <-. simpl.
-      split; [done | intros res2 s2 [<- <-]; done].
-Qed.
 
 
 (* ===== RiscvModelHne1 ===== *)
@@ -1011,16 +944,6 @@ Proof.
   - apply run_returnM. split; reflexivity.
 Qed.
 
-Lemma run_currentlyEnabled_Ziccif s : run (currentlyEnabled Ext_Ziccif) s true s.
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_Ziccif) 0) with true by reflexivity.
-  cbn match.
-  apply run_bind. exists eq_refl, s. split.
-  - apply run_ret. split; reflexivity.
-  - cbn match. apply run_hartSupports_Ziccif.
-Qed.
 
 
 (* ===== RiscvModelEnabledS ===== *)
@@ -1039,23 +962,10 @@ Qed.
 
 
 
-(* leaves: hartSupports Ext_S / Ext_Zicsr both reduce to returnM true *)
-Lemma run_hartSupports_S s : run (hartSupports Ext_S) s true s.
-Proof. unfold hartSupports. hs_open s. apply run_returnM. split; reflexivity. Qed.
 
 Lemma run_hartSupports_Zicsr s : run (hartSupports Ext_Zicsr) s true s.
 Proof. unfold hartSupports. hs_open s. apply run_returnM. split; reflexivity. Qed.
 
-(* the inner Ext_Zicsr sub-call (a reduced-limit _rec node) reduces to
-   hartSupports Ext_Zicsr = true, for any acc. *)
-Lemma run_rec_cE_Zicsr s (acc : Acc (Zwf 0) 0) :
-  run (_rec_currentlyEnabled Ext_Zicsr 0 acc) s true s.
-Proof.
-  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb 0 0) with true by reflexivity. cbn match.
-  apply run_bind. exists eq_refl, s. split; [apply run_ret; split; reflexivity | cbn match].
-  apply run_hartSupports_Zicsr.
-Qed.
 
 
 (* ===== RiscvModelHne2 ===== *)
@@ -2013,33 +1923,6 @@ Section FetchBytes.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N ->
       s.(mem) !! (pa_add addr j) = Some (nth_byte w j).
 
-  Lemma run_fetch_bytes_4 : run (fetch_bytes pc pc 4) s (@FetchBytes_Success 4 w) s.
-  Proof.
-    unfold fetch_bytes.
-    apply run_catch_early_return. right.
-    change (ext_fetch_check_pc pc pc) with (@None unit).
-    cbv iota beta.  (* match None -> returnR tt *)
-    (* body = (returnR tt >> liftR transl) >>= (fun w0 => match w0 .. >>= ..).
-       Outermost bind: intermediate value = the translateAddr result. *)
-    apply runR_bind. right.
-    exists (Ok (Physaddr addr, PBMT_PMA, init_ext_ptw)), s. split.
-    { (* returnR tt >> liftR transl  -->  Ok (..) *)
-      unfold Defs.bind0. apply runR_bind. right. exists tt, s. split.
-      { apply runR_returnR_fwd. }
-      apply runR_liftR. exists (Ok (Physaddr addr, PBMT_PMA, init_ext_ptw)).
-      split; [ reflexivity | apply run_translateAddr_identity; exact Hpriv ]. }
-    (* fun w0 => (match Ok .. -> returnR (paddr,pbmt)) >>= fun '(p,m) => .. *)
-    cbv iota beta.
-    apply runR_bind. right. exists (Physaddr addr, PBMT_PMA), s. split.
-    { apply runR_returnR_fwd. }
-    (* fun '(paddr,pbmt) => liftR (mem_read ..) >>= fun w2 => returnR (match w2 ..) *)
-    cbv iota beta.
-    apply runR_bind. right. exists (Ok w), s. split.
-    { apply runR_liftR. exists (Ok w). split; [ reflexivity | ].
-      apply (run_mem_read_fetch_pin PBMT_PMA addr region w s); assumption. }
-    (* returnR (FetchBytes_Success (autocast w)) *)
-    cbv iota beta. rewrite autocast_mword_id. apply runR_returnR_fwd.
-  Qed.
 End FetchBytes.
 
 (* ---------------------------------------------------------------------- *)
@@ -2172,60 +2055,6 @@ Section HartActiveADD.
           (add_vec (register_lookup (R_bitvector_64 x10) s1.(sregs))
                    (register_lookup (R_bitvector_64 x11) s1.(sregs)))).
 
-  Lemma run_hart_active_ADD :
-    run (run_hart_active 0) s
-        (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w)) s_exec.
-  Proof.
-    unfold run_hart_active.
-    apply run_catch_early_return. right.
-    (* read cur_privilege = Machine (state-preserving) *)
-    eapply runR_liftR_seq with (a := Machine).
-    { pose proof (run_read_reg_fwd cur_privilege s) as H. rewrite Hpriv in H. exact H. }
-    (* dispatchInterrupt Machine = None (state-preserving) *)
-    eapply runR_liftR_seq with (a := @None (InterruptType * Privilege)%type).
-    { apply run_dispatchInterrupt_none. exact Hpend. }
-    cbv iota beta.
-    (* [(match None => returnR tt) >> liftR(fetch)] yields F_Base w, then continuation *)
-    apply runR_bind. right. exists (F_Base w), s. split.
-    { unfold Defs.bind0. apply runR_bind. right. exists tt, s. split.
-      { apply runR_returnR_fwd. }
-      apply runR_liftR. exists (F_Base w). split; [reflexivity| exact Hfetch]. }
-    (* continuation: ext_fetch_hook (F_Base w) = F_Base w; the F_Base arm *)
-    cbv iota beta.
-    (* ext_decode w = RTYPE ... ADD (state-preserving) *)
-    eapply runR_liftR_seq with (a := RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)).
-    { exact Hdec. }
-    (* [(if print=false => returnR tt) >> and_boolM(landing_pad=false) _] yields false *)
-    cbv iota beta.
-    apply runR_bind. right. exists false, s. split.
-    { unfold Defs.bind0. apply runR_bind. right. exists tt, s. split.
-      { apply runR_returnR_fwd. }
-      unfold and_boolM. apply runR_bind. right. exists false, s. split.
-      { apply runR_liftR. exists false. split; [reflexivity|].
-        apply run_is_landing_pad_false. exact Help. }
-      cbv iota beta. apply runR_returnR_fwd. }
-    (* w21 = false -> else branch *)
-    cbv iota beta.
-    (* read PC = pc (state-preserving) *)
-    eapply runR_liftR_seq with (a := pc).
-    { pose proof (run_read_reg_fwd PC s) as H. rewrite HpcPC in H. exact H. }
-    (* [liftR(write nextPC (pc+4)) >> liftR(execute instr)] : s -> s_exec, RETIRE_SUCCESS *)
-    apply runR_bind. right. exists RETIRE_SUCCESS, s_exec. split.
-    { unfold Defs.bind0. apply runR_bind. right. exists tt, s1. split.
-      { apply runR_liftR. exists tt. split; [reflexivity|].
-        apply (proj2 (run_write_reg nextPC (add_vec_int pc 4) s tt s1)).
-        split; reflexivity. }
-      apply runR_liftR. exists RETIRE_SUCCESS. split; [reflexivity|].
-      change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))
-        with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) ADD).
-      unfold s_exec.
-      apply (run_execute_ADD_x12_x10_x11 rd rs1 rs2 s1 Hrs1 Hrs2 Hrd). }
-    (* match RETIRE_SUCCESS => result' = RETIRE_SUCCESS ; returnR Step_Execute *)
-    cbv iota beta.
-    apply runR_bind. right. exists RETIRE_SUCCESS, s_exec. split.
-    { apply runR_returnR_fwd. }
-    cbv iota beta. apply runR_returnR_fwd.
-  Qed.
 
 End HartActiveADD.
 

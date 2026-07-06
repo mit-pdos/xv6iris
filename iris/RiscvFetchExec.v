@@ -621,10 +621,6 @@ Local Open Scope Z_scope.
 (* pmpAddrMatchType_encdec_backwards 0#2 = OFF.                            *)
 (* ---------------------------------------------------------------------- *)
 
-(* The boot zero cfg byte makes the address-match-type OFF (pure compute). *)
-Lemma pmpcfg_zero_off :
-  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (zeros' 8)) = OFF.
-Proof. vm_compute. reflexivity. Qed.
 
 
 (* ---------------------------------------------------------------------- *)
@@ -635,28 +631,6 @@ Proof. vm_compute. reflexivity. Qed.
 (* PMA_executable is true by construction (override_PMA keeps it).         *)
 (* ---------------------------------------------------------------------- *)
 
-Definition ramRegion : PMA_Region :=
-  {| PMA_Region_base := to_bits 64 2147483648;   (* 0x80000000 *)
-     PMA_Region_size := to_bits 64 268435456;    (* 0x10000000 *)
-     PMA_Region_attributes :=
-       {| PMA_mem_type := MainMemory;
-          PMA_cacheable := true;
-          PMA_coherent := true;
-          PMA_executable := true;
-          PMA_readable := true;
-          PMA_writable := true;
-          PMA_read_idempotent := true;
-          PMA_write_idempotent := true;
-          PMA_misaligned_exceptions :=
-            {| PMAMisalignedExceptions_load_store := None;
-               PMAMisalignedExceptions_vector := None;
-               PMAMisalignedExceptions_amo := AccessFault |};
-          PMA_atomic_support := AMOArithmetic;
-          PMA_reservability := RsrvEventual;
-          PMA_supports_cbo_zero := true;
-          PMA_supports_pte_read := true;
-          PMA_supports_pte_write := true |};
-     PMA_Region_include_in_device_tree := false |}.
 
 
 

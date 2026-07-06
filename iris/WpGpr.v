@@ -93,7 +93,6 @@ Qed.
 Definition gpr_list : list register_bitvector_64 :=
   [x1;x2;x3;x4;x5;x6;x7;x8;x9;x10;x11;x12;x13;x14;x15;x16;
    x17;x18;x19;x20;x21;x22;x23;x24;x25;x26;x27;x28;x29;x30;x31].
-Definition gpr_set : gset register_bitvector_64 := list_to_set gpr_list.
 
 
 Section GprFile.
@@ -160,9 +159,6 @@ Section ForwardAddGpr.
     set_reg s_pcg (R_bitvector_64 (gpr_of_Z (uint rd)))
       (regval_into_reg (gpr_rd_val rs2 rs1 s_pcg)).
   Definition sTg : mstate := set_reg sXg PC (register_lookup nextPC sXg.(sregs)).
-  Definition sFg : mstate :=
-    if b then set_reg sTg minstret (add_vec_int (register_lookup minstret sTg.(sregs)) 1)
-         else sTg.
 
 End ForwardAddGpr.
 
@@ -180,17 +176,6 @@ Ltac gpr_trans := first
   | rewrite (irrelevant_register_set _ _ _ _ (gpr_of_Z_ne_minstret _))
   | rewrite irrelevant_register_set; [|vm_compute; reflexivity] ].
 
-Lemma gpr_rd_val_lookup (rs2 rs1 : mword 5) (t : mstate) :
-  uint rs1 <> 0 -> uint rs2 <> 0 ->
-  gpr_rd_val rs2 rs1 t
-  = add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) t.(sregs))
-            (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) t.(sregs)).
-Proof.
-  intros H1 H2. unfold gpr_rd_val.
-  replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact H1).
-  replace (Z.eqb (uint rs2) 0) with false by (symmetry; apply Z.eqb_neq; exact H2).
-  reflexivity.
-Qed.
 
 
 (* The [register_beq <special> (gpr_of_Z n) = false] side conditions of
@@ -250,8 +235,6 @@ Section CleanGpr.
          (R_bitvector_64 (gpr_of_Z (uint rd)))
          (regval_into_reg (gpr_rd_val rs2 rs1 (s_pcg s pc b))))
       PC (add_vec_int pc 4).
-  Definition sFcg : mstate :=
-    if b then set_reg base_upd_g minstret (add_vec_int mst0 1) else base_upd_g.
 
 End CleanGpr.
 

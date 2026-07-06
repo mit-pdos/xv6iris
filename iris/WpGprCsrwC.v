@@ -773,8 +773,4 @@ Proof.
     + vm_compute. split; reflexivity.
 Qed.
 
-Lemma pmp_all_off_zero : pmp_all_off pmpcfg_zero.
-Proof.
-  intro i. destruct (pmpcfg_zero_lookup i) as [HA HL]. exact (conj HA HL).
-Qed.
 
