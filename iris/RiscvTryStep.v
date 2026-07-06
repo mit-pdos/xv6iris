@@ -194,38 +194,6 @@ Proof.
 Qed.
 
 (* ---- the bridge: catch_early_return turns an early-return body back into *)
-(*      the base monad; both inl/inr at the same value collapse to it.      *)
-Lemma run_catch_early_return {X} (body : Defs.monadR X exception X) s x s' :
-  run (Defs.catch_early_return body) s x s' <->
-  (runR body s (inl x) s' \/ runR body s (inr x) s').
-Proof.
-  unfold Defs.catch_early_return. revert s. induction body as [a0 | T oc k IH]; intros s.
-  - split.
-    + intros [Hx Hs]. right. subst x. split; [reflexivity | exact Hs].
-    + intros [ [Hc _] | [Heq Hs] ]; [ discriminate Hc | injection Heq as <-; split; [reflexivity | exact Hs] ].
-  - destruct oc;
-      first
-        [ exact (IH _ _)
-        | (split;
-           [ intros (w & HP & H); apply IH in H; destruct H as [Hk | Hk];
-             [ left; exists w; split; [exact HP | exact Hk]
-             | right; exists w; split; [exact HP | exact Hk] ]
-           | intros [ (w & HP & Hk) | (w & HP & Hk) ];
-             [ exists w; split; [exact HP | apply IH; left; exact Hk]
-             | exists w; split; [exact HP | apply IH; right; exact Hk] ] ])
-        | (split;
-           [ intros (c & H); apply IH in H; destruct H as [Hk | Hk];
-             [ left; exists c; exact Hk | right; exists c; exact Hk ]
-           | intros [ (c & Hk) | (c & Hk) ];
-             [ exists c; apply IH; left; exact Hk | exists c; apply IH; right; exact Hk ] ])
-        | (match goal with He : (_ + exception)%type |- _ => destruct He as [a0 | ee] end;
-           [ split;
-             [ intros [Hx Hs]; left; subst x; split; [reflexivity | exact Hs]
-             | intros [ [Heq Hs] | [Hc _] ];
-               [ injection Heq as <-; split; [reflexivity | exact Hs] | discriminate Hc ] ]
-           | split; [ intro H; destruct H | intros [H | H]; destruct H ] ])
-        | (split; [ intro H; destruct H | intros [H | H]; destruct H ]) ].
-Qed.
 
 (* ---- bind in the early-return monad: short-circuits on early return.    *)
 Lemma runR_bind {R X Y} (m : Defs.monadR R exception Y)
@@ -309,25 +277,7 @@ Import Defs.
 (*    so each side of the `if` lands on the obvious shape.                 *)
 (* --------------------------------------------------------------------- *)
 
-Lemma run_and_boolM (l r : M bool) s b s' :
-  run (and_boolM l r) s b s' <->
-  (exists bl s1, run l s bl s1 /\
-                 (if bl then run r s1 b s' else (b = false /\ s' = s1))).
-Proof.
-  unfold and_boolM. rewrite run_bind. split.
-  - intros (bl & s1 & Hl & H). exists bl, s1. split; [exact Hl|]. destruct bl; exact H.
-  - intros (bl & s1 & Hl & H). exists bl, s1. split; [exact Hl|]. destruct bl; exact H.
-Qed.
 
-Lemma run_or_boolM (l r : M bool) s b s' :
-  run (or_boolM l r) s b s' <->
-  (exists bl s1, run l s bl s1 /\
-                 (if bl then (b = true /\ s' = s1) else run r s1 b s')).
-Proof.
-  unfold or_boolM. rewrite run_bind. split.
-  - intros (bl & s1 & Hl & H). exists bl, s1. split; [exact Hl|]. destruct bl; exact H.
-  - intros (bl & s1 & Hl & H). exists bl, s1. split; [exact Hl|]. destruct bl; exact H.
-Qed.
 
 (* --------------------------------------------------------------------- *)
 (* 2. execute (RTYPE .. ADD) reduces to the ADD datapath.                 *)
@@ -474,21 +424,8 @@ Lemma run_read_reg_fwd (r : register) s :
   run (Defs.read_reg r) s (register_lookup r s.(sregs)) s.
 Proof. rewrite run_read_reg. split; reflexivity. Qed.
 
-Lemma runR_returnR_fwd {R X} (x : X) s :
-  runR (returnR R x : Defs.monadR R exception X) s (inr x) s.
-Proof. rewrite runR_returnR. split; reflexivity. Qed.
 
 (* Forward-chaining: walk a `liftR m >>= f` when m is a state-preserving    *)
-(* base computation (the read-only effects of fetch).                       *)
-Lemma runR_liftR_seq {R X Y} (m : M Y) (f : Y -> Defs.monadR R exception X)
-    (a : Y) s res s' :
-  run m s a s ->
-  runR (f a) s res s' ->
-  runR (Defs.bind (Defs.liftR (R:=R) m) f) s res s'.
-Proof.
-  intros Hm Hf. apply runR_bind. right. exists a, s. split; [|exact Hf].
-  apply runR_liftR. exists a. split; [reflexivity|exact Hm].
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Pure sub-functions on the fetch path reduce to a value (no effects).    *)
@@ -1228,17 +1165,6 @@ Proof.
       apply runR_returnm_fwd.
 Qed.
 
-(* The user-facing wrapper [foreach_ZM_up from to step vars body]. *)
-Lemma runR_foreach_ZM_up_const {R Vars} (from to step : Z)
-    (body : forall (z : Z), Vars -> Defs.monadR R exception Vars)
-    (s : mstate) (vars : Vars) :
-  (forall i v, runR (body i v) s (inr v) s) ->
-  runR (Defs.foreach_ZM_up (E := (R + exception)%type) from to step vars body)
-       s (inr vars) s.
-Proof.
-  intros Hbody. unfold Defs.foreach_ZM_up.
-  apply runR_foreach_ZM_up'_const; exact Hbody.
-Qed.
 
 (* ===== RiscvModelFetchClose ===== *)
 (* ====================================================================== *)
@@ -1256,28 +1182,7 @@ Qed.
 
 
 (* pmpReadAddrReg only READS pmpcfg_n/pmpaddr_n and returns a pure value:   *)
-(* state-preserving.  We just need existence of the returned value.         *)
-Lemma run_pmpReadAddrReg_ex (n : Z) s : exists v, run (pmpReadAddrReg n) s v s.
-Proof.
-  unfold pmpReadAddrReg. cbn zeta. eexists.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  exists (register_lookup pmpcfg_n s.(sregs)), s.
-  split; [ exact (run_read_reg_fwd pmpcfg_n s) | ]. cbn beta.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  exists (register_lookup pmpaddr_n s.(sregs)), s.
-  split; [ exact (run_read_reg_fwd pmpaddr_n s) | ]. cbn beta.
-  apply run_returnM_fwd.
-Qed.
 
-(* pmpMatchAddr with an OFF address-match-type yields PMP_NoMatch, purely. *)
-Lemma run_pmpMatchAddr_OFF (pa : physaddr) (width : mword 64) (ent : mword 8)
-    (pmpaddr prev : mword 64) s :
-  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent) = OFF ->
-  run (pmpMatchAddr pa width ent pmpaddr prev) s PMP_NoMatch s.
-Proof.
-  intro HOFF. destruct pa as [addr0]. unfold pmpMatchAddr. cbn zeta.
-  rewrite HOFF. cbn match. apply run_returnM_fwd.
-Qed.
 
 
 (* ===== RiscvModelHneFetch2 ===== *)

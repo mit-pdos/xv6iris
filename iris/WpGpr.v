@@ -149,7 +149,6 @@ Section ForwardAddGpr.
   Hypothesis Hdec : forall s0, register_lookup cur_privilege (sregs s0) = Machine ->
     exec (ext_decode w) s0 = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD), s0).
 
-  Definition sAg : mstate := set_reg s (R_bool minstret_increment) b.
 
 End ForwardAddGpr.
 
