@@ -118,14 +118,42 @@ def main():
             want |= IMPLICIT
 
     # a def is dead if (module, secpath, name) is referenced nowhere
-    dead = [row for row in defs
-            if row[3] in want and (row[0], row[1], row[2]) not in refs]
+    dead0 = [row for row in defs
+             if row[3] in want and (row[0], row[1], row[2]) not in refs]
 
     lineidx = {}
     def loc(gbase, off):
         if gbase not in lineidx:
             lineidx[gbase] = line_index(os.path.join(d, gbase + ".v"))
         return f"{gbase}.v:{off_to_line(lineidx[gbase], off)}"
+
+    # honor an explicit keep-marker: a (* ... KEEP-UNREFERENCED ... *) comment in
+    # the definition's own header (scanning up until the previous proof/def/section)
+    # opts a deliberately-unreferenced definition OUT of the dead report.
+    _flines = {}
+    def keep_marked(gbase, off):
+        vp = os.path.join(d, gbase + ".v")
+        if gbase not in _flines:
+            try: _flines[gbase] = open(vp, encoding="utf-8").read().split("\n")
+            except OSError: _flines[gbase] = []
+        fl = _flines[gbase]
+        if not fl: return False
+        ln = off_to_line(lineidx.setdefault(gbase, line_index(vp)), off)  # 1-based
+        i = ln - 2  # line directly above the definition (0-based)
+        stop = re.compile(r"^\s*(Lemma|Theorem|Corollary|Definition|Fixpoint|"
+                          r"Global\s+Instance|Instance|Proof|Section|End|Qed|Defined|Admitted)\b")
+        steps = 0
+        while i >= 0 and steps < 14:
+            line = fl[i]
+            if "KEEP-UNREFERENCED" in line:
+                return True
+            if stop.match(line) or line.rstrip().endswith(("Qed.", "Defined.", "Admitted.")):
+                break
+            i -= 1; steps += 1
+        return False
+
+    kept = [r for r in dead0 if keep_marked(r[4], r[5])]
+    dead = [r for r in dead0 if not keep_marked(r[4], r[5])]
 
     if not args.triage:
         by_file = {}
@@ -160,6 +188,9 @@ def main():
     nfiles = len({r[4] for r in dead})
     print(f"\n== {total} unreferenced {kinds_desc} across {nfiles} files "
           f"(of {len(globs)} globs scanned) ==")
+    if kept:
+        print(f"   ({len(kept)} unreferenced def(s) suppressed by KEEP-UNREFERENCED marker: "
+              + ", ".join(sorted(r[2] for r in kept)) + ")")
     print("NB: heuristic categories are hints, not verdicts. Instances/Notations, "
           "hint-DB-only lemmas, and not-yet-consumed top-level theorems can appear "
           "here. Use --all for implicit kinds, drop --triage for by-file view.")

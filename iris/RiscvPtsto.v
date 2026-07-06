@@ -270,6 +270,11 @@ Section Bridge.
   Global Instance reg_pointsto_discarded_persistent r v : Persistent (r ↦ᵣ□ v).
   Proof. rewrite /reg_pointsto. apply _. Qed.
 
+  (* KEEP-UNREFERENCED: public bridge API (fraction-discard / duplication).  Kept
+     for downstream use even though currently unreferenced -- do not delete. *)
+  (* discard the fraction: turn an owned register cell into the persistent one. *)
+  Lemma reg_pointsto_persist r dq v : reg_pointsto r dq v ==∗ r ↦ᵣ□ v.
+  Proof. rewrite /reg_pointsto. iIntros "Hr". by iMod (ghost_map_elem_persist with "Hr"). Qed.
 
   (* reading a memory byte (at ANY fraction) agrees with the byte heap. *)
   Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a dq b :
@@ -288,7 +293,19 @@ Section Bridge.
     Persistent (a ↦ₘ□ b).
   Proof. rewrite /mem_pointsto. apply _. Qed.
 
+  (* KEEP-UNREFERENCED: public bridge API (fraction-discard / duplication).  Kept
+     for downstream use even though currently unreferenced -- do not delete. *)
+  (* discard the fraction: turn any memory byte into the persistent read-only one. *)
+  Lemma mem_pointsto_persist a dq b : a ↦ₘ{dq} b ==∗ a ↦ₘ□ b.
+  Proof.
+    iIntros "[Ha %Hr]". iMod (pointsto_persist with "Ha") as "Ha".
+    iModIntro. by iFrame.
+  Qed.
 
+  (* KEEP-UNREFERENCED: public bridge API (kept though currently unreferenced).
+     a persistent (discarded) byte can be handed out repeatedly. *)
+  Lemma mem_pointsto_dup a b : a ↦ₘ□ b -∗ a ↦ₘ□ b ∗ a ↦ₘ□ b.
+  Proof. iIntros "#H". by iSplitR. Qed.
 
 End Bridge.
 
