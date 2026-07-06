@@ -85,7 +85,7 @@ Section WpMemsetS.
         replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
     unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
     skip_pure_clause.
-    repeat (dstep s HmisaC).
+    cwalk s HmisaC.
     match goal with |- context[if ?g then _ else returnM None] =>
       replace g with true by (vm_compute; reflexivity) end.
     cbn match. rewrite exec_bind.

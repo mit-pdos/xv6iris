@@ -41,19 +41,28 @@ Proof.
   cbn match. rewrite Hpat. apply exec_returnm.
 Qed.
 
-(* walk one non-matching level of the nested compressed-decode tree. *)
+(* walk one non-matching level of the nested compressed-decode tree.
+
+   [cstep]/[dstep] used to run [cbn match] after EACH clause, re-traversing the
+   whole remaining decoder term ~once per clause.  We now DEFER that: the guard
+   is replaced by [false] but the resulting [if false then _ else returnM None]
+   is left standing, and a SINGLE [cbn match] after the [repeat (dstep ...)] walk
+   flushes all of them in one traversal.  Callers that then pick the matching
+   clause with [replace g with true] must run that trailing [cbn match] FIRST
+   (otherwise [replace ... with true] backtracks over every leftover [if false],
+   each paying a failed [vm_compute]).  See [cwalk] below, which packages the
+   walk + flush; the [*_open_rvc] tactics call it. *)
 Ltac cstep s HmisaC :=
   first
   [ match goal with
     | |- context[Defs.bind (Defs.and_boolM (currentlyEnabled Ext_Zca) (returnM ?pat)) _] =>
         rewrite (exec_bind_Some _ _ _ _ _
-                   (exec_cezca_false s pat HmisaC ltac:(vm_compute; reflexivity)));
-        cbn match
+                   (exec_cezca_false s pat HmisaC ltac:(vm_compute; reflexivity)))
     end
   | match goal with |- context[if ?g then _ else returnM None] =>
-      replace g with false by (vm_compute; reflexivity) end; cbn match
+      replace g with false by (vm_compute; reflexivity) end
   | match goal with |- context[if ?g then _ else _] =>
-      replace g with false by (vm_compute; reflexivity) end; cbn match ].
+      replace g with false by (vm_compute; reflexivity) end ].
 
 Definition rd_clui : regidx :=
   Regidx (autocast (T := mword)
@@ -66,7 +75,7 @@ Proof.
   intro HmisaC. unfold imm_clui, rd_clui.
   unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
   skip_pure_clause.                 (* C_NTL: pure guard false (flat) *)
-  do 11 (cstep s HmisaC).
+  do 11 (cstep s HmisaC); cbn match.   (* cbn deferred out of cstep, flush once *)
   (* encdec_reg_backwards (subrange 11 7) -> Regidx rd, reduced in ISOLATION
      (so it stays folded in the main goal and cbn match below cannot drive
      exec through it into cE Zca). *)
@@ -248,7 +257,7 @@ Proof.
       replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
   unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
   skip_pure_clause.
-  do 16 (cstep s HmisaC).
+  do 16 (cstep s HmisaC); cbn match.   (* cbn deferred out of cstep, flush once *)
   (* C_ADD clause: guard true *)
   match goal with |- context[if ?g then _ else returnM None] =>
     replace g with true by (vm_compute; reflexivity) end.
@@ -513,7 +522,15 @@ Definition rsd_caddi : regidx :=
 Ltac dstep s HmisaC :=
   first
   [ cstep s HmisaC
-  | rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) _)); cbn match ].
+  | rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None instruction) _)) ].
+
+(* Walk the compressed-decode tree to the matching clause, then flush the
+   deferred [if false]/[match None] redexes with a SINGLE [cbn match].  This is
+   the deferred replacement for the old [repeat (dstep ...)] (which flushed per
+   clause).  Callers should use [cwalk] wherever they previously wrote
+   [repeat (dstep s H)] so the trailing [cbn match] runs before they pick the
+   matching clause. *)
+Ltac cwalk s HmisaC := repeat (dstep s HmisaC); cbn match.
 
 Lemma decode_C_ADDI s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -529,7 +546,7 @@ Proof.
       replace g with true by (vm_compute; reflexivity) end. cbn match. apply exec_returnM. }
   unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
   skip_pure_clause.
-  repeat (dstep s HmisaC).
+  cwalk s HmisaC.
   (* C_ADDI clause: outer guard true *)
   match goal with |- context[if ?g then _ else returnM None] =>
     replace g with true by (vm_compute; reflexivity) end.

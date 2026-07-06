@@ -40,7 +40,7 @@ Local Ltac po_reg_step name w hi lo s :=
 
 Local Ltac po_open_rvc s HmisaC :=
   unfold ext_decode_compressed, encdec_compressed_backwards; cbv beta; cbn zeta;
-  skip_pure_clause; repeat (dstep s HmisaC);
+  skip_pure_clause; cwalk s HmisaC;
   match goal with |- context[if ?g then _ else returnM None] =>
     replace g with true by (vm_compute; reflexivity) end;
   cbn match; rewrite exec_bind.
@@ -247,7 +247,7 @@ Lemma podec_38 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
 Proof.
   intro H.
   unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
-  skip_pure_clause. repeat (dstep s H).
+  skip_pure_clause. cwalk s H.
   rewrite (exec_bind_Some _ _ _ _ _
     (exec_andM_true _ _ s (exec_currentlyEnabled_Zca s H)
        (exec_returnM_true _ s ltac:(vm_compute; reflexivity)))).

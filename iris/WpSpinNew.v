@@ -41,7 +41,7 @@ Section WpSpin.
     intro HmisaC. unfold imm_spin.
     unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta. cbn zeta.
     skip_pure_clause.
-    repeat (dstep s HmisaC).
+    cwalk s HmisaC.
     rewrite (exec_bind_Some _ _ _ _ _
       (exec_andM_true _ _ s (exec_currentlyEnabled_Zca s HmisaC)
          (exec_returnM_true _ s ltac:(vm_compute; reflexivity)))).

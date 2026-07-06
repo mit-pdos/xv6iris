@@ -73,7 +73,7 @@ Local Ltac aq_reg_step name w hi lo s :=
 
 Local Ltac aq_open_rvc s HmisaC :=
   unfold ext_decode_compressed, encdec_compressed_backwards; cbv beta; cbn zeta;
-  skip_pure_clause; repeat (dstep s HmisaC);
+  skip_pure_clause; cwalk s HmisaC;
   match goal with |- context[if ?g then _ else returnM None] =>
     replace g with true by (vm_compute; reflexivity) end;
   cbn match; rewrite exec_bind.
