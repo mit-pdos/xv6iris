@@ -112,35 +112,15 @@ End HwConfig.
 (* ====================================================================== *)
 (* RiscvModelADDfinal.v                                                    *)
 (*                                                                         *)
-(* Capstone (in progress): lift the proven relational ADD-cycle facts to    *)
-(* the functional [exec] level, toward closing a WP for `add a2,a0,a1`       *)
-(* through the real try_step using [wp_exec_step] -- with NO Hcycle and NO   *)
-(* per-instruction determinism reasoning.                                    *)
-(*                                                                          *)
-(* PROVEN here (axiom-clean):                                                *)
-(*  - exec_read_reg / exec_write_reg : the functional exec-leaves reduce by  *)
-(*    [reflexivity] (exec computes through read_reg/write_reg).              *)
-(*  - exec_hart_active_ADD : exec (run_hart_active 0) s = Some (Step_Execute *)
-(*    (RETIRE_SUCCESS, zero_extend' 32 w), s_exec) -- obtained FOR FREE from *)
-(*    the proven [run_hart_active_ADD] via [run_to_exec], modulo exec-       *)
-(*    progress [Hne : exec (run_hart_active 0) s <> None] (the cycle is      *)
-(*    Choose-free on the ADD path).  Only model platform axioms.            *)
-(*                                                                          *)
-(* RESIDUE (the same long-but-mapped try_step wrapper tail that the RUN side *)
-(* left Admitted in RiscvModelStep.v, now to be done FUNCTIONALLY via        *)
-(* exec_bind -- cleaner since the exec-leaves reduce by reflexivity):        *)
-(*  - exec_riscv_step_ADD : exec riscv_step s = Some (tt, s_final) -- thread *)
-(*    exec_bind/exec_bind0/exec_returnm through try_step's wrapper around    *)
-(*    exec_hart_active_ADD: read cur_privilege (exec_read_reg + Hpriv),      *)
-(*    should_inc_minstret (=b, carried exec-hyp), write minstret_increment   *)
-(*    (exec_write_reg), read hart_state=HART_ACTIVE, the Retire_Success arm  *)
-(*    (assert_exp true = returnm tt), tick_pc (run_tick_pc via run_to_exec), *)
-(*    minstret update (CASE-SPLIT on b), get_config_rvfi=false, hooks.       *)
-(*  - wp_add_real_closed : iApply wp_exec_step; reg_valid/mem_valid to read  *)
-(*    owned cells & derive the preconds, supply exec_riscv_step_ADD as the   *)
-(*    exists-sigma' witness, reg_update the changed cells, conclude.  Stands  *)
-(*    on Hdec + CSR/config preconds + points-to + model platform axioms; NO  *)
-(*    Hcycle (the determinism is already discharged by wp_exec_step).        *)
+(* The [ADDfinal] section below bundles the boot-config hypotheses for the *)
+(* ADD cycle (Machine mode, no pending interrupt, the fetched word w      *)
+(* decoding to `add a2,a0,a1`, GPR indices a0/a1/a2).                     *)
+(*                                                                        *)
+(* The exec-level hart-active reduction itself is proven as               *)
+(* [exec_hart_active_progress] in RiscvTryStep.v, by threading the        *)
+(* functional exec-leaves (exec_read_reg / exec_write_reg reduce by       *)
+(* [reflexivity]) through run_hart_active's F_Base/ADD body; the [exec]   *)
+(* fetch twin is [exec_fetch_done] (RiscvModelFetchExec section below).   *)
 (* ====================================================================== *)
 
 
@@ -148,16 +128,16 @@ End HwConfig.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
-(* exec-leaf helpers (the functional twins of run_read_reg / run_write_reg) *)
+(* exec-leaf helpers ([exec_read_reg] / [exec_write_reg]) *)
 (* -- useful for threading exec through the try_step wrapper.               *)
 (* ---------------------------------------------------------------------- *)
 
 
 
 (* ---------------------------------------------------------------------- *)
-(* Step 2a: exec_hart_active_ADD -- the exec-level hart-active reduction,   *)
-(* obtained for free from the proven [run_hart_active_ADD] via run_to_exec, *)
-(* modulo exec-progress (the cycle is Choose-free on the ADD path).         *)
+(* Step 2a: the exec-level hart-active reduction is proven as   *)
+(* [exec_hart_active_progress] (RiscvTryStep.v); the [ADDfinal] section *)
+(* below only bundles its boot-config hypotheses.         *)
 (* ---------------------------------------------------------------------- *)
 
 Section ADDfinal.
@@ -190,10 +170,10 @@ End ADDfinal.
 (* RiscvModelFetchExec.v                                                   *)
 (*                                                                         *)
 (* The fetch value-sensitive exec-mirror: exec (fetch tt) s <> None, hence *)
-(* exec (fetch tt) s = Some (F_Base w, s) (via exec_fetch_F_Base).  This is *)
-(* the FETCH leaf of Hne.  Each sub-lemma mirrors the corresponding run    *)
-(* lemma (run_translateAddr_identity / run_mem_read_fetch_pin /            *)
-(* run_fetch_F_Base) at the functional [exec]/[execR] level.               *)
+(* exec (fetch tt) s = Some (F_Base w, s) (via exec_fetch_done).  This is *)
+(* the FETCH leaf of Hne.  Each sub-lemma (exec_translateAddr_identity /    *)
+(* exec_mem_read_fetch / exec_fetch_done) reduces the corresponding fetch            *)
+(* stage at the functional [exec]/[execR] level.               *)
 (* ====================================================================== *)
 
 
@@ -515,12 +495,9 @@ Section FetchExec.
 
   (* fetch_bytes assembly: the two liftR sub-computations [translateAddr] and
      [mem_read] are PROVEN above (exec_translateAddr_identity / exec_mem_read_fetch),
-     both = Some.  What remains is the execR plumbing through fetch_bytes' / fetch's
-     catch_early_return + liftR + or_boolM/and_boolM gating (mirror of
-     run_fetch_bytes_4 / run_fetch_F_Base).  The execR_bind_Some/execR_bind0_Some/
-     execR_returnR_fwd toolkit is in place; the residue is matching the exact
-     bind/returnR/match shapes (the second bind's tuple-destructuring step
-     resisted in one shot). *)
+     both = Some.  The rest is the execR plumbing through fetch_bytes' / fetch's
+     catch_early_return + liftR + or_boolM/and_boolM gating, discharged with the
+     execR_bind_Some / execR_bind0_Some / execR_returnR_fwd toolkit. *)
   Lemma exec_fetch_bytes_4 :
     exec (fetch_bytes pc pc 4) s = Some (@FetchBytes_Success 4 w, s).
   Proof using All.
@@ -552,9 +529,8 @@ Section FetchExec.
 
   (* exec (fetch tt) s = Some (F_Base w, s): the outer fetch around fetch_bytes
      (read PC, ext_fetch_check_pc=None, or_boolM/and_boolM extension gating with
-     Ext_Zca short-circuited and Ext_Ziccif=true, isRVC=false).  Given
-     exec_fetch_bytes_4 + run_fetch_F_Base, this closes via the execR plumbing or
-     run_to_exec; left as the precise residue. *)
+     Ext_Zca short-circuited and Ext_Ziccif=true, isRVC=false).  Closes via the
+     execR plumbing on top of exec_fetch_bytes_4. *)
   Hypothesis HnotRVC : isRVC (subrange_vec_dec w 15 0) = false.
 
   Lemma exec_fetch_done : exec (fetch tt) s = Some (F_Base w, s).
@@ -603,12 +579,12 @@ End FetchExec.
 (* ====================================================================== *)
 (* RiscvModelFetchPre.v                                                    *)
 (*                                                                         *)
-(* Two bounded fetch sub-lemmas that discharge the carried hypotheses of   *)
-(* run_pmpCheck_machine_none / run_pmaCheck_ram from concrete boot CSRs:    *)
-(*   - run_pmpcfg_all_off : pmpcfg all-zero => every PMP A-field = OFF.     *)
-(*   - run_pma_match_ram  : a concrete executable RAM region matches, given *)
-(*                          the range_subset geometric fact (carried, like  *)
-(*                          the within_* facts).                            *)
+(* The bounded fetch sub-lemmas that once discharged the carried PMP/PMA   *)
+(* hypotheses from concrete boot CSRs have been removed; instead,    *)
+(*   the fetch WPs now discharge PMP/PMA functionally via the exec-level     *)
+(*   [exec_pmpCheck_machine_none] / [exec_pmaCheck_ram] lemmas above, *)
+(*                          taking the concrete boot-CSR facts (all-PMP-off, the RAM region  *)
+(*                          match) as hypotheses at their use sites.                            *)
 (* ====================================================================== *)
 
 
@@ -625,9 +601,9 @@ Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
 (* Task 2: a concrete executable RAM region (base 0x80000000, size         *)
-(* 0x10000000).  matching_pma_region [ramRegion] addr 4 reduces to         *)
-(*   if range_subset .. then Some ramRegion else None,                     *)
-(* so given the range_subset geometric fact it yields Some ramRegion;      *)
+(* 0x10000000).  matching_pma_region [region] addr 4 reduces to         *)
+(*   if range_subset .. then Some region else None,                     *)
+(* so given the range_subset geometric fact it yields Some region;      *)
 (* PMA_executable is true by construction (override_PMA keeps it).         *)
 (* ---------------------------------------------------------------------- *)
 
@@ -791,7 +767,7 @@ Ltac ehs_leaf s :=
       apply exec_returnM
   end.
 
-(* hartSupports Ext_C = true: mirror of run_hartSupports_C at the exec level. *)
+(* hartSupports Ext_C = true at the exec level (whole nested capability tree). *)
 Lemma exec_hartSupports_C s : exec (hartSupports Ext_C) s = Some (true, s).
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).

@@ -91,13 +91,13 @@ Proof. unfold returnM. apply run_ret. Qed.
 (* via [catch_early_return], [liftR], [early_return], [returnR], with the  *)
 (* SAME [>>=]/[>>] (Defs.bind/bind0) as the base monad.                    *)
 (*                                                                         *)
-(* We give an early-return-aware interpreter [runR] (result [R + X]:       *)
-(* [inl r] = early-returned r, [inr x] = fell through with x), its         *)
-(* bind/liftR/early_return/ret laws, and the bridge                        *)
-(*   run (catch_early_return body) <-> runR body falls-through-or-returns. *)
+(* The relational early-return interpreter and its bind/liftR/ret laws that       *)
+(* once lived here have been removed; the MR monad is now interpreted         *)
+(* FUNCTIONALLY by [execR] (see the RiscvModelExecR section below), with                        *)
+(*   the bridge exec (catch_early_return body) = execR body proven there. *)
 (*                                                                         *)
-(* CONVERSION-LAZY proofs only (iff_refl / destruct-to-WHNF / exact).      *)
-(* Never [cbn [run]]/[cbn [runR]] (20-branch GADT -> OOM).                 *)
+(* (The functional [execR] interpreter and its laws live in that section;      *)
+(* the relational interpreter has been removed.)                 *)
 (* ====================================================================== *)
 
 
@@ -116,7 +116,7 @@ Proof. unfold returnM. apply run_ret. Qed.
 
 
 
-(* ---- liftR: a lifted base computation never early-returns; its [runR]   *)
+(* ---- liftR: a lifted base computation never early-returns.   *)
 
 (* ---- the bridge: catch_early_return turns an early-return body back into *)
 
@@ -146,7 +146,7 @@ Proof. unfold returnM. apply run_ret. Qed.
 (*     reduces, compositionally, to read rs1, read rs2, write rd from       *)
 (*     add_vec, retire -- the ADD datapath, modulo the register-file        *)
 (*     primitives rX_bits/wX_bits (whose concrete-index dispatch + the     *)
-(*     run_read_reg/run_write_reg bridge discharge separately).            *)
+(*     run_rX_*/run_wX_* bridge discharge separately).            *)
 (* ===================================================================== *)
 Import Defs.
 
@@ -199,7 +199,7 @@ Qed.
 (*                                                                         *)
 (* KEY FINDING: the model's `read_reg`/`write_reg` AS USED INSIDE rX/wX     *)
 (* (defined in rv64d.v after `Import Defs`) resolve to Defs.read_reg /      *)
-(* Defs.write_reg — the Interface-monad ones that run_read_reg/run_write_reg*)
+(* Defs.write_reg — the Interface-monad ones that exec_read_reg/exec_write_reg*)
 (* already target.  (The `rv64d_types.read_reg` wrapper is the *Prompt*     *)
 (* monad and is shadowed; the earlier "mismatch" was a misread.)  So rX/wX  *)
 (* reduce by conversion + the existing bridge lemmas, no new axioms.        *)
@@ -295,7 +295,7 @@ Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Forward versions of the iff stepping lemmas (apply needs these to PROVE *)
-(* a run/runR goal; the iffs can't be `apply`'d directly).                 *)
+(* a run goal; the iffs can't be `apply`'d directly).                 *)
 (* ---------------------------------------------------------------------- *)
 
 Lemma run_returnM_fwd {X} (x : X) s : run (returnM x) s x s.
@@ -389,7 +389,7 @@ End Pending.
 
 (* ===== RiscvModelExecR ===== *)
 (* ====================================================================== *)
-(* RiscvModelExecR.v  —  the exec-side twin of the runR (MR) bridge.        *)
+(* RiscvModelExecR.v  —  the functional [execR] interpreter (MR bridge).        *)
 (*                                                                         *)
 (* run_hart_active runs in the early-return monad                          *)
 (*   monadR R E := iMon (fun _ => (R+E))   [= monad (R+E)]                  *)
@@ -398,8 +398,8 @@ End Pending.
 (* monadR body.  We give the functional early-return interpreter [execR]   *)
 (* (result [R+X]), its bind/liftR laws, and the bridge                     *)
 (*   exec (catch_early_return body) s = (execR body, both arms -> value).   *)
-(* Plus the determinism transfer (execR success => unique runR), hence     *)
-(* runR_to_execR (mirror of run_to_exec).                                  *)
+(* (The relational determinism transfer that once bridged back to [run]     *)
+(* has been removed.)                                  *)
 (*                                                                         *)
 (* Proof style mirrors the proven exec_bind: rewrite the Ret/Next unfold,  *)
 (* then [destruct oc; cbn [execR ...]] (cbn is safe on a CONCRETE oc),     *)
@@ -412,7 +412,7 @@ End Pending.
 (* ---------------------------------------------------------------------- *)
 (* execR: functional early-return interpreter for [monadR R exception X].   *)
 (* Mirrors [exec] (functional; Choose/GenericFail/Discard -> None;          *)
-(* MemRead via read_bytes) AND [runR]'s early-return handling               *)
+(* MemRead via read_bytes) AND handles early-return itself               *)
 (* (ExtraOutcome (inl r) = early-returned r; ExtraOutcome (inr _) stuck).   *)
 (* ---------------------------------------------------------------------- *)
 
@@ -546,7 +546,7 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* determinism transfer: execR success => the unique runR.                 *)
+(* (The relational determinism transfer back to [run] has been removed.)                 *)
 (* ---------------------------------------------------------------------- *)
 
 
@@ -681,7 +681,7 @@ End HartActiveProgress.
 (*  - `fetch` then calls `fetch_bytes` = address translation (Bare/M-mode  *)
 (*    ⇒ identity) + PMP + MemRead — a separate sub-effort (see README).    *)
 (*                                                                         *)
-(* `run_hartSupports_C` shows the WHOLE capability tree (nested and/or-     *)
+(* `exec_hartSupports_C` shows the WHOLE capability tree (nested and/or-     *)
 (* boolM over 5 sub-extensions) reduces — not just the leaves — confirming  *)
 (* the Acc recipe scales past depth 1.                                     *)
 (* ===================================================================== *)
@@ -805,7 +805,7 @@ Qed.
 
 (* --------------------------------------------------------------------- *)
 (* Task B: exec twin of the getPendingSet keystone.                        *)
-(* Mirrors run_getPendingSet_machine_none; carries the currentlyEnabled    *)
+(* Mirrors the getPendingSet keystone; carries the currentlyEnabled    *)
 (* Ext_S exec-twin (HecES), parallel to the run keystone's HcES.           *)
 (* --------------------------------------------------------------------- *)
 
@@ -936,9 +936,9 @@ End ExecPending.
 (*                                                                         *)
 (* Hne STAGE 2: the fetch exec-twin.                                       *)
 (*   - execR_foreach_ZM_up_const: the exec/execR loop-invariant for the    *)
-(*     PMP foreach (twin of runR_foreach_ZM_up_const).                     *)
-(*   - exec_fetch_F_Base via run_to_exec on the proven run_fetch_F_Base    *)
-(*     + exec-progress (exec (fetch tt) s <> None).                        *)
+(*     PMP foreach.                     *)
+(*   - the fetch exec-twin exec (fetch tt) s = Some (F_Base w, s) is closed    *)
+(*     directly as exec_fetch_done (RiscvFetchExec.v).                        *)
 (* ====================================================================== *)
 
 
@@ -952,7 +952,7 @@ Proof. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* The exec/execR loop-invariant over the nat-fueled [foreach_ZM_up'].     *)
-(* Twin of runR_foreach_ZM_up'_const: a body that is Some(inr v,s) at every *)
+(* A body that is Some(inr v,s) at every *)
 (* index makes the whole loop Some(inr vars, s).                           *)
 (* ---------------------------------------------------------------------- *)
 
@@ -986,10 +986,10 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* The fetch exec-twin, reduced to exec-progress via run_to_exec on the    *)
-(* proven run_fetch_F_Base.  The remaining residue (exec (fetch tt) s <>   *)
-(* None) is the memory-subsystem exec mirror, now equipped with            *)
-(* execR_foreach_ZM_up_const above for the PMP loop.                       *)
+(* The execR loop-invariant above (execR_foreach_ZM_up_const) equips the    *)
+(* PMP foreach for the memory-subsystem exec mirror; the fetch exec-twin   *)
+(* (exec (fetch tt) s = Some (F_Base w, s)) is closed as exec_fetch_done            *)
+(* in RiscvFetchExec.v.                       *)
 (* ---------------------------------------------------------------------- *)
 
 
@@ -999,12 +999,12 @@ Qed.
 (*                                                                         *)
 (* Fetch read-side toward discharging Hcycle's fetch dependency.           *)
 (*                                                                         *)
-(*  - run[R] loop-INVARIANT over [Defs.foreach_ZM_up'] / [foreach_ZM_up]:  *)
+(*  - execR loop-INVARIANT over [Defs.foreach_ZM_up'] / [foreach_ZM_up]:  *)
 (*    a per-iteration state-preserving no-op body ⇒ the whole bounded loop  *)
 (*    is a no-op (NO unrolling — induction on the nat fuel).  This is the   *)
 (*    reusable analogue of the Lean loop_run_const / forIn_run_const.      *)
 (*  - applied to [pmpCheck]: PMP-disabled (all pmpcfg=0) in Machine mode    *)
-(*    ⇒ [run (pmpCheck ..) s None s], MODULO the per-iteration body no-op.  *)
+(*    ⇒ [exec (pmpCheck ..) s = Some (None, s)], via the body no-op.  *)
 (* ====================================================================== *)
 
 
@@ -1025,9 +1025,9 @@ Qed.
 (* Fetch read-side, continued: reduce pmpCheck to "None" (access allowed)  *)
 (* in Machine mode when every PMP entry's address-match-type is OFF        *)
 (* (which holds when all pmpcfg = 0).  Uses the loop-invariant             *)
-(* runR_foreach_ZM_up_const from RiscvModelPmp.                            *)
+(* execR_foreach_ZM_up_const (the RiscvModelHneFetch section above).                            *)
 (*                                                                         *)
-(* CONVERSION-LAZY: never cbn [run]/[runR]; only cbn zeta/beta/match +     *)
+(* CONVERSION-LAZY: never cbn [run]/[execR]; only cbn zeta/beta/match +     *)
 (* the forward stepping lemmas.                                            *)
 (* ====================================================================== *)
 
@@ -1042,13 +1042,13 @@ Qed.
 (* RiscvModelHneFetch2.v                                                    *)
 (*                                                                         *)
 (* Hne stage 2 (fetch exec-progress mirror).  The centerpiece: the exec    *)
-(* twin of run_pmpCheck_machine_none, using the execR loop-invariant        *)
+(* reduction exec_pmpCheck_machine_none, using the execR loop-invariant        *)
 (* execR_foreach_ZM_up_const for the PMP foreach.  Plus the body leaves     *)
 (* exec_pmpReadAddrReg_ex / exec_pmpMatchAddr_OFF.                          *)
 (*                                                                         *)
-(* RESIDUE (carried, documented): exec_translateAddr / exec_mem_read /      *)
-(* exec_fetch_progress (the rest of the memory-subsystem exec mirror) — see *)
-(* README; the pmpCheck loop (the one non-mechanical piece) is done here.   *)
+(* The rest of the memory-subsystem exec mirror      *)
+(* (exec_translateAddr_identity / exec_mem_read_fetch / the fetch twin *)
+(* exec_fetch_done) is closed in RiscvFetchExec.v; the pmpCheck loop is done here.   *)
 (* ====================================================================== *)
 
 
@@ -1057,7 +1057,7 @@ Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
 (* Forward helper: a [liftR m] prefix of a bind, when [exec m] is known.   *)
-(* (exec/execR twin of runR_liftR_seq.)                                    *)
+(* (The functional [execR_liftR_seq] stepping lemma.)                                    *)
 (* ---------------------------------------------------------------------- *)
 Lemma execR_liftR_seq {R X Y} (m : M Y) (f : Y -> Defs.monadR R exception X)
     (s s' : mstate) (x : Y) :
@@ -1068,8 +1068,8 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* Leaf twins of the PMP body (mirror run_pmpReadAddrReg_ex /              *)
-(* run_pmpMatchAddr_OFF).                                                   *)
+(* Leaf lemmas of the PMP body: exec_pmpReadAddrReg_ex /              *)
+(* exec_pmpMatchAddr_OFF.                                                   *)
 (* ---------------------------------------------------------------------- *)
 Lemma exec_pmpReadAddrReg_ex (n : Z) s :
   exists v, exec (pmpReadAddrReg n) s = Some (v, s).
@@ -1090,8 +1090,8 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* CENTERPIECE: exec twin of run_pmpCheck_machine_none (the PMP foreach     *)
-(* loop), via execR_foreach_ZM_up_const.                                    *)
+(* CENTERPIECE: exec_pmpCheck_machine_none, the exec reduction of the PMP     *)
+(* foreach loop, via execR_foreach_ZM_up_const.                                    *)
 (* ---------------------------------------------------------------------- *)
 Lemma exec_pmpCheck_machine_none
     (addr : physaddr) (width : Z) (access : MemoryAccessType mem_payload) s :
@@ -1318,12 +1318,12 @@ Qed.
 (* ====================================================================== *)
 (* RiscvModelFetchAsm.v                                                    *)
 (*                                                                         *)
-(* Read-path gates toward `run_fetch_F_Base`:                              *)
+(* Read-path gates toward the fetch reduction `exec_fetch_done`:                              *)
 (*   - within_mmio_readable = false  (RAM, not MMIO)                       *)
 (*   - phys_access_check = None      (composes pmpCheck=None + pmaCheck=None)*)
 (*   - checked_mem_read reduces to read_ram (the value the memory holds)   *)
 (* built on the proven leaf lemmas (translateAddr-identity, pmpCheck=None, *)
-(* read_ram_plain_4) and the run/runR machinery.                           *)
+(* read_ram_plain_4) and the exec/execR machinery.                           *)
 (* ====================================================================== *)
 
 
@@ -1351,7 +1351,7 @@ Qed.
 (* ====================================================================== *)
 (* RiscvModelFetchF.v                                                      *)
 (*                                                                         *)
-(* Toward run_fetch_F_Base : run (fetch tt) s (F_Base word) s with a       *)
+(* Toward the fetch reduction run (fetch tt) s (F_Base word) s with a       *)
 (* CONCRETE word.  Resolves the pmaCheck representation issue, pins the    *)
 (* read value, threads the mem_read wrapper, and assembles fetch_bytes /   *)
 (* fetch.                                                                   *)
@@ -1361,8 +1361,8 @@ Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Pinned read: the read value is exactly [w] (not just existential).   *)
-(*    Same proof as run_read_ram_plain_4, but the strengthened MemRead     *)
-(*    rule lets us state the concrete result.                              *)
+(*    The strengthened MemRead rule (vs the old single-byte rule) lets us     *)
+(*    state the concrete result [w], not just an existential.                              *)
 (* ---------------------------------------------------------------------- *)
 
 Lemma run_read_ram_plain_4_pin (addr : mword 64) (w : bv 32) s :
@@ -1407,10 +1407,10 @@ Qed.
 (* ====================================================================== *)
 (* RiscvModelFetchFinal.v                                                  *)
 (*                                                                         *)
-(* Closes [run_fetch_F_Base : run (fetch tt) s (F_Base word) s] with a     *)
-(* CONCRETE word, by threading the MR-monad structure of [fetch_bytes]/    *)
-(* [fetch] over the proven leaves (translateAddr identity, mem_read pin,   *)
-(* currentlyEnabled Ext_Ziccif).  Collapses Hcycle's fetch dep to Hdec.    *)
+(* Fetch-final helpers [fetch_pa] / [autocast_mword_id].  The relational     *)
+(* fetch closure that once lived here is superseded by the functional    *)
+(* [exec_fetch_done] (RiscvFetchExec.v); the [FetchBytes] / [Fetch]   *)
+(* sections below only bundle its geometric hypotheses.    *)
 (* ====================================================================== *)
 
 
@@ -1498,7 +1498,7 @@ Import Defs.
 (* RiscvModelWrapper.v                                                     *)
 (*                                                                         *)
 (* Reductions for the try_step WRAPPER CSR helpers, toward discharging     *)
-(* Hcycle. Built on the proven run-lemmas (run_bind/run_read_reg/...).     *)
+(* Hcycle. Built on the proven run-lemmas (run_bind/run_returnM/...).     *)
 (* The memory subsystem on the fetch path (translateAddr / mem_read /      *)
 (* pmpCheck) is the remaining deep residue and is NOT reduced here — it is *)
 (* documented as the explicit fetch hypotheses in the report.             *)
@@ -1508,7 +1508,7 @@ Import Defs.
 
 
 (* is_landing_pad_expected / should_inc_minstret reduce by the SAME pattern
-   (run_bind + run_read_reg + run_returnM, plus run_and_boolM for the latter);
+   (exec_bind + exec_read_reg + exec_returnm, plus exec_and_boolM_Some for the latter);
    omitted here only because stating their results needs model-internal names
    (eq_vec / counter_priv_filter_bit) not exported by short name. They are not
    the bottleneck — the memory subsystem (translate/mem_read/pmpCheck) is. *)
@@ -1521,9 +1521,9 @@ Import Defs.
 (* real [run_hart_active] (ADD / F_Base path) and the [try_step] wrapper,  *)
 (* toward discharging [Hcycle] in wp_add_real.                             *)
 (*                                                                         *)
-(* run_hart_active_ADD is decomposed to take the fetch result as a         *)
-(* hypothesis [Hfetch] (so it does not re-thread run_fetch_F_Base's        *)
-(* geometric hypotheses); the concrete fetch is plugged in downstream.     *)
+(* The [HartActiveADD] section below bundles the ADD-cycle leaves; the         *)
+(* hart-active reduction itself is proven as [exec_hart_active_progress]        *)
+(* (RiscvModelHne1 above); the concrete fetch [Hfetch] is plugged in later.     *)
 (* ====================================================================== *)
 
 
@@ -1540,7 +1540,7 @@ Section HartActiveADD.
   Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
   Hypothesis Help  :
     eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false.
-  (* the fetched word, as a hypothesis (discharged downstream by run_fetch_F_Base) *)
+  (* the fetched word, as a hypothesis (discharged downstream by exec_fetch_done) *)
   Hypothesis Hfetch : run (fetch tt) s (F_Base w) s.
   (* the decode result (the decode wall, carried as Hdec) *)
   Hypothesis Hdec :
