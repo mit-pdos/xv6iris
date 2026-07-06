@@ -110,49 +110,6 @@ Proof. unfold returnM. apply run_ret. Qed.
 (* e)] (a genuine exception) is stuck.                                     *)
 (* ---------------------------------------------------------------------- *)
 
-Fixpoint runR {R X} (m : Defs.monadR R exception X)
-    (s : mstate) (res : R + X) (s' : mstate) {struct m} : Prop :=
-  match m with
-  | Interface.Ret y => res = inr y /\ s' = s
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T
-             return (T -> Defs.monadR R exception X) -> Prop with
-       | Interface.RegRead r _ =>
-           fun k => runR (k (register_lookup r s.(sregs))) s res s'
-       | Interface.RegWrite r _ v =>
-           fun k => runR (k tt) (set_reg s r v) res s'
-       | Interface.MemRead n req =>
-           fun k => exists w : bv (8 * n),
-             (forall j : nat, (N.of_nat j < n)%N ->
-                s.(mem) !! (pa_add (Interface.ReadReq.pa req) j) = Some (nth_byte w j))
-             /\ runR (k (inl (w, None))) s res s'
-       | Interface.MemWrite n req =>
-           fun k =>
-             runR (k (inl None))
-                  (MState s.(sregs)
-                     (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                                  (Interface.WriteReq.value req))) res s'
-       | Interface.InstrAnnounce _    => fun k => runR (k tt) s res s'
-       | Interface.BranchAnnounce _ _ => fun k => runR (k tt) s res s'
-       | Interface.Barrier _          => fun k => runR (k tt) s res s'
-       | Interface.CacheOp _          => fun k => runR (k tt) s res s'
-       | Interface.TlbOp _            => fun k => runR (k tt) s res s'
-       | Interface.TakeException _    => fun k => runR (k tt) s res s'
-       | Interface.ReturnException _  => fun k => runR (k tt) s res s'
-       | Interface.TranslationStart _ => fun k => runR (k tt) s res s'
-       | Interface.TranslationEnd _   => fun k => runR (k tt) s res s'
-       | Interface.CycleCount         => fun k => runR (k tt) s res s'
-       | Interface.Message _          => fun k => runR (k tt) s res s'
-       | Interface.GetCycleCount      => fun k => runR (k 0%Z) s res s'
-       | Interface.Choose _           => fun k => exists c, runR (k c) s res s'
-       | Interface.ExtraOutcome e =>
-           fun _ => match e with
-                    | inl r => res = inl r /\ s' = s
-                    | inr _ => False
-                    end
-       | _ => fun _ => False
-       end) k
-  end.
 
 (* ---- cheap (convertibility) laws ------------------------------------- *)
 
