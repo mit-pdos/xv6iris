@@ -35,15 +35,6 @@ Import Defs.
 (* ===================================================================== *)
 
 
-Lemma exec_hartSupports_A s : exec (hartSupports Ext_A) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  change (hartSupports_measure Ext_A) with 0.
-  change (0 >=? 0) with true. cbn match beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)).
-  apply exec_returnM.
-Qed.
 
 
 

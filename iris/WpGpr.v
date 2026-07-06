@@ -89,10 +89,6 @@ Qed.
 (* ====================================================================== *)
 (* The general-purpose register file as a SINGLE resource: all of x1..x31  *)
 (* in one separating conjunction (special/CSR registers stay separate).    *)
-(* ====================================================================== *)
-Definition gpr_list : list register_bitvector_64 :=
-  [x1;x2;x3;x4;x5;x6;x7;x8;x9;x10;x11;x12;x13;x14;x15;x16;
-   x17;x18;x19;x20;x21;x22;x23;x24;x25;x26;x27;x28;x29;x30;x31].
 
 
 Section GprFile.
@@ -158,7 +154,6 @@ Section ForwardAddGpr.
   Definition sXg : mstate :=
     set_reg s_pcg (R_bitvector_64 (gpr_of_Z (uint rd)))
       (regval_into_reg (gpr_rd_val rs2 rs1 s_pcg)).
-  Definition sTg : mstate := set_reg sXg PC (register_lookup nextPC sXg.(sregs)).
 
 End ForwardAddGpr.
 
@@ -227,14 +222,6 @@ Ltac tmig := rewrite irrelevant_register_set; [ | reg_ne ].
 
 Section CleanGpr.
   Context (s : mstate) (pc : mword 64) (b : bool) (rs2 rs1 rd : mword 5) (mst0 : mword 64).
-  Definition base_upd_g : mstate :=
-    set_reg
-      (set_reg
-         (set_reg (set_reg s (R_bool minstret_increment) b)
-                  nextPC (add_vec_int pc 4))
-         (R_bitvector_64 (gpr_of_Z (uint rd)))
-         (regval_into_reg (gpr_rd_val rs2 rs1 (s_pcg s pc b))))
-      PC (add_vec_int pc 4).
 
 End CleanGpr.
 

@@ -163,17 +163,11 @@ Section ForwardLDg.
   Definition sXlg : mstate :=
     set_reg (set_reg sAlg nextPC (add_vec_int pc 4)) (R_bitvector_64 (gpr_of_Z (uint rd)))
             (regval_into_reg (extend_value false data)).
-  Definition sTlg : mstate := set_reg sXlg PC (register_lookup nextPC sXlg.(sregs)).
 
 
   Variable mst0 : mword 64.
   Hypothesis Lmst_l : register_lookup minstret s.(sregs) = mst0.
 
-  Definition base_upd_lg : mstate :=
-    set_reg (set_reg (set_reg (set_reg s (R_bool minstret_increment) b)
-                              nextPC (add_vec_int pc 4))
-                     (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value false data)))
-            PC (add_vec_int pc 4).
 
 End ForwardLDg.
 

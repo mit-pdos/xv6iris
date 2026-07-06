@@ -84,21 +84,12 @@ Section ForwardAddiGpr.
   Definition sXi : mstate :=
     set_reg s_pci (R_bitvector_64 (gpr_of_Z (uint rd)))
       (regval_into_reg (gpr_addi_val rs1 imm s_pci)).
-  Definition sTi : mstate := set_reg sXi PC (register_lookup nextPC sXi.(sregs)).
 
 End ForwardAddiGpr.
 
 
 Section CleanAddiGpr.
   Context (s : mstate) (pc : mword 64) (b : bool) (rs1 rd : mword 5) (imm : mword 12) (mst0 : mword 64).
-  Definition base_upd_i : mstate :=
-    set_reg
-      (set_reg
-         (set_reg (set_reg s (R_bool minstret_increment) b)
-                  nextPC (add_vec_int pc 4))
-         (R_bitvector_64 (gpr_of_Z (uint rd)))
-         (regval_into_reg (gpr_addi_val rs1 imm (s_pci s pc b))))
-      PC (add_vec_int pc 4).
 
 End CleanAddiGpr.
 

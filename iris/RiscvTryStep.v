@@ -82,10 +82,6 @@ Lemma run_read_reg (r : register) s (x : type_of_register r) s' :
   (x = register_lookup r s.(sregs) /\ s' = s).
 Proof. apply iff_refl. Qed.
 
-Lemma run_write_reg (r : register) (v : type_of_register r) s x s' :
-  run (Defs.write_reg r v : M _) s x s' <->
-  (x = tt /\ s' = set_reg s r v).
-Proof. apply iff_refl. Qed.
 
 (* [returnM] is [Defs.returnm] specialised to the model's exception type. *)
 Lemma run_returnM {X} (x0 : X) s y s' :
@@ -525,28 +521,6 @@ Proof. unfold is_shadow_stack_access. apply run_returnM_fwd. Qed.
 (* irrelevant (effectivePrivilege of a fetch ignores MPRV); satp unread.   *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_translateAddr_identity (a : mword 64) s :
-  register_lookup cur_privilege s.(sregs) = Machine ->
-  run (translateAddr (Virtaddr a) (InstructionFetch tt)) s
-      (Ok (Physaddr (zero_extend' 64 (bits_of_virtaddr (Virtaddr a))),
-           PBMT_PMA, init_ext_ptw)) s.
-Proof.
-  intros Hcp.
-  assert (Hrd : run (Defs.read_reg cur_privilege) s Machine s).
-  { rewrite run_read_reg. split; [symmetry; exact Hcp | reflexivity]. }
-  unfold translateAddr.
-  apply run_catch_early_return. right.
-  eapply runR_liftR_seq; [ exact (run_read_reg_fwd mstatus s) | ]. (* mstatus *)
-  eapply runR_liftR_seq; [ exact Hrd | ].                       (* cur_privilege = Machine *)
-  eapply runR_liftR_seq; [ apply run_effectivePrivilege_fetch | ]. (* effPriv = Machine *)
-  eapply runR_liftR_seq; [ apply run_translationMode_M | ].     (* mode = Bare *)
-  eapply runR_liftR_seq; [ apply run_is_shadow_stack_fetch | ]. (* shadow = false *)
-  (* remaining: (if false .. else returnR tt) >> (if generic_eq Bare Bare then returnR (Ok ..)) *)
-  unfold Defs.bind0.
-  replace (generic_eq Bare Bare) with true by (vm_compute; reflexivity).
-  rewrite runR_bind. right. exists tt, s.
-  split; apply runR_returnR_fwd.
-Qed.
 
 (* ====================================================================== *)
 (* RESIDUE (scoped, not proven here): the read side of fetch.             *)
@@ -595,10 +569,6 @@ Qed.
 Import Defs.
 
 
-(* forward-form helpers (BUILD a run goal from the iff lemmas). *)
-Lemma run_bind_fwd {X Y} (m : M Y) (f : Y -> M X) s y s1 x s' :
-  run m s y s1 -> run (f y) s1 x s' -> run (Defs.bind m f) s x s'.
-Proof. intros H1 H2. apply (proj2 (run_bind _ _ _ _ _)). exists y, s1. split; assumption. Qed.
 
 
 
@@ -932,17 +902,6 @@ Ltac hs_open s :=
       [apply run_ret; split; reflexivity | cbn match]
   end.
 
-(* --- leaves the aligned ADD fetch path actually queries --- *)
-Lemma run_hartSupports_Ziccif s : run (hartSupports Ext_Ziccif) s true s.
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Ziccif) 0) with true by reflexivity.
-  cbn match.
-  apply run_bind. exists eq_refl, s. split.
-  - apply run_ret. split; reflexivity.
-  - apply run_returnM. split; reflexivity.
-Qed.
 
 
 
@@ -963,8 +922,6 @@ Qed.
 
 
 
-Lemma run_hartSupports_Zicsr s : run (hartSupports Ext_Zicsr) s true s.
-Proof. unfold hartSupports. hs_open s. apply run_returnM. split; reflexivity. Qed.
 
 
 
@@ -1834,49 +1791,6 @@ Qed.
 (*    is dropped (Ok (w,()) -> Ok w).                                      *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_mem_read_fetch_pin
-    (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region) (w : bv 32) s :
-  (forall i, pmpAddrMatchType_encdec_backwards
-               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-             = OFF) ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
-    = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
-  run (within_clint (Physaddr addr) 4) s false s ->
-  run (within_sig (Physaddr addr) 4) s false s ->
-  run (within_htif_readable (Physaddr addr) 4) s false s ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  register_lookup cur_privilege s.(sregs) = Machine ->
-  run (mem_read (InstructionFetch tt) pbmt (Physaddr addr) 4 false false false)
-      s (Ok w) s.
-Proof.
-  intros Hpmp Hmatch Halign Hexec Hc Hsig Hh Hbytes Hpriv.
-  unfold mem_read.
-  (* read mstatus *)
-  apply (proj2 (run_bind _ _ _ _ _)). eexists _, s. split; [ exact (run_read_reg_fwd mstatus s) | ].
-  (* read cur_privilege *)
-  apply (proj2 (run_bind _ _ _ _ _)). eexists _, s. split; [ exact (run_read_reg_fwd cur_privilege s) | ].
-  (* effectivePrivilege (InstructionFetch) = returnM cur_privilege *)
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists (register_lookup cur_privilege s.(sregs)), s. split.
-  { unfold effectivePrivilege.
-    replace (generic_neq (InstructionFetch tt) (InstructionFetch tt)) with false
-      by (vm_compute; reflexivity).
-    cbn [andb]. apply run_returnM_fwd. }
-  rewrite Hpriv.
-  (* mem_read_priv = mem_read_priv_meta >>= drop_meta *)
-  unfold mem_read_priv.
-  apply (proj2 (run_bind _ _ _ _ _)). eexists (Ok (w, default_meta)), s. split.
-  { unfold mem_read_priv_meta.
-    cbn [orb andb].
-    apply (proj2 (run_bind _ _ _ _ _)). eexists (Ok (w, default_meta)), s. split.
-    { cbn match.
-      apply run_checked_mem_read_ram_pin with (region := region); assumption. }
-    cbn match. unfold mem_read_callback. apply run_returnM_fwd. }
-  cbn [MemoryOpResult_drop_meta]. apply run_returnM_fwd.
-Qed.
 
 (* ===== RiscvModelFetchFinal ===== *)
 (* ====================================================================== *)
@@ -1966,28 +1880,7 @@ Import Defs.
 
 (* should_inc_minstret is state-preserving (its value feeds minstret bookkeeping). *)
 
-(* dispatchInterrupt yields None when no interrupt is pending. *)
-Lemma run_dispatchInterrupt_none s priv :
-  run (getPendingSet priv) s None s ->
-  run (dispatchInterrupt priv) s None s.
-Proof.
-  intros Hp. unfold dispatchInterrupt.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  exists None, s. split; [ exact Hp | apply run_returnM_fwd ].
-Qed.
 
-(* is_landing_pad_expected is false when elp != LP_EXPECTED. *)
-Lemma run_is_landing_pad_false s :
-  eq_vec (register_lookup elp s.(sregs))
-         (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  run (is_landing_pad_expected tt) s false s.
-Proof.
-  intros He. unfold is_landing_pad_expected.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  exists (register_lookup elp s.(sregs)), s.
-  split; [ exact (run_read_reg_fwd elp s) | ].
-  rewrite <- He. apply run_returnM_fwd.
-Qed.
 
 (* ===== RiscvModelWrapper ===== *)
 (* ====================================================================== *)

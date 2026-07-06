@@ -755,22 +755,5 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 Definition pmpcfg_zero : type_of_register pmpcfg_n := vector_init 64 (zeros' 8).
 
-Lemma pmpcfg_zero_lookup (i : Z) :
-  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg_zero i)) = OFF
-  /\ pmpLocked (vec_access_dec pmpcfg_zero i) = false.
-Proof.
-  unfold pmpcfg_zero, vector_init.
-  destruct (sumbool_of_bool (64 >=? 0)) as [GE|NGE]; [|exfalso; discriminate NGE].
-  unfold vec_access_dec, access_list_dec, access_list_inc, length_list. cbn [projT1].
-  change (Z.of_nat (length (repeat [zeros' 8] 64))) with 64.
-  destruct (Z.ltb (64 - 1 - i) 0).
-  - vm_compute. split; reflexivity.
-  - change (repeat [zeros' 8] 64) with (replicate 64%nat (zeros' 8)).
-    rewrite nth_lookup.
-    destruct (replicate 64%nat (zeros' 8) !! Z.to_nat (64 - 1 - i)) eqn:Hl.
-    + apply lookup_replicate_1 in Hl. destruct Hl as [-> _].
-      vm_compute. split; reflexivity.
-    + vm_compute. split; reflexivity.
-Qed.
 
 

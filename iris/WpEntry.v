@@ -143,7 +143,6 @@ Section ForwardLUI.
   Definition sAlu : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pclu : mstate := set_reg sAlu nextPC (add_vec_int pc 2).
   Definition sXlu : mstate := set_reg s_pclu (R_bitvector_64 x10) (regval_into_reg luival).
-  Definition sTlu : mstate := set_reg sXlu PC (register_lookup nextPC sXlu.(sregs)).
 
 End ForwardLUI.
 
@@ -202,7 +201,6 @@ Section ForwardADD.
     add_vec (register_lookup (R_bitvector_64 x2) s_pcad.(sregs))
             (register_lookup (R_bitvector_64 x10) s_pcad.(sregs)).
   Definition sXad : mstate := set_reg s_pcad (R_bitvector_64 x2) (regval_into_reg addval).
-  Definition sTad : mstate := set_reg sXad PC (register_lookup nextPC sXad.(sregs)).
 
 End ForwardADD.
 
@@ -241,7 +239,6 @@ Section ForwardJAL.
   Definition jlink : mword 64 := register_lookup nextPC s_pcj.(sregs).
   Definition sXj : mstate :=
     set_reg (set_reg s_pcj nextPC jtgt) (R_bitvector_64 x1) (regval_into_reg jlink).
-  Definition sTj : mstate := set_reg sXj PC (register_lookup nextPC sXj.(sregs)).
 
 End ForwardJAL.
 
@@ -374,7 +371,6 @@ Section ForwardMUL.
   Definition s_pcm : mstate := set_reg sAm nextPC (add_vec_int pc 4).
   Definition sXm : mstate :=
     set_reg s_pcm (R_bitvector_64 x10) (regval_into_reg (mulprod s_pcm)).
-  Definition sTm : mstate := set_reg sXm PC (register_lookup nextPC sXm.(sregs)).
 
 End ForwardMUL.
 
@@ -459,7 +455,6 @@ Section ForwardADDI.
     add_vec (register_lookup (R_bitvector_64 x11) s_pcai.(sregs))
             (sign_extend' 64 (sign_extend' 12 imm_caddi)).
   Definition sXai : mstate := set_reg s_pcai (R_bitvector_64 x11) (regval_into_reg addival).
-  Definition sTai : mstate := set_reg sXai PC (register_lookup nextPC sXai.(sregs)).
 
 End ForwardADDI.
 
@@ -480,13 +475,6 @@ Section StepLUI.
 
   Section CleanLUI.
     Context (s : mstate) (pc : mword 64) (b : bool) (mst0 : mword 64).
-    Definition base_upd_lu : mstate :=
-      set_reg
-        (set_reg
-           (set_reg (set_reg s (R_bool minstret_increment) b)
-                    nextPC (add_vec_int pc 2))
-           (R_bitvector_64 x10) (regval_into_reg luival))
-        PC (add_vec_int pc 2).
 
     Ltac tmilu := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -502,13 +490,6 @@ Section StepADD.
 
   Section CleanADD.
     Context (s : mstate) (pc : mword 64) (b : bool) (mst0 : mword 64).
-    Definition base_upd_ad : mstate :=
-      set_reg
-        (set_reg
-           (set_reg (set_reg s (R_bool minstret_increment) b)
-                    nextPC (add_vec_int pc 2))
-           (R_bitvector_64 x2) (regval_into_reg (addval s pc b)))
-        PC (add_vec_int pc 2).
 
     Ltac tmiad := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -528,13 +509,6 @@ Section StepMUL.
 
   Section CleanMUL.
     Context (s : mstate) (pc : mword 64) (b : bool) (mst0 : mword 64).
-    Definition base_upd_m : mstate :=
-      set_reg
-        (set_reg
-           (set_reg (set_reg s (R_bool minstret_increment) b)
-                    nextPC (add_vec_int pc 4))
-           (R_bitvector_64 x10) (regval_into_reg (mulprod (s_pcm s pc b))))
-        PC (add_vec_int pc 4).
 
     Ltac tmim := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -566,7 +540,6 @@ Section ForwardCSRR.
   Definition s_pcc : mstate := set_reg sAc nextPC (add_vec_int pc 4).
   Definition sXc : mstate :=
     set_reg s_pcc (R_bitvector_64 x11) (regval_into_reg (register_lookup mhartid s_pcc.(sregs))).
-  Definition sTc : mstate := set_reg sXc PC (register_lookup nextPC sXc.(sregs)).
 
 End ForwardCSRR.
 
@@ -589,13 +562,6 @@ Section StepADDI.
 
   Section CleanADDI.
     Context (s : mstate) (pc : mword 64) (b : bool) (mst0 : mword 64).
-    Definition base_upd_ai : mstate :=
-      set_reg
-        (set_reg
-           (set_reg (set_reg s (R_bool minstret_increment) b)
-                    nextPC (add_vec_int pc 2))
-           (R_bitvector_64 x11) (regval_into_reg (addival s pc b)))
-        PC (add_vec_int pc 2).
 
     Ltac tmiai := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -615,13 +581,6 @@ Section StepCSRR.
 
   Section CleanCSRR.
     Context (s : mstate) (pc : mword 64) (b : bool) (mst0 : mword 64).
-    Definition base_upd_c : mstate :=
-      set_reg
-        (set_reg
-           (set_reg (set_reg s (R_bool minstret_increment) b)
-                    nextPC (add_vec_int pc 4))
-           (R_bitvector_64 x11) (regval_into_reg (register_lookup mhartid (s_pcc s pc b).(sregs))))
-        PC (add_vec_int pc 4).
 
     Ltac tmic := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
@@ -640,15 +599,6 @@ Section StepJAL2.
 
   Section CleanJAL.
     Context (s : mstate) (pc : mword 64) (b : bool) (mst0 : mword 64).
-    Definition base_upd_j : mstate :=
-      set_reg
-        (set_reg
-           (set_reg
-              (set_reg (set_reg s (R_bool minstret_increment) b)
-                       nextPC (add_vec_int pc 4))
-              nextPC (jtgt s pc b))
-           (R_bitvector_64 x1) (regval_into_reg (add_vec_int pc 4)))
-        PC (jtgt s pc b).
 
     Ltac tmij := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
