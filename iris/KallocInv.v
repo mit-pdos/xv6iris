@@ -62,6 +62,36 @@ Section Kalloc.
     rewrite H0 in Hlo. unfold kmem_lo in Hlo. lia.
   Qed.
 
+  (* PGSIZE(4096)-alignment implies doubleword(8)-alignment, in the exact
+     [is_aligned_paddr] shape [word_pointsto]/[word_at] demand. *)
+  Lemma page_valid_aligned8 p : page_valid p -> is_aligned_paddr (Physaddr p) 8 = true.
+  Proof.
+    intros [Hal _]. unfold page_aligned, PGSIZE in Hal.
+    unfold is_aligned_paddr. apply Z.eqb_eq.
+    assert (Hnn : 0 <= uint p) by (unfold uint; pose proof (bv_unsigned_in_range 64 p); lia).
+    assert (Hrem : Z.rem (uint p) 8 = (uint p) mod 8) by (apply Z.rem_mod_nonneg; lia).
+    rewrite Hrem.
+    apply Z.mod_divide in Hal; [| lia]. apply Z.mod_divide; [lia|].
+    apply (Z.divide_trans 8 4096); [ exists 512; reflexivity | exact Hal ].
+  Qed.
+
+  (* the little-endian 64-bit word built from 8 bytes reproduces those bytes *)
+  Lemma nth_byte_assemble8 (bs : list (bv 8)) (j : nat) :
+    length bs = 8%nat -> (j < 8)%nat ->
+    nth_byte (Z_to_bv 64 (assemble_bytes bs) : mword 64) j = bs !!! j.
+  Proof.
+    intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
+    rewrite Z_to_bv_unsigned.
+    pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite Hlen in Hhi. simpl in Hhi.
+    assert (Hws : bv_wrap 64 (assemble_bytes bs) = assemble_bytes bs).
+    { apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
+    rewrite Hws.
+    assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
+      by (apply assemble_bytes_byte; lia).
+    rewrite <- Hab.
+    f_equal. f_equal. lia.
+  Qed.
+
   Definition byte_any (a : Arch.pa) : iProp Σ := (∃ b : bv 8, a ↦ₘ b)%I.
   (* an 8-byte little-endian word, now expressed via the [word_pointsto]
      abstraction (so it also carries the doubleword-alignment of [a]). *)
@@ -91,6 +121,36 @@ Section Kalloc.
   Proof.
     rewrite /word_at /page_head8 word_pointsto_unfold. iIntros "[_ H]".
     iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb". iExists _. iExact "Hb".
+  Qed.
+
+  (* the converse direction kfree's [sd r->next] needs: the 8 arbitrary bytes of
+     a page's head slot can be viewed as SOME 64-bit word window ready to be
+     overwritten (word_pointsto also carries the required 8-alignment). *)
+  Lemma page_head8_word_at p :
+    page_valid p -> page_head8 p ⊢ ∃ w : mword 64, word_at p w.
+  Proof.
+    intros Hv. rewrite /page_head8 /byte_any.
+    change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat.
+    iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & _)".
+    iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
+    iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
+    iDestruct "H4" as (b4) "H4". iDestruct "H5" as (b5) "H5".
+    iDestruct "H6" as (b6) "H6". iDestruct "H7" as (b7) "H7".
+    set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
+    set (w := Z_to_bv 64 (assemble_bytes bs) : mword 64).
+    iExists w.
+    rewrite /word_at /word_pointsto.
+    iSplitR; [iPureIntro; by apply page_valid_aligned8|].
+    assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E2 : nth_byte w 2%nat = b2) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E3 : nth_byte w 3%nat = b3) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E4 : nth_byte w 4%nat = b4) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E5 : nth_byte w 5%nat = b5) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E6 : nth_byte w 6%nat = b6) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E7 : nth_byte w 7%nat = b7) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat. simpl.
+    rewrite E0 E1 E2 E3 E4 E5 E6 E7. iFrame.
   Qed.
 
   Lemma run_page_page_own p next : run_page p next ⊢ page_own p.
