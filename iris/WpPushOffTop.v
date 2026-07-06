@@ -425,24 +425,7 @@ Proof.
   apply kv_addv_zero.
 Qed.
 
-Lemma po_mycpu_out_ra (P : mword 64) (m : gmap regidx (mword 64)) :
-  po_mycpu_out P m !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int P 4.
-Proof.
-  unfold po_mycpu_out. cbv zeta.
-  (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-  (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-  rewrite lookup_total_insert.
-  rewrite lookup_total_insert. reflexivity.
-Qed.
 
-Lemma po_mycpu_out_s0 (P : mword 64) (m : gmap regidx (mword 64)) :
-  po_mycpu_out P m !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5).
-Proof.
-  unfold po_mycpu_out. cbv zeta.
-  (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-  rewrite lookup_total_insert.
-  (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-Qed.
 
 Lemma po_mycpu_out_s1 (P : mword 64) (m : gmap regidx (mword 64)) :
   po_mycpu_out P m !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5).

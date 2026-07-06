@@ -25,11 +25,6 @@ Lemma exec_andM_true (l r : M bool) s :
   exec (Defs.and_boolM l r) s = Some (true, s).
 Proof. intros Hl Hr. rewrite (exec_and_boolM_Some _ _ _ _ _ Hl). exact Hr. Qed.
 
-(* reduce a settled bool-guard WITHOUT cbn (which would drive exec into cE Zca). *)
-Lemma exec_if_true {X} (A B : M X) s : exec (if true then A else B) s = exec A s.
-Proof. reflexivity. Qed.
-Lemma exec_if_false {X} (A B : M X) s : exec (if false then A else B) s = exec B s.
-Proof. reflexivity. Qed.
 
 (* HEAD-position guarded if-elimination, for walking a deep nested-if decision
    tree (e.g. [read_CSR]/[write_CSR]'s ~90-way CSR-address dispatch).  The

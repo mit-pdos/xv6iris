@@ -15,10 +15,6 @@ From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* --- get_arch_pc reads PC (state-pure). --- *)
-Lemma run_get_arch_pc s :
-  run (get_arch_pc tt) s (register_lookup PC s.(sregs)) s.
-Proof. unfold get_arch_pc. exact (run_read_reg_fwd PC s). Qed.
 
 Lemma exec_get_arch_pc s :
   exec (get_arch_pc tt) s = Some (register_lookup PC s.(sregs), s).

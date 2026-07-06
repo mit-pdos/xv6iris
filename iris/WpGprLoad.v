@@ -168,59 +168,6 @@ Section ForwardLDg.
     if b then set_reg sTlg minstret (add_vec_int (register_lookup minstret sTlg.(sregs)) 1)
          else sTlg.
 
-  Lemma forward_exec_ld_gpr :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
-           ('b"1") = false ->
-    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec riscv_step s = Some (tt, sFlg).
-  Proof using All.
-    intros Lpc Lpriv Lhs LS LmIE Lelp.
-    assert (LpcA  : register_lookup PC sAlg.(sregs) = pc).
-    { unfold sAlg. trans_mi. exact Lpc. }
-    assert (LprivA: register_lookup cur_privilege sAlg.(sregs) = Machine).
-    { unfold sAlg. trans_mi. exact Lpriv. }
-    assert (LhsA  : register_lookup hart_state sAlg.(sregs) = HART_ACTIVE tt).
-    { unfold sAlg. trans_mi. exact Lhs. }
-    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAlg.(sregs))) ('b"1") = true).
-    { unfold sAlg. trans_mi. exact LS. }
-    assert (LmIEA : eq_vec (_get_Mstatus_MIE
-              (register_lookup (R_bitvector_64 mstatus) sAlg.(sregs))) ('b"1") = false).
-    { unfold sAlg. trans_mi. exact LmIE. }
-    assert (LelpA : eq_vec (register_lookup elp sAlg.(sregs))
-              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { unfold sAlg. trans_mi. exact Lelp. }
-    assert (HdispA : exec (dispatchInterrupt Machine) sAlg = Some (None, sAlg)).
-    { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAlg _ (exec_currentlyEnabled_S sAlg) LSA LmIEA). }
-    assert (HfetchA : exec (fetch tt) sAlg = Some (F_Base w, sAlg)) by exact Hfetch_at.
-    assert (HdecA : exec (ext_decode w) sAlg
-              = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8), sAlg))
-      by (apply Hdec_gen; exact LprivA).
-    pose (s_pc := set_reg sAlg nextPC (add_vec_int pc 4)).
-    assert (LpcAA : register_lookup PC s_pc.(sregs) = pc).
-    { unfold s_pc. trans_mi. exact LpcA. }
-    assert (HexecA : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 8))) s_pc
-              = Some (RETIRE_SUCCESS, sXlg)).
-    { unfold sXlg, s_pc, sAlg. exact Hexec_spc. }
-    assert (Hha : exec (run_hart_active 0) sAlg
-              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXlg)).
-    { exact (exec_hart_active_progress sAlg sAlg sXlg sAlg w
-               (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pc RETIRE_SUCCESS
-               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecA I). }
-    apply (exec_riscv_step_ADD s sXlg w b pc).
-    - exact Lpriv.
-    - exact Hsi_s.
-    - exact LhsA.
-    - exact Hha.
-    - unfold sXlg, sAlg; cbn zeta. trans_mi. trans_mi. trans_mi. exact Lhs.
-    - unfold sXlg, sAlg; cbn zeta. trans_mi. trans_mi.
-      rewrite register_lookup_set. reflexivity.
-    - reflexivity.
-  Qed.
 
   Variable mst0 : mword 64.
   Hypothesis Lmst_l : register_lookup minstret s.(sregs) = mst0.
@@ -234,18 +181,6 @@ Section ForwardLDg.
     if b then set_reg base_upd_lg minstret (add_vec_int mst0 1)
          else base_upd_lg.
 
-  Lemma sFl_eq_gpr : sFlg = sFclg.
-  Proof.
-    assert (Enpc : register_lookup nextPC sXlg.(sregs) = add_vec_int pc 4).
-    { unfold sXlg; unfold set_reg; cbn [sregs]. tmig.
-      rewrite register_lookup_set. reflexivity. }
-    assert (HsT : sTlg = base_upd_lg).
-    { unfold sTlg. rewrite Enpc. unfold sXlg, sAlg, base_upd_lg. reflexivity. }
-    unfold sFlg, sFclg. rewrite HsT. destruct b; [|reflexivity].
-    assert (Emst : register_lookup minstret base_upd_lg.(sregs) = register_lookup minstret s.(sregs)).
-    { unfold base_upd_lg, set_reg; cbn [sregs]. tmig. tmig. tmig. tmig. reflexivity. }
-    rewrite Emst Lmst_l. reflexivity.
-  Qed.
 End ForwardLDg.
 
 

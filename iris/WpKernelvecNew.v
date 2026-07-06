@@ -152,9 +152,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* pc range of the kernelvec text (for the quantified PMP fetch premise). *)
-Definition kv_text_pc (A : Z) : bool :=
-  andb (Z.leb (KernelSyms.kernelvec) A) (Z.leb A (KernelSyms.kernelvec + 0x4c)).
 
 (* sp after the prologue c.addi16sp (the value the whole frame is based on). *)
 Definition kv_sp1 (m : gmap regidx (mword 64)) : mword 64 :=

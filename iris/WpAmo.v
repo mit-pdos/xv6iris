@@ -66,20 +66,6 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s)). apply exec_returnM.
 Qed.
 
-Lemma exec_currentlyEnabled_Zaamo s :
-  eq_vec (_get_Misa_A (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (currentlyEnabled Ext_Zaamo) s = Some (true, s).
-Proof.
-  intro HA. unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  change (currentlyEnabled_measure Ext_Zaamo) with 1.
-  change (1 >=? 0) with true. cbn match beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)). cbn match beta.
-  rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_hartSupports_Zaamo s)).
-  cbn match.
-  rewrite (exec_rec_cE_A_misa (currentlyEnabled_measure Ext_Zaamo - 1) _ s ltac:(vm_compute; reflexivity)).
-  rewrite HA. reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* Part 2 -- decode of acquire()'s [amoswap.w.aq a5,a5,(s1)] (0x0cf4a7af). *)

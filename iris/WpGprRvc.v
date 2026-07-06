@@ -108,11 +108,6 @@ Lemma exec_execute_C_ADDIW (imm : mword 6) (rsd : regidx) s :
   = Some (ExecuteAs (ADDIW (sign_extend' 12 imm, rsd, rsd)), s).
 Proof. unfold execute. cbn match. unfold execute_C_ADDIW. apply exec_returnM. Qed.
 
-Lemma exec_execute_C_LD (uimm : mword 5) (rsc rdc : cregidx) s :
-  exec (execute (C_LD (uimm, rsc, rdc))) s
-  = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")),
-                           creg2reg_idx rsc, creg2reg_idx rdc, false, 8)), s).
-Proof. unfold execute. cbn match. unfold execute_C_LD. cbn zeta. apply exec_returnM. Qed.
 
 Lemma exec_execute_C_LDSP (uimm : mword 6) (rd : regidx) s :
   exec (execute (C_LDSP (uimm, rd))) s
@@ -154,13 +149,6 @@ Proof. apply bv_add_0_l. vm_compute. reflexivity. Qed.
 Definition cli_wval (imm6 : mword 6) : mword 64 :=
   sign_extend' 64 imm6.
 
-(* the [if is_rvc then 2 else 4] pc-increment of the generalized base WPs,
-   reduced at the two literal widths -- chains rewrite these away before their
-   concrete pc-arithmetic facts. *)
-Lemma rvc_width_true : (if true then 2 else 4)%Z = 2%Z.
-Proof. reflexivity. Qed.
-Lemma rvc_width_false : (if false then 2 else 4)%Z = 4%Z.
-Proof. reflexivity. Qed.
 
 (* the file's x0 entry is hardwired zero.  Chains stepping c.li / c.mv
    through the (is_rvc-generalized) base ADDI / ADD WPs read the x0 source

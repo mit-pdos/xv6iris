@@ -43,13 +43,6 @@ Section MinstretInv.
   Global Instance minstret_inv_persistent : Persistent minstret_inv.
   Proof. apply _. Qed.
 
-  (* Allocate the invariant once (e.g. during boot setup) from the owned cells. *)
-  Lemma minstret_inv_alloc (mst : mword 64) (mi : bool) E :
-    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ mi ={E}=∗ minstret_inv.
-  Proof.
-    iIntros "Hmst Hmi". iApply inv_alloc. iNext.
-    iExists mst, mi. iFrame.
-  Qed.
 
   (* The step rule for leaves that need the two counter cells: it [iInv]s
      [minstret_inv] on top of [wp_exec_step], so a leaf gets [minstret_inv_body]

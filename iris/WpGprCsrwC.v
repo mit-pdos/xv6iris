@@ -778,9 +778,3 @@ Proof.
   intro i. destruct (pmpcfg_zero_lookup i) as [HA HL]. exact (conj HA HL).
 Qed.
 
-Example pmp_allows_all_boot_write :
-  pmp_allows_all (pmpcfg_written (mword_of_int 15) pmpcfg_zero).
-Proof.
-  apply pmp_allows_all_written.
-  exact (pmp_all_off_allows_all _ pmp_all_off_zero).
-Qed.

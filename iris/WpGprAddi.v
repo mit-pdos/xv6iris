@@ -99,76 +99,8 @@ Section ForwardAddiGpr.
     if b then set_reg sTi minstret (add_vec_int (register_lookup minstret sTi.(sregs)) 1)
          else sTi.
 
-  Lemma forward_exec_addi_gpr :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
-           ('b"1") = false ->
-    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec riscv_step s = Some (tt, sFi).
-  Proof using All.
-    intros Lpc Lpriv Lhs LS LmIE Lelp.
-    assert (LpcA  : register_lookup PC sAi.(sregs) = pc).
-    { unfold sAi, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpc | vm_compute; reflexivity ]. }
-    assert (LprivA: register_lookup cur_privilege sAi.(sregs) = Machine).
-    { unfold sAi, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (LhsA  : register_lookup hart_state sAi.(sregs) = HART_ACTIVE tt).
-    { unfold sAi, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAi.(sregs))) ('b"1") = true).
-    { unfold sAi, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LS | vm_compute; reflexivity ]. }
-    assert (LmIEA : eq_vec (_get_Mstatus_MIE
-              (register_lookup (R_bitvector_64 mstatus) sAi.(sregs))) ('b"1") = false).
-    { unfold sAi, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LmIE | vm_compute; reflexivity ]. }
-    assert (LelpA : eq_vec (register_lookup elp sAi.(sregs))
-              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { unfold sAi, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lelp | vm_compute; reflexivity ]. }
-    assert (HdispA : exec (dispatchInterrupt Machine) sAi = Some (None, sAi)).
-    { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAi _ (exec_currentlyEnabled_S sAi) LSA LmIEA). }
-    assert (HfetchA : exec (fetch tt) sAi = Some (F_Base w, sAi)) by exact Hfetch_at.
-    assert (HdecA : exec (ext_decode w) sAi
-              = Some (ITYPE (imm, Regidx rs1, Regidx rd, ADDI), sAi))
-      by (apply Hdec; exact LprivA).
-    assert (HexecG : exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))) s_pci
-              = Some (RETIRE_SUCCESS, sXi)).
-    { rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s_pci).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd0).
-      reflexivity. }
-    assert (Hha : exec (run_hart_active 0) sAi
-              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXi)).
-    { exact (exec_hart_active_progress sAi sAi sXi sAi w
-               (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) pc RETIRE_SUCCESS
-               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecG I). }
-    apply (exec_riscv_step_ADD s sXi w b pc).
-    - exact Lpriv.
-    - exact Hsi_s.
-    - exact LhsA.
-    - exact Hha.
-    - unfold sXi, s_pci, sAi; cbn zeta. trans_mi. trans_mi. trans_mi. exact Lhs.
-    - unfold sXi, s_pci, sAi; cbn zeta. trans_mi. trans_mi.
-      rewrite register_lookup_set. reflexivity.
-    - reflexivity.
-  Qed.
 End ForwardAddiGpr.
 
-Lemma gpr_addi_val_file (s : mstate) (pc : mword 64) (b : bool) (rs1 : mword 5) (imm : mword 12) (va : mword 64) :
-  uint rs1 <> 0 ->
-  register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs) = va ->
-  gpr_addi_val rs1 imm (s_pci s pc b) = add_vec va (sign_extend' 64 imm).
-Proof.
-  intros H1 Lva.
-  rewrite (gpr_addi_val_lookup rs1 imm (s_pci s pc b) H1).
-  unfold s_pci, sAi. unfold set_reg; cbn [sregs].
-  do 2 gpr_trans. rewrite Lva. reflexivity.
-Qed.
 
 Section CleanAddiGpr.
   Context (s : mstate) (pc : mword 64) (b : bool) (rs1 rd : mword 5) (imm : mword 12) (mst0 : mword 64).
@@ -183,24 +115,6 @@ Section CleanAddiGpr.
   Definition sFci : mstate :=
     if b then set_reg base_upd_i minstret (add_vec_int mst0 1) else base_upd_i.
 
-  Lemma sFi_eq :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup minstret s.(sregs) = mst0 ->
-    sFi s pc b rs1 rd imm = sFci.
-  Proof.
-    intros LpcS LmstS.
-    assert (Enpc : register_lookup nextPC (sXi s pc b rs1 rd imm).(sregs) = add_vec_int pc 4).
-    { unfold sXi; cbv zeta. unfold set_reg; cbn [sregs].
-      tmig. rewrite register_lookup_set. reflexivity. }
-    assert (HsT : sTi s pc b rs1 rd imm = base_upd_i).
-    { unfold sTi. rewrite Enpc. unfold sXi, s_pci, sAi; cbv zeta.
-      unfold base_upd_i, s_pci, sAi. reflexivity. }
-    unfold sFi, sFci. rewrite HsT. destruct b; [|reflexivity].
-    assert (Emst : register_lookup minstret base_upd_i.(sregs)
-                   = register_lookup minstret s.(sregs)).
-    { unfold base_upd_i, set_reg; cbn [sregs]. do 4 tmig. reflexivity. }
-    rewrite Emst LmstS. reflexivity.
-  Qed.
 End CleanAddiGpr.
 
 (* ====================================================================== *)

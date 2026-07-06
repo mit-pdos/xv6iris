@@ -1053,8 +1053,3 @@ End RvcTorEngines.
 (* ===================================================================== *)
 Require Import WpGprCsrwC.
 
-Example pmp_tor0_entry0_xv6 :
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (pmpcfg_written (mword_of_int 15) pmpcfg_zero) 0)) = TOR
-  /\ pmpLocked (vec_access_dec (pmpcfg_written (mword_of_int 15) pmpcfg_zero) 0) = false.
-Proof. split; vm_compute; reflexivity. Qed.

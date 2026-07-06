@@ -221,48 +221,13 @@ Qed.
 (* §3 The S-mode interrupt trap reduction.                                *)
 (* ===================================================================== *)
 
-(* the post-trap scause: interrupt bit set, cause code of [i]. *)
-Definition trap_sc (sc_old : mword 64) (i : InterruptType) : mword 64 :=
-  update_subrange_vec_dec (update_subrange_vec_dec sc_old 63 63 (bool_to_bit true)) 62 0
-    (zero_extend' 63 (trapCause_bits_forwards (Interrupt i))).
 
 (* stvec's direct-mode target. *)
 Definition stvec_base (v : mword 64) : mword 64 :=
   concat_vec (_get_Mtvec_Base v) ('b"00").
 
-(* the callback plumbing is state-preserving *)
-Lemma exec_csr_cb_scause (V : mword 64) s :
-  exec (csr_name_write_callback "scause" V) s = Some (tt, s).
-Proof.
-  unfold csr_name_write_callback.
-  rewrite (exec_bind_Some _ _ _ _ _
-    (_ : exec (csr_name_map_backwards "scause") s = Some (mword_of_int 0x142, s))).
-  2:{ vm_compute; reflexivity. }
-  match goal with |- exec (returnM ?t) _ = _ => destruct t end.
-  apply exec_returnm.
-Qed.
 
-Lemma exec_csr_cb_stval (V : mword 64) s :
-  exec (csr_name_write_callback "stval" V) s = Some (tt, s).
-Proof.
-  unfold csr_name_write_callback.
-  rewrite (exec_bind_Some _ _ _ _ _
-    (_ : exec (csr_name_map_backwards "stval") s = Some (mword_of_int 0x143, s))).
-  2:{ vm_compute; reflexivity. }
-  match goal with |- exec (returnM ?t) _ = _ => destruct t end.
-  apply exec_returnm.
-Qed.
 
-Lemma exec_csr_cb_sepc (V : mword 64) s :
-  exec (csr_name_write_callback "sepc" V) s = Some (tt, s).
-Proof.
-  unfold csr_name_write_callback.
-  rewrite (exec_bind_Some _ _ _ _ _
-    (_ : exec (csr_name_map_backwards "sepc") s = Some (mword_of_int 0x141, s))).
-  2:{ vm_compute; reflexivity. }
-  match goal with |- exec (returnM ?t) _ = _ => destruct t end.
-  apply exec_returnm.
-Qed.
 
 (* track_trap Supervisor: reads + callbacks only, any state. *)
 Lemma exec_track_trap_S (is_i : bool) (cause : mword 6) s :
@@ -422,8 +387,6 @@ Section TrapReduce.
     apply exec_set_next_pc.
   Qed.
 
-  (* the post-trap state, exported (body = the s9 Let-tower above). *)
-  Definition trap_state : mstate := s9.
 
 End TrapReduce.
 
@@ -532,14 +495,6 @@ Section WpIntrEngine.
     - rewrite irrelevant_register_set; [reflexivity | exact Hb].
   Qed.
 
-  Lemma state_interp_set_same (σ : mstate) (r : register) (v : type_of_register r) :
-    register_lookup r σ.(sregs) = v ->
-    mstate_interp σ -∗ mstate_interp (set_reg σ r v).
-  Proof.
-    iIntros (Hv) "[Hreg Hmem]".
-    unfold set_reg; cbn [sregs mem].
-    iFrame "Hmem". iApply (reg_interp_set_same _ _ _ Hv with "Hreg").
-  Qed.
 
   Lemma wp_exec_step_interrupt_inv E Φ {dq : dfrac} :
     ↑minstretN ⊆ E →
@@ -637,7 +592,6 @@ End AcqIris.
 (* ===================================================================== *)
 Definition acq_pc1 : mword 64 := mword_of_int KernelSyms.acquire.
 Definition acq_h1 : mword 16 := mword_of_int 0x1101.
-Definition acq_w1 : mword 32 := mword_of_int 0xec061101.
 Definition acq_i1 : mword 6 := mword_of_int 32.   (* c.addi imm = -32 (6-bit) *)
 
 Local Ltac acq_reg_step name w hi lo s :=

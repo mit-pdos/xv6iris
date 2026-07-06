@@ -574,31 +574,6 @@ Qed.
 
 
 
-(* read_ram for a plain 4-byte read at [addr], given the 4 consecutive bytes
-   of [w] in memory, runs (state-preserving) to a successful value. *)
-Lemma run_read_ram_plain_4 (addr : mword 64) (w : bv 32) s :
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exists value : mword (8 * 4),
-    run (read_ram Read_plain (Physaddr addr) 4 false) s (value, default_meta) s.
-Proof.
-  intro Hbytes.
-  unfold read_ram. cbn match.
-  (* rk = Read_plain : the access-kind computation is a pure returnM *)
-  eapply (ex_intro _ _).
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
-  (* now: sail_mem_read request >>= match ... *)
-  apply (proj2 (run_bind _ _ _ _ _)).
-  unfold Defs.sail_mem_read. cbn beta zeta.
-  (* the MemRead outcome: provide w as the read value *)
-  eexists _, s. split.
-  - (* run (Next (MemRead 4 req') k) : the strengthened rule, witness w *)
-    cbn match beta. exists w. split.
-    + intros j Hj. exact (Hbytes j Hj).
-    + apply run_returnM_fwd.
-  - cbn match beta. apply run_returnM_fwd.
-Qed.
 
 (* ===== RiscvModelPending ===== *)
 (* ====================================================================== *)
@@ -677,46 +652,6 @@ Section Pending.
       apply run_returnM_fwd.
   Qed.
 
-  Lemma run_getPendingSet_machine_none :
-    run (getPendingSet Machine) s None s.
-  Proof using All.
-    destruct read_mip_runs as [mipv Hmip].
-    unfold getPendingSet.
-    (* guard >>= fun w2 => assert_exp' w2 >>= fun _ => ... *)
-    eapply run_bind_fwd; [exact guard_true|].
-    (* assert_exp' true _ = returnm eq_refl *)
-    eapply run_bind_fwd; [cbn match; apply run_ret_fwd|].
-    (* read_mip *)
-    eapply run_bind_fwd; [exact Hmip|].
-    (* read mie, mideleg (pending_m let), mie, mideleg (pending_s let) *)
-    eapply run_bind_fwd; [exact (run_read_reg_fwd mie s)|].
-    eapply run_bind_fwd; [exact (run_read_reg_fwd mideleg s)|].
-    eapply run_bind_fwd; [exact (run_read_reg_fwd mie s)|].
-    eapply run_bind_fwd; [exact (run_read_reg_fwd mideleg s)|].
-    (* mIE = false *)
-    eapply run_bind_fwd.
-    { apply (proj2 (run_or_boolM _ _ _ _ _)). exists false, s. split.
-      - (* l = and_boolM (returnM (generic_eq Machine Machine)) (...) = false *)
-        apply (proj2 (run_and_boolM _ _ _ _ _)). exists true, s. split.
-        + (* returnM (generic_eq Machine Machine) -> true *)
-          change (generic_eq Machine Machine) with true. apply run_returnM_fwd.
-        + (* read mstatus >>= returnM (eq_vec (MIE) 'b1) -> false (HmIE) *)
-          eapply run_bind_fwd; [exact (run_read_reg_fwd mstatus s)|].
-          rewrite HmIE. apply run_returnM_fwd.
-      - (* bl=false: run r s false s, r = returnM (orb (M=S)(M=U)) = false *)
-        change (orb (generic_eq Machine Supervisor) (generic_eq Machine User)) with false.
-        apply run_returnM_fwd. }
-    (* sIE = false *)
-    eapply run_bind_fwd.
-    { apply (proj2 (run_or_boolM _ _ _ _ _)). exists false, s. split.
-      - (* l = and_boolM (returnM (generic_eq Machine Supervisor=false)) _ = false *)
-        apply (proj2 (run_and_boolM _ _ _ _ _)). exists false, s. split.
-        + change (generic_eq Machine Supervisor) with false. apply run_returnM_fwd.
-        + split; reflexivity.
-      - change (generic_eq Machine User) with false. apply run_returnM_fwd. }
-    (* final: andb false _ = false twice -> None *)
-    cbn [andb]. apply run_returnM_fwd.
-  Qed.
 
 End Pending.
 
@@ -915,14 +850,6 @@ Proof.
       split; [done | intros res2 s2 [<- <-]; done].
 Qed.
 
-(* mirror of run_to_exec: a proven runR-fact + execR-progress => the exec fact. *)
-Lemma runR_to_execR {R X} (m : Defs.monadR R exception X) s res s' :
-  runR m s res s' -> execR m s <> None -> execR m s = Some (res, s').
-Proof.
-  intros Hr Hne. destruct (execR m s) as [[res2 s2]|] eqn:He; [|exfalso; apply Hne; reflexivity].
-  pose proof (execR_runR_det _ _ _ _ He) as [_ Huniq].
-  destruct (Huniq _ _ Hr) as [-> ->]. reflexivity.
-Qed.
 
 (* ===== RiscvModelHne1 ===== *)
 (* ====================================================================== *)
@@ -1095,28 +1022,6 @@ Proof.
   - cbn match. apply run_hartSupports_Ziccif.
 Qed.
 
-(* --- the full Ext_C capability tree reduces to `true` (CSR-free, xlen=64) --- *)
-Lemma run_hartSupports_C s : run (hartSupports Ext_C) s true s.
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_C) 0) with true by reflexivity.
-  cbn match.
-  apply run_bind. exists eq_refl, s. split; [apply run_ret; split; reflexivity| cbn match].
-  apply run_and_boolM. exists true, s. split.
-  { hs_open s. apply run_returnM. split; reflexivity. }
-  apply run_and_boolM. exists true, s. split.
-  { apply run_or_boolM. exists false, s. split.
-    { hs_open s. apply run_returnM. split; reflexivity. }
-    apply run_or_boolM. exists false, s. split.
-    { apply run_bind. exists true, s. split.
-      { hs_open s. apply run_returnM. split; reflexivity. }
-      apply run_returnM. split; reflexivity. }
-    { apply run_returnM. split; [vm_compute; reflexivity| reflexivity]. } }
-  { apply run_or_boolM. exists true, s. split.
-    { hs_open s. apply run_returnM. split; reflexivity. }
-    split; reflexivity. }
-Qed.
 
 (* ===== RiscvModelEnabledS ===== *)
 (* ====================================================================== *)
@@ -1152,30 +1057,6 @@ Proof.
   apply run_hartSupports_Zicsr.
 Qed.
 
-(* HcES: currentlyEnabled Ext_S is state-preserving, value = misa.S bit. *)
-Lemma run_currentlyEnabled_S s :
-  run (currentlyEnabled Ext_S) s
-      (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) s.
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_S) 0) with true by reflexivity.
-  cbn match.
-  apply run_bind. exists eq_refl, s. split; [apply run_ret; split; reflexivity | cbn match].
-  (* outer and_boolM (hartSupports Ext_S = true) INNER *)
-  apply run_and_boolM. exists true, s. split; [apply run_hartSupports_S|].
-  (* bl = true -> run INNER s (misa.S bit) s *)
-  apply run_and_boolM.
-  exists (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")), s. split.
-  { (* misa check: read_reg misa >>= fun w => returnM (eq_vec (_get_Misa_S w) 0b1) *)
-    apply run_bind. exists (register_lookup misa s.(sregs)), s. split.
-    { exact (run_read_reg_fwd misa s). }
-    apply run_returnM. split; reflexivity. }
-  (* if (misa.S bit) then run (cE Ext_Zicsr) s _ s else (_ = false /\ s' = s) *)
-  destruct (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) eqn:Hb2.
-  - apply run_rec_cE_Zicsr.
-  - split; reflexivity.
-Qed.
 
 (* ===== RiscvModelHne2 ===== *)
 (* ===================================================================== *)
@@ -1447,11 +1328,6 @@ Qed.
 (* execR_foreach_ZM_up_const above for the PMP loop.                       *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma exec_fetch_F_Base (w : mword 32) (s : mstate) :
-  run (fetch tt) s (F_Base w) s ->
-  exec (fetch tt) s <> None ->
-  exec (fetch tt) s = Some (F_Base w, s).
-Proof. intros Hrun Hprog. exact (run_to_exec (fetch tt) s (F_Base w) s Hrun Hprog). Qed.
 
 (* ===== RiscvModelPmp ===== *)
 (* ====================================================================== *)
@@ -1707,10 +1583,6 @@ Qed.
 (* allow) or [inl r] (early allow).                                        *)
 (* ---------------------------------------------------------------------- *)
 
-(* early_return under execR: the [inl] early-exit value, state unchanged. *)
-Lemma execR_early_return {R X} (r : R) s :
-  execR (Defs.early_return r : Defs.monadR R exception X) s = Some (inl r, s).
-Proof. reflexivity. Qed.
 
 (* The loop invariant with early exit: a body that at every index either
    continues (inr v, no state change) or early-returns (inl r, no state
@@ -2196,49 +2068,6 @@ Section Fetch.
   Hypothesis Hvalign : is_aligned_vaddr (Virtaddr pc) 4 = true.
   Hypothesis HnotRVC : isRVC (subrange_vec_dec w 15 0) = false.
 
-  Lemma run_fetch_F_Base : run (fetch tt) s (F_Base w) s.
-  Proof.
-    assert (HrdPC : run (Defs.read_reg PC) s pc s).
-    { rewrite <- HpcPC. apply run_read_reg_fwd. }
-    unfold fetch.
-    apply run_catch_early_return. right.
-    change (get_config_rvfi tt) with false. cbv iota beta.
-    (* read PC twice *)
-    eapply runR_liftR_seq. { exact HrdPC. }
-    eapply runR_liftR_seq. { exact HrdPC. }
-    (* ext_fetch_check_pc pc pc = None *)
-    change (ext_fetch_check_pc pc pc) with (@None unit). cbv iota beta.
-    (* outer: (returnR tt >> or_boolM) >>= fun w7 => REST ; or_boolM = false *)
-    apply runR_bind. right. exists false, s. split.
-    { unfold Defs.bind0. apply runR_bind. right. exists tt, s. split.
-      { apply runR_returnR_fwd. }
-      cbv beta.
-      (* or_boolM (PC[0]!=0) (and_boolM (PC[1]!=0) (not Ext_Zca)) = false *)
-      unfold or_boolM. apply runR_bind. right. exists false, s. split.
-      { eapply runR_liftR_seq. { exact HrdPC. }
-        rewrite Hbit0. apply runR_returnR_fwd. }
-      cbv iota beta.
-      (* short-circuit on PC[1]=0 (Ext_Zca not evaluated) *)
-      unfold and_boolM. apply runR_bind. right. exists false, s. split.
-      { eapply runR_liftR_seq. { exact HrdPC. }
-        rewrite Hbit1. apply runR_returnR_fwd. }
-      cbv iota beta. apply runR_returnR_fwd. }
-    cbv iota beta.
-    (* w7 = false -> else: and_boolM (is_aligned) (Ext_Ziccif) >>= fun w11 => .. ; w11 = true *)
-    apply runR_bind. right. exists true, s. split.
-    { unfold and_boolM. apply runR_bind. right. exists true, s. split.
-      { eapply runR_liftR_seq. { exact HrdPC. }
-        rewrite Hvalign. apply runR_returnR_fwd. }
-      cbv iota beta.
-      (* bare [liftR (currentlyEnabled Ext_Ziccif)] = true *)
-      apply runR_liftR. exists true. split; [ reflexivity | apply run_currentlyEnabled_Ziccif ]. }
-    cbv iota beta.
-    (* w11 = true -> read PC twice, fetch_bytes pc pc 4 -> FetchBytes_Success w -> F_Base w *)
-    eapply runR_liftR_seq. { exact HrdPC. }
-    eapply runR_liftR_seq. { exact HrdPC. }
-    eapply runR_liftR_seq. { apply (run_fetch_bytes_4 pc region w s); assumption. }
-    cbv iota beta. rewrite HnotRVC. cbv iota beta. apply runR_returnR_fwd.
-  Qed.
 End Fetch.
 
 (* ===== RiscvModelCycle ===== *)
@@ -2290,35 +2119,6 @@ Qed.
 
 
 
-(* tick_pc copies nextPC into PC (pc_write_callback is the pure unit tt).
-   This is exactly how the cycle advances the PC: after execute sets
-   nextPC := PC+4, tick_pc gives PC := PC+4. *)
-Lemma run_tick_pc s y s' :
-  run (tick_pc tt) s y s' <->
-  (y = tt /\ s' = set_reg s PC (register_lookup nextPC s.(sregs))).
-Proof.
-  unfold tick_pc. split.
-  - intros H.
-    rewrite run_bind in H. destruct H as (w0 & s1 & H0 & H).
-    apply (proj1 (run_read_reg nextPC _ _ _)) in H0. destruct H0 as [-> ->].
-    rewrite run_bind in H. destruct H as (w1 & s2 & Hblk & H).
-    rewrite run_bind0 in Hblk. destruct Hblk as (s3 & Hw & Hr).
-    apply (proj1 (run_write_reg PC _ _ _ _)) in Hw. destruct Hw as [_ ->].
-    apply (proj1 (run_read_reg PC _ _ _)) in Hr. destruct Hr as [-> ->].
-    apply (proj1 (run_returnM _ _ _ _)) in H. destruct H as [-> ->].
-    split; reflexivity.
-  - intros [-> ->].
-    rewrite run_bind. exists (register_lookup nextPC s.(sregs)), s.
-    split; [ apply (proj2 (run_read_reg nextPC _ _ _)); split; reflexivity | ].
-    rewrite run_bind.
-    exists (register_lookup PC (set_reg s PC (register_lookup nextPC s.(sregs))).(sregs)),
-           (set_reg s PC (register_lookup nextPC s.(sregs))).
-    split.
-    + rewrite run_bind0. exists (set_reg s PC (register_lookup nextPC s.(sregs))).
-      split; [ apply (proj2 (run_write_reg PC _ _ _ _)); split; reflexivity
-             | apply (proj2 (run_read_reg PC _ _ _)); split; reflexivity ].
-    + apply (proj2 (run_returnM _ _ _ _)). split; reflexivity.
-Qed.
 
 (* is_landing_pad_expected / should_inc_minstret reduce by the SAME pattern
    (run_bind + run_read_reg + run_returnM, plus run_and_boolM for the latter);

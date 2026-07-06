@@ -95,10 +95,6 @@ Definition gpr_list : list register_bitvector_64 :=
    x17;x18;x19;x20;x21;x22;x23;x24;x25;x26;x27;x28;x29;x30;x31].
 Definition gpr_set : gset register_bitvector_64 := list_to_set gpr_list.
 
-(* [gpr_of_Z n] is always one of x0..x31 (the else branch is x31), so it always
-   lands in [gpr_set]. *)
-Lemma gpr_of_Z_in_gpr_set (n : Z) : gpr_of_Z n ∈ gpr_set.
-Proof. unfold gpr_of_Z, gpr_set; repeat case_match; set_solver. Qed.
 
 Section GprFile.
   Context `{!riscvGS Σ}.
@@ -168,66 +164,6 @@ Section ForwardAddGpr.
     if b then set_reg sTg minstret (add_vec_int (register_lookup minstret sTg.(sregs)) 1)
          else sTg.
 
-  Lemma forward_exec_add_gpr :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
-           ('b"1") = false ->
-    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec riscv_step s = Some (tt, sFg).
-  Proof using All.
-    intros Lpc Lpriv Lhs LS LmIE Lelp.
-    assert (LpcA  : register_lookup PC sAg.(sregs) = pc).
-    { unfold sAg, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpc | vm_compute; reflexivity ]. }
-    assert (LprivA: register_lookup cur_privilege sAg.(sregs) = Machine).
-    { unfold sAg, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (LhsA  : register_lookup hart_state sAg.(sregs) = HART_ACTIVE tt).
-    { unfold sAg, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAg.(sregs))) ('b"1") = true).
-    { unfold sAg, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LS | vm_compute; reflexivity ]. }
-    assert (LmIEA : eq_vec (_get_Mstatus_MIE
-              (register_lookup (R_bitvector_64 mstatus) sAg.(sregs))) ('b"1") = false).
-    { unfold sAg, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LmIE | vm_compute; reflexivity ]. }
-    assert (LelpA : eq_vec (register_lookup elp sAg.(sregs))
-              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { unfold sAg, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lelp | vm_compute; reflexivity ]. }
-    assert (HdispA : exec (dispatchInterrupt Machine) sAg = Some (None, sAg)).
-    { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAg _ (exec_currentlyEnabled_S sAg) LSA LmIEA). }
-    assert (HfetchA : exec (fetch tt) sAg = Some (F_Base w, sAg)) by exact Hfetch_at.
-    assert (HdecA : exec (ext_decode w) sAg
-              = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD), sAg))
-      by (apply Hdec; exact LprivA).
-    assert (HexecG : exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD))) s_pcg
-              = Some (RETIRE_SUCCESS, sXg)).
-    { change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))
-        with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) ADD).
-      rewrite (exec_execute_RTYPE_ADD_gpr rs2 rs1 rd s_pcg).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd0).
-      reflexivity. }
-    assert (Hha : exec (run_hart_active 0) sAg
-              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXg)).
-    { exact (exec_hart_active_progress sAg sAg sXg sAg w
-               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) pc RETIRE_SUCCESS
-               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecG I). }
-    apply (exec_riscv_step_ADD s sXg w b pc).
-    - exact Lpriv.
-    - exact Hsi_s.
-    - exact LhsA.
-    - exact Hha.
-    - unfold sXg, s_pcg, sAg; cbn zeta. trans_mi. trans_mi. trans_mi. exact Lhs.
-    - unfold sXg, s_pcg, sAg; cbn zeta. trans_mi. trans_mi.
-      rewrite register_lookup_set. reflexivity.
-    - reflexivity.
-  Qed.
 End ForwardAddGpr.
 
 (* gpr_of_Z always lands in x1..x31, hence differs from any non-GPR register. *)
@@ -256,17 +192,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma gpr_rd_val_file (s : mstate) (pc : mword 64) (b : bool) (rs2 rs1 : mword 5) (va vb : mword 64) :
-  uint rs1 <> 0 -> uint rs2 <> 0 ->
-  register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs) = va ->
-  register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs) = vb ->
-  gpr_rd_val rs2 rs1 (s_pcg s pc b) = add_vec va vb.
-Proof.
-  intros H1 H2 Lva Lvb.
-  rewrite (gpr_rd_val_lookup rs2 rs1 (s_pcg s pc b) H1 H2).
-  unfold s_pcg, sAg. unfold set_reg; cbn [sregs].
-  do 4 (gpr_trans). rewrite Lva. rewrite Lvb. reflexivity.
-Qed.
 
 (* The [register_beq <special> (gpr_of_Z n) = false] side conditions of
    [irrelevant_register_set] are proved ONCE here, in an empty context, for the
@@ -328,25 +253,6 @@ Section CleanGpr.
   Definition sFcg : mstate :=
     if b then set_reg base_upd_g minstret (add_vec_int mst0 1) else base_upd_g.
 
-  Lemma sFg_eq :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup minstret s.(sregs) = mst0 ->
-    sFg s pc b rs2 rs1 rd = sFcg.
-  Proof.
-    intros LpcS LmstS.
-    assert (Enpc : register_lookup nextPC (sXg s pc b rs2 rs1 rd).(sregs) = add_vec_int pc 4).
-    { unfold sXg; cbv zeta. unfold set_reg; cbn [sregs].
-      tmig. rewrite register_lookup_set. reflexivity. }
-    assert (HsT : sTg s pc b rs2 rs1 rd = base_upd_g).
-    { unfold sTg. rewrite Enpc. unfold sXg, s_pcg, sAg; cbv zeta.
-      unfold base_upd_g, s_pcg, sAg. reflexivity. }
-    unfold sFg, sFcg. rewrite HsT. destruct b; [|reflexivity].
-    assert (Emst : register_lookup minstret base_upd_g.(sregs)
-                   = register_lookup minstret s.(sregs)).
-    { unfold base_upd_g, set_reg; cbn [sregs].
-      do 4 tmig. reflexivity. }
-    rewrite Emst LmstS. reflexivity.
-  Qed.
 End CleanGpr.
 
 

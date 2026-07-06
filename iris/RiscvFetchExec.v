@@ -44,10 +44,6 @@ Definition pmp_all_off (cfg : type_of_register pmpcfg_n) : Prop :=
   forall i, pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg i)) = OFF
          /\ pmpLocked (vec_access_dec cfg i) = false.
 
-Lemma pmp_all_off_A (cfg : type_of_register pmpcfg_n) :
-  pmp_all_off cfg ->
-  forall i, pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg i)) = OFF.
-Proof. intros H i. exact (proj1 (H i)). Qed.
 
 Lemma pmp_all_off_allows_all (cfg : type_of_register pmpcfg_n) :
   pmp_all_off cfg -> pmp_allows_all cfg.
@@ -111,14 +107,6 @@ Section HwConfig.
   Proof. apply _. Qed.
 End HwConfig.
 
-(* The geometric fetch side-conditions for a 4-byte instruction at [pc] with
-   word [w]: PMP open, [pc] 4-byte aligned, and the word is not compressed.
-   (The is_aligned_paddr / low-two-bits forms follow via align4_low_bits.) *)
-Definition fetch_ok (pc : mword 64) (w : mword 32)
-    (pmpcfg0 : type_of_register pmpcfg_n) : Prop :=
-  pmp_allows_all pmpcfg0
-  /\ is_aligned_vaddr (Virtaddr pc) 4 = true
-  /\ isRVC (subrange_vec_dec w 15 0) = false.
 
 (* ===== RiscvModelADDfinal ===== *)
 (* ====================================================================== *)
@@ -194,13 +182,6 @@ Section ADDfinal.
           (add_vec (register_lookup (R_bitvector_64 x10) s1.(sregs))
                    (register_lookup (R_bitvector_64 x11) s1.(sregs)))).
 
-  Lemma exec_hart_active_ADD (Hne : exec (run_hart_active 0) s <> None) :
-    exec (run_hart_active 0) s
-      = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), s_exec).
-  Proof using All.
-    apply run_to_exec; [ | exact Hne ].
-    apply (run_hart_active_ADD s w pc rs2 rs1 rd); assumption.
-  Qed.
 
 End ADDfinal.
 
@@ -615,8 +596,6 @@ Section FetchExec.
     rewrite execR_returnR_fwd. cbn match. reflexivity.
   Qed.
 
-  Lemma exec_fetch_progress : exec (fetch tt) s <> None.
-  Proof using All. rewrite exec_fetch_done. discriminate. Qed.
 
 End FetchExec.
 
@@ -647,12 +626,6 @@ Lemma pmpcfg_zero_off :
   pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (zeros' 8)) = OFF.
 Proof. vm_compute. reflexivity. Qed.
 
-Lemma run_pmpcfg_all_off (s : mstate) :
-  (forall i, vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i = zeros' 8) ->
-  forall i, pmpAddrMatchType_encdec_backwards
-              (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-            = OFF.
-Proof. intros H i. rewrite H. exact pmpcfg_zero_off. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Task 2: a concrete executable RAM region (base 0x80000000, size         *)
@@ -686,18 +659,6 @@ Definition ramRegion : PMA_Region :=
      PMA_Region_include_in_device_tree := false |}.
 
 
-(* matching_pma_region for the single-region list, given range_subset. *)
-Lemma run_pma_match_ram (addr : mword 64) s :
-  register_lookup pma_regions s.(sregs) = [ramRegion] ->
-  range_subset (zero_extend' 64 (bits_of_physaddr (Physaddr addr))) (to_bits 64 4)
-               (PMA_Region_base ramRegion) (PMA_Region_size ramRegion) = true ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
-    = Some ramRegion.
-Proof.
-  intros Hreg Hrs. rewrite Hreg.
-  unfold matching_pma_region. cbn [matching_pma_region_bits_range].
-  rewrite Hrs. reflexivity.
-Qed.
 
 (* ===== RiscvModelFinal ===== *)
 (* ====================================================================== *)
@@ -768,15 +729,6 @@ Section HneClosed.
     exact (exec_execute_ADD rd rs1 rs2 _ Hrs1 Hrs2 Hrd).
   Defined.
 
-  (* the conditioned Hne. *)
-  Lemma exec_hart_active_done :
-    exec (run_hart_active 0) s <> None.
-  Proof using All.
-    erewrite (exec_hart_active_progress s s _ s w _ pc RETIRE_SUCCESS
-                Hpriv Hdisp Hfetch Hdec Hlpad ltac:(reflexivity) HpcS Hexec
-                ltac:(now unfold RETIRE_SUCCESS)).
-    discriminate.
-  Qed.
 
 End HneClosed.
 

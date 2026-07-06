@@ -420,15 +420,6 @@ Qed.
 
 (* ---- satp forward/clean/wp: writes satp; reads mstatus (MIE + SXL) ---- *)
 
-(* PROBE: does reg_update work on a VEC register (pmpaddr_n)? *)
-Lemma probe_vec_reg_update `{!riscvGS Σ} `{CpuId} rs
-    (v v' : type_of_register pmpaddr_n) :
-  reg_interp rs -∗ pmpaddr_n ↦ᵣ v ==∗
-    reg_interp (register_set pmpaddr_n v' rs) ∗ pmpaddr_n ↦ᵣ v'.
-Proof.
-  iIntros "Hi Hr". iMod (reg_update _ pmpaddr_n _ v' with "Hi Hr") as "[Hi Hr]".
-  iModIntro. iFrame.
-Qed.
 
 (* ===================================================================== *)
 (* pmpaddr0 (0x3b0): NO currentlyEnabled — pure pmpWriteAddrReg threading  *)

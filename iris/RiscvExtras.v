@@ -434,15 +434,6 @@ Proof.
   apply Z.eqb_eq. apply (align8_add_offset_unsigned x off k Hoff H).
 Qed.
 
-Lemma align8_paddr_add_offset (x off : mword 64) (k : Z) :
-  bv_unsigned off = 8 * k ->
-  is_aligned_paddr (Physaddr x) 8 = true ->
-  is_aligned_paddr (Physaddr (add_vec x off)) 8 = true.
-Proof.
-  unfold is_aligned_paddr. intros Hoff H%Z.eqb_eq.
-  rewrite uint_unsigned in H. rewrite uint_unsigned.
-  apply Z.eqb_eq. apply (align8_add_offset_unsigned x off k Hoff H).
-Qed.
 
 (* is_aligned_vaddr and is_aligned_paddr are the same check on the same
    underlying bits (both just [Z.rem (uint addr) width = 0]) -- so a vaddr
@@ -549,6 +540,4 @@ Proof. intro H. unfold wX_bits; cbn match. rewrite H. apply exec_wX_x2. Qed.
    [mbump b (mbump b (... x))] stays a LINEAR chain (c3 iApply: 83s -> 0.17s). *)
 Definition mbump (b : bool) (x : mword 64) : mword 64 :=
   if b then add_vec_int x 1 else x.
-Lemma mbump_eq (b : bool) (x : mword 64) : mbump b x = if b then add_vec_int x 1 else x.
-Proof. reflexivity. Qed.
 Global Opaque mbump.

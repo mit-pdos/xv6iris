@@ -51,7 +51,6 @@ Section WpMemsetS.
   (* the entry halfword [c.addi sp,sp,-16], and the 4-byte fetch window it sits
      in (its own 0x1141 in the low half, the next halfword 0xe406 in the high). *)
   Definition h_memset0 : mword 16 := mword_of_int 0x1141.
-  Definition w_memset0 : mword 32 := mword_of_int 0xe4061141.
   (* C.ADDI's 6-bit signed immediate (== -16) and destination register (== sp),
      extracted exactly as the model's decoder does (mirror of [imm_caddi] /
      [rsd_caddi] in WpEntry). *)
@@ -62,9 +61,6 @@ Section WpMemsetS.
               (subrange_vec_dec (subrange_vec_dec h_memset0 11 7)
                  (Z.sub regidx_bit_width 1) 0)).
 
-  (* The destination is sp, and the immediate sign-extends to -16. *)
-  Lemma rsd_memset0_sp : rsd_memset0 = Regidx csp_rs1.
-  Proof. reflexivity. Qed.
 
   Lemma imm_memset0_val :
     sign_extend' 64 (sign_extend' 12 imm_memset0) = (mword_of_int (-16) : mword 64).

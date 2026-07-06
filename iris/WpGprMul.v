@@ -47,19 +47,6 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Lemma gpr_mul_val_lookup (rs2 rs1 : mword 5) (t : mstate) :
-  uint rs1 <> 0 -> uint rs2 <> 0 ->
-  gpr_mul_val rs2 rs1 t
-  = mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
-      (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) t.(sregs))
-      (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) t.(sregs))
-      (mulop_mul.(mul_op_result_part)).
-Proof.
-  intros H1 H2. unfold gpr_mul_val.
-  replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact H1).
-  replace (Z.eqb (uint rs2) 0) with false by (symmetry; apply Z.eqb_neq; exact H2).
-  reflexivity.
-Qed.
 
 (* ====================================================================== *)
 (* The register-GENERIC MUL WP: ONE lemma for `mul rd,rs1,rs2`, ANY        *)

@@ -356,17 +356,6 @@ Proof.
   rewrite Hfe. cbn match. reflexivity.
 Qed.
 
-(* The pure TOR-entry-0 grant facts a Supervisor fetch at [a] (width [width])
-   needs, phrased over the pmpcfg/pmpaddr VALUES (converted to the
-   register_lookup forms at the state via reg_valid). *)
-Definition pmp_tor0_sfetch (cfg : type_of_register pmpcfg_n)
-    (addrs : type_of_register pmpaddr_n) (a : mword 64) (width : Z) : Prop :=
-  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg 0)) = TOR
-  /\ zopz0zKzJ_u (zeros' 64) (vec_access_dec addrs 0) = false
-  /\ pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-       (Z.mul (uint (vec_access_dec addrs 0)) 4)
-       (uint a) (uint (to_bits 64 width)) = PMP_Match
-  /\ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec cfg 0)) ('b"1") = true.
 
 (* The TOR-entry-0 facts of the page walk's 8-byte PTE read (R instead of X). *)
 Definition pmp_tor0_pte_read (cfg : type_of_register pmpcfg_n)
@@ -1629,32 +1618,6 @@ Section SFetchHit.
     Hypothesis Hh : exec (within_htif_readable (Physaddr va) 2) s = Some (false, s).
     Hypothesis Hbytes : forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte h j).
 
-    Lemma exec_fetch_bytes_2_S_hit : exec (fetch_bytes va va 2) s = Some (@FetchBytes_Success 2 h, s).
-    Proof using Hcp HSXL Hsatp Hmode Hasid Htlb Hvec Hcanon Hvpn_def Hident Hmask HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes.
-      unfold fetch_bytes.
-      rewrite exec_catch_early_return.
-      change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _
-        (_ : execR (Defs.bind0 (Defs.returnR _ tt)
-                (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
-             = Some (inr (Ok (Physaddr va, PBMT_PMA, init_ext_ptw)), s))).
-      2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-          rewrite execR_liftR.
-          rewrite (exec_translateAddr_fetch_hit_g va svpn satp0 tlbvec s Hcp HSXL Hsatp Hmode Hasid Htlb Hvec Hcanon Hvpn_def Hident Hmask).
-          cbn match. reflexivity. }
-      cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr va, PBMT_PMA) s)).
-      cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _
-        (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr va) 2 false false false)) s
-             = Some (inr (Ok h), s))).
-      2:{ rewrite execR_liftR.
-          rewrite (exec_mem_read_fetch_2_S PBMT_PMA va region h s
-                     HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes Hcp).
-          cbn match. reflexivity. }
-      cbv iota beta. rewrite autocast_mword_id_16.
-      rewrite execR_returnR_fwd. cbn match. reflexivity.
-    Qed.
   End W2.
 
   (* -- width 4 read at va -- *)
@@ -2397,31 +2360,6 @@ Section SFetchWalk.
     Hypothesis iHh : exec (within_htif_readable (Physaddr va) 4) sf = Some (false, sf).
     Hypothesis iHbytes : forall j : nat, (N.of_nat j < 4)%N -> sf.(mem) !! (pa_add va j) = Some (nth_byte w j).
 
-    Lemma exec_fetch_bytes_4_S_walk : exec (fetch_bytes va va 4) s = Some (@FetchBytes_Success 4 w, sf).
-    Proof using Htrwalk iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv.
-      unfold fetch_bytes.
-      rewrite exec_catch_early_return.
-      change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _
-        (_ : execR (Defs.bind0 (Defs.returnR _ tt)
-                (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
-             = Some (inr (Ok (Physaddr va, PBMT_PMA, init_ext_ptw)), sf))).
-      2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-          rewrite execR_liftR. rewrite Htrwalk.
-          cbn match. reflexivity. }
-      cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr va, PBMT_PMA) sf)).
-      cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _
-        (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr va) 4 false false false)) sf
-             = Some (inr (Ok w), sf))).
-      2:{ rewrite execR_liftR.
-          rewrite (exec_mem_read_fetch_4_S PBMT_PMA va region w sf
-                     iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv).
-          cbn match. reflexivity. }
-      cbv iota beta. rewrite autocast_mword_id.
-      rewrite execR_returnR_fwd. cbn match. reflexivity.
-    Qed.
 
     (* outer assemblies, 4-aligned *)
     Hypothesis Hvalign : is_aligned_vaddr (Virtaddr va) 4 = true.
@@ -2454,31 +2392,6 @@ Section SFetchWalk.
     Hypothesis iHbytes : forall j : nat, (N.of_nat j < 2)%N -> sf.(mem) !! (pa_add va j) = Some (nth_byte h j).
     Hypothesis HisRVC : isRVC h = true.
 
-    Lemma exec_fetch_bytes_2_S_walk : exec (fetch_bytes va va 2) s = Some (@FetchBytes_Success 2 h, sf).
-    Proof using Htrwalk iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv.
-      unfold fetch_bytes.
-      rewrite exec_catch_early_return.
-      change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _
-        (_ : execR (Defs.bind0 (Defs.returnR _ tt)
-                (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
-             = Some (inr (Ok (Physaddr va, PBMT_PMA, init_ext_ptw)), sf))).
-      2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-          rewrite execR_liftR. rewrite Htrwalk.
-          cbn match. reflexivity. }
-      cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr va, PBMT_PMA) sf)).
-      cbv iota beta.
-      rewrite (execR_bind_Some _ _ _ _ _
-        (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr va) 2 false false false)) sf
-             = Some (inr (Ok h), sf))).
-      2:{ rewrite execR_liftR.
-          rewrite (exec_mem_read_fetch_2_S PBMT_PMA va region h sf
-                     iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv).
-          cbn match. reflexivity. }
-      cbv iota beta. rewrite autocast_mword_id_16.
-      rewrite execR_returnR_fwd. cbn match. reflexivity.
-    Qed.
 
   End WalkW2.
 
@@ -2602,59 +2515,7 @@ Section SmodeCoreIris.
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. exact HPBMTE.
   Qed.
 
-  (* fraction-generic split/combine (mirrors mmode_config_split/_combine). *)
-  Lemma smode_config_split (q : Qp) :
-    smode_config (DfracOwn q) ⊢
-      smode_config (DfracOwn (q/2)) ∗ smode_config (DfracOwn (q/2)).
-  Proof.
-    iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
-    iDestruct "Hmst" as (ms0) "(Hms & %HSIE & %HMPRV & %HSXL)".
-    iDestruct "Hmie" as (mie_v mdv0) "(Hmi & Hmd & %Hmm)".
-    iDestruct "Hmenv" as (menvcfg0) "(Hme & %HPBMTE)".
-    iDestruct "Hhs" as "[Hhs1 Hhs2]".
-    iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
-    iDestruct "Hms" as "[Hms1 Hms2]".
-    iDestruct "Hmi" as "[Hmi1 Hmi2]".
-    iDestruct "Hmd" as "[Hmd1 Hmd2]".
-    iDestruct "Hme" as "[Hme1 Hme2]".
-    iSplitL "Hhs1 Hpriv1 Hms1 Hmi1 Hmd1 Hme1".
-    - iFrame "Hhw Hinv Hhs1 Hpriv1".
-      iSplitL "Hms1". { iExists ms0. iFrame "Hms1 %". }
-      iSplitL "Hmi1 Hmd1". { iExists mie_v, mdv0. iFrame "Hmi1 Hmd1 %". }
-      iExists menvcfg0. iFrame "Hme1 %".
-    - iFrame "Hhw Hinv Hhs2 Hpriv2".
-      iSplitL "Hms2". { iExists ms0. iFrame "Hms2 %". }
-      iSplitL "Hmi2 Hmd2". { iExists mie_v, mdv0. iFrame "Hmi2 Hmd2 %". }
-      iExists menvcfg0. iFrame "Hme2 %".
-  Qed.
 
-  Lemma smode_config_combine (q : Qp) :
-    smode_config (DfracOwn (q/2)) -∗ smode_config (DfracOwn (q/2)) -∗
-    smode_config (DfracOwn q).
-  Proof.
-    iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1 & Hmie1 & Hmenv1)
-             (_ & _ & Hhs2 & Hpriv2 & Hmst2 & Hmie2 & Hmenv2)".
-    iDestruct "Hmst1" as (ms0) "(Hms1 & %HSIE & %HMPRV & %HSXL)".
-    iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
-    iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %<-.
-    iDestruct "Hmie1" as (mie_v mdv0) "(Hmi1 & Hmd1 & %Hmm)".
-    iDestruct "Hmie2" as (mie_v' mdv0') "(Hmi2 & Hmd2 & _)".
-    iDestruct (reg_pointsto_agree with "Hmi1 Hmi2") as %<-.
-    iDestruct (reg_pointsto_agree with "Hmd1 Hmd2") as %<-.
-    iDestruct "Hmenv1" as (menvcfg0) "(Hme1 & %HPBMTE)".
-    iDestruct "Hmenv2" as (menvcfg0') "(Hme2 & _)".
-    iDestruct (reg_pointsto_agree with "Hme1 Hme2") as %<-.
-    iCombine "Hhs1 Hhs2" as "Hhs".
-    iCombine "Hpriv1 Hpriv2" as "Hpriv".
-    iCombine "Hms1 Hms2" as "Hms".
-    iCombine "Hmi1 Hmi2" as "Hmi".
-    iCombine "Hmd1 Hmd2" as "Hmd".
-    iCombine "Hme1 Hme2" as "Hme".
-    iFrame "Hhw Hinv Hhs Hpriv".
-    iSplitL "Hms". { iExists ms0. iFrame "Hms %". }
-    iSplitL "Hmi Hmd". { iExists mie_v, mdv0. iFrame "Hmi Hmd %". }
-    iExists menvcfg0. iFrame "Hme %".
-  Qed.
 
   (* dispatchInterrupt = None in S-mode, off owned (dfrac-generic) cells:
      misa.S (hw_config), the no-M-destined-pending mie/mideleg fact, and

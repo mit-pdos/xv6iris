@@ -17,42 +17,7 @@ Import Defs.
 (* ---- write_bytes spec (stated over the mstate mem field, so the gmap
    key instance matches write_bytes' definition) ---- *)
 
-(* off-window: write_bytes leaves untouched addresses alone. *)
-Lemma write_bytes_lookup_ne {w} (s : mstate) (pa : Arch.pa) (n : N) (v : bv w) (a : Arch.pa) :
-  (forall j : nat, (N.of_nat j < n)%N -> a <> pa_add pa j) ->
-  write_bytes s.(mem) pa n v !! a = s.(mem) !! a.
-Proof.
-  intro Hne. unfold write_bytes. generalize (mem s). intro mm.
-  assert (Hgen : forall l : list nat, (forall j, In j l -> a <> pa_add pa j) ->
-            foldr (fun j acc => <[pa_add pa j := nth_byte v j]> acc) mm l !! a = mm !! a).
-  { induction l as [|x xs IH]; intro Hl; simpl; [reflexivity|].
-    rewrite lookup_insert_ne.
-    - apply IH. intros j Hj. apply Hl. right. exact Hj.
-    - intro Heq. apply (Hl x (or_introl eq_refl)). symmetry. exact Heq. }
-  apply Hgen. intros j Hj%in_seq. apply Hne. lia.
-Qed.
 
-(* in-window: with distinct window addresses, byte j reads back as nth_byte v j. *)
-Lemma write_bytes_lookup_in {w} (s : mstate) (pa : Arch.pa) (n : N) (v : bv w) (j : nat) :
-  (N.of_nat j < n)%N ->
-  (forall a b : nat, (N.of_nat a < n)%N -> (N.of_nat b < n)%N ->
-     pa_add pa a = pa_add pa b -> a = b) ->
-  write_bytes s.(mem) pa n v !! pa_add pa j = Some (nth_byte v j).
-Proof.
-  intros Hj Hinj. unfold write_bytes. generalize (mem s). intro mm.
-  assert (Hgen : forall l : list nat, In j l -> (forall i, In i l -> (N.of_nat i < n)%N) ->
-            foldr (fun i acc => <[pa_add pa i := nth_byte v i]> acc) mm l !! pa_add pa j
-              = Some (nth_byte v j)).
-  { induction l as [|x xs IH]; intros Hin Hb; simpl; [destruct Hin|].
-    destruct (decide (x = j)) as [->|Hxj].
-    - rewrite lookup_insert. reflexivity.
-    - rewrite lookup_insert_ne.
-      + apply IH; [destruct Hin as [->|?]; [contradiction|assumption]
-                  | intros i Hi; apply Hb; right; exact Hi].
-      + intro Heq. apply Hxj.
-        apply (Hinj x j); [apply Hb; left; reflexivity | exact Hj | exact Heq]. }
-  apply Hgen; [apply in_seq; lia | intros i Hi%in_seq; lia].
-Qed.
 
 (* ---- write leaf: write_ram rv64d_types.Write_plain stores all 8 bytes via write_bytes ---- *)
 Lemma exec_write_ram_plain_8 (addr : mword 64) (data : bv 64) s :
@@ -206,24 +171,9 @@ Proof.
 Qed.
 
 
-Lemma match_false_branch {T : Type} (A B : T) :
-  match false return T with | true => A | false => B end = B.
-Proof. reflexivity. Qed.
-
-Lemma execR_match_false {R X} (A B : Defs.monadR R exception X) s :
-  execR (match false return (Defs.monadR R exception X) with | true => A | false => B end) s
-  = execR B s.
-Proof. reflexivity. Qed.
 
 
-(* match-reduction helper for the translateAddr Ok-triple (last component unit). *)
-Lemma match_ok_triple_branch {A1 A2 B T} (x1 : A1) (x2 : A2)
-    (f : A1 -> A2 -> T) (g : B -> T) :
-  match (Ok (x1, x2, tt) : result (A1 * A2 * unit) B) return T with
-  | Ok (y1, y2, _) => f y1 y2
-  | Err e => g e
-  end = f x1 x2.
-Proof. reflexivity. Qed.
+
 
 Section SW.
 Variable a : mword 64.
@@ -704,12 +654,6 @@ End WpStoreGpr.
 Section WpStoreGprDemo.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  (* `sd ra, imm(sp)` : rs2=ra(x1), rs1=sp(x2). *)
-  Definition wp_store_ra_sp (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_store_gpr E Φ pc false (mword_of_int 2) (mword_of_int 1) imm.
-  (* `sd a0, imm(a1)` : rs2=a0(x10), rs1=a1(x11).  SAME lemma, different regs. *)
-  Definition wp_store_a0_a1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_store_gpr E Φ pc false (mword_of_int 11) (mword_of_int 10) imm.
 
   Goal gpr_of_Z (uint (mword_of_int 1 : mword 5)) = x1
     /\ gpr_of_Z (uint (mword_of_int 2 : mword 5)) = x2

@@ -121,14 +121,6 @@ Proof.
     eexists. apply exec_returnM.
 Qed.
 
-(* the Machine-equation corollary (kept for the callers that pin the value
-   chain off a [= Machine] fact, e.g. WpGprMretWp / WpGprJalr). *)
-Lemma exec_cE_zicfilp_M s :
-  register_lookup cur_privilege (sregs s) = Machine ->
-  exists b, exec (currentlyEnabled Ext_Zicfilp) s = Some (b, s).
-Proof.
-  intro Hpriv. apply exec_cE_zicfilp_mSU. rewrite Hpriv. reflexivity.
-Qed.
 
 Lemma exec_cE_pause s : exists b, exec (currentlyEnabled Ext_Zihintpause) s = Some (b, s).
 Proof.

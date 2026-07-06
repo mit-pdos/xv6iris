@@ -558,12 +558,6 @@ Proof.
   apply exec_returnM.
 Qed.
 
-Lemma exec_pmpReadCfgReg_0_ok s :
-  exec (Defs.bind (pmpReadCfgReg 0) (fun w => returnM (Ok w) : M (result (mword 64) unit))) s
-    = Some (Ok (pmpcfg0_readback (register_lookup pmpcfg_n s.(sregs))), s).
-Proof.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpReadCfgReg_0 s)). apply exec_returnM.
-Qed.
 
 Lemma exec_write_CSR_pmpcfg0 (v : mword 64) s :
   exec (write_CSR csr_pmpcfg0 v) s
@@ -871,16 +865,6 @@ Proof.
   rewrite H. apply exec_returnM.
 Qed.
 
-Lemma exec_is_CSR_accessible_menvcfg s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (is_CSR_accessible csr_menvcfg Machine CSRWrite) s = Some (true, s).
-Proof.
-  intro HU. unfold is_CSR_accessible.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
-  match goal with |- context[if ?g then _ else _] =>
-    replace g with true by (vm_compute; reflexivity) end. cbn match.
-  apply (exec_currentlyEnabled_U s HU).
-Qed.
 
 Lemma exec_execute_csrw_menvcfg (rs1 : mword 5) s :
   uint rs1 <> 0 ->

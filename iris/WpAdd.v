@@ -129,7 +129,6 @@ Section FinalWP.
     - exact Hrvfi.
   Qed.
 
-  Definition mst_final : mword 64 := if b then add_vec_int mst0 1 else mst0.
 
   Definition base_upd (s : mstate) : mstate :=
     set_reg
@@ -145,30 +144,6 @@ Section FinalWP.
 
   Ltac tmiss := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
-  Lemma sF_eq (s : mstate) :
-    register_lookup (R_bitvector_64 x10) s.(sregs) = a0 ->
-    register_lookup (R_bitvector_64 x11) s.(sregs) = a1 ->
-    register_lookup minstret s.(sregs) = mst0 ->
-    sF s = sFc s.
-  Proof using All.
-    intros Lx10 Lx11 Lmst.
-    assert (E10 : register_lookup (R_bitvector_64 x10)
-                    (set_reg (sA s) nextPC (add_vec_int pc 4)).(sregs) = a0).
-    { unfold sA, set_reg; cbn [sregs]. tmiss. tmiss. exact Lx10. }
-    assert (E11 : register_lookup (R_bitvector_64 x11)
-                    (set_reg (sA s) nextPC (add_vec_int pc 4)).(sregs) = a1).
-    { unfold sA, set_reg; cbn [sregs]. tmiss. tmiss. exact Lx11. }
-    assert (Enpc : register_lookup nextPC (sX s).(sregs) = add_vec_int pc 4).
-    { unfold sX; cbv zeta. unfold sA, set_reg; cbn [sregs]. tmiss.
-      rewrite register_lookup_set. reflexivity. }
-    assert (HsT : sT s = base_upd s).
-    { unfold sT. rewrite Enpc. unfold sX; cbv zeta. rewrite E10 E11.
-      unfold regval_into_reg, base_upd, sA. reflexivity. }
-    unfold sF, sFc. rewrite HsT. destruct b; [ | reflexivity ].
-    assert (Emst : register_lookup minstret (base_upd s).(sregs) = mst0).
-    { unfold base_upd, sA, set_reg; cbn [sregs]. tmiss. tmiss. tmiss. tmiss. exact Lmst. }
-    rewrite Emst. reflexivity.
-  Qed.
 
   (* Like [sF_eq], but expresses the post-step state through the *runtime* minstret
      value [register_lookup minstret s.(sregs)] rather than the section parameter

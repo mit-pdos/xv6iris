@@ -62,8 +62,6 @@ Record mstate := MState {
 Definition set_reg (s : mstate) (r : register) (v : type_of_register r) : mstate :=
   MState (register_set r v s.(sregs)) s.(mem).
 
-Definition set_mem (s : mstate) (a : Arch.pa) (b : bv 8) : mstate :=
-  MState s.(sregs) (<[a := b]> s.(mem)).
 
 (* Byte address [a + j] (model's own mword arithmetic) and byte [j] of a value. *)
 

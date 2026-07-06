@@ -235,13 +235,6 @@ Proof.
   unfold access_vec_dec, access_mword_dec. mw_prep; tb1.
 Qed.
 
-Lemma sstatus_read_SIE (ms : mword 64) :
-  access_vec_dec (sstatus_read ms) 1 = _get_Mstatus_SIE ms.
-Proof.
-  unfold sstatus_read. rewrite subrange64_id.
-  unfold lower_mstatus, _update_Sstatus_SIE. cbn zeta.
-  apply access1_update_subrange11.
-Qed.
 
 Section WpPushOffCsr.
   Context `{!riscvGS Σ}.
