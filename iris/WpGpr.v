@@ -150,7 +150,6 @@ Section ForwardAddGpr.
     exec (ext_decode w) s0 = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD), s0).
 
   Definition sAg : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition s_pcg : mstate := set_reg sAg nextPC (add_vec_int pc 4).
 
 End ForwardAddGpr.
 

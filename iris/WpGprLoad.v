@@ -159,7 +159,6 @@ Section ForwardLDg.
             set_reg (set_reg (set_reg s (R_bool minstret_increment) b) nextPC (add_vec_int pc 4))
                     (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value false data))).
 
-  Definition sAlg : mstate := set_reg s (R_bool minstret_increment) b.
 
 
   Variable mst0 : mword 64.

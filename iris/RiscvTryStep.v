@@ -1279,46 +1279,6 @@ Proof.
   rewrite HOFF. cbn match. apply run_returnM_fwd.
 Qed.
 
-(* The body of pmpCheck's loop is a no-op when the i-th pmpcfg A-field=OFF. *)
-Lemma run_pmpCheck_machine_none
-    (addr : physaddr) (width : Z) (access : MemoryAccessType mem_payload) s :
-  (forall i, pmpAddrMatchType_encdec_backwards
-               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i))
-             = OFF) ->
-  run (pmpCheck addr width access Machine) s None s.
-Proof.
-  intro HpmpOFF.
-  unfold pmpCheck.
-  apply run_catch_early_return. right.
-  replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity).
-  cbn zeta. unfold Defs.bind0.
-  apply (proj2 (runR_bind _ _ _ _ _)). right. exists tt, s. split.
-  - (* the loop is a no-op *)
-    apply runR_foreach_ZM_up_const. intros i v. destruct v. cbn beta.
-    (* first bind: (if i>0 then liftR (pmpReadAddrReg (i-1)) else returnR 0) >>= REST *)
-    destruct (Z.gtb i 0) eqn:Hi.
-    + destruct (run_pmpReadAddrReg_ex (i - 1) s) as [pv Hpv].
-      eapply runR_liftR_seq; [ exact Hpv | ]. cbn beta.
-      (* REST with prev := pv *)
-      eapply runR_liftR_seq; [ exact (run_read_reg_fwd pmpcfg_n s) | ]. cbn beta.
-      destruct (run_pmpReadAddrReg_ex i s) as [w2 Hw2].
-      eapply runR_liftR_seq; [ exact Hw2 | ]. cbn beta.
-      eapply runR_liftR_seq;
-        [ apply run_pmpMatchAddr_OFF; exact (HpmpOFF i) | ]. cbn beta.
-      cbn match. apply runR_returnR_fwd.
-    + apply (proj2 (runR_bind _ _ _ _ _)). right. eexists. exists s.
-      split; [ apply runR_returnR_fwd | ]. cbn beta.
-      (* REST with prev := zeros' 64 *)
-      eapply runR_liftR_seq; [ exact (run_read_reg_fwd pmpcfg_n s) | ]. cbn beta.
-      destruct (run_pmpReadAddrReg_ex i s) as [w2 Hw2].
-      eapply runR_liftR_seq; [ exact Hw2 | ]. cbn beta.
-      eapply runR_liftR_seq;
-        [ apply run_pmpMatchAddr_OFF; exact (HpmpOFF i) | ]. cbn beta.
-      cbn match. apply runR_returnR_fwd.
-  - (* Machine mode falls through to None *)
-    replace (generic_eq Machine Machine) with true by (vm_compute; reflexivity).
-    cbn match. apply runR_returnR_fwd.
-Qed.
 
 (* ===== RiscvModelHneFetch2 ===== *)
 (* ====================================================================== *)
@@ -1618,40 +1578,11 @@ Qed.
 (*    hypotheses (their concrete reduction depends on the plat_* config).  *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_within_mmio_readable_false (addr : physaddr) (width : Z) s :
-  run (within_clint addr width) s false s ->
-  run (within_sig addr width) s false s ->
-  run (within_htif_readable addr width) s false s ->
-  run (within_mmio_readable addr width) s false s.
-Proof.
-  intros Hc Hsig Hh.
-  unfold within_mmio_readable.
-  cbn [get_config_rvfi].
-  apply (proj2 (run_or_boolM _ _ _ _ _)). exists false, s. split; [exact Hc|].
-  cbn match.
-  apply (proj2 (run_or_boolM _ _ _ _ _)). exists false, s. split; [exact Hsig|].
-  cbn match.
-  apply (proj2 (run_and_boolM _ _ _ _ _)). exists false, s. split; [exact Hh|].
-  cbn match. split; reflexivity.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 2. phys_access_check = None when both PMP and PMA allow the access.     *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_phys_access_check_none
-    (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
-    (priv : Privilege) (paddr : physaddr) (width : Z) (res : bool) s :
-  run (pmpCheck paddr width access priv) s None s ->
-  run (pmaCheck paddr width access pbmt res) s None s ->
-  run (phys_access_check access pbmt priv paddr width res) s None s.
-Proof.
-  intros Hpmp Hpma.
-  unfold phys_access_check.
-  apply (proj2 (run_bind _ _ _ _ _)). exists None, s. split; [exact Hpmp|].
-  apply (proj2 (run_bind _ _ _ _ _)). exists None, s. split; [exact Hpma|].
-  cbn match. apply (proj2 (run_returnM _ _ _ _)). split; reflexivity.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. checked_mem_read reduces to read_ram for an allowed, non-MMIO,       *)
@@ -1701,34 +1632,6 @@ Qed.
 (*    which the wrapper maps to [None] when it is [true].                  *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma run_pmaCheck_ram (addr : mword 64) (pbmt : page_based_mem_type)
-    (region : PMA_Region) s :
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4
-    = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
-  run (pmaCheck (Physaddr addr) 4 (InstructionFetch tt) pbmt false) s None s.
-Proof.
-  intros Hmatch Halign Hexec.
-  unfold pmaCheck.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists _, s. split; [ apply run_read_reg_fwd | ].
-  rewrite Hmatch.
-  destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hexec |- *.
-  (* misaligned = not (is_aligned_paddr ...) = not true = false *)
-  rewrite Halign. cbn [negb].
-  (* (if not false then returnM None else ...) >>= fun me => match me with ... *)
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists None, s. split; [ apply run_returnM_fwd | ].
-  cbn match beta.
-  (* match access (InstructionFetch) => returnM (override_PMA rattr pbmt).PMA_executable *)
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists _, s. split; [ apply run_returnM_fwd | ].
-  (* canAccess = (override_PMA rattr pbmt).PMA_executable = true ; print guard = tt *)
-  rewrite Hexec. cbn [andb negb].
-  apply run_returnM_fwd.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. Pinned checked_mem_read: result is exactly [Ok (w, default_meta)].   *)

@@ -141,7 +141,6 @@ Section ForwardLUI.
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
   Definition sAlu : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition s_pclu : mstate := set_reg sAlu nextPC (add_vec_int pc 2).
 
 End ForwardLUI.
 
@@ -196,9 +195,6 @@ Section ForwardADD.
 
   Definition sAad : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pcad : mstate := set_reg sAad nextPC (add_vec_int pc 2).
-  Definition addval : mword 64 :=
-    add_vec (register_lookup (R_bitvector_64 x2) s_pcad.(sregs))
-            (register_lookup (R_bitvector_64 x10) s_pcad.(sregs)).
 
 End ForwardADD.
 
@@ -232,9 +228,6 @@ Section ForwardJAL.
 
   Definition sAj : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pcj : mstate := set_reg sAj nextPC (add_vec_int pc 4).
-  Definition jtgt : mword 64 :=
-    add_vec (register_lookup PC s_pcj.(sregs)) (sign_extend' 64 imm_jal).
-  Definition jlink : mword 64 := register_lookup nextPC s_pcj.(sregs).
 
 End ForwardJAL.
 
@@ -350,10 +343,6 @@ Lemma wX_mul_x10 (v : mword 64) :
   = Defs.bind0 (Defs.write_reg (R_bitvector_64 x10) (regval_into_reg v)) (returnM tt).
 Proof. replace (uint i_mul_rd) with 10%Z by (vm_compute; reflexivity). reflexivity. Qed.
 
-Definition mulprod (s : mstate) : mword 64 :=
-  mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
-    (register_lookup (R_bitvector_64 x10) s.(sregs))
-    (register_lookup (R_bitvector_64 x11) s.(sregs)) (mulop_mul.(mul_op_result_part)).
 
 
 Section ForwardMUL.
@@ -364,7 +353,6 @@ Section ForwardMUL.
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
   Definition sAm : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition s_pcm : mstate := set_reg sAm nextPC (add_vec_int pc 4).
 
 End ForwardMUL.
 
@@ -445,9 +433,6 @@ Section ForwardADDI.
 
   Definition sAai : mstate := set_reg s (R_bool minstret_increment) b.
   Definition s_pcai : mstate := set_reg sAai nextPC (add_vec_int pc 2).
-  Definition addival : mword 64 :=
-    add_vec (register_lookup (R_bitvector_64 x11) s_pcai.(sregs))
-            (sign_extend' 64 (sign_extend' 12 imm_caddi)).
 
 End ForwardADDI.
 
@@ -530,7 +515,6 @@ Section ForwardCSRR.
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
   Definition sAc : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition s_pcc : mstate := set_reg sAc nextPC (add_vec_int pc 4).
 
 End ForwardCSRR.
 

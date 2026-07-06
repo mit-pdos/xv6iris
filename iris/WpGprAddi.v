@@ -80,7 +80,6 @@ Section ForwardAddiGpr.
     exec (ext_decode w) s0 = Some (ITYPE (imm, Regidx rs1, Regidx rd, ADDI), s0).
 
   Definition sAi : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition s_pci : mstate := set_reg sAi nextPC (add_vec_int pc 4).
 
 End ForwardAddiGpr.
 

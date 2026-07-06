@@ -77,8 +77,6 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Definition luival : mword 64 :=
-  sign_extend' 64 (concat_vec (sign_extend' 20 imm_clui) ((Ox"000") : mword 12)).
 
 Lemma exec_set_next_pc (target : mword 64) s :
   exec (set_next_pc target) s = Some (tt, set_reg s nextPC target).
