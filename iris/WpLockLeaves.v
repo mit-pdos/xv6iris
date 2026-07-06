@@ -47,7 +47,8 @@ Section WpLockLeaves.
 
   (* ------------------------------------------------------------------- *)
   (* amoswap.w.aq rd, rs2, (rs1) on the LOCK WORD, through [is_lock].     *)
-  (* Cloned from WpAmo.wp_amoswap_w_s; the byte window comes out of the   *)
+  (* Structured like a plain amoswap.w.aq step (cf. WpAmo.v's amoswap      *)
+  (* value shims); the byte window comes out of the                       *)
   (* opened invariant (value [w] existential) and goes back with the      *)
   (* stored (nonzero) word under the "held" disjunct.  The pre-swap       *)
   (* branch payload is handed VERBATIM to the continuation: if the lock   *)

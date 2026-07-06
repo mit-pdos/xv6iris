@@ -11,7 +11,9 @@
                                    refuted at the read, so the slow path is
                                    taken and holding() returns 1.
 
-   Both are clones of WpHolding.wp_holding with instruction +0x0 swapped. *)
+   Both are built from WpHolding.v's decode/leaf lemmas (hi_00..hi_06,
+   his_08..his_2a), with instruction +0x0 swapped for the invariant-mediated
+   read. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.

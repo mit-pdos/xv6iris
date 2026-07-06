@@ -629,7 +629,7 @@ Section WpAcquireLock.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    (* address bridges into wp_holding's own lets *)
+    (* address bridges into wp_holding_lockinv's own lets *)
     assert (HB2sp : B2 !!! Regidx csp_rs1 = spd).
     { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
