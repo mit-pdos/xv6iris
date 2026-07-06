@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""find_dead.py -- find definitions/lemmas that are never referenced.
+
+Uses Coq's .glob files (emitted during compilation), which record every
+top-level definition and every cross-reference by fully-qualified name.
+A definition is reported as "dead" when its qualified name (module, secpath,
+name) appears in no reference (R) line anywhere in the considered fileset.
+
+Only files listed in _CoqProject are considered (scratch/Zz*/Scratch* globs
+are ignored), so a lemma referenced only by a throwaway Print-Assumptions
+file is still counted as dead.
+
+Caveats (why a "dead" hit may be a false positive):
+  * Instances / Notations / Canonical structures are used by inference, not by
+    name -- reported separately under [implicit] and almost never truly dead.
+  * Lemmas used ONLY via a hint database (auto/eauto with, autorewrite) or a
+    generic tactic may not emit a name reference -> could appear dead.
+  * A recursive Fixpoint references itself, so it won't show as dead even if
+    externally unused.
+  * A genuinely-unused top-level THEOREM (a result nothing consumes yet) is
+    indistinguishable from dead code by this analysis -- that's the judgment
+    call this tool is meant to surface, not make.
+
+Usage:
+  python3 find_dead.py                 # analyse ./ (dir holding the .glob files)
+  python3 find_dead.py --dir .         # same
+  python3 find_dead.py --all           # include implicit (inst/not/ind/...) too
+  python3 find_dead.py --kinds prf,def # restrict to given glob kinds
+"""
+import argparse, bisect, os, re, sys
+
+# glob def-kinds we treat as "lemmas & definitions" (the primary report)
+PRIMARY = {"prf", "def", "rec", "abbrev", "scheme"}
+# structural / implicitly-used kinds (reported separately, rarely truly dead)
+IMPLICIT = {"inst", "not", "ind", "constr", "proj", "ax", "coe", "class"}
+KIND_LABEL = {"prf": "Lemma/Thm", "def": "Definition", "rec": "Fixpoint",
+              "abbrev": "Notation(abbrev)", "scheme": "Scheme",
+              "inst": "Instance", "not": "Notation", "ind": "Inductive",
+              "constr": "Constructor", "proj": "Projection", "ax": "Axiom",
+              "coe": "Coercion", "class": "Class"}
+
+def coqproject_modules(dirpath):
+    """Return the set of module basenames listed in _CoqProject (no extension)."""
+    cp = os.path.join(dirpath, "_CoqProject")
+    mods = set()
+    if not os.path.exists(cp):
+        return None
+    for line in open(cp):
+        line = line.strip()
+        if line.endswith(".v") and not line.startswith("-"):
+            mods.add(os.path.basename(line)[:-2])
+    return mods
+
+def line_index(vpath):
+    """Byte-offset -> 1-based line lookup for a .v file."""
+    try:
+        data = open(vpath, "rb").read()
+    except OSError:
+        return None
+    starts = [0]
+    for i, b in enumerate(data):
+        if b == 0x0A:
+            starts.append(i + 1)
+    return starts
+
+def off_to_line(starts, off):
+    if starts is None:
+        return "?"
+    return bisect.bisect_right(starts, off)
+
+DEF_RE = re.compile(r"^([a-z]+)\s+(\d+):(\d+)\s+(\S+)\s+(\S+)\s*$")
+REF_RE = re.compile(r"^R(\d+):(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$")
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dir", default=".", help="directory with .glob and .v files")
+    ap.add_argument("--all", action="store_true", help="also report implicit kinds")
+    ap.add_argument("--kinds", default="", help="comma list of glob kinds to report")
+    ap.add_argument("--triage", action="store_true",
+                    help="group by heuristic category instead of by file")
+    args = ap.parse_args()
+    d = args.dir
+
+    only_mods = coqproject_modules(d)
+    globs = sorted(g for g in os.listdir(d) if g.endswith(".glob"))
+    if only_mods is not None:
+        globs = [g for g in globs if g[:-5] in only_mods]
+
+    defs = []                 # (module, secpath, name, kind, glob-basename, off)
+    refs = set()              # (module, secpath, name)
+    for g in globs:
+        gp = os.path.join(d, g)
+        module = None
+        for line in open(gp):
+            line = line.rstrip("\n")
+            if line.startswith("F"):
+                module = line[1:]
+                continue
+            m = REF_RE.match(line)
+            if m:
+                _, _, rmod, rsec, rname, _ = m.groups()
+                if rname != "<>":
+                    refs.add((rmod, rsec, rname))
+                continue
+            m = DEF_RE.match(line)
+            if m and module is not None:
+                kind, s, _e, sec, name = m.groups()
+                if kind in ("var", "binder", "sec"):
+                    continue
+                defs.append((module, sec, name, kind, g[:-5], int(s)))
+
+    want = set()
+    if args.kinds:
+        want = set(args.kinds.split(","))
+    else:
+        want = set(PRIMARY)
+        if args.all:
+            want |= IMPLICIT
+
+    # a def is dead if (module, secpath, name) is referenced nowhere
+    dead = [row for row in defs
+            if row[3] in want and (row[0], row[1], row[2]) not in refs]
+
+    lineidx = {}
+    def loc(gbase, off):
+        if gbase not in lineidx:
+            lineidx[gbase] = line_index(os.path.join(d, gbase + ".v"))
+        return f"{gbase}.v:{off_to_line(lineidx[gbase], off)}"
+
+    if not args.triage:
+        by_file = {}
+        for module, sec, name, kind, gbase, off in dead:
+            by_file.setdefault(gbase, []).append((off, name, kind, sec))
+        total = 0
+        for gbase in sorted(by_file):
+            print(f"\n### {gbase}.v  ({len(by_file[gbase])} unreferenced)")
+            for off, name, kind, sec in sorted(by_file[gbase]):
+                secnote = "" if sec == "<>" else f"  [in {sec}]"
+                print(f"  {loc(gbase,off):<28} {KIND_LABEL.get(kind,kind):<16} {name}{secnote}")
+                total += 1
+    else:
+        cats = {}
+        for module, sec, name, kind, gbase, off in dead:
+            cats.setdefault(category(name, kind), []).append((gbase, off, name, kind))
+        order = ["auto-generated (eliminator/projection) -- NOT dead",
+                 "smoke-test instantiation (concrete-register example)",
+                 "top-level spec? (whole-function / step WP -- maybe intentional)",
+                 "helper candidate -- likely reviewable for removal"]
+        total = 0
+        for cat in order:
+            rows = cats.get(cat, [])
+            if not rows:
+                continue
+            print(f"\n===== {cat}  ({len(rows)}) =====")
+            for gbase, off, name, kind in sorted(rows, key=lambda r: (r[0], r[1])):
+                print(f"  {loc(gbase,off):<28} {KIND_LABEL.get(kind,kind):<16} {name}")
+                total += 1
+
+    kinds_desc = ",".join(sorted(want))
+    nfiles = len({r[4] for r in dead})
+    print(f"\n== {total} unreferenced {kinds_desc} across {nfiles} files "
+          f"(of {len(globs)} globs scanned) ==")
+    print("NB: heuristic categories are hints, not verdicts. Instances/Notations, "
+          "hint-DB-only lemmas, and not-yet-consumed top-level theorems can appear "
+          "here. Use --all for implicit kinds, drop --triage for by-file view.")
+
+TOPLEVEL_RE = re.compile(
+    r"^(wp_acquire$|wp_holding|wp_kernel$|wp_kernelvec$|wp_spin$|wp_start$|wp_memset_s|"
+    r"wp_push_off$|wp_step_|wp_.*_intr$|kernelvec_handler_spec$|intr_inv|kernel_window$|"
+    r"fetch_from_pts$|wp_add_real|.*_handler_spec$|wp_csrw_.*_gpr$)")
+SMOKE_RE = re.compile(r"(_x\d+|^Unnamed_thm$|^wp_[a-z]+_x\d)")
+
+def category(name, kind):
+    if kind in ("scheme", "proj", "inst", "not", "ind", "constr"):
+        return "auto-generated (eliminator/projection) -- NOT dead"
+    if SMOKE_RE.search(name):
+        return "smoke-test instantiation (concrete-register example)"
+    if TOPLEVEL_RE.match(name):
+        return "top-level spec? (whole-function / step WP -- maybe intentional)"
+    return "helper candidate -- likely reviewable for removal"
+
+if __name__ == "__main__":
+    main()
