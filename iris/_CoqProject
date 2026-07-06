@@ -74,3 +74,9 @@ WpAmo.v
 WpAcquireMem.v
 WpHolding.v
 WpAcquireTop.v
+WpLock.v
+WpLockLeaves.v
+WpHoldingInv.v
+WpPopOff.v
+WpRelease.v
+WpAcquireLock.v
