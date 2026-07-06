@@ -192,7 +192,6 @@ Section ForwardADD.
       = Some (F_RVC h_add, set_reg s (R_bool minstret_increment) b).
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
-  Definition sAad : mstate := set_reg s (R_bool minstret_increment) b.
 
 End ForwardADD.
 
@@ -224,7 +223,6 @@ Section ForwardJAL.
       = Some (F_Base w_jal, set_reg s (R_bool minstret_increment) b).
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
-  Definition sAj : mstate := set_reg s (R_bool minstret_increment) b.
 
 End ForwardJAL.
 
@@ -427,7 +425,6 @@ Section ForwardADDI.
       = Some (F_RVC h_addi, set_reg s (R_bool minstret_increment) b).
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
-  Definition sAai : mstate := set_reg s (R_bool minstret_increment) b.
 
 End ForwardADDI.
 

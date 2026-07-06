@@ -163,35 +163,9 @@ Fixpoint runR {R X} (m : Defs.monadR R exception X)
 (* ---- cheap (convertibility) laws ------------------------------------- *)
 
 
-Lemma runR_returnR {R X} (x0 : X) s res s' :
-  runR (returnR R x0 : Defs.monadR R exception X) s res s' <-> (res = inr x0 /\ s' = s).
-Proof. apply iff_refl. Qed.
 
 
 (* ---- liftR: a lifted base computation never early-returns; its [runR]   *)
-(*      coincides with [run] of the base computation (result tagged inr).  *)
-Lemma runR_liftR {R X} (m : M X) s res s' :
-  runR (Defs.liftR (R:=R) m) s res s' <-> (exists x, res = inr x /\ run m s x s').
-Proof.
-  unfold Defs.liftR. revert s. induction m as [x0 | T oc k IH]; intros s.
-  - split.
-    + intros [Hr Hs]. exists x0. split; [exact Hr | split; [reflexivity | exact Hs]].
-    + intros (x & Hr & Hx & Hs). subst x. split; [exact Hr | exact Hs].
-  - destruct oc;
-      first
-        [ exact (IH _ _)
-        | (split;
-           [ intros (w & HP & H); apply IH in H; destruct H as (x & Hr & Hk);
-             exists x; split; [exact Hr | exists w; split; [exact HP | exact Hk]]
-           | intros (x & Hr & (w & HP & Hk));
-             exists w; split; [exact HP | apply IH; exists x; split; [exact Hr | exact Hk]] ])
-        | (split;
-           [ intros (c & H); apply IH in H; destruct H as (x & Hr & Hk);
-             exists x; split; [exact Hr | exists c; exact Hk]
-           | intros (x & Hr & (c & Hk));
-             exists c; apply IH; exists x; split; [exact Hr | exact Hk] ])
-        | (split; [ intro H; destruct H | intros (x & _ & H); destruct H ]) ].
-Qed.
 
 (* ---- the bridge: catch_early_return turns an early-return body back into *)
 
@@ -420,9 +394,6 @@ Qed.
 Lemma run_returnM_fwd {X} (x : X) s : run (returnM x) s x s.
 Proof. rewrite run_returnM. split; reflexivity. Qed.
 
-Lemma run_read_reg_fwd (r : register) s :
-  run (Defs.read_reg r) s (register_lookup r s.(sregs)) s.
-Proof. rewrite run_read_reg. split; reflexivity. Qed.
 
 
 (* Forward-chaining: walk a `liftR m >>= f` when m is a state-preserving    *)
@@ -1142,28 +1113,6 @@ Proof. split; reflexivity. Qed.
 (* recursive call.                                                         *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma runR_foreach_ZM_up'_const {R Vars} (to step : Z)
-    (body : forall (z : Z), Vars -> Defs.monadR R exception Vars) (s : mstate) :
-  (forall i v, runR (body i v) s (inr v) s) ->
-  forall (n : nat) (from : Z) (vars : Vars),
-    runR (Defs.foreach_ZM_up' (E := (R + exception)%type) from to step n vars body)
-         s (inr vars) s.
-Proof.
-  intros Hbody. induction n as [|n IH]; intros from vars.
-  - (* fuel exhausted: returnm vars in both branches *)
-    cbn [Defs.foreach_ZM_up']. destruct (from <=? to); apply runR_returnm_fwd.
-  - destruct (Z.leb_spec from to) as [Hle|Hgt].
-    + (* one iteration, then recurse with from+step *)
-      rewrite (Defs.unroll_foreach_ZM_up' _ _ _ _ _ _ _ _ Hle).
-      apply (proj2 (runR_bind _ _ _ _ _)).
-      right. exists vars, s. split.
-      * exact (Hbody from vars).
-      * exact (IH (from + step) vars).
-    + (* from > to: immediate returnm vars *)
-      cbn [Defs.foreach_ZM_up'].
-      replace (from <=? to) with false by (symmetry; apply Z.leb_gt; lia).
-      apply runR_returnm_fwd.
-Qed.
 
 
 (* ===== RiscvModelFetchClose ===== *)
