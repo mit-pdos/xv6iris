@@ -545,10 +545,10 @@ Section WpEntryNew.
               = true).
     { rewrite Hea. exact Hld_al. }
     iApply (wp_ld_gpr E Φ pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
-              (dq := dq) HN Hpmp Hrd1 Hea_al with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
-    { rewrite Hea. iExact "Hbytes". }
+              (dq := dq) HN Hpmp Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
+    { rewrite /word_pointsto. iSplitR; [iPureIntro; exact Hea_al | rewrite Hea; iExact "Hbytes"]. }
     iEval (rewrite pc_e1_e2).
-    iIntros "Hmm Hpmpc Hpc Hfile Hbytes".
+    iIntros "Hmm Hpmpc Hpc Hfile Hbtw". iDestruct "Hbtw" as "(_ & Hbytes)".
     iEval (rewrite Hea) in "Hbytes".
     iEval (change (<[Regidx i_ld := regval_into_reg v_stack0]> (m_auipc m))
              with (m_ld m v_stack0)) in "Hfile".

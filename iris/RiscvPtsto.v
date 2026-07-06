@@ -156,6 +156,45 @@ Notation "a ↦ₘ v" := (mem_pointsto a (DfracOwn 1) v)
   (at level 20, format "a  ↦ₘ  v") : bi_scope.
 
 (* ---------------------------------------------------------------------- *)
+(* word points-to: an 8-byte (doubleword) value [w] stored little-endian at a
+   DOUBLEWORD-ALIGNED address [a].  Bundling the 8 byte points-to facts with
+   the alignment lets an 8-byte load/store WP take a single [a ↦₈ w] hypothesis
+   instead of a byte window PLUS a separate [is_aligned_paddr ... 8 = true]
+   side condition -- the alignment travels with the ownership.  Both the paddr
+   and (definitionally identical) vaddr alignment forms are recoverable.       *)
+Definition word_pointsto `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (w : bv 64) : iProp Σ :=
+  (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+   [∗ list] j ∈ seq 0 8, mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
+Notation "a ↦₈{ dq } w" := (word_pointsto a dq w)
+  (at level 20, format "a  ↦₈{ dq }  w") : bi_scope.
+Notation "a ↦₈ w" := (word_pointsto a (DfracOwn 1) w)
+  (at level 20, format "a  ↦₈  w") : bi_scope.
+
+Section word_pointsto.
+  Context `{!riscvGS Σ}.
+
+  Lemma word_pointsto_aligned_p a dq w :
+    word_pointsto a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 8 = true⌝.
+  Proof. iIntros "[$ _]". Qed.
+  Lemma word_pointsto_aligned_v a dq w :
+    word_pointsto a dq w ⊢ ⌜is_aligned_vaddr (Virtaddr a) 8 = true⌝.
+  Proof. iIntros "[%H _]". iPureIntro. exact H. Qed.
+  Lemma word_pointsto_bytes a dq w :
+    word_pointsto a dq w ⊢ [∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ{dq} nth_byte w j.
+  Proof. iIntros "[_ $]". Qed.
+  (* repackage a byte window + its alignment fact into a word points-to *)
+  Lemma word_pointsto_intro a dq w :
+    is_aligned_paddr (Physaddr a) 8 = true ->
+    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ{dq} nth_byte w j) ⊢ word_pointsto a dq w.
+  Proof. iIntros (Hal) "H". by iFrame. Qed.
+  Lemma word_pointsto_unfold a dq w :
+    word_pointsto a dq w ⊣⊢
+    ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ{dq} nth_byte w j).
+  Proof. reflexivity. Qed.
+End word_pointsto.
+
+(* ---------------------------------------------------------------------- *)
 (* 2. The bridge: an existential register map agreeing with [regstate].    *)
 (* ---------------------------------------------------------------------- *)
 

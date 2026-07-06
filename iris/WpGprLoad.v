@@ -199,23 +199,23 @@ Section WpLdGpr.
        side uses [pmp_all_off_allows_all]. *)
     pmp_all_off pmpcfg0 ->
     uint rd <> 0 ->
-    is_aligned_paddr (Physaddr ea) 8 = true ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
+    word_pointsto ea dq v -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ([∗ list] j ∈ seq 0 8, (pa_add ea j) ↦ₘ{ dq } nth_byte v j) -∗
+      word_pointsto ea dq v -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros offset ea HN Hpmp Hrd Halign.
-    iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+    intros offset ea HN Hpmp Hrd.
+    iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbw Hcont".
+    iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
@@ -338,7 +338,9 @@ Section WpLdGpr.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbytes").
+    iAssert (word_pointsto ea dq v) with "[Hbytes]" as "Hbw".
+    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
+    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbw").
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".

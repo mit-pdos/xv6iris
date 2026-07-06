@@ -1356,9 +1356,10 @@ Section WpStartThm.
       by (rewrite Hea31; exact Hal_ra).
     iApply (wp_store_gpr E Φ st_pc31 true csp_rs1 ti_ra
               (zero_extend' 12 (concat_vec u10 ('b"000"))) (st_m30 m sp0) vsra pmpcfg0 (1/2)%Qp
-              HN Hpmp Hal31 with "Hmm HpcfA Hpc Hfile Hi31 [Hsra]").
-    { rewrite Hea31. iExact "Hsra". }
-    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P31 Hea31 L31ra). iIntros "Hmm HpcfA Hpc Hfile Hsra".
+              HN Hpmp with "Hmm HpcfA Hpc Hfile Hi31 [Hsra]").
+    { rewrite /word_pointsto. iSplitR; [iPureIntro; exact Hal31 | rewrite Hea31; iExact "Hsra"]. }
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P31 Hea31 L31ra).
+    iIntros "Hmm HpcfA Hpc Hfile Hsraw". iDestruct "Hsraw" as "(_ & Hsra)".
 
     (* ---- 32. c.sdsp s0, 0(sp) ---- *)
     assert (L32s0 : st_m30 m sp0 !!! Regidx ti_s0 = s00) by (st_unfold; st_look).
@@ -1371,9 +1372,10 @@ Section WpStartThm.
       by (rewrite Hea32; exact Hal_s0).
     iApply (wp_store_gpr E Φ st_pc32 true csp_rs1 ti_s0
               (zero_extend' 12 (concat_vec u11 ('b"000"))) (st_m30 m sp0) vss0 pmpcfg0 (1/2)%Qp
-              HN Hpmp Hal32 with "Hmm HpcfA Hpc Hfile Hi32 [Hss0]").
-    { rewrite Hea32. iExact "Hss0". }
-    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P32 Hea32 L32s0). iIntros "Hmm HpcfA Hpc Hfile Hss0".
+              HN Hpmp with "Hmm HpcfA Hpc Hfile Hi32 [Hss0]").
+    { rewrite /word_pointsto. iSplitR; [iPureIntro; exact Hal32 | rewrite Hea32; iExact "Hss0"]. }
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P32 Hea32 L32s0).
+    iIntros "Hmm HpcfA Hpc Hfile Hss0w". iDestruct "Hss0w" as "(_ & Hss0)".
 
     (* ---- 33. c.addi4spn s0, sp, 16 (s0 := sp0) ---- *)
     iApply (wp_addi_gpr E Φ st_pc33 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (st_m30 m sp0)
