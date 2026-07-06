@@ -16,7 +16,7 @@
    What remains here:
      - the operand-encoding abbreviations (cli_rs1 / csp_rs1 /
        caddi16sp_imm / caddi4spn_imm) and value helpers (cli_wval,
-       sext6_12_64, add_vec_zero_l, gpr_file_x0, rvc_width_true/false)
+       sext6_12_64, add_vec_zero_l, gpr_file_x0)
        chains use to normalize the base-WP-shaped written values;
      - the [exec_execute_C_*] ExecuteAs-expansion facts, which now feed the
        [instr] CONSTRUCTORS (each kernel_text -∗ instr pc true <target>

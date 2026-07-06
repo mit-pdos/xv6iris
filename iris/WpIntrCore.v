@@ -266,8 +266,7 @@ Section TrapReduce.
   Let ms_e := update_subrange_vec_dec ms_v 23 23 elp_v.
   Let s1 := set_reg s mstatus ms_e.
   (* the zicfilp epilogue resets elp (value-identical: elp is pinned to
-     NO_LP_EXPECTED by hw_config; the Iris side absorbs this write with
-     [state_interp_set_same]) *)
+     NO_LP_EXPECTED by hw_config; the Iris side absorbs this write) *)
   Let s1e := set_reg s1 elp (landing_pad_bits_backwards NO_LP_EXPECTED).
   Let c1 := update_subrange_vec_dec sc_old (64 - 1) (64 - 1)
               (bool_to_bit (trapCause_is_interrupt (Interrupt i))).

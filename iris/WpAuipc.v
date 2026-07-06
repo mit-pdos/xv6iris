@@ -145,7 +145,7 @@ Section ForwardAUIPC.
     - reflexivity. (* Hrvfi : get_config_rvfi tt = false -- definitional *)
   Qed.
 
-  (* clean-form post-state (concrete values), mirror of base_upd/sFc/sF_eq. *)
+  (* clean-form post-state (concrete values). *)
   Variable mst0 : mword 64.
   Hypothesis Lmst_a : register_lookup minstret s.(sregs) = mst0.
 

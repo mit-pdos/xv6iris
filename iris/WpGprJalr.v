@@ -24,7 +24,7 @@ From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
 (* currentlyEnabled Ext_Zicfilp = the mseccfg MLPE bit; false in the boot config.
-   Adapted from WpDecode.exec_cE_zicfilp_M, pinning the value. *)
+   Pinning the value. *)
 Lemma exec_cE_zicfilp_false s :
   register_lookup cur_privilege (sregs s) = Machine ->
   bool_bit_backwards (_get_Seccfg_MLPE (register_lookup mseccfg s.(sregs))) = false ->

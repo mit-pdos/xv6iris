@@ -143,7 +143,7 @@ Section FinalWP.
   Ltac tmiss := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
 
-  (* Like [sF_eq], but expresses the post-step state through the *runtime* minstret
+  (* Expresses the post-step state through the *runtime* minstret
      value [register_lookup minstret s.(sregs)] rather than the section parameter
      [mst0].  This is what a leaf needs when it does NOT own (and never learns) the
      minstret value up front -- it only obtains it transiently from the invariant

@@ -97,7 +97,7 @@ Notation "r ↦ᵣ□ v" := (reg_pointsto r DfracDiscarded v)
   (at level 20, format "r  ↦ᵣ□  v") : bi_scope.
 (* The concrete physical RAM of the platform: a single DRAM bank of
    [ram_size] bytes based at [ram_base] (0x80000000), matching the executable
-   [ramRegion] PMA and the QEMU/xv6 memory map.  We fix the size at 256 MiB
+   RAM-region PMA and the QEMU/xv6 memory map.  We fix the size at 256 MiB
    for now. *)
 Definition ram_base : Z := 0x80000000.       (* 2147483648 *)
 Definition ram_size : Z := 0x10000000.       (* 268435456 = 256 MiB *)
