@@ -48,13 +48,6 @@ Ltac kv_regne :=
   intro H; apply (f_equal (fun r0 : regidx => uint (regidx_bits r0))) in H;
   vm_compute in H; discriminate H.
 
-(* kv_fetch_geom at a CONCRETE pc: all three components close by vm_compute. *)
-Ltac kv_geom :=
-  refine (conj _ (conj _ _));
-  [ vm_compute; reflexivity
-  | apply bv_eq; vm_compute; reflexivity
-  | apply bv_eq; vm_compute; reflexivity ].
-
 Lemma kv_addv_assoc (a b c : mword 64) :
   add_vec (add_vec a b) c = add_vec a (add_vec b c).
 Proof.
