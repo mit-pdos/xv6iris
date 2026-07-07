@@ -12,15 +12,12 @@
    and gives token + R back.  The "held" disjunct records the word's
    non-zeroness in exactly the shape the spin loop's [c.bnez] test consumes:
    [neq_vec (sign_extend' 64 v) zero_reg = true]. *)
-From Stdlib Require Import ZArith Lia.
-From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl.
-From iris.base_logic.lib Require Import gen_heap invariants own.
-From iris.program_logic Require Import weakestpre.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto.
+From iris.base_logic.lib Require Import invariants own.
+Require Import SailStdpp.Base SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d.
+Require Import RiscvModelBytes RiscvPtsto.
 Local Open Scope Z_scope.
 
 Class lockG (Σ : gFunctors) := LockG { lock_inG :: inG Σ (exclR unitO) }.

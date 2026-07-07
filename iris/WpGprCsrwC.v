@@ -12,11 +12,10 @@
      - SXL is preserved from the OLD mstatus (never touched by the legalizer);
      - MPP of the legalized value depends only on [v] (the fact the boot chain
        uses to know MPP = Supervisor at the eventual MRET). *)
-From Stdlib Require Import Eqdep_dec ZArith Lia FunctionalExtensionality.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language.
 Require Import MinstretInv.
 From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.

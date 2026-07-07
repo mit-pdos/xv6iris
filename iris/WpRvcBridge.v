@@ -19,13 +19,13 @@
    [exec_currentlyEnabled_Zca]).  Every other leaf is handled by [Rb_refl],
    which needs only that the leaf is state-preserving; those obligations are
    discharged by the [ro] ("read-only") development below.  No axioms. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import SailStdpp.Base.
+Require Import RiscvLang RiscvExec RiscvFetchExec.
 Local Open Scope Z_scope.
 Import Defs.
 

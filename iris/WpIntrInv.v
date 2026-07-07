@@ -26,11 +26,10 @@
      - [kernelvec_handler_spec]: kernelvec's WP ([wp_kernelvec_hit] + the
        [trap_ms]/[sret_ms5] round-trip lemmas) DOES satisfy the spec, for the
        concrete kernelvec frame [F_kv]. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

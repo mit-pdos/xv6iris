@@ -18,16 +18,15 @@
         replaced by the abstract pmpCheck fact.
      3. [wp_store_gpr_tor] / [wp_ld_gpr_tor] (is_rvc-generic base) engines + the
         [wp_csdsp_gpr_tor] / [wp_cldsp_gpr_tor] wrappers. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpGpr WpGprAddi WpGprLui WpGprShift WpGprLogic WpGprLoad WpGprJalr WpGprStore WpGprRvc.
+Require Import SailStdpp.MachineWord SailStdpp.Values.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpLoad WpGpr WpGprLoad WpGprStore WpGprRvc.
 Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 From iris.bi.lib Require Import fractional.

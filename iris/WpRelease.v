@@ -18,12 +18,10 @@
        +0x1a 0004a023  sw zero,0(s1)       lk->locked := 0  (invariant closes)
        +0x1e f9bff0ef  jal ra,pop_off
        +0x22 60e2 / +0x24 6442 / +0x26 64a2 / +0x28 6105 / +0x2a 8082  epilogue *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.

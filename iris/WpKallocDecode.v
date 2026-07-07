@@ -14,11 +14,10 @@
        off mod 4 = 0  -> mk_rvc4 (w = (next_halfword << 16) | h),
        off mod 4 = 2  -> mk_rvc2.
    Base (4-byte) instructions always use [mk_base]. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.

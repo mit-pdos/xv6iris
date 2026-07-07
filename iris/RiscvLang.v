@@ -8,18 +8,14 @@
 (*      which ssreflect -- pulled in by iris -- forbids).           *)
 (* ============================================================== *)
 
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics finite.
-From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
+From stdpp Require Import gmap bitvector.definitions.
+From iris.program_logic Require Import language.
 (* NOTE: SailStdpp.Base/Values/TypeCasts are imported LATER (before the         *)
 (* ExecClose section), NOT here: they make the model's [mword] Countable        *)
 (* (Countable_mword) canonical, but the Lang/Iris/Exec sections + the iris-free  *)
 (* RiscvModelBytes must agree on stdpp's bv_countable for [gmap Arch.pa (bv 8)]  *)
 (* (= the [mstate.mem] type).  Importing them here would retype mstate.mem and   *)
 (* clash with read_bytes.  See the import line just above RiscvModelExecClose.    *)
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 (* NB: deliberately NO `Set Default Proof Using "Type"` — some merged sections   *)

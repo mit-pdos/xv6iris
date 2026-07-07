@@ -2,11 +2,10 @@
    S-mode WP (acquire()'s [sd a0,16(s1)] writing lk->cpu).  Cloned from
    WpPushOffMem.wp_csw_s with the access width changed 4 -> 8, on the
    register-generic 8-byte STORE execute lemmas of WpSmodeGpr. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.

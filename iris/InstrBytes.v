@@ -4,14 +4,14 @@
    side conditions (alignment / compressed-ness) the fetch reduction needs.
    It is the resource a fetch lemma consumes to establish
    [exec (fetch tt) s = Some (r, s)]. *)
-From Stdlib Require Import Eqdep_dec ZArith Zquot Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith Zquot.
+From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.base_logic.lib Require Import ghost_map.
+From iris.program_logic Require Import language.
 From iris.bi.lib Require Import fractional.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import SailStdpp.Base SailStdpp.TypeCasts.
+Require Import SailStdpp.Operators_mwords.
+Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.

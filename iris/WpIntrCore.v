@@ -33,11 +33,10 @@
    §6  the SIE=1 normal-path step client [wp_instr_s_intr]: like
        WpSmodeGpr.wp_instr_s_config but WITHOUT smode_config's SIE=0 --
        dispatchInterrupt = None is discharged from [s_dispatch = None]. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List Bool.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith Bool.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

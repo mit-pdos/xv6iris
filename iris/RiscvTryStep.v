@@ -1,10 +1,8 @@
 (* RiscvTryStep.v -- the shared try_step machinery: fetch, currentlyEnabled, *)
 (*   the MR (early-return) monad, memory read, pending, + the ADD datapath.   *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
-From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
+From Stdlib Require Import ZArith.
+From stdpp Require Import bitvector.definitions.
+From iris.program_logic Require Import lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

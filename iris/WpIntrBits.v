@@ -2,10 +2,10 @@
    Kept FREE of iris/proofmode imports: the Ltac here uses vanilla-Coq
    rewrite syntax (comma lists + `by`), which ssreflect (pulled in by the
    proofmode) would re-parse.  See WpIntrCore.v for the consumers. *)
-From Stdlib Require Import ZArith Lia Bool.
+From Stdlib Require Import ZArith Bool.
 From stdpp Require Import bitvector.definitions bitvector.tactics.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import SailStdpp.Operators_mwords.
+Require Import SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import WpSmodeSret.
 Local Open Scope Z_scope.

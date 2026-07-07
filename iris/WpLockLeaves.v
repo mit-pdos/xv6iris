@@ -21,23 +21,19 @@
      wp_sd_zero_s           -- plain 32-bit [sd zero,imm(rs1)] on an OWNED
                                8-byte window (release() zeroing lk->cpu;
                                no invariant involved) *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From iris.base_logic.lib Require Import invariants.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import SailStdpp.TypeCasts SailStdpp.Values.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpAuipc.
-Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLogic WpGprAuipc WpGprLoad.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpPushOffMem WpAcquireMem WpAmo WpLock.
-From Kernel Require KernelInstrs.
-From Kernel Require KernelSyms.
+Require Import WpGpr WpGprStore WpGprLoad.
+Require Import SmodeCore WpSmodeGpr WpPushOffMem WpAmo WpLock.
 Local Open Scope Z_scope.
 Import Defs.
 

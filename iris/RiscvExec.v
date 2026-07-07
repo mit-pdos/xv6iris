@@ -1,10 +1,7 @@
 (* RiscvExec.v -- the run/exec interpreters, determinism bridge, wp_exec_step. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
 From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
@@ -153,7 +150,7 @@ End WPExec.
 (* Now that the Lang/Iris/Exec sections (which must share stdpp's bv_countable   *)
 (* with RiscvModelBytes for [mstate.mem]) are defined, bring in the model's      *)
 (* Base/Values/TypeCasts for the remaining proof sections.                        *)
-Require Import SailStdpp.Base SailStdpp.TypeCasts.
+Require Import SailStdpp.Base.
 (* Re-import the model AFTER Base so the model's names (read_kind/Read_plain/…)  *)
 (* win over SailStdpp's homonyms for the sections below — matching the original  *)
 (* per-file import order (model imported last).  mstate.mem's type is already    *)

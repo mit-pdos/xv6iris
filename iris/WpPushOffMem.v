@@ -3,22 +3,20 @@
    [noff]/[intena] accesses.  Built by cloning wp_cldsp_gpr_s / wp_csdsp_gpr_s
    (WpSmodeGpr.v, 8-byte, sp-relative) with the base register generalized and
    the access width changed 8 -> 4. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From iris.base_logic.lib Require Import gen_heap.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpAuipc.
-Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLogic WpGprAuipc WpGprLoad.
-Require Import SmodeCore WpSmodeGpr WpMemsetS.
-From Kernel Require KernelInstrs.
-From Kernel Require KernelSyms.
+Require Import WpLoad.
+Require Import WpGpr WpGprStore WpGprLoad.
+Require Import SmodeCore WpSmodeGpr.
 Local Open Scope Z_scope.
 Import Defs.
 

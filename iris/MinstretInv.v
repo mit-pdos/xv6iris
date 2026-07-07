@@ -12,15 +12,12 @@
    The invariant is then persistent (duplicable): a leaf only needs [minstret_inv]
    (shareable) instead of the two owned cells, and obtains the cells transiently
    by opening the invariant for the duration of the step. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+From iris.base_logic.lib Require Import invariants.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts.
+Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Local Open Scope Z_scope.

@@ -48,22 +48,21 @@
    csrw pmpcfg0, mret) the halves are recombined to full raw cells (value
    pinned by [reg_pointsto_agree]) and the RAW WPs of WpGprCsrwC /
    WpGprMretNew run at full ownership, after which the cells are re-split. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+From iris.base_logic.lib Require Import ghost_map.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpGpr.
-Require Import WpAuipc WpGprAuipc WpGprLoad WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprJal WpGprJalr WpGprStore WpGprRvc WpGprRvcTor.
-Require Import WpGprCsrrCommon WpGprCsrrA WpGprCsrrB WpGprCsrwCommon WpGprCsrwA WpGprCsrwB WpGprCsrwC.
-Require Import WpGprMret WpGprMretWp WpGprMretNew.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode WpLeafCommon WpGpr.
+Require Import WpAuipc WpGprAuipc WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprJal WpGprStore WpGprRvc WpGprRvcTor.
+Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB WpGprCsrwC.
+Require Import WpGprMretWp WpGprMretNew.
 Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit.
 Require Import WpRvcBridge.
-From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

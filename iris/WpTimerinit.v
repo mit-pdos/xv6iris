@@ -36,18 +36,17 @@
    [kernel_text] / [kernel_window_pc] / the [instr_bytes_*] constructors are
    REUSED from WpEntryNew.v (they close over its Section's `{!riscvGS Σ}`
    context, so they are directly applicable here). *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpGpr.
-Require Import WpGprLoad WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprJalr WpGprStore WpGprRvc WpGprRvcTor.
-Require Import WpGprCsrrCommon WpGprCsrrA WpGprCsrrB WpGprCsrwCommon WpGprCsrwA WpGprCsrwB.
+Require Import SailStdpp.Base.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras WpDecode WpGpr.
+Require Import WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprRvc WpGprRvcTor.
+Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB.
 Require Import MinstretInv InstrBytes WpEntryNew.
 Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
