@@ -86,3 +86,8 @@ WpFreelistMem.v
 WpMemsetPage.v
 WpKalloc.v
 WpKfree.v
+VcGen.v
+VcGenDemo.v
+VcGenS.v
+WpMycpuVc.v
+WpPopOffVc.v

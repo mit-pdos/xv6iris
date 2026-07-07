@@ -27,6 +27,11 @@ order; `make proofs` computes the order automatically from `_CoqProject`):
 | **`WpDecode.v`** | The separation-logic-free **decode** lemmas `decode_auipc` / `decode_ld`: for the **concrete** kernel encodings `w_auipc = 0xa117` / `w_ld = 0x1d813103`, `cur_privilege = Machine ⊢ exec (ext_decode w) s = Some (<AST>, s)` — i.e. the bytes decode to `UTYPE (…,AUIPC)` / `LOAD (…,false,8)`. The Sail decoder (`encdec_backwards`, ~4000 lines) is **not** `vm_compute`d whole (that's the "decode wall"); instead it is **stepped clause-by-clause** through `exec`: each pure opcode guard `vm_compute`s to a bool (`skip_pure_clause`), and the `currentlyEnabled`-gated `PAUSE`/`LPAD` clauses reduce via the `Acc` recipe (`exec_cE_pause`, and `exec_cE_zicfilp_M` — which needs `cur_privilege = Machine` because `get_xLPE` `throw`s an `internal_error` in the Virtual privileges). Axiom-free. |
 | **`KernelBoot.v`** | The top: imports the real xv6 kernel image (the dumped `Kernel.*` modules) and **proves `wp_kernel_first_two`** — a WP for executing the kernel's **first two instructions** (`auipc sp,0xa`; `ld sp,472(sp)`) through the real `try_step`. Owning the booting-Machine state with PC at the entry point (and the 8 `ld` data bytes), two `Loop` steps leave PC at entry+8 and `sp` holding the loaded value. Built from `wp_step_auipc` + `wp_step_ld`. `Print Assumptions wp_kernel_first_two` = **exactly the 5 model platform axioms**; **zero `Admitted`**. **All** `exec`-conditions are now **discharged** into initial-state ownership / concrete computation: `should_inc_minstret` (owns `mcountinhibit`/`minstretcfg`; the counter flag is computed); the MMIO checks (`within_clint`/`within_sig` from the RAM-constrained `↦ₘ` bytes; `within_htif` from an owned `htif_tohost_base ↦ᵣ None`); **`fetch`** (owns the two instructions' 4-byte encodings and discharges via `fetch_from_pts_minstret`); and — **new** — **`decode`** itself: the instruction words are the concrete `w_auipc`/`w_ld`, and the two `ext_decode` side-conditions are discharged by `decode_auipc`/`decode_ld` (the `uint i = 2` / `isRVC = false` facts compute by `vm_compute`). So **the theorem carries no fetch and no decode hypothesis** — the two `encdec_backwards` "decode walls" are gone. The surviving hypotheses are the genuine boot frontier: the boot-CSR config (`mstatus`/`mseccfg`/`elp`) and the per-instruction PMA/PMP/alignment geometric facts at the concrete kernel PCs. **Memory precondition: the whole ELF text image.** Instead of hand-listing the two instruction byte-blocks, the WP now takes a single `kernel_text` predicate — `[∗ list] k ∈ KernelInstrs.kernel_instrs, kinstr_bytes k` — asserting that *every* dumped instruction's little-endian bytes are resident at the fetch-translation of its ELF address (`kinstr_bytes k` owns `ki_width/8` bytes of `ki_enc` at `fetch_pa (mword_of_int (ki_addr k))`). `kernel_text_first_two` extracts the auipc/ld blocks (the first two `kernel_instrs` entries, in the per-opcode WPs' form) and returns a wand to restore the full image (fetch leaves memory unchanged), so `kernel_text` is both consumed and handed back to the continuation. This directly wires the WP to the dumper's image rather than to two ad-hoc points-to facts. |
 | `model-xv6iris/` | The generated Sail RISC-V model (`Riscv.rv64d` / `rv64d_types`), a separate compiled dependency (≈43k generated lines — not inlinable). |
+| **`VcGen.v`** | The straight-line **VCgen**: deep-embedded symbolic values/heap, the computable symbolic executor `vc_step`/`vc_block`, and the single generic block WP **`wp_vc_block`** (one `vm_compute` + one `iApply` per block instead of one leaf-WP `iApply` per instruction). See the "straight-line VCgen" section below. |
+| **`VcGenDemo.v`** | The VCgen applied to a real kernel block: the 4-instruction timerinit prologue, re-derived as `wp_timerinit_prologue_vc` with ordinary `↦₈` pre/posts. |
+| **`VcGenS.v`** | The **S-mode** instantiation of the VCgen: the RVC-shape alphabet `vop_s` (c.addi / c.addi4spn / c.sdsp / c.ldsp), the executor `vc_block_s`, and **`wp_vc_block_s`** — the same one-`vm_compute`-per-block lifting over the S-mode leaf WPs (Supervisor config + `tlb_inv` threaded through). |
+| **`WpMycpuVc.v`** | `wp_mycpu` **re-proved with the VCgen**: mycpu's 4-instruction prologue and 3-instruction epilogue are each one `wp_vc_block_s`; only the 6 value-computing middle instructions and the `c.ret` keep per-instruction leaves. Statement identical to `WpMycpu.wp_mycpu`. |
+| **`WpPopOffVc.v`** | `wp_pop_off` **re-proved with the VCgen**, callee included: pop_off's prologue and (per bnez branch) epilogue are `wp_vc_block_s` applications — the epilogue's symbolic run is `vm_compute`d ONCE and reused in both branches — and the `jal mycpu` call composite is rebuilt on `wp_mycpu_vc`. Statement identical to `WpPopOff.wp_pop_off`; same 5 platform axioms. |
 | `kernel-rocq/` | The dumped xv6 kernel image (`Kernel.KernelInstrs` / `KernelData` / `KernelSyms`), produced by `tools/dump_kernel.py`; a separate compiled dependency consumed by `KernelBoot.v`. |
 | `archive/` | The original ~35-file modular development this was consolidated from, plus dead-ends (the mock `RiscvIris*`, superseded `ADDwp*`/`WPAdd`, the abandoned `ChooseFree2`/`Step`). Kept for reference; not needed to build. |
 
@@ -311,3 +316,123 @@ same ones that once forced a single-file consolidation):
    rely on Coq generalizing over the section hypotheses actually used.
 
 (`archive/` holds the original ~35-file development this layout descends from.)
+
+## The straight-line VCgen (`VcGen.v` / `VcGenDemo.v`)
+
+An experiment in replacing hand-chained per-instruction WPs with a
+**reflective verification-condition generator** for sequential blocks.
+
+**Problem.** A straight-line block is verified today by one
+`iApply (wp_<op>_gpr …)` per instruction, manually re-threading
+`mmode_config` / `pmpcfg` / `pc_is` / `gpr_file` / points-to through every
+step (WpTimerinit / WpStartNew / WpPushOffTop are 20–35 such steps and
+1–3 kloc each).  The plumbing is identical per instruction shape; only the
+data differ.
+
+**Design (`VcGen.v`).**  A block is described in a small deep-embedded
+language and *executed symbolically by computation*:
+
+- `sval` — symbolic 64-bit values: a constant `SC z` or a variable plus
+  concrete offset `SX x off`, offsets canonicalized mod 2⁶⁴.  This normal
+  form makes address matching *decidable* (syntactic equality), which is
+  what lets the executor resolve loads/stores against the footprint.
+- `vop` — the instruction alphabet (currently `addi`/`add`/`lui`/`ld`/`sd`,
+  covering the RVC forms through the `instr` ExecuteAs indirection).
+  Extending it = one constructor + one `vc_step` case + one `wp_vc_block`
+  case.
+- `vstate` — concrete pc + symbolic register file (`gmap regidx sval`) +
+  symbolic word heap (`list (sval * sval)` of 8-byte cells).  **The heap is
+  the block's memory footprint**: exactly the `a ↦₈ v` facts (full
+  ownership — sequential code) the block needs.
+- `vc_step` / `vc_block` — the symbolic executor; for a concrete block it
+  runs by `vm_compute`.
+
+The single Iris lemma **`wp_vc_block`** (proved once, by induction over the
+program, dispatching to the existing leaf WPs) turns a successful symbolic
+run `vc_block st prog = Some st'` into a WP for the whole block: resources
+in = the denotation of `st` (via a valuation `ρ : nat → mword 64` for the
+symbolic variables), resources out = the denotation of `st'`.  Per-block
+cost is therefore: the `instr` decode facts (needed by any approach) + one
+`vm_compute` + one `iApply` — no per-instruction Iris reasoning.  The
+per-step Iris plumbing was paid once, inside the (Qed-opaque) induction.
+
+**Why it lifts into Iris cleanly.**  `wp_vc_block` is an ordinary `WP Loop`
+lemma in the same CSL as everything else: its pre/post are plain `↦ᵣ`/`↦₈`
+resources, so a client can extract the footprint from an invariant/lock
+before the block and return the updated footprint afterwards — concurrent
+reasoning composes before/after the block exactly as with hand-chained
+proofs.  Determinism is only assumed *inside* the block (full ownership of
+the touched cells for its duration), matching the sequential-code premise.
+Aliasing needs no side conditions: distinct heap cells are separately owned
+`↦₈` facts, so separation (plus the 8-alignment carried by `word_pointsto`)
+already guarantees their disjointness; the executor only ever *matches*
+addresses syntactically and fails (returns `None`) on anything it cannot
+resolve.
+
+**Demo (`VcGenDemo.v`).**  The 4-instruction timerinit prologue
+(`c.addi sp,-16; c.sdsp ra,8(sp); c.sdsp s0,0(sp); c.addi4spn s0,sp,16`) —
+a block WpTimerinit steps through by hand — is re-derived as
+`wp_timerinit_prologue_vc` with ordinary `↦₈` pre/posts.  The whole
+symbolic execution is the one-line `demo_run` (`vm_compute`), which also
+computes `s0 = (sp−16)+16 = sp` by canonical offset arithmetic.
+`vregs_den_init` bridges the canonical initial symbolic register file
+(`vregs_init`: x0 ↦ `SC 0`, xk ↦ `SX k 0`) to an arbitrary complete runtime
+`gpr_file m` by choosing `ρ k := m !!! xk`.
+
+**The S-mode VCgen and the pop_off()/mycpu() example
+(`VcGenS.v` / `WpMycpuVc.v` / `WpPopOffVc.v`).**  The same design
+instantiated for S-mode kernel code: the alphabet `vop_s` mirrors the RVC
+shapes the S-mode leaf WPs are stated for (`c.addi`, `c.addi4spn`,
+`c.sdsp`, `c.ldsp` — exactly the prologue/epilogue instructions of the
+kernel's S-mode functions), and `wp_vc_block_s` threads the S-mode machine
+configuration (Supervisor privilege, mstatus/mie/mideleg/menvcfg, the
+PMP-TOR-covers-RAM geometry, `tlb_inv root_ppn`) through the induction.
+`wp_mycpu_vc` and `wp_pop_off_vc` re-prove `wp_mycpu` and `wp_pop_off`
+*verbatim* (same statements, same 5 platform axioms) with every
+straight-line stack-frame run as a VCgen block: 7 of mycpu's 14
+instructions and 10 of pop_off's own 19-instruction path come from four
+`wp_vc_block_s` applications backed by one-line `vm_compute` runs — and
+pop_off's epilogue run is computed once and reused in both `bnez`
+branches.  Two things the example makes explicit:
+
+- *Mid-proof seams.*  Entering a block from an abstract `gpr_file m`
+  mid-chain uses `vregs_den_init_agree` (choose the valuation
+  `ρ k := m !!! xk`); exiting converts the denoted post-state back to the
+  surrounding proof's spelling with `vregs_den_insert` + a few
+  `add_vec_off2`/`bv_eq; vm_compute` value equalities.  That glue is the
+  honest cost of dropping a computational block into a hand proof — a
+  dozen `assert`s per seam, all mechanical.
+- *Division of labor.*  Branch conditions, CSR reads, and 32-bit
+  sign-extending arithmetic (`c.lw`/`c.addiw`/`c.sw`) stay on the existing
+  per-instruction leaves by design: their values live outside the VCgen's
+  symbolic domain (`var + concrete offset`), and the VCgen honestly
+  returns `None` rather than approximating.
+
+**4-byte (word) cells and 32-bit tracking.**  The symbolic domain has a
+second layer for `lw`/`sw`/`addiw`: `sval32` (32-bit constant, or "low
+word of variable x plus offset") and a register shape `S32` denoting a
+sign-extended word — so `lw` loads a cell's word into a register, `addiw`
+does the arithmetic *in the 32-bit domain* (`vc_step` computes, e.g.,
+"low word of a5, minus one" as `SX32 15 (2³²−1)`), and `sw` stores
+`sval_trunc32` of any register back into a cell.  Cells live in a second
+heap (`vheap4`, one `word4_pointsto` each — the 4-byte `↦₈` analogue,
+alignment bundled).  The bv layer behind it is the `trunc32` algebra
+(`trunc32_sext`, `trunc32_add`, `trunc32_subrange`, …): truncation
+commutes with the model's sign-extensions and sums, which is exactly why
+the ADDIW leaf's `sext64 (subrange (x + imm) 31 0)` normalizes into the
+symbolic form.  The `wp_clw_s_ram`/`wp_csw_s_ram` wrappers derive the ten
+per-address translation/PMP geometry facts of the underlying leaves from
+the cell's RAM-ness + alignment, so word cells need no side conditions
+either.  In `WpPopOffVc.v` this absorbs three more of pop_off's
+instructions: `c.lw a5,120(a0)` is a one-instruction block, and
+`c.addiw a5,-1; c.sw a5,120(a0)` is a single block whose `vm_compute` run
+carries the decrement symbolically into the stored word.  64-bit offset
+arithmetic on `S32` registers is guarded off (`sval_is64`) — the executor
+fails rather than approximates.
+
+**Future work.**  Byte-width cells for `lb`/`sb` (memset); more `vop`s
+(shifts, logic ops, `mv`); an M-mode/S-mode-generic induction to avoid the
+duplicated per-mode lemma; and a footprint-*inference* pre-pass (run the
+executor with a fresh-variable-on-miss heap to *emit* the needed cells —
+it needs no soundness proof, since its output is re-checked by the
+verified `vc_block`).
