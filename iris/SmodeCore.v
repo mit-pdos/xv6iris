@@ -2662,6 +2662,51 @@ Section SmodeCoreIris.
      [∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{ dq } nth_byte pte_super j)%I.
 
   (* =================================================================== *)
+  (* THE AMBIENT PMP CONFIGURATION (Iris bundle).  PMP entry 0 is a TOR   *)
+  (* region granting R/W/X, covering all of RAM, and -- together with the *)
+  (* PTE-region PMA -- permitting the page-table walk's PTE read.  These  *)
+  (* facts are checked on every S-mode fetch (X + the walk's PTE read)    *)
+  (* and every data access (R/W + the walk's PTE read); the cells are     *)
+  (* READ-ONLY in S-mode, so (like satp / the super-PTE) they are folded  *)
+  (* into [tlb_inv] at full fraction, with EXISTENTIAL                     *)
+  (* [pmpcfg0]/[pmpaddr00]/[region_pte] -- callers state a single          *)
+  (* [tlb_inv] and never mention the PMP machinery.  Engines / data WPs    *)
+  (* open this to drive fetch and the data-side walk (deriving any per-    *)
+  (* access [pmpRangeMatch] from the folded RAM coverage) and re-seal it.  *)
+  (* =================================================================== *)
+  Definition pmp_config (root_ppn : mword 44) : iProp Σ :=
+    (∃ (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+        (region_pte : PMA_Region),
+       pmpcfg_n ↦ᵣ pmpcfg0 ∗ pmpaddr_n ↦ᵣ pmpaddr00 ∗
+       ⌜ pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ⌝ ∗
+       ⌜ forall pmar0, pma_allows_all pmar0 ->
+           matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
+           (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ⌝)%I.
+
+  (* re-seal [pmp_config] from the raw cells + the ambient facts (used by     *)
+  (* engines / data WPs after they open it to drive a fetch / data walk).     *)
+  Lemma pmp_config_intro (root_ppn : mword 44)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (region_pte : PMA_Region) :
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
+       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pmp_config root_ppn.
+  Proof.
+    intros Hpmpp Hpteregion HX HW HR Hcov. iIntros "Hc Ha".
+    iExists pmpcfg0, pmpaddr00, region_pte. iFrame "Hc Ha". iPureIntro. tauto.
+  Qed.
+
+  (* =================================================================== *)
   (* THE TLB/PAGE-TABLE CONSISTENCY INVARIANT (Iris bundle): own the tlb  *)
   (* cell at FULL fraction (fills write it) with SOME consistent          *)
   (* contents.  S-mode WPs take [tlb_inv root_ppn] instead of an explicit *)
@@ -2679,9 +2724,11 @@ Section SmodeCoreIris.
        ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
        ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
        tlb ↦ᵣ tlbvec ∗ ⌜ tlb_pt_consistent root_ppn tlbvec ⌝ ∗
-       pte_super_bytes root_ppn (DfracOwn 1))%I.
+       pte_super_bytes root_ppn (DfracOwn 1) ∗
+       pmp_config root_ppn)%I.
 
-  (* introduce from the raw pieces (satp + facts + tlb + consistency + pte). *)
+  (* introduce from the raw pieces (satp + facts + tlb + consistency + pte + *)
+  (* the ambient PMP configuration).                                         *)
   Lemma tlb_inv_intro (root_ppn : mword 44) (satp0 : mword 64)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
@@ -2689,14 +2736,15 @@ Section SmodeCoreIris.
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_pt_consistent root_ppn tlbvec ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ pte_super_bytes root_ppn (DfracOwn 1) -∗
+    pmp_config root_ppn -∗
     tlb_inv root_ppn.
   Proof.
-    intros Hmode Hasid Hppn Hc. iIntros "Hsatp Htlb Hpte".
-    iExists satp0, tlbvec. iFrame "Hsatp Htlb Hpte". iPureIntro. tauto.
+    intros Hmode Hasid Hppn Hc. iIntros "Hsatp Htlb Hpte Hpmp".
+    iExists satp0, tlbvec. iFrame "Hsatp Htlb Hpte Hpmp". iPureIntro. tauto.
   Qed.
 
   (* open: expose satp cell + the three SATP facts + tlb cell + consistency  *)
-  (* + the owned super-PTE bytes.                                            *)
+  (* + the owned super-PTE bytes + the ambient PMP configuration.            *)
   Lemma tlb_inv_open (root_ppn : mword 44) :
     tlb_inv root_ppn -∗
     ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
@@ -2705,11 +2753,12 @@ Section SmodeCoreIris.
       ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_pt_consistent root_ppn tlbvec ⌝ ∗
-      pte_super_bytes root_ppn (DfracOwn 1).
+      pte_super_bytes root_ppn (DfracOwn 1) ∗
+      pmp_config root_ppn.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* close: re-seal after a read/fill that preserves consistency and does    *)
-  (* not change satp / the pte bytes.                                        *)
+  (* not change satp / the pte bytes / the PMP configuration.                *)
   Lemma tlb_inv_close (root_ppn : mword 44) (satp0 : mword 64)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
@@ -2717,6 +2766,7 @@ Section SmodeCoreIris.
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_pt_consistent root_ppn tlbvec ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ pte_super_bytes root_ppn (DfracOwn 1) -∗
+    pmp_config root_ppn -∗
     tlb_inv root_ppn.
   Proof. apply tlb_inv_intro. Qed.
 
@@ -3217,19 +3267,9 @@ Section SmodeCoreIris.
   (* (walk), which become internal to this engine.                        *)
   (* =================================================================== *)
   Lemma wp_instr_s_tlbinv (root_ppn : mword 44) E Φ
-      (pc : mword 64) (is_rvc : bool) (i : instruction)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
     ↑minstretN ⊆ E →
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     smode_config dq -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb_inv root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
@@ -3242,8 +3282,6 @@ Section SmodeCoreIris.
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          mstate_interp s_exec ∗
          (smode_config dq -∗
-          pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-          pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
           tlb_inv root_ppn -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
@@ -3252,11 +3290,14 @@ Section SmodeCoreIris.
     (* Open [tlb_inv] ONCE and drive the UNIFIED fetch (each chunk translates
        through its own vpn, 0/1/2 slots filled) -- no hit/walk split, no
        same-page premise.  Re-bundle [smode_config] and re-seal [tlb_inv]
-       (with the fetch's [tlbvec2]) in the caller's continuation. *)
-    iIntros (HN HX Hcov Hpmpp Hpteregion)
-      "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr H".
+       (with the fetch's [tlbvec2]) in the caller's continuation.  The ambient
+       PMP config is opened out of [tlb_inv] and re-sealed unchanged. *)
+    iIntros (HN)
+      "Hsm Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
+    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00 region_pte)
+      "(Hpmpc & Hpmpa & %Hpmpp & %Hpteregion & %HX & %HW & %HR & %Hcov)".
     iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
     iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HSIE & %HMPRV & %HSXL)".
     iDestruct "Hmie" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
@@ -3306,12 +3347,14 @@ Section SmodeCoreIris.
              ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
-      iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hmiec Hmdlc Hmenvc] Hpmpc Hpmpa [Hsatp Htlb Hpbytes] Hpc'").
+      iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").
       - iApply (smode_config_rebuild dq mstatus0 mie_v mdv0 menvcfg0
                   HSIE HMPRV HSXL Hmm HPBMTE
                   with "Hhw Hinv Hhs' Hpriv Hmstatus Hmiec Hmdlc Hmenvc").
       - iApply (tlb_inv_close root_ppn satp0 tlbvec2 Hmode Hasid Hppn Hcons2
-                  with "Hsatp Htlb Hpbytes"). }
+                  with "Hsatp Htlb Hpbytes [Hpmpc Hpmpa]").
+        iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 region_pte
+                  Hpmpp Hpteregion HX HW HR Hcov with "Hpmpc Hpmpa"). }
     iDestruct "Hexec" as %Hexec.
     destruct r as [e | w | h | erx].
     - iDestruct "Hbytes" as "[_ %Hbf]". done.

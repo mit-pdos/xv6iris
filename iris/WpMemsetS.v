@@ -336,8 +336,7 @@ Qed.
       (pc : mword 64) (ra : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -345,12 +344,6 @@ Qed.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint ra <> 0 ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
@@ -363,8 +356,6 @@ Qed.
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -375,23 +366,21 @@ Qed.
       mie ↦ᵣ{ dq } mie_v -∗
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-      pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
       tlb_inv root_ppn -∗
       pc_is tgt -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros tgt HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hra Hlpe Halign Hbit1.
-    iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    intros tgt HN HSIE HMPRV HSXL Hmm HPBMTE Hra Hlpe Halign Hbit1.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
@@ -436,9 +425,9 @@ Qed.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes] [$Hpc' $Hnpc] [Hfmap]").
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp] [$Hpc' $Hnpc] [Hfmap]").
     { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
-                with "Hsatp Htlb Hpbytes"). }
+                with "Hsatp Htlb Hpbytes Hpmp"). }
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
@@ -446,8 +435,7 @@ Qed.
       (pc : mword 64) (ra : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -455,12 +443,6 @@ Qed.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint ra <> 0 ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
@@ -472,8 +454,6 @@ Qed.
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -484,26 +464,24 @@ Qed.
       mie ↦ᵣ{ dq } mie_v -∗
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-      pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
       tlb_inv root_ppn -∗
       pc_is tgt -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros tgt HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hra Hlpe Halign.
-    iIntros "#Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    intros tgt HN HSIE HMPRV HSXL Hmm HPBMTE Hra Hlpe Halign.
+    iIntros "#Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
@@ -553,9 +531,9 @@ Qed.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes] [$Hpc' $Hnpc] [Hfmap]").
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp] [$Hpc' $Hnpc] [Hfmap]").
     { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
-                with "Hsatp Htlb Hpbytes"). }
+                with "Hsatp Htlb Hpbytes Hpmp"). }
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
@@ -1166,9 +1144,7 @@ Qed.
   Lemma wp_sb_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12) (svpn : mword 27)
       (m : gmap regidx (mword 64)) (vold : bv 8)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
     let pa := zero_extend' 64 (add_vec_int a8 (0 * 1)) in
@@ -1181,8 +1157,6 @@ Qed.
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* data address: superpage-identity geometry at tlb_hash svpn *)
     neq_vec (bits_of_virtaddr (Virtaddr a8))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
@@ -1195,15 +1169,7 @@ Qed.
     sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
     zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
     (* the walks' PTE read *)
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     (* store PMP: TOR entry 0 covers pa with W *)
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-      (uint pa) (uint (to_bits 64 1)) = PMP_Match ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -1212,8 +1178,6 @@ Qed.
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -1225,8 +1189,6 @@ Qed.
       mie ↦ᵣ{ dq } mie_v -∗
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-      pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
@@ -1235,28 +1197,28 @@ Qed.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea a8 pa storeval HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      HX Hcov Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
-      Hpmpp Hpteregion Hrange_st HW.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbyte Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 1) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
-    destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
-    pose proof Hpmpp as Hpmpp_copy.
-    destruct Hpmpp_copy as (HA0 & Hord0 & Hrangep & HRp).
     assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
               (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
     { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (STORE (imm, Regidx rs2, Regidx rs1, 1))
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov
-              Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
+    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00 region_pte)
+      "(Hpmpc & Hpmpa & %Hpmpp & %Hpteregion & %HX & %HW & %HR & %Hcov)".
+    destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
+    pose proof Hpmpp as Hpmpp_copy.
+    destruct Hpmpp_copy as (HA0 & Hord0 & Hrangep & HRp).
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
@@ -1273,6 +1235,11 @@ Qed.
       by (apply lookup_lookup_total_dom; apply Hdom).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (mem_ram with "Hbyte") as %Hr0. iPureIntro. exact Hr0. }
+    assert (Hlo : (ram_base <= uint pa)%Z) by (destruct Hrampa as [Hl _]; exact Hl).
+    assert (Hfit : (uint pa + 1 <= ram_base + ram_size)%Z)
+      by (destruct Hrampa as [_ Hh]; unfold ram_base, ram_size in *; lia).
+    pose proof (ram_pmp_match_w pa (vec_access_dec pmpaddr00 0) 1
+                  ltac:(lia) ltac:(vm_compute; reflexivity) Hlo Hfit Hcov) as Hrange_st.
     (* the walk's PTE bytes + their RAM-ness (used by the data-miss branch) *)
     iAssert (⌜ is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ⌝)%I as %Halignp.
     { iDestruct "Hpbytes" as "[$ _]". }
@@ -1376,12 +1343,14 @@ Qed.
       assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 4).
       { unfold s_x, s_f, s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
-      iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes]
+      iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmpc Hpmpa]
                             [$Hpc' $Hnpc] [Hfmap] Hbyte").
       { iApply (tlb_inv_close root_ppn satp0 tlbf2 Hmode Hasid Hppn
                   (tlb_pt_consistent_fill root_ppn tlbvec_f (tlb_hash (__id 39) svpn)
                      (tlb_hash_range svpn) Hconsf)
-                  with "Hsatp Htlb Hpbytes"). }
+                  with "Hsatp Htlb Hpbytes [Hpmpc Hpmpa]").
+        iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 region_pte
+                  Hpmpp Hpteregion HX HW HR Hcov with "Hpmpc Hpmpa"). }
       iSplitR; [ iPureIntro; exact Hdom | iExact "Hfmap" ].
     - (* ---- data slot RESIDENT: TLB hit (state-preserving) ---- *)
       pose proof (within_clint_false pa 1 s_pc (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
@@ -1420,10 +1389,12 @@ Qed.
       assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 4).
       { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
-      iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes]
+      iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmpc Hpmpa]
                             [$Hpc' $Hnpc] [Hfmap] Hbyte").
       { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
-                  with "Hsatp Htlb Hpbytes"). }
+                  with "Hsatp Htlb Hpbytes [Hpmpc Hpmpa]").
+        iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 region_pte
+                  Hpmpp Hpteregion HX HW HR Hcov with "Hpmpc Hpmpa"). }
       iSplitR; [ iPureIntro; exact Hdom | iExact "Hfmap" ].
   Qed.
 
@@ -1438,20 +1409,13 @@ Qed.
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
@@ -1470,8 +1434,6 @@ Qed.
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -1482,23 +1444,21 @@ Qed.
       mie ↦ᵣ{ dq } mie_v -∗
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
-      pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd Hbexec)
-      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrd Hbexec)
+      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true base
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -1534,10 +1494,10 @@ Qed.
              = add_vec_int pc 2)
       by (tmig; exact Lnpc0).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes]
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp]
                           [$Hpc' $Hnpc] [Hfmap]").
     { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
-                with "Hsatp Htlb Hpbytes"). }
+                with "Hsatp Htlb Hpbytes Hpmp"). }
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
@@ -1549,46 +1509,39 @@ Qed.
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint rd <> 0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrd)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd rd rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI))
               (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))
-              m mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd
+              m mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hrd
               _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont").
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     rewrite (exec_execute_ITYPE_ADDI_gpr rd rd (sign_extend' 12 imm) s_pc).
     replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
@@ -1601,45 +1554,38 @@ Qed.
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrs1 Hrs2 Hcmp)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -1662,9 +1608,9 @@ Qed.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes]
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp]
                           [$Hpc' $Hnpc] [Hfmap]").
-    { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb Hpbytes"). }
+    { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb Hpbytes Hpmp"). }
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
@@ -1674,20 +1620,13 @@ Qed.
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
     (* only 2-alignment of the target is required: the C extension (Zca,
@@ -1697,29 +1636,29 @@ Qed.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrs1 Hrs2 Hcmp Hal0)
-      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp Hal0)
+      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
@@ -1756,9 +1695,9 @@ Qed.
              = add_vec pc (sign_extend' 64 imm))
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes]
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp]
                           [$Hpc' $Hnpc] [Hfmap]").
-    { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb Hpbytes"). }
+    { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb Hpbytes Hpmp"). }
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
@@ -1768,20 +1707,13 @@ Qed.
       (pc : mword 64) (rd rsa rsb : mword 5) (i : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
@@ -1796,26 +1728,26 @@ Qed.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false i -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd Hbexec)
-      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrd Hbexec)
+      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false i
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -1851,10 +1783,10 @@ Qed.
              = add_vec_int pc 4)
       by (tmig; exact Lnpc0).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes]
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp]
                           [$Hpc' $Hnpc] [Hfmap]").
     { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
-                with "Hsatp Htlb Hpbytes"). }
+                with "Hsatp Htlb Hpbytes Hpmp"). }
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
@@ -1866,20 +1798,13 @@ Qed.
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
     eq_vec (m !!! Regidx rd1) zero_reg = false ->
@@ -1887,25 +1812,25 @@ Qed.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗ gpr_file m -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrs Hrd1 Hcmp)
-      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrs Hrd1 Hcmp)
+      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ))
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -1928,9 +1853,9 @@ Qed.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes]
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp]
                           [$Hpc' $Hnpc] [Hfmap]").
-    { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb Hpbytes"). }
+    { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb Hpbytes Hpmp"). }
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
@@ -1944,46 +1869,39 @@ Qed.
       (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     creg2reg_idx rdc = Regidx rd ->
     uint rd <> 0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrdc Hrd)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrdc Hrd)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd csp_rs1 csp_rs1
               (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))
-              m mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont").
+              m mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hrd _
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       change sp with (Regidx csp_rs1).
       rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 rd (caddi4spn_imm nzimm) s_pc).
@@ -1996,44 +1914,37 @@ Qed.
       (pc : mword 64) (rd rs2 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     uint rd <> 0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec zero_reg (m !!! Regidx rs2))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrd)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd rs2 rs2
               (RTYPE (Regidx rs2, zreg, Regidx rd, ADD))
               (add_vec zero_reg (m !!! Regidx rs2))
-              m mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont").
+              m mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hrd _
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
       change (execute (RTYPE (Regidx rs2, Regidx (zero_extend' 5 ('b"00") : mword 5), Regidx rd, ADD)))
@@ -2050,46 +1961,39 @@ Qed.
       (pc : mword 64) (rsd : regidx) (rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     rsd = Regidx rd ->
     uint rd <> 0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (shift_bits_left (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrsd Hrd)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrsd Hrd)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI))
               (shift_bits_left (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
-              m mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont").
+              m mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hrd _
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIOP_SLLI_gpr rd rd shamt s_pc).
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
@@ -2101,46 +2005,39 @@ Qed.
       (pc : mword 64) (crsd : cregidx) (rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     creg2reg_idx crsd = Regidx rd ->
     uint rd <> 0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI)) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (shift_bits_right (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hcrsd Hrd)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hcrsd Hrd)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI))
               (shift_bits_right (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
-              m mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hrd _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont").
+              m mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hrd _
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIOP_SRLI_gpr rd rd shamt s_pc).
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
@@ -2182,8 +2079,7 @@ Qed.
   Lemma wp_memset_loop (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13) (svpn : mword 27)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) (olds : nat -> bv 8) {dq : dfrac} :
+      (olds : nat -> bv 8) {dq : dfrac} :
     let pc0 := mword_of_int (KernelSyms.memset + 0x14) in
     let pc4 := add_vec_int pc0 4 in
     let pc6 := add_vec_int pc0 6 in
@@ -2200,12 +2096,6 @@ Qed.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch: TLB slot 5 + geometry for each of the three instructions *)
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     (* bne target = loop top pc0; only 2-alignment is needed (the C extension
        legalizes the bit1 = 1 target in the relocated image). *)
     add_vec pc6 (sign_extend' 64 imm_bne) = pc0 ->
@@ -2215,7 +2105,6 @@ Qed.
     subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
     sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
     zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* per-byte store geometry, for each byte offset j < N (a5-value ms_addr p j) *)
     (forall j : nat, (j < N)%nat ->
        neq_vec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j))))
@@ -2226,10 +2115,6 @@ Qed.
     (forall j : nat, (j < N)%nat ->
        zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
          (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
-    (forall j : nat, (j < N)%nat ->
-       pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-         (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-         (uint (ms_pa (ms_addr p j))) (uint (to_bits 64 1)) = PMP_Match) ->
     (* pointer arithmetic: c.addi advances offset; bne compares a5+1 vs a4=e *)
     (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
@@ -2248,14 +2133,14 @@ Qed.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     kernel_text -∗
     pc_is pc0 -∗ gpr_file m -∗
     ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pc6 4) -∗
       gpr_file (<[Regidx ra5 := regval_into_reg (ms_addr p N)]> m) -∗
       ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
@@ -2263,11 +2148,11 @@ Qed.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros pc0 pc4 pc6 cbyte HN Hra1 Hra4 Hra5 HSIE HMPRV HSXL Hmm HMXR Hpmm
-      HPBMTE HX Hcov Hpmpp Hpteregion Hback Hal0 Hmask Hvpn2s Hmvpns Hmppns HW
-      Hcanon Hvpn Hident Hrange Hincr Hcmp Hra4ne Hra1ne Hext0 Hext4 Hext6.
+      HPBMTE Hback Hal0 Hmask Hvpn2s Hmvpns Hmppns
+      Hcanon Hvpn Hident Hincr Hcmp Hra4ne Hra1ne Hext0 Hext4 Hext6.
     induction rem as [|rem' IH]; intros off m Hoff Hrem Hcur Hm4 Hm1;
       [ exfalso; lia | ].
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hbuf Hcont".
     iPoseProof (Hext0 with "Htext") as "Hi0".
     iPoseProof (Hext4 with "Htext") as "Hi4".
@@ -2280,25 +2165,23 @@ Qed.
     iDestruct "Hbuf" as "[Hb0 Hbuf]".
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
     iApply (wp_sb_s root_ppn E Φ pc0 ra1 ra5 (mword_of_int 0) svpn m (olds off)
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               ltac:(rewrite Hcur; apply (Hcanon off HoffN))
               ltac:(rewrite Hcur; apply (Hvpn off HoffN))
               ltac:(rewrite Hcur; apply (Hident off HoffN))
-              Hmask Hvpn2s Hmvpns Hmppns Hpmpp Hpteregion
-              ltac:(rewrite Hcur; apply (Hrange off HoffN))
-              HW
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0 [Hb0]").
+              Hmask Hvpn2s Hmvpns Hmppns
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi0 [Hb0]").
     { (* the byte points-to at ms_pa (m!!!ra5) = ms_pa (ms_addr p off) *)
       unfold ms_pa, ms_a8. rewrite Hcur. iExact "Hb0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hb0".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hb0".
     (* --- 0xce4: c.addi a5, a5, 1 : a5 := a5 + 1 --- *)
     iApply (wp_caddi_gpr_s_config root_ppn E Φ pc4 ra5 (mword_of_int 1)
-              m mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hra5
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv [Hpc] Hfile Hi4 [-]").
+              m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hra5
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc] Hfile Hi4 [-]").
     { unfold pc4. iExact "Hpc". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     (* the new a5 value = ms_addr p (S off) *)
     set (m' := <[Regidx ra5 := regval_into_reg
           (add_vec (m !!! Regidx ra5) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> m).
@@ -2315,13 +2198,13 @@ Qed.
     - (* last iteration: S off = N, bne falls through to 0xcea *)
       assert (HSN : (S off = N)%nat) by lia.
       iApply (wp_bne_fall_s_config root_ppn E Φ pc6 imm_bne ra4 ra5
-                m' mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hra5 Hra4
+                m' mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hra5 Hra4
                 ltac:(rewrite Hm'a5 Hm'a4; rewrite (Hcmp off HoffN); rewrite HSN Nat.eqb_refl; reflexivity)
-                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv [Hpc] Hfile Hi6 [-]").
+                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc] Hfile Hi6 [-]").
       { unfold pc6. iExact "Hpc". }
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc [Hfile] [Hb0 Hbuf]").
+      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
+      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] [Hb0 Hbuf]").
       + (* gpr_file m' = <[ra5 := ms_addr p N]> m *)
         rewrite HSN in Hm'a5. unfold m'.
         replace (ms_addr p N) with
@@ -2335,26 +2218,26 @@ Qed.
     - (* more iterations: S off < N, bne taken back to the loop head pc0 *)
       assert (HSN : (S off < N)%nat) by lia.
       iApply (wp_bne_taken_s_config root_ppn E Φ pc6 imm_bne ra4 ra5
-                m' mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Hra5 Hra4
+                m' mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hra5 Hra4
                 ltac:(rewrite Hm'a5 Hm'a4; rewrite (Hcmp off HoffN);
                       replace (Nat.eqb (S off) N) with false by (symmetry; apply Nat.eqb_neq; lia); reflexivity)
                 ltac:(rewrite Hback; exact Hal0)
-                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv [Hpc] Hfile Hi6 [-]").
+                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc] Hfile Hi6 [-]").
       { unfold pc6. iExact "Hpc". }
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       rewrite Hback.
       (* apply the induction hypothesis for rem' = S rem'', off' = S off *)
       iApply (IH (S off) m' ltac:(lia) ltac:(lia) Hm'a5 Hm'a4 Hm'a1
-                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile [Hbuf] [Hb0 Hcont]").
+                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile [Hbuf] [Hb0 Hcont]").
       + iExact "Hbuf".
       + (* recombine: the just-filled byte [off] + IH's continuation gives seq off (S(S rem'')) filled *)
-        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbuf'".
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbuf'".
         assert (Hmeq : <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m'
                      = <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m)
           by (unfold m'; apply insert_insert).
         iEval (rewrite Hmeq) in "Hfile".
-        iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile [Hb0 Hbuf']").
+        iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile [Hb0 Hbuf']").
         change (seq off (S (S rem''))) with (off :: seq (S off) (S rem'')).
         rewrite big_sepL_cons.
         iSplitL "Hb0"; [ iEval (rewrite Hcur; rewrite Hm1) in "Hb0"; iExact "Hb0" | iExact "Hbuf'" ].
@@ -2366,25 +2249,14 @@ Qed.
 
   Lemma wp_memset_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) (q : Qp) :
+      (q : Qp) :
     ↑minstretN ⊆ E ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     smode_config (DfracOwn q) -∗
-    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
     tlb_inv root_ppn -∗
     pc_is pc_memset -∗
     gpr_file m -∗
     kernel_text -∗
     ( smode_config (DfracOwn q) -∗
-      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
-      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc_memset 2) -∗
       (* the stack frame is allocated: sp := sp - 16 *)
@@ -2394,15 +2266,15 @@ Qed.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HX Hcov Hpmpp Hpteregion) "Hsm Hpmpc Hpmpa Htlbinv Hpc Hfile Htext Hcont".
+    iIntros (HN) "Hsm Htlbinv Hpc Hfile Htext Hcont".
     iPoseProof (memset_instr0 with "Htext") as "Hinstr".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
     unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc_memset csp_rs1 csp_rs1 csp_rs1
               (ITYPE (sign_extend' 12 imm_memset0, Regidx csp_rs1, Regidx csp_rs1, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (mword_of_int (-16) : mword 64))
-              m pmpcfg0 pmpaddr00 region_pte q HN HX Hcov Hpmpp Hpteregion Hsp
+              m q HN Hsp
               _
-              with "Hsm Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont").
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (sign_extend' 12 imm_memset0) s_pc).
     replace (Z.eqb (uint csp_rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hsp).
@@ -2423,8 +2295,7 @@ Qed.
       (sp' : mword 64) (ra0 s00 : mword 64) (ra_idx s0_idx : mword 5) (imm_dealloc : mword 6)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq dqm : dfrac} :
+      {dq dqm : dfrac} :
     let pcL := mword_of_int (KernelSyms.memset + 0x1e) in
     let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
     let a8_ra := ea_ra in
@@ -2447,24 +2318,16 @@ Qed.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     (* NOTE: a 2-aligned return target (bit1 = 1) is allowed -- the ret step
        jumps via [exec_jump_to_zca] (Zca enabled), so only bit0 = 0 is needed. *)
     (* load geometry for the two frame slots: just the one "PMP TOR entry 0 covers all
        of RAM" fact -- the _ram wrappers derive the rest from the owned points-to. *)
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pcL -∗ gpr_file m -∗
     instr pcL true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx ra_idx, false, 8)) -∗
     instr (add_vec_int pcL 2) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx s0_idx, false, 8)) -∗
@@ -2475,7 +2338,7 @@ Qed.
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈{ dqm } ra0 -∗
       pa_s0 ↦₈{ dqm } s00 -∗
@@ -2491,38 +2354,38 @@ Qed.
     intros pcL ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0 ret_tgt
       HN Hrai Hs0i Hrasp Hs0sp Hs0ra Hsp Hra
       HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      HX Hcov Hpmpp Hpteregion Hal0
-      Hpmpcov HR.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+      Hal0
+     .
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hbra Hbs0 Hcont".
     (* cea: c.ldsp ra,8(sp) : ra := ra0 *)
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ pcL (mword_of_int 1) ra_idx m ra0
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)(dqm:=dqm)
-              HN Hrai HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion
-              Hpmpcov HR
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0 [Hbra]").
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)(dqm:=dqm)
+              HN Hrai HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+             
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi0 [Hbra]").
     { rewrite Hsp. iExact "Hbra". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra".
     set (m1 := <[Regidx ra_idx := regval_into_reg ra0]> m).
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp')
       by (unfold m1; rewrite lookup_total_insert_ne; [ exact Hsp | exact Hrasp ]).
     (* cec: c.ldsp s0,0(sp) : s0 := s00 *)
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (add_vec_int pcL 2) (mword_of_int 0) s0_idx
               m1 s00
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)(dqm:=dqm)
-              HN Hs0i HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion
-              Hpmpcov HR
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2 [Hbs0]").
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)(dqm:=dqm)
+              HN Hs0i HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+             
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2 [Hbs0]").
     { rewrite Hsp1. iExact "Hbs0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbs0".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbs0".
     set (m2 := <[Regidx s0_idx := regval_into_reg s00]> m1).
     (* cee: c.addi sp,16 : sp := sp'+16 *)
     iApply (wp_caddi_gpr_s_config root_ppn E Φ (add_vec_int pcL 4) csp_rs1 imm_dealloc
               m2
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi4 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi4 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     set (m3 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (m2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m2).
     assert (Hra3 : m3 !!! Regidx ra_idx = ra0).
@@ -2533,14 +2396,14 @@ Qed.
        so a 2-aligned target (bit1 = 1) is fine; only bit0 = 0 is required. *)
     iApply (wp_cret_s_zca root_ppn E Φ (add_vec_int pcL 6) ra_idx
               m3
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE
               Hrai Hlpe
               ltac:(rewrite Hra3; exact Hal0)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi6 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi6 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     iEval (rewrite Hra3) in "Hpc".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc [Hbra] [Hbs0] [Hfile]").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc [Hbra] [Hbs0] [Hfile]").
     - rewrite Hsp. iExact "Hbra".
     - rewrite Hsp1. iExact "Hbs0".
     - iExists m3. iFrame "Hfile". iPureIntro. split; [| split; [| split]].
@@ -2575,8 +2438,7 @@ Qed.
       (imm_entry shamt_l shamt_r : mword 6) (nzimm_s0 imm8_beqz : mword 8)
       (i_add : instruction) (wval_add : mword 64) (vra vs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -2607,12 +2469,6 @@ Qed.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch geometry + PMP for all nine C-instr addresses (and add's second half) *)
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     (* n <> 0 (fall through the c.beqz) *)
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
     (* the add reduces to a4 := wval_add *)
@@ -2628,13 +2484,11 @@ Qed.
        one "PMP TOR entry 0 covers all of RAM" fact -- the _ram wrappers derive the
        rest (canonicality, identity translation, the gigapage masks, PMP match) from
        the owned points-to (addr_is_ram) themselves. *)
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     pc_is pcE -∗ gpr_file m0 -∗
     instr pcE true (ITYPE (sign_extend' 12 imm_entry, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     instr (add_vec_int pcE 2) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx ra_idx, sp, 8)) -∗
@@ -2650,7 +2504,7 @@ Qed.
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is (add_vec_int pcE 20) -∗ gpr_file m6 -∗
       pa_ra ↦₈ (m0 !!! Regidx ra_idx) -∗
       pa_s0 ↦₈ (m0 !!! Regidx s0_idx) -∗
@@ -2660,81 +2514,81 @@ Qed.
     intros ra_idx s0_idx a0_idx a2_idx a4_idx a5_idx pcE sp'
       ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0 m1 m2 m3 m4 m5 m6
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      HX Hcov Hpmpp Hpteregion
+     
       Hn0 Hbexec_add
-      Hpmpcov HW_R.
+     .
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp') by (unfold m1; rewrite lookup_total_insert; reflexivity).
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 Hcont".
     (* ccc: c.addi sp,-16 : sp := sp' *)
     iApply (wp_caddi_gpr_s_config root_ppn E Φ pcE csp_rs1 imm_entry m0
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi0 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)))]> m0)
       with m1.
     (* cce: c.sdsp ra,8(sp) : store ra0 to 8(sp') *)
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 vra
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion
-              Hpmpcov HW_R
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi2 [Hbra]").
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+             
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2 [Hbra]").
     { rewrite Hsp1. iExact "Hbra". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra".
     (* cd0: c.sdsp s0,0(sp) : store s00 to 0(sp') *)
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 vs0
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion
-              Hpmpcov HW_R
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi4 [Hbs0]").
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+             
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi4 [Hbs0]").
     { rewrite Hsp1. iExact "Hbs0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbs0".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbs0".
     (* cd2: c.addi4spn s0,sp,16 : s0 := sp'+16 *)
     iApply (wp_caddi4spn_gpr_s_config root_ppn E Φ (add_vec_int pcE 6) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi6 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi6 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1)
       with m2.
     (* cd4: c.beqz a2,cea : n<>0, fall through *)
     iApply (wp_cbeqz_fall_s_config root_ppn E Φ (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx m2
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(unfold m2, m1; rewrite lookup_total_insert_ne; [ rewrite lookup_total_insert_ne; [ exact Hn0 | vm_compute; discriminate ] | vm_compute; discriminate ])
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi8 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi8 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     (* cd6: c.mv a5,a0 : a5 := a0 *)
     iApply (wp_cmv_gpr_s_config root_ppn E Φ (add_vec_int pcE 10) a5_idx a0_idx m2
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi10 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi10 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2)
       with m3.
     (* cd8: c.slli a2,32 : a2 := a2 << shamt_l *)
     iApply (wp_cslli_gpr_s_config root_ppn E Φ (add_vec_int pcE 12) (Regidx a2_idx) a2_idx shamt_l m3
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(reflexivity) ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi12 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(reflexivity) ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi12 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3)
       with m4.
     (* cda: c.srli a2,32 : a2 := a2 >> shamt_r *)
     iApply (wp_csrli_gpr_s_config root_ppn E Φ (add_vec_int pcE 14) (Cregidx (mword_of_int 4)) a2_idx shamt_r m4
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi14 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi14 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4)
       with m5.
     (* cdc: add a4,a2,a0 : a4 := a2 + a0 (end pointer) *)
     iApply (wp_gpr_write_s_config_base root_ppn E Φ (add_vec_int pcE 16) a4_idx a2_idx a0_idx i_add wval_add m5
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion ltac:(vm_compute; discriminate) Hbexec_add
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi16 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE ltac:(vm_compute; discriminate) Hbexec_add
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi16 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.
     replace (add_vec_int (add_vec_int pcE 16) 4) with (add_vec_int pcE 20) by (vm_compute; reflexivity).
     assert (Hra_eq : m1 !!! Regidx ra_idx = m0 !!! Regidx ra_idx)
@@ -2743,7 +2597,7 @@ Qed.
       by (unfold m1; rewrite lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
     iEval (rewrite Hsp1 Hra_eq) in "Hbra".
     iEval (rewrite Hsp1 Hs0_eq) in "Hbs0".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra Hbs0").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0").
   Qed.
 
   (* =================================================================== *)
@@ -2762,8 +2616,7 @@ Qed.
       (i_add : instruction) (wval_add : mword 64) (imm_bne : mword 13)
       (svpn : mword 27) (olds : nat -> bv 8) (vra vs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -2805,12 +2658,6 @@ Qed.
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* fetch geometry + PMP: prefix (0..18), loop (ce0-relative), suffix (cea-relative) *)
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     (* the add reduces to a4 := wval_add (end pointer) *)
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
@@ -2824,9 +2671,6 @@ Qed.
        TOR entry 0 covers all of RAM" fact -- the _ram wrappers derive the rest
        (canonicality, identity translation, the gigapage masks, PMP match) from the
        owned points-to (addr_is_ram) themselves. *)
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* n <> 0 (fall through the c.beqz) *)
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
     (* return-target low bit clear (2-aligned target is OK: Zca return) *)
@@ -2847,10 +2691,6 @@ Qed.
     (forall j : nat, (j < N)%nat ->
        zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
          (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
-    (forall j : nat, (j < N)%nat ->
-       pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-         (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-         (uint (ms_pa (ms_addr p j))) (uint (to_bits 64 1)) = PMP_Match) ->
     (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
     (⊢ kernel_text -∗ instr pc0L false (STORE (mword_of_int 0, Regidx a1_idx, Regidx a5_idx, 1))) ->
@@ -2860,7 +2700,7 @@ Qed.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     instr pcE true (ITYPE (sign_extend' 12 imm_entry, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     instr (add_vec_int pcE 2) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx ra_idx, sp, 8)) -∗
@@ -2881,7 +2721,7 @@ Qed.
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
@@ -2900,11 +2740,11 @@ Qed.
       sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
       HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      HX Hcov Hpmpp Hpteregion
+     
       Hbexec_add
-      Hpmpcov HW_R HR_R
+     
       Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
-      Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
+      Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
       Hext0 Hext4 Hext6.
     (* interface: register file at the loop top and the suffix top *)
     assert (Hcur : m6 !!! Regidx a5_idx = ms_addr p 0).
@@ -2933,50 +2773,50 @@ Qed.
       unfold ra0; reflexivity. }
     assert (Hpc1 : add_vec_int pcE 20 = pc0L) by (vm_compute; reflexivity).
     assert (Hpc2 : add_vec_int (add_vec_int pc0L 6) 4 = pcLS) by (vm_compute; reflexivity).
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16
              HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 Hbuf Hcont".
     (* --- PREFIX: 0xccc..0xcdc --- *)
     iApply (wp_memset_prefix root_ppn E Φ m0 imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
-              i_add wval_add vra vs0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
+              i_add wval_add vra vs0 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              HX Hcov Hpmpp Hpteregion
+             
               Hn0 Hbexec_add
-              Hpmpcov HW_R
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
+             
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
                     Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra Hbs0".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
     iEval (rewrite Hpc1) in "Hpc".
     (* --- LOOP: 0xce0..0xce6 --- *)
     iApply (wp_memset_loop root_ppn E Φ N p e cval a1_idx a4_idx a5_idx imm_bne svpn
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte olds (dq:=dq)
+              mstatus0 mie_v mdv0 menvcfg0 olds (dq:=dq)
               HN ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              HX Hcov Hpmpp Hpteregion
-              Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb HW_R
-              Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
+             
+              Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
+              Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               Hext0 Hext4 Hext6
               N 0%nat m6 ltac:(reflexivity) HNge1 Hcur Hm4 Hm1
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Htext Hpc Hfile Hbuf [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbuf".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbuf [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbuf".
     iEval (rewrite Hpc2) in "Hpc".
     (* --- SUFFIX: 0xcea..ret --- *)
     iApply (wp_memset_suffix root_ppn E Φ sp' ra0 s00 ra_idx s0_idx imm_dealloc
               (<[Regidx a5_idx := regval_into_reg (ms_addr p N)]> m6)
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)(dqm:=DfracOwn 1)
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)(dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               Hsuf_sp Hsuf_ra
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              HX Hcov Hpmpp Hpteregion Hret0
-              Hpmpcov HR_R
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
+              Hret0
+             
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
                     HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hmfin".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 Hmfin".
     iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
     destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hbuf [Hfile]").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 Hbuf [Hfile]").
     iExists mfin. iFrame "Hfile". iPureIntro.
     split; [exact Hpra | split; [exact Hps0 | split; [exact Hpcsp |]]].
     intros r Hra Hs0 Hcsp Ha5 Ha2 Ha4.

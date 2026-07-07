@@ -312,8 +312,7 @@ Section WpMemsetInstr.
       (m0 : gmap regidx (mword 64)) (N : nat) (wval_add : mword 64)
       (svpn : mword 27) (olds : nat -> bv 8) (vra vs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -362,12 +361,6 @@ Section WpMemsetInstr.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
        (if Z.eqb (uint a2_idx) 0 then zero_reg
@@ -376,9 +369,6 @@ Section WpMemsetInstr.
         else register_lookup (R_bitvector_64 (gpr_of_Z (uint a0_idx))) s_pc.(sregs)) = m5 !!! Regidx a0_idx ->
        exec (execute i_add) s_pc
        = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint a4_idx))) (regval_into_reg wval_add))) ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     (* 2-aligned return target OK: memset returns via [exec_jump_to_zca] *)
@@ -397,17 +387,13 @@ Section WpMemsetInstr.
     (forall j : nat, (j < N)%nat ->
        zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
          (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
-    (forall j : nat, (j < N)%nat ->
-       pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-         (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
-         (uint (ms_pa (ms_addr p j))) (uint (to_bits 64 1)) = PMP_Match) ->
     (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
@@ -415,7 +401,7 @@ Section WpMemsetInstr.
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
@@ -435,12 +421,10 @@ Section WpMemsetInstr.
       sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
       HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      HX Hcov Hpmpp Hpteregion
       Hbexec_add
-      Hpmpcov HW_R HR_R
       Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
-      Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+      Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hbra Hbs0 Hbuf Hcont".
     (* derive the thirteen prefix/suffix instr resources from the text image *)
     iPoseProof (minstr_cba with "Htext") as "Hi0".
@@ -458,15 +442,13 @@ Section WpMemsetInstr.
     iPoseProof (minstr_cde with "Htext") as "HiL6".
     iApply (wp_memset_s_full root_ppn E Φ m0 N imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz
               i_add wval_add imm_bne svpn olds vra vs0
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
               HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              HX Hcov Hpmpp Hpteregion
               Hbexec_add
-              Hpmpcov HW_R HR_R
               Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
-              Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
+              Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
               minstr_cce minstr_cd2 minstr_cd4
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                     Htext Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16
                     HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 Hbuf Hcont").
   Qed.

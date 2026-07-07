@@ -64,12 +64,9 @@ Section WpIntrInv.
   Definition F_kv (root_ppn : mword 44) (svpn : mword 27)
       (m : gmap regidx (mword 64))
       (menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       : iProp Sig :=
     (hw_config ∗ minstret_inv ∗ kernel_text ∗
      menvcfg ↦ᵣ menvcfg0 ∗
-     pmpcfg_n ↦ᵣ pmpcfg0 ∗
-     pmpaddr_n ↦ᵣ pmpaddr00 ∗
      tlb_inv root_ppn ∗
      gpr_file m ∗
      (∃ w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : bv 64,
@@ -164,52 +161,43 @@ Section WpIntrInv.
   Lemma kernelvec_handler_spec (root_ppn : mword 44) (svpn : mword 27)
       (m : gmap regidx (mword 64))
       (menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) :
+      :
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     (* the walk's PTE read *)
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* PMP: TOR entry 0 grants X on the whole kernelvec text + R/W on the frame *)
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* stack-page geometry (symbolic sp; svpn = its Sv39 VPN) *)
     (* SRET facts *)
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
     ⊢ intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64)
-        (F_kv root_ppn svpn m menvcfg0 pmpcfg0 pmpaddr00).
+        (F_kv root_ppn svpn m menvcfg0).
   Proof.
-    intros HPBMTE Hpmm Hpmpp Hpteregion Hpmpcov HX HW HR Hlpe0.
+    intros HPBMTE Hpmm Hlpe0.
     iModIntro. iIntros (elp_v ms pc0 mie_v mdv0 E Φ) "%HN %Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hstvec Hpc HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR).
-    iDestruct "HF" as "(#Hhw & #Hinv & #Htext & Hmenv & Hpmpc & Hpmpa & Htlbinv & Hfile & Hwins)".
+    iDestruct "HF" as "(#Hhw & #Hinv & #Htext & Hmenv & Htlbinv & Hfile & Hwins)".
     iDestruct "Hwins" as (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17)
       "(Hw1 & Hw2 & Hw3 & Hw4 & Hw5 & Hw6 & Hw7 & Hw8 & Hw9 & Hw10 & Hw11 & Hw12 & Hw13 & Hw14 & Hw15 & Hw16 & Hw17)".
     iApply (wp_kernelvec root_ppn m (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
-              pmpcfg0 pmpaddr00 region_pte w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 E Φ
+              w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 E Φ
               HN
               (trap_ms_SIE_false elp_v ms)
               (trap_ms_MPRV_false elp_v ms HMPRV0)
               (trap_ms_SXL_eq elp_v ms HSXL)
               Hmm HPBMTE
               (trap_ms_MXR_true elp_v ms HMXR)
-              Hpmm Hpmpp Hpteregion Hpmpcov HX HW HR
+              Hpmm
               (trap_ms_TSR_false elp_v ms HTSR)
               (sret_newpriv_trap_ms elp_v ms)
               Hlpe0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc
                     Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc Hpc Hfile
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     iEval (rewrite Hpc0) in "Hpc".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hstvec Hpc [-]").
     { iExists pc0. iFrame "Hsepc". }
-    iFrame "Hhw Hinv Htext Hmenv Hpmpc Hpmpa Htlbinv Hfile".
+    iFrame "Hhw Hinv Htext Hmenv Htlbinv Hfile".
     iExists (m !!! Regidx (mword_of_int 1 : mword 5)), (m !!! Regidx (mword_of_int 3 : mword 5)), (m !!! Regidx (mword_of_int 5 : mword 5)), (m !!! Regidx (mword_of_int 6 : mword 5)), (m !!! Regidx (mword_of_int 7 : mword 5)), (m !!! Regidx (mword_of_int 10 : mword 5)), (m !!! Regidx (mword_of_int 11 : mword 5)), (m !!! Regidx (mword_of_int 12 : mword 5)), (m !!! Regidx (mword_of_int 13 : mword 5)), (m !!! Regidx (mword_of_int 14 : mword 5)), (m !!! Regidx (mword_of_int 15 : mword 5)), (m !!! Regidx (mword_of_int 16 : mword 5)), (m !!! Regidx (mword_of_int 17 : mword 5)), (m !!! Regidx (mword_of_int 28 : mword 5)), (m !!! Regidx (mword_of_int 29 : mword 5)), (m !!! Regidx (mword_of_int 30 : mword 5)), (m !!! Regidx (mword_of_int 31 : mword 5)).
     iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
   Qed.

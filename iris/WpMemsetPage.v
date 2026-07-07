@@ -218,8 +218,7 @@ Section WpMemsetPage.
   Lemma wp_memset_page (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (cval : mword 64) (vra vs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) {dq : dfrac} :
+      {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -251,15 +250,6 @@ Section WpMemsetPage.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* the caller's return target's low bit is clear (a 2-aligned target is
        fine: memset returns via [exec_jump_to_zca], Zca always enabled) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
@@ -267,7 +257,7 @@ Section WpMemsetPage.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+    tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
@@ -275,7 +265,7 @@ Section WpMemsetPage.
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗ tlb_inv root_ppn -∗
+      tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
@@ -292,9 +282,8 @@ Section WpMemsetPage.
   Proof.
     intros ra_idx s0_idx a0_idx a1_idx a2_idx pcE imm_entry sp' ra0 s00 p
       ea_ra pa_ra ea_s0 pa_s0 ret_tgt
-      Hpv Hcval Ha2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      HX Hcov Hpmpp Hpteregion Halignp HW_R HR_R Hret0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+      Hpv Hcval Ha2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hret0.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hbra Hbs0 Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
@@ -308,9 +297,8 @@ Section WpMemsetPage.
     pose proof (page_valid_ram p Hpv) as Hramp.
     iApply (wp_memset_s_full_kt root_ppn E Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds vra vs0
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
               HN ltac:(lia) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              HX Hcov Hpmpp Hpteregion
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
                     cbn [execute];
@@ -342,7 +330,6 @@ Section WpMemsetPage.
                         | rewrite HB ]
                     end;
                     reflexivity)
-              Hcov HW_R HR_R
               (* Hn0 : a2 = 4096 <> 0 *)
               ltac:(rewrite Ha2; vm_compute; reflexivity)
               Hret0
@@ -360,18 +347,14 @@ Section WpMemsetPage.
               ltac:(intros j Hj; rewrite ms_a8_ms_addr;
                     rewrite <- (svpn_pa_add_same p j Hpv Hj);
                     exact (ram_ident root_ppn (pa_add p j) (page_valid_ram_j p j Hpv Hj)))
-              ltac:(intros j Hj; pose proof (page_valid_ram_j p j Hpv Hj) as [Hlo Hhi];
-                    rewrite ms_pa_ms_addr;
-                    exact (ram_pmp_match_w (pa_add p j) (vec_access_dec pmpaddr00 0) 1
-                             ltac:(lia) ltac:(vm_compute; reflexivity) Hlo ltac:(lia) Hcov))
               (* Hincr / Hcmp : pointer arithmetic *)
               ltac:(intros j; exact (ms_incr_step p j))
               ltac:(intros j Hj; exact (ms_cmp_page p j Hpv Hj))
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                     Htext Hpc Hfile Hbra Hbs0 Hbuf [Hcont]").
     (* --- continuation: rebuild [page_own p] and re-expose gpr_file --- *)
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 [Hbuf] [Hmfin]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 [Hbuf] [Hmfin]").
     - (* page_own p from the returned all-cbyte buffer *)
       iEval (rewrite /page_own /byte_any).
       iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".

@@ -236,8 +236,7 @@ Section WpSretGpr.
       (pc : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       (m : gmap regidx (mword 64))
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (region_pte : PMA_Region) :
+      :
     ↑minstretN ⊆ E ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -246,13 +245,7 @@ Section WpSretGpr.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch: page-table geometry (SRET is a 4-byte F_Base) *)
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* the walk's PTE read *)
-    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
-       (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     (* SRET-specific premises *)
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
     sret_newpriv mstatus0 = Supervisor ->
@@ -265,8 +258,6 @@ Section WpSretGpr.
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ pmpaddr00 -∗
     tlb_inv root_ppn -∗
     sepc ↦ᵣ sepc0 -∗
     pc_is pc -∗
@@ -278,8 +269,6 @@ Section WpSretGpr.
       mie ↦ᵣ mie_v -∗
       mideleg ↦ᵣ mdv0 -∗
       menvcfg ↦ᵣ menvcfg0 -∗
-      pmpcfg_n ↦ᵣ pmpcfg0 -∗
-      pmpaddr_n ↦ᵣ pmpaddr00 -∗
       tlb_inv root_ppn -∗
       sepc ↦ᵣ sepc0 -∗
       pc_is (sret_tgt sepc0) -∗
@@ -287,9 +276,8 @@ Section WpSretGpr.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov
-             Hpmpp Hpteregion HTSR Hsup Hlpe0)
-      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hsepc
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HTSR Hsup Hlpe0)
+      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc
        [Hpc Hnpc] Hfile Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -301,12 +289,11 @@ Section WpSretGpr.
               exec (get_xLPE (sret_newpriv mstatus0)) sz = Some (false, sz)).
     { intros sz Hm. rewrite Hsup. apply exec_get_xLPE_S. rewrite Hm. exact Hlpe0. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (SRET tt)
-              mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov
-              Hpmpp Hpteregion
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
@@ -376,10 +363,10 @@ Section WpSretGpr.
     assert (Lnpc : register_lookup nextPC sX.(sregs) = sret_tgt sepc0)
       by (unfold sX, set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa [Hsatp Htlb Hpbytes] Hsepc
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp] Hsepc
                           [$Hpc' $Hnpc] Hfile").
     iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
-              with "Hsatp Htlb Hpbytes").
+              with "Hsatp Htlb Hpbytes Hpmp").
   Qed.
 
 End WpSretGpr.
