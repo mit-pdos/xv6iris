@@ -103,6 +103,8 @@ Section Kalloc.
     iPoseProof (kai_04 with "Htext") as "Hi04".
     iPoseProof (kai_06 with "Htext") as "Hi06".
     iPoseProof (kai_08 with "Htext") as "Hi08".
+    iPoseProof (kai_0a with "Htext") as "Hi0a".
+    iPoseProof (kai_0e with "Htext") as "Hi0e".
     (* +0x00 c.addi16sp sp,-32 *)
     iApply (wp_caddi_gpr_s_config root_ppn E Φ pcE csp_rs1 (mword_of_int 32 : mword 6) m
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
@@ -154,7 +156,25 @@ Section Kalloc.
     set (R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1).
     assert (Hpp0a : add_vec_int (mword_of_int (AK + 0x08) : mword 64) 2 = mword_of_int (AK + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
-    (* ---- prologue done; s1<-a0<-&kmem, jal acquire, freelist, release, memset, epilogue TODO ---- *)
+    (* +0x0a auipc a0,0x11 *)
+    iApply (wp_auipc_s root_ppn E Φ (mword_of_int (AK + 0x0a)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
+              R2 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0a [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+    set (R3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x0a) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R2).
+    assert (Hpp0e : add_vec_int (mword_of_int (AK + 0x0a) : mword 64) 4 = mword_of_int (AK + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp0e) in "Hpc".
+    (* +0x0e addi a0,a0,2046  (a0 := &kmem) *)
+    iApply (wp_addi4_s root_ppn E Φ (mword_of_int (AK + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7fe : mword 12)
+              R3 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion Halignp ltac:(vm_compute; discriminate)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi0e [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+    set (R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fe : mword 12)))]> R3).
+    assert (Hpp12 : add_vec_int (mword_of_int (AK + 0x0e) : mword 64) 4 = mword_of_int (AK + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp12) in "Hpc".
+    (* ---- a0 = &kmem now (R4 !!! a0);  +0x12 jal acquire, freelist, release, memset, epilogue TODO ---- *)
     admit.
   Admitted.
 
