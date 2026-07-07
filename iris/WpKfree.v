@@ -774,7 +774,7 @@ Section Kfree.
       rewrite /R5 lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite Hp10. apply add_vec_zero_l. }
     (* ---- acquire(&kmem) ---- *)
-    iApply (wp_acquire_lock root_ppn E Φ γ (kmem_res fl) Kacq
+    unshelve iApply (wp_acquire_lock root_ppn E Φ γ (kmem_res fl) Kacq
               svpn_noff svpn_intena svpn_lk svpn_cpu
               qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qfraold qfs0old qcpuold
               qnoff qintena_old a0f
@@ -782,22 +782,7 @@ Section Kfree.
               HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               Hlegal
               ltac:(rewrite HKacqa0 -Hlk; exact Hamo)
-              ltac:(erewrite (po_mycpu_out_a0_cong _ _ m);
-                    [ exact Hpin1
-                    | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
-                                    | rewrite po_mycpu_out_tp ]); exact Hmfptp ])
-              ltac:(erewrite (po_mycpu_out_a0_cong _ _ m);
-                    [ exact Hpin2
-                    | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
-                                    | rewrite po_mycpu_out_tp ]); exact Hmfptp ])
-              ltac:(erewrite (po_mycpu_out_a0_cong _ _ m);
-                    [ exact Hpin3
-                    | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
-                                    | rewrite po_mycpu_out_tp ]); exact Hmfptp ])
-              ltac:(erewrite (po_mycpu_out_a0_cong _ _ m);
-                    [ exact Hpin3
-                    | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
-                                    | rewrite po_mycpu_out_tp ]); exact Hmfptp ])
+              _ _ _ _
              
               ltac:(rewrite HKacqtp; exact Hcpune)
               Hg_noff Hg_int
@@ -806,6 +791,22 @@ Section Kfree.
               ltac:(rewrite HKacqra; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile
                     [Hqr24] [Hqr16] [Hqr8] [Hqp24] [Hqp16] [Hqp8] [Hqfra] [Hqfs0] Hqnoff Hqint [Hkmem] [Hqcpu] [-]").
+    { erewrite (po_mycpu_out_a0_cong _ _ m);
+      [ exact Hpin1
+      | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
+                      | rewrite po_mycpu_out_tp ]); exact Hmfptp ]. }
+    { erewrite (po_mycpu_out_a0_cong _ _ m);
+      [ exact Hpin2
+      | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
+                      | rewrite po_mycpu_out_tp ]); exact Hmfptp ]. }
+    { erewrite (po_mycpu_out_a0_cong _ _ m);
+      [ exact Hpin3
+      | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
+                      | rewrite po_mycpu_out_tp ]); exact Hmfptp ]. }
+    { erewrite (po_mycpu_out_a0_cong _ _ m);
+      [ exact Hpin3
+      | repeat (first [ (rewrite lookup_total_insert_ne; [| vm_compute; discriminate])
+                      | rewrite po_mycpu_out_tp ]); exact Hmfptp ]. }
     { iEval (rewrite HKacqcsp). iExact "Hqr24". }
     { iEval (rewrite HKacqcsp). iExact "Hqr16". }
     { iEval (rewrite HKacqcsp). iExact "Hqr8". }
