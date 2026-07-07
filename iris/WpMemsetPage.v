@@ -310,7 +310,7 @@ Section WpMemsetPage.
               (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds vra vs0
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN ltac:(lia) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              HX Hcov Hpmpp Hpteregion Halignp
+              HX Hcov Hpmpp Hpteregion
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
                     cbn [execute];

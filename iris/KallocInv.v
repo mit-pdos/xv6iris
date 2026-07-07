@@ -25,11 +25,9 @@
    invariant releases a page ([kmem_res_pop]) and absorbs one ([kmem_res_push]).
    The instruction-level proof (later) opens [is_kmem] around kalloc/kfree's
    atomic loads/stores and discharges the triples using these lemmas. *)
-From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap list bitvector.definitions.
+From Stdlib Require Import ZArith.
+From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl.
-From iris.base_logic.lib Require Import gen_heap invariants own.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.

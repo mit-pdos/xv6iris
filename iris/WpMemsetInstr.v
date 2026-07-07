@@ -7,11 +7,10 @@
    c.ldsp / c.jr) share their byte patterns with WpTimerinit's, so their decode
    lemmas are reused verbatim; the other eight (c.mv / c.slli / c.srli / c.beqz /
    c.addi a5,1 and the three base add/sb/bne) get fresh decode lemmas here. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
@@ -369,7 +368,6 @@ Section WpMemsetInstr.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
        (if Z.eqb (uint a2_idx) 0 then zero_reg
@@ -437,7 +435,7 @@ Section WpMemsetInstr.
       sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
       HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      HX Hcov Hpmpp Hpteregion Halignp
+      HX Hcov Hpmpp Hpteregion
       Hbexec_add
       Hpmpcov HW_R HR_R
       Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
@@ -462,7 +460,7 @@ Section WpMemsetInstr.
               i_add wval_add imm_bne svpn olds vra vs0
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HNge1 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              HX Hcov Hpmpp Hpteregion Halignp
+              HX Hcov Hpmpp Hpteregion
               Hbexec_add
               Hpmpcov HW_R HR_R
               Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb

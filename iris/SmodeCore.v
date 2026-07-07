@@ -32,11 +32,10 @@
      fetch-state-threading decode/execute step engine;
    - [wp_instr_s_tlbinv] -- the unified S-mode step engine (opens [tlb_inv],
      drives the consistent fetch, re-seals the invariant). *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List FunctionalExtensionality.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith FunctionalExtensionality.
+From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
@@ -2659,7 +2658,8 @@ Section SmodeCoreIris.
 
   (* the walk's memory footprint: the identity superpage PTE. *)
   Definition pte_super_bytes (root_ppn : mword 44) (dq : dfrac) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{ dq } nth_byte pte_super j)%I.
+    (⌜ is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ⌝ ∗
+     [∗ list] j ∈ seq 0 8, (pa_add (pte_paddr root_ppn) j) ↦ₘ{ dq } nth_byte pte_super j)%I.
 
   (* =================================================================== *)
   (* THE TLB/PAGE-TABLE CONSISTENCY INVARIANT (Iris bundle): own the tlb  *)
@@ -2751,7 +2751,6 @@ Section SmodeCoreIris.
     pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_paddr root_ppn) ->
     matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte ->
     (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Supervisor -∗
@@ -2769,8 +2768,11 @@ Section SmodeCoreIris.
     ⌜ ∃ tlbvec2, exec (fetch tt) σ = Some (r, set_reg σ tlb tlbvec2)
                  ∧ tlb_pt_consistent root_ppn tlbvec2 ⌝.
   Proof.
-    iIntros (Hpma0 HmisaC0 HSXL0 Hmode Hppn Hasid Hcons HPBMTE HX Hcov Hpmpp Hmatchp0 Hptep Halignp)
+    iIntros (Hpma0 HmisaC0 HSXL0 Hmode Hppn Hasid Hcons HPBMTE HX Hcov Hpmpp Hmatchp0 Hptep)
       "[Hreg Hmem] Hpc Hpriv Hms Hsatp Htlb Hmenv Hpmpc Hpmpa Hpma Hhtif Hmisa Hpbytes Hbytes".
+    (* the PTE-root 8-byte alignment now rides inside [pte_super_bytes] (folded
+       into [tlb_inv]); peel it back off together with the raw byte points. *)
+    iDestruct "Hpbytes" as "[%Halignp Hpbytes]".
     destruct Hpmpp as (HA & Hord & Hrangep & HR).
     iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
@@ -3225,7 +3227,6 @@ Section SmodeCoreIris.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     smode_config dq -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{ dq } pmpaddr00 -∗
@@ -3252,7 +3253,7 @@ Section SmodeCoreIris.
        through its own vpn, 0/1/2 slots filled) -- no hit/walk split, no
        same-page premise.  Re-bundle [smode_config] and re-seal [tlb_inv]
        (with the fetch's [tlbvec2]) in the caller's continuation. *)
-    iIntros (HN HX Hcov Hpmpp Hpteregion Halignp)
+    iIntros (HN HX Hcov Hpmpp Hpteregion)
       "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes)".
@@ -3272,7 +3273,7 @@ Section SmodeCoreIris.
     iDestruct (fetch_from_instr_bytes_s_consistent root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 region_pte pmpcfg0 pmpaddr00 pmar0 tlbvec
                  Hpma_all HmisaC HSXL Hmode Hppn Hasid Hcons HPBMTE HX Hcov Hpmpp
-                 Hmatchp0 Hptep Halignp
+                 Hmatchp0 Hptep
                  with "Hsi Hpc Hpriv Hmstatus Hsatp Htlb Hmenvc Hpmpc Hpmpa Hpma Hhtif Hmisa Hpbytes Hbytes")
       as %Hfetch.
     destruct Hfetch as (tlbvec2 & Hfetcheq & Hcons2).

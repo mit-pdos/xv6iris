@@ -1,10 +1,4 @@
 (* WpGprCsrw.v -- split into Common/A/B for build parallelism; this shim re-exports everything. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia FunctionalExtensionality.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
-From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import MinstretInv.
 From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.

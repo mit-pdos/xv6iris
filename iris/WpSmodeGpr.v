@@ -37,11 +37,10 @@
        passes them INTO the caller's fupd (so the caller can read them at σ
        via reg_valid and/or reg_update them alongside its other writes).
      - Part C: the client WPs. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia List.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
@@ -2418,7 +2417,6 @@ Section WpInstrSConfig.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -2467,7 +2465,7 @@ Section WpInstrSConfig.
     (* Open [tlb_inv] ONCE, then drive the UNIFIED fetch (which translates each
        16-bit chunk through its own vpn and fills 0/1/2 slots as needed) -- no
        up-front hit/walk slot case-split, no same-page premise. *)
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp)
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes)".
@@ -2483,7 +2481,7 @@ Section WpInstrSConfig.
     iDestruct (fetch_from_instr_bytes_s_consistent root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 region_pte pmpcfg0 pmpaddr00 pmar0 tlbvec
                  Hpma_all HmisaC HSXL Hmode Hppn Hasid Hcons HPBMTE HX Hcov Hpmpp
-                 Hmatchp0 Hptep Halignp
+                 Hmatchp0 Hptep
                  with "Hsi Hpc Hpriv Hmstatus Hsatp Htlb Hmenvc Hpmpc Hpmpa Hpma Hhtif Hmisa Hpbytes Hbytes")
       as %Hfetch.
     destruct Hfetch as (tlbvec2 & Hfetcheq & Hcons2).
@@ -2620,7 +2618,6 @@ Section SmodeGprClients.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
@@ -2647,10 +2644,10 @@ Section SmodeGprClients.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HX Hcov Hpmpp Hpteregion Halignp Hrd Hbexec)
+    iIntros (HN HX Hcov Hpmpp Hpteregion Hrd Hbexec)
       "Hsm Hpmpc Hpmpa Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_tlbinv root_ppn E Φ pc true base pmpcfg0 pmpaddr00 region_pte
-              HN HX Hcov Hpmpp Hpteregion Halignp
+              HN HX Hcov Hpmpp Hpteregion
               with "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -2710,7 +2707,6 @@ Section SmodeGprClients.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     smode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddr00 -∗
@@ -2728,14 +2724,14 @@ Section SmodeGprClients.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HX Hcov Hpmpp Hpteregion Halignp)
+    iIntros (HN HX Hcov Hpmpp Hpteregion)
       "Hsm Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
     unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
               m pmpcfg0 pmpaddr00 region_pte q
-              HN HX Hcov Hpmpp Hpteregion Halignp Hsp _
+              HN HX Hcov Hpmpp Hpteregion Hsp _
               with "Hsm Hpmpc Hpmpa Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     change sp with (Regidx csp_rs1).
@@ -2759,7 +2755,6 @@ Section SmodeGprClients.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
     smode_config (DfracOwn q) -∗
@@ -2778,12 +2773,12 @@ Section SmodeGprClients.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HX Hcov Hpmpp Hpteregion Halignp Hrd Halign)
+    iIntros (HN HX Hcov Hpmpp Hpteregion Hrd Halign)
       "Hsm Hpmpc Hpmpa Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
     iApply (wp_instr_s_tlbinv root_ppn E Φ pc false (JAL (imm, Regidx rd))
               pmpcfg0 pmpaddr00 region_pte
-              HN HX Hcov Hpmpp Hpteregion Halignp
+              HN HX Hcov Hpmpp Hpteregion
               with "Hsm Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -2883,7 +2878,6 @@ Section SmodeGprClients.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (* store PMP: TOR entry 0 covers pa with W *)
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
@@ -2921,7 +2915,7 @@ Section SmodeGprClients.
   Proof.
     intros imm ea a8 pa HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
       Hgeom Hpmp Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
-      Hpmpp Hpteregion Halignp Hrange_st HW.
+      Hpmpp Hpteregion Hrange_st HW.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign8 & Hbytes)".
@@ -2940,7 +2934,7 @@ Section SmodeGprClients.
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (STORE (imm, Regidx rs2, sp, 8))
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom Hpmp
-              Hpmpp Hpteregion Halignp
+              Hpmpp Hpteregion
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
@@ -2963,14 +2957,18 @@ Section SmodeGprClients.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     (* the walk's PTE bytes + their RAM-ness (used by the data-miss branch) *)
+    iAssert (⌜ is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ⌝)%I as %Halignp.
+    { iDestruct "Hpbytes" as "[$ _]". }
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
                σ.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)⌝)%I as %Hpbytesf.
     { iIntros (j Hj).
+      iDestruct "Hpbytes" as "[_ Hpbytes]".
       iDestruct (big_sepL_lookup _ _ j j with "Hpbytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
     iAssert (⌜addr_is_ram (pte_paddr root_ppn)⌝)%I as %Hramp.
-    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
+    { iDestruct "Hpbytes" as "[_ Hpbytes]".
+      iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     (* tick nextPC := pc+2 *)
@@ -3171,7 +3169,6 @@ Section SmodeGprClients.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (* load PMP: TOR entry 0 covers pa with R *)
     pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
       (Z.mul (uint (vec_access_dec pmpaddr00 0)) 4)
@@ -3209,7 +3206,7 @@ Section SmodeGprClients.
   Proof.
     intros imm ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
       Hgeom Hpmp Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
-      Hpmpp Hpteregion Halignp Hrange_ld HR.
+      Hpmpp Hpteregion Hrange_ld HR.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign8 & Hbytes)".
@@ -3228,7 +3225,7 @@ Section SmodeGprClients.
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (LOAD (imm, sp, Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               HN HSIE HMPRV HSXL Hmm HPBMTE Hgeom Hpmp
-              Hpmpp Hpteregion Halignp
+              Hpmpp Hpteregion
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlb Hpbytes Hsi".
@@ -3257,14 +3254,18 @@ Section SmodeGprClients.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     (* the walk's PTE bytes + their RAM-ness (used by the data-miss branch) *)
+    iAssert (⌜ is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ⌝)%I as %Halignp.
+    { iDestruct "Hpbytes" as "[$ _]". }
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
                σ.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)⌝)%I as %Hpbytesf.
     { iIntros (j Hj).
+      iDestruct "Hpbytes" as "[_ Hpbytes]".
       iDestruct (big_sepL_lookup _ _ j j with "Hpbytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
     iAssert (⌜addr_is_ram (pte_paddr root_ppn)⌝)%I as %Hramp.
-    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
+    { iDestruct "Hpbytes" as "[_ Hpbytes]".
+      iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hpbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     (* tick nextPC := pc+2 *)
@@ -3479,7 +3480,6 @@ Section SmodeGprClients.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (* the single "PMP TOR entry 0 covers all of RAM" config fact *)
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
@@ -3514,7 +3514,7 @@ Section SmodeGprClients.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros imm ea a8 pa HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hgeom Hpmp Hpmpp Hpteregion Halignp Hpmpcov HW.
+      Hgeom Hpmp Hpmpp Hpteregion Hpmpcov HW.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Hpalign8 & Hbytes)".
     iAssert (⌜addr_is_ram pa⌝)%I as %Hr0.
@@ -3537,7 +3537,7 @@ Section SmodeGprClients.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hgeom Hpmp
               (ram_canonical a8 Hr0) ltac:(reflexivity) (ram_ident root_ppn a8 Hr0)
               (ram_mask a8 Hr0) (ram_svpn2 a8 Hr0) (ram_mvpn a8 Hr0) (ram_mppn a8 Hr0)
-              Hpmpp Hpteregion Halignp
+              Hpmpp Hpteregion
               (ram_pmp_match a8 (vec_access_dec pmpaddr00 0) Hlo Hfit Hpmpcov) HW
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr [Hbytes] Hcont").
     rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign8.
@@ -3568,7 +3568,6 @@ Section SmodeGprClients.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     hw_config -∗
@@ -3602,7 +3601,7 @@ Section SmodeGprClients.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros imm ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hgeom Hpmp Hpmpp Hpteregion Halignp Hpmpcov HR.
+      Hgeom Hpmp Hpmpp Hpteregion Hpmpcov HR.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Hpalign8 & Hbytes)".
     iAssert (⌜addr_is_ram pa⌝)%I as %Hr0.
@@ -3625,7 +3624,7 @@ Section SmodeGprClients.
               HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hgeom Hpmp
               (ram_canonical a8 Hr0) ltac:(reflexivity) (ram_ident root_ppn a8 Hr0)
               (ram_mask a8 Hr0) (ram_svpn2 a8 Hr0) (ram_mvpn a8 Hr0) (ram_mppn a8 Hr0)
-              Hpmpp Hpteregion Halignp
+              Hpmpp Hpteregion
               (ram_pmp_match a8 (vec_access_dec pmpaddr00 0) Hlo Hfit Hpmpcov) HR
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpcis Hfile Hinstr [Hbytes] Hcont").
     rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign8.

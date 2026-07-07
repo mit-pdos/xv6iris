@@ -12,19 +12,17 @@
      - wp_start's stack-geometry side conditions (8-alignment of the four
        frame slots + the TOR bound for timerinit's two slots) are premises
        of wp_kernel, phrased over the SAME symbolic sp0. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpGpr.
-Require Import WpAuipc WpGprAuipc WpGprLoad WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprJal WpGprJalr WpGprStore WpGprRvc WpGprRvcTor.
-Require Import WpGprCsrrCommon WpGprCsrrA WpGprCsrrB WpGprCsrwCommon WpGprCsrwA WpGprCsrwB WpGprCsrwC.
-Require Import WpGprMret WpGprMretWp WpGprMretNew.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import SailStdpp.Base.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec WpEntry WpGpr.
+Require Import WpGprRvc.
+Require Import WpGprCsrwA WpGprCsrwB.
+Require Import WpGprMretWp.
 Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit WpStartNew.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.

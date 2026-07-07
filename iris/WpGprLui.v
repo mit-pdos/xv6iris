@@ -2,16 +2,14 @@
    / [gpr_file] layer (cf. wp_auipc_gpr / wp_addi_gpr).  LUI has no source
    register: it writes rd := sign_extend(imm << 12) -- an ABSOLUTE value, not
    PC-relative.  Built on [wp_instr]. *)
-From Stdlib Require Import Eqdep_dec ZArith Lia.
-From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
-From iris.program_logic Require Import language weakestpre lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpGpr.
+Require Import SailStdpp.Base.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpGpr.
 Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.

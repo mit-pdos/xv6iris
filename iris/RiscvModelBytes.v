@@ -16,14 +16,10 @@
 
 From stdpp Require Import gmap.
 From stdpp Require Import bitvector.definitions.
-From stdpp Require Import list list_monad.
+From stdpp Require Import list_monad.
 
-Require Import SailStdpp.ConcurrencyInterface.
-Require Import SailStdpp.ConcurrencyInterfaceBuiltins.
-Require Import SailStdpp.ConcurrencyInterfaceTypes.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
-Require Import Riscv.rv64d.
 
 Local Open Scope Z_scope.
 
