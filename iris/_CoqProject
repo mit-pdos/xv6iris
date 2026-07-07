@@ -91,3 +91,4 @@ VcGenDemo.v
 VcGenS.v
 WpMycpuVc.v
 WpPopOffVc.v
+WpKernelvecVc.v

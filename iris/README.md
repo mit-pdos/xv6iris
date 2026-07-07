@@ -430,9 +430,46 @@ carries the decrement symbolically into the stored word.  64-bit offset
 arithmetic on `S32` registers is guarded off (`sval_is64`) — the executor
 fails rather than approximates.
 
+**Performance: the agreement interface and the kernelvec blocks
+(`VcGenS.v` / `WpKernelvecVc.v`).**  Profiling showed the first-cut VCgen
+was compile-time-neutral: symbolic runs `vm_compute`d 32-entry
+mword-keyed register maps (~2s per run lemma), the seams materialized
+`vregs_den ρ vregs_init` (a term bigger than the hand proofs' maps), and
+the per-cell `big_sepL_cons` *setoid* rewrites at the heap seams cost
+~0.5s each.  Three fixes:
+
+- **`gpr_matches`, the agreement interface** — `wp_vc_block_s` now takes
+  an abstract `gpr_file m` plus a pointwise pure fact
+  `gpr_matches ρ vr m` relating a *partial* symbolic map (just the
+  registers the block touches or observes) to `m`; the continuation gets
+  the stepped file abstractly (`∀ mf` + post-agreement).  `gpr_file` is
+  never rewritten, seeding a register is a one-line `gpr_matches_ins`,
+  and exit facts are `vm_compute`d symbolic-map lookups.  Small maps also
+  make the run lemmas ~0.1–0.4s (the old cost was normalizing the
+  32-entry map on both sides of the equation).  The old total-map
+  denotation interface survives as `wp_vc_block_s_den` (used by
+  `wp_mycpu_vc`, whose statement demands an exact concrete output map).
+- **`pose`, not `set`, for valuations** — `set (ρ := …)` scans the whole
+  (late-proof, huge) goal for occurrences to abstract; two such `set`s
+  cost 3.3s each in pop_off.
+- **`cbn [big_opL]`, not `rewrite !big_sepL_cons`** — unfolding a literal
+  cell list by setoid rewriting pays a Proper-instance search per cons
+  (~16s of the 17-cell kernelvec blocks); one structural `cbn` pass is
+  free.
+
+Measured effect (per-lemma coqc time, same statements):
+`wp_pop_off` 23.4s hand → 17.0s VCgen (+1.3s for all four run lemmas,
+was 8.2s); and on the block shape the VCgen is built for — kernelvec's
+17-instruction register-save/restore runs (`WpKernelvecVc.v`) — the
+VCgen block lemmas cost 4.4s / 5.9s (+ ~2s runs + ~1.5s instr bundles)
+against 18.1s / 23.9s for the hand-chained `wp_kv_prologue` /
+`wp_kv_epilogue`: **roughly 3× faster**, with the block programs and
+footprints as data and the seam glue mechanically generated.
+
 **Future work.**  Byte-width cells for `lb`/`sb` (memset); more `vop`s
 (shifts, logic ops, `mv`); an M-mode/S-mode-generic induction to avoid the
-duplicated per-mode lemma; and a footprint-*inference* pre-pass (run the
+duplicated per-mode lemma; porting the M-mode `wp_vc_block` to the
+agreement interface; and a footprint-*inference* pre-pass (run the
 executor with a fresh-variable-on-miss heap to *emit* the needed cells —
 it needs no soundness proof, since its output is re-checked by the
 verified `vc_block`).

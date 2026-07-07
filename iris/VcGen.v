@@ -425,6 +425,16 @@ Proof.
     symmetry. apply avi_assoc32.
 Qed.
 
+(* a plain variable (offset 0) denotes the valuation directly -- the shape
+   clients use to seed a register with its current (unknown) value. *)
+Lemma sval_den_SX0 (ρ : nat -> mword 64) (x : nat) :
+  sval_den ρ (SX x 0) = ρ x.
+Proof.
+  cbn [sval_den].
+  change (add_vec (ρ x) (mword_of_int 0)) with (add_vec_int (ρ x) 0).
+  apply avi0.
+Qed.
+
 (* truncate a 64-bit symbolic value to a 32-bit one (total; sound). *)
 Definition sval_trunc32 (v : sval) : sval32 :=
   match v with
@@ -784,10 +794,16 @@ End VcGenIris.
 (* [gpr_file m] without rearranging it.                                     *)
 (* ====================================================================== *)
 
+(* stored PRE-NORMALIZED ([Eval vm_compute]): the 32 mword-keyed inserts cost
+   ~0.4s to normalize, and every [vm_compute]d symbolic run over a state built
+   on [vregs_init] would otherwise pay that again on BOTH sides of the
+   equation (and once more at Qed). *)
 Definition vregs_init : gmap regidx sval :=
-  list_to_map
+  Eval vm_compute in
+  (list_to_map
     ((fun k => (Regidx (mword_of_int (Z.of_nat k) : mword 5),
-                if Nat.eqb k 0 then SC 0 else SX k 0)) <$> seq 0 32).
+                if Nat.eqb k 0 then SC 0 else SX k 0)) <$> seq 0 32)
+   : gmap regidx sval).
 
 (* mword_of_int inverts uint at width 5 (for the register-index geometry). *)
 Lemma mword5_of_uint (i : mword 5) : mword_of_int (uint i) = i.

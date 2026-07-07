@@ -248,7 +248,7 @@ Section WpMycpuVc.
       apply avi0. }
     iDestruct (mycpu_prologue_instrs with "Htext") as "Hbi".
     iEval (rewrite -HdenA) in "Hfile".
-    iApply (wp_vc_block_s root_ppn mycpu_prologue E Φ
+    iApply (wp_vc_block_s_den root_ppn mycpu_prologue E Φ
               (VSt KernelSyms.mycpu vregs_init mycpu_pro_heap0 [])
               (VSt (KernelSyms.mycpu + 8) mycpu_pro_regs1 mycpu_pro_heap1 [])
               ρA mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
@@ -258,8 +258,7 @@ Section WpMycpuVc.
                     Hpc Hfile Hbi [Hbra Hbs0] []").
     { rewrite /vheap_own. cbn [vheap].
       rewrite /mycpu_pro_heap0.
-      rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
-      cbn [fst snd]. rewrite Hara Has0 Hvra Hvs0.
+      cbn [big_opL fst snd]. rewrite Hara Has0 Hvra Hvs0.
       iFrame "Hbra Hbs0". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap _".
@@ -302,7 +301,7 @@ Section WpMycpuVc.
         with (add_vec_int (m0 !!! Regidx (mword_of_int 8 : mword 5)) 0).
       rewrite avi0. reflexivity. }
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /mycpu_pro_heap1;
-           rewrite big_sepL_cons big_sepL_cons big_sepL_nil; cbn [fst snd];
+           cbn [big_opL fst snd];
            rewrite Hara Has0 Hvra0 Hvs00) in "Hheap".
     iDestruct "Hheap" as "(Hbra & Hbs0 & _)".
     (* pc: mword_of_int (mycpu+8) -> the hand-proof's add_vec_int spelling *)
@@ -409,7 +408,7 @@ Section WpMycpuVc.
     iEval (rewrite Hpc24) in "Hpc".
     iEval (rewrite -HdenB) in "Hfile".
     iDestruct (mycpu_epilogue_instrs with "Htext") as "Hbi2".
-    iApply (wp_vc_block_s root_ppn mycpu_epilogue E Φ
+    iApply (wp_vc_block_s_den root_ppn mycpu_epilogue E Φ
               (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap [])
               (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap [])
               ρB mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
@@ -418,8 +417,7 @@ Section WpMycpuVc.
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
                     Hpc Hfile Hbi2 [Hbra Hbs0] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /mycpu_epi_heap.
-      rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
-      cbn [fst snd]. rewrite HaraB Has0B HvraB Hvs0B.
+      cbn [big_opL fst snd]. rewrite HaraB Has0B HvraB Hvs0B.
       iFrame "Hbra Hbs0". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap _".
@@ -441,7 +439,7 @@ Section WpMycpuVc.
       unfold m11, m10, m9, regval_into_reg. reflexivity. }
     iEval (rewrite Hm11den) in "Hfile".
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /mycpu_epi_heap;
-           rewrite big_sepL_cons big_sepL_cons big_sepL_nil; cbn [fst snd];
+           cbn [big_opL fst snd];
            rewrite HaraB Has0B HvraB Hvs0B) in "Hheap".
     iDestruct "Hheap" as "(Hbra & Hbs0 & _)".
     (* +0x1e c.ret : PC := ra0 (low bit cleared) *)

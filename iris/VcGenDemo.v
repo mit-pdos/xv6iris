@@ -151,8 +151,7 @@ Section VcGenDemo.
       with "[Hw1 Hw2]" as "Hheap".
     { rewrite /vheap_own.
       change (vheap demo_st0) with demo_heap0. rewrite /demo_heap0.
-      rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
-      cbn [fst snd].
+      cbn [big_opL fst snd].
       rewrite demo_den_a1 demo_den_a2 !demo_den_x.
       cbn [demo_ρ]. iFrame "Hw1 Hw2". }
     iApply (wp_vc_block demo_prog E Φ demo_st0 demo_st1
@@ -162,8 +161,7 @@ Section VcGenDemo.
     iIntros "Hmm Hpmpc Hpc Hgpr Hheap".
     iEval (rewrite /vheap_own;
            change (vheap demo_st1) with demo_heap1; rewrite /demo_heap1;
-           rewrite big_sepL_cons big_sepL_cons big_sepL_nil;
-           cbn [fst snd];
+           cbn [big_opL fst snd];
            rewrite demo_den_a1 demo_den_a2 !demo_den_x;
            cbn [demo_ρ]) in "Hheap".
     iDestruct "Hheap" as "(Hw1 & Hw2 & _)".
