@@ -132,7 +132,6 @@ Section WpIntrStep.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* stack-page geometry *)
     (* SRET *)
@@ -149,7 +148,7 @@ Section WpIntrStep.
       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros HN Hmm HPBMTE Hpmm HX HW HR Hpmpp Hpteregion Halignp Hpmpcov Hlpe0.
+    intros HN Hmm HPBMTE Hpmm HX HW HR Hpmpp Hpteregion Hpmpcov Hlpe0.
     iIntros "#Hhw #Hinv #Htext HP Hpc Hfile Hcont".
     iRevert "HP Hpc Hfile Hcont".
     iLöb as "IH".
@@ -251,7 +250,7 @@ Section WpIntrStep.
                 (trap_ms_SXL_eq elp0 ms HSXL)
                 Hmm HPBMTE
                 (trap_ms_MXR_true elp0 ms HMXR)
-                Hpmm Hpmpp Hpteregion Halignp Hpmpcov HX HW HR
+                Hpmm Hpmpp Hpteregion Hpmpcov HX HW HR
                 (trap_ms_TSR_false elp0 ms HTSR)
                 (sret_newpriv_trap_ms elp0 ms)
                 Hlpe0
@@ -273,7 +272,7 @@ Section WpIntrStep.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     - (* ---- no interrupt: the instruction executes ---- *)
       iApply (wp_acq_caddi_intr root_ppn E Phi m ms mie_v mdv0 menvcfg0 mip_v meip seip
-                pmpcfg0 pmpaddr00 region_pte HN HSXL Hmm Hdres HPBMTE HX Hpmpcov Hpmpp Hpteregion Halignp
+                pmpcfg0 pmpaddr00 region_pte HN HSXL Hmm Hdres HPBMTE HX Hpmpcov Hpmpp Hpteregion
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Hpmpc Hpmpa
                       Htlbinv Hpc Hfile Htext").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Hpmpc Hpmpa Htlbinv Hpc Hfile".

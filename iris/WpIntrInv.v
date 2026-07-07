@@ -173,7 +173,6 @@ Section WpIntrInv.
     (forall pmar0, pma_allows_all pmar0 ->
        matching_pma_region pmar0 (Physaddr (pte_paddr root_ppn)) 8 = Some region_pte /\
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     (* PMP: TOR entry 0 grants X on the whole kernelvec text + R/W on the frame *)
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
@@ -185,7 +184,7 @@ Section WpIntrInv.
     ⊢ intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64)
         (F_kv root_ppn svpn m menvcfg0 pmpcfg0 pmpaddr00).
   Proof.
-    intros HPBMTE Hpmm Hpmpp Hpteregion Halignp Hpmpcov HX HW HR Hlpe0.
+    intros HPBMTE Hpmm Hpmpp Hpteregion Hpmpcov HX HW HR Hlpe0.
     iModIntro. iIntros (elp_v ms pc0 mie_v mdv0 E Φ) "%HN %Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hstvec Hpc HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR).
     iDestruct "HF" as "(#Hhw & #Hinv & #Htext & Hmenv & Hpmpc & Hpmpa & Htlbinv & Hfile & Hwins)".
@@ -199,7 +198,7 @@ Section WpIntrInv.
               (trap_ms_SXL_eq elp_v ms HSXL)
               Hmm HPBMTE
               (trap_ms_MXR_true elp_v ms HMXR)
-              Hpmm Hpmpp Hpteregion Halignp Hpmpcov HX HW HR
+              Hpmm Hpmpp Hpteregion Hpmpcov HX HW HR
               (trap_ms_TSR_false elp_v ms HTSR)
               (sret_newpriv_trap_ms elp_v ms)
               Hlpe0
