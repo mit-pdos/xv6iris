@@ -62,8 +62,8 @@ Definition mycpu_pro_regs1 : gmap regidx sval :=
     (<[Regidx csp_rs1 := SX 2 (wrap64 (-16))]> vregs_init).
 
 Lemma mycpu_prologue_run :
-  vc_block_s (VSt KernelSyms.mycpu vregs_init mycpu_pro_heap0) mycpu_prologue
-  = Some (VSt (KernelSyms.mycpu + 8) mycpu_pro_regs1 mycpu_pro_heap1).
+  vc_block_s (VSt KernelSyms.mycpu vregs_init mycpu_pro_heap0 []) mycpu_prologue
+  = Some (VSt (KernelSyms.mycpu + 8) mycpu_pro_regs1 mycpu_pro_heap1 []).
 Proof. vm_compute. reflexivity. Qed.
 
 (* the epilogue runs with sp already at sp' (the decremented value), so its
@@ -77,8 +77,8 @@ Definition mycpu_epi_regs1 : gmap regidx sval :=
        (<[Regidx (mword_of_int 1 : mword 5) := SX 33 0]> vregs_init)).
 
 Lemma mycpu_epilogue_run :
-  vc_block_s (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap) mycpu_epilogue
-  = Some (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap).
+  vc_block_s (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap []) mycpu_epilogue
+  = Some (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap []).
 Proof. vm_compute. reflexivity. Qed.
 
 Section WpMycpuVc.
@@ -249,19 +249,20 @@ Section WpMycpuVc.
     iDestruct (mycpu_prologue_instrs with "Htext") as "Hbi".
     iEval (rewrite -HdenA) in "Hfile".
     iApply (wp_vc_block_s root_ppn mycpu_prologue E Φ
-              (VSt KernelSyms.mycpu vregs_init mycpu_pro_heap0)
-              (VSt (KernelSyms.mycpu + 8) mycpu_pro_regs1 mycpu_pro_heap1)
+              (VSt KernelSyms.mycpu vregs_init mycpu_pro_heap0 [])
+              (VSt (KernelSyms.mycpu + 8) mycpu_pro_regs1 mycpu_pro_heap1 [])
               ρA mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hramcov Hpmpp Hpteregion
               HW HR mycpu_prologue_run
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
-                    Hpc Hfile Hbi [Hbra Hbs0]").
+                    Hpc Hfile Hbi [Hbra Hbs0] []").
     { rewrite /vheap_own. cbn [vheap].
       rewrite /mycpu_pro_heap0.
       rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
       cbn [fst snd]. rewrite Hara Has0 Hvra Hvs0.
       iFrame "Hbra Hbs0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap".
+    { rewrite /vheap4_own. cbn [vheap4]. done. }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap _".
     (* SEAM 1 exit: the symbolic post-state denotes to m2 / the stored words *)
     assert (Hspv : sval_den ρA (SX 2 (wrap64 (-16))) = sp').
     { cbn [sval_den].
@@ -409,18 +410,19 @@ Section WpMycpuVc.
     iEval (rewrite -HdenB) in "Hfile".
     iDestruct (mycpu_epilogue_instrs with "Htext") as "Hbi2".
     iApply (wp_vc_block_s root_ppn mycpu_epilogue E Φ
-              (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap)
-              (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap)
+              (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap [])
+              (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap [])
               ρB mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hramcov Hpmpp Hpteregion
               HW HR mycpu_epilogue_run
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
-                    Hpc Hfile Hbi2 [Hbra Hbs0]").
+                    Hpc Hfile Hbi2 [Hbra Hbs0] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /mycpu_epi_heap.
       rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
       cbn [fst snd]. rewrite HaraB Has0B HvraB Hvs0B.
       iFrame "Hbra Hbs0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap".
+    { rewrite /vheap4_own. cbn [vheap4]. done. }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap _".
     (* SEAM 2 exit: the symbolic post-state denotes to m11 *)
     assert (Hsp16B : sval_den ρB (SX 2 16)
                      = add_vec (m10 !!! Regidx csp_rs1)

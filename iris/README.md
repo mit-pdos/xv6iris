@@ -408,10 +408,31 @@ branches.  Two things the example makes explicit:
   symbolic domain (`var + concrete offset`), and the VCgen honestly
   returns `None` rather than approximating.
 
-**Future work.**  Byte/4-byte-width heap cells (would absorb the
-`lw`/`sw` steps of pop_off and memset's `sb`); more `vop`s (shifts, logic
-ops, `mv`); an M-mode/S-mode-generic induction to avoid the duplicated
-per-mode lemma; and a footprint-*inference* pre-pass (run the executor
-with a fresh-variable-on-miss heap to *emit* the needed cells — it needs
-no soundness proof, since its output is re-checked by the verified
-`vc_block`).
+**4-byte (word) cells and 32-bit tracking.**  The symbolic domain has a
+second layer for `lw`/`sw`/`addiw`: `sval32` (32-bit constant, or "low
+word of variable x plus offset") and a register shape `S32` denoting a
+sign-extended word — so `lw` loads a cell's word into a register, `addiw`
+does the arithmetic *in the 32-bit domain* (`vc_step` computes, e.g.,
+"low word of a5, minus one" as `SX32 15 (2³²−1)`), and `sw` stores
+`sval_trunc32` of any register back into a cell.  Cells live in a second
+heap (`vheap4`, one `word4_pointsto` each — the 4-byte `↦₈` analogue,
+alignment bundled).  The bv layer behind it is the `trunc32` algebra
+(`trunc32_sext`, `trunc32_add`, `trunc32_subrange`, …): truncation
+commutes with the model's sign-extensions and sums, which is exactly why
+the ADDIW leaf's `sext64 (subrange (x + imm) 31 0)` normalizes into the
+symbolic form.  The `wp_clw_s_ram`/`wp_csw_s_ram` wrappers derive the ten
+per-address translation/PMP geometry facts of the underlying leaves from
+the cell's RAM-ness + alignment, so word cells need no side conditions
+either.  In `WpPopOffVc.v` this absorbs three more of pop_off's
+instructions: `c.lw a5,120(a0)` is a one-instruction block, and
+`c.addiw a5,-1; c.sw a5,120(a0)` is a single block whose `vm_compute` run
+carries the decrement symbolically into the stored word.  64-bit offset
+arithmetic on `S32` registers is guarded off (`sval_is64`) — the executor
+fails rather than approximates.
+
+**Future work.**  Byte-width cells for `lb`/`sb` (memset); more `vop`s
+(shifts, logic ops, `mv`); an M-mode/S-mode-generic induction to avoid the
+duplicated per-mode lemma; and a footprint-*inference* pre-pass (run the
+executor with a fresh-variable-on-miss heap to *emit* the needed cells —
+it needs no soundness proof, since its output is re-checked by the
+verified `vc_block`).

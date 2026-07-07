@@ -81,9 +81,43 @@ Local Open Scope Z_scope.
    Constants and offsets are kept CANONICAL in [0, 2^64) ([wrap64]d by every
    operation), so syntactic equality [sval_beq] decides denotational equality
    for same-variable values -- which is what memory-address matching needs. *)
+(* 32-bit symbolic values, for tracking lw/sw/addiw word (32-bit) data:
+   a constant, or "low 32 bits of variable x, plus offset".  [trunc32] is
+   spelled EXACTLY as the model's store-value extraction (wp_csw_s's
+   [storeval]), so the leaf WPs' terms match syntactically. *)
+Definition wrap32 (z : Z) : Z := bv_wrap 32 z.
+Definition trunc32 (w : mword 64) : mword 32 :=
+  autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 4 8) 1) 0).
+
+Inductive sval32 : Type :=
+  | SC32 (z : Z)               (* the constant [mword_of_int z : mword 32] *)
+  | SX32 (x : nat) (off : Z).  (* [trunc32 (ρ x) + off]                     *)
+
+Definition sval32_den (ρ : nat -> mword 64) (v : sval32) : mword 32 :=
+  match v with
+  | SC32 z => mword_of_int z
+  | SX32 x off => add_vec (trunc32 (ρ x)) (mword_of_int off)
+  end.
+
+Definition sval32_addZ (v : sval32) (d : Z) : sval32 :=
+  match v with
+  | SC32 z => SC32 (wrap32 (z + d))
+  | SX32 x o => SX32 x (wrap32 (o + d))
+  end.
+
+Definition sval32_beq (v w : sval32) : bool :=
+  match v, w with
+  | SC32 z1, SC32 z2 => Z.eqb z1 z2
+  | SX32 xa oa, SX32 xb ob => Nat.eqb xa xb && Z.eqb oa ob
+  | _, _ => false
+  end.
+
 Inductive sval : Type :=
   | SC (z : Z)                 (* the constant [mword_of_int z]            *)
-  | SX (x : nat) (off : Z).    (* [ρ x + off] for the valuation ρ          *)
+  | SX (x : nat) (off : Z)     (* [ρ x + off] for the valuation ρ          *)
+  | S32 (v : sval32).          (* [sign_extend' 64 (sval32_den ρ v)] -- a
+                                  register holding a sign-extended WORD
+                                  (the result of an lw / addiw)            *)
 
 Definition wrap64 (z : Z) : Z := bv_wrap 64 z.
 
@@ -91,39 +125,57 @@ Definition sval_den (ρ : nat -> mword 64) (v : sval) : mword 64 :=
   match v with
   | SC z => mword_of_int z
   | SX x off => add_vec (ρ x) (mword_of_int off)
+  | S32 w => sign_extend' 64 (sval32_den ρ w)
   end.
+
+(* 64-bit offset arithmetic is only meaningful on the non-S32 shapes; the
+   executors guard every use of [sval_addZ]/[sval_add] with [sval_is64]. *)
+Definition sval_is64 (v : sval) : bool :=
+  match v with S32 _ => false | _ => true end.
 
 (* add a concrete offset (the ADDI/address-computation workhorse). *)
 Definition sval_addZ (v : sval) (d : Z) : sval :=
   match v with
   | SC z => SC (wrap64 (z + d))
   | SX x o => SX x (wrap64 (o + d))
+  | S32 w => S32 w   (* junk clause; unreachable under the sval_is64 guards *)
   end.
 
 (* symbolic ADD: defined when at least one side is a constant.  var + var is
    representable in no normal form here, so the VCgen (honestly) fails on it. *)
 Definition sval_add (v w : sval) : option sval :=
   match v with
-  | SC z => Some (sval_addZ w z)
+  | SC z => if sval_is64 w then Some (sval_addZ w z) else None
   | SX _ _ => match w with
               | SC z => Some (sval_addZ v z)
-              | SX _ _ => None
+              | _ => None
               end
+  | S32 _ => None
   end.
 
 Definition sval_beq (v w : sval) : bool :=
   match v, w with
   | SC z1, SC z2 => Z.eqb z1 z2
   | SX xa oa, SX xb ob => Nat.eqb xa xb && Z.eqb oa ob
+  | S32 a, S32 b => sval32_beq a b
   | _, _ => false
   end.
 
-Lemma sval_beq_eq (v w : sval) : sval_beq v w = true -> v = w.
+Lemma sval32_beq_eq (v w : sval32) : sval32_beq v w = true -> v = w.
 Proof.
   destruct v as [za|xa oa], w as [zb|xb ob]; simpl; intro H; try discriminate.
   - apply Z.eqb_eq in H. by subst.
   - apply andb_true_iff in H as [Hx Ho].
     apply Nat.eqb_eq in Hx. apply Z.eqb_eq in Ho. by subst.
+Qed.
+
+Lemma sval_beq_eq (v w : sval) : sval_beq v w = true -> v = w.
+Proof.
+  destruct v as [za|xa oa|va], w as [zb|xb ob|vb]; simpl; intro H; try discriminate.
+  - apply Z.eqb_eq in H. by subst.
+  - apply andb_true_iff in H as [Hx Ho].
+    apply Nat.eqb_eq in Hx. apply Z.eqb_eq in Ho. by subst.
+  - apply sval32_beq_eq in H. by subst.
 Qed.
 
 (* ---- denotation algebra: the symbolic ops track the model's [add_vec] ---- *)
@@ -154,11 +206,13 @@ Proof.
   apply bv_eq. rewrite !bv_add_unsigned. f_equal. lia.
 Qed.
 
-(* the one lemma every register/address computation reduces to *)
+(* the one lemma every register/address computation reduces to (for the
+   64-bit shapes; the executors never apply [sval_addZ] to an [S32]) *)
 Lemma sval_den_addZ (ρ : nat -> mword 64) (v : sval) (d : Z) :
+  sval_is64 v = true ->
   sval_den ρ (sval_addZ v d) = add_vec (sval_den ρ v) (mword_of_int d).
 Proof.
-  destruct v as [z|x o]; simpl.
+  destruct v as [z|x o|w]; [intros _..|discriminate]; simpl.
   - rewrite mword_of_int_wrap.
     change (add_vec (mword_of_int z) (mword_of_int d))
       with (add_vec_int (mword_of_int z : mword 64) d).
@@ -175,10 +229,11 @@ Lemma sval_add_sound (ρ : nat -> mword 64) (u v w : sval) :
   sval_add u v = Some w ->
   sval_den ρ w = add_vec (sval_den ρ u) (sval_den ρ v).
 Proof.
-  destruct u as [za|xa oa]; cbn [sval_add]; intro H.
-  - injection H as <-. rewrite sval_den_addZ. cbn [sval_den].
+  destruct u as [za|xa oa|wa]; cbn [sval_add]; intro H; [| |discriminate].
+  - destruct (sval_is64 v) eqn:H64; [|discriminate].
+    injection H as <-. rewrite (sval_den_addZ _ _ _ H64). cbn [sval_den].
     apply add_vec_comm.
-  - destruct v as [zb|xb ob]; [|discriminate].
+  - destruct v as [zb|xb ob|wb]; [|discriminate|discriminate].
     injection H as <-. cbn [sval_den].
     (* injection normalizes [sval_addZ (SX xa oa) zb]; redo its SX case *)
     rewrite mword_of_int_wrap.
@@ -194,17 +249,29 @@ Qed.
    [sign_extend' 64 imm].  Computable ([vm_compute]) for concrete [imm]. *)
 Definition zimm12 (imm : mword 12) : Z := uint (sign_extend' 64 imm : mword 64).
 
+(* the ADDIW immediate as a canonical 32-bit Z (c.addiw carries a 6-bit
+   immediate that the decoder widens twice). *)
+Definition zimm32 (imm : mword 6) : Z :=
+  uint (trunc32 (sign_extend' 64 (sign_extend' 12 imm)) : mword 32).
+
 Lemma sval_den_add_imm (ρ : nat -> mword 64) (v : sval) (imm : mword 12) :
+  sval_is64 v = true ->
   sval_den ρ (sval_addZ v (zimm12 imm)) =
   add_vec (sval_den ρ v) (sign_extend' 64 imm).
-Proof. rewrite sval_den_addZ. unfold zimm12. by rewrite mword_of_int_uint. Qed.
+Proof.
+  intro H64. rewrite (sval_den_addZ _ _ _ H64). unfold zimm12.
+  by rewrite mword_of_int_uint.
+Qed.
 
 (* the fully general offset form (any 64-bit offset word, canonical Z = its
    uint) -- used by the S-mode c.sdsp/c.ldsp cases, whose offsets are
    zero-extended rather than sign-extended. *)
 Lemma sval_den_add_off (ρ : nat -> mword 64) (v : sval) (off : mword 64) :
+  sval_is64 v = true ->
   sval_den ρ (sval_addZ v (uint off)) = add_vec (sval_den ρ v) off.
-Proof. rewrite sval_den_addZ. by rewrite mword_of_int_uint. Qed.
+Proof.
+  intro H64. rewrite (sval_den_addZ _ _ _ H64). by rewrite mword_of_int_uint.
+Qed.
 
 (* collapse two consecutive concrete offsets into one canonical one; the
    seam lemma for matching a hand-proof's [add_vec (add_vec x o1) o2]
@@ -219,6 +286,161 @@ Proof.
   change (add_vec x (mword_of_int (uint o1 + uint o2)))
     with (add_vec_int x (uint o1 + uint o2)).
   apply avi_assoc.
+Qed.
+
+(* ---- the 32-bit (word) algebra: trunc32 / sign-extension interplay ---- *)
+
+(* the ADDIW leaf spells the truncation as a bare [subrange _ 31 0]; the
+   outer [autocast] of [trunc32] is between CONVERTIBLE indices
+   ((4*8-1)-0+1 vs 32), so [change] them equal first. *)
+Lemma trunc32_subrange (w : mword 64) :
+  trunc32 w = subrange_vec_dec w 31 0.
+Proof.
+  unfold trunc32.
+  change (Z.sub (Z.mul 4 8) 1) with 31.
+  change (31 - 0 + 1) with 32.
+  apply autocast_id.
+Qed.
+
+(* the unsigned view of [trunc32]: plain wrap to 32 bits. *)
+Lemma trunc32_unsigned (w : mword 64) :
+  bv_unsigned (trunc32 w) = bv_wrap 32 (bv_unsigned w).
+Proof.
+  rewrite trunc32_subrange.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  rewrite bv_extract_0_unsigned.
+  change (MachineWord.MachineWord.Z_idx (31 - 0 + 1)) with 32%N.
+  reflexivity.
+Qed.
+
+(* wrapping a signed reading back to 32 bits recovers the unsigned reading. *)
+Lemma wrap32_swrap (u : Z) : bv_wrap 32 (bv_swrap 32 u) = bv_wrap 32 u.
+Proof.
+  unfold bv_swrap, bv_wrap.
+  rewrite Zminus_mod_idemp_l. f_equal. lia.
+Qed.
+
+(* truncation cancels sign extension (an lw'd value stored back by sw). *)
+Lemma trunc32_sext (w : mword 32) : trunc32 (sign_extend' 64 w) = w.
+Proof.
+  apply bv_eq. rewrite trunc32_unsigned.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  rewrite bv_wrap_bv_wrap; [|lia].
+  unfold bv_signed. rewrite wrap32_swrap.
+  apply bv_wrap_small, bv_unsigned_in_range.
+Qed.
+
+(* truncation distributes over 64-bit addition (low bits of a sum). *)
+Lemma trunc32_add (a b : mword 64) :
+  trunc32 (add_vec a b) = add_vec (trunc32 a) (trunc32 b).
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+         SailStdpp.Values.with_word, MachineWord.MachineWord.add.
+  apply bv_eq.
+  rewrite trunc32_unsigned.
+  rewrite bv_add_unsigned.
+  rewrite bv_add_unsigned.
+  rewrite !trunc32_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  change (MachineWord.MachineWord.Z_idx 32) with 32%N.
+  rewrite bv_wrap_bv_wrap; [|lia].
+  rewrite bv_wrap_add_idemp. reflexivity.
+Qed.
+
+(* truncation of a 64-bit constant is the 32-bit constant. *)
+Lemma trunc32_mword_of_int (z : Z) :
+  trunc32 (mword_of_int z : mword 64) = (mword_of_int z : mword 32).
+Proof.
+  apply bv_eq. rewrite trunc32_unsigned.
+  unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite !Z_to_bv_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  change (MachineWord.MachineWord.Z_idx 32) with 32%N.
+  rewrite bv_wrap_bv_wrap; [|lia]. reflexivity.
+Qed.
+
+(* the 32-bit twins of the 64-bit constant lemmas. *)
+Lemma mword_of_int_wrap32' (z : Z) :
+  (mword_of_int (wrap32 z) : mword 32) = mword_of_int z.
+Proof.
+  unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
+  apply bv_eq. rewrite !Z_to_bv_unsigned.
+  change (MachineWord.MachineWord.Z_idx 32) with 32%N.
+  unfold wrap32. apply bv_wrap_bv_wrap. lia.
+Qed.
+
+Lemma mword_of_int_uint32 (w : mword 32) : mword_of_int (uint w) = w.
+Proof.
+  unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  pose proof (bv_unsigned_in_range _ w) as Hr.
+  rewrite Z2N.id; [|lia].
+  change (MachineWord.MachineWord.Z_idx 32) with 32%N.
+  apply Z_to_bv_bv_unsigned.
+Qed.
+
+Lemma avi_assoc32 (a : mword 32) (x y : Z) :
+  add_vec (add_vec a (mword_of_int x)) (mword_of_int y)
+  = add_vec a (mword_of_int (x + y)).
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+         SailStdpp.Values.with_word, mword_of_int,
+         MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
+  apply bv_eq. rewrite !bv_add_unsigned !Z_to_bv_unsigned.
+  change (MachineWord.MachineWord.Z_idx 32) with 32%N.
+  rewrite bv_wrap_add_idemp_l.
+  rewrite !bv_wrap_add_idemp_r.
+  rewrite Z.add_shuffle0.
+  rewrite bv_wrap_add_idemp_r.
+  f_equal. lia.
+Qed.
+
+(* 32-bit "+0 is identity" (the twin of avi0). *)
+Lemma avi0_32 (a : mword 32) : add_vec a (mword_of_int 0) = a.
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+         SailStdpp.Values.with_word, mword_of_int,
+         MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
+  apply bv_eq. rewrite bv_add_unsigned Z_to_bv_unsigned.
+  rewrite bv_wrap_0 Z.add_0_r. apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+(* sval32 offset arithmetic tracks 32-bit add_vec. *)
+Lemma sval32_den_addZ (ρ : nat -> mword 64) (v : sval32) (d : Z) :
+  sval32_den ρ (sval32_addZ v d) = add_vec (sval32_den ρ v) (mword_of_int d).
+Proof.
+  destruct v as [z|x o]; simpl.
+  - rewrite mword_of_int_wrap32'.
+    unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
+    apply bv_eq. rewrite bv_add_unsigned !Z_to_bv_unsigned.
+    change (MachineWord.MachineWord.Z_idx 32) with 32%N.
+    rewrite bv_wrap_add_idemp. reflexivity.
+  - rewrite mword_of_int_wrap32'.
+    symmetry. apply avi_assoc32.
+Qed.
+
+(* truncate a 64-bit symbolic value to a 32-bit one (total; sound). *)
+Definition sval_trunc32 (v : sval) : sval32 :=
+  match v with
+  | SC z => SC32 (wrap32 z)
+  | SX x off => SX32 x (wrap32 off)
+  | S32 w => w
+  end.
+
+Lemma sval_trunc32_den (ρ : nat -> mword 64) (v : sval) :
+  sval32_den ρ (sval_trunc32 v) = trunc32 (sval_den ρ v).
+Proof.
+  destruct v as [z|x o|w]; simpl.
+  - rewrite mword_of_int_wrap32' trunc32_mword_of_int. reflexivity.
+  - rewrite trunc32_add trunc32_mword_of_int mword_of_int_wrap32'.
+    reflexivity.
+  - rewrite trunc32_sext. reflexivity.
 Qed.
 
 (* decidable equality on register indices (via the uint injection). *)
@@ -260,11 +482,13 @@ Definition vinstr : Type := bool * vop.
 Record vstate := VSt {
   vpc   : Z;
   vregs : gmap regidx sval;
-  vheap : list (sval * sval);
+  vheap : list (sval * sval);       (* 8-byte cells: (address, value)      *)
+  vheap4 : list (sval * sval32);    (* 4-byte cells: (address, word value) *)
 }.
 
-(* find the heap cell at (syntactically) address [a]: index + stored value. *)
-Fixpoint vheap_find (h : list (sval * sval)) (a : sval) : option (nat * sval) :=
+(* find the heap cell at (syntactically) address [a]: index + stored value.
+   Polymorphic in the cell datum (8-byte cells store [sval], 4-byte [sval32]). *)
+Fixpoint vheap_find {A : Type} (h : list (sval * A)) (a : sval) : option (nat * A) :=
   match h with
   | nil => None
   | (a', v) :: t => if sval_beq a' a then Some (0%nat, v)
@@ -274,7 +498,7 @@ Fixpoint vheap_find (h : list (sval * sval)) (a : sval) : option (nat * sval) :=
                          end
   end.
 
-Lemma vheap_find_lookup (h : list (sval * sval)) (a : sval) (i : nat) (v : sval) :
+Lemma vheap_find_lookup {A : Type} (h : list (sval * A)) (a : sval) (i : nat) (v : A) :
   vheap_find h a = Some (i, v) -> h !! i = Some (a, v).
 Proof.
   revert i. induction h as [|[a' v'] t IH]; intros i H; simpl in H; [discriminate|].
@@ -296,8 +520,10 @@ Definition vc_step (st : vstate) (x : vinstr) : option vstate :=
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx rs1 with
       | Some v1 =>
-          Some (VSt pc' (<[Regidx rd := sval_addZ v1 (zimm12 imm)]> st.(vregs))
-                    st.(vheap))
+          if sval_is64 v1 then
+            Some (VSt pc' (<[Regidx rd := sval_addZ v1 (zimm12 imm)]> st.(vregs))
+                      st.(vheap) st.(vheap4))
+          else None
       | None => None
       end
   | Vadd rs2 rs1 rd =>
@@ -306,7 +532,7 @@ Definition vc_step (st : vstate) (x : vinstr) : option vstate :=
       | Some v1, Some v2 =>
           match sval_add v1 v2 with
           | Some v =>
-              Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap))
+              Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap) st.(vheap4))
           | None => None
           end
       | _, _ => None
@@ -314,14 +540,15 @@ Definition vc_step (st : vstate) (x : vinstr) : option vstate :=
   | Vlui imm rd =>
       if Z.eqb (uint rd) 0 then None else
       Some (VSt pc' (<[Regidx rd := SC (uint (luival imm))]> st.(vregs))
-                st.(vheap))
+                st.(vheap) st.(vheap4))
   | Vld imm rs1 rd =>
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx rs1 with
       | Some v1 =>
+          if negb (sval_is64 v1) then None else
           match vheap_find st.(vheap) (sval_addZ v1 (zimm12 imm)) with
           | Some (_, v) =>
-              Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap))
+              Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap) st.(vheap4))
           | None => None
           end
       | None => None
@@ -329,10 +556,11 @@ Definition vc_step (st : vstate) (x : vinstr) : option vstate :=
   | Vsd imm rs2 rs1 =>
       match st.(vregs) !! Regidx rs1, st.(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
+          if negb (sval_is64 v1) then None else
           let a := sval_addZ v1 (zimm12 imm) in
           match vheap_find st.(vheap) a with
           | Some (i, _) =>
-              Some (VSt pc' st.(vregs) (<[i := (a, v2)]> st.(vheap)))
+              Some (VSt pc' st.(vregs) (<[i := (a, v2)]> st.(vheap)) st.(vheap4))
           | None => None
           end
       | _, _ => None
@@ -424,6 +652,7 @@ Section VcGenIris.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
         iApply (wp_addi_gpr E Φ (mword_of_int (vpc st)) rvc rs1 rd imm
                   (vregs_den ρ (vregs st)) pmpcfg0 q HN
@@ -436,7 +665,7 @@ Section VcGenIris.
                              (sign_extend' 64 imm))]> (vregs_den ρ (vregs st))
                 = vregs_den ρ (<[Regidx rd := sval_addZ v1 (zimm12 imm)]> (vregs st))).
         { rewrite (vregs_den_lookup ρ _ _ _ Hrs1). unfold regval_into_reg.
-          rewrite -sval_den_add_imm. apply vregs_den_insert. }
+          rewrite -(sval_den_add_imm ρ v1 imm H64). apply vregs_den_insert. }
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hmm Hpmpc Hpc Hgpr Hbi Hheap Hcont").
       + (* Vadd *)
@@ -484,6 +713,7 @@ Section VcGenIris.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
         destruct (vheap_find (vheap st) (sval_addZ v1 (zimm12 imm)))
           as [[i vv]|] eqn:Hfind; [|discriminate].
         injection Hstep as <-.
@@ -491,7 +721,8 @@ Section VcGenIris.
         assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
                       = add_vec (vregs_den ρ (vregs st) !!! Regidx rs1)
                                 (sign_extend' 64 imm)).
-        { rewrite sval_den_add_imm (vregs_den_lookup ρ _ _ _ Hrs1). reflexivity. }
+        { rewrite (sval_den_add_imm ρ v1 imm H64)
+                  (vregs_den_lookup ρ _ _ _ Hrs1). reflexivity. }
         rewrite /vheap_own.
         iDestruct (big_sepL_lookup_acc _ _ _ _ Hcell with "Hheap")
           as "[Hcell Hheapk]".
@@ -513,6 +744,7 @@ Section VcGenIris.
       + (* Vsd *)
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
         destruct (vheap_find (vheap st) (sval_addZ v1 (zimm12 imm)))
           as [[i vold]|] eqn:Hfind; [|discriminate].
         injection Hstep as <-.
@@ -520,7 +752,8 @@ Section VcGenIris.
         assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
                       = add_vec (vregs_den ρ (vregs st) !!! Regidx rs1)
                                 (sign_extend' 64 imm)).
-        { rewrite sval_den_add_imm (vregs_den_lookup ρ _ _ _ Hrs1). reflexivity. }
+        { rewrite (sval_den_add_imm ρ v1 imm H64)
+                  (vregs_den_lookup ρ _ _ _ Hrs1). reflexivity. }
         rewrite /vheap_own.
         iDestruct (big_sepL_insert_acc _ _ _ _ Hcell with "Hheap")
           as "[Hcell Hheapk]".

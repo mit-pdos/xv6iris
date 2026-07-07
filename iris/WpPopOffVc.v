@@ -44,13 +44,45 @@ Local Open Scope Z_scope.
    mycpu's ([mycpu_prologue]/[mycpu_epilogue] from WpMycpuVc), just at
    pop_off's addresses: two fresh one-line runs. *)
 Lemma popoff_prologue_run :
-  vc_block_s (VSt KernelSyms.pop_off vregs_init mycpu_pro_heap0) mycpu_prologue
-  = Some (VSt (KernelSyms.pop_off + 8) mycpu_pro_regs1 mycpu_pro_heap1).
+  vc_block_s (VSt KernelSyms.pop_off vregs_init mycpu_pro_heap0 []) mycpu_prologue
+  = Some (VSt (KernelSyms.pop_off + 8) mycpu_pro_regs1 mycpu_pro_heap1 []).
 Proof. vm_compute. reflexivity. Qed.
 
 Lemma popoff_epilogue_run :
-  vc_block_s (VSt (KernelSyms.pop_off + 0x28) vregs_init mycpu_epi_heap) mycpu_epilogue
-  = Some (VSt (KernelSyms.pop_off + 0x2e) mycpu_epi_regs1 mycpu_epi_heap).
+  vc_block_s (VSt (KernelSyms.pop_off + 0x28) vregs_init mycpu_epi_heap []) mycpu_epilogue
+  = Some (VSt (KernelSyms.pop_off + 0x2e) mycpu_epi_regs1 mycpu_epi_heap []).
+Proof. vm_compute. reflexivity. Qed.
+
+(* ---- the 4-byte-cell blocks: noff sits at [a0 + 120]; its cell is
+   [(SX 10 120, SX32 33 0)] (variable 33 = the pre-decrement word). ---- *)
+Definition popoff_lw_prog : list vop_s :=
+  [ VSclw (mword_of_int 120) (mword_of_int 10) (mword_of_int 15) ].
+Definition popoff_noff_cell0 : list (sval * sval32) :=
+  [ (SX 10 120, SX32 33 0) ].
+
+Lemma popoff_lw_run :
+  vc_block_s (VSt (KernelSyms.pop_off + 0x14) vregs_init [] popoff_noff_cell0)
+             popoff_lw_prog
+  = Some (VSt (KernelSyms.pop_off + 0x16)
+              (<[Regidx (mword_of_int 15 : mword 5) := S32 (SX32 33 0)]> vregs_init)
+              [] popoff_noff_cell0).
+Proof. vm_compute. reflexivity. Qed.
+
+(* [c.addiw a5,-1; c.sw a5,120(a0)]: the decrement is TRACKED symbolically --
+   a5 becomes [S32 (SX32 15 (2^32-1))] (low 32 bits of a5, minus one), and the
+   store writes that word back into the cell. *)
+Definition popoff_decsw_prog : list vop_s :=
+  [ VScaddiw (mword_of_int 63) (mword_of_int 15);
+    VScsw (mword_of_int 120) (mword_of_int 15) (mword_of_int 10) ].
+Definition popoff_noff_cell1 : list (sval * sval32) :=
+  [ (SX 10 120, SX32 15 4294967295) ].
+
+Lemma popoff_decsw_run :
+  vc_block_s (VSt (KernelSyms.pop_off + 0x1a) vregs_init [] popoff_noff_cell0)
+             popoff_decsw_prog
+  = Some (VSt (KernelSyms.pop_off + 0x1e)
+              (<[Regidx (mword_of_int 15 : mword 5) := S32 (SX32 15 4294967295)]> vregs_init)
+              [] popoff_noff_cell1).
 Proof. vm_compute. reflexivity. Qed.
 
 Section WpPopOffVc.
@@ -320,19 +352,20 @@ Section WpPopOffVc.
     iDestruct (popoff_prologue_instrs with "Htext") as "Hbi".
     iEval (rewrite -HdenA) in "Hfile".
     iApply (wp_vc_block_s root_ppn mycpu_prologue E Φ
-              (VSt PP vregs_init mycpu_pro_heap0)
-              (VSt (PP + 8) mycpu_pro_regs1 mycpu_pro_heap1)
+              (VSt PP vregs_init mycpu_pro_heap0 [])
+              (VSt (PP + 8) mycpu_pro_regs1 mycpu_pro_heap1 [])
               ρA mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
               (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion
               HW HR popoff_prologue_run
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
-                    Hpc Hfile Hbi [Hp8 Hp0]").
+                    Hpc Hfile Hbi [Hp8 Hp0] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /mycpu_pro_heap0.
       rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
       cbn [fst snd]. rewrite Hara Has0 Hv33 Hv34.
       iFrame "Hp8 Hp0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap".
+    { rewrite /vheap4_own. cbn [vheap4]. done. }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap _".
     (* seam out: denote the symbolic post-state as P2 (the hand-proof's map) *)
     set (P1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
     assert (HspP1 : P1 !!! Regidx csp_rs1 = spd)
@@ -446,23 +479,60 @@ Section WpPopOffVc.
     { rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       exact Ha0C. }
-    assert (HAnoff4 : add_vec (P4 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 120 : mword 12)) = a_noff)
-      by (rewrite Ha0P4; reflexivity).
     pose proof Hg_noff as (Ncanon & Nvpn & Nident & Nmask & Nvpn2 & Nmvpn & Nmppn & Nrange & Nalign & Npalign).
-    iApply (wp_clw_s root_ppn E Φ (mword_of_int (PP + 0x14)) (mword_of_int 15) (mword_of_int 10)
-              (mword_of_int 120) svpn_noff P4 noffv mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
-              ltac:(rewrite HAnoff4; exact Ncanon) ltac:(rewrite HAnoff4; exact Nvpn) ltac:(rewrite HAnoff4; exact Nident)
-              Nmask Nvpn2 Nmvpn Nmppn Hpmpp Hpteregion ltac:(rewrite HAnoff4; exact Nrange) HR
-              ltac:(rewrite HAnoff4; exact Nalign) ltac:(rewrite HAnoff4; exact Npalign)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi14 [Hnoff] [-]").
-    { iEval (rewrite HAnoff4). iExact "Hnoff". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hnoff".
-    iEval (rewrite HAnoff4) in "Hnoff".
+    (* the noff word as a 4-byte VCgen cell: variable 33 carries the
+       (sign-extended) pre-decrement word, so [trunc32 (ρ 33) = noffv]. *)
+    iDestruct (gpr_file_dom with "Hfile") as "[%HdomP4 Hfile]".
+    iDestruct (gpr_file_x0 P4 (mword_of_int 0) ltac:(vm_compute; reflexivity)
+                 with "Hfile") as "[%Hx0P4 Hfile]".
+    set (ρD := fun k : nat =>
+           if (k <? 32)%nat
+           then P4 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
+           else sign_extend' 64 noffv).
+    assert (HdenD : vregs_den ρD vregs_init = P4).
+    { apply (vregs_den_init_agree _ _ HdomP4 Hx0P4). intros k Hk.
+      unfold ρD. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
+    assert (HaD : sval_den ρD (SX 10 120) = a_noff).
+    { cbn [sval_den].
+      replace (ρD 10%nat) with (P4 !!! Regidx (mword_of_int 10 : mword 5))
+        by (unfold ρD; reflexivity).
+      rewrite Ha0P4. unfold a_noff. f_equal;
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (HvD : sval32_den ρD (SX32 33 0) = noffv).
+    { cbn [sval32_den].
+      replace (ρD 33%nat) with (sign_extend' 64 noffv) by (unfold ρD; reflexivity).
+      rewrite trunc32_sext. apply avi0_32. }
+    iAssert (block_instrs_s (PP + 0x14) popoff_lw_prog) with "[Hi14]" as "Hbi14".
+    { cbn [block_instrs_s popoff_lw_prog vop_s_ast]. iFrame "Hi14". }
+    iEval (rewrite -HdenD) in "Hfile".
+    iApply (wp_vc_block_s root_ppn popoff_lw_prog E Φ
+              (VSt (PP + 0x14) vregs_init [] popoff_noff_cell0)
+              (VSt (PP + 0x16)
+                 (<[Regidx (mword_of_int 15 : mword 5) := S32 (SX32 33 0)]> vregs_init)
+                 [] popoff_noff_cell0)
+              ρD mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
+              (dq:=DfracOwn 1)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion
+              HW HR popoff_lw_run
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+                    Hpc Hfile Hbi14 [] [Hnoff]").
+    { rewrite /vheap_own. cbn [vheap]. done. }
+    { rewrite /vheap4_own. cbn [vheap4]. rewrite /popoff_noff_cell0.
+      rewrite big_sepL_cons big_sepL_nil. cbn [fst snd].
+      rewrite HaD HvD. rewrite /word4_pointsto.
+      iFrame "Hnoff". iPureIntro. exact (conj Nalign Npalign). }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile _ Hheap4".
     set (P5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 noffv)]> P4).
-    assert (Hpp16 : add_vec_int (mword_of_int (PP + 0x14) : mword 64) 2 = mword_of_int (PP + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp16) in "Hpc".
+    assert (HP5den : vregs_den ρD
+              (<[Regidx (mword_of_int 15 : mword 5) := S32 (SX32 33 0)]> vregs_init)
+              = P5).
+    { rewrite -vregs_den_insert HdenD.
+      unfold P5, regval_into_reg. cbn [sval_den]. rewrite HvD. reflexivity. }
+    iEval (rewrite HP5den) in "Hfile".
+    iEval (rewrite /vheap4_own; cbn [vheap4]; rewrite /popoff_noff_cell0;
+           rewrite big_sepL_cons big_sepL_nil; cbn [fst snd];
+           rewrite HaD HvD) in "Hheap4".
+    iDestruct "Hheap4" as "[Hnoffw _]".
     (* +0x16 blez a5 NOT taken (noff >= 1) *)
     assert (Ha5P5 : P5 !!! Regidx (mword_of_int 15 : mword 5) = sign_extend' 64 noffv)
       by (rewrite /P5; apply lookup_total_insert).
@@ -475,41 +545,98 @@ Section WpPopOffVc.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
     assert (Hpp1a : add_vec_int (mword_of_int (PP + 0x16) : mword 64) 4 = mword_of_int (PP + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
-    (* +0x1a c.addiw a5,-1 *)
-    iApply (wp_caddiw_s root_ppn E Φ (mword_of_int (PP + 0x1a)) (mword_of_int 15) (mword_of_int 63 : mword 6)
-              P5 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi1a [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
+    (* +0x1a c.addiw a5,-1 ; +0x1c c.sw a5,120(a0) -- ONE VCgen block: the
+       decrement happens in the 32-bit symbolic domain (a5 becomes
+       [S32 (SX32 15 (2^32-1))], i.e. "low word of a5, minus one") and the
+       store writes that word back into the noff cell. *)
+    iDestruct (gpr_file_dom with "Hfile") as "[%HdomP5 Hfile]".
+    iDestruct (gpr_file_x0 P5 (mword_of_int 0) ltac:(vm_compute; reflexivity)
+                 with "Hfile") as "[%Hx0P5 Hfile]".
+    set (ρE := fun k : nat =>
+           if (k <? 32)%nat
+           then P5 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
+           else sign_extend' 64 noffv).
+    assert (HdenE : vregs_den ρE vregs_init = P5).
+    { apply (vregs_den_init_agree _ _ HdomP5 Hx0P5). intros k Hk.
+      unfold ρE. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
+    assert (Ha0P5 : P5 !!! Regidx (mword_of_int 10 : mword 5) = a0v).
+    { rewrite /P5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      exact Ha0P4. }
+    assert (HaE : sval_den ρE (SX 10 120) = a_noff).
+    { cbn [sval_den].
+      replace (ρE 10%nat) with (P5 !!! Regidx (mword_of_int 10 : mword 5))
+        by (unfold ρE; reflexivity).
+      rewrite Ha0P5. unfold a_noff. f_equal;
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (HvE : sval32_den ρE (SX32 33 0) = noffv).
+    { cbn [sval32_den].
+      replace (ρE 33%nat) with (sign_extend' 64 noffv) by (unfold ρE; reflexivity).
+      rewrite trunc32_sext. apply avi0_32. }
+    iAssert (block_instrs_s (PP + 0x1a) popoff_decsw_prog) with "[Hi1a Hi1c]" as "Hbi1a".
+    { cbn [block_instrs_s popoff_decsw_prog vop_s_ast].
+      replace (PP + 0x1a + 2) with (PP + 0x1c) by lia.
+      iFrame "Hi1a Hi1c". }
+    iEval (rewrite -HdenE) in "Hfile".
+    iApply (wp_vc_block_s root_ppn popoff_decsw_prog E Φ
+              (VSt (PP + 0x1a) vregs_init [] popoff_noff_cell0)
+              (VSt (PP + 0x1e)
+                 (<[Regidx (mword_of_int 15 : mword 5) := S32 (SX32 15 4294967295)]> vregs_init)
+                 [] popoff_noff_cell1)
+              ρE mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
+              (dq:=DfracOwn 1)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion
+              HW HR popoff_decsw_run
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
+                    Hpc Hfile Hbi1a [] [Hnoffw]").
+    { rewrite /vheap_own. cbn [vheap]. done. }
+    { rewrite /vheap4_own. cbn [vheap4]. rewrite /popoff_noff_cell0.
+      rewrite big_sepL_cons big_sepL_nil. cbn [fst snd].
+      rewrite HaE HvE. iFrame "Hnoffw". }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile _ Hheap4".
     set (P6 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (sign_extend' 64 (subrange_vec_dec
            (add_vec (P5 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))]> P5).
+    (* the decremented word: -1 as a 32-bit immediate *)
+    assert (Hc63 : (mword_of_int 4294967295 : mword 32)
+                   = trunc32 (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))).
+    { apply bv_eq. vm_compute. reflexivity. }
+    assert (Ha5den : sval_den ρE (S32 (SX32 15 4294967295))
+                     = sign_extend' 64 (subrange_vec_dec
+                         (add_vec (P5 !!! Regidx (mword_of_int 15 : mword 5))
+                            (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)).
+    { cbn [sval_den sval32_den].
+      replace (ρE 15%nat) with (P5 !!! Regidx (mword_of_int 15 : mword 5))
+        by (unfold ρE; reflexivity).
+      rewrite Hc63 -trunc32_add trunc32_subrange. reflexivity. }
+    assert (HP6den : vregs_den ρE
+              (<[Regidx (mword_of_int 15 : mword 5) := S32 (SX32 15 4294967295)]> vregs_init)
+              = P6).
+    { rewrite -vregs_den_insert HdenE.
+      unfold P6, regval_into_reg. rewrite Ha5den. reflexivity. }
+    iEval (rewrite HP6den) in "Hfile".
     assert (Ha5P6 : P6 !!! Regidx (mword_of_int 15 : mword 5) = nv1).
     { rewrite /P6. rewrite lookup_total_insert. rewrite Ha5P5. reflexivity. }
-    assert (Hpp1c : add_vec_int (mword_of_int (PP + 0x1a) : mword 64) 2 = mword_of_int (PP + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp1c) in "Hpc".
-    (* +0x1c c.sw a5,120(a0): noff := noff-1 *)
     assert (Ha0P6 : P6 !!! Regidx (mword_of_int 10 : mword 5) = a0v).
     { rewrite /P6. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /P5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      exact Ha0P4. }
-    assert (HAnoff6 : add_vec (P6 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 120 : mword 12)) = a_noff)
-      by (rewrite Ha0P6; reflexivity).
-    iApply (wp_csw_s root_ppn E Φ (mword_of_int (PP + 0x1c)) (mword_of_int 15) (mword_of_int 10)
-              (mword_of_int 120) svpn_noff P6 noffv mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
-              (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov
-              ltac:(rewrite HAnoff6; exact Ncanon) ltac:(rewrite HAnoff6; exact Nvpn) ltac:(rewrite HAnoff6; exact Nident)
-              Nmask Nvpn2 Nmvpn Nmppn Hpmpp Hpteregion ltac:(rewrite HAnoff6; exact Nrange) HW
-              ltac:(rewrite HAnoff6; exact Nalign) ltac:(rewrite HAnoff6; exact Npalign)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi1c [Hnoff] [-]").
-    { iEval (rewrite HAnoff6). iExact "Hnoff". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hnoff".
-    iEval (rewrite HAnoff6 Ha5P6) in "Hnoff".
-    assert (Hpp1e : add_vec_int (mword_of_int (PP + 0x1c) : mword 64) 2 = mword_of_int (PP + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp1e) in "Hpc".
-    (* the shared VCgen EPILOGUE (both bnez outcomes land on it): factored
-       here as a local Iris abbreviation applied in each branch. *)
+      exact Ha0P5. }
+    (* the stored word IS the statement's [storeval] *)
+    assert (Hstv : sval32_den ρE (SX32 15 4294967295) = storeval).
+    { cbn [sval32_den].
+      replace (ρE 15%nat) with (P5 !!! Regidx (mword_of_int 15 : mword 5))
+        by (unfold ρE; reflexivity).
+      rewrite Ha5P5.
+      unfold storeval. fold (trunc32 nv1). unfold nv1.
+      rewrite -trunc32_subrange.
+      rewrite trunc32_sext.
+      rewrite trunc32_add.
+      rewrite (trunc32_sext noffv).
+      rewrite -Hc63.
+      rewrite trunc32_sext. reflexivity. }
+    iEval (rewrite /vheap4_own; cbn [vheap4]; rewrite /popoff_noff_cell1;
+           rewrite big_sepL_cons big_sepL_nil; cbn [fst snd];
+           rewrite HaE Hstv) in "Hheap4".
+    iDestruct "Hheap4" as "[Hnoffw2 _]".
+    iDestruct "Hnoffw2" as "(_ & _ & Hnoff)".
     (* +0x1e c.bnez a5: both outcomes (noff-1 <> 0 / = 0) *)
     destruct (neq_vec nv1 zero_reg) eqn:Hnz.
     - (* taken: skip the intena check, straight to the epilogue at +0x28 *)
@@ -573,19 +700,20 @@ Section WpPopOffVc.
       iEval (rewrite -HdenC) in "Hfile".
       iDestruct (popoff_epilogue_instrs with "Htext") as "Hbi2".
       iApply (wp_vc_block_s root_ppn mycpu_epilogue E Φ
-                (VSt (PP + 0x28) vregs_init mycpu_epi_heap)
-                (VSt (PP + 0x2e) mycpu_epi_regs1 mycpu_epi_heap)
+                (VSt (PP + 0x28) vregs_init mycpu_epi_heap [])
+                (VSt (PP + 0x2e) mycpu_epi_regs1 mycpu_epi_heap [])
                 ρC mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
                 (dq:=DfracOwn 1)
                 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion
                 HW HR popoff_epilogue_run
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
-                      Hpc Hfile Hbi2 [Hp8 Hp0]").
+                      Hpc Hfile Hbi2 [Hp8 Hp0] []").
       { rewrite /vheap_own. cbn [vheap]. rewrite /mycpu_epi_heap.
         rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
         cbn [fst snd]. rewrite HaraC Has0C Hv33C Hv34C.
         iFrame "Hp8 Hp0". }
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap".
+      { rewrite /vheap4_own. cbn [vheap4]. done. }
+      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap _".
       (* seam out *)
       assert (Hsp16C : sval_den ρC (SX 2 16) = add_vec spd (mword_of_int 16)).
       { cbn [sval_den]. rewrite HspC2. reflexivity. }
@@ -742,19 +870,20 @@ Section WpPopOffVc.
       iEval (rewrite -HdenC) in "Hfile".
       iDestruct (popoff_epilogue_instrs with "Htext") as "Hbi2".
       iApply (wp_vc_block_s root_ppn mycpu_epilogue E Φ
-                (VSt (PP + 0x28) vregs_init mycpu_epi_heap)
-                (VSt (PP + 0x2e) mycpu_epi_regs1 mycpu_epi_heap)
+                (VSt (PP + 0x28) vregs_init mycpu_epi_heap [])
+                (VSt (PP + 0x2e) mycpu_epi_regs1 mycpu_epi_heap [])
                 ρC mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte
                 (dq:=DfracOwn 1)
                 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmyg Hramcov Hpmpp Hpteregion
                 HW HR popoff_epilogue_run
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
-                      Hpc Hfile Hbi2 [Hp8 Hp0]").
+                      Hpc Hfile Hbi2 [Hp8 Hp0] []").
       { rewrite /vheap_own. cbn [vheap]. rewrite /mycpu_epi_heap.
         rewrite big_sepL_cons big_sepL_cons big_sepL_nil.
         cbn [fst snd]. rewrite HaraC Has0C Hv33C Hv34C.
         iFrame "Hp8 Hp0". }
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap".
+      { rewrite /vheap4_own. cbn [vheap4]. done. }
+      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hheap _".
       assert (Hsp16C : sval_den ρC (SX 2 16) = add_vec spd (mword_of_int 16)).
       { cbn [sval_den]. rewrite HspC2. reflexivity. }
       set (Qf := <[Regidx csp_rs1 := add_vec spd (mword_of_int 16)]>

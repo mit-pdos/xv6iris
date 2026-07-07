@@ -55,7 +55,7 @@ Definition demo_heap0 : list (sval * sval) :=
     (SX 2 (wrap64 (-16)), SX 34 0) ].   (* [sp-16] : old word v2 *)
 
 Definition demo_st0 : vstate :=
-  VSt KernelSyms.timerinit vregs_init demo_heap0.
+  VSt KernelSyms.timerinit vregs_init demo_heap0 [].
 
 (* the symbolic post-state.  Note [ti_s0 ↦ SX 2 0]: the VCgen has computed
    s0 = (sp - 16) + 16 = the ORIGINAL sp, by canonical offset arithmetic. *)
@@ -66,7 +66,7 @@ Definition demo_heap1 : list (sval * sval) :=
   [ (SX 2 (wrap64 (-8)),  SX 1 0);      (* [sp-8]  = ra *)
     (SX 2 (wrap64 (-16)), SX 8 0) ].    (* [sp-16] = s0 *)
 Definition demo_st1 : vstate :=
-  VSt (KernelSyms.timerinit + 8) demo_regs1 demo_heap1.
+  VSt (KernelSyms.timerinit + 8) demo_regs1 demo_heap1 [].
 
 (* the whole symbolic execution of the block: ONE vm_compute. *)
 Lemma demo_run : vc_block demo_st0 demo_prog = Some demo_st1.
