@@ -84,3 +84,4 @@ WpAcquireLock.v
 WpKallocDecode.v
 WpFreelistMem.v
 WpKalloc.v
+WpKfree.v
