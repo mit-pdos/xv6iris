@@ -2565,7 +2565,7 @@ Qed.
   Lemma wp_memset_prefix (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64))
       (imm_entry shamt_l shamt_r : mword 6) (nzimm_s0 imm8_beqz : mword 8)
-      (i_add : instruction) (wval_add : mword 64)
+      (i_add : instruction) (wval_add : mword 64) (vra vs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (region_pte : PMA_Region) {dq : dfrac} :
@@ -2638,8 +2638,8 @@ Qed.
     instr (add_vec_int pcE 12) true (SHIFTIOP (shamt_l, Regidx a2_idx, Regidx a2_idx, SLLI)) -∗
     instr (add_vec_int pcE 14) true (SHIFTIOP (shamt_r, Regidx a2_idx, Regidx a2_idx, SRLI)) -∗
     instr (add_vec_int pcE 16) false i_add -∗
-    pa_ra ↦₈ (bv_0 64) -∗
-    pa_s0 ↦₈ (bv_0 64) -∗
+    pa_ra ↦₈ vra -∗
+    pa_s0 ↦₈ vs0 -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
@@ -2668,7 +2668,7 @@ Qed.
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)))]> m0)
       with m1.
     (* cce: c.sdsp ra,8(sp) : store ra0 to 8(sp') *)
-    iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 (bv_0 64)
+    iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 vra
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               Hpmpcov HW_R
@@ -2676,7 +2676,7 @@ Qed.
     { rewrite Hsp1. iExact "Hbra". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hbra".
     (* cd0: c.sdsp s0,0(sp) : store s00 to 0(sp') *)
-    iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 (bv_0 64)
+    iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 vs0
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               Hpmpcov HW_R
@@ -2753,7 +2753,7 @@ Qed.
       (m0 : gmap regidx (mword 64)) (N : nat)
       (imm_entry shamt_l shamt_r imm_dealloc : mword 6) (nzimm_s0 imm8_beqz : mword 8)
       (i_add : instruction) (wval_add : mword 64) (imm_bne : mword 13)
-      (svpn : mword 27) (olds : nat -> bv 8)
+      (svpn : mword 27) (olds : nat -> bv 8) (vra vs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (region_pte : PMA_Region) {dq : dfrac} :
@@ -2870,8 +2870,8 @@ Qed.
     instr (add_vec_int pcLS 2) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx s0_idx, false, 8)) -∗
     instr (add_vec_int pcLS 4) true (ITYPE (sign_extend' 12 imm_dealloc, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     instr (add_vec_int pcLS 6) true (JALR (zeros' 12, Regidx ra_idx, zreg)) -∗
-    pa_ra ↦₈ (bv_0 64) -∗
-    pa_s0 ↦₈ (bv_0 64) -∗
+    pa_ra ↦₈ vra -∗
+    pa_s0 ↦₈ vs0 -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -2926,7 +2926,7 @@ Qed.
              HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 Hbuf Hcont".
     (* --- PREFIX: 0xccc..0xcdc --- *)
     iApply (wp_memset_prefix root_ppn E Φ m0 imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
-              i_add wval_add mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
+              i_add wval_add vra vs0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               HX Hcov Hpmpp Hpteregion Halignp
               Hn0 Hbexec_add
