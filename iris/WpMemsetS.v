@@ -2491,6 +2491,12 @@ Qed.
       pc_is ret_tgt -∗
       pa_ra ↦₈{ dqm } ra0 -∗
       pa_s0 ↦₈{ dqm } s00 -∗
+      ( ∃ mfin, gpr_file mfin ∗
+          ⌜ mfin !!! Regidx ra_idx = ra0
+          /\ mfin !!! Regidx s0_idx = s00
+          /\ mfin !!! Regidx csp_rs1 = add_vec sp' (sign_extend' 64 (sign_extend' 12 imm_dealloc))
+          /\ (forall r, r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
+                 mfin !!! r = m !!! r) ⌝ ) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -2545,9 +2551,22 @@ Qed.
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi6 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
     iEval (rewrite Hra3) in "Hpc".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc [Hbra] [Hbs0]").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc [Hbra] [Hbs0] [Hfile]").
     - rewrite Hsp. iExact "Hbra".
     - rewrite Hsp1. iExact "Hbs0".
+    - iExists m3. iFrame "Hfile". iPureIntro. split; [| split; [| split]].
+      + exact Hra3.
+      + unfold m3, m2. rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hs0sp)].
+        rewrite lookup_total_insert. reflexivity.
+      + unfold m3, m2, m1. rewrite lookup_total_insert.
+        rewrite lookup_total_insert_ne; [| exact Hs0sp].
+        rewrite lookup_total_insert_ne; [| exact Hrasp].
+        rewrite Hsp. reflexivity.
+      + intros r Hr_ra Hr_s0 Hr_csp. unfold m3, m2, m1.
+        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hr_csp)].
+        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hr_s0)].
+        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hr_ra)].
+        reflexivity.
   Qed.
 
   (* =================================================================== *)
@@ -2881,6 +2900,13 @@ Qed.
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
+      ( ∃ mfin, gpr_file mfin ∗
+          ⌜ mfin !!! Regidx ra_idx = ra0
+          /\ mfin !!! Regidx s0_idx = s00
+          /\ mfin !!! Regidx csp_rs1 = add_vec sp' (sign_extend' 64 (sign_extend' 12 imm_dealloc))
+          /\ (forall r, r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
+                 r <> Regidx a5_idx -> r <> Regidx a2_idx -> r <> Regidx a4_idx ->
+                 mfin !!! r = m0 !!! r) ⌝ ) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -2961,8 +2987,23 @@ Qed.
               Hpmpcov HR_R
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
                     HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hbuf").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hmfin".
+    iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
+    destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hbuf [Hfile]").
+    iExists mfin. iFrame "Hfile". iPureIntro.
+    split; [exact Hpra | split; [exact Hps0 | split; [exact Hpcsp |]]].
+    intros r Hra Hs0 Hcsp Ha5 Ha2 Ha4.
+    rewrite (Hpres r Hra Hs0 Hcsp).
+    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
+    unfold m6, m5, m4, m3, m2, m1.
+    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha4)].
+    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2)].
+    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2)].
+    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
+    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hs0)].
+    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hcsp)].
+    reflexivity.
   Qed.
 
 End WpMemsetS.

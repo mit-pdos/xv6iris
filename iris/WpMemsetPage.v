@@ -92,6 +92,22 @@ Proof.
   f_equal. lia.
 Qed.
 
+(* memset's frame alloc (c.addi16sp sp,-16 ; encoded imm 48 = -16 in 6-bit)
+   and dealloc (c.addi16sp sp,+16 ; imm 16) cancel, so sp is net-preserved. *)
+Lemma add_vec_frame_cancel (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
+          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
+Proof.
+  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
+             = 18446744073709551600) by (vm_compute; reflexivity).
+  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
+             = 16) by (vm_compute; reflexivity).
+  rewrite HA HB. rewrite <- Z.add_assoc.
+  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
+  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+Qed.
+
 (* ---- page validity gives RAM residency for the base and every byte ---- *)
 
 Lemma page_valid_ram (p : mword 64) : page_valid p -> addr_is_ram p.
@@ -264,6 +280,12 @@ Section WpMemsetPage.
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       page_own p -∗
+      ( ∃ mfin, gpr_file mfin ∗
+          ⌜ mfin !!! Regidx ra_idx = ra0
+          /\ mfin !!! Regidx s0_idx = s00
+          /\ mfin !!! Regidx (mword_of_int 9 : mword 5)  = m0 !!! Regidx (mword_of_int 9 : mword 5)   (* s1 *)
+          /\ mfin !!! Regidx (mword_of_int 18 : mword 5) = m0 !!! Regidx (mword_of_int 18 : mword 5)  (* s2 *)
+          /\ mfin !!! Regidx csp_rs1 = m0 !!! Regidx csp_rs1 ⌝ ) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -346,12 +368,21 @@ Section WpMemsetPage.
               ltac:(intros j Hj; exact (ms_cmp_page p j Hpv Hj))
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
                     Htext Hpc Hfile Hbra Hbs0 Hbuf [Hcont]").
-    (* --- continuation: rebuild [page_own p] from the returned buffer --- *)
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hbuf".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 [Hbuf]").
-    iEval (rewrite /page_own /byte_any).
-    iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
-    iEval (rewrite ms_pa_ms_addr) in "H". iExists _. iExact "H".
+    (* --- continuation: rebuild [page_own p] and re-expose gpr_file --- *)
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hbra Hbs0 [Hbuf] [Hmfin]").
+    - (* page_own p from the returned all-cbyte buffer *)
+      iEval (rewrite /page_own /byte_any).
+      iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
+      iEval (rewrite ms_pa_ms_addr) in "H". iExists _. iExact "H".
+    - (* the final register file, with ra/s0/s1/s2/sp pinned to their caller values *)
+      iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
+      destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
+      iExists mfin. iFrame "Hfile". iPureIntro.
+      split; [exact Hpra |]. split; [exact Hps0 |].
+      split; [apply Hpres; vm_compute; discriminate |].
+      split; [apply Hpres; vm_compute; discriminate |].
+      rewrite Hpcsp. apply add_vec_frame_cancel.
   Qed.
 
 End WpMemsetPage.

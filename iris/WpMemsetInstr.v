@@ -422,6 +422,13 @@ Section WpMemsetInstr.
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
+      ( ∃ mfin, gpr_file mfin ∗
+          ⌜ mfin !!! Regidx ra_idx = ra0
+          /\ mfin !!! Regidx s0_idx = s00
+          /\ mfin !!! Regidx csp_rs1 = add_vec sp' (sign_extend' 64 (sign_extend' 12 imm_dealloc))
+          /\ (forall r, r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
+                 r <> Regidx a5_idx -> r <> Regidx a2_idx -> r <> Regidx a4_idx ->
+                 mfin !!! r = m0 !!! r) ⌝ ) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
