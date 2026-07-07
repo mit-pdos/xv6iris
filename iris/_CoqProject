@@ -83,3 +83,5 @@ WpRelease.v
 WpAcquireLock.v
 WpKallocDecode.v
 WpKalloc.v
+WpVCGen.v
+WpVCGenDemo.v
