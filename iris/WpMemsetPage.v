@@ -260,9 +260,9 @@ Section WpMemsetPage.
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (* the caller's return target is 4-aligned (memset returns via [jalr ra]) *)
+    (* the caller's return target's low bit is clear (a 2-aligned target is
+       fine: memset returns via [exec_jump_to_zca], Zca always enabled) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec ret_tgt 1) = false ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -285,14 +285,15 @@ Section WpMemsetPage.
           /\ mfin !!! Regidx s0_idx = s00
           /\ mfin !!! Regidx (mword_of_int 9 : mword 5)  = m0 !!! Regidx (mword_of_int 9 : mword 5)   (* s1 *)
           /\ mfin !!! Regidx (mword_of_int 18 : mword 5) = m0 !!! Regidx (mword_of_int 18 : mword 5)  (* s2 *)
-          /\ mfin !!! Regidx csp_rs1 = m0 !!! Regidx csp_rs1 ⌝ ) -∗
+          /\ mfin !!! Regidx csp_rs1 = m0 !!! Regidx csp_rs1
+          /\ mfin !!! Regidx (mword_of_int 4 : mword 5) = m0 !!! Regidx (mword_of_int 4 : mword 5) ⌝ ) -∗  (* tp *)
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ra_idx s0_idx a0_idx a1_idx a2_idx pcE imm_entry sp' ra0 s00 p
       ea_ra pa_ra ea_s0 pa_s0 ret_tgt
       Hpv Hcval Ha2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      HX Hcov Hpmpp Hpteregion Halignp HW_R HR_R Hret0 Hret1.
+      HX Hcov Hpmpp Hpteregion Halignp HW_R HR_R Hret0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              #Htext Hpc Hfile Hbra Hbs0 Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
@@ -344,7 +345,7 @@ Section WpMemsetPage.
               Hcov HW_R HR_R
               (* Hn0 : a2 = 4096 <> 0 *)
               ltac:(rewrite Ha2; vm_compute; reflexivity)
-              Hret0 Hret1
+              Hret0
               (* Hbne / HpcL0 : constant target geometry *)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -382,7 +383,8 @@ Section WpMemsetPage.
       split; [exact Hpra |]. split; [exact Hps0 |].
       split; [apply Hpres; vm_compute; discriminate |].
       split; [apply Hpres; vm_compute; discriminate |].
-      rewrite Hpcsp. apply add_vec_frame_cancel.
+      split; [rewrite Hpcsp; apply add_vec_frame_cancel |].
+      apply Hpres; vm_compute; discriminate.
   Qed.
 
 End WpMemsetPage.

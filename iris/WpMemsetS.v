@@ -2467,7 +2467,8 @@ Qed.
        (override_PMA (PMA_Region_attributes region_pte) PBMT_PMA).(PMA_supports_pte_read) = true) ->
     is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec ret_tgt 1) = false ->
+    (* NOTE: a 2-aligned return target (bit1 = 1) is allowed -- the ret step
+       jumps via [exec_jump_to_zca] (Zca enabled), so only bit0 = 0 is needed. *)
     (* load geometry for the two frame slots: just the one "PMP TOR entry 0 covers all
        of RAM" fact -- the _ram wrappers derive the rest from the owned points-to. *)
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
@@ -2503,7 +2504,7 @@ Qed.
     intros pcL ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0 ret_tgt
       HN Hrai Hs0i Hrasp Hs0sp Hs0ra Hsp Hra
       HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      HX Hcov Hpmpp Hpteregion Halignp Hal0 Hal1
+      HX Hcov Hpmpp Hpteregion Halignp Hal0
       Hpmpcov HR.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hbra Hbs0 Hcont".
@@ -2541,13 +2542,14 @@ Qed.
     { unfold m3, m2, m1. rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hrasp)].
       rewrite lookup_total_insert_ne; [| exact Hs0ra].
       rewrite lookup_total_insert. reflexivity. }
-    (* cf0: ret (c.jr ra) : PC := ra0 (low bit cleared) *)
-    iApply (wp_cret_s root_ppn E Φ (add_vec_int pcL 6) ra_idx
+    (* cf0: ret (c.jr ra) : PC := ra0 (low bit cleared).  Uses the Zca return
+       so a 2-aligned target (bit1 = 1) is fine; only bit0 = 0 is required. *)
+    iApply (wp_cret_s_zca root_ppn E Φ (add_vec_int pcL 6) ra_idx
               m3
               mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 region_pte (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HPBMTE HX Hcov Hpmpp Hpteregion Halignp
               Hrai Hlpe
-              ltac:(rewrite Hra3; exact Hal0) ltac:(rewrite Hra3; exact Hal1)
+              ltac:(rewrite Hra3; exact Hal0)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile Hi6 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile".
     iEval (rewrite Hra3) in "Hpc".
@@ -2842,9 +2844,8 @@ Qed.
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (* n <> 0 (fall through the c.beqz) *)
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
-    (* return-target low bits (2-aligned) *)
+    (* return-target low bit clear (2-aligned target is OK: Zca return) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec ret_tgt 1) = false ->
     (* loop: bne target = pc0L (only 2-alignment needed), buffer page geometry *)
     add_vec (add_vec_int pc0L 6) (sign_extend' 64 imm_bne) = pc0L ->
     eq_vec (access_vec_dec pc0L 0) ('b"0") = true ->
@@ -2917,7 +2918,7 @@ Qed.
       HX Hcov Hpmpp Hpteregion Halignp
       Hbexec_add
       Hpmpcov HW_R HR_R
-      Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
+      Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
       Hext0 Hext4 Hext6.
     (* interface: register file at the loop top and the suffix top *)
@@ -2983,7 +2984,7 @@ Qed.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               Hsuf_sp Hsuf_ra
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              HX Hcov Hpmpp Hpteregion Halignp Hret0 Hret1
+              HX Hcov Hpmpp Hpteregion Halignp Hret0
               Hpmpcov HR_R
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc Hfile
                     HiL0 HiL2 HiL4 HiL6 Hbra Hbs0 [-]").

@@ -383,7 +383,7 @@ Section WpMemsetInstr.
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec ret_tgt 1) = false ->
+    (* 2-aligned return target OK: memset returns via [exec_jump_to_zca] *)
     add_vec (add_vec_int pc0L 6) (sign_extend' 64 imm_bne) = pc0L ->
     eq_vec (access_vec_dec pc0L 0) ('b"0") = true ->
     and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
@@ -440,7 +440,7 @@ Section WpMemsetInstr.
       HX Hcov Hpmpp Hpteregion Halignp
       Hbexec_add
       Hpmpcov HW_R HR_R
-      Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
+      Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv
              #Htext Hpc Hfile Hbra Hbs0 Hbuf Hcont".
@@ -465,7 +465,7 @@ Section WpMemsetInstr.
               HX Hcov Hpmpp Hpteregion Halignp
               Hbexec_add
               Hpmpcov HW_R HR_R
-              Hn0 Hret0 Hret1 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
+              Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
               Hpb_canon Hpb_vpn Hpb_ident Hpb_range Hincr Hcmp
               minstr_cce minstr_cd2 minstr_cd4
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv

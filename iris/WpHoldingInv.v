@@ -130,7 +130,8 @@ Section WpHoldingInv.
           mh !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
           mh !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
           mh !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
-          mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) ⌝) -∗
+          mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) /\
+          mh !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) ⌝) -∗
       a_cpu ↦₈{ dqc } cpuold -∗
       (∃ (w24 w16 w8 wra ws0 : bv 64),
         a_h24 ↦₈ w24 ∗
@@ -447,7 +448,7 @@ Section WpHoldingInv.
       iEval (rewrite HraH11) in "Hpc".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc [Hfile] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
       { iExists H11. iFrame "Hfile". iPureIntro.
-        split; [exact HraH11|]. split; [|split; [|split; [|split]]].
+        split; [exact HraH11|]. split; [|split; [|split; [|split; [|split]]]].
         - rewrite /H11. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /H10. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /H9. apply lookup_total_insert.
@@ -479,6 +480,19 @@ Section WpHoldingInv.
           rewrite Ha0H6 Hs1C Ha0C.
           rewrite add_vec_zero_l.
           apply seqz_sub_neq. exact Hnotmine.
+        - (* s2 (x18): preserved through the whole holding chain (never written) *)
+          rewrite /H11. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H10. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H6. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /C po_mycpu_out_s2.
+          rewrite /H5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate].
       }
       iExists _, _, _, _, _. iFrame "Hh24 Hh16 Hh8 Hfra Hfs0".
     - (* ===== FAST PATH: lock word 0, c.bnez NOT taken ===== *)
@@ -526,7 +540,7 @@ Section WpHoldingInv.
       iEval (rewrite HraH2f) in "Hpc".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hpmpc Hpmpa Htlbinv Hpc [Hfile] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
       { iExists H2f. iFrame "Hfile". iPureIntro.
-        split; [exact HraH2f|]. split; [|split; [|split; [|split]]].
+        split; [exact HraH2f|]. split; [|split; [|split; [|split; [|split]]]].
         - rewrite /H2f. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate].
         - rewrite /H2f. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -536,6 +550,9 @@ Section WpHoldingInv.
         - rewrite /H2f. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate].
         - rewrite /H2f. rewrite lookup_total_insert. apply bv_eq. vm_compute. reflexivity.
+        - (* s2 (x18): untouched *)
+          rewrite /H2f. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate].
       }
       iExists vp24, vp16, vp8, vfra, vfs0. iFrame "Hh24 Hh16 Hh8 Hfra Hfs0".
   Qed.
