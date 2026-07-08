@@ -305,11 +305,6 @@ Proof.
   apply exec_returnM.
 Qed.
 
-Definition have_nom_val (priv : mword 2) : bool :=
-  if eq_vec priv ('b"00") then true
-  else if eq_vec priv ('b"01") then true
-  else if eq_vec priv ('b"10") then false else true.
-
 Lemma exec_have_nominal_privLevel (priv : mword 2) s :
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -322,51 +317,6 @@ Proof.
     + rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
     + apply exec_returnM.
 Qed.
-
-(* SYMBOLIC legalized mstatus (misa.S=misa.U=true; Zicfilp + Sv39 enabled). *)
-Definition mstatus_legalized (o v : mword 64) : mword 64 :=
-  let mv := Mk_Mstatus v in
-  let w18 := if have_nom_val (_get_Mstatus_MPP mv)
-             then _get_Mstatus_MPP mv else privLevel_to_bits User in
-  let o' :=
-    _update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP mv))
-                                    (_get_Mstatus_SPELP mv))
-                                  (_get_Mstatus_TSR mv))
-                                (_get_Mstatus_TW mv))
-                              (_get_Mstatus_TVM mv))
-                            (_get_Mstatus_MXR mv))
-                          (_get_Mstatus_SUM mv))
-                        (_get_Mstatus_MPRV mv))
-                      (extStatus_map_forwards Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS mv)))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS mv)))
-                w18)
-              (_get_Mstatus_SPP mv))
-            (_get_Mstatus_MPIE mv))
-          (_get_Mstatus_SPIE mv))
-        (_get_Mstatus_MIE mv))
-      (_get_Mstatus_SIE mv) in
-  let dirty :=
-    orb (generic_eq (extStatus_map_backwards (_get_Mstatus_FS o')) Dirty)
-      (orb (generic_eq (extStatus_map_backwards (_get_Mstatus_XS o')) Dirty)
-        (generic_eq (extStatus_map_backwards (_get_Mstatus_VS o')) Dirty)) in
-  _update_Mstatus_SD o' (bool_to_bit dirty).
 
 Lemma exec_legalize_mstatus (o v : mword 64) s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->

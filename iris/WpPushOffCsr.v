@@ -29,19 +29,9 @@ Import Defs.
 
 Definition csr_sstatus : mword 12 := Ox"100".
 
-(* RDVAL: the S-visible read of an mstatus value, as read_CSR(0x100) returns. *)
-Definition sstatus_read (ms : mword 64) : mword 64 :=
-  subrange_vec_dec (lower_mstatus ms) (Z.sub xlen 1) 0.
-
-(* The value csrrc writes back: the read value with the imm-selected bits
-   cleared (bit 1 = SIE for imm5 = 2). *)
-Definition sstatus_write_val (ms : mword 64) (imm5 : mword 5) : mword 64 :=
-  and_vec (sstatus_read ms) (not_vec (zero_extend' 64 imm5)).
-
-(* The mstatus value the model computes after write_CSR(0x100, v): legalize the
-   S-status-lifted new value.  Matches [mstatus_legalized] from WpGprCsrwA. *)
-Definition legalize_sstatus_val (m v : mword 64) : mword 64 :=
-  mstatus_legalized m (lift_sstatus m (Mk_Sstatus (zero_extend' 64 v))).
+(* RDVAL: the S-visible read of an mstatus value, as read_CSR(0x100) returns.
+   [sstatus_read]/[sstatus_write_val]/[legalize_sstatus_val] now live low in
+   WpGprCsrwCommon.v (reused by WpGprCsrwC's idempotence lemma). *)
 
 (* ---- set a bitvector-64 register to the value it already holds = no-op ---- *)
 Lemma register_set_bv64_id (r : register_bitvector_64) (rs : regstate) :

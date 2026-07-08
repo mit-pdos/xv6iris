@@ -754,3 +754,331 @@ Qed.
 
 
 
+
+
+(* ====================================================================== *)
+(* Idempotence of the S-mode SIE-clear (csrrci sstatus,2) on a well-formed *)
+(* kernel mstatus: [legalize_sstatus_val m (sstatus_write_val m 2) = m].    *)
+(* Proved WITHOUT axioms by reducing every mstatus/sstatus field op to the  *)
+(* [MachineWord] bv layer.  Three phases: (1) the written S-view value      *)
+(* equals [lower_mstatus m] (clearing an already-0 SIE bit is the identity);*)
+(* (2) [lift_sstatus m (lower_mstatus m) = m] (each S-field round-trips to   *)
+(* its M-position; SD stays 0 as FS/VS/XS = Off); (3) [mstatus_legalized m m *)
+(* = m] (FS/VS legalize FourState = id, XS forced Off = XS m, MPP nominal).  *)
+(* NB: this file uses ssreflect [rewrite] (via proofmode), hence no [by]     *)
+(* clauses / comma lists -- side goals are discharged with [; [| tac]].      *)
+(* ====================================================================== *)
+
+(* set-a-field-to-its-current-value is the identity, at the bv layer *)
+Lemma bv_update_slice_extract_id (m n : N) (w : bv m) (i : N) :
+  (i + n <= m)%N ->
+  MachineWord.MachineWord.update_slice (n:=n) w i (bv_extract i n w) = w.
+Proof.
+  intros Hlim.
+  unfold MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
+  apply bv_eq.
+  pose proof (bv_unsigned_in_range _ w) as [Hw0 Hwhi].
+  rewrite !bv_concat_unsigned'.
+  rewrite !bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  apply Z.bits_inj'. intros j Hj.
+  destruct (decide (j < Z.of_N m)) as [Hjm|Hjm].
+  2:{ rewrite (Z.mod_pow2_bits_high _ (Z.of_N m)); [|lia]. symmetry.
+      destruct (decide (bv_unsigned w = 0)) as [Hz|Hnz].
+      - rewrite Hz. apply Z.bits_0.
+      - apply Z.bits_above_log2; [lia|]. apply Z.log2_lt_pow2 in Hwhi; lia. }
+  rewrite (Z.mod_pow2_bits_low _ (Z.of_N m)); [|lia].
+  rewrite !Z.lor_spec.
+  destruct (decide (j < Z.of_N (i + n))) as [Hlo|Hhi].
+  - rewrite (Z.shiftl_spec_low _ (Z.of_N (i+n))); [|lia].
+    rewrite orb_false_l.
+    rewrite (Z.mod_pow2_bits_low _ (Z.of_N (i+n))); [|lia].
+    rewrite Z.lor_spec.
+    destruct (decide (j < Z.of_N i)) as [Hji|Hji].
+    + rewrite (Z.shiftl_spec_low _ (Z.of_N i)); [|lia].
+      rewrite orb_false_l.
+      rewrite Z.shiftr_0_r.
+      rewrite (Z.mod_pow2_bits_low _ (Z.of_N i)); [|lia].
+      reflexivity.
+    + rewrite (Z.mod_pow2_bits_high _ (Z.of_N i)); [|lia].
+      rewrite orb_false_r.
+      rewrite (Z.shiftl_spec _ (Z.of_N i)); [|lia].
+      rewrite (Z.mod_pow2_bits_low _ (Z.of_N n)); [|lia].
+      rewrite (Z.shiftr_spec _ (Z.of_N i)); [|lia].
+      f_equal. lia.
+  - rewrite (Z.mod_pow2_bits_high _ (Z.of_N (i+n))); [|lia].
+    rewrite orb_false_r.
+    rewrite (Z.shiftl_spec _ (Z.of_N (i+n))); [|lia].
+    rewrite (Z.mod_pow2_bits_low _ (Z.of_N (m - n - i))); [|lia].
+    rewrite (Z.shiftr_spec _ (Z.of_N (i+n))); [|lia].
+    f_equal. lia.
+Qed.
+
+Ltac us_id_tac :=
+  unfold subrange_vec_dec, update_subrange_vec_dec;
+  rewrite !autocast_refl;
+  unfold to_word_idx, to_word, get_word;
+  rewrite !MachineWord.MachineWord.cast_idx_refl;
+  unfold MachineWord.MachineWord.slice;
+  match goal with
+  | |- @MachineWord.MachineWord.update_slice ?m ?n ?w ?i (@bv_extract ?m2 ?s ?l ?b) = _ =>
+      change l with n; change s with i
+  end;
+  apply bv_update_slice_extract_id; apply N.leb_le; reflexivity.
+
+(* [_update_Mstatus_X w (_get_Mstatus_X w) = w] for every field the legalizer/
+   lifter touch. *)
+Lemma uSIE_id (w : mword 64) : _update_Mstatus_SIE w (_get_Mstatus_SIE w) = w.
+Proof. unfold _update_Mstatus_SIE, _get_Mstatus_SIE. us_id_tac. Qed.
+Lemma uMIE_id (w : mword 64) : _update_Mstatus_MIE w (_get_Mstatus_MIE w) = w.
+Proof. unfold _update_Mstatus_MIE, _get_Mstatus_MIE. us_id_tac. Qed.
+Lemma uSPIE_id (w : mword 64) : _update_Mstatus_SPIE w (_get_Mstatus_SPIE w) = w.
+Proof. unfold _update_Mstatus_SPIE, _get_Mstatus_SPIE. us_id_tac. Qed.
+Lemma uMPIE_id (w : mword 64) : _update_Mstatus_MPIE w (_get_Mstatus_MPIE w) = w.
+Proof. unfold _update_Mstatus_MPIE, _get_Mstatus_MPIE. us_id_tac. Qed.
+Lemma uSPP_id (w : mword 64) : _update_Mstatus_SPP w (_get_Mstatus_SPP w) = w.
+Proof. unfold _update_Mstatus_SPP, _get_Mstatus_SPP. us_id_tac. Qed.
+Lemma uMPP_id (w : mword 64) : _update_Mstatus_MPP w (_get_Mstatus_MPP w) = w.
+Proof. unfold _update_Mstatus_MPP, _get_Mstatus_MPP. us_id_tac. Qed.
+Lemma uVS_id (w : mword 64) : _update_Mstatus_VS w (_get_Mstatus_VS w) = w.
+Proof. unfold _update_Mstatus_VS, _get_Mstatus_VS. us_id_tac. Qed.
+Lemma uFS_id (w : mword 64) : _update_Mstatus_FS w (_get_Mstatus_FS w) = w.
+Proof. unfold _update_Mstatus_FS, _get_Mstatus_FS. us_id_tac. Qed.
+Lemma uXS_id (w : mword 64) : _update_Mstatus_XS w (_get_Mstatus_XS w) = w.
+Proof. unfold _update_Mstatus_XS, _get_Mstatus_XS. us_id_tac. Qed.
+Lemma uMPRV_id (w : mword 64) : _update_Mstatus_MPRV w (_get_Mstatus_MPRV w) = w.
+Proof. unfold _update_Mstatus_MPRV, _get_Mstatus_MPRV. us_id_tac. Qed.
+Lemma uSUM_id (w : mword 64) : _update_Mstatus_SUM w (_get_Mstatus_SUM w) = w.
+Proof. unfold _update_Mstatus_SUM, _get_Mstatus_SUM. us_id_tac. Qed.
+Lemma uMXR_id (w : mword 64) : _update_Mstatus_MXR w (_get_Mstatus_MXR w) = w.
+Proof. unfold _update_Mstatus_MXR, _get_Mstatus_MXR. us_id_tac. Qed.
+Lemma uTVM_id (w : mword 64) : _update_Mstatus_TVM w (_get_Mstatus_TVM w) = w.
+Proof. unfold _update_Mstatus_TVM, _get_Mstatus_TVM. us_id_tac. Qed.
+Lemma uTW_id (w : mword 64) : _update_Mstatus_TW w (_get_Mstatus_TW w) = w.
+Proof. unfold _update_Mstatus_TW, _get_Mstatus_TW. us_id_tac. Qed.
+Lemma uTSR_id (w : mword 64) : _update_Mstatus_TSR w (_get_Mstatus_TSR w) = w.
+Proof. unfold _update_Mstatus_TSR, _get_Mstatus_TSR. us_id_tac. Qed.
+Lemma uSPELP_id (w : mword 64) : _update_Mstatus_SPELP w (_get_Mstatus_SPELP w) = w.
+Proof. unfold _update_Mstatus_SPELP, _get_Mstatus_SPELP. us_id_tac. Qed.
+Lemma uMPELP_id (w : mword 64) : _update_Mstatus_MPELP w (_get_Mstatus_MPELP w) = w.
+Proof. unfold _update_Mstatus_MPELP, _get_Mstatus_MPELP. us_id_tac. Qed.
+Lemma uUXL_id (w : mword 64) : _update_Mstatus_UXL w (_get_Mstatus_UXL w) = w.
+Proof. unfold _update_Mstatus_UXL, _get_Mstatus_UXL. us_id_tac. Qed.
+Lemma uSD_id (w : mword 64) : _update_Mstatus_SD w (_get_Mstatus_SD w) = w.
+Proof. unfold _update_Mstatus_SD, _get_Mstatus_SD. us_id_tac. Qed.
+
+(* ---- general reduction of Mstatus/Sstatus field ops to the bv layer ---- *)
+Ltac to_bv :=
+  unfold Mk_Mstatus, Mk_Sstatus,
+    _get_Mstatus_SIE, _get_Mstatus_MIE, _get_Mstatus_SPIE, _get_Mstatus_MPIE,
+    _get_Mstatus_SPP, _get_Mstatus_MPP, _get_Mstatus_VS, _get_Mstatus_FS,
+    _get_Mstatus_XS, _get_Mstatus_MPRV, _get_Mstatus_SUM, _get_Mstatus_MXR,
+    _get_Mstatus_TVM, _get_Mstatus_TW, _get_Mstatus_TSR, _get_Mstatus_SPELP,
+    _get_Mstatus_MPELP, _get_Mstatus_SD, _get_Mstatus_UXL, _get_Mstatus_SXL,
+    _update_Mstatus_SIE, _update_Mstatus_MIE, _update_Mstatus_SPIE,
+    _update_Mstatus_MPIE, _update_Mstatus_SPP, _update_Mstatus_MPP,
+    _update_Mstatus_VS, _update_Mstatus_FS, _update_Mstatus_XS,
+    _update_Mstatus_MPRV, _update_Mstatus_SUM, _update_Mstatus_MXR,
+    _update_Mstatus_TVM, _update_Mstatus_TW, _update_Mstatus_TSR,
+    _update_Mstatus_SPELP, _update_Mstatus_MPELP, _update_Mstatus_SD,
+    _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS,
+    _get_Sstatus_FS, _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR,
+    _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
+    _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP,
+    _update_Sstatus_VS, _update_Sstatus_FS, _update_Sstatus_XS,
+    _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP,
+    _update_Sstatus_UXL, _update_Sstatus_SD;
+  unfold subrange_vec_dec, update_subrange_vec_dec;
+  rewrite ?autocast_refl;
+  unfold to_word_idx, to_word, get_word;
+  rewrite ?MachineWord.MachineWord.cast_idx_refl;
+  unfold MachineWord.MachineWord.slice.
+
+Ltac provN := apply N.leb_le; reflexivity.
+Ltac provDisj := first [ (apply or_introl; provN) | (apply or_intror; provN) | (provN) ].
+
+(* disjoint FIRST: at each layer [disjoint] peels immediately, so the
+   (search-heavy, under ssr) [same] rewrite is attempted only once, at the
+   target layer.  Putting [same] first makes ssr run an expensive failing
+   match on every iteration -- quadratic, pathologically slow here. *)
+Ltac bvcrush :=
+  repeat first
+    [ (rewrite bv_extract_update_slice_disjoint; [| provDisj | provDisj])
+    | (rewrite bv_extract_update_slice_same; [| provDisj]) ].
+
+(* [_get_Sstatus_Y (lower_mstatus m) = _get_Mstatus_Y m]: lower places each
+   S-field at the SAME bit position it reads from m. *)
+Lemma sSIE_lower (m : mword 64) : _get_Sstatus_SIE (lower_mstatus m) = _get_Mstatus_SIE m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sSPIE_lower (m : mword 64) : _get_Sstatus_SPIE (lower_mstatus m) = _get_Mstatus_SPIE m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sSPP_lower (m : mword 64) : _get_Sstatus_SPP (lower_mstatus m) = _get_Mstatus_SPP m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sVS_lower (m : mword 64) : _get_Sstatus_VS (lower_mstatus m) = _get_Mstatus_VS m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sFS_lower (m : mword 64) : _get_Sstatus_FS (lower_mstatus m) = _get_Mstatus_FS m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sXS_lower (m : mword 64) : _get_Sstatus_XS (lower_mstatus m) = _get_Mstatus_XS m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sSUM_lower (m : mword 64) : _get_Sstatus_SUM (lower_mstatus m) = _get_Mstatus_SUM m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sMXR_lower (m : mword 64) : _get_Sstatus_MXR (lower_mstatus m) = _get_Mstatus_MXR m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sSPELP_lower (m : mword 64) : _get_Sstatus_SPELP (lower_mstatus m) = _get_Mstatus_SPELP m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma sUXL_lower (m : mword 64) : _get_Sstatus_UXL (lower_mstatus m) = _get_Mstatus_UXL m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+Lemma mSIE_lower (m : mword 64) : _get_Mstatus_SIE (lower_mstatus m) = _get_Mstatus_SIE m.
+Proof. unfold lower_mstatus. to_bv. bvcrush. reflexivity. Qed.
+
+(* Phase 3: legalizing an mstatus that is already legal is the identity. *)
+Lemma mstatus_legalized_self (m : mword 64)
+  (HXS : _get_Mstatus_XS m = extStatus_map_forwards Off)
+  (HFS : _get_Mstatus_FS m = extStatus_map_forwards Off)
+  (HVS : _get_Mstatus_VS m = extStatus_map_forwards Off)
+  (HSD : _get_Mstatus_SD m = 'b"0")
+  (HMPP : have_nom_val (_get_Mstatus_MPP m) = true) :
+  mstatus_legalized m m = m.
+Proof.
+  unfold mstatus_legalized. cbv zeta. unfold Mk_Mstatus.
+  rewrite HMPP. cbn match.
+  unfold plat_mstatus_legal_fs, plat_mstatus_legal_vs.
+  cbn [legalize_extStatus].
+  rewrite <- HXS.
+  rewrite uMPELP_id uSPELP_id uTSR_id uTW_id uTVM_id uMXR_id uSUM_id
+          uMPRV_id uXS_id uFS_id uVS_id uMPP_id uSPP_id uMPIE_id
+          uSPIE_id uMIE_id uSIE_id.
+  rewrite HFS HXS HVS.
+  match goal with |- _update_Mstatus_SD m ?d = m =>
+    assert (Hd : d = _get_Mstatus_SD m) by (rewrite HSD; vm_compute; reflexivity)
+  end.
+  rewrite Hd. apply uSD_id.
+Qed.
+
+(* Phase 2: lifting the S-view of m back into m is the identity. *)
+Lemma lift_lower_self (m : mword 64)
+  (HXS : _get_Mstatus_XS m = extStatus_map_forwards Off)
+  (HFS : _get_Mstatus_FS m = extStatus_map_forwards Off)
+  (HVS : _get_Mstatus_VS m = extStatus_map_forwards Off)
+  (HSD : _get_Mstatus_SD m = 'b"0") :
+  lift_sstatus m (lower_mstatus m) = m.
+Proof.
+  unfold lift_sstatus. cbv zeta.
+  rewrite sSIE_lower sSPIE_lower sSPP_lower sVS_lower sFS_lower sXS_lower
+          sSUM_lower sMXR_lower sSPELP_lower sUXL_lower.
+  match goal with |- context [_update_Mstatus_SD m ?d] =>
+    assert (Hd : d = _get_Mstatus_SD m)
+      by (rewrite HFS HXS HVS HSD; vm_compute; reflexivity)
+  end.
+  rewrite Hd.
+  rewrite uSD_id uUXL_id uSPELP_id uMXR_id uSUM_id uXS_id uFS_id uVS_id
+          uSPP_id uSPIE_id uSIE_id.
+  reflexivity.
+Qed.
+
+(* zero-extend of a full-width word is the identity *)
+Lemma zext64_id (w : mword 64) : zero_extend' 64 w = w.
+Proof.
+  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
+       to_word get_word MachineWord.MachineWord.zero_extend].
+  apply bv_zero_extend_idemp.
+Qed.
+
+(* full-width subrange is the identity *)
+Lemma subrange_full (w : mword 64) : subrange_vec_dec w (Z.sub xlen 1) 0 = w.
+Proof.
+  unfold subrange_vec_dec.
+  rewrite autocast_refl. unfold to_word_idx, to_word, get_word.
+  rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
+  apply bv_eq. rewrite bv_extract_unsigned. rewrite Z.shiftr_0_r.
+  apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+Lemma and_vec_unsigned (a b : mword 64) :
+  bv_unsigned (and_vec a b) = Z.land (bv_unsigned a) (bv_unsigned b).
+Proof.
+  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word'
+       SailStdpp.Values.with_word to_word get_word].
+  unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
+Qed.
+
+(* SIE lives in bit 1 *)
+Lemma sie_bit (m : mword 64) :
+  _get_Mstatus_SIE m = 'b"0" -> Z.testbit (bv_unsigned m) 1 = false.
+Proof.
+  intro HS.
+  apply (f_equal bv_unsigned) in HS.
+  unfold _get_Mstatus_SIE, subrange_vec_dec in HS.
+  rewrite autocast_refl in HS.
+  unfold to_word_idx, to_word, get_word in HS.
+  rewrite MachineWord.MachineWord.cast_idx_refl in HS.
+  unfold MachineWord.MachineWord.slice in HS.
+  rewrite bv_extract_unsigned in HS.
+  change (bv_unsigned ('b"0" : mword 1)) with 0 in HS.
+  apply (f_equal (fun z => Z.testbit z 0)) in HS.
+  rewrite Z.bits_0 in HS.
+  rewrite <- HS.
+  unfold bv_wrap, bv_modulus.
+  rewrite (Z.mod_pow2_bits_low _ (Z.of_N (MachineWord.MachineWord.Z_idx (1 - 1 + 1)))); [| vm_compute; reflexivity].
+  rewrite Z.shiftr_spec; [| lia]. reflexivity.
+Qed.
+
+(* Phase 1 core: ANDing with ~2 leaves a word whose SIE bit is already 0. *)
+Lemma and_clear_sie (w : mword 64) :
+  Z.testbit (bv_unsigned w) 1 = false ->
+  and_vec w (not_vec (zero_extend' 64 (mword_of_int 2 : mword 5))) = w.
+Proof.
+  intro Hb1.
+  assert (HC : bv_unsigned (not_vec (zero_extend' 64 (mword_of_int 2 : mword 5)) : mword 64)
+               = bv_wrap 64 (Z.lnot 2)).
+  { cbv [not_vec Operators_mwords.word_unop Operators_mwords.with_word'
+         SailStdpp.Values.with_word to_word get_word MachineWord.MachineWord.not].
+    rewrite bv_not_unsigned. f_equal. }
+  apply bv_eq. rewrite and_vec_unsigned. rewrite HC.
+  apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec.
+  pose proof (bv_unsigned_in_range _ w) as [Hw0 Hwhi].
+  destruct (decide (j < 64)) as [Hjlt|Hjge].
+  - unfold bv_wrap, bv_modulus.
+    rewrite (Z.mod_pow2_bits_low _ 64); [| lia].
+    rewrite Z.lnot_spec; [| lia].
+    replace 2 with (2^1) by reflexivity.
+    rewrite Z.pow2_bits_eqb; [| lia].
+    destruct (Z.eqb 1 j) eqn:E1.
+    + apply Z.eqb_eq in E1. subst j. rewrite Hb1. reflexivity.
+    + rewrite andb_true_r. reflexivity.
+  - unfold bv_wrap, bv_modulus.
+    rewrite (Z.mod_pow2_bits_high _ 64); [| lia].
+    rewrite andb_false_r. symmetry.
+    assert (Hwlt : bv_unsigned w < 2 ^ 64) by exact Hwhi.
+    destruct (decide (bv_unsigned w = 0)) as [Hz|Hnz].
+    + rewrite Hz. apply Z.bits_0.
+    + apply Z.bits_above_log2; [lia|]. apply Z.log2_lt_pow2 in Hwlt; lia.
+Qed.
+
+(* Phase 1: the S-view value csrrci writes back equals [lower_mstatus m]. *)
+Lemma phase1 (m : mword 64) (HSIE : _get_Mstatus_SIE m = 'b"0") :
+  Mk_Sstatus (zero_extend' 64 (sstatus_write_val m (mword_of_int 2))) = lower_mstatus m.
+Proof.
+  unfold Mk_Sstatus, sstatus_write_val, sstatus_read.
+  rewrite subrange_full.
+  rewrite (and_clear_sie (lower_mstatus m)).
+  2:{ apply sie_bit. rewrite mSIE_lower. exact HSIE. }
+  apply zext64_id.
+Qed.
+
+(* THE lemma: clearing SIE on a well-formed kernel mstatus is idempotent. *)
+Lemma legalize_sie_clear_idem (m : mword 64)
+  (HSIE : _get_Mstatus_SIE m = 'b"0")
+  (HXS : _get_Mstatus_XS m = extStatus_map_forwards Off)
+  (HFS : _get_Mstatus_FS m = extStatus_map_forwards Off)
+  (HVS : _get_Mstatus_VS m = extStatus_map_forwards Off)
+  (HSD : _get_Mstatus_SD m = 'b"0")
+  (HMPP : have_nom_val (_get_Mstatus_MPP m) = true) :
+  legalize_sstatus_val m (sstatus_write_val m (mword_of_int 2)) = m.
+Proof.
+  unfold legalize_sstatus_val.
+  rewrite (phase1 m HSIE).
+  rewrite (lift_lower_self m HXS HFS HVS HSD).
+  apply (mstatus_legalized_self m HXS HFS HVS HSD HMPP).
+Qed.
