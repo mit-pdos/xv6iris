@@ -72,14 +72,9 @@ Section WpAcquireLock.
        the RAM/PMP fetch geometry is derived internally from instr_bytes *)
     (* the lock word's data-slot geometry is DERIVED inside [wp_amoswap_lockinv]
        from the lock invariant -- no premise. *)
-    (forall pmar0, pma_allows_all pmar0 ->
-       exists region_amo,
-         matching_pma_region pmar0 (Physaddr lk) 4 = Some region_amo /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_readable) = true /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_writable) = true /\
-         pma_allows_atomic_op
-           ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
-           AMOSWAP 4 = true) ->
+    (* the amoswap.w PMA side-condition is DERIVED inside [wp_amoswap_lockinv]
+       from [pma_allows_all] (which pins [PMA_atomic_support] to [AMOSwap]) --
+       no premise. *)
     (* the loop-invariant register facts *)
     M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
     M0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk ->
@@ -101,7 +96,7 @@ Section WpAcquireLock.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros a4one HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hpma_amo HM0a4 HM0s1.
+    intros a4one HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HM0a4 HM0s1.
     (* a5v-independent register/address facts, posed once outside the Löb *)
     assert (Ha4any : forall w : mword 64,
         (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg w]> M0) !!! Regidx (mword_of_int 14 : mword 5) = a4one).
@@ -152,7 +147,6 @@ Section WpAcquireLock.
               HN HNl HPAlk
               HSTZ
               ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              ltac:(rewrite (Hs1any v1) HAlk2; exact Hpma_amo)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hj1c Hlock [-]").
     iIntros (w) "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hpay".
     iEval (rewrite insert_insert) in "Hfile".
@@ -315,15 +309,8 @@ Section WpAcquireLock.
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    (* ---- the amoswap data cell additionally supports amoswap.w ---- *)
-    (forall pmar0, pma_allows_all pmar0 ->
-       exists region_amo,
-         matching_pma_region pmar0 (Physaddr lk) 4 = Some region_amo /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_readable) = true /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_writable) = true /\
-         pma_allows_atomic_op
-           ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
-           AMOSWAP 4 = true) ->
+    (* ---- the amoswap.w PMA side-condition is DERIVED inside
+       [wp_amoswap_lockinv] from [pma_allows_all] -- no premise. ---- *)
     (* ---- push_off's a0f pins (its two mycpu calls return &cpus[cpuid]) ---- *)
     po_mycpu_out (mword_of_int (PO + 0x10)) PN3 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
     po_mycpu_out (mword_of_int (PO + 0x2c)) PN5 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
@@ -390,7 +377,7 @@ Section WpAcquireLock.
       a_noff a_intena a_cpu A0 A1 A2 P0 PN0 PN1 PN2 PN3 PN4 PN5 PN6 PN7 PN8
       po_storeval32 po_noff_a5 po_noff_store ret_tgt
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hlegal Hpma_amo Ha0_10 Ha0_2c Ha0_18f Ha0_18t Hnotmine
+      Hlegal Ha0_10 Ha0_2c Ha0_18f Ha0_18t Hnotmine
       Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile
              Hr24 Hr16 Hr8 Hp24 Hp16 Hp8 Hfra Hfs0 Hnoff Hintena #Hlk Hcpu Hcont".
@@ -717,7 +704,6 @@ Section WpAcquireLock.
     iApply (wp_acquire_lock_loop root_ppn E Φ γ R B5 (B5 !!! Regidx (mword_of_int 15 : mword 5)) lk
               mstatus0 mie_v mdv0 menvcfg0
               HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              Hpma_amo
               HB5a4L HB5s1
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc [HfmapB5] Hlk [-]").
     { rewrite insert_id; [| exact HB5l ].

@@ -124,14 +124,7 @@ Section Kalloc.
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* ---- acquire's extra side conditions (m := mA) ---- *)
     legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       exists region_amo,
-         matching_pma_region pmar0 (Physaddr lkA) 4 = Some region_amo /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_readable) = true /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_writable) = true /\
-         pma_allows_atomic_op
-           ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
-           AMOSWAP 4 = true) ->
+    (* the amoswap.w PMA side-condition is DERIVED in the leaf from pma_allows_all. *)
     po_mycpu_out (mword_of_int (PO + 0x10)) PN3 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
     po_mycpu_out (mword_of_int (PO + 0x2c)) PN5 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
     po_mycpu_out (mword_of_int (PO + 0x18)) PN5 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
@@ -191,7 +184,7 @@ Section Kalloc.
       A0 A1 A2 P0 PN0 PN1 PN2 PN3 PN4 PN5 PN6 PN7 PN8
       q_storeval32 q_noff_a5 q_noff_store q_ret_tgt
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hlegal Hamo Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hret0 Hretm Hfl
+      Hlegal Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hret0 Hretm Hfl
       Hfiom Ha0fcpu Hsst Hnoffpos Hintena0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hr24 Hr16 Hr8
@@ -289,7 +282,7 @@ Section Kalloc.
               qnoff qintena_old a0f
               mstatus0 mie_v mdv0 menvcfg0
               HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              Hlegal Hamo Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hret0
+              Hlegal Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hret0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile
                     Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqfra Hqfs0 Hnoff Hint Hlock Hcpu [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Htok HRres Hgpr

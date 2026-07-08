@@ -182,14 +182,7 @@ Section Kfree.
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* ---- acquire's extra side conditions ---- *)
     legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    (forall pmar0, pma_allows_all pmar0 ->
-       exists region_amo,
-         matching_pma_region pmar0 (Physaddr lk) 4 = Some region_amo /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_readable) = true /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_writable) = true /\
-         pma_allows_atomic_op
-           ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
-           AMOSWAP 4 = true) ->
+    (* the amoswap.w PMA side-condition is DERIVED in the leaf from pma_allows_all. *)
     (* the mycpu() return pointer depends on the input map only through tp, so
        the a0 pins can be stated over the input map [m]. *)
     po_mycpu_out (mword_of_int (PO + 0x10)) m !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
@@ -250,7 +243,7 @@ Section Kfree.
       spdA q_r24 q_r16 q_r8 pspdA q_p24 q_p16 q_p8 q_p0 pspm10A q_fra q_fs0
       q_noff q_intena q_cpu q_noff_a5 q_noff_store
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hlegal Hamo Hpin1 Hpin2 Hpin3 Hcpune Hretm Hlk Hfl Ha0fcpu
+      Hlegal Hpin1 Hpin2 Hpin3 Hcpune Hretm Hlk Hfl Ha0fcpu
       Hfiom Hsst Hnoffpos Hintena0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile #Hkmem Hpre Hr24 Hr16 Hr8 Hr0 Hmra Hms0
@@ -777,7 +770,6 @@ Section Kfree.
               mstatus0 mie_v mdv0 menvcfg0
               HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               Hlegal
-              ltac:(rewrite HKacqa0 -Hlk; exact Hamo)
               _ _ _ _
              
               ltac:(rewrite HKacqtp; exact Hcpune)

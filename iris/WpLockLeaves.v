@@ -79,16 +79,10 @@ Section WpLockLeaves.
        (which carries [addr_is_ram] + alignment) -- see below -- so no geometry
        or alignment premise is taken here. *)
     (* the walks' PTE read *)
-    (* AMO PMP: TOR entry 0 covers pa with R and W *)
-    (* AMO PMA: the region matching pa additionally supports amoswap.w *)
-    (forall pmar0, pma_allows_all pmar0 ->
-       exists region_amo,
-         matching_pma_region pmar0 (Physaddr pa) 4 = Some region_amo /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_readable) = true /\
-         (override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_writable) = true /\
-         pma_allows_atomic_op
-           ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
-           AMOSWAP 4 = true) ->
+    (* AMO PMP: TOR entry 0 covers pa with R and W.  The AMO PMA side-condition
+       (region matches pa, is R/W, and supports amoswap.w) is DERIVED internally
+       from [pma_allows_all] -- which now pins [PMA_atomic_support] to [AMOSwap]
+       -- so no premise is threaded here. *)
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -117,15 +111,18 @@ Section WpLockLeaves.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa HN HNl Hpalk Hstz Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hpma_amo.
+    intros ea a8 pa HN HNl Hpalk Hstz Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
-    destruct (Hpma_amo pmar0 Hpma_all) as (region_amo & Hmatch_amo & Hread_amo & Hwrite_amo & Hatomic_amo).
+    destruct (Hpma_all pa 4) as (region_amo & Hmatch_amo & _ & Hread_amo & Hwrite_amo & Hatomic_supp_amo).
+    assert (Hatomic_amo : pma_allows_atomic_op
+              ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
+              AMOSWAP 4 = true)
+      by (rewrite Hatomic_supp_amo; vm_compute; reflexivity).
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE
@@ -1154,7 +1151,7 @@ Section WpLockLeaves.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
-    destruct (Hpma_all pa 8) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
+    destruct (Hpma_all pa 8) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE
@@ -1423,7 +1420,7 @@ Section WpLockLeaves.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
-    destruct (Hpma_all pa 4) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
+    destruct (Hpma_all pa 4) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE

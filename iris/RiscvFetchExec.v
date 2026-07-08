@@ -62,7 +62,8 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
       matching_pma_region regions (Physaddr a) n = Some r /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_executable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_readable) = true /\
-      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true.
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true /\
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_atomic_support) = AMOSwap.
 
 (* ====================================================================== *)
 (* hw_config: the immutable hardware configuration the boot relies on,      *)
