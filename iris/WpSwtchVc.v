@@ -537,46 +537,53 @@ Section WpSwtchVc.
        menvcfg ↦ᵣ{dq} menvcfg0 ∗ tlb_inv root_ppn)%I.
 
     (* -------------------------------------------------------------------- *)
-    (* valid_context c : "the register set saved in the struct context at     *)
-    (* [c] admits a WP to run".  It owns c's 14 saved-register cells and is    *)
-    (* the wand from (config + pc at c.ra + a gpr file whose callee-saved      *)
-    (* regs are c's saved values, caller-saved arbitrary) to a whole-machine   *)
-    (* WP.  There is no free predicate argument: the resource the continuation *)
-    (* may assume is ALWAYS [valid_context cret] for whatever context [cret]   *)
-    (* resumed it.  That self-reference is a well-defined Iris [fixpoint]      *)
+    (* valid_context P c : "the context saved at [c] admits a WP to run".  It  *)
+    (* owns c's 14 saved-register cells and is the wand from (config + pc at   *)
+    (* c.ra + a gpr file whose callee-saved regs are c's saved values,         *)
+    (* caller-saved arbitrary) to a whole-machine WP.  On resumption the       *)
+    (* continuation is handed, for the (existentially quantified) context      *)
+    (* [cret] that resumed c, both [▷ valid_context P cret] (cret is now the    *)
+    (* suspended, valid one) AND [P cret] -- a caller-chosen predicate about    *)
+    (* the resumer.  [P] is fixed along the whole chain; the resumer stays      *)
+    (* existential (any context / any CPU may resume c), and [P cret] is where  *)
+    (* a caller threads coupling info (e.g. CPU-locality for a scheduler), or   *)
+    (* just [True] for the fully generic spec.  Well-defined Iris [fixpoint]    *)
     (* because the recursive occurrence is guarded by a [▷].                   *)
     (* -------------------------------------------------------------------- *)
     Local Definition valid_context_pre
+        (P : mword 64 -d> iPropO Σ)
         (rec : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ := fun c =>
       (∃ vs : list (mword 64),
         ⌜length vs = 14%nat⌝ ∗
         ⌜eq_vec (access_vec_dec (ctx_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
         ctx_cells c vs ∗
-        (∀ (m : gmap regidx (mword 64)) (cret : mword 64),
+        (∀ (m : gmap regidx (mword 64)),
            ⌜callee_img m = vs⌝ -∗ sconf -∗
            pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
-           ▷ rec cret -∗
+           (∃ cret : mword 64, ▷ rec cret ∗ P cret) -∗
            WP (Loop : expr riscv_lang) @ E {{ Phi }}))%I.
 
-    Local Instance valid_context_pre_contractive : Contractive valid_context_pre.
+    Local Instance valid_context_pre_contractive (P : mword 64 -d> iPropO Σ) :
+      Contractive (valid_context_pre P).
     Proof. solve_contractive. Qed.
 
-    Definition valid_context : mword 64 -d> iPropO Σ :=
-      fixpoint valid_context_pre.
+    Definition valid_context (P : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ :=
+      fixpoint (valid_context_pre P).
 
-    Lemma valid_context_unfold (c : mword 64) :
-      valid_context c ⊣⊢ valid_context_pre valid_context c.
-    Proof. apply (fixpoint_unfold valid_context_pre c). Qed.
+    Lemma valid_context_unfold (P : mword 64 -d> iPropO Σ) (c : mword 64) :
+      valid_context P c ⊣⊢ valid_context_pre P (valid_context P) c.
+    Proof. apply (fixpoint_unfold (valid_context_pre P) c). Qed.
 
     (* ================================================================== *)
-    (* THE SPEC.  swtch(old,new): given [valid_context new], runs new's      *)
-    (* saved WP, handing it [valid_context old] as the resource it may        *)
-    (* assume.  The last premise is the caller's own return continuation      *)
-    (* (what runs when control comes back to [old] later) -- exactly the      *)
-    (* wand that, with old's freshly-saved cells, becomes [valid_context old].*)
+    (* THE SPEC.  swtch(old,new): given [valid_context P new] (new is a valid  *)
+    (* suspended context whose resumer must satisfy [P]) and [P old] (old, the *)
+    (* context resuming new this round, does satisfy P), runs new's saved WP.  *)
+    (* The last premise is the caller's own return continuation: what old runs *)
+    (* when it is later resumed -- and it LEARNS, for the (existential)         *)
+    (* resumer [cret], both [▷ valid_context P cret] and [P cret].             *)
     (* ================================================================== *)
-    Lemma wp_swtch (oldc newc : mword 64) (m0 : gmap regidx (mword 64))
-        (old_vs : list (mword 64)) :
+    Lemma wp_swtch (P : mword 64 -d> iPropO Σ) (oldc newc : mword 64)
+        (m0 : gmap regidx (mword 64)) (old_vs : list (mword 64)) :
       length old_vs = 14%nat ->
       m0 !!! Regidx (mword_of_int 10) = oldc ->
       m0 !!! Regidx (mword_of_int 11) = newc ->
@@ -584,20 +591,21 @@ Section WpSwtchVc.
       hw_config -∗ minstret_inv -∗ kernel_text -∗
       sconf -∗ pc_is (mword_of_int KernelSyms.swtch) -∗ gpr_file m0 -∗
       ctx_cells oldc old_vs -∗
-      valid_context newc -∗
-      (∀ (m : gmap regidx (mword 64)) (cret : mword 64),
+      valid_context P newc -∗
+      P oldc -∗
+      (∀ (m : gmap regidx (mword 64)),
          ⌜callee_img m = callee_img m0⌝ -∗ sconf -∗
          pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
-         ▷ valid_context cret -∗
+         (∃ cret : mword 64, ▷ valid_context P cret ∗ P cret) -∗
          WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
       WP (Loop : expr riscv_lang) @ E {{ Phi }}.
     Proof.
       iIntros (Hlen_old Holdc Hnewc Hal_old)
-        "#Hhw #Hinv #Ht Hconf Hpc Hfile Holdcells Hvalidnew Hwold".
+        "#Hhw #Hinv #Ht Hconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
       iEval (rewrite /sconf) in "Hconf".
       iDestruct "Hconf" as
         "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv & Htlbinv)".
-      iEval (rewrite valid_context_unfold /valid_context_pre) in "Hvalidnew".
+      iEval (rewrite (valid_context_unfold P newc) /valid_context_pre) in "Hvalidnew".
       iDestruct "Hvalidnew" as (new_vs)
         "(%Hlen_new & %Hal_new & Hnewcells & Hnewwand)".
       (* the symbolic environment: 0..31 = current file m0; 32..45 = new's saved
@@ -652,10 +660,11 @@ Section WpSwtchVc.
       { unfold callee_img, ctx_regs, ctx_regs_nat, rho; cbn. reflexivity. }
       iEval (rewrite Hmapcallee Hmapnew) in "Hheap".
       iDestruct "Hheap" as "[Holdpart Hnewpart]".
-      (* ---- build [valid_context oldc] from old's restored cells + the
+      (* ---- build [valid_context P oldc] from old's restored cells + the
              caller's own return continuation [Hwold] ---- *)
-      iAssert (valid_context oldc) with "[Holdpart Hwold]" as "Hvoldc".
-      { rewrite valid_context_unfold /valid_context_pre. iExists (callee_img m0).
+      iAssert (valid_context P oldc) with "[Holdpart Hwold]" as "Hvoldc".
+      { rewrite (valid_context_unfold P oldc) /valid_context_pre.
+        iExists (callee_img m0).
         iSplit.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
         iSplit.
@@ -691,16 +700,17 @@ Section WpSwtchVc.
                 HN HSIE HMPRV HSXL Hmm HPBMTE
                 ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe Hlow
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                      Hpc Hfile Hret [Hnewwand Hvoldc]").
+                      Hpc Hfile Hret [Hnewwand Hvoldc HP]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-      (* ---- hand control to new's saved WP, giving it [valid_context Q oldc] ---- *)
+      (* ---- hand control to new's saved WP, giving it (as its resumer [oldc])
+             [▷ valid_context P oldc] together with [P oldc] ---- *)
       iAssert sconf with
         "[Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv]" as "Hconf".
       { rewrite /sconf. iFrame. }
-      iApply ("Hnewwand" $! (vregs_den rho swtch_regs1) oldc
-                with "[] Hconf Hpc Hfile [Hvoldc]").
+      iApply ("Hnewwand" $! (vregs_den rho swtch_regs1)
+                with "[] Hconf Hpc Hfile [Hvoldc HP]").
       { iPureIntro. exact Hcallee_new. }
-      iNext. iExact "Hvoldc".
+      iExists oldc. iSplitL "Hvoldc"; [iNext; iExact "Hvoldc" | iExact "HP"].
     Qed.
   End SwtchSpec.
 
