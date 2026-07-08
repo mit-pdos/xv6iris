@@ -528,13 +528,12 @@ Section WpAcquireLock.
       by (rewrite /P0; apply lookup_total_insert).
     assert (E1a : add_vec_int (mword_of_int (PO + 0x18) : mword 64) 2 = mword_of_int (PO + 0x1a))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_push_off root_ppn E Φ P0 svpn_noff svpn_intena pr24 pr16 pr8 fraold fs0old noff intena_old a0f
+    iApply (wp_push_off root_ppn E Φ P0 pr24 pr16 pr8 fraold fs0old noff intena_old a0f
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
               Hlegal ltac:(vm_compute; reflexivity)
               ltac:(rewrite HP0ra; vm_compute; reflexivity)
               Ha0_10 Ha0_2c Ha0_18f Ha0_18t
-              Hg_noff Hg_intena
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile [Hp24] [Hp16] [Hp8] [Hfra] [Hfs0] [Hnoff] [Hintena] [-]").
     { iEval (rewrite HP0csp). iExact "Hp24". }
     { iEval (rewrite HP0csp). iExact "Hp16". }
