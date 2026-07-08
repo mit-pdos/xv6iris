@@ -128,6 +128,52 @@ Proof.
   eexists; reflexivity.
 Qed.
 
+(* One-shot elimination of the shared PAUSE/Zicfilp prefix (mirrors the RVC
+   one-shot bridge in WpRvcBridge.v, applied to the two stateful gates that
+   sit unconditionally at the head of the BASE decoder). Proven ONCE, fully
+   symbolic in [THEN1]/[THEN2]/[INNER]/[K]: for any non-PAUSE/non-LPAD word
+   (R1/R2 = false) and non-virtual privilege, the whole gated prefix collapses
+   to just running [INNER] (and then the caller's continuation [K]). Each
+   [decode_any] call site then does ONE [erewrite] instead of
+   [decode_pause_prefix]'s ~7 tactic steps, each of which used to retype the
+   entire (still-concrete, ~4000-line) decoder tail -- that retyping, not
+   [decode_finish]'s own [vm_compute] (already ~0.07s, opcode-depth-independent),
+   was the real cost (measured ~2.4-3.4s/call; see build-perf-profile memory). *)
+Lemma exec_bind_assoc {A B C} (m : M A) (f : A -> M B) (g : B -> M C) s :
+  exec (Defs.bind (Defs.bind m f) g) s = exec (Defs.bind m (fun a => Defs.bind (f a) g)) s.
+Proof.
+  rewrite !exec_bind. destruct (exec m s) as [[a s1]|]; [rewrite exec_bind|]; reflexivity.
+Qed.
+
+Lemma decode_prefix_elim {U} (R1 R2 : bool) (THEN1 THEN2 INNER : M (option instruction))
+    (K : option instruction -> M U) s :
+  R1 = false -> R2 = false ->
+  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (Defs.bind (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM R1))
+          (fun w10 => Defs.bind
+                        (if w10 then THEN1
+                         else Defs.bind (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM R2))
+                                (fun w12 => if w12 then THEN2 else INNER))
+                        K)) s
+  = exec (Defs.bind INNER K) s.
+Proof.
+  intros HR1 HR2 Hpriv. subst R1 R2.
+  assert (HA1 : exec (Defs.and_boolM (currentlyEnabled Ext_Zihintpause) (returnM false)) s
+                = Some (false, s)).
+  { destruct (exec_cE_pause s) as [bp Hbp].
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbp).
+    destruct bp; [apply exec_returnm | reflexivity]. }
+  rewrite (exec_bind_Some _ _ _ _ _ HA1); cbn match.
+  rewrite exec_bind_assoc.
+  assert (HA2 : exec (Defs.and_boolM (currentlyEnabled Ext_Zicfilp) (returnM false)) s
+                = Some (false, s)).
+  { destruct (exec_cE_zicfilp_mSU s Hpriv) as [bz Hbz].
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hbz).
+    destruct bz; [apply exec_returnm | reflexivity]. }
+  rewrite (exec_bind_Some _ _ _ _ _ HA2); cbn match.
+  reflexivity.
+Qed.
+
 Definition w_auipc : mword 32 := mword_of_int 0xa117.
 
 (* Head-only clause skip: when the head decoder clause's guard is concretely
@@ -259,16 +305,30 @@ Ltac decode_pause_prefix s Hpriv :=
   rewrite (exec_bind_Some _ _ _ _ _ HA2); cbn match; clear HA2.
 
 (* ONE-SHOT decoder for (almost) any 32-bit instruction word: peel the shared
-   stateful PAUSE/Zicfilp prefix, then [decode_finish] collapses the entire
-   read-free remainder in a single [vm_compute].  Works for ALL of base RV64I +
+   stateful PAUSE/Zicfilp prefix via the [decode_prefix_elim] bridge (one
+   [erewrite] instead of [decode_pause_prefix]'s ~7 tactic steps -- see the
+   comment there), then [decode_finish] collapses the entire read-free
+   remainder in a single [vm_compute].  Works for ALL of base RV64I +
    Zicsr -- lui/auipc, loads/stores, branches, jal/jalr, the OP-IMM/OP arithmetic
    family, and csrr/csrw/csrrs -- with no per-opcode clause stepping.
    LIMITATION: it does NOT handle instructions sitting behind a *misa-gated*
    extension clause (M mul/div, A atomics, C compressed, F/D), because their
    [currentlyEnabled Ext_*] reads the misa register and [vm_compute] gets stuck on
    it (just like Zicfilp).  Those still need the relevant misa hypothesis to peel
-   their gate before finishing. *)
-Ltac decode_any s Hpriv := decode_pause_prefix s Hpriv; decode_finish s.
+   their gate before finishing.
+   [unshelve] keeps the two [R1 = false]/[R2 = false] side conditions as
+   ordinary trailing goals (rather than silently shelved, which [decode_finish]
+   would then never discharge); [decode_finish] closes those goals too, since
+   its [try] step is a no-op on a non-[exec]-headed goal and it falls through
+   to plain [vm_compute; reflexivity]. *)
+Ltac decode_any s Hpriv :=
+  lazymatch goal with
+  | |- exec (ext_decode ?w) s = _ =>
+      unfold ext_decode, encdec_backwards; cbv beta; cbn zeta;
+      skip_pure_clause; skip_pure_clause;
+      unshelve erewrite (decode_prefix_elim _ _ _ _ _ _ s _ _ Hpriv);
+      decode_finish s
+  end.
 
 Definition imm_auipc : mword 20 := subrange_vec_dec w_auipc 31 12.
 Definition i_auipc : mword 5 :=
