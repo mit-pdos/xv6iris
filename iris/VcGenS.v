@@ -34,7 +34,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec WpLeafCommon WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpGprAddi WpGprLogic WpGprLui WpGprLoad WpGprStore WpGprRvc.
-Require Import WpEntryNew WpSpinNew SmodeCore WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem.
+Require Import WpEntryNew WpSpinNew SmodeCore WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem WpFreelistMem.
 Require Import VcGen.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
@@ -51,7 +51,9 @@ Inductive vop_s : Type :=
   | VScldsp (uimm : mword 6) (rd : mword 5)                   (* ld rd, uimm*8(sp)    *)
   | VSclw (imm : mword 12) (rs1 rd : mword 5)                 (* lw rd, imm(rs1)      *)
   | VScsw (imm : mword 12) (rs2 rs1 : mword 5)                (* sw rs2, imm(rs1)     *)
-  | VScaddiw (imm : mword 6) (rd : mword 5).                  (* c.addiw rd, imm      *)
+  | VScaddiw (imm : mword 6) (rd : mword 5)                   (* c.addiw rd, imm      *)
+  | VSsd (rvc : bool) (imm : mword 12) (rs2 rs1 : mword 5)    (* [c.]sd rs2, imm(rs1) *)
+  | VSld (rvc : bool) (imm : mword 12) (rs1 rd : mword 5).    (* [c.]ld rd, imm(rs1)  *)
 
 (* the TARGET AST of each shape, exactly as the S-mode leaves state it. *)
 Definition vop_s_ast (op : vop_s) : instruction :=
@@ -70,6 +72,22 @@ Definition vop_s_ast (op : vop_s) : instruction :=
       STORE (imm, Regidx rs2, Regidx rs1, 4)
   | VScaddiw imm rd =>
       ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd)
+  | VSsd _ imm rs2 rs1 =>
+      STORE (imm, Regidx rs2, Regidx rs1, 8)
+  | VSld _ imm rs1 rd =>
+      LOAD (imm, Regidx rs1, Regidx rd, false, 8)
+  end.
+
+(* per-op fetch width: all the RVC shapes are 2 bytes; the base [sd]/[ld]
+   general 8-byte accesses carry their own [rvc] flag (c.sd/c.ld -> 2, the
+   full-width base sd/ld -> 4).  Used by [block_instrs_s] / [vc_step_s]. *)
+Definition vop_s_rvc (op : vop_s) : bool :=
+  match op with VSsd b _ _ _ => b | VSld b _ _ _ => b | _ => true end.
+Definition vop_s_w (op : vop_s) : Z :=
+  match op with
+  | VSsd b _ _ _ => (if b then 2 else 4)
+  | VSld b _ _ _ => (if b then 2 else 4)
+  | _ => 2
   end.
 
 (* the sp-relative byte offset of a c.sdsp/c.ldsp (canonical Z). *)
@@ -82,7 +100,7 @@ Definition zoff6 (uimm : mword 6) : Z :=
 (* ====================================================================== *)
 
 Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
-  let pc' := st.(vpc) + 2 in
+  let pc' := st.(vpc) + vop_s_w op in
   match op with
   | VScaddi imm rd =>
       if Z.eqb (uint rd) 0 then None else
@@ -168,6 +186,31 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
                   (<[Regidx rd := S32 (sval32_addZ (sval_trunc32 v) (zimm32 imm))]>
                      st.(vregs))
                   st.(vheap) st.(vheap4))
+      | None => None
+      end
+  | VSsd _ imm rs2 rs1 =>
+      match st.(vregs) !! Regidx rs1, st.(vregs) !! Regidx rs2 with
+      | Some v1, Some v2 =>
+          if negb (sval_is64 v1) then None else
+          let a := sval_addZ v1 (zimm12 imm) in
+          match vheap_find st.(vheap) a with
+          | Some (i, _) =>
+              Some (VSt pc' st.(vregs) (<[i := (a, v2)]> st.(vheap)) st.(vheap4))
+          | None => None
+          end
+      | _, _ => None
+      end
+  | VSld _ imm rs1 rd =>
+      if Z.eqb (uint rd) 0 then None else
+      match st.(vregs) !! Regidx rs1 with
+      | Some v1 =>
+          if negb (sval_is64 v1) then None else
+          let a := sval_addZ v1 (zimm12 imm) in
+          match vheap_find st.(vheap) a with
+          | Some (_, v) =>
+              Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap) st.(vheap4))
+          | None => None
+          end
       | None => None
       end
   end.
@@ -392,8 +435,8 @@ Section VcGenSIris.
     match prog with
     | nil => emp%I
     | op :: rest =>
-        (instr (mword_of_int pc) true (vop_s_ast op) ∗
-         block_instrs_s (pc + 2) rest)%I
+        (instr (mword_of_int pc) (vop_s_rvc op) (vop_s_ast op) ∗
+         block_instrs_s (pc + vop_s_w op) rest)%I
     end.
 
   (* expose gpr_file's dom-completeness fact without consuming it. *)
@@ -404,6 +447,24 @@ Section VcGenSIris.
     iSplitR; [iPureIntro; exact Hdom|].
     iSplitR; [iPureIntro; exact Hdom|].
     iExact "Hmap".
+  Qed.
+
+  (* The 8-byte PTE-address alignment the general sd/ld leaves demand is a
+     component of [pte_super_bytes] inside [tlb_inv]; expose it (a pure fact)
+     without consuming the invariant, so the general 8-byte cases below need
+     no extra hypothesis on the block lemma. *)
+  Lemma tlb_inv_align (root_ppn : mword 44) :
+    tlb_inv root_ppn -∗
+    ⌜ is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ⌝ ∗ tlb_inv root_ppn.
+  Proof.
+    iIntros "H".
+    iDestruct (tlb_inv_open with "H") as (satp0 tlbvec)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hbytes & Hpmp)".
+    iDestruct "Hbytes" as "(%Hal & Hbytes)".
+    iSplitR; [iPureIntro; exact Hal|].
+    iApply (tlb_inv_intro root_ppn satp0 tlbvec Hmode Hasid Hppn Hcons
+              with "Hsatp Htlb [Hbytes] Hpmp").
+    rewrite /pte_super_bytes. iSplitR; [iPureIntro; exact Hal|]. iExact "Hbytes".
   Qed.
 
   (* ================================================================== *)
@@ -459,7 +520,8 @@ Section VcGenSIris.
       iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hcont".
       destruct op as [imm rd|rdc nzimm rd|uimm rs2|uimm rd
-                     |imm rs1 rd|imm rs2 rs1|imm rd]; simpl in Hstep.
+                     |imm rs1 rd|imm rs2 rs1|imm rd
+                     |rvc imm rs2 rs1|rvc imm rs1 rd]; simpl in Hstep.
       + (* VScaddi *)
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
@@ -690,6 +752,103 @@ Section VcGenSIris.
         iEval (rewrite Egpr) in "Hgpr".
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+      + (* VSsd : general-base 8-byte store (c.sd / base sd) *)
+        destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
+        destruct (vheap_find (vheap st) (sval_addZ v1 (zimm12 imm)))
+          as [[i vold]|] eqn:Hfind; [|discriminate].
+        injection Hstep as <-.
+        pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
+        assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
+                      = add_vec (vregs_den ρ (vregs st) !!! Regidx rs1)
+                                (sign_extend' 64 imm)).
+        { rewrite (sval_den_add_imm ρ v1 imm H64)
+                  (vregs_den_lookup ρ _ _ _ Hrs1). reflexivity. }
+        assert (Hsv : vregs_den ρ (vregs st) !!! Regidx rs2 = sval_den ρ v2)
+          by (rewrite (vregs_den_lookup ρ _ _ _ Hrs2); reflexivity).
+        rewrite /vheap_own.
+        iDestruct (big_sepL_insert_acc _ _ _ _ Hcell with "Hheap")
+          as "[Hcell Hheapk]".
+        iEval (cbn [fst snd]) in "Hcell".
+        iEval (rewrite Hea) in "Hcell".
+        destruct rvc.
+        * iApply (wp_csd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
+                    (vregs_den ρ (vregs st)) (sval_den ρ vold)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite Hsv -Hea) in "Hcell".
+          iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
+            as "Hheap"; [iExact "Hcell"|].
+          iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+        * iApply (wp_sd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
+                    (vregs_den ρ (vregs st)) (sval_den ρ vold)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite Hsv -Hea) in "Hcell".
+          iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
+            as "Hheap"; [iExact "Hcell"|].
+          iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+      + (* VSld : general-base 8-byte load (c.ld / base ld) *)
+        destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
+        apply Z.eqb_neq in Hrd0.
+        destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
+        destruct (vheap_find (vheap st) (sval_addZ v1 (zimm12 imm)))
+          as [[i vv]|] eqn:Hfind; [|discriminate].
+        injection Hstep as <-.
+        pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
+        assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
+                      = add_vec (vregs_den ρ (vregs st) !!! Regidx rs1)
+                                (sign_extend' 64 imm)).
+        { rewrite (sval_den_add_imm ρ v1 imm H64)
+                  (vregs_den_lookup ρ _ _ _ Hrs1). reflexivity. }
+        assert (Egpr : <[Regidx rd := regval_into_reg (sval_den ρ vv)]>
+                    (vregs_den ρ (vregs st))
+                = vregs_den ρ (<[Regidx rd := vv]> (vregs st)))
+          by (unfold regval_into_reg; apply vregs_den_insert).
+        rewrite /vheap_own.
+        iDestruct (big_sepL_lookup_acc _ _ _ _ Hcell with "Hheap")
+          as "[Hcell Hheapk]".
+        iEval (cbn [fst snd]) in "Hcell".
+        iEval (rewrite Hea) in "Hcell".
+        destruct rvc.
+        * iApply (wp_cld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
+                    (vregs_den ρ (vregs st)) (sval_den ρ vv)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite -Hea) in "Hcell".
+          iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
+          iEval (rewrite Egpr) in "Hgpr".
+          iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+        * iApply (wp_ld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
+                    (vregs_den ρ (vregs st)) (sval_den ρ vv)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite -Hea) in "Hcell".
+          iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
+          iEval (rewrite Egpr) in "Hgpr".
+          iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                                  Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
   Qed.
 
 
@@ -755,7 +914,8 @@ Section VcGenSIris.
       iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hcont".
       destruct op as [imm rd|rdc nzimm rd|uimm rs2|uimm rd
-                     |imm rs1 rd|imm rs2 rs1|imm rd]; simpl in Hstep.
+                     |imm rs1 rd|imm rs2 rs1|imm rd
+                     |rvc imm rs2 rs1|rvc imm rs1 rd]; simpl in Hstep.
       + (* VScaddi *)
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
@@ -971,6 +1131,99 @@ Section VcGenSIris.
         iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+      + (* VSsd : general-base 8-byte store (agreement interface) *)
+        destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
+        destruct (vheap_find (vheap st) (sval_addZ v1 (zimm12 imm)))
+          as [[i vold]|] eqn:Hfind; [|discriminate].
+        injection Hstep as <-.
+        pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
+        pose proof (Hmatch _ _ Hrs1) as Hm1.
+        pose proof (Hmatch _ _ Hrs2) as Hm2.
+        assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
+                      = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
+        { rewrite (sval_den_add_imm ρ v1 imm H64) Hm1. reflexivity. }
+        rewrite /vheap_own.
+        iDestruct (big_sepL_insert_acc _ _ _ _ Hcell with "Hheap")
+          as "[Hcell Hheapk]".
+        iEval (cbn [fst snd]) in "Hcell".
+        iEval (rewrite Hea) in "Hcell".
+        destruct rvc.
+        * iApply (wp_csd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
+                    m (sval_den ρ vold)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite Hm2 -Hea) in "Hcell".
+          iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
+            as "Hheap"; [iExact "Hcell"|].
+          iApply (IH _ _ Hblk Hmatch
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+        * iApply (wp_sd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
+                    m (sval_den ρ vold)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite Hm2 -Hea) in "Hcell".
+          iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
+            as "Hheap"; [iExact "Hcell"|].
+          iApply (IH _ _ Hblk Hmatch
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+      + (* VSld : general-base 8-byte load (agreement interface) *)
+        destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
+        apply Z.eqb_neq in Hrd0.
+        destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
+        destruct (vheap_find (vheap st) (sval_addZ v1 (zimm12 imm)))
+          as [[i vv]|] eqn:Hfind; [|discriminate].
+        injection Hstep as <-.
+        pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
+        pose proof (Hmatch _ _ Hrs1) as Hm1.
+        assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
+                      = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
+        { rewrite (sval_den_add_imm ρ v1 imm H64) Hm1. reflexivity. }
+        rewrite /vheap_own.
+        iDestruct (big_sepL_lookup_acc _ _ _ _ Hcell with "Hheap")
+          as "[Hcell Hheapk]".
+        iEval (cbn [fst snd]) in "Hcell".
+        iEval (rewrite Hea) in "Hcell".
+        assert (Hval : regval_into_reg (sval_den ρ vv) = sval_den ρ vv) by reflexivity.
+        destruct rvc.
+        * iApply (wp_cld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
+                    m (sval_den ρ vv)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite -Hea) in "Hcell".
+          iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
+          iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+        * iApply (wp_ld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
+                    m (sval_den ρ vv)
+                    mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hgpr Hi Hcell").
+          iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
+          iEval (rewrite avi_mword) in "Hpc".
+          iEval (rewrite -Hea) in "Hcell".
+          iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
+          iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+                    with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                          Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
   Qed.
 
 End VcGenSIris.
