@@ -48,7 +48,6 @@ Section Kalloc.
       (γ : gname)
       (m : gmap regidx (mword 64))
       (vr24 vr16 vr8 : bv 64)
-      (svpn_noff svpn_intena svpn_lk svpn_cpu : mword 27)
       (qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qpr0 qfraold qfs0old qcpuold : bv 64)
       (qnoff qintena_old : mword 32) (a0f fl : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -138,10 +137,8 @@ Section Kalloc.
     po_mycpu_out (mword_of_int (PO + 0x18)) PN5 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
     po_mycpu_out (mword_of_int (PO + 0x18)) PN8 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
     eq_vec (qcpuold : mword 64) (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    po_slot_geom root_ppn svpn_noff q_noff 4 ->
-    po_slot_geom root_ppn svpn_intena q_intena 4 ->
-    po_slot_geom root_ppn svpn_lk lkA 4 ->
-    po_slot_geom root_ppn svpn_cpu q_cpu 8 ->
+    (* lk/cpu/noff/intena slot geometry DERIVED in acquire/release/leaves
+       from the lock invariant and owned points-to -- no po_slot_geom. *)
     eq_vec (access_vec_dec q_ret_tgt 0) ('b"0") = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     (* the freelist head lives at &kmem.freelist = kmem+24 *)
@@ -194,7 +191,7 @@ Section Kalloc.
       A0 A1 A2 P0 PN0 PN1 PN2 PN3 PN4 PN5 PN6 PN7 PN8
       q_storeval32 q_noff_a5 q_noff_store q_ret_tgt
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hlegal Hamo Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hg_noff Hg_int Hg_lk Hg_cpu Hret0 Hretm Hfl
+      Hlegal Hamo Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hret0 Hretm Hfl
       Hfiom Ha0fcpu Hsst Hnoffpos Hintena0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hr24 Hr16 Hr8
@@ -288,12 +285,11 @@ Section Kalloc.
     iEval (rewrite Htgta) in "Hpc".
     (* ---- acquire(&kmem): CSL acquire, returns [locked γ ∗ kmem_res fl] ---- *)
     iApply (wp_acquire_lock root_ppn E Φ γ (kmem_res fl) mA
-              svpn_noff svpn_intena svpn_lk svpn_cpu
               qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qfraold qfs0old qcpuold
               qnoff qintena_old a0f
               mstatus0 mie_v mdv0 menvcfg0
               HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              Hlegal Hamo Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hg_noff Hg_int Hg_lk Hg_cpu Hret0
+              Hlegal Hamo Hpin1 Hpin2 Hpin3 Hpin4 Hcpune Hret0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile
                     Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqfra Hqfs0 Hnoff Hint Hlock Hcpu [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Htok HRres Hgpr
@@ -422,7 +418,6 @@ Section Kalloc.
       { rewrite HE3tp /q_intena Ha0fcpu. reflexivity. }
       iDestruct "Hqjunk" as (vp24 vp16 vp8 vfra vfs0) "(Hqp24 & Hqp16 & Hqp8 & Hqfra & Hqfs0)".
       iApply (wp_release root_ppn E Φ γ lkA (kmem_res fl) E3
-                svpn_lk svpn_cpu svpn_noff svpn_intena
                 (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)))
                 q_noff_store
                 (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)
@@ -433,10 +428,6 @@ Section Kalloc.
                 mstatus0 mie_v mdv0 menvcfg0 (dqi:=DfracOwn 1)
                 HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hfiom Hlpe
                 ltac:(rewrite HE3a0 HlkAkmem; apply bv_eq; vm_compute; reflexivity)
-                Hg_lk
-                ltac:(rewrite Hacpu; exact Hg_cpu)
-                ltac:(rewrite Hanoff; exact Hg_noff)
-                ltac:(rewrite Haint; exact Hg_int)
                 ltac:(rewrite HE3tp; apply eq_vec_true_iff; reflexivity)
                 Hsst Hnoffpos Hintena0
                 ltac:(rewrite HE3ra; vm_compute; reflexivity)
@@ -726,7 +717,6 @@ Section Kalloc.
       { rewrite HR12tp /q_intena Ha0fcpu. reflexivity. }
       iDestruct "Hqjunk" as (vp24 vp16 vp8 vfra vfs0) "(Hqp24 & Hqp16 & Hqp8 & Hqfra & Hqfs0)".
       iApply (wp_release root_ppn E Φ γ lkA (kmem_res fl) R12
-                svpn_lk svpn_cpu svpn_noff svpn_intena
                 (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)))
                 q_noff_store
                 (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)
@@ -737,10 +727,6 @@ Section Kalloc.
                 mstatus0 mie_v mdv0 menvcfg0 (dqi:=DfracOwn 1)
                 HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hfiom Hlpe
                 ltac:(rewrite HR12a0 HlkAkmem; apply bv_eq; vm_compute; reflexivity)
-                Hg_lk
-                ltac:(rewrite Hacpu; exact Hg_cpu)
-                ltac:(rewrite Hanoff; exact Hg_noff)
-                ltac:(rewrite Haint; exact Hg_int)
                 ltac:(rewrite HR12tp; apply eq_vec_true_iff; reflexivity)
                 Hsst Hnoffpos Hintena0
                 ltac:(rewrite HR12ra; vm_compute; reflexivity)

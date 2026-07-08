@@ -55,7 +55,7 @@ Section WpAcquireLock.
 
   Lemma wp_acquire_lock_loop (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (R : iProp Σ)
-      (M0 : gmap regidx (mword 64)) (a5v lk : mword 64) (svpn_lk : mword 27)
+      (M0 : gmap regidx (mword 64)) (a5v lk : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       :
     let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
@@ -70,8 +70,8 @@ Section WpAcquireLock.
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch geometry over the loop body: a single X-bit fact + RAM coverage;
        the RAM/PMP fetch geometry is derived internally from instr_bytes *)
-    (* the lock word's data-slot geometry *)
-    po_slot_geom root_ppn svpn_lk lk 4 ->
+    (* the lock word's data-slot geometry is DERIVED inside [wp_amoswap_lockinv]
+       from the lock invariant -- no premise. *)
     (forall pmar0, pma_allows_all pmar0 ->
        exists region_amo,
          matching_pma_region pmar0 (Physaddr lk) 4 = Some region_amo /\
@@ -101,8 +101,7 @@ Section WpAcquireLock.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros a4one HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hg_lk Hpma_amo HM0a4 HM0s1.
-    pose proof Hg_lk as (Lcanon & Lvpn & Lident & Lmask & Lvpn2 & Lmvpn & Lmppn & Lalign & Lpalign).
+    intros a4one HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hpma_amo HM0a4 HM0s1.
     (* a5v-independent register/address facts, posed once outside the Löb *)
     assert (Ha4any : forall w : mword 64,
         (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg w]> M0) !!! Regidx (mword_of_int 14 : mword 5) = a4one).
@@ -148,18 +147,12 @@ Section WpAcquireLock.
                         !!! Regidx (mword_of_int 15 : mword 5)))) zero_reg = true)
       by (rewrite lookup_total_insert Hst1; vm_compute; reflexivity).
     iApply (wp_amoswap_lockinv root_ppn E Φ γ lk R (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
-              svpn_lk (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
+              (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
               mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HN HNl HPAlk
               HSTZ
               ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              ltac:(rewrite (Hs1any v1) HAlk2; exact Lcanon)
-              ltac:(rewrite (Hs1any v1) HAlk2; exact Lvpn)
-              ltac:(rewrite (Hs1any v1) HAlk2; exact Lident)
-              Lmask Lvpn2 Lmvpn Lmppn
               ltac:(rewrite (Hs1any v1) HAlk2; exact Hpma_amo)
-              ltac:(rewrite (Hs1any v1) HAlk2; exact Lalign)
-              ltac:(rewrite (Hs1any v1) HAlk2; exact Lpalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hj1c Hlock [-]").
     iIntros (w) "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hpay".
     iEval (rewrite insert_insert) in "Hfile".
@@ -250,7 +243,6 @@ Section WpAcquireLock.
   Lemma wp_acquire_lock (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (R : iProp Σ)
       (m : gmap regidx (mword 64))
-      (svpn_noff svpn_intena svpn_lk svpn_cpu : mword 27)
       (vr24 vr16 vr8 pr24 pr16 pr8 fraold fs0old cpuold : bv 64)
       (noff intena_old : mword 32) (a0f : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -342,11 +334,8 @@ Section WpAcquireLock.
        RAM/PMP fetch geometry is derived internally from instr_bytes ---- *)
     (* ---- the lock is not already held by THIS cpu (no panic) ---- *)
     eq_vec (cpuold : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    (* ---- data-slot geometry ---- *)
-    po_slot_geom root_ppn svpn_noff a_noff 4 ->
-    po_slot_geom root_ppn svpn_intena a_intena 4 ->
-    po_slot_geom root_ppn svpn_lk lk 4 ->
-    po_slot_geom root_ppn svpn_cpu a_cpu 8 ->
+    (* ---- data-slot geometry is DERIVED in the leaves from the owned points-to
+       (noff/intena/cpu) and the lock invariant (lk) -- no premise. ---- *)
     (* ---- the return target is well-aligned ---- *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     hw_config -∗ minstret_inv -∗
@@ -402,7 +391,7 @@ Section WpAcquireLock.
       po_storeval32 po_noff_a5 po_noff_store ret_tgt
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
       Hlegal Hpma_amo Ha0_10 Ha0_2c Ha0_18f Ha0_18t Hnotmine
-      Hg_noff Hg_intena Hg_lk Hg_cpu Hal0.
+      Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile
              Hr24 Hr16 Hr8 Hp24 Hp16 Hp8 Hfra Hfs0 Hnoff Hintena #Hlk Hcpu Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
@@ -650,16 +639,12 @@ Section WpAcquireLock.
     assert (Hspdh_eq : add_vec (B2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = po_spd)
       by (rewrite HB2sp; reflexivity).
     iDestruct "Hjunk" as (vfra0 vfs00) "[Hfra2 Hfs02]".
-    iApply (wp_holding_lockinv root_ppn E Φ γ lk R B2 svpn_lk svpn_cpu cpuold
+    iApply (wp_holding_lockinv root_ppn E Φ γ lk R B2 cpuold
               (P0 !!! Regidx (mword_of_int 1 : mword 5)) (P0 !!! Regidx (mword_of_int 8 : mword 5))
               (P0 !!! Regidx (mword_of_int 9 : mword 5)) vfra0 vfs00
               mstatus0 mie_v mdv0 menvcfg0
               (dqc:=DfracOwn 1)
               HN HNl HAlk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              
-             
-              ltac:(rewrite HAlk; exact Hg_lk)
-              ltac:(rewrite HAcpu2; exact Hg_cpu)
               ltac:(rewrite HB2tp; exact Hnotmine)
               ltac:(rewrite HB2ra; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile
@@ -729,10 +714,10 @@ Section WpAcquireLock.
     assert (HB5l : B5 !! Regidx (mword_of_int 15 : mword 5)
                    = Some (B5 !!! Regidx (mword_of_int 15 : mword 5)))
       by (apply lookup_lookup_total_dom; apply HdomB5).
-    iApply (wp_acquire_lock_loop root_ppn E Φ γ R B5 (B5 !!! Regidx (mword_of_int 15 : mword 5)) lk svpn_lk
+    iApply (wp_acquire_lock_loop root_ppn E Φ γ R B5 (B5 !!! Regidx (mword_of_int 15 : mword 5)) lk
               mstatus0 mie_v mdv0 menvcfg0
               HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              Hg_lk Hpma_amo
+              Hpma_amo
               HB5a4L HB5s1
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc [HfmapB5] Hlk [-]").
     { rewrite insert_id; [| exact HB5l ].
@@ -779,12 +764,9 @@ Section WpAcquireLock.
     { rewrite /C1 po_mycpu_out_s1. exact HB8s1. }
     assert (HAcpu : add_vec (C1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu).
     { rewrite HC1s1 aq_addv_zero_l. reflexivity. }
-    pose proof Hg_cpu as (Ccanon & Cvpn & Cident & Cmask & Cvpn2 & Cmvpn & Cmppn & Calign & Cpalign).
-    iApply (wp_csd_s root_ppn E Φ (mword_of_int (AQ + 0x28)) (mword_of_int 10) (mword_of_int 9)
-              (mword_of_int 16) svpn_cpu C1 cpuold mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
+    iApply (wp_csd_s_ram root_ppn E Φ (mword_of_int (AQ + 0x28)) (mword_of_int 10) (mword_of_int 9)
+              (mword_of_int 16) C1 cpuold mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              ltac:(rewrite HAcpu; exact Ccanon) ltac:(rewrite HAcpu; exact Cvpn) ltac:(rewrite HAcpu; exact Cident)
-              Cmask Cvpn2 Cmvpn Cmppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi28 [Hcpu] [-]").
     { iEval (rewrite HAcpu). iExact "Hcpu". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hcpu".

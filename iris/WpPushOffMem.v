@@ -1760,7 +1760,7 @@ Section WpPushOffMem.
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64)) (v : mword 32)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
+      {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     ↑minstretN ⊆ E ->
     uint rd <> 0 ->
@@ -1778,14 +1778,14 @@ Section WpPushOffMem.
     tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    ea ↦₄ v -∗
+    ea ↦₄{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      ea ↦₄ v -∗
+      ea ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -1798,11 +1798,11 @@ Section WpPushOffMem.
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr. rewrite pa_add_0 in Hr.
       iPureIntro. exact Hr. }
-    iAssert (ea ↦₄ v)%I with "[Hbytes]" as "Hbw4".
+    iAssert (ea ↦₄{ dqm } v)%I with "[Hbytes]" as "Hbw4".
     { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpal4. }
     iApply (wp_clw_s root_ppn E Φ pc rd rs1 imm (svpn_of ea) m v
               mstatus0 mie_v mdv0 menvcfg0
-              (dq:=dq) (dqm:=DfracOwn 1)
+              (dq:=dq) (dqm:=dqm)
               HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               (ram_canonical ea Hr0) ltac:(reflexivity)
               (ram_ident root_ppn ea Hr0) (ram_mask ea Hr0)

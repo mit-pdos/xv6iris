@@ -131,7 +131,6 @@ Section Kfree.
       (γ : gname) (lk fl : mword 64)
       (m : gmap regidx (mword 64))
       (vr24 vr16 vr8 vr0 mvra mvs0 : bv 64)
-      (svpn_noff svpn_intena svpn_lk svpn_cpu : mword 27)
       (qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qpr0 qfraold qfs0old qcpuold : bv 64)
       (qnoff qintena_old : mword 32) (a0f : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -197,10 +196,8 @@ Section Kfree.
     po_mycpu_out (mword_of_int (PO + 0x2c)) m !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
     po_mycpu_out (mword_of_int (PO + 0x18)) m !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
     eq_vec (qcpuold : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    po_slot_geom root_ppn svpn_noff q_noff 4 ->
-    po_slot_geom root_ppn svpn_intena q_intena 4 ->
-    po_slot_geom root_ppn svpn_lk lk 4 ->
-    po_slot_geom root_ppn svpn_cpu q_cpu 8 ->
+    (* lk/cpu/noff/intena slot geometry DERIVED in acquire/release/leaves
+       from the lock invariant and owned points-to -- no po_slot_geom. *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     lk = mword_of_int KernelSyms.kmem ->
     fl = mword_of_int (KernelSyms.kmem + 24) ->
@@ -253,7 +250,7 @@ Section Kfree.
       spdA q_r24 q_r16 q_r8 pspdA q_p24 q_p16 q_p8 q_p0 pspm10A q_fra q_fs0
       q_noff q_intena q_cpu q_noff_a5 q_noff_store
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hlegal Hamo Hpin1 Hpin2 Hpin3 Hcpune Hg_noff Hg_int Hg_lk Hg_cpu Hretm Hlk Hfl Ha0fcpu
+      Hlegal Hamo Hpin1 Hpin2 Hpin3 Hcpune Hretm Hlk Hfl Ha0fcpu
       Hfiom Hsst Hnoffpos Hintena0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile #Hkmem Hpre Hr24 Hr16 Hr8 Hr0 Hmra Hms0
@@ -775,7 +772,6 @@ Section Kfree.
       rewrite Hp10. apply add_vec_zero_l. }
     (* ---- acquire(&kmem) ---- *)
     unshelve iApply (wp_acquire_lock root_ppn E Φ γ (kmem_res fl) Kacq
-              svpn_noff svpn_intena svpn_lk svpn_cpu
               qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qfraold qfs0old qcpuold
               qnoff qintena_old a0f
               mstatus0 mie_v mdv0 menvcfg0
@@ -785,9 +781,7 @@ Section Kfree.
               _ _ _ _
              
               ltac:(rewrite HKacqtp; exact Hcpune)
-              Hg_noff Hg_int
-              ltac:(rewrite HKacqa0 -Hlk; exact Hg_lk)
-              ltac:(rewrite HKacqa0 -Hlk; exact Hg_cpu)
+             
               ltac:(rewrite HKacqra; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile
                     [Hqr24] [Hqr16] [Hqr8] [Hqp24] [Hqp16] [Hqp8] [Hqfra] [Hqfs0] Hqnoff Hqint [Hkmem] [Hqcpu] [-]").
@@ -938,7 +932,6 @@ Section Kfree.
     iEval (rewrite HKacqcsp) in "Hqfra". iEval (rewrite HKacqcsp) in "Hqfs0".
     (* ---- release(&kmem) ---- *)
     iApply (wp_release root_ppn E Φ γ lk (kmem_res fl) Rrel
-              svpn_lk svpn_cpu svpn_noff svpn_intena
               (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
               q_noff_store
               (if eq_vec (sign_extend' 64 qnoff) zero_reg then acq_intena_store mstatus0 else qintena_old)
@@ -947,10 +940,6 @@ Section Kfree.
               mstatus0 mie_v mdv0 menvcfg0 (dqi:=DfracOwn 1)
               HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hfiom Hlpe
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
-              Hg_lk
-              ltac:(rewrite HRrela0 -Hlk; exact Hg_cpu)
-              ltac:(rewrite HRreltp -Ha0fcpu; exact Hg_noff)
-              ltac:(rewrite HRreltp -Ha0fcpu; exact Hg_int)
               ltac:(rewrite HRreltp; apply eq_vec_true_iff; reflexivity)
               Hsst Hnoffpos Hintena0
               ltac:(rewrite HRrelra; vm_compute; reflexivity)

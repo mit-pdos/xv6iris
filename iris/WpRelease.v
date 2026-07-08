@@ -365,7 +365,6 @@ Section WpReleaseTop.
   Lemma wp_release (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (lka : mword 64) (R : iProp Σ)
       (m : gmap regidx (mword 64))
-      (svpn_lk svpn_cpu svpn_noff svpn_int : mword 27)
       (cpuold : mword 64) (noffv intenav : mword 32)
       (vr24 vr16 vr8 vh24 vh16 vh8 vh0 vhra vhs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -404,10 +403,8 @@ Section WpReleaseTop.
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* the lock word (through the invariant) and the data slots *)
     add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-    po_slot_geom root_ppn svpn_lk lka 4 ->
-    po_slot_geom root_ppn svpn_cpu a_cpu 8 ->
-    po_slot_geom root_ppn svpn_noff a_noff 4 ->
-    po_slot_geom root_ppn svpn_int a_int 4 ->
+    (* lk/cpu/noff/int slot geometry DERIVED in the leaves/pop_off from the
+       lock invariant and the owned points-to -- no po_slot_geom premise. *)
     (* THIS cpu holds the lock: lk->cpu = mycpu() *)
     eq_vec cpuold cpuv = true ->
     (* pop_off preconditions *)
@@ -466,7 +463,7 @@ Section WpReleaseTop.
     intros pcE lk0 a_cpu spr a_r24 a_r16 a_r8 spdh a_h24 a_h16 a_h8 a_h0 mch a_hfra a_hfs0
       cpuv a_noff a_int nv1 storeval_noff ret_tgt
       HN HNl HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE HFIOM Hlpe
-      Hlkeq Hg_lk Hg_cpu Hg_noff Hg_int
+      Hlkeq
       Hmine Hsst2 Hnoffpos Hint Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile #Hlock Htok HRes Hcpu Hnoff Hint
@@ -592,14 +589,12 @@ Section WpReleaseTop.
       rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     assert (HraR4 : R4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RL + 0x0c) : mword 64) 4)
       by (rewrite /R4; apply lookup_total_insert).
-    iApply (wp_holding_lockinv_locked root_ppn E Φ γ lka R R4 svpn_lk svpn_cpu cpuold
+    iApply (wp_holding_lockinv_locked root_ppn E Φ γ lka R R4 cpuold
               vh24 vh16 vh8 vhra vhs0
               mstatus0 mie_v mdv0 menvcfg0 (dqc:=DfracOwn 1)
               HN HNl ltac:(rewrite Ha0R4; exact Hlkeq)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
              
-              ltac:(rewrite Ha0R4 Hlkeq; exact Hg_lk)
-              ltac:(rewrite Ha0R4; exact Hg_cpu)
               ltac:(rewrite HtpR4; exact Hmine)
               ltac:(rewrite HraR4; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hlock Htok
@@ -641,13 +636,10 @@ Section WpReleaseTop.
       apply aq_addv_zero_l. }
     assert (HAcpu : add_vec (mh !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu)
       by (rewrite Hs1mh; reflexivity).
-    pose proof Hg_cpu as (Ccanon & Cvpn & Cident & Cmask & Cvpn2 & Cmvpn & Cmppn & Calign & Cpalign).
     iApply (wp_sd_zero_s root_ppn E Φ (mword_of_int (RL + 0x12)) (mword_of_int 9)
-              (mword_of_int 16) svpn_cpu mh cpuold mstatus0 mie_v mdv0 menvcfg0
+              (mword_of_int 16) mh cpuold mstatus0 mie_v mdv0 menvcfg0
               (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              ltac:(rewrite HAcpu; exact Ccanon) ltac:(rewrite HAcpu; exact Cvpn) ltac:(rewrite HAcpu; exact Cident)
-              Cmask Cvpn2 Cmvpn Cmppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi12 [Hcpu] [-]").
     { iEval (rewrite HAcpu). iExact "Hcpu". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hcpu".
@@ -663,17 +655,12 @@ Section WpReleaseTop.
     assert (Hpp1a : add_vec_int (mword_of_int (RL + 0x16) : mword 64) 4 = mword_of_int (RL + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a sw zero,0(s1): the lock word clears, [locked γ ∗ R] re-enter the invariant *)
-    pose proof Hg_lk as (Lcanon & Lvpn & Lident & Lmask & Lvpn2 & Lmvpn & Lmppn & Lalign & Lpalign).
     assert (HAlk : add_vec (mh !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
       by (rewrite Hs1mh; exact Hlkeq).
     iApply (wp_sw_zero_lockinv root_ppn E Φ γ lka R (mword_of_int (RL + 0x1a)) (mword_of_int 9)
-              (mword_of_int 0) svpn_lk mh mstatus0 mie_v mdv0 menvcfg0
+              (mword_of_int 0) mh mstatus0 mie_v mdv0 menvcfg0
               (dq:=DfracOwn 1)
               HN HNl HAlk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              ltac:(rewrite HAlk; exact Lcanon)
-              ltac:(rewrite HAlk; exact Lvpn) ltac:(rewrite HAlk; exact Lident)
-              Lmask Lvpn2 Lmvpn Lmppn
-              ltac:(rewrite HAlk; exact Lalign) ltac:(rewrite HAlk; exact Lpalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi1a Hlock Htok HRes [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     assert (Hpp1e : add_vec_int (mword_of_int (RL + 0x1a) : mword 64) 4 = mword_of_int (RL + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -719,13 +706,11 @@ Section WpReleaseTop.
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
                      (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = a_h0).
     { rewrite /a_h0 /spdh !po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_pop_off root_ppn E Φ M1 svpn_noff svpn_int noffv intenav
+    iApply (wp_pop_off root_ppn E Φ M1 noffv intenav
               w24 w16 w8 vh0
               mstatus0 mie_v mdv0 menvcfg0 (dqi:=dqi)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
              
-              ltac:(rewrite HtpM1; exact Hg_noff)
-              ltac:(rewrite HtpM1; exact Hg_int)
               Hsst2 Hnoffpos Hint
               ltac:(rewrite HraM1; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile

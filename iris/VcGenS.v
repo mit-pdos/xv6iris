@@ -34,7 +34,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec WpLeafCommon WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpGprAddi WpGprLogic WpGprLui WpGprLoad WpGprStore WpGprRvc.
-Require Import WpEntryNew WpSpinNew SmodeCore WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem WpFreelistMem.
+Require Import WpEntryNew WpSpinNew SmodeCore WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem WpFreelistMem WpAcquireMem.
 Require Import VcGen.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.

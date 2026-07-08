@@ -925,7 +925,7 @@ Section WpPopOffTopSec.
   Notation PP := KernelSyms.pop_off.
 
   Lemma wp_pop_off (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (svpn_noff svpn_int : mword 27)
+      (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
       (vp8 vp0 vfra vfs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -952,8 +952,8 @@ Section WpPopOffTopSec.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    po_slot_geom root_ppn svpn_noff a_noff 4 ->
-    po_slot_geom root_ppn svpn_int a_int 4 ->
+    (* noff/intena slot geometry DERIVED in the _ram leaves from the owned
+       points-to -- no po_slot_geom premise. *)
     (* interrupts are off: sstatus & 2 = 0 *)
     neq_vec (and_vec (sstatus_read mstatus0) (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false ->
     (* noff >= 1 (signed) *)
@@ -997,7 +997,7 @@ Section WpPopOffTopSec.
   Proof.
     intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hg_noff Hg_int Hsst2 Hnoffpos Hint Hal0.
+      Hsst2 Hnoffpos Hint Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Hint Hcont".
     iPoseProof (ppi_00 with "Htext") as "Hi00".
@@ -1132,13 +1132,10 @@ Section WpPopOffTopSec.
       exact Ha0C. }
     assert (HAnoff4 : add_vec (P4 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 120 : mword 12)) = a_noff)
       by (rewrite Ha0P4; reflexivity).
-    pose proof Hg_noff as (Ncanon & Nvpn & Nident & Nmask & Nvpn2 & Nmvpn & Nmppn & Nalign & Npalign).
-    iApply (wp_clw_s root_ppn E Φ (mword_of_int (PP + 0x14)) (mword_of_int 15) (mword_of_int 10)
-              (mword_of_int 120) svpn_noff P4 noffv mstatus0 mie_v mdv0 menvcfg0
-              (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
+    iApply (wp_clw_s_ram root_ppn E Φ (mword_of_int (PP + 0x14)) (mword_of_int 15) (mword_of_int 10)
+              (mword_of_int 120) P4 noffv mstatus0 mie_v mdv0 menvcfg0
+              (dq:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              ltac:(rewrite HAnoff4; exact Ncanon) ltac:(rewrite HAnoff4; exact Nvpn) ltac:(rewrite HAnoff4; exact Nident)
-              Nmask Nvpn2 Nmvpn Nmppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi14 [Hnoff] [-]").
     { iEval (rewrite HAnoff4). iExact "Hnoff". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hnoff".
@@ -1178,12 +1175,10 @@ Section WpPopOffTopSec.
       exact Ha0P4. }
     assert (HAnoff6 : add_vec (P6 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 120 : mword 12)) = a_noff)
       by (rewrite Ha0P6; reflexivity).
-    iApply (wp_csw_s root_ppn E Φ (mword_of_int (PP + 0x1c)) (mword_of_int 15) (mword_of_int 10)
-              (mword_of_int 120) svpn_noff P6 noffv mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_csw_s_ram root_ppn E Φ (mword_of_int (PP + 0x1c)) (mword_of_int 15) (mword_of_int 10)
+              (mword_of_int 120) P6 noffv mstatus0 mie_v mdv0 menvcfg0
               (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              ltac:(rewrite HAnoff6; exact Ncanon) ltac:(rewrite HAnoff6; exact Nvpn) ltac:(rewrite HAnoff6; exact Nident)
-              Nmask Nvpn2 Nmvpn Nmppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi1c [Hnoff] [-]").
     { iEval (rewrite HAnoff6). iExact "Hnoff". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hnoff".
@@ -1312,13 +1307,10 @@ Section WpPopOffTopSec.
       (* +0x20 c.lw a5,124(a0): a5 := sext64 intenav *)
       assert (HAint6 : add_vec (P6 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 124 : mword 12)) = a_int)
         by (rewrite Ha0P6; reflexivity).
-      pose proof Hg_int as (Icanon & Ivpn & Iident & Imask & Ivpn2 & Imvpn & Imppn & Ialign & Ipalign).
-      iApply (wp_clw_s root_ppn E Φ (mword_of_int (PP + 0x20)) (mword_of_int 15) (mword_of_int 10)
-                (mword_of_int 124) svpn_int P6 intenav mstatus0 mie_v mdv0 menvcfg0
+      iApply (wp_clw_s_ram root_ppn E Φ (mword_of_int (PP + 0x20)) (mword_of_int 15) (mword_of_int 10)
+                (mword_of_int 124) P6 intenav mstatus0 mie_v mdv0 menvcfg0
                 (dq:=DfracOwn 1) (dqm:=dqi)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-                ltac:(rewrite HAint6; exact Icanon) ltac:(rewrite HAint6; exact Ivpn) ltac:(rewrite HAint6; exact Iident)
-                Imask Ivpn2 Imvpn Imppn
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi20 [Hint] [-]").
       { iEval (rewrite HAint6). iExact "Hint". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hint".

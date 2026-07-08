@@ -57,7 +57,7 @@ Section WpHoldingInv.
 
   Lemma wp_holding_lockinv (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (lka : mword 64) (R : iProp Σ)
-      (m : gmap regidx (mword 64)) (svpn_lk svpn_cpu : mword 27)
+      (m : gmap regidx (mword 64))
       (cpuold : mword 64)
       (vp24 vp16 vp8 vfra vfs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -87,9 +87,8 @@ Section WpHoldingInv.
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* fetch geometry over holding's whole body: a single X-bit fact, threaded
        to every instruction; the RAM/PMP geometry is derived from instr_bytes *)
-    (* data-slot geometry *)
-    po_slot_geom root_ppn svpn_lk a_lk 4 ->
-    po_slot_geom root_ppn svpn_cpu a_cpu 8 ->
+    (* data-slot geometry is DERIVED in the leaves from the lock invariant
+       (a_lk) and the owned [a_cpu ↦₈ _] -- no po_slot_geom premise. *)
     (* the lock is not held by THIS cpu *)
     eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
     (* return target alignment *)
@@ -132,19 +131,16 @@ Section WpHoldingInv.
   Proof.
     intros pcE lk a_lk a_cpu spdh a_h24 a_h16 a_h8 mc_sp a_fra a_fs0 ret_tgt
       HN HNl Hlka HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe 
-      Hg_lk Hg_cpu Hnotmine Hal0.
-    pose proof Hg_lk as (Lcanon & Lvpn & Lident & Lmask & Lvpn2 & Lmvpn & Lmppn & Lalign & Lpalign).
+      Hnotmine Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile #Hlock Hcpu Hh24 Hh16 Hh8 Hfra Hfs0 Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* +0x0 c.lw a5,0(a0): a5 := sext64 lockv *)
     iApply (wp_clw_lockinv root_ppn E Φ γ lka R pcE (mword_of_int 15) (mword_of_int 10)
-              (mword_of_int 0) svpn_lk m mstatus0 mie_v mdv0 menvcfg0
+              (mword_of_int 0) m mstatus0 mie_v mdv0 menvcfg0
               (dq:=DfracOwn 1)
               HN HNl Hlka ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              Lcanon Lvpn Lident Lmask Lvpn2 Lmvpn Lmppn
-              Lalign Lpalign
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi00 Hlock [-]").
     iIntros (lockv) "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     set (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m).
@@ -254,13 +250,10 @@ Section WpHoldingInv.
         rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
       assert (HAcpu : add_vec (H3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu)
         by (rewrite Ha0H3; reflexivity).
-      pose proof Hg_cpu as (Ccanon & Cvpn & Cident & Cmask & Cvpn2 & Cmvpn & Cmppn & Calign & Cpalign).
-      iApply (wp_cld_s root_ppn E Φ (mword_of_int (KernelSyms.holding + 0x12)) (mword_of_int 15) (mword_of_int 10)
-                (mword_of_int 16) svpn_cpu H3 cpuold mstatus0 mie_v mdv0 menvcfg0
+        iApply (wp_cld_s_ram root_ppn E Φ (mword_of_int (KernelSyms.holding + 0x12)) (mword_of_int 15) (mword_of_int 10)
+                (mword_of_int 16) H3 cpuold mstatus0 mie_v mdv0 menvcfg0
                 (dq:=DfracOwn 1) (dqm:=dqc)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-                ltac:(rewrite HAcpu; exact Ccanon) ltac:(rewrite HAcpu; exact Cvpn) ltac:(rewrite HAcpu; exact Cident)
-                Cmask Cvpn2 Cmvpn Cmppn
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi12 [Hcpu] [-]").
       { iEval (rewrite HAcpu). iExact "Hcpu". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hcpu".
@@ -545,7 +538,7 @@ Section WpHoldingInv.
 
   Lemma wp_holding_lockinv_locked (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (lka : mword 64) (R : iProp Σ)
-      (m : gmap regidx (mword 64)) (svpn_lk svpn_cpu : mword 27)
+      (m : gmap regidx (mword 64))
       (cpuold : mword 64)
       (vp24 vp16 vp8 vfra vfs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -575,9 +568,8 @@ Section WpHoldingInv.
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* fetch geometry over holding's whole body: a single X-bit fact, threaded
        to every instruction; the RAM/PMP geometry is derived from instr_bytes *)
-    (* data-slot geometry *)
-    po_slot_geom root_ppn svpn_lk a_lk 4 ->
-    po_slot_geom root_ppn svpn_cpu a_cpu 8 ->
+    (* data-slot geometry is DERIVED in the leaves from the lock invariant
+       (a_lk) and the owned [a_cpu ↦₈ _] -- no po_slot_geom premise. *)
     (* the lock IS held by THIS cpu *)
     eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = true ->
     (* return target alignment *)
@@ -621,19 +613,16 @@ Section WpHoldingInv.
   Proof.
     intros pcE lk a_lk a_cpu spdh a_h24 a_h16 a_h8 mc_sp a_fra a_fs0 ret_tgt
       HN HNl Hlka HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe 
-      Hg_lk Hg_cpu Hmine Hal0.
-    pose proof Hg_lk as (Lcanon & Lvpn & Lident & Lmask & Lvpn2 & Lmvpn & Lmppn & Lalign & Lpalign).
+      Hmine Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile #Hlock Htok Hcpu Hh24 Hh16 Hh8 Hfra Hfs0 Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* +0x0 c.lw a5,0(a0): a5 := sext64 lockv *)
     iApply (wp_clw_lockinv_locked root_ppn E Φ γ lka R pcE (mword_of_int 15) (mword_of_int 10)
-              (mword_of_int 0) svpn_lk m mstatus0 mie_v mdv0 menvcfg0
+              (mword_of_int 0) m mstatus0 mie_v mdv0 menvcfg0
               (dq:=DfracOwn 1)
               HN HNl Hlka ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              Lcanon Lvpn Lident Lmask Lvpn2 Lmvpn Lmppn
-              Lalign Lpalign
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi00 Hlock Htok [-]").
     iIntros (lockv) "%Hheldp Htok Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     set (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m).
@@ -744,13 +733,10 @@ Section WpHoldingInv.
         rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
       assert (HAcpu : add_vec (H3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu)
         by (rewrite Ha0H3; reflexivity).
-      pose proof Hg_cpu as (Ccanon & Cvpn & Cident & Cmask & Cvpn2 & Cmvpn & Cmppn & Calign & Cpalign).
-      iApply (wp_cld_s root_ppn E Φ (mword_of_int (KernelSyms.holding + 0x12)) (mword_of_int 15) (mword_of_int 10)
-                (mword_of_int 16) svpn_cpu H3 cpuold mstatus0 mie_v mdv0 menvcfg0
+        iApply (wp_cld_s_ram root_ppn E Φ (mword_of_int (KernelSyms.holding + 0x12)) (mword_of_int 15) (mword_of_int 10)
+                (mword_of_int 16) H3 cpuold mstatus0 mie_v mdv0 menvcfg0
                 (dq:=DfracOwn 1) (dqm:=dqc)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-                ltac:(rewrite HAcpu; exact Ccanon) ltac:(rewrite HAcpu; exact Cvpn) ltac:(rewrite HAcpu; exact Cident)
-                Cmask Cvpn2 Cmvpn Cmppn
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi12 [Hcpu] [-]").
       { iEval (rewrite HAcpu). iExact "Hcpu". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hcpu".

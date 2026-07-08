@@ -232,7 +232,7 @@ Section WpPopOffVc.
   (* wp_pop_off, re-proved.  Statement identical to WpPopOff.wp_pop_off.   *)
   (* ==================================================================== *)
   Lemma wp_pop_off_vc (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (svpn_noff svpn_int : mword 27)
+      (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
       (vp8 vp0 vfra vfs0 : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -259,8 +259,8 @@ Section WpPopOffVc.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    po_slot_geom root_ppn svpn_noff a_noff 4 ->
-    po_slot_geom root_ppn svpn_int a_int 4 ->
+    (* noff/intena slot geometry DERIVED in the _ram leaves from the owned
+       points-to -- no po_slot_geom premise. *)
     neq_vec (and_vec (sstatus_read mstatus0) (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false ->
     zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
     eq_vec (sign_extend' 64 intenav) zero_reg = true ->
@@ -301,7 +301,7 @@ Section WpPopOffVc.
   Proof.
     intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
       HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hg_noff Hg_int Hsst2 Hnoffpos Hint Hal0.
+      Hsst2 Hnoffpos Hint Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Hint Hcont".
     iPoseProof (ppi_08 with "Htext") as "Hi08".
@@ -473,7 +473,6 @@ Section WpPopOffVc.
     (* +0x14 c.lw a5,120(a0): a ONE-instruction VCgen block over the noff   *)
     (* word cell (geometry from RAM-ness; alignment from po_slot_geom).     *)
     (* ------------------------------------------------------------------ *)
-    pose proof Hg_noff as (Ncanon & Nvpn & Nident & Nmask & Nvpn2 & Nmvpn & Nmppn & Nalign & Npalign).
     pose (ρD := fun k : nat => match k with
            | 2%nat => P4 !!! Regidx csp_rs1
            | 4%nat => P4 !!! Regidx (mword_of_int 4 : mword 5)
@@ -781,13 +780,10 @@ Section WpPopOffVc.
       (* +0x20 c.lw a5,124(a0): a5 := sext64 intenav (fractional cell: leaf) *)
       assert (HAint : add_vec (M3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 124 : mword 12)) = a_int)
         by (rewrite Ha0M3; reflexivity).
-      pose proof Hg_int as (Icanon & Ivpn & Iident & Imask & Ivpn2 & Imvpn & Imppn & Ialign & Ipalign).
-      iApply (wp_clw_s root_ppn E Φ (mword_of_int (PP + 0x20)) (mword_of_int 15) (mword_of_int 10)
-                (mword_of_int 124) svpn_int M3 intenav mstatus0 mie_v mdv0 menvcfg0
+      iApply (wp_clw_s_ram root_ppn E Φ (mword_of_int (PP + 0x20)) (mword_of_int 15) (mword_of_int 10)
+                (mword_of_int 124) M3 intenav mstatus0 mie_v mdv0 menvcfg0
                 (dq:=DfracOwn 1) (dqm:=dqi)
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-                ltac:(rewrite HAint; exact Icanon) ltac:(rewrite HAint; exact Ivpn) ltac:(rewrite HAint; exact Iident)
-                Imask Ivpn2 Imvpn Imppn
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi20 [Hint] [-]").
       { iEval (rewrite HAint). iExact "Hint". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hint".

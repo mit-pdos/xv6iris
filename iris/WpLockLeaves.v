@@ -52,7 +52,7 @@ Section WpLockLeaves.
   (* ------------------------------------------------------------------- *)
   Lemma wp_amoswap_lockinv (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
-      (pc : mword 64) (rd rs2 rs1 : mword 5) (svpn : mword 27)
+      (pc : mword 64) (rd rs2 rs1 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
@@ -74,17 +74,10 @@ Section WpLockLeaves.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch (4-byte base instruction) *)
-    (* data address: superpage-identity geometry at tlb_hash svpn *)
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
+    (* data address: the whole superpage-identity geometry AND the 4-byte
+       alignment are DERIVED internally from the lock invariant's [lk ↦₄ _]
+       (which carries [addr_is_ram] + alignment) -- see below -- so no geometry
+       or alignment premise is taken here. *)
     (* the walks' PTE read *)
     (* AMO PMP: TOR entry 0 covers pa with R and W *)
     (* AMO PMA: the region matching pa additionally supports amoswap.w *)
@@ -96,8 +89,6 @@ Section WpLockLeaves.
          pma_allows_atomic_op
            ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
            AMOSWAP 4 = true) ->
-    is_aligned_vaddr (Virtaddr a8) 4 = true ->
-    is_aligned_paddr (Physaddr pa) 4 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -127,8 +118,7 @@ Section WpLockLeaves.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea a8 pa HN HNl Hpalk Hstz Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
-      Hpma_amo Halign4 Hpalign4.
+      Hpma_amo.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -136,9 +126,6 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_amo pmar0 Hpma_all) as (region_amo & Hmatch_amo & Hread_amo & Hwrite_amo & Hatomic_amo).
-    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
-              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
-    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE
@@ -156,7 +143,7 @@ Section WpLockLeaves.
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes Hbr]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
-    iDestruct "Hbytes" as "[_ Hbytes]".
+    iDestruct "Hbytes" as "[%Hpalign4 Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -176,6 +163,23 @@ Section WpLockLeaves.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    (* recover the slot geometry (svpn := svpn_of pa) + vaddr alignment from
+       [addr_is_ram pa] + the invariant's paddr alignment, instead of premises. *)
+    set (svpn := svpn_of pa).
+    pose proof (ram_canonical pa Hrampa) as Hcanon.
+    assert (Hvpn_def : autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn)
+      by reflexivity.
+    pose proof (ram_ident root_ppn pa Hrampa) as Hident.
+    pose proof (ram_mask pa Hrampa) as Hmask.
+    pose proof (ram_svpn2 pa Hrampa) as Hvpn2.
+    pose proof (ram_mvpn pa Hrampa) as Hmvpn.
+    pose proof (WpSmodeGpr.ram_mppn pa Hrampa) as Hmppn.
+    assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true)
+      by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
+    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
+              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
+    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iAssert (⌜addr_is_ram (pa_add pa 3)⌝)%I as %Hrampa3.
     { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hb3".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -411,7 +415,7 @@ Section WpLockLeaves.
   (* ------------------------------------------------------------------- *)
   Lemma wp_clw_lockinv (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (svpn : mword 27)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
@@ -431,21 +435,11 @@ Section WpLockLeaves.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch *)
-    (* data address: superpage-identity geometry at tlb_hash svpn *)
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
+    (* data address: the superpage-identity geometry AND the 4-byte alignment
+       are DERIVED internally from the lock invariant's [lk ↦₄ _]
+       (addr_is_ram + alignment) -- see below -- no premise taken. *)
     (* the walks' PTE read *)
     (* load PMP: TOR entry 0 covers pa with R *)
-    is_aligned_vaddr (Virtaddr a8) 4 = true ->
-    is_aligned_paddr (Physaddr pa) 4 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -472,9 +466,7 @@ Section WpLockLeaves.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa HN HNl Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
-      Halign4 Hpalign4.
+    intros ea a8 pa HN HNl Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -482,9 +474,6 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 4) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
-    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
-              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
-    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE
@@ -501,7 +490,7 @@ Section WpLockLeaves.
       [solve_ndisj|].
     iDestruct "Hbody" as (v) "[>Hbytes Hbr]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
-    iDestruct "Hbytes" as "[_ Hbytes]".
+    iDestruct "Hbytes" as "[%Hpalign4 Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -527,6 +516,23 @@ Section WpLockLeaves.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    (* recover the slot geometry (svpn := svpn_of pa) + vaddr alignment from
+       [addr_is_ram pa] + the invariant's paddr alignment, instead of premises. *)
+    set (svpn := svpn_of pa).
+    pose proof (ram_canonical pa Hrampa) as Hcanon.
+    assert (Hvpn_def : autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn)
+      by reflexivity.
+    pose proof (ram_ident root_ppn pa Hrampa) as Hident.
+    pose proof (ram_mask pa Hrampa) as Hmask.
+    pose proof (ram_svpn2 pa Hrampa) as Hvpn2.
+    pose proof (ram_mvpn pa Hrampa) as Hmvpn.
+    pose proof (WpSmodeGpr.ram_mppn pa Hrampa) as Hmppn.
+    assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true)
+      by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
+    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
+              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
+    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iAssert (⌜addr_is_ram (pa_add pa 3)⌝)%I as %Hrampab.
     { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hbb".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -739,7 +745,7 @@ Section WpLockLeaves.
   (* ------------------------------------------------------------------- *)
   Lemma wp_clw_lockinv_locked (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (svpn : mword 27)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
@@ -759,21 +765,11 @@ Section WpLockLeaves.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch *)
-    (* data address: superpage-identity geometry at tlb_hash svpn *)
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
+    (* data address: the superpage-identity geometry AND the 4-byte alignment
+       are DERIVED internally from the lock invariant's [lk ↦₄ _]
+       (addr_is_ram + alignment) -- see below -- no premise taken. *)
     (* the walks' PTE read *)
     (* load PMP: TOR entry 0 covers pa with R *)
-    is_aligned_vaddr (Virtaddr a8) 4 = true ->
-    is_aligned_paddr (Physaddr pa) 4 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -803,9 +799,7 @@ Section WpLockLeaves.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa HN HNl Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
-      Halign4 Hpalign4.
+    intros ea a8 pa HN HNl Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Htok Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -813,9 +807,6 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 4) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
-    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
-              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
-    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE
@@ -834,7 +825,7 @@ Section WpLockLeaves.
     iDestruct "Hbr" as "[(_ & >Htok2 & _) | >%Hvnz]".
     { iExFalso. iApply (locked_exclusive with "Htok Htok2"). }
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
-    iDestruct "Hbytes" as "[_ Hbytes]".
+    iDestruct "Hbytes" as "[%Hpalign4 Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -860,6 +851,23 @@ Section WpLockLeaves.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    (* recover the slot geometry (svpn := svpn_of pa) + vaddr alignment from
+       [addr_is_ram pa] + the invariant's paddr alignment, instead of premises. *)
+    set (svpn := svpn_of pa).
+    pose proof (ram_canonical pa Hrampa) as Hcanon.
+    assert (Hvpn_def : autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn)
+      by reflexivity.
+    pose proof (ram_ident root_ppn pa Hrampa) as Hident.
+    pose proof (ram_mask pa Hrampa) as Hmask.
+    pose proof (ram_svpn2 pa Hrampa) as Hvpn2.
+    pose proof (ram_mvpn pa Hrampa) as Hmvpn.
+    pose proof (WpSmodeGpr.ram_mppn pa Hrampa) as Hmppn.
+    assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true)
+      by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
+    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
+              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
+    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iAssert (⌜addr_is_ram (pa_add pa 3)⌝)%I as %Hrampab.
     { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hbb".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -1071,7 +1079,7 @@ Section WpLockLeaves.
   (* Cloned from WpAcquireMem.wp_csd_s with rs2 := x0, is_rvc := false.   *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_sd_zero_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12) (svpn : mword 27)
+      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64)) (vold : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
@@ -1089,17 +1097,9 @@ Section WpLockLeaves.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch: X-bit + RAM coverage (geometry derived from instr_bytes) *)
-    (* data address: superpage-identity geometry at tlb_hash svpn *)
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
+    (* data address: the superpage-identity geometry AND alignment are DERIVED
+       internally (addr_is_ram + alignment from the owned points-to/invariant)
+       -- see below -- no premise taken. *)
     (* the walks' PTE read *)
     (* store PMP: TOR entry 0 covers pa with W *)
     hw_config -∗
@@ -1128,20 +1128,33 @@ Section WpLockLeaves.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa storeval HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn.
+    intros ea a8 pa storeval HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 8 = true) by exact Hpalign4.
+    iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    set (svpn := svpn_of pa).
+    pose proof (ram_canonical pa Hrampa) as Hcanon.
+    assert (Hvpn_def : autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn)
+      by reflexivity.
+    pose proof (ram_ident root_ppn pa Hrampa) as Hident.
+    pose proof (ram_mask pa Hrampa) as Hmask.
+    pose proof (ram_svpn2 pa Hrampa) as Hvpn2.
+    pose proof (ram_mvpn pa Hrampa) as Hmvpn.
+    pose proof (WpSmodeGpr.ram_mppn pa Hrampa) as Hmppn.
+    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
+              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
+    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 8) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
-    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
-              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
-    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE
@@ -1165,10 +1178,6 @@ Section WpLockLeaves.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
-    iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
-    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
-      { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     iAssert (⌜addr_is_ram (pa_add pa 7)⌝)%I as %Hrampab.
     { iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbytes") as "Hbb".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -1355,7 +1364,7 @@ Section WpLockLeaves.
   (* ------------------------------------------------------------------- *)
   Lemma wp_sw_zero_lockinv (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12) (svpn : mword 27)
+      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
@@ -1375,21 +1384,11 @@ Section WpLockLeaves.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     (* fetch *)
-    (* data address: superpage-identity geometry at tlb_hash svpn *)
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
+    (* data address: the superpage-identity geometry AND alignment are DERIVED
+       internally (addr_is_ram + alignment from the owned points-to/invariant)
+       -- see below -- no premise taken. *)
     (* the walks' PTE read *)
     (* store PMP: TOR entry 0 covers pa with W *)
-    is_aligned_vaddr (Virtaddr a8) 4 = true ->
-    is_aligned_paddr (Physaddr pa) 4 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -1417,9 +1416,7 @@ Section WpLockLeaves.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa storeval HN HNl Hpalk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn
-      Halign4 Hpalign4.
+    intros ea a8 pa storeval HN HNl Hpalk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Htok HRes Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -1427,9 +1424,6 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
     destruct (Hpma_all pa 4) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st).
-    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
-              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
-    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
               mstatus0 mie_v mdv0 menvcfg0
               HN HSIE HMPRV HSXL Hmm HPBMTE
@@ -1446,7 +1440,7 @@ Section WpLockLeaves.
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes _]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
-    iDestruct "Hbytes" as "[_ Hbytes]".
+    iDestruct "Hbytes" as "[%Hpalign4 Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -1462,6 +1456,21 @@ Section WpLockLeaves.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true)
+      by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
+    set (svpn := svpn_of pa).
+    pose proof (ram_canonical pa Hrampa) as Hcanon.
+    assert (Hvpn_def : autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn)
+      by reflexivity.
+    pose proof (ram_ident root_ppn pa Hrampa) as Hident.
+    pose proof (ram_mask pa Hrampa) as Hmask.
+    pose proof (ram_svpn2 pa Hrampa) as Hvpn2.
+    pose proof (ram_mvpn pa Hrampa) as Hmvpn.
+    pose proof (WpSmodeGpr.ram_mppn pa Hrampa) as Hmppn.
+    assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
+              (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
+    { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
     iAssert (⌜addr_is_ram (pa_add pa 3)⌝)%I as %Hrampab.
     { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hbb".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
