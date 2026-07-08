@@ -48,6 +48,7 @@ Import Defs.
 
 Section WpIntrInv.
   Context `{!riscvGS Sig}.
+  Context `{!sieG Sig}.
   Context `{CID : CpuId}.
 
   (* The mstatus fact set carried across the round trip: SIE=1 (interrupts
@@ -169,15 +170,27 @@ Section WpIntrInv.
     (* stack-page geometry (symbolic sp; svpn = its Sv39 VPN) *)
     (* SRET facts *)
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
     ⊢ intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64)
         (F_kv root_ppn svpn m menvcfg0).
   Proof.
-    intros HPBMTE Hpmm Hlpe0.
+    intros HPBMTE Hpmm Hlpe0 HFIOM.
     iModIntro. iIntros (elp_v ms pc0 mie_v mdv0 E Φ) "%HN %Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hstvec Hpc HF Hcont".
-    pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR).
+    pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
     iDestruct "HF" as "(#Hhw & #Hinv & #Htext & Hmenv & Htlbinv & Hfile & Hwins)".
     iDestruct "Hwins" as (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17)
       "(Hw1 & Hw2 & Hw3 & Hw4 & Hw5 & Hw6 & Hw7 & Hw8 & Hw9 & Hw10 & Hw11 & Hw12 & Hw13 & Hw14 & Hw15 & Hw16 & Hw17)".
+    assert (Hleg_trap :
+      WpGprCsrwCommon.legalize_sstatus_val (trap_ms elp_v ms)
+        (WpGprCsrwCommon.sstatus_write_val (trap_ms elp_v ms) (mword_of_int 2))
+      = trap_ms elp_v ms).
+    { apply WpGprCsrwC.legalize_sie_clear_idem.
+      - apply trap_ms_SIE.
+      - rewrite trap_ms_XS; exact HXS.
+      - rewrite trap_ms_FS; exact HFS.
+      - rewrite trap_ms_VS; exact HVS.
+      - rewrite trap_ms_SD; exact HSD.
+      - rewrite trap_ms_MPP; exact HMPP. }
     iApply (wp_kernelvec root_ppn m (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
               w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 E Φ
               HN
@@ -190,6 +203,8 @@ Section WpIntrInv.
               (trap_ms_TSR_false elp_v ms HTSR)
               (sret_newpriv_trap_ms elp_v ms)
               Hlpe0
+              HFIOM
+              Hleg_trap
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc
                     Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
