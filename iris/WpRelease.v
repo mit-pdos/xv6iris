@@ -425,8 +425,8 @@ Section WpReleaseTop.
     locked γ -∗
     R -∗
     a_cpu ↦₈ cpuold -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noffv j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
+    a_noff ↦₄ noffv -∗
+    a_int ↦₄{ dqi } intenav -∗
     a_r24 ↦₈ vr24 -∗
     a_r16 ↦₈ vr16 -∗
     a_r8 ↦₈ vr8 -∗
@@ -448,8 +448,8 @@ Section WpReleaseTop.
           mr !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
           mr !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) ⌝) -∗
       a_cpu ↦₈ (zero_reg : mword 64) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte storeval_noff j) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
+      a_noff ↦₄ storeval_noff -∗
+      a_int ↦₄{ dqi } intenav -∗
       (∃ (u1 u2 u3 u4 u5 u6 u7 u8 u9 : bv 64),
         a_r24 ↦₈ u1 ∗
         a_r16 ↦₈ u2 ∗

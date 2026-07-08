@@ -275,8 +275,8 @@ Section WpPopOffVc.
     a_p0 ↦₈ vp0 -∗
     a_fra ↦₈ vfra -∗
     a_fs0 ↦₈ vfs0 -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noffv j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
+    a_noff ↦₄ noffv -∗
+    a_int ↦₄{ dqi } intenav -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
@@ -289,8 +289,8 @@ Section WpPopOffVc.
           mf !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
           mf !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
           mf !!! Regidx (mword_of_int 10 : mword 5) = a0v ⌝) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte storeval j) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
+      a_noff ↦₄ storeval -∗
+      a_int ↦₄{ dqi } intenav -∗
       (∃ (w8 w0 wra ws0 : bv 64),
         a_p8 ↦₈ w8 ∗
         a_p0 ↦₈ w0 ∗
@@ -507,8 +507,7 @@ Section WpPopOffVc.
     { rewrite /vheap_own. cbn [vheap]. done. }
     { rewrite /vheap4_own. cbn [vheap4]. rewrite /po_noff_cell0.
       cbn [big_opL fst snd].
-      rewrite HaD HvD. rewrite /word4_pointsto.
-      iFrame "Hnoff". iPureIntro. exact (conj Nalign Npalign). }
+      rewrite HaD HvD. iFrame "Hnoff". }
     iIntros (M2) "%HmD1 Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile _ Hheap4".
     iEval (rewrite /vheap4_own; cbn [vheap4]; rewrite /po_noff_cell0;
            cbn [big_opL fst snd];
@@ -620,7 +619,7 @@ Section WpPopOffVc.
            cbn [big_opL fst snd];
            rewrite HaE Hstv) in "Hheap4".
     iDestruct "Hheap4" as "[Hnoffw2 _]".
-    iDestruct "Hnoffw2" as "(_ & _ & Hnoff)".
+    iRename "Hnoffw2" into "Hnoff".
     (* M3 facts *)
     assert (Ha5M3 : M3 !!! Regidx (mword_of_int 15 : mword 5) = nv1).
     { assert (Hl : po_decsw_regs1 !! Regidx (mword_of_int 15 : mword 5)
@@ -789,7 +788,6 @@ Section WpPopOffVc.
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
                 ltac:(rewrite HAint; exact Icanon) ltac:(rewrite HAint; exact Ivpn) ltac:(rewrite HAint; exact Iident)
                 Imask Ivpn2 Imvpn Imppn
-                ltac:(rewrite HAint; exact Ialign) ltac:(rewrite HAint; exact Ipalign)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi20 [Hint] [-]").
       { iEval (rewrite HAint). iExact "Hint". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hint".

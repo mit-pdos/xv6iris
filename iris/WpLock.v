@@ -34,9 +34,10 @@ Section Lock.
 
   Definition locked (γ : gname) : iProp Σ := own γ (Excl ()).
 
-  (* the physical 4-byte little-endian lock word at address [lk] *)
+  (* the physical 4-byte little-endian lock word at address [lk]: the 4-byte
+     word points-to [↦₄] (which also bundles the 4-byte alignment of [lk]). *)
   Definition lock_word (lk : mword 64) (v : mword 32) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 4, (pa_add lk j) ↦ₘ nth_byte v j)%I.
+    (lk ↦₄ v)%I.
 
   Definition lock_inv (γ : gname) (lk : mword 64) (R : iProp Σ) : iProp Σ :=
     (∃ v : mword 32,
@@ -57,7 +58,7 @@ Section Lock.
   Proof. rewrite /mem_pointsto. apply _. Qed.
 
   Global Instance lock_word_timeless lk v : Timeless (lock_word lk v).
-  Proof. apply _. Qed.
+  Proof. rewrite /lock_word /word4_pointsto. apply _. Qed.
 
   Lemma locked_exclusive γ : locked γ -∗ locked γ -∗ False.
   Proof.

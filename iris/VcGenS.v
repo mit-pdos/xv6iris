@@ -233,10 +233,8 @@ Section VcGenSIris.
   (* alignment forms travel with the ownership, exactly as ↦₈ does, so    *)
   (* the wrappers below need no per-address side conditions.              *)
   (* ------------------------------------------------------------------ *)
-  Definition word4_pointsto (a : mword 64) (w : mword 32) : iProp Σ :=
-    (⌜is_aligned_vaddr (Virtaddr a) 4 = true⌝ ∗
-     ⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
-     [∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ nth_byte w j)%I.
+  (* [word4_pointsto] / [↦₄] is defined in RiscvPtsto (the 4-byte analogue of
+     [↦₈]); it bundles the 4 byte points-to facts with the 4-byte alignment. *)
 
   (* wp_clw_s with the ten slot-geometry hypotheses DERIVED from the cell's
      RAM-ness + alignment (the [ram_*] lemmas), mirroring
@@ -263,21 +261,21 @@ Section VcGenSIris.
     tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    word4_pointsto ea v -∗
+    ea ↦₄ v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      word4_pointsto ea v -∗
+      ea ↦₄ v -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              Hpc Hfile Hinstr Hbw Hcont".
-    iDestruct "Hbw" as "(%Hval4 & %Hpal4 & Hbytes)".
+    iDestruct "Hbw" as "(%Hpal4 & Hbytes)".
     iAssert (⌜addr_is_ram ea⌝)%I as %Hr0.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -296,6 +294,8 @@ Section VcGenSIris.
       destruct Hr3 as [_ Hhi3]. rewrite Heq in Hhi3.
       change (Z.of_nat 3) with 3 in Hhi3.
       unfold ram_base, ram_size in *. lia. }
+    iAssert (ea ↦₄ v)%I with "[Hbytes]" as "Hbw4".
+    { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpal4. }
     iApply (wp_clw_s root_ppn E Φ pc rd rs1 imm (svpn_of ea) m v
               mstatus0 mie_v mdv0 menvcfg0
               (dq:=dq) (dqm:=DfracOwn 1)
@@ -303,13 +303,11 @@ Section VcGenSIris.
               (ram_canonical ea Hr0) ltac:(reflexivity)
               (ram_ident root_ppn ea Hr0) (ram_mask ea Hr0)
               (ram_svpn2 ea Hr0) (ram_mvpn ea Hr0) (ram_mppn ea Hr0)
-              Hval4 Hpal4
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                    Hpc Hfile Hinstr Hbytes [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbytes".
+                    Hpc Hfile Hinstr Hbw4 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hfile [Hbytes]").
-    rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact (conj Hval4 Hpal4).
+                          Hpc Hfile Hbw").
   Qed.
 
   (* wp_csw_s, same treatment.  The stored word is [trunc32 rs2]. *)
@@ -334,21 +332,21 @@ Section VcGenSIris.
     tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-    word4_pointsto ea vold -∗
+    ea ↦₄ vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
-      word4_pointsto ea (trunc32 (m !!! Regidx rs2)) -∗
+      ea ↦₄ (trunc32 (m !!! Regidx rs2)) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              Hpc Hfile Hinstr Hbw Hcont".
-    iDestruct "Hbw" as "(%Hval4 & %Hpal4 & Hbytes)".
+    iDestruct "Hbw" as "(%Hpal4 & Hbytes)".
     iAssert (⌜addr_is_ram ea⌝)%I as %Hr0.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -367,25 +365,24 @@ Section VcGenSIris.
       destruct Hr3 as [_ Hhi3]. rewrite Heq in Hhi3.
       change (Z.of_nat 3) with 3 in Hhi3.
       unfold ram_base, ram_size in *. lia. }
+    iAssert (ea ↦₄ vold)%I with "[Hbytes]" as "Hbw4".
+    { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpal4. }
     iApply (wp_csw_s root_ppn E Φ pc rs2 rs1 imm (svpn_of ea) m vold
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               (ram_canonical ea Hr0) ltac:(reflexivity)
               (ram_ident root_ppn ea Hr0) (ram_mask ea Hr0)
               (ram_svpn2 ea Hr0) (ram_mvpn ea Hr0) (ram_mppn ea Hr0)
-              Hval4 Hpal4
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                    Hpc Hfile Hinstr Hbytes [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbytes".
+                    Hpc Hfile Hinstr Hbw4 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          Hpc Hfile [Hbytes]").
-    rewrite /word4_pointsto /trunc32. iFrame "Hbytes".
-    iPureIntro. exact (conj Hval4 Hpal4).
+                          Hpc Hfile Hbw").
   Qed.
 
   (* one fully-owned 4-byte points-to per word cell. *)
   Definition vheap4_own (ρ : nat -> mword 64) (h : list (sval * sval32)) : iProp Σ :=
-    ([∗ list] c ∈ h, word4_pointsto (sval_den ρ c.1) (sval32_den ρ c.2))%I.
+    ([∗ list] c ∈ h, (sval_den ρ c.1) ↦₄ (sval32_den ρ c.2))%I.
 
   (* the block's code: one RVC [instr] fact per entry, at consecutive pcs. *)
   Fixpoint block_instrs_s (pc : Z) (prog : list vop_s) : iProp Σ :=

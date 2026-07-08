@@ -173,8 +173,8 @@ Section Kalloc.
     q_p0  ↦₈ qpr0 -∗
     q_fra ↦₈ qfraold -∗
     q_fs0 ↦₈ qfs0old -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add q_noff j) ↦ₘ nth_byte qnoff j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add q_intena j) ↦ₘ nth_byte qintena_old j) -∗
+    q_noff ↦₄ qnoff -∗
+    q_intena ↦₄ qintena_old -∗
     is_lock γ lkA (kmem_res fl) -∗
     q_cpu ↦₈ qcpuold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
