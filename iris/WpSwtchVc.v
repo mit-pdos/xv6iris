@@ -517,8 +517,8 @@ Section WpSwtchVc.
   Qed.
 
   (* -------------------------------------------------------------------- *)
-  (* valid_context sc E Phi P c : "the context saved at [c] admits a WP to   *)
-  (* run".  It owns c's 14 saved-register cells and is the wand from (config  *)
+  (* valid_context sc E Phi P c : the context saved at [c] admits a WP to     *)
+  (* run.  It owns c's 14 saved-register cells and is the wand from (config    *)
   (* bundle [sc] + pc at c.ra + a gpr file whose callee-saved regs are c's    *)
   (* saved values, caller-saved arbitrary) to a whole-machine [WP Loop @ E    *)
   (* {{Phi}}].  On resumption the continuation is handed, for the             *)
