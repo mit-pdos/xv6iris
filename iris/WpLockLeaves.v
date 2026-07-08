@@ -155,7 +155,8 @@ Section WpLockLeaves.
     iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes Hbr]".
-    iEval (rewrite /lock_word -Hpalk) in "Hbytes".
+    iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
+    iDestruct "Hbytes" as "[_ Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -313,7 +314,7 @@ Section WpLockLeaves.
       (* re-close the lock invariant: the word is now the NONZERO stored one *)
       iMod ("Hclose" with "[Hbytes]") as "_".
       { iNext. iExists (amoswap_stored (m !!! Regidx rs2)).
-        iSplitL. { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        iSplitL. { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iRight. iPureIntro. exact Hstz. }
       iModIntro.
       iExists s_x.
@@ -378,7 +379,7 @@ Section WpLockLeaves.
       iMod (upd_window_4 σ.(mem) pa (amoswap_stored (m !!! Regidx rs2)) w with "Hmem Hbytes") as "[Hmem Hbytes]".
       iMod ("Hclose" with "[Hbytes]") as "_".
       { iNext. iExists (amoswap_stored (m !!! Regidx rs2)).
-        iSplitL. { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        iSplitL. { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iRight. iPureIntro. exact Hstz. }
       iModIntro.
       iExists s_x.
@@ -499,7 +500,8 @@ Section WpLockLeaves.
     iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (v) "[>Hbytes Hbr]".
-    iEval (rewrite /lock_word -Hpalk) in "Hbytes".
+    iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
+    iDestruct "Hbytes" as "[_ Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -640,7 +642,7 @@ Section WpLockLeaves.
       { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
       iMod ("Hclose" with "[Hbytes Hbr]") as "_".
       { iNext. iExists v. iSplitL "Hbytes".
-        { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iExact "Hbr". }
       iModIntro.
       iExists (set_reg s_f (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (sign_extend' 64 v))).
@@ -704,7 +706,7 @@ Section WpLockLeaves.
       { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
       iMod ("Hclose" with "[Hbytes Hbr]") as "_".
       { iNext. iExists v. iSplitL "Hbytes".
-        { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iExact "Hbr". }
       iModIntro.
       iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (sign_extend' 64 v))).
@@ -831,7 +833,8 @@ Section WpLockLeaves.
     iDestruct "Hbody" as (v) "[>Hbytes Hbr]".
     iDestruct "Hbr" as "[(_ & >Htok2 & _) | >%Hvnz]".
     { iExFalso. iApply (locked_exclusive with "Htok Htok2"). }
-    iEval (rewrite /lock_word -Hpalk) in "Hbytes".
+    iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
+    iDestruct "Hbytes" as "[_ Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -972,7 +975,7 @@ Section WpLockLeaves.
       { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
       iMod ("Hclose" with "[Hbytes]") as "_".
       { iNext. iExists v. iSplitL "Hbytes".
-        { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iRight. iPureIntro. exact Hvnz. }
       iModIntro.
       iExists (set_reg s_f (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (sign_extend' 64 v))).
@@ -1036,7 +1039,7 @@ Section WpLockLeaves.
       { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
       iMod ("Hclose" with "[Hbytes]") as "_".
       { iNext. iExists v. iSplitL "Hbytes".
-        { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iRight. iPureIntro. exact Hvnz. }
       iModIntro.
       iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (sign_extend' 64 v))).
@@ -1442,7 +1445,8 @@ Section WpLockLeaves.
     iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes _]".
-    iEval (rewrite /lock_word -Hpalk) in "Hbytes".
+    iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
+    iDestruct "Hbytes" as "[_ Hbytes]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
@@ -1564,7 +1568,7 @@ Section WpLockLeaves.
       iMod (upd_window_4 σ.(mem) pa storeval w with "Hmem Hbytes") as "[Hmem Hbytes]".
       iMod ("Hclose" with "[Hbytes Htok HRes]") as "_".
       { iNext. iExists storeval. iSplitL "Hbytes".
-        { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iLeft. iFrame "Htok HRes". iPureIntro. reflexivity. }
       iModIntro.
       iExists s_x.
@@ -1618,7 +1622,7 @@ Section WpLockLeaves.
       iMod (upd_window_4 σ.(mem) pa storeval w with "Hmem Hbytes") as "[Hmem Hbytes]".
       iMod ("Hclose" with "[Hbytes Htok HRes]") as "_".
       { iNext. iExists storeval. iSplitL "Hbytes".
-        { rewrite /lock_word -Hpalk. iExact "Hbytes". }
+        { rewrite /lock_word -Hpalk. iApply (word4_pointsto_intro _ _ _ Hpalign4). iExact "Hbytes". }
         iLeft. iFrame "Htok HRes". iPureIntro. reflexivity. }
       iModIntro.
       iExists s_x.

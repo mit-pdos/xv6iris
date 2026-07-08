@@ -1184,8 +1184,6 @@ Section WpPushOffMem.
     zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
     (* the walks' PTE read *)
     (* store PMP: TOR entry 0 covers pa with W *)
-    is_aligned_vaddr (Virtaddr a8) 4 = true ->
-    is_aligned_paddr (Physaddr pa) 4 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -1198,7 +1196,7 @@ Section WpPushOffMem.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add pa j) ↦ₘ nth_byte vold j) -∗
+    pa ↦₄ vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1208,14 +1206,16 @@ Section WpPushOffMem.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add pa j) ↦ₘ nth_byte storeval j) -∗
+      pa ↦₄ storeval -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea a8 pa storeval HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn Halign4 Hpalign4.
+      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+    iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
+    assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true) by exact Hpalign4.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -1371,8 +1371,10 @@ Section WpPushOffMem.
       assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 2).
       { unfold s_x, s_f, s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
+      iAssert (pa ↦₄ storeval)%I with "[Hbytes]" as "Hbw".
+      { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmpc Hpmpa]
-                            [$Hpc' $Hnpc] [Hfmap] Hbytes").
+                            [$Hpc' $Hnpc] [Hfmap] Hbw").
       { iApply (tlb_inv_close root_ppn satp0 tlbf2 Hmode Hasid Hppn
                   (tlb_pt_consistent_fill root_ppn tlbvec_f (tlb_hash (__id 39) svpn)
                      (tlb_hash_range svpn) Hconsf)
@@ -1420,8 +1422,10 @@ Section WpPushOffMem.
       assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 2).
       { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
+      iAssert (pa ↦₄ storeval)%I with "[Hbytes]" as "Hbw".
+      { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmpc Hpmpa]
-                            [$Hpc' $Hnpc] [Hfmap] Hbytes").
+                            [$Hpc' $Hnpc] [Hfmap] Hbw").
       { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
                   with "Hsatp Htlb Hpbytes [Hpmpc Hpmpa]").
         iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 region_pte
@@ -1465,8 +1469,6 @@ Section WpPushOffMem.
     zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
     (* the walks' PTE read *)
     (* load PMP: TOR entry 0 covers pa with R *)
-    is_aligned_vaddr (Virtaddr a8) 4 = true ->
-    is_aligned_paddr (Physaddr pa) 4 = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -1479,7 +1481,7 @@ Section WpPushOffMem.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add pa j) ↦ₘ{ dqm } nth_byte v j) -∗
+    pa ↦₄{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1489,14 +1491,16 @@ Section WpPushOffMem.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add pa j) ↦ₘ{ dqm } nth_byte v j) -∗
+      pa ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn Halign4 Hpalign4.
+      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+    iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
+    assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true) by exact Hpalign4.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -1669,8 +1673,10 @@ Section WpPushOffMem.
                = add_vec_int pc 2).
       { unfold s_f, s_pc; cbn [sregs]. tmig. tmig. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
+      iAssert (pa ↦₄{ dqm } v)%I with "[Hbytes]" as "Hbw".
+      { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmpc Hpmpa]
-                            [$Hpc' $Hnpc] [Hfmap] Hbytes").
+                            [$Hpc' $Hnpc] [Hfmap] Hbw").
       { iApply (tlb_inv_close root_ppn satp0 tlbf2 Hmode Hasid Hppn
                   (tlb_pt_consistent_fill root_ppn tlbvec_f (tlb_hash (__id 39) svpn)
                      (tlb_hash_range svpn) Hconsf)
@@ -1729,8 +1735,10 @@ Section WpPushOffMem.
                = add_vec_int pc 2).
       { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
+      iAssert (pa ↦₄{ dqm } v)%I with "[Hbytes]" as "Hbw".
+      { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmpc Hpmpa]
-                            [$Hpc' $Hnpc] [Hfmap] Hbytes").
+                            [$Hpc' $Hnpc] [Hfmap] Hbw").
       { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf
                   with "Hsatp Htlb Hpbytes [Hpmpc Hpmpa]").
         iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 region_pte

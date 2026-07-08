@@ -363,8 +363,8 @@ Section WpAcquireLock.
     a_p8 ↦₈ pr8 -∗
     a_fra ↦₈ fraold -∗
     a_fs0 ↦₈ fs0old -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noff j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_intena j) ↦ₘ nth_byte intena_old j) -∗
+    a_noff ↦₄ noff -∗
+    a_intena ↦₄ intena_old -∗
     is_lock γ lk R -∗
     a_cpu ↦₈ cpuold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -391,9 +391,8 @@ Section WpAcquireLock.
         a_p8 ↦₈ vp8 ∗
         a_fra ↦₈ vfra ∗
         a_fs0 ↦₈ vfs0) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte po_noff_store j) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_intena j) ↦ₘ
-          nth_byte (if eq_vec (sign_extend' 64 noff) zero_reg then acq_intena_store mstatus0 else intena_old) j) -∗
+      a_noff ↦₄ po_noff_store -∗
+      a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then acq_intena_store mstatus0 else intena_old) -∗
       a_cpu ↦₈ (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.

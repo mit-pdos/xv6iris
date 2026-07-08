@@ -195,6 +195,44 @@ Section word_pointsto.
 End word_pointsto.
 
 (* ---------------------------------------------------------------------- *)
+(* 4-byte word points-to: a 4-byte (word) value [w] stored little-endian at a
+   WORD-ALIGNED address [a].  The exact 4-byte analogue of [word_pointsto]
+   ([↦₈]): bundling the 4 byte points-to facts with the 4-byte alignment lets
+   a 4-byte load/store WP take a single [a ↦₄ w] hypothesis instead of a byte
+   window PLUS a separate [is_aligned_paddr ... 4 = true] side condition.      *)
+Definition word4_pointsto `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (w : bv 32) : iProp Σ :=
+  (⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
+   [∗ list] j ∈ seq 0 4, mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
+Notation "a ↦₄{ dq } w" := (word4_pointsto a dq w)
+  (at level 20, format "a  ↦₄{ dq }  w") : bi_scope.
+Notation "a ↦₄ w" := (word4_pointsto a (DfracOwn 1) w)
+  (at level 20, format "a  ↦₄  w") : bi_scope.
+
+Section word4_pointsto.
+  Context `{!riscvGS Σ}.
+
+  Lemma word4_pointsto_aligned_p a dq w :
+    word4_pointsto a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 4 = true⌝.
+  Proof. iIntros "[$ _]". Qed.
+  Lemma word4_pointsto_aligned_v a dq w :
+    word4_pointsto a dq w ⊢ ⌜is_aligned_vaddr (Virtaddr a) 4 = true⌝.
+  Proof. iIntros "[%H _]". iPureIntro. exact H. Qed.
+  Lemma word4_pointsto_bytes a dq w :
+    word4_pointsto a dq w ⊢ [∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ{dq} nth_byte w j.
+  Proof. iIntros "[_ $]". Qed.
+  (* repackage a byte window + its alignment fact into a word points-to *)
+  Lemma word4_pointsto_intro a dq w :
+    is_aligned_paddr (Physaddr a) 4 = true ->
+    ([∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ{dq} nth_byte w j) ⊢ word4_pointsto a dq w.
+  Proof. iIntros (Hal) "H". by iFrame. Qed.
+  Lemma word4_pointsto_unfold a dq w :
+    word4_pointsto a dq w ⊣⊢
+    ⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
+    ([∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ{dq} nth_byte w j).
+  Proof. reflexivity. Qed.
+End word4_pointsto.
+
+(* ---------------------------------------------------------------------- *)
 (* 2. The bridge: an existential register map agreeing with [regstate].    *)
 (* ---------------------------------------------------------------------- *)
 

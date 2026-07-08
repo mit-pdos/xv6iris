@@ -735,7 +735,7 @@ Section WpPushOffTop.
     kernel_text -∗ pc_is P -∗ gpr_file ms -∗
     a8_ra ↦₈ raold -∗
     a8_s0 ↦₈ s0old -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a8_noff j) ↦ₘ nth_byte noff j) -∗
+    a8_noff ↦₄ noff -∗
     a8_p24 ↦₈ ra0e -∗
     a8_p16 ↦₈ s00e -∗
     a8_p8 ↦₈ s10e -∗
@@ -752,7 +752,7 @@ Section WpPushOffTop.
                                  mfin !!! Regidx (mword_of_int 18 : mword 5) = ms !!! Regidx (mword_of_int 18 : mword 5) ⌝) -∗
       a8_ra ↦₈ ra0 -∗
       a8_s0 ↦₈ s00 -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a8_noff j) ↦ₘ nth_byte storeval j) -∗
+      a8_noff ↦₄ storeval -∗
       a8_p24 ↦₈ ra0e -∗
       a8_p16 ↦₈ s00e -∗
       a8_p8 ↦₈ s10e -∗
@@ -789,7 +789,7 @@ Section WpPushOffTop.
               (mword_of_int 120 : mword 12) svpn_noff M1 noff mstatus0 mie_v mdv0 menvcfg0
               (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
-              Ncanon Nvpn Nident Nmask Nvpn2 Nmvpn Nmppn Nalign Npalign
+              Ncanon Nvpn Nident Nmask Nvpn2 Nmvpn Nmppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi1c Hnoff [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hnoff".
     assert (Hpc1e : add_vec_int (mword_of_int (PO + 0x1c) : mword 64) 2 = mword_of_int (PO + 0x1e))
@@ -816,7 +816,6 @@ Section WpPushOffTop.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               ltac:(rewrite Hm310; exact Ncanon) ltac:(rewrite Hm310; exact Nvpn) ltac:(rewrite Hm310; exact Nident)
               Nmask Nvpn2 Nmvpn Nmppn
-              ltac:(rewrite Hm310; exact Nalign) ltac:(rewrite Hm310; exact Npalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi20 [Hnoff] [-]").
     { iEval (rewrite Hm310). iExact "Hnoff". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hnoff".
@@ -1002,8 +1001,8 @@ Section WpPushOffTop.
     a_r8 ↦₈ vr8 -∗
     a_fra ↦₈ raold0 -∗
     a_fs0 ↦₈ s0old0 -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noff j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_intena j) ↦ₘ nth_byte intena_old j) -∗
+    a_noff ↦₄ noff -∗
+    a_intena ↦₄ intena_old -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
@@ -1020,9 +1019,8 @@ Section WpPushOffTop.
       a_r8 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
       (∃ vfra vfs0 : bv 64, a_fra ↦₈ vfra ∗
                             a_fs0 ↦₈ vfs0) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noff_store j) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_intena j) ↦ₘ
-          nth_byte (if eq_vec (sign_extend' 64 noff) zero_reg then storeval32 else intena_old) j) -∗
+      a_noff ↦₄ noff_store -∗
+      a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then storeval32 else intena_old) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -1135,7 +1133,6 @@ Section WpPushOffTop.
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               ltac:(rewrite Hnoffaddr; exact Ncanon) ltac:(rewrite Hnoffaddr; exact Nvpn) ltac:(rewrite Hnoffaddr; exact Nident)
               Nmask Nvpn2 Nmvpn Nmppn
-              ltac:(rewrite Hnoffaddr; exact Nalign) ltac:(rewrite Hnoffaddr; exact Npalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi14 [Hnoff] [-]").
     { iEval (rewrite Hnoffaddr). iExact "Hnoff". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hnoff".
@@ -1219,7 +1216,6 @@ Section WpPushOffTop.
                 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
                 ltac:(rewrite Hintaddr; exact INTcanon) ltac:(rewrite Hintaddr; exact INTvpn) ltac:(rewrite Hintaddr; exact INTident)
                 INTmask INTvpn2 INTmvpn INTmppn
-                ltac:(rewrite Hintaddr; exact INTalign) ltac:(rewrite Hintaddr; exact INTpalign)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi36 [Hintena] [-]").
       { iEval (rewrite Hintaddr). iExact "Hintena". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hintena".

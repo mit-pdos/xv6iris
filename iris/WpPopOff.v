@@ -971,8 +971,8 @@ Section WpPopOffTopSec.
     a_p0 ↦₈ vp0 -∗
     a_fra ↦₈ vfra -∗
     a_fs0 ↦₈ vfs0 -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte noffv j) -∗
-    ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
+    a_noff ↦₄ noffv -∗
+    a_int ↦₄{ dqi } intenav -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
@@ -985,8 +985,8 @@ Section WpPopOffTopSec.
           mf !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
           mf !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
           mf !!! Regidx (mword_of_int 10 : mword 5) = a0v ⌝) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_noff j) ↦ₘ nth_byte storeval j) -∗
-      ([∗ list] j ∈ seq 0 4, (pa_add a_int j) ↦ₘ{ dqi } nth_byte intenav j) -∗
+      a_noff ↦₄ storeval -∗
+      a_int ↦₄{ dqi } intenav -∗
       (∃ (w8 w0 wra ws0 : bv 64),
         a_p8 ↦₈ w8 ∗
         a_p0 ↦₈ w0 ∗
@@ -1139,7 +1139,6 @@ Section WpPopOffTopSec.
               HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               ltac:(rewrite HAnoff4; exact Ncanon) ltac:(rewrite HAnoff4; exact Nvpn) ltac:(rewrite HAnoff4; exact Nident)
               Nmask Nvpn2 Nmvpn Nmppn
-              ltac:(rewrite HAnoff4; exact Nalign) ltac:(rewrite HAnoff4; exact Npalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi14 [Hnoff] [-]").
     { iEval (rewrite HAnoff4). iExact "Hnoff". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hnoff".
@@ -1185,7 +1184,6 @@ Section WpPopOffTopSec.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
               ltac:(rewrite HAnoff6; exact Ncanon) ltac:(rewrite HAnoff6; exact Nvpn) ltac:(rewrite HAnoff6; exact Nident)
               Nmask Nvpn2 Nmvpn Nmppn
-              ltac:(rewrite HAnoff6; exact Nalign) ltac:(rewrite HAnoff6; exact Npalign)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi1c [Hnoff] [-]").
     { iEval (rewrite HAnoff6). iExact "Hnoff". }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hnoff".
@@ -1321,7 +1319,6 @@ Section WpPopOffTopSec.
                 HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
                 ltac:(rewrite HAint6; exact Icanon) ltac:(rewrite HAint6; exact Ivpn) ltac:(rewrite HAint6; exact Iident)
                 Imask Ivpn2 Imvpn Imppn
-                ltac:(rewrite HAint6; exact Ialign) ltac:(rewrite HAint6; exact Ipalign)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi20 [Hint] [-]").
       { iEval (rewrite HAint6). iExact "Hint". }
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hint".
