@@ -36,6 +36,7 @@ From Stdlib Require Import ZArith FunctionalExtensionality.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
+From iris.base_logic.lib Require Import ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
@@ -44,6 +45,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import MinstretInv InstrBytes.
 Require Import WpFetch WpDecode WpLeafCommon WpEntry WpLoad WpGprCsrwB WpGprRvc WpEntryNew.
 Require Import WpRvcBridge.
+Require Import WpGprCsrwCommon.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -2449,70 +2451,101 @@ End SFetchWalk.
 (* root ppn for the page walk, so the satp VALUE stays visible.           *)
 (* ===================================================================== *)
 
+(* ghost tracking of the [mstatus.SIE] bit: [smode_config] holds one half tied
+   to the actual flag; functions that observe/save SIE (push_off/pop_off via
+   acquire/release) own the other half.  Mirrors [lockG] in WpLock.v. *)
+Class sieG (Σ : gFunctors) := SieG { sie_inG :: ghost_varG Σ (mword 1) }.
+Definition sieΣ : gFunctors := #[ ghost_varΣ (mword 1) ].
+Global Instance subG_sieΣ {Σ} : subG sieΣ Σ -> sieG Σ.
+Proof. solve_inG. Qed.
+
 Section SmodeCoreIris.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Definition smode_config (dq : dfrac) : iProp Σ :=
+  (* The ambient S-mode machine configuration, keyed by the SIE ghost name [γ].
+     Bundles the config registers + all the pure config facts an S-mode kernel
+     instruction relies on (SIE=0, MPRV=0, SXL, mie∧¬mdv=0, PBMTE, MXR=0, PMM
+     disabled, LPE=0, FIOM=0, and the SIE-clear legalize fixpoint), and ties a
+     half of [γ] to the live [mstatus.SIE] bit. *)
+  Definition smode_config (γ : gname) (dq : dfrac) : iProp Σ :=
     (hw_config ∗ minstret_inv ∗
      hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
      cur_privilege ↦ᵣ{ dq } Supervisor ∗
      (∃ mstatus0 : mword 64,
         mstatus ↦ᵣ{ dq } mstatus0 ∗
+        ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
         ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ ∗
         ⌜ eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ⌝ ∗
-        ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝) ∗
+        ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ ∗
+        ⌜ eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ⌝ ∗
+        ⌜ legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ⌝) ∗
      (∃ mie_v mdv0 : mword 64,
         mie ↦ᵣ{ dq } mie_v ∗ mideleg ↦ᵣ{ dq } mdv0 ∗
         ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝) ∗
      (∃ menvcfg0 : mword 64,
         menvcfg ↦ᵣ{ dq } menvcfg0 ∗
-        ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝))%I.
+        ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝ ∗
+        ⌜ pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ⌝ ∗
+        ⌜ bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ⌝ ∗
+        ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝))%I.
 
-  (* unbundle: expose the raw cells + the pure facts. *)
-  Lemma smode_config_unbundle (dq : dfrac) :
-    smode_config dq -∗
+  (* unbundle: expose the raw cells + the ghost half + the pure facts. *)
+  Lemma smode_config_unbundle (γ : gname) (dq : dfrac) :
+    smode_config γ dq -∗
     hw_config ∗ minstret_inv ∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
     cur_privilege ↦ᵣ{ dq } Supervisor ∗
     (∃ mstatus0 : mword 64,
        mstatus ↦ᵣ{ dq } mstatus0 ∗
+       ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
        ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ ∗
        ⌜ eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ⌝ ∗
-       ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝) ∗
+       ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ ∗
+       ⌜ eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ⌝ ∗
+       ⌜ legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ⌝) ∗
     (∃ mie_v mdv0 : mword 64,
        mie ↦ᵣ{ dq } mie_v ∗ mideleg ↦ᵣ{ dq } mdv0 ∗
        ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝) ∗
     (∃ menvcfg0 : mword 64,
        menvcfg ↦ᵣ{ dq } menvcfg0 ∗
-       ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝).
+       ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝ ∗
+       ⌜ pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ⌝ ∗
+       ⌜ bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ⌝ ∗
+       ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝).
   Proof. iIntros "H". iExact "H". Qed.
 
-  (* rebuild from raw cells + the pure facts (inverse of unbundle). *)
-  Lemma smode_config_rebuild (dq : dfrac) (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
+  (* rebuild from raw cells + the ghost half + the pure facts (inverse). *)
+  Lemma smode_config_rebuild (γ : gname) (dq : dfrac) (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗
     mstatus ↦ᵣ{ dq } mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    smode_config dq.
+    smode_config γ dq.
   Proof.
-    iIntros (HSIE HMPRV HSXL Hmie HPBMTE)
-            "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv".
+    iIntros (HSIE HMPRV HSXL HMXR Hleg Hmie HPBMTE Hpmm Hlpe Hfiom)
+            "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv".
     iFrame "Hhw Hinv Hhs Hpriv".
-    iSplitL "Hms".
-    { iExists mstatus0. iFrame "Hms". iPureIntro. exact (conj HSIE (conj HMPRV HSXL)). }
+    iSplitL "Hms Hsie".
+    { iExists mstatus0. iFrame "Hms Hsie". iPureIntro. repeat split; assumption. }
     iSplitL "Hmie Hmdl".
     { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmie. }
-    iExists menvcfg0. iFrame "Hmenv". iPureIntro. exact HPBMTE.
+    iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption.
   Qed.
 
 
@@ -3266,10 +3299,10 @@ Section SmodeCoreIris.
   (* invariant).  Subsumes [wp_instr_s] (hit) and [wp_instr_s_fill]       *)
   (* (walk), which become internal to this engine.                        *)
   (* =================================================================== *)
-  Lemma wp_instr_s_tlbinv (root_ppn : mword 44) E Φ
+  Lemma wp_instr_s_tlbinv (root_ppn : mword 44) (γ : gname) E Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
     ↑minstretN ⊆ E →
-    smode_config dq -∗
+    smode_config γ dq -∗
     tlb_inv root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
@@ -3281,7 +3314,7 @@ Section SmodeCoreIris.
                                      (if is_rvc then 2 else 4)))
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          mstate_interp s_exec ∗
-         (smode_config dq -∗
+         (smode_config γ dq -∗
           tlb_inv root_ppn -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
@@ -3299,9 +3332,9 @@ Section SmodeCoreIris.
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00 region_pte)
       "(Hpmpc & Hpmpa & %Hpmpp & %Hpteregion & %HX & %HW & %HR & %Hcov)".
     iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
-    iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HSIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst" as (mstatus0) "(Hmstatus & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmie" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
-    iDestruct "Hmenv" as (menvcfg0) "(Hmenvc & %HPBMTE)".
+    iDestruct "Hmenv" as (menvcfg0) "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -3345,12 +3378,12 @@ Section SmodeCoreIris.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
              ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
-      with "[Hcont Hpriv Hmstatus Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
+      with "[Hcont Hpriv Hmstatus Hsie Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
-      iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").
-      - iApply (smode_config_rebuild dq mstatus0 mie_v mdv0 menvcfg0
-                  HSIE HMPRV HSXL Hmm HPBMTE
-                  with "Hhw Hinv Hhs' Hpriv Hmstatus Hmiec Hmdlc Hmenvc").
+      iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").
+      - iApply (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                  with "Hhw Hinv Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc").
       - iApply (tlb_inv_close root_ppn satp0 tlbvec2 Hmode Hasid Hppn Hcons2
                   with "Hsatp Htlb Hpbytes [Hpmpc Hpmpa]").
         iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 region_pte

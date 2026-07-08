@@ -222,7 +222,7 @@ End ExecSRET.
 (* sepc) unchanged.                                                       *)
 (* ===================================================================== *)
 Section WpSretGpr.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
 

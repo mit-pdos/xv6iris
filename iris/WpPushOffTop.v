@@ -10,6 +10,7 @@ From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
 Require Import RiscvModelBytes.
@@ -584,7 +585,7 @@ Section WpPushOffTop.
     (mword_of_int (PO + 0x38) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)) podec_38 exec_execute_C_J. Qed.
 
   (* ============ reusable jal->mycpu->return block (used 3x) ============ *)
-  Lemma wp_pushoff_call_mycpu (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_pushoff_call_mycpu (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
       (m : gmap regidx (mword 64))
       (raold s0old : bv 64)
@@ -636,11 +637,13 @@ Section WpPushOffTop.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (* the single "PMP TOR entry 0 covers all of RAM" config fact *)
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
@@ -649,6 +652,7 @@ Section WpPushOffTop.
     pa_s0 ↦₈ s0old -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+      ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗ gpr_file (po_mycpu_out P m) -∗
@@ -662,11 +666,11 @@ Section WpPushOffTop.
       ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
       HN Htarget Halign_tgt
-      HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
+      HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hfiom Hleg
       Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
-    iDestruct (kv_cfg_split mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL Hmm HPBMTE
-                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv")
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
+    iDestruct (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
     iApply (wp_jal_gpr_s2 root_ppn E Φ P (mword_of_int 1) jimm m (1/2)%Qp
               HN  ltac:(vm_compute; discriminate)
@@ -674,18 +678,20 @@ Section WpPushOffTop.
               with "Hhw Hsm Htlbinv Hpc Hfile Hjal [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite Htarget) in "Hpc".
-    iDestruct (kv_cfg_recombine mstatus0 mie_v mdv0 menvcfg0
+    iDestruct (kv_cfg_recombine γ mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
-      as "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv)".
+      as "(Hhs & Hpriv & Hms & Hsie & Hmie & Hmdl & Hmenv)".
     iApply (wp_mycpu root_ppn E Φ m0 raold s0old mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
              
               Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 Hcont").
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hsie Hcont]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0").
   Qed.
 
   (* ============ the suffix from 0x80000bd8 (PO+0x18) to c.ret ============ *)
-  Lemma wp_push_off_suffix (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_push_off_suffix (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (ms : gmap regidx (mword 64))
       (raold s0old : bv 64) (noff : mword 32) (ra0e s00e s10e : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -725,10 +731,13 @@ Section WpPushOffTop.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     eq_vec (access_vec_dec cret_tgt 0) ('b"0") = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file ms -∗
@@ -740,6 +749,7 @@ Section WpPushOffTop.
     a8_p8 ↦₈ s10e -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+      ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is cret_tgt -∗
@@ -760,11 +770,11 @@ Section WpPushOffTop.
   Proof.
     intros P spm ra0 s00 M1 a0v sp' a8_ra a8_s0 a8_noff a8_p24 a8_p16 a8_p8
       M2 M3 storeval M4 M5 M6 M7 cret_tgt
-      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
+      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hfiom Hleg
       Hret0.
     assert (Hm0sp : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> ms) !!! Regidx csp_rs1 = spm)
       by (rewrite lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hbra Hbs0 Hnoff Hpp24 Hpp16 Hpp8 Hcont".
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hbra Hbs0 Hnoff Hpp24 Hpp16 Hpp8 Hcont".
     iPoseProof (poi_18 with "Htext") as "Hi18".
     iApply (wp_pushoff_call_mycpu root_ppn E Φ P (mword_of_int 0xcfe : mword 21) ms raold s0old
               mstatus0 mie_v mdv0 menvcfg0
@@ -862,16 +872,16 @@ Section WpPushOffTop.
     iEval (rewrite Hpc28) in "Hpc".
     (* ---- 0x28: c.addi16sp sp,32 (via smode_config) ---- *)
     iPoseProof (poi_28 with "Htext") as "Hi28".
-    iDestruct (kv_cfg_split mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL Hmm HPBMTE
-                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv")
+    iDestruct (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int (PO + 0x28)) (mword_of_int 2 : mword 6) M6
+    iApply (wp_caddi16sp_gpr_s root_ppn γ E Φ (mword_of_int (PO + 0x28)) (mword_of_int 2 : mword 6) M6
               (1/2)%Qp HN 
               with "Hsm Htlbinv Hpc Hfile Hi28 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
-    iDestruct (kv_cfg_recombine mstatus0 mie_v mdv0 menvcfg0
+    iDestruct (kv_cfg_recombine γ mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
-      as "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv)".
+      as "(Hhs & Hpriv & Hms & Hsie & Hmie & Hmdl & Hmenv)".
     assert (Hpc2a : add_vec_int (mword_of_int (PO + 0x28) : mword 64) 2 = mword_of_int (PO + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -901,7 +911,7 @@ Section WpPushOffTop.
     iEval (rewrite Hcsp3) in "Hpp24".
     iEval (rewrite Hcsp4) in "Hpp16".
     iEval (rewrite Hcsp5) in "Hpp8".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hbra Hbs0 Hnoff Hpp24 Hpp16 Hpp8").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hbra Hbs0 Hnoff Hpp24 Hpp16 Hpp8").
     iExists M7. iFrame "Hfile". iPureIntro. split; [exact Hra7|]. split; [| split; [| split; [| split]]].
     - rewrite /M7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /M6. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -929,7 +939,7 @@ Section WpPushOffTop.
   Qed.
 
   (* ============ the full push_off, entry (0x80000bc0) to caller return ============ *)
-  Lemma wp_push_off (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_push_off (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (vr24 vr16 vr8 raold0 s0old0 : bv 64) (noff intena_old : mword 32) (a0f : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -974,6 +984,7 @@ Section WpPushOffTop.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
     legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false ->
     eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
@@ -984,6 +995,7 @@ Section WpPushOffTop.
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int (PO + 0x00) : mword 64) -∗ gpr_file m -∗
@@ -996,6 +1008,7 @@ Section WpPushOffTop.
     a_intena ↦₄ intena_old -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+      ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is caller_ret -∗

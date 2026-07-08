@@ -45,7 +45,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Section WpMemsetS.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   Definition pc_memset : mword 64 := mword_of_int KernelSyms.memset.
@@ -2247,16 +2247,16 @@ Qed.
   (*  THE THEOREM: [memset]'s entry step in S-mode allocates its frame.  *)
   (* =================================================================== *)
 
-  Lemma wp_memset_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_memset_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (q : Qp) :
     ↑minstretN ⊆ E ->
-    smode_config (DfracOwn q) -∗
+    smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗
     pc_is pc_memset -∗
     gpr_file m -∗
     kernel_text -∗
-    ( smode_config (DfracOwn q) -∗
+    ( smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc_memset 2) -∗
       (* the stack frame is allocated: sp := sp - 16 *)
@@ -2269,7 +2269,7 @@ Qed.
     iIntros (HN) "Hsm Htlbinv Hpc Hfile Htext Hcont".
     iPoseProof (memset_instr0 with "Htext") as "Hinstr".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc_memset csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn γ E Φ pc_memset csp_rs1 csp_rs1 csp_rs1
               (ITYPE (sign_extend' 12 imm_memset0, Regidx csp_rs1, Regidx csp_rs1, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (mword_of_int (-16) : mword 64))
               m q HN Hsp

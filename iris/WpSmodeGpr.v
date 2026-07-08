@@ -2388,7 +2388,7 @@ End ExecLoadGSwalk.
 (* the fill).  Fraction-generic: read-only clients instantiate any dq.    *)
 (* ===================================================================== *)
 Section WpInstrSConfig.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
 
@@ -2542,7 +2542,7 @@ End WpInstrSConfig.
 (* Part C -- the kernelvec client WPs.                                    *)
 (* ===================================================================== *)
 Section SmodeGprClients.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
@@ -2598,7 +2598,7 @@ Section SmodeGprClients.
   (* above, with (tlb cell + slot facts) replaced by [tlb_inv root_ppn] + *)
   (* [pte_super_bytes] (the page-table fact's resource).                  *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_rvc_gpr_write_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_rvc_gpr_write_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5)
       (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
@@ -2614,12 +2614,12 @@ Section SmodeGprClients.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    smode_config (DfracOwn q) -∗
+    smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true base -∗
-    ( smode_config (DfracOwn q) -∗
+    ( smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
@@ -2628,7 +2628,7 @@ Section SmodeGprClients.
   Proof.
     iIntros (HN Hrd Hbexec)
       "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_tlbinv root_ppn E Φ pc true base
+    iApply (wp_instr_s_tlbinv root_ppn γ E Φ pc true base
               HN
               with "Hsm Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
@@ -2677,17 +2677,17 @@ Section SmodeGprClients.
   Qed.
 
   (* ---- c.addi16sp imm6 (S-mode, unified) ---- *)
-  Lemma wp_caddi16sp_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_gpr_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm6 : mword 6)
       (m : gmap regidx (mword 64))
       (q : Qp) :
     ↑minstretN ⊆ E ->
-    smode_config (DfracOwn q) -∗
+    smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
-    ( smode_config (DfracOwn q) -∗
+    ( smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
@@ -2698,7 +2698,7 @@ Section SmodeGprClients.
     iIntros (HN)
       "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_rvc_gpr_write_s root_ppn E Φ pc csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn γ E Φ pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
               m q
@@ -2714,19 +2714,19 @@ Section SmodeGprClients.
   (* ---- jal rd, imm (S-mode, unified; 2-aligned F_Base: the fetch may
      WALK -- the first halfword's translation fills slot 5, the second
      halfword hits it) ---- *)
-  Lemma wp_jal_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_jal_gpr_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : gmap regidx (mword 64))
       (q : Qp) :
     ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
-    smode_config (DfracOwn q) -∗
+    smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc false (JAL (imm, Regidx rd)) -∗
-    ( smode_config (DfracOwn q) -∗
+    ( smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
@@ -2736,7 +2736,7 @@ Section SmodeGprClients.
     iIntros (HN Hrd Halign)
       "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iApply (wp_instr_s_tlbinv root_ppn E Φ pc false (JAL (imm, Regidx rd))
+    iApply (wp_instr_s_tlbinv root_ppn γ E Φ pc false (JAL (imm, Regidx rd))
              
               HN
               with "Hsm Htlbinv Hpc Hinstr").

@@ -23,6 +23,7 @@ From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
+From iris.base_logic.lib Require Import ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
@@ -263,27 +264,33 @@ Axiom kerneltrap_returns :
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
 
 Section WpKernelvecNew.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   (* =================================================================== *)
   (* Fraction choreography (the wp_start recipe): full raw cells <->     *)
   (* smode_config(1/2) + retained halves with the values pinned outside. *)
   (* =================================================================== *)
-  Lemma kv_cfg_split (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
+  Lemma kv_cfg_split (γ : gname) (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
-    smode_config (DfracOwn (1/2)) ∗
+    smode_config γ (DfracOwn (1/2)) ∗
     hart_state ↦ᵣ{DfracOwn (1/2)} HART_ACTIVE tt ∗
     cur_privilege ↦ᵣ{DfracOwn (1/2)} Supervisor ∗
     mstatus ↦ᵣ{DfracOwn (1/2)} mstatus0 ∗
@@ -291,23 +298,23 @@ Section WpKernelvecNew.
     mideleg ↦ᵣ{DfracOwn (1/2)} mdv0 ∗
     menvcfg ↦ᵣ{DfracOwn (1/2)} menvcfg0.
   Proof.
-    iIntros (HSIE HMPRV HSXL Hmm HPBMTE)
-      "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv".
+    iIntros (HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom)
+      "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv".
     iDestruct "Hhs" as "[Hhs1 Hhs2]".
     iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
     iDestruct "Hms" as "[Hms1 Hms2]".
     iDestruct "Hmie" as "[Hmie1 Hmie2]".
     iDestruct "Hmdl" as "[Hmdl1 Hmdl2]".
     iDestruct "Hmenv" as "[Hmenv1 Hmenv2]".
-    iSplitL "Hhs1 Hpriv1 Hms1 Hmie1 Hmdl1 Hmenv1".
-    { iApply (smode_config_rebuild (DfracOwn (1/2)) mstatus0 mie_v mdv0 menvcfg0
-                HSIE HMPRV HSXL Hmm HPBMTE
-                with "Hhw Hinv Hhs1 Hpriv1 Hms1 Hmie1 Hmdl1 Hmenv1"). }
+    iSplitL "Hhs1 Hpriv1 Hms1 Hsie Hmie1 Hmdl1 Hmenv1".
+    { iApply (smode_config_rebuild γ (DfracOwn (1/2)) mstatus0 mie_v mdv0 menvcfg0
+                HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                with "Hhw Hinv Hhs1 Hpriv1 Hms1 Hsie Hmie1 Hmdl1 Hmenv1"). }
     iFrame.
   Qed.
 
-  Lemma kv_cfg_recombine (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
-    smode_config (DfracOwn (1/2)) -∗
+  Lemma kv_cfg_recombine (γ : gname) (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
+    smode_config γ (DfracOwn (1/2)) -∗
     hart_state ↦ᵣ{DfracOwn (1/2)} HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{DfracOwn (1/2)} Supervisor -∗
     mstatus ↦ᵣ{DfracOwn (1/2)} mstatus0 -∗
@@ -317,6 +324,7 @@ Section WpKernelvecNew.
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
      cur_privilege ↦ᵣ Supervisor ∗
      mstatus ↦ᵣ mstatus0 ∗
+     ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
      mie ↦ᵣ mie_v ∗
      mideleg ↦ᵣ mdv0 ∗
      menvcfg ↦ᵣ menvcfg0).
@@ -324,12 +332,12 @@ Section WpKernelvecNew.
     iIntros "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2".
     iDestruct (smode_config_unbundle with "Hsm")
       as "(_ & _ & Hhs1 & Hpriv1 & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (ms') "(Hms1 & _ & _ & _)".
+    iDestruct "Hmst" as (ms') "(Hms1 & Hsie & _ & _ & _ & _ & _)".
     iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %->.
     iDestruct "Hmieb" as (mie' mdv') "(Hmi1 & Hmd1 & _)".
     iDestruct (reg_pointsto_agree with "Hmi1 Hmie2") as %->.
     iDestruct (reg_pointsto_agree with "Hmd1 Hmdl2") as %->.
-    iDestruct "Hmenvb" as (menv') "(Hme1 & _)".
+    iDestruct "Hmenvb" as (menv') "(Hme1 & _ & _ & _ & _)".
     iDestruct (reg_pointsto_agree with "Hme1 Hmenv2") as %->.
     iCombine "Hhs1 Hhs2" as "Hhs".
     iCombine "Hpriv1 Hpriv2" as "Hpriv".
@@ -343,7 +351,7 @@ Section WpKernelvecNew.
   (* wp_jal_gpr_s with a merely 2-ALIGNED target (Zca enabled discharges the
      bit-1 misalignment check): mirror of WpSmodeGpr's [wp_jal_gpr_s], on
      [kv_exec_execute_JAL_gpr_zca]; hw_config supplies misa.C = 1. *)
-  Lemma wp_jal_gpr_s2 (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_jal_gpr_s2 (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : gmap regidx (mword 64))
       (q : Qp) :
@@ -351,12 +359,12 @@ Section WpKernelvecNew.
     uint rd <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     hw_config -∗
-    smode_config (DfracOwn q) -∗
+    smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc false (JAL (imm, Regidx rd)) -∗
-    ( smode_config (DfracOwn q) -∗
+    ( smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
@@ -368,7 +376,7 @@ Section WpKernelvecNew.
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
-    iApply (wp_instr_s_tlbinv root_ppn E Φ pc false (JAL (imm, Regidx rd))
+    iApply (wp_instr_s_tlbinv root_ppn γ E Φ pc false (JAL (imm, Regidx rd))
               HN
               with "Hsm Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
@@ -434,10 +442,10 @@ Section WpKernelvecNew.
   (* fills TLB slot 5), 17 c.sdsp saves (the first data-WALKS and fills   *)
   (* slot tlb_hash svpn; the rest hit), jal kerneltrap.                   *)
   (* =================================================================== *)
-  Lemma wp_kv_prologue (root_ppn : mword 44)
+  Lemma wp_kv_prologue (root_ppn : mword 44) (γ : gname)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      
+
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12
        vold13 vold14 vold15 vold16 vold17 : bv 64)
       E (Φ : mval -> iProp Σ) :
@@ -449,10 +457,14 @@ Section WpKernelvecNew.
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
@@ -480,6 +492,7 @@ Section WpKernelvecNew.
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ mstatus0 -∗
+      ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗
       mideleg ↦ᵣ mdv0 -∗
       menvcfg ↦ᵣ menvcfg0 -∗
@@ -506,20 +519,19 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
-     .
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
+    intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm Hlpe Hfiom Hleg.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     (* split: bundle(1/2) for the caddi16sp/jal WPs + retained halves *)
-    iPoseProof (kv_cfg_split mstatus0 mie_v mdv0 menvcfg0
-                  HSIE HMPRV HSXL Hmm HPBMTE
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv")
+    iPoseProof (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0
+                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
     (* ---- #1: c.addi16sp sp,-256 @ 0x800053e0 (fetch page-walk, fills slot 5) ---- *)
     iPoseProof (kv_instr1 with "Htext") as "Hi1".
     assert (Hpc1 : add_vec_int (mword_of_int (KernelSyms.kernelvec) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64))
       by (vm_compute; reflexivity).
-    iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec)) kv_imm1 m
+    iApply (wp_caddi16sp_gpr_s root_ppn γ E Φ (mword_of_int (KernelSyms.kernelvec)) kv_imm1 m
               (1/2)%Qp
               HN
               with "Hsm Htlbinv Hpc Hfile Hi1").
@@ -792,17 +804,17 @@ Section WpKernelvecNew.
     assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
                       (sign_extend' 64 (mword_of_int 0x1fd246 : mword 21))) 0) ('b"0") = true)
       by (vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s2 root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd246)
+    iApply (wp_jal_gpr_s2 root_ppn γ E Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd246)
               (kv_m1 m) (1/2)%Qp
               HN Hrd19 Hal19
               with "Hhw Hsm Htlbinv Hpc Hfile Hi19").
     iEval (rewrite kv_jal_tgt kv_ra_val).
     iIntros "Hsm Htlbinv Hpc Hfile".
     (* recombine to full raw cells for the caller *)
-    iPoseProof (kv_cfg_recombine mstatus0 mie_v mdv0 menvcfg0
+    iPoseProof (kv_cfg_recombine γ mstatus0 mie_v mdv0 menvcfg0
                   with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
-      as "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv)".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
+      as "(Hhs & Hpriv & Hms & Hsie & Hmie & Hmdl & Hmenv)".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
   Qed.
 
 
@@ -810,10 +822,10 @@ Section WpKernelvecNew.
   (* wp_kv_epilogue: instrs #20..#38 -- 17 c.ldsp restores (all hits),    *)
   (* c.addi16sp sp,+256, sret.                                            *)
   (* =================================================================== *)
-  Lemma wp_kv_epilogue (root_ppn : mword 44)
+  Lemma wp_kv_epilogue (root_ppn : mword 44) (γ : gname)
       (mt : gmap regidx (mword 64)) (spv : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
-      
+
       (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64)
       E (Φ : mval -> iProp Σ) :
     ↑minstretN ⊆ E ->
@@ -828,10 +840,14 @@ Section WpKernelvecNew.
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
     sret_newpriv mstatus0 = Supervisor ->
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
+    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
@@ -888,8 +904,8 @@ Section WpKernelvecNew.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
-      Hsp0 HTSR Hsup Hlpe0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
+      Hsp0 HTSR Hsup Hlpe0 Hlpe_bb Hfiom Hleg.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hcont".
     (* ---- #20: c.ldsp x1, 0(sp) @ 0x80005408 ---- *)
     iPoseProof (kv_i20 with "Htext") as "Hi20".
@@ -1187,19 +1203,19 @@ Section WpKernelvecNew.
     iPoseProof (kv_i37 with "Htext") as "Hi37".
     assert (Hpc37 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64))
       by (vm_compute; reflexivity).
-    iPoseProof (kv_cfg_split mstatus0 mie_v mdv0 menvcfg0
-                  HSIE HMPRV HSXL Hmm HPBMTE
-                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv")
+    iPoseProof (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0
+                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe_bb Hfiom
+                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_caddi16sp_gpr_s root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
+    iApply (wp_caddi16sp_gpr_s root_ppn γ E Φ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
               (1/2)%Qp
               HN
               with "Hsm Htlbinv Hpc Hfile Hi37").
     iEval (rewrite Hpc37).
     iIntros "Hsm Htlbinv Hpc Hfile".
-    iPoseProof (kv_cfg_recombine mstatus0 mie_v mdv0 menvcfg0
+    iPoseProof (kv_cfg_recombine γ mstatus0 mie_v mdv0 menvcfg0
                   with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
-      as "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv)".
+      as "(Hhs & Hpriv & Hms & Hsie & Hmie & Hmdl & Hmenv)".
     iEval (rewrite Hsp17) in "Hfile".
     (* ---- #38: sret @ 0x8000542c ---- *)
     iPoseProof (kv_i38 with "Htext") as "Hi38".
@@ -1243,6 +1259,8 @@ Section WpKernelvecNew.
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
     sret_newpriv mstatus0 = Supervisor ->
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -1303,21 +1321,26 @@ Section WpKernelvecNew.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
-      HTSR Hsup Hlpe0.
+      HTSR Hsup Hlpe0 Hfiom Hleg.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
+    (* allocate the SIE ghost variable for this hart's kernelvec run: one half
+       rides inside the per-instruction [smode_config], the other is dropped. *)
+    iMod (ghost_var_alloc (_get_Mstatus_SIE mstatus0)) as (γ) "Hg".
+    iEval (rewrite -Qp.half_half) in "Hg".
+    iDestruct (ghost_var_split with "Hg") as "[Hsie _]".
     (* totality of the entry file (for the final map_eq) *)
     iDestruct "Hfile" as "[%HdomM Hfmap]".
     iAssert (gpr_file m) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact HdomM |]. iExact "Hfmap". }
     (* ---- instrs #1..#19: prologue (fills + saves + jal) ---- *)
-    iApply (wp_kv_prologue root_ppn m mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_kv_prologue root_ppn γ m mstatus0 mie_v mdv0 menvcfg0
               vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 E Φ
               HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
-             
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
+              ltac:(rewrite Hlpe0; vm_compute; reflexivity) Hfiom Hleg
+              with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
+    iIntros "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     (* ---- the kerneltrap call (THE axiom) ---- *)
     assert (Hsp_l : kv_m2 m !! Regidx csp_rs1 = Some (kv_sp1 m)).
     { unfold kv_m2. rewrite lookup_insert_ne; [| kv_regne]. unfold kv_m1. apply lookup_insert. }
@@ -1345,13 +1368,14 @@ Section WpKernelvecNew.
     (* ---- instrs #20..#38: epilogue (restores + sp cancel + sret) ---- *)
     iDestruct (tlb_inv_close root_ppn satp0 tlbmid Hmode Hasid Hppn Hconsmid
                  with "Hsatp Htlb Hpte Hpmp") as "Htlbinv".
-    iApply (wp_kv_epilogue root_ppn m' (kv_sp1 m) mstatus0 mie_v mdv0 menvcfg0 sepc0
-             
+    iApply (wp_kv_epilogue root_ppn γ m' (kv_sp1 m) mstatus0 mie_v mdv0 menvcfg0 sepc0
+
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
               E Φ
               HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
               Hsp'' HTSR Hsup Hlpe0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
+              ltac:(rewrite Hlpe0; vm_compute; reflexivity) Hfiom Hleg
+              with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     (* ---- the round-trip: the final file IS the entry file ---- *)
