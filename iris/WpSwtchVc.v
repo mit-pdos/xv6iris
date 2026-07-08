@@ -537,30 +537,46 @@ Section WpSwtchVc.
        menvcfg ↦ᵣ{dq} menvcfg0 ∗ tlb_inv root_ppn)%I.
 
     (* -------------------------------------------------------------------- *)
-    (* valid_context P c : "the register set saved in the struct context at  *)
-    (* [c] admits a WP to run".  It owns c's 14 saved-register cells and is   *)
-    (* the wand from (config + pc at c.ra + gpr file whose callee-saved regs  *)
-    (* are c's saved values, caller-saved arbitrary + the resource [P] the    *)
-    (* continuation may assume) to a whole-machine WP.                        *)
+    (* valid_context c : "the register set saved in the struct context at     *)
+    (* [c] admits a WP to run".  It owns c's 14 saved-register cells and is    *)
+    (* the wand from (config + pc at c.ra + a gpr file whose callee-saved      *)
+    (* regs are c's saved values, caller-saved arbitrary) to a whole-machine   *)
+    (* WP.  There is no free predicate argument: the resource the continuation *)
+    (* may assume is ALWAYS [valid_context cret] for whatever context [cret]   *)
+    (* resumed it.  That self-reference is a well-defined Iris [fixpoint]      *)
+    (* because the recursive occurrence is guarded by a [▷].                   *)
     (* -------------------------------------------------------------------- *)
-    Definition valid_context (P : iProp Σ) (c : mword 64) : iProp Σ :=
+    Local Definition valid_context_pre
+        (rec : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ := fun c =>
       (∃ vs : list (mword 64),
         ⌜length vs = 14%nat⌝ ∗
         ⌜eq_vec (access_vec_dec (ctx_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
         ctx_cells c vs ∗
-        (∀ m : gmap regidx (mword 64),
+        (∀ (m : gmap regidx (mword 64)) (cret : mword 64),
            ⌜callee_img m = vs⌝ -∗ sconf -∗
-           pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗ P -∗
+           pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
+           ▷ rec cret -∗
            WP (Loop : expr riscv_lang) @ E {{ Phi }}))%I.
 
+    Local Instance valid_context_pre_contractive : Contractive valid_context_pre.
+    Proof. solve_contractive. Qed.
+
+    Definition valid_context : mword 64 -d> iPropO Σ :=
+      fixpoint valid_context_pre.
+
+    Lemma valid_context_unfold (c : mword 64) :
+      valid_context c ⊣⊢ valid_context_pre valid_context c.
+    Proof. apply (fixpoint_unfold valid_context_pre c). Qed.
+
     (* ================================================================== *)
-    (* THE SPEC.  swtch(old,new): runs new's saved WP, giving it             *)
-    (* [valid_context Q old] as its postcondition.  The last premise is the  *)
-    (* caller's own return continuation (what runs when control comes back    *)
-    (* to [old] later) -- exactly the wand that becomes valid_context old.    *)
+    (* THE SPEC.  swtch(old,new): given [valid_context new], runs new's      *)
+    (* saved WP, handing it [valid_context old] as the resource it may        *)
+    (* assume.  The last premise is the caller's own return continuation      *)
+    (* (what runs when control comes back to [old] later) -- exactly the      *)
+    (* wand that, with old's freshly-saved cells, becomes [valid_context old].*)
     (* ================================================================== *)
     Lemma wp_swtch (oldc newc : mword 64) (m0 : gmap regidx (mword 64))
-        (Q : iProp Σ) (old_vs : list (mword 64)) :
+        (old_vs : list (mword 64)) :
       length old_vs = 14%nat ->
       m0 !!! Regidx (mword_of_int 10) = oldc ->
       m0 !!! Regidx (mword_of_int 11) = newc ->
@@ -568,10 +584,11 @@ Section WpSwtchVc.
       hw_config -∗ minstret_inv -∗ kernel_text -∗
       sconf -∗ pc_is (mword_of_int KernelSyms.swtch) -∗ gpr_file m0 -∗
       ctx_cells oldc old_vs -∗
-      valid_context (valid_context Q oldc) newc -∗
-      (∀ m : gmap regidx (mword 64),
+      valid_context newc -∗
+      (∀ (m : gmap regidx (mword 64)) (cret : mword 64),
          ⌜callee_img m = callee_img m0⌝ -∗ sconf -∗
-         pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗ Q -∗
+         pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
+         ▷ valid_context cret -∗
          WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
       WP (Loop : expr riscv_lang) @ E {{ Phi }}.
     Proof.
@@ -580,7 +597,7 @@ Section WpSwtchVc.
       iEval (rewrite /sconf) in "Hconf".
       iDestruct "Hconf" as
         "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv & Htlbinv)".
-      iEval (rewrite /valid_context) in "Hvalidnew".
+      iEval (rewrite valid_context_unfold /valid_context_pre) in "Hvalidnew".
       iDestruct "Hvalidnew" as (new_vs)
         "(%Hlen_new & %Hal_new & Hnewcells & Hnewwand)".
       (* the symbolic environment: 0..31 = current file m0; 32..45 = new's saved
@@ -635,10 +652,10 @@ Section WpSwtchVc.
       { unfold callee_img, ctx_regs, ctx_regs_nat, rho; cbn. reflexivity. }
       iEval (rewrite Hmapcallee Hmapnew) in "Hheap".
       iDestruct "Hheap" as "[Holdpart Hnewpart]".
-      (* ---- build [valid_context Q oldc] from old's restored cells + the
+      (* ---- build [valid_context oldc] from old's restored cells + the
              caller's own return continuation [Hwold] ---- *)
-      iAssert (valid_context Q oldc) with "[Holdpart Hwold]" as "Hvoldc".
-      { rewrite /valid_context. iExists (callee_img m0).
+      iAssert (valid_context oldc) with "[Holdpart Hwold]" as "Hvoldc".
+      { rewrite valid_context_unfold /valid_context_pre. iExists (callee_img m0).
         iSplit.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
         iSplit.
@@ -680,9 +697,10 @@ Section WpSwtchVc.
       iAssert sconf with
         "[Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv]" as "Hconf".
       { rewrite /sconf. iFrame. }
-      iApply ("Hnewwand" $! (vregs_den rho swtch_regs1)
-                with "[] Hconf Hpc Hfile Hvoldc").
-      iPureIntro. exact Hcallee_new.
+      iApply ("Hnewwand" $! (vregs_den rho swtch_regs1) oldc
+                with "[] Hconf Hpc Hfile [Hvoldc]").
+      { iPureIntro. exact Hcallee_new. }
+      iNext. iExact "Hvoldc".
     Qed.
   End SwtchSpec.
 
