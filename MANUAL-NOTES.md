@@ -1,5 +1,6 @@
 Some high-level ideas that might be interesting for some eventual paper:
 
+- loop language, no real expr
 - vcgen
 - predicates capturing config registers (mmode_config, smode_config)
 - instr predicate (instr memory points-to, abstract 2-byte vs 4-byte, decode)
@@ -13,3 +14,15 @@ Some high-level ideas that might be interesting for some eventual paper:
 - re-proving across source code changes (symbolic names, agent does gruntwork)
 - background agent does continuous performance optimizations
 
+Big things that still need to be done/explored:
+
+- weak memory
+- devices
+- liveness, or at least deadlock avoidance
+- file system
+- virtual memory / page tables
+- switch to user, trampolines, taking syscall
+
+Don't know where else to put this:
+
+- seems like atomic interrupt masking in mstatus might simplify reasoning
