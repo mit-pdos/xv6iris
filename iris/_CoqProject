@@ -93,3 +93,4 @@ WpMycpuVc.v
 WpPopOffVc.v
 WpKernelvecVc.v
 WpSwtchVc.v
+WpWakeup.v
