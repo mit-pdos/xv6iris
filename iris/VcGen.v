@@ -86,8 +86,8 @@ Local Open Scope Z_scope.
    spelled EXACTLY as the model's store-value extraction (wp_csw_s's
    [storeval]), so the leaf WPs' terms match syntactically. *)
 Definition wrap32 (z : Z) : Z := bv_wrap 32 z.
-Definition trunc32 (w : mword 64) : mword 32 :=
-  autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 4 8) 1) 0).
+(* [trunc32] now lives in [RiscvExtras] (spelled EXACTLY as wp_csw_s's
+   [storeval]), so the low-level leaf WPs can share it. *)
 
 Inductive sval32 : Type :=
   | SC32 (z : Z)               (* the constant [mword_of_int z : mword 32] *)

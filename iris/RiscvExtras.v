@@ -23,6 +23,12 @@ Qed.
 Lemma autocast_id (m : Z) (x : mword m) : autocast x = x.
 Proof. apply autocast_refl. Qed.
 
+(* Truncate a 64-bit value to its low 32 bits (the value a 4-byte store commits).
+   Lives here (rather than in [VcGen]) so the low-level S-mode load/store WPs in
+   [WpPushOffMem] can state their [_ram] postconditions with it. *)
+Definition trunc32 (w : mword 64) : mword 32 :=
+  autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 4 8) 1) 0).
+
 (* sign-extending a 9-bit value to 12 bits then to 64 is the same as
    zero-extending it to 64 directly: the 12-bit zero-extension's sign bit
    (bit 11) is always 0 since a 9-bit value's magnitude is well below 2^11,

@@ -1748,4 +1748,127 @@ Section WpPushOffMem.
       iExact "Hfmap".
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* [_ram] variants: the whole Sv39 super-page-identity geometry is     *)
+  (* DERIVED internally from the owning [ea ↦₄ v] (which carries          *)
+  (* [addr_is_ram] + 4-byte alignment) via the [ram_*] family, so the    *)
+  (* caller supplies NO geometry -- it just hands over the points-to.    *)
+  (* This lets [wp_push_off] and the VCgen keep their per-instruction    *)
+  (* obligations to a single memory fact.                                *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_clw_s_ram (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : gmap regidx (mword 64)) (v : mword 32)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
+    ea ↦₄ v -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
+      ea ↦₄ v -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros ea HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+             Hpc Hfile Hinstr Hbw Hcont".
+    iDestruct "Hbw" as "(%Hpal4 & Hbytes)".
+    iAssert (⌜addr_is_ram ea⌝)%I as %Hr0.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr. rewrite pa_add_0 in Hr.
+      iPureIntro. exact Hr. }
+    iAssert (ea ↦₄ v)%I with "[Hbytes]" as "Hbw4".
+    { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpal4. }
+    iApply (wp_clw_s root_ppn E Φ pc rd rs1 imm (svpn_of ea) m v
+              mstatus0 mie_v mdv0 menvcfg0
+              (dq:=dq) (dqm:=DfracOwn 1)
+              HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              (ram_canonical ea Hr0) ltac:(reflexivity)
+              (ram_ident root_ppn ea Hr0) (ram_mask ea Hr0)
+              (ram_svpn2 ea Hr0) (ram_mvpn ea Hr0) (ram_mppn ea Hr0)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    Hpc Hfile Hinstr Hbw4 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hfile Hbw").
+  Qed.
+
+  (* [wp_csw_s], same treatment.  The stored word is [trunc32 rs2]. *)
+  Lemma wp_csw_s_ram (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (m : gmap regidx (mword 64)) (vold : bv 32)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    ↑minstretN ⊆ E ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
+    ea ↦₄ vold -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file m -∗
+      ea ↦₄ (trunc32 (m !!! Regidx rs2)) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros ea HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+             Hpc Hfile Hinstr Hbw Hcont".
+    iDestruct "Hbw" as "(%Hpal4 & Hbytes)".
+    iAssert (⌜addr_is_ram ea⌝)%I as %Hr0.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr. rewrite pa_add_0 in Hr.
+      iPureIntro. exact Hr. }
+    iAssert (ea ↦₄ vold)%I with "[Hbytes]" as "Hbw4".
+    { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpal4. }
+    iApply (wp_csw_s root_ppn E Φ pc rs2 rs1 imm (svpn_of ea) m vold
+              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              (ram_canonical ea Hr0) ltac:(reflexivity)
+              (ram_ident root_ppn ea Hr0) (ram_mask ea Hr0)
+              (ram_svpn2 ea Hr0) (ram_mvpn ea Hr0) (ram_mppn ea Hr0)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    Hpc Hfile Hinstr Hbw4 [-]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          Hpc Hfile Hbw").
+  Qed.
+
 End WpPushOffMem.
