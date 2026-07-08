@@ -36,6 +36,9 @@ Require Import WpGpr WpGprRvc WpGprAddi WpGprMret.
 Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpKvInstr.
 Require Import WpKernelvecNew.
 Require Import WpIntrBits WpIntrCore.
+(* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the
+   WpGprCsrwCommon/C namespaces don't shadow anything here. *)
+Require WpGprCsrwCommon WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -43,6 +46,7 @@ Import Defs.
 
 Section WpIntrStep.
   Context `{!riscvGS Sig}.
+  Context `{!sieG Sig}.
   Context `{CID : CpuId}.
 
   (* the mstatus fact set carried through the round trip *)
@@ -51,7 +55,15 @@ Section WpIntrStep.
     eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
     _get_Mstatus_SXL ms = 'b"10" /\
     eq_vec (_get_Mstatus_MXR ms) ('b"0") = true /\
-    eq_vec (_get_Mstatus_TSR ms) ('b"1") = false.
+    eq_vec (_get_Mstatus_TSR ms) ('b"1") = false /\
+    (* ext-state / dirty / MPP well-formedness -- carried so the steady-state
+       [wp_kernelvec] can discharge [legalize_sie_clear_idem (trap_ms elp ms)];
+       trap_ms/sret_ms5 leave these bits intact (see WpIntrBits roundtrip lemmas). *)
+    _get_Mstatus_XS ms = extStatus_map_forwards Off /\
+    _get_Mstatus_FS ms = extStatus_map_forwards Off /\
+    _get_Mstatus_VS ms = extStatus_map_forwards Off /\
+    _get_Mstatus_SD ms = 'b"0" /\
+    WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true.
 
   (* the round trip preserves the fact set (SIE=1 is RESTORED -- the
      headline [roundtrip_SIE]; MPRV is cleared by SRET; SXL/MXR/TSR live in
@@ -59,12 +71,17 @@ Section WpIntrStep.
   Lemma acq_ms_facts_roundtrip (elp_v : mword 1) (ms : mword 64) :
     acq_ms_facts ms -> acq_ms_facts (sret_ms5 (trap_ms elp_v ms)).
   Proof.
-    intros (H1 & H2 & H3 & H4 & H5).
+    intros (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10).
     split; [exact (roundtrip_SIE_true elp_v ms H1) |].
     split; [exact (roundtrip_MPRV_false elp_v ms) |].
     split; [exact (roundtrip_SXL_eq elp_v ms H3) |].
     split; [exact (roundtrip_MXR_true elp_v ms H4) |].
-    exact (roundtrip_TSR_false elp_v ms H5).
+    split; [exact (roundtrip_TSR_false elp_v ms H5) |].
+    split; [rewrite roundtrip_XS; exact H6 |].
+    split; [rewrite roundtrip_FS; exact H7 |].
+    split; [rewrite roundtrip_VS; exact H8 |].
+    split; [rewrite roundtrip_SD; exact H9 |].
+    rewrite roundtrip_MPP; exact H10.
   Qed.
 
   (* THE ROUND-TRIP INVARIANT (all resources except pc_is / gpr_file,
@@ -124,6 +141,7 @@ Section WpIntrStep.
     (* stack-page geometry *)
     (* SRET *)
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
     hw_config -∗
     minstret_inv -∗
     kernel_text -∗
@@ -136,7 +154,7 @@ Section WpIntrStep.
       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros HN Hmm HPBMTE Hpmm Hlpe0.
+    intros HN Hmm HPBMTE Hpmm Hlpe0 HFIOM.
     iIntros "#Hhw #Hinv #Htext HP Hpc Hfile Hcont".
     iRevert "HP Hpc Hfile Hcont".
     iLöb as "IH".
@@ -144,7 +162,7 @@ Section WpIntrStep.
     iDestruct "HP" as "(Hhs & Hpriv & Hmsx & Hmie & Hmdl & Hmenv & Hmip & Hmeip & Hseip
                        & Hstvec & Hsepcx & Hscausex & Hstvalx & Htlbinv & Hwins)".
     iDestruct "Hmsx" as (ms) "[Hms %Hmsf]".
-    pose proof Hmsf as Hmsf'. destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR).
+    pose proof Hmsf as Hmsf'. destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
     iDestruct "Hsepcx" as (sepc_old) "Hsepc".
     iDestruct "Hscausex" as (scause_old) "Hscause".
     iDestruct "Hstvalx" as (stval_old) "Hstval".
@@ -229,6 +247,19 @@ Section WpIntrStep.
       assert (Htm : ms_c = trap_ms elp0 ms) by reflexivity.
       iEval (rewrite Htm) in "Hms".
       assert (Hst : sret_tgt acq_pc1 = acq_pc1) by (apply bv_eq; vm_compute; reflexivity).
+      (* clearing SIE on the trap-time mstatus is idempotent under legalization
+         (the ext-state/dirty/MPP well-formedness rides in via acq_ms_facts). *)
+      assert (Hleg_trap :
+        WpGprCsrwCommon.legalize_sstatus_val (trap_ms elp0 ms)
+          (WpGprCsrwCommon.sstatus_write_val (trap_ms elp0 ms) (mword_of_int 2))
+        = trap_ms elp0 ms).
+      { apply WpGprCsrwC.legalize_sie_clear_idem.
+        - apply trap_ms_SIE.
+        - rewrite trap_ms_XS; exact HXS.
+        - rewrite trap_ms_FS; exact HFS.
+        - rewrite trap_ms_VS; exact HVS.
+        - rewrite trap_ms_SD; exact HSD.
+        - rewrite trap_ms_MPP; exact HMPP. }
       (* ---- the whole kernelvec handler (steady-state, TLB hits) ---- *)
       iApply (wp_kernelvec root_ppn m (trap_ms elp0 ms) mie_v mdv0 menvcfg0
                 acq_pc1 w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 E Phi
@@ -242,6 +273,8 @@ Section WpIntrStep.
                 (trap_ms_TSR_false elp0 ms HTSR)
                 (sret_newpriv_trap_ms elp0 ms)
                 Hlpe0
+                HFIOM
+                Hleg_trap
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc
                       [$Hpcr $Hnpc] Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc2 Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".

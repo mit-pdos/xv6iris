@@ -223,3 +223,69 @@ Lemma roundtrip_SXL_eq (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_SXL ms = ('b"10" : mword 2) ->
   _get_Mstatus_SXL (sret_ms5 (trap_ms elp_v ms)) = ('b"10" : mword 2).
 Proof. intros H. rewrite sret_ms5_SXL. rewrite trap_ms_SXL. exact H. Qed.
+
+(* --------------------------------------------------------------------- *)
+(* The ext-state / dirty / MPP fields (bits 16:15 XS, 14:13 FS, 10:9 VS,   *)
+(* 63 SD, 12:11 MPP): NEITHER trap_ms (bits 23,5,1,8) NOR sret_ms5 (bits    *)
+(* 1,5,8,17,23) touches them, so they ride through the round trip intact.  *)
+(* Needed to discharge [legalize_sie_clear_idem] on [trap_ms elp ms].      *)
+(* --------------------------------------------------------------------- *)
+Lemma trap_ms_XS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_XS (trap_ms elp_v ms) = _get_Mstatus_XS ms.
+Proof. unfold trap_ms, _get_Mstatus_XS; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma trap_ms_FS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_FS (trap_ms elp_v ms) = _get_Mstatus_FS ms.
+Proof. unfold trap_ms, _get_Mstatus_FS; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma trap_ms_VS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_VS (trap_ms elp_v ms) = _get_Mstatus_VS ms.
+Proof. unfold trap_ms, _get_Mstatus_VS; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma trap_ms_MPP (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_MPP (trap_ms elp_v ms) = _get_Mstatus_MPP ms.
+Proof. unfold trap_ms, _get_Mstatus_MPP; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma trap_ms_SD (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_SD (trap_ms elp_v ms) = _get_Mstatus_SD ms.
+Proof. unfold trap_ms, _get_Mstatus_SD; cbn zeta; mw_prep; tb1. Qed.
+
+Lemma sret_ms5_XS (x : mword 64) :
+  _get_Mstatus_XS (sret_ms5 x) = _get_Mstatus_XS x.
+Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_XS. mw_prep; tb2. Qed.
+
+Lemma sret_ms5_FS (x : mword 64) :
+  _get_Mstatus_FS (sret_ms5 x) = _get_Mstatus_FS x.
+Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_FS. mw_prep; tb2. Qed.
+
+Lemma sret_ms5_VS (x : mword 64) :
+  _get_Mstatus_VS (sret_ms5 x) = _get_Mstatus_VS x.
+Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_VS. mw_prep; tb2. Qed.
+
+Lemma sret_ms5_MPP (x : mword 64) :
+  _get_Mstatus_MPP (sret_ms5 x) = _get_Mstatus_MPP x.
+Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_MPP. mw_prep; tb2. Qed.
+
+Lemma sret_ms5_SD (x : mword 64) :
+  _get_Mstatus_SD (sret_ms5 x) = _get_Mstatus_SD x.
+Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_SD. mw_prep; tb1. Qed.
+
+Lemma roundtrip_XS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_XS (sret_ms5 (trap_ms elp_v ms)) = _get_Mstatus_XS ms.
+Proof. rewrite sret_ms5_XS. apply trap_ms_XS. Qed.
+
+Lemma roundtrip_FS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_FS (sret_ms5 (trap_ms elp_v ms)) = _get_Mstatus_FS ms.
+Proof. rewrite sret_ms5_FS. apply trap_ms_FS. Qed.
+
+Lemma roundtrip_VS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_VS (sret_ms5 (trap_ms elp_v ms)) = _get_Mstatus_VS ms.
+Proof. rewrite sret_ms5_VS. apply trap_ms_VS. Qed.
+
+Lemma roundtrip_MPP (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_MPP (sret_ms5 (trap_ms elp_v ms)) = _get_Mstatus_MPP ms.
+Proof. rewrite sret_ms5_MPP. apply trap_ms_MPP. Qed.
+
+Lemma roundtrip_SD (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_SD (sret_ms5 (trap_ms elp_v ms)) = _get_Mstatus_SD ms.
+Proof. rewrite sret_ms5_SD. apply trap_ms_SD. Qed.
