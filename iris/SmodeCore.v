@@ -2488,7 +2488,8 @@ Section SmodeCoreIris.
         ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝ ∗
         ⌜ pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ⌝ ∗
         ⌜ bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ⌝ ∗
-        ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝))%I.
+        ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝ ∗
+        ⌜ menvcfg0 = MENVCFG_S ⌝))%I.
 
   (* unbundle: expose the raw cells + the ghost half + the pure facts. *)
   Lemma smode_config_unbundle (γ : gname) (dq : dfrac) :
@@ -2512,7 +2513,8 @@ Section SmodeCoreIris.
        ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝ ∗
        ⌜ pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ⌝ ∗
        ⌜ bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ⌝ ∗
-       ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝).
+       ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝ ∗
+       ⌜ menvcfg0 = MENVCFG_S ⌝).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* rebuild from raw cells + the ghost half + the pure facts (inverse). *)
@@ -2527,6 +2529,7 @@ Section SmodeCoreIris.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    menvcfg0 = MENVCFG_S ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -2538,7 +2541,7 @@ Section SmodeCoreIris.
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     smode_config γ dq.
   Proof.
-    iIntros (HSIE HMPRV HSXL HMXR Hleg Hmie HPBMTE Hpmm Hlpe Hfiom)
+    iIntros (HSIE HMPRV HSXL HMXR Hleg Hmie HPBMTE Hpmm Hlpe Hfiom Hmenvval)
             "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv".
     iFrame "Hhw Hinv Hhs Hpriv".
     iSplitL "Hms Hsie".
@@ -3334,11 +3337,11 @@ Section SmodeCoreIris.
     iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
     iDestruct "Hmst" as (mstatus0) "(Hmstatus & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmie" as (mie_v mdv0) "(Hmiec & Hmdlc & %Hmm)".
-    iDestruct "Hmenv" as (menvcfg0) "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom)".
+    iDestruct "Hmenv" as (menvcfg0) "(Hmenvc & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
@@ -3366,9 +3369,13 @@ Section SmodeCoreIris.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σf.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σf.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σf.
+    iDestruct (reg_valid_dq with "Hreg Hmenvc") as %Hmenv_σf.
     specialize (Hdec0 ltac:(rewrite Hpriv_σf; reflexivity)
                       ltac:(rewrite Hmisa_σf; exact HmisaC)
-                      ltac:(rewrite Hmisa_σf; exact HmisaA)).
+                      ltac:(rewrite Hmisa_σf; exact HmisaA)
+                      ltac:(rewrite Hmisa_σf; exact Hmisa_val0)
+                      ltac:(unfold cfg_ok; right; split;
+                            [ exact Hpriv_σf | rewrite Hmenv_σf; exact Hmenvval0 ])).
     assert (Lpc_σf : register_lookup PC σf.(sregs) = pc).
     { unfold σf, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
@@ -3382,7 +3389,7 @@ Section SmodeCoreIris.
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").
       - iApply (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                   with "Hhw Hinv Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc").
       - iApply (tlb_inv_close root_ppn satp0 tlbvec2 Hmode Hasid Hppn Hcons2
                   with "Hsatp Htlb Hpbytes [Hpmpc Hpmpa]").
@@ -3474,7 +3481,7 @@ Section SmodeDemo.
     iSplitL "".
     - iApply (instr_bytes_rvc4 kv_pc1 kv_h1 kv_w1 H2al H4al Hrvc Hsub).
       iApply (kernel_window_pc (KernelSyms.kernelvec) kv_w1 4 kv_pc1 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
       exists (C_ADDI16SP kv_imm1).
       split; [exact (kv_decode1 σ HmisaC) |].
       split; [vm_compute; reflexivity |].

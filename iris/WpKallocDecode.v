@@ -23,7 +23,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
+Require Import MinstretInv InstrBytes WpDecodeBridge.
 Require Import WpDecode WpGprRvc WpEntryNew.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
@@ -214,140 +214,140 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* ===================================================================== *)
 (* Base (4-byte) decode facts (one per distinct 32-bit encoding).         *)
 (* ===================================================================== *)
-Lemma kdb_00011517 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00011517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00011517 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00012497 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00012497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00012497 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x12 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00011717 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00011717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00011717 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00023797 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00023797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00023797 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x23 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00012917 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00012917 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00012917 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x12 : mword 20, Regidx (mword_of_int 18), AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00006517 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00006517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00006517 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x6 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_7fe50513 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_7fe50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x7fe50513 : mword 32)) s
   = Some (ITYPE (mword_of_int 0x7fe : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_7de50513 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_7de50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x7de50513 : mword 32)) s
   = Some (ITYPE (mword_of_int 0x7de : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_7bc50513 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_7bc50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x7bc50513 : mword 32)) s
   = Some (ITYPE (mword_of_int 0x7bc : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_b1478793 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_b1478793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xb1478793 : mword 32)) s
   = Some (ITYPE (mword_of_int 0xb14 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_8ba90913 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_8ba90913 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x8ba90913 : mword 32)) s
   = Some (ITYPE (mword_of_int 0x8ba : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_5a050513 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_5a050513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x5a050513 : mword 32)) s
   = Some (ITYPE (mword_of_int 0x5a0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_0c8000ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_0c8000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0c8000ef : mword 32)) s
   = Some (JAL (mword_of_int 0xc8 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_130000ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_130000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x130000ef : mword 32)) s
   = Some (JAL (mword_of_int 0x130 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_15e000ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_15e000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x15e000ef : mword 32)) s
   = Some (JAL (mword_of_int 0x15e : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_10e000ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_10e000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x10e000ef : mword 32)) s
   = Some (JAL (mword_of_int 0x10e : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_250000ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_250000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x250000ef : mword 32)) s
   = Some (JAL (mword_of_int 0x250 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_182000ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_182000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x182000ef : mword 32)) s
   = Some (JAL (mword_of_int 0x182 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_1fa000ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_1fa000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x1fa000ef : mword 32)) s
   = Some (JAL (mword_of_int 0x1fa : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_d79ff0ef s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_d79ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xd79ff0ef : mword 32)) s
   = Some (JAL (mword_of_int 0x1ffd78 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_80a4b483 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_80a4b483 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x80a4b483 : mword 32)) s
   = Some (LOAD (mword_of_int 0x80a : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), false, 8), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_01893783 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_01893783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x01893783 : mword 32)) s
   = Some (LOAD (mword_of_int 0x18 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 15), false, 8), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_7ef73f23 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_7ef73f23 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x7ef73f23 : mword 32)) s
   = Some (STORE (mword_of_int 0x7fe : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 8), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00993c23 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00993c23 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00993c23 : mword 32)) s
   = Some (STORE (mword_of_int 0x18 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 18), 8), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00f53733 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00f53733 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00f53733 : mword 32)) s
   = Some (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 10), Regidx (mword_of_int 14), SLTU), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00a7b7b3 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_00a7b7b3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00a7b7b3 : mword 32)) s
   = Some (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLTU), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_03451793 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma kdb_03451793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x03451793 : mword 32)) s
   = Some (SHIFTIOP (mword_of_int 52 : mword 6, Regidx (mword_of_int 10), Regidx (mword_of_int 15), SLLI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. decode_bridge_ms. Qed.
 
 Section WpKallocDecode.
   Context `{!riscvGS Σ}.

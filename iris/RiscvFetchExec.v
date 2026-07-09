@@ -78,6 +78,28 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
 (*   NB the *mutable* config (pmpcfg_n, mstatus, mie, elp, pmpaddr, ...) is  *)
 (*   NOT here: those genuinely change during boot and stay linearly threaded.*)
 (* ====================================================================== *)
+
+(* Concrete reference config values for the decode bridge (WpDecodeBridge).
+   [MISA_C] is the platform misa (S/C/U/M/A/I/D/F set, MXL=2); read-only, never
+   written by the kernel.  [MENVCFG_S] is the S-mode menvcfg AFTER the M-mode
+   boot write ([start.c]: [menvcfg |= 1<<63]) legalizes from the all-zero reset
+   -- i.e. only the STCE bit (63) set; the kernel never writes menvcfg again, so
+   this value is constant throughout S-mode execution.  Both are consistent with
+   the bit-level facts pinned by [hw_config] / [smode_config]. *)
+Definition MISA_C : mword 64 := mword_of_int 0x800000000014112D.
+Definition MENVCFG_S : mword 64 := mword_of_int 0x8000000000000000.
+
+(* [cfg_ok s]: the config precondition the fast concrete-state decode bridge
+   (WpDecodeBridge) needs -- either a Machine state with mseccfg = 0, or a
+   Supervisor state with menvcfg = MENVCFG_S (the constant post-boot value).
+   Supplied to the [instr] decode obligation by the M-/S-mode step engines from
+   [hw_config] / [smode_config]; consumed by the per-word bridge lemmas. *)
+Definition cfg_ok (s : mstate) : Prop :=
+  (register_lookup cur_privilege s.(sregs) = Machine /\
+   register_lookup mseccfg s.(sregs) = mword_of_int 0)
+  \/ (register_lookup cur_privilege s.(sregs) = Supervisor /\
+      register_lookup menvcfg s.(sregs) = MENVCFG_S).
+
 Section HwConfig.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -100,7 +122,14 @@ Section HwConfig.
      ⌜ pmm_mode_backwards (_get_Seccfg_PMM mseccfg0) = PMM_Disabled ⌝ ∗
      ⌜ bool_bit_backwards (_get_Seccfg_MLPE mseccfg0) = false ⌝ ∗
      ⌜ eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ⌝ ∗
-     ⌜ eq_vec (_get_Misa_A misa0) ('b"1") = true ⌝)%I.
+     ⌜ eq_vec (_get_Misa_A misa0) ('b"1") = true ⌝ ∗
+     (* Full-value pins for the concrete-state decode bridge (WpDecodeBridge):
+        the read-frame congruence compares WHOLE register values, so it needs
+        misa/mseccfg pinned to the [dstate] reference.  Both are CONSISTENT with
+        the bit pins above: MISA_C = 0x800000000014112D has S/C/U/M/A set, and
+        mseccfg = 0 gives PMM = Disabled and MLPE = false. *)
+     ⌜ misa0 = MISA_C ⌝ ∗
+     ⌜ mseccfg0 = mword_of_int 0 ⌝)%I.
 
   Global Instance hw_config_persistent : Persistent hw_config.
   Proof. apply _. Qed.

@@ -249,6 +249,7 @@ Section WpMemsetPage.
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* the caller's return target's low bit is clear (a 2-aligned target is
        fine: memset returns via [exec_jump_to_zca], Zca always enabled) *)
@@ -282,7 +283,7 @@ Section WpMemsetPage.
   Proof.
     intros ra_idx s0_idx a0_idx a1_idx a2_idx pcE imm_entry sp' ra0 s00 p
       ea_ra pa_ra ea_s0 pa_s0 ret_tgt
-      Hpv Hcval Ha2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hret0.
+      Hpv Hcval Ha2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hret0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hbra Hbs0 Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
@@ -298,7 +299,7 @@ Section WpMemsetPage.
     iApply (wp_memset_s_full_kt root_ppn E Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds vra vs0
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN ltac:(lia) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
+              HN ltac:(lia) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
                     cbn [execute];

@@ -340,6 +340,7 @@ Section VcGenSIris.
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     vc_block_s st prog = Some st' ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -362,7 +363,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
+    intros HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     revert st. induction prog as [|op rest IH]; intros st Hblk.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
@@ -387,7 +388,7 @@ Section VcGenSIris.
         iApply (wp_caddi_gpr_s_config root_ppn E Φ (mword_of_int (vpc st)) rd imm
                   (vregs_den ρ (vregs st))
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HPBMTE Hrd0
+                  HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
@@ -417,7 +418,7 @@ Section VcGenSIris.
         iApply (wp_caddi4spn_gpr_s_config root_ppn E Φ (mword_of_int (vpc st))
                   rdc nzimm rd (vregs_den ρ (vregs st))
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HPBMTE Hrdc Hrd0
+                  HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrdc Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
@@ -456,7 +457,7 @@ Section VcGenSIris.
         iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (vpc st)) uimm rs2
                   (vregs_den ρ (vregs st)) (sval_den ρ vold)
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -489,7 +490,7 @@ Section VcGenSIris.
                   (vregs_den ρ (vregs st)) (sval_den ρ vv)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq) (dqm:=DfracOwn 1)
-                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -526,7 +527,7 @@ Section VcGenSIris.
                   (vregs_den ρ (vregs st)) (sval32_den ρ w32)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
-                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -564,7 +565,7 @@ Section VcGenSIris.
                   (vregs_den ρ (vregs st)) (sval32_den ρ wold)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -585,7 +586,7 @@ Section VcGenSIris.
         iApply (wp_caddiw_s root_ppn E Φ (mword_of_int (vpc st)) rd imm
                   (vregs_den ρ (vregs st))
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HPBMTE Hrd0
+                  HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
@@ -632,7 +633,7 @@ Section VcGenSIris.
         * iApply (wp_csd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -645,7 +646,7 @@ Section VcGenSIris.
         * iApply (wp_sd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -682,7 +683,7 @@ Section VcGenSIris.
         * iApply (wp_cld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
-                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -695,7 +696,7 @@ Section VcGenSIris.
         * iApply (wp_ld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
-                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -731,6 +732,7 @@ Section VcGenSIris.
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     vc_block_s st prog = Some st' ->
     gpr_matches ρ st.(vregs) m ->
     hw_config -∗ minstret_inv -∗
@@ -756,7 +758,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE.
+    intros HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     revert st m. induction prog as [|op rest IH]; intros st m Hblk Hmatch.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
@@ -781,7 +783,7 @@ Section VcGenSIris.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
         iApply (wp_caddi_gpr_s_config root_ppn E Φ (mword_of_int (vpc st)) rd imm m
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HPBMTE Hrd0
+                  HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
@@ -808,7 +810,7 @@ Section VcGenSIris.
         iApply (wp_caddi4spn_gpr_s_config root_ppn E Φ (mword_of_int (vpc st))
                   rdc nzimm rd m
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HPBMTE Hrdc Hrd0
+                  HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrdc Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
@@ -844,7 +846,7 @@ Section VcGenSIris.
         iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (vpc st)) uimm rs2
                   m (sval_den ρ vold)
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -878,7 +880,7 @@ Section VcGenSIris.
                   m (sval_den ρ vv)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq) (dqm:=DfracOwn 1)
-                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -912,7 +914,7 @@ Section VcGenSIris.
                   m (sval32_den ρ w32)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
-                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -946,7 +948,7 @@ Section VcGenSIris.
                   m (sval32_den ρ wold)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                  HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi Hcell").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -967,7 +969,7 @@ Section VcGenSIris.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
         iApply (wp_caddiw_s root_ppn E Φ (mword_of_int (vpc st)) rd imm m
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                  HN HSIE HMPRV HSXL Hmm HPBMTE Hrd0
+                  HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                         Hpc Hgpr Hi").
         iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
@@ -1009,7 +1011,7 @@ Section VcGenSIris.
         * iApply (wp_csd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
                     m (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -1023,7 +1025,7 @@ Section VcGenSIris.
         * iApply (wp_sd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
                     m (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -1057,7 +1059,7 @@ Section VcGenSIris.
         * iApply (wp_cld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
                     m (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
-                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -1070,7 +1072,7 @@ Section VcGenSIris.
         * iApply (wp_ld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
                     m (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
-                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+                    HN Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           Hpc Hgpr Hi Hcell").
           iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hcell".
@@ -1110,6 +1112,7 @@ Section VcGenSIris.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     hw_config -∗ minstret_inv -∗
@@ -1135,18 +1138,18 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hal.
+    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hal.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr Htaken Hfall".
     destruct (neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2)) eqn:Hcmp.
     - iApply (wp_bne_taken_s_config root_ppn E Φ pc imm rs2 rs1 m
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp Hal
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp Hal
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
       iApply ("Htaken" with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr").
     - iApply (wp_bne_fall_s_config root_ppn E Φ pc imm rs2 rs1 m
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
       iApply ("Hfall" with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr").
@@ -1163,6 +1166,7 @@ Section VcGenSIris.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     hw_config -∗ minstret_inv -∗
@@ -1188,18 +1192,18 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hal.
+    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hal.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr Htaken Hfall".
     destruct (eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2)) eqn:Hcmp.
     - iApply (wp_beq_taken_s_config root_ppn E Φ pc imm rs2 rs1 m
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp Hal
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp Hal
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
       iApply ("Htaken" with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr").
     - iApply (wp_beq_fall_s_config root_ppn E Φ pc imm rs2 rs1 m
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
       iApply ("Hfall" with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr").

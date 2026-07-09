@@ -164,6 +164,7 @@ Section WpIntrInv.
       (menvcfg0 : mword 64)
       :
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     (* the walk's PTE read *)
     (* PMP: TOR entry 0 grants X on the whole kernelvec text + R/W on the frame *)
@@ -174,7 +175,7 @@ Section WpIntrInv.
     ⊢ intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64)
         (F_kv root_ppn svpn m menvcfg0).
   Proof.
-    intros HPBMTE Hpmm Hlpe0 HFIOM.
+    intros HPBMTE Hmenvval0 Hpmm Hlpe0 HFIOM.
     iModIntro. iIntros (elp_v ms pc0 mie_v mdv0 E Φ) "%HN %Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hstvec Hpc HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
     iDestruct "HF" as "(#Hhw & #Hinv & #Htext & Hmenv & Htlbinv & Hfile & Hwins)".
@@ -197,7 +198,7 @@ Section WpIntrInv.
               (trap_ms_SIE_false elp_v ms)
               (trap_ms_MPRV_false elp_v ms HMPRV0)
               (trap_ms_SXL_eq elp_v ms HSXL)
-              Hmm HPBMTE
+              Hmm HPBMTE Hmenvval0
               (trap_ms_MXR_true elp_v ms HMXR)
               Hpmm
               (trap_ms_TSR_false elp_v ms HTSR)
@@ -303,7 +304,7 @@ Section WpIntrInv.
         iPoseProof "Hhw" as "#Hhwc".
         iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
           "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-            %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
+            %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
         pose proof (elp_no_lp elp0 Help_np) as Help0.
         iDestruct "Hsepc" as (sepc_old) "Hsepc".
         iDestruct "Hscause" as (scause_old) "Hscause".

@@ -623,7 +623,7 @@ Section AcqInstr.
     iSplitL "".
     - iApply (instr_bytes_rvc2 acq_pc1 acq_h1 H2al H4al Hrvc).
       iApply (kernel_window_pc KernelSyms.acquire acq_h1 2 acq_pc1 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _. cbn [fetch_is_rvc].
+    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
       exists (C_ADDI (acq_i1, Regidx csp_rs1)).
       split; [exact (acq_decode1 σ HmisaC) |].
       split; [vm_compute; reflexivity |].
@@ -651,6 +651,7 @@ Section WpInstrIntr.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -700,7 +701,7 @@ Section WpInstrIntr.
        non-RVC instruction no longer needs its two halves on one page.  The
        [s_dispatch = None] / dispatchInterrupt-not-taken obligation is threaded
        over the unified filled state [set_reg σ tlb tlbvec2] exactly as before. *)
-    iIntros (HN HSXL Hmm Hdnone HPBMTE)
+    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -709,7 +710,7 @@ Section WpInstrIntr.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
@@ -740,9 +741,13 @@ Section WpInstrIntr.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σf.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Help_σf.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Hmisa_σf.
+    iDestruct (reg_valid_dq with "Hreg Hmenvc") as %Hmenv_σf.
     specialize (Hdec0 ltac:(rewrite Hpriv_σf; reflexivity)
                       ltac:(rewrite Hmisa_σf; exact HmisaC)
-                      ltac:(rewrite Hmisa_σf; exact HmisaA)).
+                      ltac:(rewrite Hmisa_σf; exact HmisaA)
+                      ltac:(rewrite Hmisa_σf; exact Hmisa_val0)
+                      ltac:(unfold cfg_ok; right; split;
+                            [ exact Hpriv_σf | rewrite Hmenv_σf; exact Hmenvval0 ])).
     assert (Lpc_σf : register_lookup PC σf.(sregs) = pc).
     { unfold σf, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
@@ -795,6 +800,7 @@ Section WpInstrIntr.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -841,11 +847,11 @@ Section WpInstrIntr.
     (* The unified [wp_instr_s_intr_tlbinv] is [is_rvc]-polymorphic and, via the
        unified fetch, already covers the 2-aligned compressed case; this is now
        just its [is_rvc := true] specialisation ([if true then 2 else 4] = 2). *)
-    iIntros (HN HSXL Hmm Hdnone HPBMTE)
+    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Htlbinv Hpc Hinstr H".
     iApply (wp_instr_s_intr_tlbinv root_ppn E Φ pc true i
               mstatus0 mie_v mdv0 menvcfg0 mip_v meip seip
-              HN HSXL Hmm Hdnone HPBMTE
+              HN HSXL Hmm Hdnone HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Htlbinv Hpc Hinstr H").
   Qed.
 
@@ -863,6 +869,7 @@ Section WpInstrIntr.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
@@ -903,10 +910,10 @@ Section WpInstrIntr.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSXL Hmm Hdnone HPBMTE Hrd Hbexec)
+    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0 Hrd Hbexec)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_intr_tlbinv root_ppn E Φ pc true base mstatus0 mie_v mdv0 menvcfg0 mip_v
-              meip seip HN HSXL Hmm Hdnone HPBMTE
+              meip seip HN HSXL Hmm Hdnone HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Hpmp Htlb Hpbytes Hsi".
@@ -969,6 +976,7 @@ Section WpInstrIntr.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
@@ -1009,10 +1017,10 @@ Section WpInstrIntr.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSXL Hmm Hdnone HPBMTE Hrd Hbexec)
+    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0 Hrd Hbexec)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_s_intr_rvc2_tlbinv root_ppn E Φ pc base mstatus0 mie_v mdv0 menvcfg0 mip_v
-              meip seip HN HSXL Hmm Hdnone HPBMTE
+              meip seip HN HSXL Hmm Hdnone HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Hpmp Htlb Hpbytes Hsi".
@@ -1072,6 +1080,7 @@ Section WpInstrIntr.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -1103,7 +1112,7 @@ Section WpInstrIntr.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN HSXL Hmm Hdnone HPBMTE)
+    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv Hpc Hfile #Htext Hcont".
     iPoseProof (acq_instr1 with "Htext") as "Hi1".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
@@ -1113,7 +1122,7 @@ Section WpInstrIntr.
               (ITYPE (sign_extend' 12 acq_i1, Regidx csp_rs1, Regidx csp_rs1, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 acq_i1)))
               m mstatus0 mie_v mdv0 menvcfg0 mip_v meip seip
-              HN HSXL Hmm Hdnone HPBMTE Hsp _
+              HN HSXL Hmm Hdnone HPBMTE Hmenvval0 Hsp _
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv Hpc Hfile Hi1 [Hcont]").
     2:{ iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv2 Hpc Hfile".
         iEval (rewrite Hpc2) in "Hpc".

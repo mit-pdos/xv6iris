@@ -282,6 +282,7 @@ Section WpKernelvecNew.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    menvcfg0 = MENVCFG_S ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -298,7 +299,7 @@ Section WpKernelvecNew.
     mideleg ↦ᵣ{DfracOwn (1/2)} mdv0 ∗
     menvcfg ↦ᵣ{DfracOwn (1/2)} menvcfg0.
   Proof.
-    iIntros (HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom)
+    iIntros (HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv".
     iDestruct "Hhs" as "[Hhs1 Hhs2]".
     iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
@@ -308,7 +309,7 @@ Section WpKernelvecNew.
     iDestruct "Hmenv" as "[Hmenv1 Hmenv2]".
     iSplitL "Hhs1 Hpriv1 Hms1 Hsie Hmie1 Hmdl1 Hmenv1".
     { iApply (smode_config_rebuild γ (DfracOwn (1/2)) mstatus0 mie_v mdv0 menvcfg0
-                HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                 with "Hhw Hinv Hhs1 Hpriv1 Hms1 Hsie Hmie1 Hmdl1 Hmenv1"). }
     iFrame.
   Qed.
@@ -375,7 +376,7 @@ Section WpKernelvecNew.
       "#Hhw Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     iApply (wp_instr_s_tlbinv root_ppn γ E Φ pc false (JAL (imm, Regidx rd))
               HN
               with "Hsm Htlbinv Hpc Hinstr").
@@ -455,6 +456,7 @@ Section WpKernelvecNew.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
@@ -519,12 +521,12 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm Hlpe Hfiom Hleg.
+    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm Hlpe Hfiom Hleg.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     (* split: bundle(1/2) for the caddi16sp/jal WPs + retained halves *)
     iPoseProof (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0
-                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
     (* ---- #1: c.addi16sp sp,-256 @ 0x800053e0 (fetch page-walk, fills slot 5) ---- *)
@@ -584,7 +586,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw1".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2)) (mword_of_int 0) (mword_of_int 1)
               (kv_m1 m) vold1 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi2 Hw1").
     iEval (rewrite Hpc2).
@@ -597,7 +599,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw2".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x4)) (mword_of_int 2) (mword_of_int 3)
               (kv_m1 m) vold2 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi3 Hw2").
     iEval (rewrite Hpc3).
@@ -610,7 +612,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw3".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x6)) (mword_of_int 4) (mword_of_int 5)
               (kv_m1 m) vold3 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi4 Hw3").
     iEval (rewrite Hpc4).
@@ -623,7 +625,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw4".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x8)) (mword_of_int 5) (mword_of_int 6)
               (kv_m1 m) vold4 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi5 Hw4").
     iEval (rewrite Hpc5).
@@ -636,7 +638,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw5".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xa)) (mword_of_int 6) (mword_of_int 7)
               (kv_m1 m) vold5 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi6 Hw5").
     iEval (rewrite Hpc6).
@@ -649,7 +651,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw6".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xc)) (mword_of_int 9) (mword_of_int 10)
               (kv_m1 m) vold6 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi7 Hw6").
     iEval (rewrite Hpc7).
@@ -662,7 +664,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw7".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0xe)) (mword_of_int 10) (mword_of_int 11)
               (kv_m1 m) vold7 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi8 Hw7").
     iEval (rewrite Hpc8).
@@ -675,7 +677,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw8".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x10)) (mword_of_int 11) (mword_of_int 12)
               (kv_m1 m) vold8 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi9 Hw8").
     iEval (rewrite Hpc9).
@@ -688,7 +690,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw9".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x12)) (mword_of_int 12) (mword_of_int 13)
               (kv_m1 m) vold9 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi10 Hw9").
     iEval (rewrite Hpc10).
@@ -701,7 +703,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw10".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x14)) (mword_of_int 13) (mword_of_int 14)
               (kv_m1 m) vold10 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi11 Hw10").
     iEval (rewrite Hpc11).
@@ -714,7 +716,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw11".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x16)) (mword_of_int 14) (mword_of_int 15)
               (kv_m1 m) vold11 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi12 Hw11").
     iEval (rewrite Hpc12).
@@ -727,7 +729,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw12".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x18)) (mword_of_int 15) (mword_of_int 16)
               (kv_m1 m) vold12 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi13 Hw12").
     iEval (rewrite Hpc13).
@@ -740,7 +742,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw13".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1a)) (mword_of_int 16) (mword_of_int 17)
               (kv_m1 m) vold13 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi14 Hw13").
     iEval (rewrite Hpc14).
@@ -753,7 +755,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw14".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1c)) (mword_of_int 27) (mword_of_int 28)
               (kv_m1 m) vold14 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi15 Hw14").
     iEval (rewrite Hpc15).
@@ -766,7 +768,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw15".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x1e)) (mword_of_int 28) (mword_of_int 29)
               (kv_m1 m) vold15 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi16 Hw15").
     iEval (rewrite Hpc16).
@@ -779,7 +781,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw16".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x20)) (mword_of_int 29) (mword_of_int 30)
               (kv_m1 m) vold16 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi17 Hw16").
     iEval (rewrite Hpc17).
@@ -792,7 +794,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hm1sp) in "Hw17".
     iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x22)) (mword_of_int 30) (mword_of_int 31)
               (kv_m1 m) vold17 mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hpc Hfile Hi18 Hw17").
     iEval (rewrite Hpc18).
@@ -834,6 +836,7 @@ Section WpKernelvecNew.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     mt !!! Regidx csp_rs1 = spv ->
@@ -903,7 +906,7 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
+    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm
       Hsp0 HTSR Hsup Hlpe0 Hlpe_bb Hfiom Hleg.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hcont".
@@ -918,7 +921,7 @@ Section WpKernelvecNew.
     iEval (rewrite Heq0g) in "Hv1".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x28)) (mword_of_int 0) (mword_of_int 1)
               mt v1 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd20 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd20 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi20 Hv1").
     iEval (rewrite Hpc20).
@@ -935,7 +938,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp1) in "Hv2".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2a)) (mword_of_int 2) (mword_of_int 3)
               mt1 v2 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd21 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd21 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi21 Hv2").
     iEval (rewrite Hpc21).
@@ -952,7 +955,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp2) in "Hv3".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2c)) (mword_of_int 4) (mword_of_int 5)
               mt2 v3 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd22 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd22 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi22 Hv3").
     iEval (rewrite Hpc22).
@@ -969,7 +972,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp3) in "Hv4".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x2e)) (mword_of_int 5) (mword_of_int 6)
               mt3 v4 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd23 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd23 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi23 Hv4").
     iEval (rewrite Hpc23).
@@ -986,7 +989,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp4) in "Hv5".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x30)) (mword_of_int 6) (mword_of_int 7)
               mt4 v5 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd24 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd24 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi24 Hv5").
     iEval (rewrite Hpc24).
@@ -1003,7 +1006,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp5) in "Hv6".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x32)) (mword_of_int 9) (mword_of_int 10)
               mt5 v6 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd25 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd25 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi25 Hv6").
     iEval (rewrite Hpc25).
@@ -1020,7 +1023,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp6) in "Hv7".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x34)) (mword_of_int 10) (mword_of_int 11)
               mt6 v7 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd26 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd26 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi26 Hv7").
     iEval (rewrite Hpc26).
@@ -1037,7 +1040,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp7) in "Hv8".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x36)) (mword_of_int 11) (mword_of_int 12)
               mt7 v8 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd27 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd27 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi27 Hv8").
     iEval (rewrite Hpc27).
@@ -1054,7 +1057,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp8) in "Hv9".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x38)) (mword_of_int 12) (mword_of_int 13)
               mt8 v9 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd28 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd28 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi28 Hv9").
     iEval (rewrite Hpc28).
@@ -1071,7 +1074,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp9) in "Hv10".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3a)) (mword_of_int 13) (mword_of_int 14)
               mt9 v10 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd29 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd29 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi29 Hv10").
     iEval (rewrite Hpc29).
@@ -1088,7 +1091,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp10) in "Hv11".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3c)) (mword_of_int 14) (mword_of_int 15)
               mt10 v11 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd30 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd30 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi30 Hv11").
     iEval (rewrite Hpc30).
@@ -1105,7 +1108,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp11) in "Hv12".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x3e)) (mword_of_int 15) (mword_of_int 16)
               mt11 v12 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd31 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd31 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi31 Hv12").
     iEval (rewrite Hpc31).
@@ -1122,7 +1125,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp12) in "Hv13".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x40)) (mword_of_int 16) (mword_of_int 17)
               mt12 v13 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd32 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd32 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi32 Hv13").
     iEval (rewrite Hpc32).
@@ -1139,7 +1142,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp13) in "Hv14".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x42)) (mword_of_int 27) (mword_of_int 28)
               mt13 v14 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd33 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd33 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi33 Hv14").
     iEval (rewrite Hpc33).
@@ -1156,7 +1159,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp14) in "Hv15".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x44)) (mword_of_int 28) (mword_of_int 29)
               mt14 v15 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd34 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd34 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi34 Hv15").
     iEval (rewrite Hpc34).
@@ -1173,7 +1176,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp15) in "Hv16".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x46)) (mword_of_int 29) (mword_of_int 30)
               mt15 v16 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd35 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd35 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi35 Hv16").
     iEval (rewrite Hpc35).
@@ -1190,7 +1193,7 @@ Section WpKernelvecNew.
     iEval (rewrite <- Hsp16) in "Hv17".
     iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (mword_of_int (KernelSyms.kernelvec + 0x48)) (mword_of_int 30) (mword_of_int 31)
               mt16 v17 mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd36 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE
+              HN Hrd36 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
              
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi36 Hv17").
     iEval (rewrite Hpc36).
@@ -1204,7 +1207,7 @@ Section WpKernelvecNew.
     assert (Hpc37 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64))
       by (vm_compute; reflexivity).
     iPoseProof (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0
-                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe_bb Hfiom
+                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe_bb Hfiom Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
     iApply (wp_caddi16sp_gpr_s root_ppn γ E Φ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
@@ -1223,7 +1226,7 @@ Section WpKernelvecNew.
               mstatus0 mie_v mdv0 menvcfg0 sepc0
               (<[Regidx csp_rs1 := regval_into_reg (add_vec spv (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> mt17)
              
-              HN HSIE HMPRV HSXL Hmm HPBMTE HTSR Hsup Hlpe0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HTSR Hsup Hlpe0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile Hi38").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17").
@@ -1250,6 +1253,7 @@ Section WpKernelvecNew.
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     (* the walks' PTE read *)
@@ -1320,7 +1324,7 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
+    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm
       HTSR Hsup Hlpe0 Hfiom Hleg.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
@@ -1336,7 +1340,7 @@ Section WpKernelvecNew.
     (* ---- instrs #1..#19: prologue (fills + saves + jal) ---- *)
     iApply (wp_kv_prologue root_ppn γ m mstatus0 mie_v mdv0 menvcfg0
               vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 E Φ
-              HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm
               ltac:(rewrite Hlpe0; vm_compute; reflexivity) Hfiom Hleg
               with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
@@ -1372,7 +1376,7 @@ Section WpKernelvecNew.
 
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
               E Φ
-              HN HSIE HMPRV HSXL Hmm HPBMTE HMXR Hpmm
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm
               Hsp'' HTSR Hsup Hlpe0
               ltac:(rewrite Hlpe0; vm_compute; reflexivity) Hfiom Hleg
               with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile

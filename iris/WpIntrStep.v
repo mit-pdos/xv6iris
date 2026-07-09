@@ -136,6 +136,7 @@ Section WpIntrStep.
     (* S-mode config facts *)
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     (* PMP: kernelvec text + frame + the acquire pc *)
     (* stack-page geometry *)
@@ -154,7 +155,7 @@ Section WpIntrStep.
       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros HN Hmm HPBMTE Hpmm Hlpe0 HFIOM.
+    intros HN Hmm HPBMTE Hmenvval0 Hpmm Hlpe0 HFIOM.
     iIntros "#Hhw #Hinv #Htext HP Hpc Hfile Hcont".
     iRevert "HP Hpc Hfile Hcont".
     iLöb as "IH".
@@ -173,7 +174,7 @@ Section WpIntrStep.
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA)".
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
       pose proof (elp_no_lp elp0 Help_np) as Help0.
       iDestruct "Hpc" as "[Hpcr Hnpc]".
       iApply (wp_exec_step_interrupt_inv E Phi HN with "Hinv Hhs").
@@ -267,7 +268,7 @@ Section WpIntrStep.
                 (trap_ms_SIE_false elp0 ms)
                 (trap_ms_MPRV_false elp0 ms HMPRV0)
                 (trap_ms_SXL_eq elp0 ms HSXL)
-                Hmm HPBMTE
+                Hmm HPBMTE Hmenvval0
                 (trap_ms_MXR_true elp0 ms HMXR)
                 Hpmm
                 (trap_ms_TSR_false elp0 ms HTSR)
@@ -293,7 +294,7 @@ Section WpIntrStep.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     - (* ---- no interrupt: the instruction executes ---- *)
       iApply (wp_acq_caddi_intr root_ppn E Phi m ms mie_v mdv0 menvcfg0 mip_v meip seip
-                HN HSXL Hmm Hdres HPBMTE
+                HN HSXL Hmm Hdres HPBMTE Hmenvval0
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip
                       Htlbinv Hpc Hfile Htext").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv Hpc Hfile".

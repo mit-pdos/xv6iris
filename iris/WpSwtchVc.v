@@ -629,7 +629,7 @@ Section WpSwtchVc.
         "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
       iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
       iDestruct "Hmenvb" as (menvcfg0)
-        "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM)".
+        "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
       iEval (rewrite (valid_context_unfold sconf E Phi P newc) /valid_context_pre) in "Hvalidnew".
       iDestruct "Hvalidnew" as (new_vs)
         "(%Hlen_new & %Hal_new & Hnewcells & Hnewwand)".
@@ -663,7 +663,7 @@ Section WpSwtchVc.
                 (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
                 (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
                 rho mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE swtch_run
+                HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                       Hpc Hfile Hcode [Holdcells Hnewcells] []").
       { rewrite /vheap_own /swtch_heap0 big_sepL_app.
@@ -722,7 +722,7 @@ Section WpSwtchVc.
                 (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
                 (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
                 ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe Hlow
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                       Hpc Hfile Hret [Hnewwand Hvoldc HP Hsie Hgc]").
@@ -733,7 +733,7 @@ Section WpSwtchVc.
         "[Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Hgc Htlbinv]" as "Hconf".
       { rewrite /sconf.
         iDestruct (smode_config_rebuild γc dq mstatus0 mie_v mdv0 menvcfg0
-                     HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM
+                     HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                      with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
         iFrame "Hsm Hgc Htlbinv". }
       iApply ("Hnewwand" $! (vregs_den rho swtch_regs1)
