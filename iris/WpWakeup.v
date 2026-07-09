@@ -27,7 +27,7 @@ From stdpp Require Import gmap list.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 From iris.algebra Require Import excl ofe.
-From iris.base_logic.lib Require Import invariants own.
+From iris.base_logic.lib Require Import invariants own ghost_var.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang.
@@ -172,31 +172,23 @@ End ProcInv.
 (* a0, used to skip the current process) is a genuine entry of the global    *)
 (* proc[] table.  We assume a jal-callable whole-function WP that: returns   *)
 (* a0 = proc_addr j for some j < NPROC; preserves the callee-saved registers *)
-(* (sp, s0..s11), the S-mode configuration and every invariant; and threads  *)
-(* any caller frame [F] untouched.  ("For now, just returns some proc.")     *)
+(* (sp, s0..s11); and preserves the ambient config [smode_config γc], its    *)
+(* SIE ghost half, and [tlb_inv] -- exactly the resources acquire/release     *)
+(* thread -- with myproc managing its own stack frame internally.  (For now,  *)
+(* it just returns some proc.)                                                *)
 (* ======================================================================= *)
 Axiom wp_myproc :
-  forall {Σ : gFunctors} {HR : riscvGS Σ} {CID : CpuId}
+  forall {Σ : gFunctors} {HR : riscvGS Σ} {HS : sieG Σ} {CID : CpuId}
     (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ)
-    (mstatus0 mie_v mdv0 menvcfg0 : mword 64) (dq : dfrac)
-    (m : gmap regidx (mword 64)) (F : iProp Σ),
+    (γc : gname) (bsie : mword 1)
+    (m : gmap regidx (mword 64)),
     ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     let ret_tgt :=
       update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
                         (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    sconf root_ppn mstatus0 mie_v mdv0 menvcfg0 dq -∗
+    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.myproc) -∗ gpr_file m -∗
-    F -∗
     (∀ (j : nat) (mret : gmap regidx (mword 64)),
        ⌜(j < NPROC)%nat⌝ -∗
        ⌜mret !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j⌝ -∗
@@ -207,7 +199,7 @@ Axiom wp_myproc :
                mword_of_int 24; mword_of_int 25; mword_of_int 26;
                mword_of_int 27] ->
           mret !!! Regidx r = m !!! Regidx r⌝ -∗
-       sconf root_ppn mstatus0 mie_v mdv0 menvcfg0 dq -∗
-       pc_is ret_tgt -∗ gpr_file mret -∗ F -∗
+       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+       pc_is ret_tgt -∗ gpr_file mret -∗
        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
