@@ -24,6 +24,7 @@ From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
 Require Import RiscvModelBytes.
@@ -117,6 +118,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section WpPopOffVc.
   Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
   Notation PP := KernelSyms.pop_off.
@@ -154,7 +156,7 @@ Section WpPopOffVc.
   (* the call composite (jal + the whole mycpu): the WpPushOffTop proof,  *)
   (* verbatim, with wp_mycpu_vc as the callee.                            *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_call_mycpu_vc (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_call_mycpu_vc (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
       (m : gmap regidx (mword 64))
       (raold s0old : bv 64)
@@ -187,10 +189,13 @@ Section WpPopOffVc.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
@@ -199,6 +204,7 @@ Section WpPopOffVc.
     pa_s0 ↦₈ s0old -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+      ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗ gpr_file (po_mycpu_out P m) -∗
@@ -210,29 +216,31 @@ Section WpPopOffVc.
     intros ra_idx tp_idx s0_idx a0_idx a5_idx m0 pcE imm_entry sp' ra0 s00
       ea_ra pa_ra ea_s0 pa_s0 ret_tgt
       HN Htarget Halign_tgt
-      HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
-    iDestruct (kv_cfg_split mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL Hmm HPBMTE
-                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv")
+      HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe HFIOM Hlegal Hal0.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
+    iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM
+                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_jal_gpr_s2 root_ppn E Φ P (mword_of_int 1) jimm m (1/2)%Qp
+    iApply (wp_jal_gpr_s2 root_ppn γc E Φ P (mword_of_int 1) jimm m (1/2)%Qp
               HN ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
               with "Hhw Hsm Htlbinv Hpc Hfile Hjal [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite Htarget) in "Hpc".
-    iDestruct (kv_cfg_recombine mstatus0 mie_v mdv0 menvcfg0
+    iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
-      as "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv)".
+      as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
     iApply (wp_mycpu_vc root_ppn E Φ m0 raold s0old mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 Hcont").
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hgc Hcont]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0").
   Qed.
 
   (* ==================================================================== *)
   (* wp_pop_off, re-proved.  Statement identical to WpPopOff.wp_pop_off.   *)
   (* ==================================================================== *)
-  Lemma wp_pop_off_vc (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_pop_off_vc (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
       (vp8 vp0 vfra vfs0 : bv 64)
@@ -260,6 +268,8 @@ Section WpPopOffVc.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
     (* noff/intena slot geometry DERIVED in the _ram leaves from the owned
        points-to -- no po_slot_geom premise. *)
     neq_vec (and_vec (sstatus_read mstatus0) (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false ->
@@ -269,6 +279,7 @@ Section WpPopOffVc.
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
@@ -280,6 +291,7 @@ Section WpPopOffVc.
     a_int ↦₄{ dqi } intenav -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
+      ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
@@ -301,9 +313,9 @@ Section WpPopOffVc.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
-      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
+      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe HFIOM Hlegal
       Hsst2 Hnoffpos Hint Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Hint Hcont".
     iPoseProof (ppi_08 with "Htext") as "Hi08".
     iPoseProof (ppi_0c with "Htext") as "Hi0c".
@@ -391,16 +403,16 @@ Section WpPopOffVc.
     (* +0x08 jal ra,mycpu; the whole mycpu() -- via the VCgen-based callee *)
     assert (HspP2r : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4)]> M1) !!! Regidx csp_rs1 = spd)
       by (rewrite lookup_total_insert_ne; [ exact Hsp1 | vm_compute; discriminate ]).
-    iApply (wp_call_mycpu_vc root_ppn E Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) M1 vfra vfs0
+    iApply (wp_call_mycpu_vc root_ppn γc E Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) M1 vfra vfs0
               mstatus0 mie_v mdv0 menvcfg0
               HN ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe HFIOM Hlegal
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
+              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
     { iEval (rewrite HspP2r). iExact "Hfra". }
     { iEval (rewrite HspP2r). iExact "Hfs0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hfra Hfs0".
+    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hfra Hfs0".
     iEval (rewrite HspP2r) in "Hfra". iEval (rewrite HspP2r) in "Hfs0".
     iEval (rewrite lookup_total_insert) in "Hpc".
     assert (Hpc0c : update_vec_dec (add_vec (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
@@ -764,7 +776,7 @@ Section WpPopOffVc.
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Mf. iFrame "Hfile". iPureIntro.
         exact (conj HraF (conj Hs0F (conj Hs1F (conj HspF (conj HtpF Ha0F))))). }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
@@ -914,7 +926,7 @@ Section WpPopOffVc.
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Mf. iFrame "Hfile". iPureIntro.
         exact (conj HraF (conj Hs0F (conj Hs1F (conj HspF (conj HtpF Ha0F))))). }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
