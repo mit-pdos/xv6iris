@@ -34,9 +34,89 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import InstrBytes MinstretInv RiscvFetchExec WpGpr WpEntryNew.
 Require Import WpLock.
+Require Import WpGprAddi WpGprRvc WpGprLoad WpGprStore.
+Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGenS.
+Require Import WpAcquireLock WpRelease.
 Require Import WpSwtchVc.
-From Kernel Require KernelSyms.
+Require Import RiscvExec RiscvExtras WpDecode WpFetch WpLeafCommon.
+From Kernel Require Import KernelSyms KernelInstrs.
 Local Open Scope Z_scope.
+Import Defs.
+
+(* ======================================================================= *)
+(* Instruction DECODE facts for wakeup's instructions.  Base instrs decode  *)
+(* via [decode_any]; compressed instrs decode to their [C_*] form and then   *)
+(* bridge to the executable [ExecuteAs (...)] form.  (Same apparatus as      *)
+(* WpSwtchVc / WpTimerinit.)  Register indices: ra=1 sp=2 s0=8 s1=9 a0=10    *)
+(* a5=15 s2=18 s3=19 s4=20 s5=21.  wakeup base = 0x80001f44.                  *)
+(* ======================================================================= *)
+
+(* ---- base instructions ---- *)
+(* 0x80001f58 auipc s1,0x11 *)
+Lemma wkd_f58 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x00011497 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f5c addi s1,s1,-2016 *)
+Lemma wkd_f5c s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x82048493 : mword 32)) s
+  = Some (ITYPE (mword_of_int 2080 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f64 auipc s2,0x16 *)
+Lemma wkd_f64 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x00016917 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f68 addi s2,s2,532 *)
+Lemma wkd_f68 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x21490913 : mword 32)) s
+  = Some (ITYPE (mword_of_int 532 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f74 addi s1,s1,360 *)
+Lemma wkd_f74 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x16848493 : mword 32)) s
+  = Some (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f78 beq s1,s2,+36 *)
+Lemma wkd_f78 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x03248263 : mword 32)) s
+  = Some (BTYPE (mword_of_int 36 : mword 13, Regidx (mword_of_int 18), Regidx (mword_of_int 9), BEQ), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f80 beq a0,s1,-12 *)
+Lemma wkd_f80 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0xfe950ae3 : mword 32)) s
+  = Some (BTYPE (mword_of_int 8180 : mword 13, Regidx (mword_of_int 9), Regidx (mword_of_int 10), BEQ), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f8c bne a5,s3,-30 *)
+Lemma wkd_f8c s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0xff3791e3 : mword 32)) s
+  = Some (BTYPE (mword_of_int 8162 : mword 13, Regidx (mword_of_int 19), Regidx (mword_of_int 15), BNE), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f92 bne a5,s4,-36 *)
+Lemma wkd_f92 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0xfd479ee3 : mword 32)) s
+  = Some (BTYPE (mword_of_int 8156 : mword 13, Regidx (mword_of_int 20), Regidx (mword_of_int 15), BNE), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f96 sw s5,24(s1) *)
+Lemma wkd_f96 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x0154ac23 : mword 32)) s
+  = Some (STORE (mword_of_int 24 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 9), 4), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f70 jal release (-4846) *)
+Lemma wkd_f70 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0xd13fe0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2092306 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f7c jal myproc (-1670) *)
+Lemma wkd_f7c s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0x97bff0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2095482 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
+(* 0x80001f86 jal acquire (-5004) *)
+Lemma wkd_f86 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  exec (ext_decode (mword_of_int 0xc75fe0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2092148 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. intro Hpriv. decode_any s Hpriv. Qed.
 
 Section ProcInv.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
@@ -204,3 +284,66 @@ Axiom wp_myproc :
        pc_is ret_tgt -∗ gpr_file mret -∗
        WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+
+(* ======================================================================= *)
+(* Leaf lemmas specific to wakeup's instruction mix that were not already   *)
+(* available: the compressed [c.li rd, imm] (ADDI from x0).                  *)
+(* ======================================================================= *)
+Section WkLeaves.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  (* c.li rd, imm  ==  addi rd, x0, sext(imm) : writes sext(imm) into rd.
+     Mirrors wp_caddi_gpr_s_config but with rs1 = x0 (so the value is the
+     immediate, not rd+imm).  Discharged through wp_gpr_write_s_config. *)
+  Lemma wp_cli_gpr_s_config (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 6)
+      (m : gmap regidx (mword 64))
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    uint rd <> 0 ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc true (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)))]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hrd)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd
+              (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
+              (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI))
+              (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)))
+              m mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hrd
+              _
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
+    rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) rd
+               (sign_extend' 12 imm) s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_addi_val.
+    replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
+      by (vm_compute; reflexivity).
+    reflexivity.
+  Qed.
+
+End WkLeaves.
