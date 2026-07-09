@@ -418,28 +418,6 @@ Proof.
   repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
 Qed.
 
-(* mycpu's returned a0 depends on the input register file only through tp (x4):
-   the returned pointer is [const + f(m!!!x4)].  Hence two maps agreeing on x4
-   yield the same a0.  This lets a caller whose mycpu-input map is only known
-   up to its tp still discharge the a0 pins. *)
-Lemma po_mycpu_out_a0_cong (P : mword 64) (m1 m2 : gmap regidx (mword 64)) :
-  m1 !!! Regidx (mword_of_int 4 : mword 5) = m2 !!! Regidx (mword_of_int 4 : mword 5) ->
-  po_mycpu_out P m1 !!! Regidx (mword_of_int 10 : mword 5)
-  = po_mycpu_out P m2 !!! Regidx (mword_of_int 10 : mword 5).
-Proof.
-  intros H4. unfold po_mycpu_out. cbv zeta.
-  (* reduce the a0 (x10) lookup on both sides; the only base-map dependence
-     that survives is m_i !!! x4. *)
-  repeat (first [ rewrite lookup_total_insert
-                | (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]) ]).
-  rewrite H4. reflexivity.
-Qed.
-
-(* ===================================================================== *)
-(* SIE=0 (folded into smode_config) collapses push_off's saved-interrupt   *)
-(* store [storeval32] to the concrete [zeros' 32], so wp_push_off's intena  *)
-(* postcondition needs no mstatus0.  Bridges mirror WpAcquireLock.          *)
-(* ===================================================================== *)
 (* po_mycpu_out's a0 output depends on the input map only through tp (x4)
    (local copy; WpHolding.po_mycpu_out_a0 is downstream of this file). *)
 Lemma pt_mycpu_out_a0 (P : mword 64) (m : gmap regidx (mword 64)) :
@@ -452,6 +430,27 @@ Proof.
   unfold mycpu_ret, mycpu_a5.
   reflexivity.
 Qed.
+
+(* mycpu's returned a0 depends on the input register file only through tp (x4):
+   the returned pointer is [const + f(m!!!x4)].  Hence two maps agreeing on x4
+   yield the same a0.  This lets a caller whose mycpu-input map is only known
+   up to its tp still discharge the a0 pins. *)
+Lemma po_mycpu_out_a0_cong (P : mword 64) (m1 m2 : gmap regidx (mword 64)) :
+  m1 !!! Regidx (mword_of_int 4 : mword 5) = m2 !!! Regidx (mword_of_int 4 : mword 5) ->
+  po_mycpu_out P m1 !!! Regidx (mword_of_int 10 : mword 5)
+  = po_mycpu_out P m2 !!! Regidx (mword_of_int 10 : mword 5).
+Proof.
+  (* reuse [pt_mycpu_out_a0] rather than re-walking the (cbv-zeta-inlined)
+     nested-lookup tree on both sides: the re-walk cost ~6.5s per -time
+     profiling; via the pinned lemma this is ~0s. *)
+  intros H4. rewrite !pt_mycpu_out_a0. rewrite H4. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* SIE=0 (folded into smode_config) collapses push_off's saved-interrupt   *)
+(* store [storeval32] to the concrete [zeros' 32], so wp_push_off's intena  *)
+(* postcondition needs no mstatus0.  Bridges mirror WpAcquireLock.          *)
+(* ===================================================================== *)
 
 Lemma po_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
 Proof.
