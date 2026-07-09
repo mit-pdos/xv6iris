@@ -244,7 +244,6 @@ Section WpPopOffVc.
       (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
       (vp8 vp0 vfra vfs0 : bv 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dqi : dfrac} :
     let pcE : mword 64 := mword_of_int PP in
     let spd := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
@@ -260,27 +259,12 @@ Section WpPopOffVc.
     let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    (* noff/intena slot geometry DERIVED in the _ram leaves from the owned
-       points-to -- no po_slot_geom premise. *)
-    neq_vec (and_vec (sstatus_read mstatus0) (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false ->
+    (* S-mode config facts + the interrupt-off sstatus fact are folded into
+       [smode_config γc] below. *)
     zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
     eq_vec (sign_extend' 64 intenav) zero_reg = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
-    mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
+    smode_config γc (DfracOwn 1) -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
     a_p8 ↦₈ vp8 -∗
@@ -289,10 +273,7 @@ Section WpPopOffVc.
     a_fs0 ↦₈ vfs0 -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-      ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
-      mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
+    ( smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       (∃ mf, gpr_file mf ∗
@@ -313,10 +294,18 @@ Section WpPopOffVc.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
-      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe HFIOM Hlegal
-      Hsst2 Hnoffpos Hint Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv
+      HN Hnoffpos Hint Hal0.
+    iIntros "Hcfg Htlbinv
              #Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Hint Hcont".
+    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
+      as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM)".
+    assert (Hsst2 : neq_vec (and_vec (sstatus_read mstatus0)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false)
+      by (apply pop_sstatus_clear_neq; exact HSIE).
     iPoseProof (ppi_08 with "Htext") as "Hi08".
     iPoseProof (ppi_0c with "Htext") as "Hi0c".
     iPoseProof (ppi_10 with "Htext") as "Hi10".
@@ -776,7 +765,10 @@ Section WpPopOffVc.
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                   HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM
+                   with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Mf. iFrame "Hfile". iPureIntro.
         exact (conj HraF (conj Hs0F (conj Hs1F (conj HspF (conj HtpF Ha0F))))). }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
@@ -926,7 +918,10 @@ Section WpPopOffVc.
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                   HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM
+                   with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Mf. iFrame "Hfile". iPureIntro.
         exact (conj HraF (conj Hs0F (conj Hs1F (conj HspF (conj HtpF Ha0F))))). }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
