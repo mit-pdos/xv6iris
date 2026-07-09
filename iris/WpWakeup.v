@@ -678,4 +678,38 @@ Section ProcInv.
   Definition wk_lockcells (γs : list gname) : iProp Σ :=
     ([∗ list] i ↦ _ ∈ γs, wk_cpu_addr (proc_addr i) ↦₈ (zero_reg : mword 64))%I.
 
+  (* wakeup's own 7-entry register-save frame, at spF+8..spF+56 (written by the
+     [c.sdsp] prologue, read back by the epilogue).  Cell addresses are given in
+     the [c.sdsp] leaf's own form [add_vec spF (sign_extend' 64 (csdsp_imm u))]. *)
+  Definition wk_fcell (spF : mword 64) (u : Z) : mword 64 :=
+    add_vec spF (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int u : mword 6) ('b"000")))).
+  Definition wk_frame (spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64) : iProp Σ :=
+    (wk_fcell spF 7 ↦₈ vra ∗ wk_fcell spF 6 ↦₈ vs0 ∗ wk_fcell spF 5 ↦₈ vs1 ∗
+     wk_fcell spF 4 ↦₈ vs2 ∗ wk_fcell spF 3 ↦₈ vs3 ∗ wk_fcell spF 2 ↦₈ vs4 ∗
+     wk_fcell spF 1 ↦₈ vs5)%I.
+
+  (* the mutable stack/lock/percpu resources that the loop threads; [noffv] is
+     the (fixed) entry noff, restored by each acquire/release pair. *)
+  Definition wk_res (γs : list gname) (spF a0f : mword 64) (noffv : mword 32) : iProp Σ :=
+    (wk_scratch spF ∗
+     wk_noff_addr a0f ↦₄ noffv ∗
+     wk_intena_addr a0f ↦₄ (zeros' 32) ∗
+     wk_lockcells γs)%I.
+
+  (* register-map shape at the loop test [pc = wakeup+0x38] with counter [i]:
+     the loop/callee-saved registers hold their fixed values (a0/a5 are scratch,
+     hence existential in the map). *)
+  Definition wk_regs (M : gmap regidx (mword 64))
+      (spF sp0 rra rtp : mword 64) (chan : mword 64) (i : nat) : Prop :=
+    M !!! Regidx (mword_of_int 1)  = rra /\
+    M !!! Regidx (mword_of_int 2)  = spF /\
+    M !!! Regidx (mword_of_int 8)  = sp0 /\
+    M !!! Regidx (mword_of_int 9)  = proc_addr i /\
+    M !!! Regidx (mword_of_int 4)  = rtp /\
+    M !!! Regidx (mword_of_int 18) = proc_addr 64 /\
+    M !!! Regidx (mword_of_int 19) = (mword_of_int 2 : mword 64) /\
+    M !!! Regidx (mword_of_int 20) = chan /\
+    M !!! Regidx (mword_of_int 21) = (mword_of_int 3 : mword 64) /\
+    (forall r : regidx, r ∈ dom M).
+
 End ProcInv.
