@@ -428,49 +428,9 @@ Section WpAcquireLock.
     iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM)".
-    (* reconstruct push_off's internal register chain over the unbundled
-       mstatus0 (matches wp_push_off's own chain, so its storeval / mycpu-pin
-       obligations line up). *)
-    set (PN2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read mstatus0)]> PN1).
-    set (PN3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
-        (add_vec zero_reg (PN2 !!! Regidx (mword_of_int 15 : mword 5)))]> PN2).
-    set (PN4 := po_mycpu_out (mword_of_int (PO + 0x10)) PN3).
-    set (PN5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 noff)]> PN4).
-    set (PN6 := po_mycpu_out (mword_of_int (PO + 0x2c)) PN5).
-    set (PN7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
-        (shift_bits_right (PN6 !!! Regidx (mword_of_int 9 : mword 5))
-           (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))]> PN6).
-    set (PN8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
-        (and_vec (PN7 !!! Regidx (mword_of_int 15 : mword 5))
-           (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> PN7).
-    set (po_storeval32 := (autocast (T := mword)
-        (subrange_vec_dec (PN8 !!! Regidx (mword_of_int 15 : mword 5)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32)).
-    (* x4 (tp) rides through the whole chain unchanged; po_mycpu_out's a0
-       output depends on x4 alone, so the per-map a0f pins follow from Ha0. *)
-    assert (HPN3tp : PN3 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
-    { rewrite /PN3 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /PN2 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /PN1 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /PN0 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /P0 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /A2 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /A1 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /A0 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
-    assert (HPN5tp : PN5 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
-    { rewrite /PN5 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /PN4 po_mycpu_out_tp. exact HPN3tp. }
-    assert (HPN8tp : PN8 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
-    { rewrite /PN8 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /PN7 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /PN6 po_mycpu_out_tp. exact HPN5tp. }
-    assert (Ha0_10 : po_mycpu_out (mword_of_int (PO + 0x10)) PN3 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
-      by (rewrite po_mycpu_out_a0 HPN3tp; exact Ha0).
-    assert (Ha0_2c : po_mycpu_out (mword_of_int (PO + 0x2c)) PN5 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
-      by (rewrite po_mycpu_out_a0 HPN5tp; exact Ha0).
-    assert (Ha0_18f : po_mycpu_out (mword_of_int (PO + 0x18)) PN5 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
-      by (rewrite po_mycpu_out_a0 HPN5tp; exact Ha0).
-    assert (Ha0_18t : po_mycpu_out (mword_of_int (PO + 0x18)) PN8 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
-      by (rewrite po_mycpu_out_a0 HPN8tp; exact Ha0).
+    (* wp_push_off now takes smode_config + the single tp-only mycpu pin and
+       returns the saved intena as the concrete zeros'32, so acquire needs
+       neither the reconstructed PN chain nor po_storeval32 here. *)
     iPoseProof (aqi_00 with "Htext") as "Hi00".
     iPoseProof (aqi_02 with "Htext") as "Hi02".
     iPoseProof (aqi_04 with "Htext") as "Hi04".
@@ -594,13 +554,17 @@ Section WpAcquireLock.
       by (rewrite /P0; apply lookup_total_insert).
     assert (E1a : add_vec_int (mword_of_int (PO + 0x18) : mword 64) 2 = mword_of_int (PO + 0x1a))
       by (apply bv_eq; vm_compute; reflexivity).
+    iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM
+                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
     iApply (wp_push_off root_ppn γc E Φ P0 pr24 pr16 pr8 fraold fs0old noff intena_old a0f
-              mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-              HFIOM Hlegal ltac:(vm_compute; reflexivity)
+              HN ltac:(vm_compute; reflexivity)
               ltac:(rewrite HP0ra; vm_compute; reflexivity)
-              Ha0_10 Ha0_2c Ha0_18f Ha0_18t
-              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile [Hp24] [Hp16] [Hp8] [Hfra] [Hfs0] [Hnoff] [Hintena] [-]").
+              ltac:(rewrite /P0 lookup_total_insert_ne; [| vm_compute; discriminate];
+                    rewrite /A2 lookup_total_insert_ne; [| vm_compute; discriminate];
+                    rewrite /A1 lookup_total_insert_ne; [| vm_compute; discriminate];
+                    rewrite /A0 lookup_total_insert_ne; [| vm_compute; discriminate]; exact Ha0)
+              with "Hcfg Htlbinv Htext Hpc Hfile [Hp24] [Hp16] [Hp8] [Hfra] [Hfs0] [Hnoff] [Hintena] [-]").
     { iEval (rewrite HP0csp). iExact "Hp24". }
     { iEval (rewrite HP0csp). iExact "Hp16". }
     { iEval (rewrite HP0csp). iExact "Hp8". }
@@ -608,25 +572,14 @@ Section WpAcquireLock.
     { iEval (rewrite HP0csp). iExact "Hfs0". }
     { iExact "Hnoff". }
     { iExact "Hintena". }
-    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hmfin Hp24 Hp16 Hp8 Hjunk Hnoff Hintena".
-    (* re-express push_off's saved intena byte in the map-independent form.
-       [po_storeval32] (the PN8-chain form) equals [acq_intena_store mstatus0];
-       convert the received intena array so acquire's postcondition can expose
-       the map-independent value. *)
-    assert (Hstv : (if eq_vec (sign_extend' 64 noff) zero_reg then po_storeval32 else intena_old)
-                 = (if eq_vec (sign_extend' 64 noff) zero_reg then (zeros' 32) else intena_old)).
-    { destruct (eq_vec (sign_extend' 64 noff) zero_reg); [| reflexivity].
-      transitivity (acq_intena_store mstatus0).
-      { rewrite /po_storeval32 /acq_intena_store.
-        rewrite /PN8 lookup_total_insert.
-        rewrite /PN7 lookup_total_insert.
-        rewrite /PN6 po_mycpu_out_s1.
-        rewrite /PN5 lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /PN4 po_mycpu_out_s1.
-        rewrite /PN3 lookup_total_insert.
-        rewrite /PN2 lookup_total_insert.
-        reflexivity. }
-      apply acq_intena_store_zero. exact HSIE. }
+    iIntros "Hcfg Htlbinv Hpc Hmfin Hp24 Hp16 Hp8 Hjunk Hnoff Hintena".
+    (* re-open the config for acquire's own post-push_off leaves *)
+    clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM.
+    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
+      as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM)".
     iEval (rewrite HP0csp) in "Hp24". iEval (rewrite HP0csp) in "Hp16". iEval (rewrite HP0csp) in "Hp8".
     iEval (rewrite HP0csp) in "Hjunk".
     assert (Hpc10 : update_vec_dec (add_vec (P0 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AQ + 0x10))
@@ -975,7 +928,7 @@ Section WpAcquireLock.
     }
     iExists _, _, _, _, _.
     iFrame "Hp24 Hp16 Hp8 Hfra Hfs0".
-    iEval (rewrite -Hstv). iExact "Hintena".
+    iExact "Hintena".
   Qed.
 
 End WpAcquireLock.
