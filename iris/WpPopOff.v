@@ -31,6 +31,8 @@ From iris.base_logic.lib Require Import ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
+(* QUALIFIED (no Import): sstatus SIE-bit bridges for the pop_off interrupt-off fact. *)
+Require WpGprCsrwC.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
@@ -920,6 +922,49 @@ End WpPopOffTakenZca.
 (* per-cpu noff is signed-POSITIVE, and the saved intena is 0 (so the     *)
 (* csrsi that would re-enable interrupts is provably skipped).            *)
 (* ===================================================================== *)
+(* SIE=0 (folded into smode_config) gives pop_off's interrupt-off fact
+   [sstatus & 2 = 0] with mstatus0 hidden.  Mirrors WpRelease's bridge. *)
+Lemma pop_mword1_zero_of_ne_one (x : mword 1) :
+  eq_vec x ('b"1") = false -> x = ('b"0" : mword 1).
+Proof.
+  intro H. apply eq_vec_false_iff in H. apply bv_eq.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  assert (Hmod : bv_modulus 1 = 2) by (vm_compute; reflexivity).
+  rewrite Hmod in Hr.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  assert (H0 : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
+  rewrite H0.
+  assert (Hne : bv_unsigned x <> 1).
+  { intro Hc. apply H. apply bv_eq. rewrite H1. exact Hc. }
+  lia.
+Qed.
+
+Lemma pop_sstatus_clear_neq (m : mword 64) :
+  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
+  neq_vec (and_vec (sstatus_read m)
+             (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false.
+Proof.
+  intro HSIE.
+  unfold neq_vec. apply negb_false_iff. apply eq_vec_true_iff.
+  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1))
+    by (apply pop_mword1_zero_of_ne_one; exact HSIE).
+  assert (Hb1 : Z.testbit (bv_unsigned (sstatus_read m)) 1 = false).
+  { unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
+    apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz. }
+  assert (Hmask : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)) : mword 64) = 2)
+    by (vm_compute; reflexivity).
+  assert (Hzr : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
+  apply bv_eq. rewrite WpGprCsrwC.and_vec_unsigned. rewrite Hmask. rewrite Hzr.
+  apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec. rewrite Z.bits_0.
+  destruct (decide (j = 1)) as [->|Hne].
+  - rewrite Hb1. reflexivity.
+  - assert (Ht2 : Z.testbit 2 j = false).
+    { destruct (Z.eq_dec j 0) as [->|Hj0].
+      - reflexivity.
+      - apply Z.bits_above_log2; [lia|]. change (Z.log2 2) with 1. lia. }
+    rewrite Ht2. apply andb_false_r.
+Qed.
+
 Section WpPopOffTopSec.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -931,7 +976,6 @@ Section WpPopOffTopSec.
       (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
       (vp8 vp0 vfra vfs0 : bv 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dqi : dfrac} :
     let pcE : mword 64 := mword_of_int PP in
     let spd := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
@@ -947,30 +991,14 @@ Section WpPopOffTopSec.
     let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    (* noff/intena slot geometry DERIVED in the _ram leaves from the owned
-       points-to -- no po_slot_geom premise. *)
-    (* interrupts are off: sstatus & 2 = 0 *)
-    neq_vec (and_vec (sstatus_read mstatus0) (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false ->
+    (* S-mode config facts + the interrupt-off sstatus fact are folded into
+       [smode_config γc] below. *)
     (* noff >= 1 (signed) *)
     zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
     (* saved intena is 0 *)
     eq_vec (sign_extend' 64 intenav) zero_reg = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
-    mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
+    smode_config γc (DfracOwn 1) -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
     a_p8 ↦₈ vp8 -∗
@@ -979,10 +1007,7 @@ Section WpPopOffTopSec.
     a_fs0 ↦₈ vfs0 -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-      ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
-      mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
+    ( smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       (∃ mf, gpr_file mf ∗
@@ -1003,10 +1028,19 @@ Section WpPopOffTopSec.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
-      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe Hfiom Hleg
-      Hsst2 Hnoffpos Hint Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv
+      HN Hnoffpos Hint Hal0.
+    iIntros "Hcfg Htlbinv
              #Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Hint Hcont".
+    (* unbundle the ambient config; the interrupt-off sstatus fact follows from SIE=0 *)
+    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
+      as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom)".
+    assert (Hsst2 : neq_vec (and_vec (sstatus_read mstatus0)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false)
+      by (apply pop_sstatus_clear_neq; exact HSIE).
     iPoseProof (ppi_00 with "Htext") as "Hi00".
     iPoseProof (ppi_02 with "Htext") as "Hi02".
     iPoseProof (ppi_04 with "Htext") as "Hi04".
@@ -1261,7 +1295,10 @@ Section WpPopOffTopSec.
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       iEval (rewrite HraQ3) in "Hpc".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                   HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                   with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Q3. iFrame "Hfile". iPureIntro.
         split; [exact HraQ3|]. split; [|split; [|split; [|split]]].
         - rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -1395,7 +1432,10 @@ Section WpPopOffTopSec.
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       iEval (rewrite HraQ3) in "Hpc".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                   HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom
+                   with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Q3. iFrame "Hfile". iPureIntro.
         split; [exact HraQ3|]. split; [|split; [|split; [|split]]].
         - rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
