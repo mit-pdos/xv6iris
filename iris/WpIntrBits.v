@@ -40,9 +40,13 @@ Ltac zn_norm :=
 (* Chase one Z.testbit through the bv_concat/bv_extract tower.            *)
 Ltac tb_rw :=
   zn_norm;
+  (* NB: the boolean-identity cleanup (orb_false / andb rewrites) is the LAST
+     branch, not the first.  As the first branch it was retried -- re-scanning
+     the whole goal -- after every structural rewrite, and dominated ~70% of
+     this file's compile time (per Ltac profiling).  Deprioritised, it fires
+     only once the structural chase is stuck, cutting this file's build ~2.5x. *)
   repeat (first
-    [ progress rewrite ?orb_false_l, ?orb_false_r, ?andb_true_l, ?andb_false_l
-    | rewrite bv_extract_unsigned
+    [ rewrite bv_extract_unsigned
     | rewrite bv_concat_unsigned'
     | rewrite bv_wrap_spec_low by lia
     | rewrite bv_wrap_spec_high by lia
@@ -52,6 +56,7 @@ Ltac tb_rw :=
     | rewrite Z.testbit_neg_r by lia
     | rewrite Z.bits_0
     | progress zn_norm
+    | progress rewrite ?orb_false_l, ?orb_false_r, ?andb_true_l, ?andb_false_l
     ]);
   first [ reflexivity | f_equal; lia | vm_compute; reflexivity | lia ].
 

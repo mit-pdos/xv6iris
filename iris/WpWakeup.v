@@ -1021,7 +1021,10 @@ Section ProcInv.
       - (* s5 = 3 *) wk_peel.
         apply bv_eq; vm_compute; reflexivity.
       - (* dom *) intro r. pose proof (Hdom r) as Hr.
-        rewrite !dom_insert_L. set_solver. }
+        (* was [set_solver] -- ~128s here, as naive_solver rescans the whole
+           (huge) proof context; the goal is just [r ∈ union-tower ∪ dom base]
+           with [Hr : r ∈ dom base], so route right and close directly. *)
+        rewrite !dom_insert_L. repeat apply elem_of_union_r. exact Hr. }
     { (* wk_frame *)
       unfold wk_frame.
       iEval (rewrite HM1sp) in "Hc7". iEval (rewrite HM1sp) in "Hc6".
@@ -1234,7 +1237,8 @@ Section ProcInv.
       - (* s5 *) wk_peel. reflexivity.
       - (* sp *) wk_peel. rewrite HspF. reflexivity.
       - (* dom *) intro r. pose proof (Hdom r) as Hr.
-        rewrite !dom_insert_L. set_solver. }
+        (* context-free replacement for [set_solver] -- see wp_wakeup_prologue. *)
+        rewrite !dom_insert_L. repeat apply elem_of_union_r. exact Hr. }
     { (* wk_frame reassembly *)
       unfold wk_frame. iFrame "Hc7 Hc6 Hc5 Hc4 Hc3 Hc2 Hc1". }
   Qed.
@@ -1498,7 +1502,7 @@ Section ProcInv.
     iEval (rewrite Hret3c) in "Hpc".
     (* s1 is preserved by myproc: mret!!!s1 = proc_addr k *)
     assert (Hmrets1 : mret !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k).
-    { rewrite (Hpres (mword_of_int 9 : mword 5) ltac:(set_solver)).
+    { rewrite (Hpres (mword_of_int 9 : mword 5) ltac:(compute_done)).
       rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs1. }
     (* ---- 0x3c: beq a0,s1 (raw leaf): skip-self test ---- *)
     iPoseProof (wki_3c with "Htext") as "Hi3c".
@@ -1529,17 +1533,17 @@ Section ProcInv.
       iApply ("Htail" $! mret with "[] Hsm Hgc Htlb Hpc Hfile Hres Hframe").
       iPureIntro. unfold wk_loop_regs.
       split; [exact Hmrets1|].
-      split; [rewrite (Hpres (mword_of_int 2 : mword 5) ltac:(set_solver));
+      split; [rewrite (Hpres (mword_of_int 2 : mword 5) ltac:(compute_done));
               rewrite /Mj lookup_total_insert_ne; [exact Hsp | vm_compute; discriminate]|].
-      split; [rewrite (Hpres (mword_of_int 4 : mword 5) ltac:(set_solver));
+      split; [rewrite (Hpres (mword_of_int 4 : mword 5) ltac:(compute_done));
               rewrite /Mj lookup_total_insert_ne; [exact Htp | vm_compute; discriminate]|].
-      split; [rewrite (Hpres (mword_of_int 18 : mword 5) ltac:(set_solver));
+      split; [rewrite (Hpres (mword_of_int 18 : mword 5) ltac:(compute_done));
               rewrite /Mj lookup_total_insert_ne; [exact Hs2 | vm_compute; discriminate]|].
-      split; [rewrite (Hpres (mword_of_int 19 : mword 5) ltac:(set_solver));
+      split; [rewrite (Hpres (mword_of_int 19 : mword 5) ltac:(compute_done));
               rewrite /Mj lookup_total_insert_ne; [exact Hs3 | vm_compute; discriminate]|].
-      split; [rewrite (Hpres (mword_of_int 20 : mword 5) ltac:(set_solver));
+      split; [rewrite (Hpres (mword_of_int 20 : mword 5) ltac:(compute_done));
               rewrite /Mj lookup_total_insert_ne; [exact Hs4 | vm_compute; discriminate]|].
-      split; [rewrite (Hpres (mword_of_int 21 : mword 5) ltac:(set_solver));
+      split; [rewrite (Hpres (mword_of_int 21 : mword 5) ltac:(compute_done));
               rewrite /Mj lookup_total_insert_ne; [exact Hs5 | vm_compute; discriminate]|].
       exact Hdommret.
     - (* FALL: a0 <> s1: acquire proc[k], check state/chan, maybe wake, release *)
@@ -1564,10 +1568,10 @@ Section ProcInv.
         "(Hu1 & Hu2 & Hu3 & Hu4 & Hu5 & Hu6 & Hu7 & Hu8 & Hu9)".
       (* sp/tp preserved through myproc (needed for acquire's frame + a0f). *)
       assert (Hmret2 : mret !!! Regidx (mword_of_int 2 : mword 5) = spF).
-      { rewrite (Hpres (mword_of_int 2 : mword 5) ltac:(set_solver)).
+      { rewrite (Hpres (mword_of_int 2 : mword 5) ltac:(compute_done)).
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hsp. }
       assert (Hmret4 : mret !!! Regidx (mword_of_int 4 : mword 5) = rtp).
-      { rewrite (Hpres (mword_of_int 4 : mword 5) ltac:(set_solver)).
+      { rewrite (Hpres (mword_of_int 4 : mword 5) ltac:(compute_done)).
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Htp. }
       iPoseProof (wki_40 with "Htext") as "Hi40".
       (* 0x40 c.mv a0,s1 : a0 := &proc[k] *)
@@ -1651,16 +1655,16 @@ Section ProcInv.
       { rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmrets1. }
       assert (Hmret18 : mret !!! Regidx (mword_of_int 18 : mword 5) = proc_addr NPROC).
-      { rewrite (Hpres (mword_of_int 18 : mword 5) ltac:(set_solver)).
+      { rewrite (Hpres (mword_of_int 18 : mword 5) ltac:(compute_done)).
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs2. }
       assert (Hmret19 : mret !!! Regidx (mword_of_int 19 : mword 5) = (mword_of_int 2 : mword 64)).
-      { rewrite (Hpres (mword_of_int 19 : mword 5) ltac:(set_solver)).
+      { rewrite (Hpres (mword_of_int 19 : mword 5) ltac:(compute_done)).
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs3. }
       assert (Hmret20 : mret !!! Regidx (mword_of_int 20 : mword 5) = chan).
-      { rewrite (Hpres (mword_of_int 20 : mword 5) ltac:(set_solver)).
+      { rewrite (Hpres (mword_of_int 20 : mword 5) ltac:(compute_done)).
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs4. }
       assert (Hmret21 : mret !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64)).
-      { rewrite (Hpres (mword_of_int 21 : mword 5) ltac:(set_solver)).
+      { rewrite (Hpres (mword_of_int 21 : mword 5) ltac:(compute_done)).
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs5. }
       assert (HM42s2 : M42 !!! Regidx (mword_of_int 18 : mword 5) = proc_addr NPROC).
       { rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -1896,7 +1900,7 @@ Section ProcInv.
       assert (HM48_21 : M48 !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64))
         by (rewrite /M48 lookup_total_insert_ne; [exact HMacq21 | vm_compute; discriminate]).
       assert (HdomM48 : forall r : regidx, r ∈ dom M48).
-      { intro r. rewrite /M48 dom_insert_L. pose proof (Hdomacq r). set_solver. }
+      { intro r. rewrite /M48 dom_insert_L. apply elem_of_union_r. apply Hdomacq. }
       (* ---- 0x48 bne a5,s3 : if state != SLEEPING -> release ---- *)
       iPoseProof (wki_48 with "Htext") as "Hi48".
       destruct (neq_vec (M48 !!! Regidx (mword_of_int 15 : mword 5))
@@ -1973,7 +1977,7 @@ Section ProcInv.
         assert (HM4e_21 : M4e !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64))
           by (rewrite /M4e lookup_total_insert_ne; [exact HM48_21 | vm_compute; discriminate]).
         assert (HdomM4e : forall r : regidx, r ∈ dom M4e).
-        { intro r. rewrite /M4e dom_insert_L. pose proof (HdomM48 r). set_solver. }
+        { intro r. rewrite /M4e dom_insert_L. apply elem_of_union_r. apply HdomM48. }
         (* ---- 0x4e bne a5,s4 : if chan != arg -> release ---- *)
         iPoseProof (wki_4e with "Htext") as "Hi4e".
         destruct (neq_vec (M4e !!! Regidx (mword_of_int 15 : mword 5))
