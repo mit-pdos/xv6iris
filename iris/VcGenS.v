@@ -1152,4 +1152,57 @@ Section VcGenSIris.
       iApply ("Hfall" with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr").
   Qed.
 
+  Lemma wp_beq_split_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : gmap regidx (mword 64))
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
+    ( ⌜eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true⌝ -∗
+      hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ( ⌜eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false⌝ -∗
+      hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hal.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr Htaken Hfall".
+    destruct (eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2)) eqn:Hcmp.
+    - iApply (wp_beq_taken_s_config root_ppn E Φ pc imm rs2 rs1 m
+                mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp Hal
+                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr").
+      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
+      iApply ("Htaken" with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr").
+    - iApply (wp_beq_fall_s_config root_ppn E Φ pc imm rs2 rs1 m
+                mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+                HN HSIE HMPRV HSXL Hmm HPBMTE Hrs1 Hrs2 Hcmp
+                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr").
+      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
+      iApply ("Hfall" with "[//] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr").
+  Qed.
+
 End VcGenSIris.
