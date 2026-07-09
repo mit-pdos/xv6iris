@@ -276,7 +276,7 @@ Section Kalloc.
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM)".
     (* ---- acquire returned: [locked γ ∗ kmem_res fl] held, pc = +0x16 ---- *)
     iDestruct "Hgpr" as (mfin) "[Hfile %Hpins]".
-    destruct Hpins as (Hmra & Hms0 & Hms1 & Hmsp & Hma0 & Hmtp & Hms2).
+    destruct Hpins as (Hmra & Hms0 & Hms1 & Hmsp & Hma0 & Hmtp & Hms2 & _ & _ & _).
     assert (Hmara : mA !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)
       by (rewrite /mA; apply lookup_total_insert).
     assert (Hpc16 : update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x16)).
@@ -440,7 +440,7 @@ Section Kalloc.
       { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc58) in "Hpc".
       iDestruct "Hgpr2" as (mr) "[Hfile %Hpins2]".
-      destruct Hpins2 as (Hmrra & Hmrs0 & Hmrs1 & Hmrcsp & Hmrtp).
+      destruct Hpins2 as (Hmrra & Hmrs0 & Hmrs1 & Hmrcsp & Hmrtp & _ & _ & _ & _).
       assert (HE3s1 : E3 !!! Regidx (mword_of_int 9 : mword 5) = nullp).
       { rewrite /E3 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /E2 lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -800,7 +800,7 @@ Section Kalloc.
       assert (Hpp3c : add_vec_int (mword_of_int (AK + 0x3a) : mword 64) 2 = mword_of_int (AK + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3c) in "Hpc".
       set (M3a := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (Mli !!! Regidx (mword_of_int 9 : mword 5)))]> Mli).
-      destruct Hpins2 as (Hmrra & Hmrs0 & Hmrs1 & Hmrcsp & Hmrtp).
+      destruct Hpins2 as (Hmrra & Hmrs0 & Hmrs1 & Hmrcsp & Hmrtp & _ & _ & _ & _).
       assert (HR12s1 : R12 !!! Regidx (mword_of_int 9 : mword 5) = p).
       { rewrite /R12 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /R11 lookup_total_insert_ne; [| vm_compute; discriminate].

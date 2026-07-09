@@ -783,7 +783,7 @@ Section Kfree.
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
     iDestruct "Hgpr" as (macq) "[Hfile %Hacqpins]".
-    destruct Hacqpins as (Hqra & Hqs0 & Hqs1 & Hqsp & Hqa0 & Hqtp & Hqs2).
+    destruct Hacqpins as (Hqra & Hqs0 & Hqs1 & Hqsp & Hqa0 & Hqtp & Hqs2 & _ & _ & _).
     assert (Hs1p : macq !!! Regidx (mword_of_int 9 : mword 5) = p) by (rewrite Hqs1; exact Hmacq_s1).
     assert (Hs2km : macq !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int KernelSyms.kmem) by (rewrite Hqs2; exact HKacqs2).
     iPoseProof (kfi_44 with "Htext") as "Hi44".
@@ -939,7 +939,7 @@ Section Kfree.
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".
     iDestruct "Hgprr" as (mrel) "[Hfile %Hrelpins]".
-    destruct Hrelpins as (Hrra & Hrs0 & Hrs1 & Hrsp & Hrtp).
+    destruct Hrelpins as (Hrra & Hrs0 & Hrs1 & Hrsp & Hrtp & _ & _ & _ & _).
     assert (HspMrel : mrel !!! Regidx csp_rs1 = spr) by (rewrite Hrsp; exact HRrelcsp).
     iPoseProof (kfi_54 with "Htext") as "Hi54".
     iPoseProof (kfi_56 with "Htext") as "Hi56".
