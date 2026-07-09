@@ -636,4 +636,46 @@ Section ProcInv.
     - rewrite needs_ctx_RUNNABLE in Hn. discriminate.
   Qed.
 
+  (* ===================================================================== *)
+  (* Resource layout for the wakeup() WP.                                   *)
+  (*                                                                        *)
+  (* [spF] is wakeup's frame pointer -- the sp value AFTER the [c.addi16sp  *)
+  (* sp,-64] prologue.  acquire/release are called with sp = spF and place  *)
+  (* their spill/push_off/mycpu scratch BELOW spF at the exact offsets       *)
+  (* recomputed here (so these cells UNIFY with the acquire/release specs).  *)
+  (* ===================================================================== *)
+
+  Definition off32m6 : mword 64 := sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)).
+  Definition off48m6 : mword 64 := sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)).
+  Definition wk_spd   (spF : mword 64) : mword 64 := add_vec spF (off32m6).           (* spF - 32 *)
+  Definition wk_pospd (spF : mword 64) : mword 64 := add_vec (wk_spd spF) (off32m6).   (* spF - 64 *)
+  Definition wk_pospm (spF : mword 64) : mword 64 := add_vec (wk_pospd spF) (off48m6). (* spF - 80 *)
+  Definition wk_cell (base : mword 64) (n : Z) : mword 64 :=
+    add_vec base (zero_extend' 64 (concat_vec (mword_of_int n : mword 6) ('b"000"))).
+
+  (* the 9 acquire/release scratch cells (shared: spd+{1,2,3}, pospd+{1,2,3};
+     release-only: pospd+0; both: pospm+{0,1}), contents irrelevant. *)
+  Definition wk_scratch (spF : mword 64) : iProp Σ :=
+    (∃ u1 u2 u3 u4 u5 u6 u7 u8 u9 : bv 64,
+       wk_cell (wk_spd spF) 3 ↦₈ u1 ∗ wk_cell (wk_spd spF) 2 ↦₈ u2 ∗
+       wk_cell (wk_spd spF) 1 ↦₈ u3 ∗
+       wk_cell (wk_pospd spF) 3 ↦₈ u4 ∗ wk_cell (wk_pospd spF) 2 ↦₈ u5 ∗
+       wk_cell (wk_pospd spF) 1 ↦₈ u6 ∗ wk_cell (wk_pospd spF) 0 ↦₈ u7 ∗
+       wk_cell (wk_pospm spF) 1 ↦₈ u8 ∗ wk_cell (wk_pospm spF) 0 ↦₈ u9)%I.
+
+  (* the current cpu's per-cpu push_off bookkeeping words, at cpu+120/+124.
+     [noff] is restored to its entry value by each acquire/release pair;
+     [intena] stays 0 throughout (our S-mode config has SIE=0). *)
+  Definition wk_noff_addr (a0f : mword 64) : mword 64 :=
+    add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)).
+  Definition wk_intena_addr (a0f : mword 64) : mword 64 :=
+    add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)).
+
+  (* the lock->cpu word of every proc, all 0 at each loop-test (acquire sets it
+     to mycpu, release clears it back to 0). *)
+  Definition wk_cpu_addr (pa : mword 64) : mword 64 :=
+    add_vec pa (sign_extend' 64 (mword_of_int 16 : mword 12)).
+  Definition wk_lockcells (γs : list gname) : iProp Σ :=
+    ([∗ list] i ↦ _ ∈ γs, wk_cpu_addr (proc_addr i) ↦₈ (zero_reg : mword 64))%I.
+
 End ProcInv.
