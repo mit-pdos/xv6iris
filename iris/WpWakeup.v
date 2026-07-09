@@ -38,7 +38,7 @@ Require Import WpGprAddi WpGprRvc WpGprLoad WpGprStore.
 Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGenS.
 Require Import WpAcquireLock WpRelease.
 Require Import WpSwtchVc.
-Require Import RiscvExec RiscvExtras WpDecode WpFetch WpLeafCommon.
+Require Import RiscvExec RiscvExtras WpDecode WpFetch WpLeafCommon WpRvcBridge WpKallocDecode.
 From Kernel Require Import KernelSyms KernelInstrs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -117,6 +117,124 @@ Lemma wkd_f86 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
   exec (ext_decode (mword_of_int 0xc75fe0ef : mword 32)) s
   = Some (JAL (mword_of_int 2092148 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. intro Hpriv. decode_any s Hpriv. Qed.
+
+(* ---- compressed instructions (misa.C + rvc_oneshot; ext_decode_compressed) ---- *)
+(* 0x80001f44 c.addi16sp sp,-64 *)
+Lemma wkd_f44 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x7139 : mword 16)) s
+  = Some (C_ADDI16SP (mword_of_int 60 : mword 6), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001faa c.addi16sp sp,64 *)
+Lemma wkd_faa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x6121 : mword 16)) s
+  = Some (C_ADDI16SP (mword_of_int 4 : mword 6), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f46..52 c.sdsp ra/s0/s1/s2/s3/s4/s5 at 56/48/40/32/24/16/8(sp) *)
+Lemma wkd_f46 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xfc06 : mword 16)) s
+  = Some (C_SDSP (mword_of_int 7, Regidx (mword_of_int 1)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f48 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xf822 : mword 16)) s
+  = Some (C_SDSP (mword_of_int 6, Regidx (mword_of_int 8)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f4a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xf426 : mword 16)) s
+  = Some (C_SDSP (mword_of_int 5, Regidx (mword_of_int 9)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f4c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xf04a : mword 16)) s
+  = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 18)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f4e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xec4e : mword 16)) s
+  = Some (C_SDSP (mword_of_int 3, Regidx (mword_of_int 19)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f50 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xe852 : mword 16)) s
+  = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 20)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f52 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xe456 : mword 16)) s
+  = Some (C_SDSP (mword_of_int 1, Regidx (mword_of_int 21)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f54 c.addi4spn s0,sp,64 *)
+Lemma wkd_f54 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x0080 : mword 16)) s
+  = Some (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 16), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f56 c.mv s4,a0 *)
+Lemma wkd_f56 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8a2a : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 20), Regidx (mword_of_int 10)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f6e / 0x80001f84 c.mv a0,s1 *)
+Lemma wkd_f6e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8526 : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 9)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f60 c.li s3,2 ; 0x80001f62 c.li s5,3 *)
+Lemma wkd_f60 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4989 : mword 16)) s
+  = Some (C_LI (mword_of_int 2, Regidx (mword_of_int 19)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f62 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4a8d : mword 16)) s
+  = Some (C_LI (mword_of_int 3, Regidx (mword_of_int 21)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f6c c.j +16 ; 0x80001f9a c.j -44 *)
+Lemma wkd_f6c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xa801 : mword 16)) s
+  = Some (C_J (mword_of_int 8 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f9a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xbfd1 : mword 16)) s
+  = Some (C_J (mword_of_int 2026 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f8a c.lw a5,24(s1) *)
+Lemma wkd_f8a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4c9c : mword 16)) s
+  = Some (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f90 c.ld a5,32(s1) *)
+Lemma wkd_f90 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x709c : mword 16)) s
+  = Some (C_LD (mword_of_int 4, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001f9c..a8 c.ldsp ra/s0/s1/s2/s3/s4/s5 at 56/48/40/32/24/16/8(sp) *)
+Lemma wkd_f9c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x70e2 : mword 16)) s
+  = Some (C_LDSP (mword_of_int 7, Regidx (mword_of_int 1)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_f9e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x7442 : mword 16)) s
+  = Some (C_LDSP (mword_of_int 6, Regidx (mword_of_int 8)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_fa0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x74a2 : mword 16)) s
+  = Some (C_LDSP (mword_of_int 5, Regidx (mword_of_int 9)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_fa2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x7902 : mword 16)) s
+  = Some (C_LDSP (mword_of_int 4, Regidx (mword_of_int 18)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_fa4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x69e2 : mword 16)) s
+  = Some (C_LDSP (mword_of_int 3, Regidx (mword_of_int 19)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_fa6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x6a42 : mword 16)) s
+  = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 20)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+Lemma wkd_fa8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x6aa2 : mword 16)) s
+  = Some (C_LDSP (mword_of_int 1, Regidx (mword_of_int 21)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x80001fac c.ret = c.jr ra *)
+Lemma wkd_fac s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8082 : mword 16)) s
+  = Some (C_JR (Regidx (mword_of_int 1)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
 
 Section ProcInv.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
