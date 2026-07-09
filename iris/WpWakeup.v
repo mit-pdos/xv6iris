@@ -39,15 +39,16 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 Section ProcInv.
-  Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
-  (* the fixed S-mode machine configuration -- the same parameters that
-     [valid_context]/[sconf] are stated against in WpSwtchVc. *)
+  (* the ambient S-mode config a running/resumed kernel thread holds -- the same
+     [sconf] (smode_config γc + the SIE ghost half + tlb_inv) that wp_swtch is
+     now stated against, so a proc's saved context interoperates with swtch. *)
   Context (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ).
-  Context (mstatus0 mie_v mdv0 menvcfg0 : mword 64) (dq : dfrac).
+  Context (γc : gname) (bsie : mword 1) (dq : dfrac).
 
   Local Notation VC :=
-    (valid_context (sconf root_ppn mstatus0 mie_v mdv0 menvcfg0 dq) E Phi).
+    (valid_context (sconf root_ppn γc bsie dq) E Phi).
 
   (* ---- struct proc geometry ---- *)
   Definition NPROC : nat := 64%nat.

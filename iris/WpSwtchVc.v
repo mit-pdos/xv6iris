@@ -42,7 +42,7 @@ Require Import SmodeCore WpSmodeGpr WpMemsetS WpPushOffMem WpPushOffTop WpKalloc
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-From iris.base_logic.lib Require Import invariants.
+From iris.base_logic.lib Require Import invariants ghost_var.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -293,6 +293,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section WpSwtchVc.
   Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
   Notation SW := KernelSyms.swtch.
@@ -562,23 +563,16 @@ Section WpSwtchVc.
 
   Section SwtchSpec.
     Context (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ).
-    Context (mstatus0 mie_v mdv0 menvcfg0 : mword 64) (dq : dfrac).
+    Context (γc : gname) (bsie : mword 1) (dq : dfrac).
     Hypothesis HN : ↑minstretN ⊆ E.
-    Hypothesis HSIE : eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false.
-    Hypothesis HMPRV : eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false.
-    Hypothesis HSXL : _get_Mstatus_SXL mstatus0 = 'b"10".
-    Hypothesis Hmm : and_vec mie_v (not_vec mdv0) = zeros' 64.
-    Hypothesis HMXR : eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true.
-    Hypothesis Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled.
-    Hypothesis HPBMTE : eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true.
-    Hypothesis Hlpe : bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false.
 
-    (* the fixed S-mode machine configuration, bundled.  The PMP configuration
-       (pmpcfg/pmpaddr cells + coverage facts) lives inside [tlb_inv]. *)
+    (* the ambient S-mode machine configuration a running kernel thread holds:
+       the config bundle [smode_config] (keyed by the SIE ghost name [γc], which
+       hides the concrete CSR values), the caller's half of that SIE ghost var,
+       and the page-table invariant.  This is exactly what the cleaned-up
+       acquire/release consume and return; a resumed context receives it too. *)
     Definition sconf : iProp Σ :=
-      (hart_state ↦ᵣ{dq} HART_ACTIVE tt ∗ cur_privilege ↦ᵣ{dq} Supervisor ∗
-       mstatus ↦ᵣ{dq} mstatus0 ∗ mie ↦ᵣ{dq} mie_v ∗ mideleg ↦ᵣ{dq} mdv0 ∗
-       menvcfg ↦ᵣ{dq} menvcfg0 ∗ tlb_inv root_ppn)%I.
+      (smode_config γc dq ∗ ghost_var γc (1/2) bsie ∗ tlb_inv root_ppn)%I.
 
     (* -------------------------------------------------------------------- *)
     (* valid_context P c : "the context saved at [c] admits a WP to run".  It  *)
@@ -612,7 +606,7 @@ Section WpSwtchVc.
       m0 !!! Regidx (mword_of_int 10) = oldc ->
       m0 !!! Regidx (mword_of_int 11) = newc ->
       eq_vec (access_vec_dec (ctx_pc (m0 !!! Regidx (mword_of_int 1))) 0) ('b"0") = true ->
-      hw_config -∗ minstret_inv -∗ kernel_text -∗
+      kernel_text -∗
       sconf -∗ pc_is (mword_of_int KernelSyms.swtch) -∗ gpr_file m0 -∗
       ctx_cells oldc old_vs -∗
       valid_context sconf E Phi P newc -∗
@@ -625,10 +619,17 @@ Section WpSwtchVc.
       WP (Loop : expr riscv_lang) @ E {{ Phi }}.
     Proof.
       iIntros (Hlen_old Holdc Hnewc Hal_old)
-        "#Hhw #Hinv #Ht Hconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
+        "#Ht Hconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
       iEval (rewrite /sconf) in "Hconf".
-      iDestruct "Hconf" as
-        "(Hhs & Hpriv & Hms & Hmie & Hmdl & Hmenv & Htlbinv)".
+      iDestruct "Hconf" as "(Hsm & Hgc & Htlbinv)".
+      iDestruct (smode_config_unbundle γc dq with "Hsm")
+        as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+      iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
+      iDestruct "Hmsb" as (mstatus0)
+        "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+      iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+      iDestruct "Hmenvb" as (menvcfg0)
+        "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM)".
       iEval (rewrite (valid_context_unfold sconf E Phi P newc) /valid_context_pre) in "Hvalidnew".
       iDestruct "Hvalidnew" as (new_vs)
         "(%Hlen_new & %Hal_new & Hnewcells & Hnewwand)".
@@ -724,13 +725,17 @@ Section WpSwtchVc.
                 HN HSIE HMPRV HSXL Hmm HPBMTE
                 ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe Hlow
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                      Hpc Hfile Hret [Hnewwand Hvoldc HP]").
+                      Hpc Hfile Hret [Hnewwand Hvoldc HP Hsie Hgc]").
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
       (* ---- hand control to new's saved WP, giving it (as its resumer [oldc])
              [▷ valid_context P oldc] together with [P oldc] ---- *)
       iAssert sconf with
-        "[Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv]" as "Hconf".
-      { rewrite /sconf. iFrame. }
+        "[Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Hgc Htlbinv]" as "Hconf".
+      { rewrite /sconf.
+        iDestruct (smode_config_rebuild γc dq mstatus0 mie_v mdv0 menvcfg0
+                     HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM
+                     with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+        iFrame "Hsm Hgc Htlbinv". }
       iApply ("Hnewwand" $! (vregs_den rho swtch_regs1)
                 with "[] Hconf Hpc Hfile [Hvoldc HP]").
       { iPureIntro. exact Hcallee_new. }
