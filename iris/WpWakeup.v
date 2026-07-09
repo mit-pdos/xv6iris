@@ -682,7 +682,7 @@ Section ProcInv.
      [c.sdsp] prologue, read back by the epilogue).  Cell addresses are given in
      the [c.sdsp] leaf's own form [add_vec spF (sign_extend' 64 (csdsp_imm u))]. *)
   Definition wk_fcell (spF : mword 64) (u : Z) : mword 64 :=
-    add_vec spF (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int u : mword 6) ('b"000")))).
+    add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
   Definition wk_frame (spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64) : iProp Σ :=
     (wk_fcell spF 7 ↦₈ vra ∗ wk_fcell spF 6 ↦₈ vs0 ∗ wk_fcell spF 5 ↦₈ vs1 ∗
      wk_fcell spF 4 ↦₈ vs2 ∗ wk_fcell spF 3 ↦₈ vs3 ∗ wk_fcell spF 2 ↦₈ vs4 ∗
