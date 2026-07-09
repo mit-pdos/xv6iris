@@ -243,18 +243,11 @@ Lemma wkx_clw (uimm : mword 5) (rsc rdc : cregidx) s :
                            creg2reg_idx rsc, creg2reg_idx rdc, false, 4)), s).
 Proof. unfold execute. cbn match. unfold execute_C_LW. cbn zeta. apply exec_returnM. Qed.
 
-Section ProcInv.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
-  (* the ambient S-mode config a running/resumed kernel thread holds -- the same
-     [sconf] (smode_config γc + the SIE ghost half + tlb_inv) that wp_swtch is
-     now stated against, so a proc's saved context interoperates with swtch. *)
-  Context (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ).
-  Context (γc : gname) (bsie : mword 1) (dq : dfrac).
 
-  Local Notation VC :=
-    (valid_context (sconf root_ppn γc bsie dq) E Phi).
-
+(* ===================================================================== *)
+(* struct proc geometry (parameter-free; used by the myproc axiom and the *)
+(* invariant/proof below).                                                *)
+(* ===================================================================== *)
   (* ---- struct proc geometry ---- *)
   Definition NPROC : nat := 64%nat.
   Definition proc_size : Z := 360.
@@ -280,140 +273,6 @@ Section ProcInv.
   Definition needs_ctx (st : mword 32) : bool :=
     bool_decide (st = RUNNABLE) || bool_decide (st = SLEEPING).
 
-  (* [P contains the lock token]: P is an accessor from which the exclusive
-     [locked γ] can be borrowed and returned.  (An accessor, not plain
-     ownership, so P can carry further per-proc coupling -- "more later".) *)
-  Definition contains_lock (γ : gname) (P : mword 64 -d> iPropO Σ) : iProp Σ :=
-    (□ ∀ c : mword 64, P c -∗ locked γ ∗ (locked γ -∗ P c))%I.
-
-  Global Instance contains_lock_persistent γ P : Persistent (contains_lock γ P).
-  Proof. apply _. Qed.
-
-  (* the [valid_context] obligation attached to a parked proc: some resumer
-     predicate P that hands over the lock token, plus a valid saved context at
-     [&p->context]. *)
-  Definition proc_ctx (γ : gname) (pa : mword 64) : iProp Σ :=
-    (∃ P : mword 64 -d> iPropO Σ,
-       contains_lock γ P ∗ VC P (p_context pa))%I.
-
-  (* the resource protected by [p->lock]. *)
-  Definition proc_lock_res (γ : gname) (pa : mword 64) : iProp Σ :=
-    (∃ (st : mword 32) (ch : mword 64),
-       p_state pa ↦₄ st ∗
-       p_chan pa ↦₈ ch ∗
-       (if needs_ctx st then proc_ctx γ pa else emp))%I.
-
-  (* the global proc-array invariant: an [is_lock] over every proc's
-     [proc_lock_res]. *)
-  Definition procs_inv (γs : list gname) : iProp Σ :=
-    (⌜length γs = NPROC⌝ ∗
-     [∗ list] i ↦ γ ∈ γs, is_lock γ (proc_addr i) (proc_lock_res γ (proc_addr i)))%I.
-
-  Global Instance procs_inv_persistent γs : Persistent (procs_inv γs).
-  Proof. apply _. Qed.
-
-  (* the per-proc [is_lock] extracted from the global invariant. *)
-  Lemma procs_inv_lookup (γs : list gname) (i : nat) (γ : gname) :
-    γs !! i = Some γ ->
-    procs_inv γs -∗ is_lock γ (proc_addr i) (proc_lock_res γ (proc_addr i)).
-  Proof.
-    iIntros (Hi) "[_ Hbig]".
-    by iDestruct (big_sepL_lookup with "Hbig") as "$".
-  Qed.
-
-  (* ===================================================================== *)
-  (* Core preservation lemmas -- the separation-logic content of wakeup.    *)
-  (* ===================================================================== *)
-
-  (* the two parked states both demand the context obligation, so the obligation
-     [proc_ctx] carries UNCHANGED across the SLEEPING -> RUNNABLE transition
-     that wakeup performs. *)
-  Lemma needs_ctx_SLEEPING : needs_ctx SLEEPING = true.
-  Proof. rewrite /needs_ctx orb_true_r. done. Qed.
-
-  Lemma needs_ctx_RUNNABLE : needs_ctx RUNNABLE = true.
-  Proof.
-    rewrite /needs_ctx. rewrite (bool_decide_eq_true_2 (RUNNABLE = RUNNABLE)); done.
-  Qed.
-
-  (* reassemble [proc_lock_res] from its parts -- what wakeup does at every
-     [release]: whatever the (possibly updated) state, if it now demands a
-     context we supply the (carried) [proc_ctx]. *)
-  Lemma proc_lock_res_intro (γ : gname) (pa : mword 64) (st : mword 32) (ch : mword 64) :
-    p_state pa ↦₄ st -∗
-    p_chan pa ↦₈ ch -∗
-    (if needs_ctx st then proc_ctx γ pa else emp) -∗
-    proc_lock_res γ pa.
-  Proof. iIntros "Hs Hc Hctx". iExists st, ch. iFrame. Qed.
-
-  Lemma proc_lock_res_elim (γ : gname) (pa : mword 64) :
-    proc_lock_res γ pa -∗
-    ∃ (st : mword 32) (ch : mword 64),
-      p_state pa ↦₄ st ∗ p_chan pa ↦₈ ch ∗
-      (if needs_ctx st then proc_ctx γ pa else emp).
-  Proof. iIntros "H". iExact "H". Qed.
-
-  (* the wakeup transition: a proc found SLEEPING (hence carrying [proc_ctx]),
-     with its state cell flipped to RUNNABLE, still satisfies [proc_lock_res].
-     The saved context (with the lock token in its resumer predicate) survives
-     the state change untouched. *)
-  Lemma proc_lock_res_wakeup (γ : gname) (pa : mword 64) (ch : mword 64) :
-    p_state pa ↦₄ RUNNABLE -∗
-    p_chan pa ↦₈ ch -∗
-    proc_ctx γ pa -∗
-    proc_lock_res γ pa.
-  Proof.
-    iIntros "Hs Hc Hctx". iExists RUNNABLE, ch. iFrame "Hs Hc".
-    destruct (needs_ctx RUNNABLE) eqn:Hn.
-    - iExact "Hctx".
-    - rewrite needs_ctx_RUNNABLE in Hn. discriminate.
-  Qed.
-
-End ProcInv.
-
-(* ======================================================================= *)
-(* myproc(), axiomatized.                                                    *)
-(*                                                                           *)
-(* wakeup only relies on ONE fact about myproc(): the pointer it returns (in *)
-(* a0, used to skip the current process) is a genuine entry of the global    *)
-(* proc[] table.  We assume a jal-callable whole-function WP that: returns   *)
-(* a0 = proc_addr j for some j < NPROC; preserves the callee-saved registers *)
-(* (sp, s0..s11); and preserves the ambient config [smode_config γc], its    *)
-(* SIE ghost half, and [tlb_inv] -- exactly the resources acquire/release     *)
-(* thread -- with myproc managing its own stack frame internally.  (For now,  *)
-(* it just returns some proc.)                                                *)
-(* ======================================================================= *)
-Axiom wp_myproc :
-  forall {Σ : gFunctors} {HR : riscvGS Σ} {HS : sieG Σ} {CID : CpuId}
-    (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ)
-    (γc : gname) (bsie : mword 1)
-    (m : gmap regidx (mword 64)),
-    ↑minstretN ⊆ E ->
-    let ret_tgt :=
-      update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
-                        (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is (mword_of_int KernelSyms.myproc) -∗ gpr_file m -∗
-    (∀ (j : nat) (mret : gmap regidx (mword 64)),
-       ⌜(j < NPROC)%nat⌝ -∗
-       ⌜mret !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j⌝ -∗
-       ⌜forall r : mword 5,
-          r ∈ [mword_of_int 2; mword_of_int 8; mword_of_int 9;
-               mword_of_int 18; mword_of_int 19; mword_of_int 20;
-               mword_of_int 21; mword_of_int 22; mword_of_int 23;
-               mword_of_int 24; mword_of_int 25; mword_of_int 26;
-               mword_of_int 27] ->
-          mret !!! Regidx r = m !!! Regidx r⌝ -∗
-       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
-       pc_is ret_tgt -∗ gpr_file mret -∗
-       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
-
-(* ======================================================================= *)
-(* Leaf lemmas specific to wakeup's instruction mix that were not already   *)
-(* available: the compressed [c.li rd, imm] (ADDI from x0).                  *)
-(* ======================================================================= *)
 Section WkLeaves.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -632,3 +491,149 @@ Section WkLeaves.
   Proof. mk_rvc4 (KernelSyms.wakeup + 0x68)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int 0x71798082 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x68) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) wkd_fac exec_execute_C_JR. Qed.
 
 End WkLeaves.
+
+(* ======================================================================= *)
+(* myproc(), axiomatized.                                                    *)
+(*                                                                           *)
+(* wakeup only relies on ONE fact about myproc(): the pointer it returns (in *)
+(* a0, used to skip the current process) is a genuine entry of the global    *)
+(* proc[] table.  We assume a jal-callable whole-function WP that: returns   *)
+(* a0 = proc_addr j for some j < NPROC; preserves the callee-saved registers *)
+(* (sp, s0..s11); and preserves the ambient config [smode_config γc], its    *)
+(* SIE ghost half, and [tlb_inv] -- exactly the resources acquire/release     *)
+(* thread -- with myproc managing its own stack frame internally.  (For now,  *)
+(* it just returns some proc.)                                                *)
+(* ======================================================================= *)
+Axiom wp_myproc :
+  forall {Σ : gFunctors} {HR : riscvGS Σ} {HS : sieG Σ} {CID : CpuId}
+    (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ)
+    (γc : gname) (bsie : mword 1)
+    (m : gmap regidx (mword 64)),
+    ↑minstretN ⊆ E ->
+    let ret_tgt :=
+      update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
+                        (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+    kernel_text -∗ pc_is (mword_of_int KernelSyms.myproc) -∗ gpr_file m -∗
+    (∀ (j : nat) (mret : gmap regidx (mword 64)),
+       ⌜(j < NPROC)%nat⌝ -∗
+       ⌜mret !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j⌝ -∗
+       ⌜forall r : mword 5,
+          r ∈ [mword_of_int 2; mword_of_int 8; mword_of_int 9;
+               mword_of_int 18; mword_of_int 19; mword_of_int 20;
+               mword_of_int 21; mword_of_int 22; mword_of_int 23;
+               mword_of_int 24; mword_of_int 25; mword_of_int 26;
+               mword_of_int 27] ->
+          mret !!! Regidx r = m !!! Regidx r⌝ -∗
+       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+       pc_is ret_tgt -∗ gpr_file mret -∗
+       WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+
+(* ======================================================================= *)
+(* Leaf lemmas specific to wakeup's instruction mix that were not already   *)
+(* available: the compressed [c.li rd, imm] (ADDI from x0).                  *)
+
+Section ProcInv.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{CID : CpuId}.
+  (* the ambient S-mode config a running/resumed kernel thread holds -- the same
+     [sconf] (smode_config γc + the SIE ghost half + tlb_inv) that wp_swtch is
+     now stated against, so a proc's saved context interoperates with swtch. *)
+  Context (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ).
+  Context (γc : gname) (bsie : mword 1) (dq : dfrac).
+
+  Local Notation VC :=
+    (valid_context (sconf root_ppn γc bsie dq) E Phi).
+
+  (* [P contains the lock token]: P is an accessor from which the exclusive
+     [locked γ] can be borrowed and returned.  (An accessor, not plain
+     ownership, so P can carry further per-proc coupling -- "more later".) *)
+  Definition contains_lock (γ : gname) (P : mword 64 -d> iPropO Σ) : iProp Σ :=
+    (□ ∀ c : mword 64, P c -∗ locked γ ∗ (locked γ -∗ P c))%I.
+
+  Global Instance contains_lock_persistent γ P : Persistent (contains_lock γ P).
+  Proof. apply _. Qed.
+
+  (* the [valid_context] obligation attached to a parked proc: some resumer
+     predicate P that hands over the lock token, plus a valid saved context at
+     [&p->context]. *)
+  Definition proc_ctx (γ : gname) (pa : mword 64) : iProp Σ :=
+    (∃ P : mword 64 -d> iPropO Σ,
+       contains_lock γ P ∗ VC P (p_context pa))%I.
+
+  (* the resource protected by [p->lock]. *)
+  Definition proc_lock_res (γ : gname) (pa : mword 64) : iProp Σ :=
+    (∃ (st : mword 32) (ch : mword 64),
+       p_state pa ↦₄ st ∗
+       p_chan pa ↦₈ ch ∗
+       (if needs_ctx st then proc_ctx γ pa else emp))%I.
+
+  (* the global proc-array invariant: an [is_lock] over every proc's
+     [proc_lock_res]. *)
+  Definition procs_inv (γs : list gname) : iProp Σ :=
+    (⌜length γs = NPROC⌝ ∗
+     [∗ list] i ↦ γ ∈ γs, is_lock γ (proc_addr i) (proc_lock_res γ (proc_addr i)))%I.
+
+  Global Instance procs_inv_persistent γs : Persistent (procs_inv γs).
+  Proof. apply _. Qed.
+
+  (* the per-proc [is_lock] extracted from the global invariant. *)
+  Lemma procs_inv_lookup (γs : list gname) (i : nat) (γ : gname) :
+    γs !! i = Some γ ->
+    procs_inv γs -∗ is_lock γ (proc_addr i) (proc_lock_res γ (proc_addr i)).
+  Proof.
+    iIntros (Hi) "[_ Hbig]".
+    by iDestruct (big_sepL_lookup with "Hbig") as "$".
+  Qed.
+
+  (* ===================================================================== *)
+  (* Core preservation lemmas -- the separation-logic content of wakeup.    *)
+  (* ===================================================================== *)
+
+  (* the two parked states both demand the context obligation, so the obligation
+     [proc_ctx] carries UNCHANGED across the SLEEPING -> RUNNABLE transition
+     that wakeup performs. *)
+  Lemma needs_ctx_SLEEPING : needs_ctx SLEEPING = true.
+  Proof. rewrite /needs_ctx orb_true_r. done. Qed.
+
+  Lemma needs_ctx_RUNNABLE : needs_ctx RUNNABLE = true.
+  Proof.
+    rewrite /needs_ctx. rewrite (bool_decide_eq_true_2 (RUNNABLE = RUNNABLE)); done.
+  Qed.
+
+  (* reassemble [proc_lock_res] from its parts -- what wakeup does at every
+     [release]: whatever the (possibly updated) state, if it now demands a
+     context we supply the (carried) [proc_ctx]. *)
+  Lemma proc_lock_res_intro (γ : gname) (pa : mword 64) (st : mword 32) (ch : mword 64) :
+    p_state pa ↦₄ st -∗
+    p_chan pa ↦₈ ch -∗
+    (if needs_ctx st then proc_ctx γ pa else emp) -∗
+    proc_lock_res γ pa.
+  Proof. iIntros "Hs Hc Hctx". iExists st, ch. iFrame. Qed.
+
+  Lemma proc_lock_res_elim (γ : gname) (pa : mword 64) :
+    proc_lock_res γ pa -∗
+    ∃ (st : mword 32) (ch : mword 64),
+      p_state pa ↦₄ st ∗ p_chan pa ↦₈ ch ∗
+      (if needs_ctx st then proc_ctx γ pa else emp).
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* the wakeup transition: a proc found SLEEPING (hence carrying [proc_ctx]),
+     with its state cell flipped to RUNNABLE, still satisfies [proc_lock_res].
+     The saved context (with the lock token in its resumer predicate) survives
+     the state change untouched. *)
+  Lemma proc_lock_res_wakeup (γ : gname) (pa : mword 64) (ch : mword 64) :
+    p_state pa ↦₄ RUNNABLE -∗
+    p_chan pa ↦₈ ch -∗
+    proc_ctx γ pa -∗
+    proc_lock_res γ pa.
+  Proof.
+    iIntros "Hs Hc Hctx". iExists RUNNABLE, ch. iFrame "Hs Hc".
+    destruct (needs_ctx RUNNABLE) eqn:Hn.
+    - iExact "Hctx".
+    - rewrite needs_ctx_RUNNABLE in Hn. discriminate.
+  Qed.
+
+End ProcInv.
