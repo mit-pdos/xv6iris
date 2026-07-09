@@ -757,13 +757,14 @@ Section WpReleaseTop.
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
                      (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = a_h0).
     { rewrite /a_h0 /spdh !po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM
+                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
     iApply (wp_pop_off root_ppn γc E Φ M1 noffv intenav
-              w24 w16 w8 vh0
-              mstatus0 mie_v mdv0 menvcfg0 (dqi:=dqi)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe HFIOM Hleg
-              Hsst2 Hnoffpos Hint
+              w24 w16 w8 vh0 (dqi:=dqi)
+              HN Hnoffpos Hint
               ltac:(rewrite HraM1; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile
+              with "Hcfg Htlbinv Htext Hpc Hfile
                     [Hh24] [Hh16] [Hh8] [Hh0] [Hnoff] [Hint] [-]").
     { iEval (rewrite HspM1 EQp8). iExact "Hh24". }
     { iEval (rewrite HspM1 EQp0). iExact "Hh16". }
@@ -771,7 +772,13 @@ Section WpReleaseTop.
     { iEval (rewrite HspM1 EQpfs0). iExact "Hh0". }
     { iEval (rewrite HtpM1). iExact "Hnoff". }
     { iEval (rewrite HtpM1). iExact "Hint". }
-    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hnoff Hint Hjunk".
+    iIntros "Hcfg Htlbinv Hpc Hgpr Hnoff Hint Hjunk".
+    clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hsst2.
+    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
+      as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM)".
     iEval (rewrite HtpM1) in "Hnoff". iEval (rewrite HtpM1) in "Hint".
     iDestruct "Hgpr" as (mf) "[Hfile %Hmff]".
     destruct Hmff as (Hfra & Hfs0 & Hfs1 & Hfsp & Hftp & Hfa0).
