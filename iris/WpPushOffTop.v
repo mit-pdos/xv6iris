@@ -22,6 +22,8 @@ Require Import WpGpr WpGprRvc WpGprStore.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew.
 Require Import WpPushOff WpPushOffMem WpPushOffCsr WpMycpu.
 Require Import WpRvcBridge.
+(* QUALIFIED (no Import): sstatus SIE-bit bridges for the saved-intena = 0 fact. *)
+Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -409,6 +411,96 @@ Proof.
   repeat (first [ rewrite lookup_total_insert
                 | (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]) ]).
   rewrite H4. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* SIE=0 (folded into smode_config) collapses push_off's saved-interrupt   *)
+(* store [storeval32] to the concrete [zeros' 32], so wp_push_off's intena  *)
+(* postcondition needs no mstatus0.  Bridges mirror WpAcquireLock.          *)
+(* ===================================================================== *)
+(* po_mycpu_out's a0 output depends on the input map only through tp (x4)
+   (local copy; WpHolding.po_mycpu_out_a0 is downstream of this file). *)
+Lemma pt_mycpu_out_a0 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 10 : mword 5)
+  = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  repeat first [ rewrite lookup_total_insert
+               | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ].
+  unfold mycpu_ret, mycpu_a5.
+  reflexivity.
+Qed.
+
+Lemma po_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  apply bv_eq. rewrite bv_add_unsigned.
+  change (bv_unsigned zero_reg) with 0.
+  rewrite Z.add_0_l. apply bv_wrap_bv_unsigned.
+Qed.
+
+Lemma po_mword1_zero_of_ne_one (x : mword 1) :
+  eq_vec x ('b"1") = false -> x = ('b"0" : mword 1).
+Proof.
+  intro H. apply eq_vec_false_iff in H. apply bv_eq.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  assert (Hmod : bv_modulus 1 = 2) by (vm_compute; reflexivity).
+  rewrite Hmod in Hr.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  assert (H0 : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
+  rewrite H0.
+  assert (Hne : bv_unsigned x <> 1).
+  { intro Hc. apply H. apply bv_eq. rewrite H1. exact Hc. }
+  lia.
+Qed.
+
+Lemma po_sstatus_bit1_sie (m : mword 64) :
+  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
+  Z.testbit (bv_unsigned (sstatus_read m)) 1 = false.
+Proof.
+  intro HSIE.
+  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1)) by (apply po_mword1_zero_of_ne_one; exact HSIE).
+  unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
+  apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz.
+Qed.
+
+Lemma po_storeval32_zero (m : mword 64) :
+  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
+  (autocast (T := mword)
+     (subrange_vec_dec
+        (and_vec
+           (shift_bits_right (add_vec zero_reg (sstatus_read m))
+              (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))
+           (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
+        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = zeros' 32.
+Proof.
+  intro HSIE.
+  pose proof (po_sstatus_bit1_sie m HSIE) as Hb1.
+  assert (Hshamt : int_of_mword false (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0) = 1)
+    by (vm_compute; reflexivity).
+  assert (Hmask : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)) : mword 64) = 1)
+    by (vm_compute; reflexivity).
+  assert (Hsh0 : Z.testbit (bv_unsigned (shiftr (sstatus_read m) 1)) 0 = false).
+  { unfold shiftr, with_word, MachineWord.logical_shift_right.
+    rewrite bv_shiftr_unsigned.
+    assert (Hn1 : bv_unsigned (MachineWord.N_to_word (MachineWord.Z_idx 64) (MachineWord.Z_idx 1)) = 1)
+      by (vm_compute; reflexivity).
+    rewrite Hn1. rewrite (Z.shiftr_spec (bv_unsigned (sstatus_read m)) 1 0 ltac:(lia)). simpl (0 + 1)%Z. exact Hb1. }
+  assert (Hand0 : and_vec (shift_bits_right (add_vec zero_reg (sstatus_read m))
+                    (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))
+                    (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) = (zeros' 64 : mword 64)).
+  { rewrite po_addv_zero_l. unfold shift_bits_right. rewrite Hshamt.
+    apply bv_eq.
+    assert (Hz64 : bv_unsigned (zeros' 64 : mword 64) = 0) by (vm_compute; reflexivity).
+    rewrite Hz64. rewrite WpGprCsrwC.and_vec_unsigned. rewrite Hmask.
+    apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec. rewrite Z.bits_0.
+    destruct (decide (j = 0)) as [->|Hne].
+    - rewrite Hsh0. reflexivity.
+    - assert (Ht1 : Z.testbit 1 j = false)
+        by (apply Z.bits_above_log2; [lia| change (Z.log2 1) with 0; lia]).
+      rewrite Ht1. apply andb_false_r. }
+  rewrite Hand0. apply bv_eq. vm_compute. reflexivity.
 Qed.
 
 Section WpPushOffTop.
@@ -943,27 +1035,15 @@ Section WpPushOffTop.
   Lemma wp_push_off (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (vr24 vr16 vr8 raold0 s0old0 : bv 64) (noff intena_old : mword 32) (a0f : mword 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     let N0 := <[Regidx csp_rs1 := regval_into_reg spd]> m in
     let N1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (N0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> N0 in
-    let N2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read mstatus0)]> N1 in
-    let N3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
-        (add_vec zero_reg (N2 !!! Regidx (mword_of_int 15 : mword 5)))]> N2 in
-    let N4 := po_mycpu_out (mword_of_int (PO + 0x10)) N3 in
-    let N5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 noff)]> N4 in
-    let N6 := po_mycpu_out (mword_of_int (PO + 0x2c)) N5 in
-    let N7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
-        (shift_bits_right (N6 !!! Regidx (mword_of_int 9 : mword 5))
-           (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))]> N6 in
-    let N8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
-        (and_vec (N7 !!! Regidx (mword_of_int 15 : mword 5))
-           (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> N7 in
-    let storeval32 := (autocast (T := mword)
-        (subrange_vec_dec (N8 !!! Regidx (mword_of_int 15 : mword 5)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
+       read [sstatus_read mstatus0]) are reconstructed inside the proof over the
+       unbundled mstatus0; the statement stays mstatus0-free. *)
     let noff_a5 := sign_extend' 64 (subrange_vec_dec
         (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let noff_store := (autocast (T := mword) (subrange_vec_dec noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
@@ -977,27 +1057,12 @@ Section WpPushOffTop.
     let a_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
     let caller_ret := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
+    (* S-mode config facts + legalize are folded into [smode_config γ] below;
+       the 4 mycpu a0f pins reduce to the single tp-only fact (po_mycpu_out_a0). *)
     eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false ->
     eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
-    po_mycpu_out (mword_of_int (PO + 0x10)) N3 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
-    po_mycpu_out (mword_of_int (PO + 0x2c)) N5 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
-    po_mycpu_out (mword_of_int (PO + 0x18)) N5 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
-    po_mycpu_out (mword_of_int (PO + 0x18)) N8 !!! Regidx (mword_of_int 10 : mword 5) = a0f ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
-    mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
+    mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
+    smode_config γ (DfracOwn 1) -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int (PO + 0x00) : mword 64) -∗ gpr_file m -∗
     a_r24 ↦₈ vr24 -∗
@@ -1007,10 +1072,7 @@ Section WpPushOffTop.
     a_fs0 ↦₈ s0old0 -∗
     a_noff ↦₄ noff -∗
     a_intena ↦₄ intena_old -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-      ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
-      mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
+    ( smode_config γ (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is caller_ret -∗
       (∃ mfin, gpr_file mfin ∗ ⌜ mfin !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5) /\
@@ -1025,15 +1087,63 @@ Section WpPushOffTop.
       (∃ vfra vfs0 : bv 64, a_fra ↦₈ vfra ∗
                             a_fs0 ↦₈ vfs0) -∗
       a_noff ↦₄ noff_store -∗
-      a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then storeval32 else intena_old) -∗
+      a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then (zeros' 32) else intena_old) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros sp0 spd N0 N1 N2 N3 N4 N5 N6 N7 N8 storeval32 noff_a5 noff_store spm10
+    intros sp0 spd N0 N1 noff_a5 noff_store spm10
       a_r24 a_r16 a_r8 a_fra a_fs0 a_noff a_intena caller_ret
-      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hlpe
-      Hfiom Hlegal Himm5 Hcret0 Ha0_10 Ha0_2c Ha0_18f Ha0_18t.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hr24 Hr16 Hr8 Hfra Hfs0 Hnoff Hintena Hcont".
+      HN Himm5 Hcret0 Ha0.
+    iIntros "Hcfg Htlbinv #Htext Hpc Hfile Hr24 Hr16 Hr8 Hfra Hfs0 Hnoff Hintena Hcont".
+    (* unbundle the ambient S-mode config; reconstruct the mstatus0-dependent
+       register chain N2..N8 + storeval32 over the unbundled mstatus0. *)
+    iDestruct (smode_config_unbundle γ (DfracOwn 1) with "Hcfg")
+      as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom)".
+    set (N2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read mstatus0)]> N1).
+    set (N3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
+        (add_vec zero_reg (N2 !!! Regidx (mword_of_int 15 : mword 5)))]> N2).
+    set (N4 := po_mycpu_out (mword_of_int (PO + 0x10)) N3).
+    set (N5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 noff)]> N4).
+    set (N6 := po_mycpu_out (mword_of_int (PO + 0x2c)) N5).
+    set (N7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+        (shift_bits_right (N6 !!! Regidx (mword_of_int 9 : mword 5))
+           (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))]> N6).
+    set (N8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+        (and_vec (N7 !!! Regidx (mword_of_int 15 : mword 5))
+           (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> N7).
+    set (storeval32 := (autocast (T := mword)
+        (subrange_vec_dec (N8 !!! Regidx (mword_of_int 15 : mword 5)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32)).
+    (* the four a0f pins follow from Ha0 via po_mycpu_out_a0 + tp-preservation *)
+    assert (HN3tp : N3 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
+    { rewrite /N3 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /N2 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /N1 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /N0 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    assert (HN5tp : N5 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
+    { rewrite /N5 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /N4 po_mycpu_out_tp. exact HN3tp. }
+    assert (HN8tp : N8 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
+    { rewrite /N8 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /N7 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /N6 po_mycpu_out_tp. exact HN5tp. }
+    assert (Ha0_10 : po_mycpu_out (mword_of_int (PO + 0x10)) N3 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
+      by (rewrite pt_mycpu_out_a0 HN3tp; exact Ha0).
+    assert (Ha0_2c : po_mycpu_out (mword_of_int (PO + 0x2c)) N5 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
+      by (rewrite pt_mycpu_out_a0 HN5tp; exact Ha0).
+    assert (Ha0_18f : po_mycpu_out (mword_of_int (PO + 0x18)) N5 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
+      by (rewrite pt_mycpu_out_a0 HN5tp; exact Ha0).
+    assert (Ha0_18t : po_mycpu_out (mword_of_int (PO + 0x18)) N8 !!! Regidx (mword_of_int 10 : mword 5) = a0f)
+      by (rewrite pt_mycpu_out_a0 HN8tp; exact Ha0).
+    (* the saved interrupt-enable store is 0 (SIE=0), so it reduces to zeros'32 *)
+    assert (Hsv32 : storeval32 = zeros' 32).
+    { rewrite /storeval32 /N8 lookup_total_insert /N7 lookup_total_insert.
+      rewrite /N6 po_mycpu_out_s1 /N5 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /N4 po_mycpu_out_s1 /N3 lookup_total_insert /N2 lookup_total_insert.
+      apply po_storeval32_zero. exact HSIE. }
     assert (Hcsp0 : N0 !!! Regidx csp_rs1 = spd) by (rewrite /N0; apply lookup_total_insert).
     (* ---- 0x00: c.addi sp,-32 ---- *)
     iPoseProof (poi_00 with "Htext") as "Hi00".
@@ -1252,7 +1362,10 @@ Section WpPushOffTop.
       iEval (rewrite HcspN8) in "Hfra". iEval (rewrite HcspN8) in "Hfs0".
       iEval (rewrite Ha0_18t) in "Hnoff". iEval (rewrite !lookup_total_insert) in "Hnoff".
       iEval (rewrite HcspN8) in "Hr24". iEval (rewrite HcspN8) in "Hr16". iEval (rewrite HcspN8) in "Hr8".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc [Hmfin] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff Hintena").
+      iDestruct (smode_config_rebuild γ (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                   HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe Hfiom
+                   with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hcfg".
+      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hmfin] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff [Hintena]").
       { iDestruct "Hmfin" as (mfin) "[Hmf %Hp]". destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Htp & Hs2).
         iExists mfin. iFrame "Hmf". iPureIntro. split; [exact Hra|]. split; [exact Hs0|]. split; [exact Hs1|].
         split; [| split].
@@ -1281,7 +1394,8 @@ Section WpPushOffTop.
           rewrite /N2 lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /N1 lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /N0 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
-      iExists _, _. iFrame "Hfra Hfs0".
+      { iExists _, _. iFrame "Hfra Hfs0". }
+      { first [ iExact "Hintena" | (iEval (rewrite -Hsv32); iExact "Hintena") ]. }
     - (* ===== FALL arm: noff <> 0 ===== *)
       iApply (wp_cbeqz_fall_s_config root_ppn E Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) N5 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
@@ -1308,7 +1422,10 @@ Section WpPushOffTop.
       iEval (rewrite HcspN5) in "Hfra". iEval (rewrite HcspN5) in "Hfs0".
       iEval (rewrite Ha0_18f) in "Hnoff". iEval (rewrite !lookup_total_insert) in "Hnoff".
       iEval (rewrite HcspN5) in "Hr24". iEval (rewrite HcspN5) in "Hr16". iEval (rewrite HcspN5) in "Hr8".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc [Hmfin] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff Hintena").
+      iDestruct (smode_config_rebuild γ (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                   HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe Hfiom
+                   with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hcfg".
+      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hmfin] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff [Hintena]").
       { iDestruct "Hmfin" as (mfin) "[Hmf %Hp]". destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Htp & Hs2).
         iExists mfin. iFrame "Hmf". iPureIntro. split; [exact Hra|]. split; [exact Hs0|]. split; [exact Hs1|].
         split; [| split].
@@ -1331,7 +1448,8 @@ Section WpPushOffTop.
           rewrite /N2 lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /N1 lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /N0 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
-      iExists _, _. iFrame "Hfra Hfs0".
+      { iExists _, _. iFrame "Hfra Hfs0". }
+      { first [ iExact "Hintena" | (iEval (rewrite -Hsv32); iExact "Hintena") ]. }
   Qed.
 
 
