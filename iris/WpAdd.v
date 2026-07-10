@@ -42,19 +42,6 @@ Section FinalWP.
   Context (b : bool) (pc a0 a1 mst0 npc v2old : mword 64) (mi0 : bool)
           (w : mword 32) (rs2 rs1 rd : mword 5).
 
-  Definition sA (s : mstate) : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition sX (s : mstate) : mstate :=
-    let s1 := set_reg (sA s) nextPC (add_vec_int pc 4) in
-    set_reg s1 (R_bitvector_64 x12)
-       (regval_into_reg
-          (add_vec (register_lookup (R_bitvector_64 x10) s1.(sregs))
-                   (register_lookup (R_bitvector_64 x11) s1.(sregs)))).
-  Definition sT (s : mstate) : mstate :=
-    set_reg (sX s) PC (register_lookup nextPC (sX s).(sregs)).
-  Definition sF (s : mstate) : mstate :=
-    if b then set_reg (sT s) minstret
-                      (add_vec_int (register_lookup minstret (sT s).(sregs)) 1)
-         else sT s.
 
   (* fetch/decode facts, stated once at the EXEC level; the relational [run]
      twins needed by run_hart_active_ADD are derived on the spot via
@@ -71,14 +58,6 @@ Section FinalWP.
 
 
 
-  Definition base_upd (s : mstate) : mstate :=
-    set_reg
-      (set_reg
-        (set_reg
-          (set_reg s (R_bool minstret_increment) b)
-          nextPC (add_vec_int pc 4))
-        (R_bitvector_64 x12) (add_vec a0 a1))
-      PC (add_vec_int pc 4).
 
 
   Ltac tmiss := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].

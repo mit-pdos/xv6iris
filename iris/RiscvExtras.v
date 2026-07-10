@@ -498,9 +498,6 @@ Qed.
    address [A] is the physical byte address [A + j].  This is what lets a
    per-byte image (keyed by absolute byte address) feed the WP fetch windows,
    which are phrased as [pa_add (fetch_pa pc) j]. *)
-Lemma pa_add_fetch_mword (A : Z) (j : nat) :
-  pa_add (fetch_pa (mword_of_int A)) j = mword_of_int (A + Z.of_nat j).
-Proof. unfold pa_add. rewrite fetch_pa_id. apply avi_mword. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Leaf 2: rX / rX_bits read leaf for x2 (sp), mirroring run_rX_x10.        *)

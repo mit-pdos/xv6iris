@@ -387,13 +387,6 @@ Section StepADD.
                       (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
          else s_tick.
 
-  Lemma exec_riscv_step_ADD : exec riscv_step s = Some (tt, s_final).
-  Proof using All.
-    assert (Hsi' : exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
-                     = Some (b, s)) by (rewrite Hpriv; exact Hsi).
-    apply (exec_riscv_step_hart_active s s_exec (zero_extend' 32 w) b
-             Hsi' Hhart_a Hha Hhart_exec Hmi_exec).
-  Qed.
 
 End StepADD.
 
