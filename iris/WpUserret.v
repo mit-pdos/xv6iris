@@ -42,7 +42,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpDecodeBridge WpRvcBridge WpLeafCommon.
 Require Import WpGpr WpGprLui WpGprAddi WpGprShift WpGprRvc WpLoad.
 Require Import WpGprCsrwCommon WpGprCsrwB WpGprMretNew WpRelease.
-Require Import SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
+Require Import WpEntryNew SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
 Require Import TrampPt TrampTlb.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
@@ -1000,3 +1000,502 @@ Section WpInstrU.
   Qed.
 
 End WpInstrU.
+
+(* ===================================================================== *)
+(* 6. The 38 userret instructions: decode facts + [instr] constructors.   *)
+(* ===================================================================== *)
+
+(* --- 32-bit words --- *)
+Definition uw_sfence : mword 32 := mword_of_int 0x12000073.
+Definition uw_csrw   : mword 32 := mword_of_int 0x18051073.
+Definition uw_lui    : mword 32 := mword_of_int 0x02000537.
+Definition uw_sret   : mword 32 := mword_of_int 0x10200073.
+
+Definition uw_ld_ra : mword 32 := mword_of_int 0x02853083.
+Definition uw_ld_sp : mword 32 := mword_of_int 0x03053103.
+Definition uw_ld_gp : mword 32 := mword_of_int 0x03853183.
+Definition uw_ld_tp : mword 32 := mword_of_int 0x04053203.
+Definition uw_ld_t0 : mword 32 := mword_of_int 0x04853283.
+Definition uw_ld_t1 : mword 32 := mword_of_int 0x05053303.
+Definition uw_ld_t2 : mword 32 := mword_of_int 0x05853383.
+Definition uw_ld_a6 : mword 32 := mword_of_int 0x0a053803.
+Definition uw_ld_a7 : mword 32 := mword_of_int 0x0a853883.
+Definition uw_ld_s2 : mword 32 := mword_of_int 0x0b053903.
+Definition uw_ld_s3 : mword 32 := mword_of_int 0x0b853983.
+Definition uw_ld_s4 : mword 32 := mword_of_int 0x0c053a03.
+Definition uw_ld_s5 : mword 32 := mword_of_int 0x0c853a83.
+Definition uw_ld_s6 : mword 32 := mword_of_int 0x0d053b03.
+Definition uw_ld_s7 : mword 32 := mword_of_int 0x0d853b83.
+Definition uw_ld_s8 : mword 32 := mword_of_int 0x0e053c03.
+Definition uw_ld_s9 : mword 32 := mword_of_int 0x0e853c83.
+Definition uw_ld_s10 : mword 32 := mword_of_int 0x0f053d03.
+Definition uw_ld_s11 : mword 32 := mword_of_int 0x0f853d83.
+Definition uw_ld_t3 : mword 32 := mword_of_int 0x10053e03.
+Definition uw_ld_t4 : mword 32 := mword_of_int 0x10853e83.
+Definition uw_ld_t5 : mword 32 := mword_of_int 0x11053f03.
+Definition uw_ld_t6 : mword 32 := mword_of_int 0x11853f83.
+
+(* --- compressed halves and their 4-aligned windows --- *)
+Definition uh_addiw : mword 16 := mword_of_int 0x357d.
+Definition uh_slli  : mword 16 := mword_of_int 0x0536.
+Definition uwin_addiw : mword 32 := mword_of_int 0x0536357d.
+Definition uh_cld_s0 : mword 16 := mword_of_int 0x7120.
+Definition uh_cld_s1 : mword 16 := mword_of_int 0x7524.
+Definition uh_cld_a1 : mword 16 := mword_of_int 0x7d2c.
+Definition uh_cld_a2 : mword 16 := mword_of_int 0x6150.
+Definition uh_cld_a3 : mword 16 := mword_of_int 0x6554.
+Definition uh_cld_a4 : mword 16 := mword_of_int 0x6958.
+Definition uh_cld_a5 : mword 16 := mword_of_int 0x6d5c.
+Definition uh_cld_a0 : mword 16 := mword_of_int 0x7928.
+Definition uwin_cld_s0 : mword 32 := mword_of_int 0x75247120.
+Definition uwin_cld_a1 : mword 32 := mword_of_int 0x61507d2c.
+Definition uwin_cld_a3 : mword 32 := mword_of_int 0x69586554.
+Definition uwin_cld_a5 : mword 32 := mword_of_int 0x38036d5c.
+
+(* --- ASTs --- *)
+Definition ureg (n : Z) : regidx := Regidx (mword_of_int n).
+Definition ucreg (n : Z) : cregidx := Cregidx (mword_of_int n).
+Definition ai_sfence : instruction := SFENCE_VMA (zreg, zreg).
+Definition ai_csrw : instruction := CSRReg (csr_satp, ureg 10, zreg, CSRRW).
+Definition ai_lui : instruction := UTYPE (mword_of_int 0x2000, ureg 10, LUI).
+Definition ai_addiw : instruction :=
+  ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6), ureg 10, ureg 10).
+Definition ai_slli : instruction :=
+  SHIFTIOP (mword_of_int 13, ureg 10, ureg 10, SLLI).
+Definition ai_sret : instruction := SRET tt.
+Definition ai_ld (rd : Z) (imm : Z) : instruction :=
+  LOAD (mword_of_int imm, ureg 10, ureg rd, false, 8).
+Definition ai_cld_tgt (rdc : Z) (uimm : Z) : instruction :=
+  LOAD (zero_extend' 12 (concat_vec (mword_of_int uimm : mword 5) ('b"000")),
+        creg2reg_idx (ucreg 2), creg2reg_idx (ucreg rdc), false, 8).
+
+(* --- decode facts --- *)
+Lemma udec_sfence s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_sfence) s = Some (ai_sfence, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_csrw s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_csrw) s = Some (ai_csrw, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_lui s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_lui) s = Some (ai_lui, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_sret s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_sret) s = Some (ai_sret, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_ra s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_ra) s = Some (ai_ld 1 40, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_sp s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_sp) s = Some (ai_ld 2 48, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_gp s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_gp) s = Some (ai_ld 3 56, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_tp s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_tp) s = Some (ai_ld 4 64, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_t0 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_t0) s = Some (ai_ld 5 72, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_t1 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_t1) s = Some (ai_ld 6 80, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_t2 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_t2) s = Some (ai_ld 7 88, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_a6 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_a6) s = Some (ai_ld 16 160, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_a7 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_a7) s = Some (ai_ld 17 168, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s2 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s2) s = Some (ai_ld 18 176, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s3 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s3) s = Some (ai_ld 19 184, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s4 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s4) s = Some (ai_ld 20 192, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s5 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s5) s = Some (ai_ld 21 200, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s6 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s6) s = Some (ai_ld 22 208, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s7 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s7) s = Some (ai_ld 23 216, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s8 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s8) s = Some (ai_ld 24 224, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s9 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s9) s = Some (ai_ld 25 232, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s10 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s10) s = Some (ai_ld 26 240, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_s11 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_s11) s = Some (ai_ld 27 248, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_t3 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_t3) s = Some (ai_ld 28 256, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_t4 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_t4) s = Some (ai_ld 29 264, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_t5 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_t5) s = Some (ai_ld 30 272, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_ld_t6 s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_ld_t6) s = Some (ai_ld 31 280, s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma udec_addiw s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_addiw) s
+  = Some (C_ADDIW (mword_of_int 63, ureg 10), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_slli s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_slli) s
+  = Some (C_SLLI (mword_of_int 13, ureg 10), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_s0 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_s0) s
+  = Some (C_LD (mword_of_int 12, ucreg 2, ucreg 0), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_s1 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_s1) s
+  = Some (C_LD (mword_of_int 13, ucreg 2, ucreg 1), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_a1 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_a1) s
+  = Some (C_LD (mword_of_int 15, ucreg 2, ucreg 3), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_a2 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_a2) s
+  = Some (C_LD (mword_of_int 16, ucreg 2, ucreg 4), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_a3 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_a3) s
+  = Some (C_LD (mword_of_int 17, ucreg 2, ucreg 5), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_a4 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_a4) s
+  = Some (C_LD (mword_of_int 18, ucreg 2, ucreg 6), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_a5 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_a5) s
+  = Some (C_LD (mword_of_int 19, ucreg 2, ucreg 7), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+Lemma udec_cld_a0 s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed uh_cld_a0) s
+  = Some (C_LD (mword_of_int 14, ucreg 2, ucreg 2), s).
+Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
+
+
+Section UserretInstrs.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{CID : CpuId}.
+
+  Local Ltac u_mk_base A w pc ast decname :=
+    let Hlpad := fresh "Hlpad" in
+    let H2al := fresh "H2al" in
+    let Hnrvc := fresh "Hnrvc" in
+    let Hbytes := fresh "Hbytes" in
+    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+    assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
+    assert (Hbytes : forall j, (j < 4)%nat ->
+        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
+      by (intros j Hj;
+          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+    iIntros "#Ht"; rewrite /instr;
+    iSplitR; [iPureIntro; exact Hlpad|];
+    iExists (F_Base w);
+    iSplitR; [iPureIntro; reflexivity|];
+    iSplitL "";
+    [ iApply (instr_bytes_base pc w H2al Hnrvc);
+      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
+    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
+
+  Local Ltac u_mk_rvc4 A h w pc ast decname expname :=
+    let Hlpad := fresh "Hlpad" in
+    let H2al := fresh "H2al" in
+    let H4al := fresh "H4al" in
+    let Hrvc := fresh "Hrvc" in
+    let Hsub := fresh "Hsub" in
+    let Hbytes := fresh "Hbytes" in
+    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = true) by (vm_compute; reflexivity);
+    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
+    assert (Hsub : subrange_vec_dec w 15 0 = h) by (apply bv_eq; vm_compute; reflexivity);
+    assert (Hbytes : forall j, (j < 4)%nat ->
+        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
+      by (intros j Hj;
+          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+    iIntros "#Ht"; rewrite /instr;
+    iSplitR; [iPureIntro; exact Hlpad|];
+    iExists (F_RVC h);
+    iSplitR; [iPureIntro; reflexivity|];
+    iSplitL "";
+    [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
+      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+      eexists; (split; [ apply decname; assumption
+                       | split; [ vm_compute; reflexivity
+                                | intro; apply expname ] ]) ].
+
+  Local Ltac u_mk_rvc2 A h pc ast decname expname :=
+    let Hlpad := fresh "Hlpad" in
+    let H2al := fresh "H2al" in
+    let H4al := fresh "H4al" in
+    let Hrvc := fresh "Hrvc" in
+    let Hbytes := fresh "Hbytes" in
+    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = false) by (vm_compute; reflexivity);
+    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
+    assert (Hbytes : forall j, (j < 2)%nat ->
+        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte h j))
+      by (intros j Hj;
+          do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+    iIntros "#Ht"; rewrite /instr;
+    iSplitR; [iPureIntro; exact Hlpad|];
+    iExists (F_RVC h);
+    iSplitR; [iPureIntro; reflexivity|];
+    iSplitL "";
+    [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
+      iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
+    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+      eexists; (split; [ apply decname; assumption
+                       | split; [ vm_compute; reflexivity
+                                | intro; apply expname ] ]) ].
+
+  Lemma ui_sfence1 :
+    kernel_text -∗ instr (upa 0x9c) false ai_sfence.
+  Proof. u_mk_base (KernelSyms.trampoline + 0x9c) uw_sfence (upa 0x9c) ai_sfence udec_sfence. Qed.
+
+  Lemma ui_csrw :
+    kernel_text -∗ instr (upa 0xa0) false ai_csrw.
+  Proof. u_mk_base (KernelSyms.trampoline + 0xa0) uw_csrw (upa 0xa0) ai_csrw udec_csrw. Qed.
+
+  Lemma ui_sfence2 :
+    kernel_text -∗ instr (upa 0xa4) false ai_sfence.
+  Proof. u_mk_base (KernelSyms.trampoline + 0xa4) uw_sfence (upa 0xa4) ai_sfence udec_sfence. Qed.
+
+  Lemma ui_lui :
+    kernel_text -∗ instr (upa 0xa8) false ai_lui.
+  Proof. u_mk_base (KernelSyms.trampoline + 0xa8) uw_lui (upa 0xa8) ai_lui udec_lui. Qed.
+
+  Lemma ui_addiw :
+    kernel_text -∗ instr (upa 0xac) true ai_addiw.
+  Proof. u_mk_rvc4 (KernelSyms.trampoline + 0xac) uh_addiw uwin_addiw (upa 0xac) ai_addiw udec_addiw exec_execute_C_ADDIW. Qed.
+
+  Lemma ui_slli :
+    kernel_text -∗ instr (upa 0xae) true ai_slli.
+  Proof. u_mk_rvc2 (KernelSyms.trampoline + 0xae) uh_slli (upa 0xae) ai_slli udec_slli exec_execute_C_SLLI. Qed.
+
+  Lemma ui_ld_ra :
+    kernel_text -∗ instr (upa 0xb0) false (ai_ld 1 40).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xb0) uw_ld_ra (upa 0xb0) (ai_ld 1 40) udec_ld_ra. Qed.
+
+  Lemma ui_ld_sp :
+    kernel_text -∗ instr (upa 0xb4) false (ai_ld 2 48).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xb4) uw_ld_sp (upa 0xb4) (ai_ld 2 48) udec_ld_sp. Qed.
+
+  Lemma ui_ld_gp :
+    kernel_text -∗ instr (upa 0xb8) false (ai_ld 3 56).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xb8) uw_ld_gp (upa 0xb8) (ai_ld 3 56) udec_ld_gp. Qed.
+
+  Lemma ui_ld_tp :
+    kernel_text -∗ instr (upa 0xbc) false (ai_ld 4 64).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xbc) uw_ld_tp (upa 0xbc) (ai_ld 4 64) udec_ld_tp. Qed.
+
+  Lemma ui_ld_t0 :
+    kernel_text -∗ instr (upa 0xc0) false (ai_ld 5 72).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xc0) uw_ld_t0 (upa 0xc0) (ai_ld 5 72) udec_ld_t0. Qed.
+
+  Lemma ui_ld_t1 :
+    kernel_text -∗ instr (upa 0xc4) false (ai_ld 6 80).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xc4) uw_ld_t1 (upa 0xc4) (ai_ld 6 80) udec_ld_t1. Qed.
+
+  Lemma ui_ld_t2 :
+    kernel_text -∗ instr (upa 0xc8) false (ai_ld 7 88).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xc8) uw_ld_t2 (upa 0xc8) (ai_ld 7 88) udec_ld_t2. Qed.
+
+  Lemma ui_ld_a6 :
+    kernel_text -∗ instr (upa 0xda) false (ai_ld 16 160).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xda) uw_ld_a6 (upa 0xda) (ai_ld 16 160) udec_ld_a6. Qed.
+
+  Lemma ui_ld_a7 :
+    kernel_text -∗ instr (upa 0xde) false (ai_ld 17 168).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xde) uw_ld_a7 (upa 0xde) (ai_ld 17 168) udec_ld_a7. Qed.
+
+  Lemma ui_ld_s2 :
+    kernel_text -∗ instr (upa 0xe2) false (ai_ld 18 176).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xe2) uw_ld_s2 (upa 0xe2) (ai_ld 18 176) udec_ld_s2. Qed.
+
+  Lemma ui_ld_s3 :
+    kernel_text -∗ instr (upa 0xe6) false (ai_ld 19 184).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xe6) uw_ld_s3 (upa 0xe6) (ai_ld 19 184) udec_ld_s3. Qed.
+
+  Lemma ui_ld_s4 :
+    kernel_text -∗ instr (upa 0xea) false (ai_ld 20 192).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xea) uw_ld_s4 (upa 0xea) (ai_ld 20 192) udec_ld_s4. Qed.
+
+  Lemma ui_ld_s5 :
+    kernel_text -∗ instr (upa 0xee) false (ai_ld 21 200).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xee) uw_ld_s5 (upa 0xee) (ai_ld 21 200) udec_ld_s5. Qed.
+
+  Lemma ui_ld_s6 :
+    kernel_text -∗ instr (upa 0xf2) false (ai_ld 22 208).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xf2) uw_ld_s6 (upa 0xf2) (ai_ld 22 208) udec_ld_s6. Qed.
+
+  Lemma ui_ld_s7 :
+    kernel_text -∗ instr (upa 0xf6) false (ai_ld 23 216).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xf6) uw_ld_s7 (upa 0xf6) (ai_ld 23 216) udec_ld_s7. Qed.
+
+  Lemma ui_ld_s8 :
+    kernel_text -∗ instr (upa 0xfa) false (ai_ld 24 224).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xfa) uw_ld_s8 (upa 0xfa) (ai_ld 24 224) udec_ld_s8. Qed.
+
+  Lemma ui_ld_s9 :
+    kernel_text -∗ instr (upa 0xfe) false (ai_ld 25 232).
+  Proof. u_mk_base (KernelSyms.trampoline + 0xfe) uw_ld_s9 (upa 0xfe) (ai_ld 25 232) udec_ld_s9. Qed.
+
+  Lemma ui_ld_s10 :
+    kernel_text -∗ instr (upa 0x102) false (ai_ld 26 240).
+  Proof. u_mk_base (KernelSyms.trampoline + 0x102) uw_ld_s10 (upa 0x102) (ai_ld 26 240) udec_ld_s10. Qed.
+
+  Lemma ui_ld_s11 :
+    kernel_text -∗ instr (upa 0x106) false (ai_ld 27 248).
+  Proof. u_mk_base (KernelSyms.trampoline + 0x106) uw_ld_s11 (upa 0x106) (ai_ld 27 248) udec_ld_s11. Qed.
+
+  Lemma ui_ld_t3 :
+    kernel_text -∗ instr (upa 0x10a) false (ai_ld 28 256).
+  Proof. u_mk_base (KernelSyms.trampoline + 0x10a) uw_ld_t3 (upa 0x10a) (ai_ld 28 256) udec_ld_t3. Qed.
+
+  Lemma ui_ld_t4 :
+    kernel_text -∗ instr (upa 0x10e) false (ai_ld 29 264).
+  Proof. u_mk_base (KernelSyms.trampoline + 0x10e) uw_ld_t4 (upa 0x10e) (ai_ld 29 264) udec_ld_t4. Qed.
+
+  Lemma ui_ld_t5 :
+    kernel_text -∗ instr (upa 0x112) false (ai_ld 30 272).
+  Proof. u_mk_base (KernelSyms.trampoline + 0x112) uw_ld_t5 (upa 0x112) (ai_ld 30 272) udec_ld_t5. Qed.
+
+  Lemma ui_ld_t6 :
+    kernel_text -∗ instr (upa 0x116) false (ai_ld 31 280).
+  Proof. u_mk_base (KernelSyms.trampoline + 0x116) uw_ld_t6 (upa 0x116) (ai_ld 31 280) udec_ld_t6. Qed.
+
+  Lemma ui_cld_s0 :
+    kernel_text -∗ instr (upa 0xcc) true (ai_cld_tgt 0 12).
+  Proof. u_mk_rvc4 (KernelSyms.trampoline + 0xcc) uh_cld_s0 uwin_cld_s0 (upa 0xcc) (ai_cld_tgt 0 12) udec_cld_s0 exec_execute_C_LD. Qed.
+
+  Lemma ui_cld_s1 :
+    kernel_text -∗ instr (upa 0xce) true (ai_cld_tgt 1 13).
+  Proof. u_mk_rvc2 (KernelSyms.trampoline + 0xce) uh_cld_s1 (upa 0xce) (ai_cld_tgt 1 13) udec_cld_s1 exec_execute_C_LD. Qed.
+
+  Lemma ui_cld_a1 :
+    kernel_text -∗ instr (upa 0xd0) true (ai_cld_tgt 3 15).
+  Proof. u_mk_rvc4 (KernelSyms.trampoline + 0xd0) uh_cld_a1 uwin_cld_a1 (upa 0xd0) (ai_cld_tgt 3 15) udec_cld_a1 exec_execute_C_LD. Qed.
+
+  Lemma ui_cld_a2 :
+    kernel_text -∗ instr (upa 0xd2) true (ai_cld_tgt 4 16).
+  Proof. u_mk_rvc2 (KernelSyms.trampoline + 0xd2) uh_cld_a2 (upa 0xd2) (ai_cld_tgt 4 16) udec_cld_a2 exec_execute_C_LD. Qed.
+
+  Lemma ui_cld_a3 :
+    kernel_text -∗ instr (upa 0xd4) true (ai_cld_tgt 5 17).
+  Proof. u_mk_rvc4 (KernelSyms.trampoline + 0xd4) uh_cld_a3 uwin_cld_a3 (upa 0xd4) (ai_cld_tgt 5 17) udec_cld_a3 exec_execute_C_LD. Qed.
+
+  Lemma ui_cld_a4 :
+    kernel_text -∗ instr (upa 0xd6) true (ai_cld_tgt 6 18).
+  Proof. u_mk_rvc2 (KernelSyms.trampoline + 0xd6) uh_cld_a4 (upa 0xd6) (ai_cld_tgt 6 18) udec_cld_a4 exec_execute_C_LD. Qed.
+
+  Lemma ui_cld_a5 :
+    kernel_text -∗ instr (upa 0xd8) true (ai_cld_tgt 7 19).
+  Proof. u_mk_rvc4 (KernelSyms.trampoline + 0xd8) uh_cld_a5 uwin_cld_a5 (upa 0xd8) (ai_cld_tgt 7 19) udec_cld_a5 exec_execute_C_LD. Qed.
+
+  Lemma ui_cld_a0 :
+    kernel_text -∗ instr (upa 0x11a) true (ai_cld_tgt 2 14).
+  Proof. u_mk_rvc2 (KernelSyms.trampoline + 0x11a) uh_cld_a0 (upa 0x11a) (ai_cld_tgt 2 14) udec_cld_a0 exec_execute_C_LD. Qed.
+
+  Lemma ui_sret :
+    kernel_text -∗ instr (upa 0x11c) false ai_sret.
+  Proof. u_mk_base (KernelSyms.trampoline + 0x11c) uw_sret (upa 0x11c) ai_sret udec_sret. Qed.
+
+
+End UserretInstrs.
