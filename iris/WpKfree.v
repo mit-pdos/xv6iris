@@ -20,16 +20,14 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import WpGprCsrwCommon.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpAuipc.
-Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLogic WpGprAuipc WpGprLoad WpGprLui.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
-Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr WpHolding WpAcquireMem WpAcquireTop.
-Require Import WpRvcBridge WpLock WpLockLeaves WpHoldingInv WpPopOff.
+Require Import WpEntryNew WpAuipc.
+Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprLogic WpGprLui.
+Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
+Require Import WpMycpu WpHolding WpAcquireMem.
+Require Import WpLock.
 Require Import WpAcquireLock WpRelease WpMemsetPage WpFreelistMem.
 Require Import KallocInv WpKallocDecode.
 From Kernel Require KernelInstrs.

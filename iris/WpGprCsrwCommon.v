@@ -2,10 +2,8 @@ From Stdlib Require Import ZArith.
 From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpGpr.
-Require Import MinstretInv InstrBytes.
+Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec WpGpr.
 Local Open Scope Z_scope.
 
 (* [exec_if_false_g] (from WpEntry) drives the [write_CSR] CSR-dispatch walks

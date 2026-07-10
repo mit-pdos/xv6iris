@@ -17,7 +17,7 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
-Require Import RiscvModelBytes RiscvPtsto.
+Require Import RiscvPtsto.
 Local Open Scope Z_scope.
 
 Class lockG (Σ : gFunctors) := LockG { lock_inG :: inG Σ (exclR unitO) }.

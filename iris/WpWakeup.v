@@ -34,11 +34,11 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import InstrBytes MinstretInv RiscvFetchExec WpGpr WpEntryNew.
 Require Import WpLock.
-Require Import WpGprAddi WpGprRvc WpGprLoad WpGprStore.
+Require Import WpGprAddi WpGprRvc.
 Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGen VcGenS.
 Require Import WpAcquireTop WpAcquireLock WpAcquireMem WpRelease WpMycpu WpPushOffTop.
 Require Import WpSwtchVc.
-Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpFetch WpLeafCommon WpRvcBridge WpKallocDecode WpAuipc.
+Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge WpKallocDecode WpAuipc.
 From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
 Local Open Scope Z_scope.

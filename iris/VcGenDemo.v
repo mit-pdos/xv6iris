@@ -29,10 +29,10 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec WpLeafCommon WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec WpGpr.
 Require Import MinstretInv InstrBytes.
-Require Import WpGprAddi WpGprLogic WpGprLui WpGprLoad WpGprStore WpGprRvc.
-Require Import WpEntryNew WpSpinNew SmodeCore WpSmodeGpr WpMemsetS WpSmodeSret WpTimerinit.
+Require Import WpGprRvc.
+Require Import WpEntryNew WpTimerinit.
 Require Import VcGen.
 From Kernel Require KernelSyms.
 From iris.base_logic.lib Require Import invariants.

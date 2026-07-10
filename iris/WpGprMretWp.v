@@ -9,7 +9,6 @@ Require Import MinstretInv.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
-Require Import WpGpr.
 Require Import WpGprMret.
 
 (* ====================================================================== *)

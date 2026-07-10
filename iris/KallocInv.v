@@ -31,7 +31,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto WpLock.
+Require Import RiscvModelBytes RiscvPtsto WpLock.
 Local Open Scope Z_scope.
 Import Defs.
 

@@ -8,7 +8,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import RiscvLang RiscvExec.
 Local Open Scope Z_scope.
 
 (* ===== RiscvModelWP ===== *)

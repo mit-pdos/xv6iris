@@ -28,13 +28,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpAuipc.
-Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLogic WpGprAuipc WpGprLoad.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
-Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr WpHolding WpAcquireMem WpAcquireTop.
-Require Import WpRvcBridge WpLock WpLockLeaves WpHoldingInv WpPopOff.
+Require Import WpDecode WpEntryNew.
+Require Import WpGpr WpGprRvc.
+Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew.
+Require Import WpMycpu WpPushOffTop WpAcquireTop.
+Require Import WpLock WpLockLeaves WpHoldingInv WpPopOff.
 (* subrange_full / mSIE_lower / sie_bit for the sstatus-SIE bridge; kept
    QUALIFIED so the WpGprCsrwC namespace doesn't shadow anything. *)
 Require WpGprCsrwC.

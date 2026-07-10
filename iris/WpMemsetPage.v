@@ -17,12 +17,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry.
-Require Import WpGpr WpGprRvc WpGprLoad WpGprRvcTor.
-Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpMemsetS WpTimerinit.
-Require Import WpRvcBridge WpMemsetInstr.
+Require Import WpGpr WpGprRvc WpGprLoad.
+Require Import SmodeCore WpSmodeGpr WpEntryNew WpMemsetS.
+Require Import WpMemsetInstr.
 Require Import WpLock KallocInv.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

@@ -1052,5 +1052,4 @@ End RvcTorEngines.
 (* R|W|X, unlocked); the range conjunct is per-address arithmetic the     *)
 (* caller supplies (xv6's pmpaddr0 = 0x3fffffffffffff covers all of RAM). *)
 (* ===================================================================== *)
-Require Import WpGprCsrwC.
 

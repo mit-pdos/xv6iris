@@ -2,12 +2,10 @@ From Stdlib Require Import ZArith.
 From iris.program_logic Require Import lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpAdd WpFetch WpLoad WpDecode WpLeafCommon.
+Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec WpLeafCommon.
 Local Open Scope Z_scope.
 
-Require Import WpGpr.
 
 (* currentlyEnabled Ext_U, mirroring exec_currentlyEnabled_M (WpEntry). *)
 Lemma exec_hartSupports_U s : exec (hartSupports Ext_U) s = Some (true, s).
