@@ -239,23 +239,3 @@ Section Wp_srli.
     iExact "Hfmap".
   Qed.
 End Wp_srli.
-
-
-(* Demonstrations: ONE lemma per type serves many register operands. *)
-Section WpGprShiftDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Context {dqc : dfrac}.
-  Definition wp_slli_x5_x6  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_slli_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) sh.    (* slli x5, x6, sh *)
-  Definition wp_slli_x28_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_slli_gpr E Φ pc false (mword_of_int 1) (mword_of_int 28) sh.   (* slli x28, x1, sh *)
-  Definition wp_srli_x5_x6  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_srli_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) sh.
-  Definition wp_srli_x28_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (sh : mword 6) :=
-    wp_srli_gpr E Φ pc false (mword_of_int 1) (mword_of_int 28) sh.
-  Goal gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6
-    /\ gpr_of_Z (uint (mword_of_int 15 : mword 5)) = x15
-    /\ uint (mword_of_int 28 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpGprShiftDemo.

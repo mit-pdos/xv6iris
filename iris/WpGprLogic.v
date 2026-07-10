@@ -743,32 +743,3 @@ Section WpLogicITypeGpr.
     iExact "Hfmap".
   Qed.
 End WpLogicITypeGpr.
-
-(* ====================================================================== *)
-(* Demonstration: each ONE lemma serves many register (triples/pairs).     *)
-(* ====================================================================== *)
-Section WpLogicGprDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Context {dqc : dfrac}.
-  (* `or x5, x6, x7` : rd=x5, rs1=x6, rs2=x7. *)
-  Definition wp_or_x5_x6_x7 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) :=
-    wp_or_gpr E Φ pc false (mword_of_int 7) (mword_of_int 6) (mword_of_int 5).
-  (* `and x28, x1, x2` : SAME lemma, different regs. *)
-  Definition wp_and_x28_x1_x2 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) :=
-    wp_and_gpr E Φ pc false (mword_of_int 2) (mword_of_int 1) (mword_of_int 28).
-  (* `xor x5, x6, x6` : rs1 = rs2 = x6.  SAME lemma. *)
-  Definition wp_xor_x5_x6_x6 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) :=
-    wp_xor_gpr E Φ pc (mword_of_int 6) (mword_of_int 6) (mword_of_int 5).
-  (* `ori x5, x6, imm`, `andi x5, x6, imm`, `xori x28, x1, imm`. *)
-  Definition wp_ori_x5_x6 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_ori_gpr E Φ pc (mword_of_int 6) (mword_of_int 5) imm.
-  Definition wp_andi_x5_x6 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_andi_gpr E Φ pc (mword_of_int 6) (mword_of_int 5) imm.
-  Definition wp_xori_x28_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_xori_gpr E Φ pc (mword_of_int 1) (mword_of_int 28) imm.
-  Goal gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6
-    /\ gpr_of_Z (uint (mword_of_int 28 : mword 5)) = x28
-    /\ uint (mword_of_int 7 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpLogicGprDemo.

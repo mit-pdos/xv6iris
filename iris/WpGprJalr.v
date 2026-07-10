@@ -241,21 +241,3 @@ Section WpJalrGpr.
     iExact "Hfmap".
   Qed.
 End WpJalrGpr.
-
-(* Demonstration: ONE lemma [wp_jalr_gpr] serves many (rs1,rd) pairs; and the
-   exec-level [exec_execute_JALR_ret] covers the ret = jalr x0,0(ra) shape. *)
-Section WpJalrGprDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Definition wp_jalr_x1_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_jalr_gpr E Φ pc false (mword_of_int 1) (mword_of_int 5) imm.   (* jalr x5, imm(x1) *)
-  Definition wp_jalr_x6_x28 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_jalr_gpr E Φ pc false (mword_of_int 6) (mword_of_int 28) imm.  (* jalr x28, imm(x6) *)
-  Goal gpr_of_Z (uint (mword_of_int 1 : mword 5)) = x1
-    /\ gpr_of_Z (uint (mword_of_int 5 : mword 5)) = x5
-    /\ gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6
-    /\ gpr_of_Z (uint (mword_of_int 28 : mword 5)) = x28
-    /\ uint (mword_of_int 1 : mword 5) <> 0
-    /\ uint (mword_of_int 0 : mword 5) = 0.   (* x0 (ret dest) *)
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpJalrGprDemo.

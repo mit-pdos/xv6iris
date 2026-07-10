@@ -107,17 +107,3 @@ Section WpLuiGpr.
     iExact "Hfmap".
   Qed.
 End WpLuiGpr.
-
-(* Demonstration: ONE lemma [wp_lui_gpr] serves many destination regs. *)
-Section WpLuiGprDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Definition wp_lui_x5  (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 20) :=
-    wp_lui_gpr E Φ pc false (mword_of_int 5) imm.
-  Definition wp_lui_x28 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 20) :=
-    wp_lui_gpr E Φ pc false (mword_of_int 28) imm.
-  Goal gpr_of_Z (uint (mword_of_int 5 : mword 5)) = x5
-    /\ gpr_of_Z (uint (mword_of_int 28 : mword 5)) = x28
-    /\ uint (mword_of_int 5 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpLuiGprDemo.

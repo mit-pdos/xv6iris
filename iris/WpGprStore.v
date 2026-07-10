@@ -645,19 +645,3 @@ Section WpStoreGpr.
     iExact "Hfmap".
   Qed.
 End WpStoreGpr.
-
-(* ====================================================================== *)
-(* Demonstration: ONE lemma [wp_store_gpr] serves many (rs2,rs1) pairs.    *)
-(* Only the register operands differ between `sd ra, imm(sp)` and          *)
-(* `sd a0, imm(a1)`.                                                        *)
-(* ====================================================================== *)
-Section WpStoreGprDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-
-  Goal gpr_of_Z (uint (mword_of_int 1 : mword 5)) = x1
-    /\ gpr_of_Z (uint (mword_of_int 2 : mword 5)) = x2
-    /\ gpr_of_Z (uint (mword_of_int 10 : mword 5)) = x10
-    /\ gpr_of_Z (uint (mword_of_int 11 : mword 5)) = x11.
-  Proof. repeat split; vm_compute; reflexivity. Qed.
-End WpStoreGprDemo.

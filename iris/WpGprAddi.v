@@ -265,18 +265,3 @@ Section WpAddiwGpr.
   Definition wp_addiw_x5_x6 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
     wp_addiw_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) imm.
 End WpAddiwGpr.
-
-(* Demonstration: ONE lemma [wp_addi_gpr] serves many (rd,rs1) pairs. *)
-Section WpAddiGprDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Context {dqc : dfrac}.
-  Definition wp_addi_x5_x6 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_addi_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) imm.   (* addi x5, x6, imm *)
-  Definition wp_addi_x28_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_addi_gpr E Φ pc false (mword_of_int 1) (mword_of_int 28) imm.  (* addi x28, x1, imm *)
-  Goal gpr_of_Z (uint (mword_of_int 6 : mword 5)) = x6
-    /\ gpr_of_Z (uint (mword_of_int 28 : mword 5)) = x28
-    /\ uint (mword_of_int 1 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpAddiGprDemo.

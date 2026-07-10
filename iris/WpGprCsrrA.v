@@ -309,23 +309,6 @@ Section WpCsrrMhartidGpr.
     iExact "Hfmap".
   Qed.
 End WpCsrrMhartidGpr.
-
-(* Demonstration: ONE lemma [wp_csrr_mhartid_gpr] serves many destination regs. *)
-Section WpCsrrMhartidGprDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Definition wp_csrr_mhartid_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64)
-      (mhartid_in : mword 64) :=
-    wp_csrr_mhartid_gpr E Φ pc (mword_of_int 5) mhartid_in.   (* csrr x5, mhartid *)
-  Definition wp_csrr_mhartid_x28 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64)
-      (mhartid_in : mword 64) :=
-    wp_csrr_mhartid_gpr E Φ pc (mword_of_int 28) mhartid_in.  (* csrr x28, mhartid *)
-  Goal gpr_of_Z (uint (mword_of_int 5 : mword 5)) = x5
-    /\ gpr_of_Z (uint (mword_of_int 28 : mword 5)) = x28
-    /\ uint (mword_of_int 5 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpCsrrMhartidGprDemo.
-
 (* ====================================================================== *)
 (* Register-generic csrr WPs for arbitrary readable CSRs (mstatus /          *)
 (* mcounteren / menvcfg / sie / time), stated on the new                     *)

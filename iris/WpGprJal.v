@@ -137,17 +137,3 @@ Section WpJalGpr.
     iExact "Hfmap".
   Qed.
 End WpJalGpr.
-
-(* Demonstration: ONE lemma [wp_jal_gpr] serves many link registers. *)
-Section WpJalGprDemo.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Definition wp_jal_x1 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 21) :=
-    wp_jal_gpr E Φ pc (mword_of_int 1) imm.   (* jal x1, off *)
-  Definition wp_jal_x5 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 21) :=
-    wp_jal_gpr E Φ pc (mword_of_int 5) imm.   (* jal x5, off *)
-  Goal gpr_of_Z (uint (mword_of_int 1 : mword 5)) = x1
-    /\ gpr_of_Z (uint (mword_of_int 5 : mword 5)) = x5
-    /\ uint (mword_of_int 1 : mword 5) <> 0.
-  Proof. repeat split; vm_compute; first [ reflexivity | discriminate ]. Qed.
-End WpJalGprDemo.
