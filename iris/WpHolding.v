@@ -33,6 +33,7 @@ Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpAcquireMem.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -138,22 +139,22 @@ Local Ltac h_dbase s Hpriv :=
   h_ast.
 
 (* +0x16  0x52d000ef  jal ra,mycpu (offset +0xd2c) *)
-Lemma hdec_jal_mycpu s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma hdec_jal_mycpu s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x52d000ef : mword 32)) s
   = Some (JAL (mword_of_int 0xd2c : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. h_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; h_dbase s Hpriv ]. Qed.
 
 (* +0x1a  0x40a48533  sub a0,s1,a0 *)
-Lemma hdec_sub s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma hdec_sub s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x40a48533 : mword 32)) s
   = Some (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 9), Regidx (mword_of_int 10), SUB), s).
-Proof. intro Hpriv. h_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; h_dbase s Hpriv ]. Qed.
 
 (* +0x1e  0x00153513  seqz a0,a0 (sltiu a0,a0,1) *)
-Lemma hdec_seqz s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma hdec_seqz s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00153513 : mword 32)) s
   = Some (ITYPE (mword_of_int 1, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLTIU), s).
-Proof. intro Hpriv. h_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; h_dbase s Hpriv ]. Qed.
 
 (* register-generic RTYPE SUB execute (mirror of WpGpr.exec_execute_RTYPE_ADD_gpr) *)
 Definition gpr_sub_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=

@@ -40,6 +40,7 @@ Require Import WpRvcBridge WpLock WpLockLeaves WpHoldingInv WpPopOff.
 Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -59,28 +60,28 @@ Local Ltac rl_dbase s Hpriv :=
   rl_ast.
 
 (* +0x0c  0xf07ff0ef  jal ra,holding (offset -0xfa) *)
-Lemma rldec_jal_holding s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma rldec_jal_holding s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf07ff0ef : mword 32)) s
   = Some (JAL (mword_of_int 0x1fff06 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. rl_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; rl_dbase s Hpriv ]. Qed.
 
 (* +0x1e  0xf9bff0ef  jal ra,pop_off (offset -0x66) *)
-Lemma rldec_jal_popoff s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma rldec_jal_popoff s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf9bff0ef : mword 32)) s
   = Some (JAL (mword_of_int 0x1fff9a : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. rl_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; rl_dbase s Hpriv ]. Qed.
 
 (* +0x12  0x0004b823  sd zero,16(s1) *)
-Lemma rldec_sd_zero s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma rldec_sd_zero s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0004b823 : mword 32)) s
   = Some (STORE (mword_of_int 16, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8), s).
-Proof. intro Hpriv. rl_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; rl_dbase s Hpriv ]. Qed.
 
 (* +0x1a  0x0004a023  sw zero,0(s1) *)
-Lemma rldec_sw_zero s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma rldec_sw_zero s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0004a023 : mword 32)) s
   = Some (STORE (mword_of_int 0, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4), s).
-Proof. intro Hpriv. rl_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; rl_dbase s Hpriv ]. Qed.
 
 (* ===================================================================== *)
 (* [instr] facts.                                                         *)

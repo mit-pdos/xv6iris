@@ -37,6 +37,7 @@ Require Import WpTimerinit WpMemsetInstr.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -98,16 +99,16 @@ Proof.
 Qed.
 
 (* +0x0e  00011517  auipc a0,0x11 *)
-Lemma mydec_auipc s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma mydec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00011517 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* +0x12  a9450513  addi a0,a0,-1388 *)
-Lemma mydec_addi s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma mydec_addi s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xa9450513 : mword 32)) s
   = Some (ITYPE (mword_of_int 0xa94 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* ===================================================================== *)
 (* The closed-form return value a0 = &cpus[cpuid].                        *)

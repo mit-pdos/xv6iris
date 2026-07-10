@@ -47,6 +47,7 @@ Require Import WpAmo WpAcquireMem WpHolding.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -138,22 +139,22 @@ Local Ltac aq_dbase s Hpriv :=
   aq_ast.
 
 (* +0x0c  0xfbbff0ef  jal ra,push_off (offset -0x46) *)
-Lemma aqdec_jal_pushoff s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma aqdec_jal_pushoff s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xfbbff0ef : mword 32)) s
   = Some (JAL (mword_of_int 0x1fffba : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. aq_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
 
 (* +0x12  0xf89ff0ef  jal ra,holding (offset -0x78) *)
-Lemma aqdec_jal_holding s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma aqdec_jal_holding s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf89ff0ef : mword 32)) s
   = Some (JAL (mword_of_int 0x1fff88 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. aq_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
 
 (* +0x24  0x4b9000ef  jal ra,mycpu (offset +0xcb8) *)
-Lemma aqdec_jal_mycpu s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma aqdec_jal_mycpu s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x4b9000ef : mword 32)) s
   = Some (JAL (mword_of_int 0xcb8 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. aq_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
 
 (* ---- creg / ExecuteAs expansions ---- *)
 Lemma aq_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).

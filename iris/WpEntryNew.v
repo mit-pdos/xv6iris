@@ -39,18 +39,19 @@ Require Import MinstretInv InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 
 (* Moved here from WpDecode.v via the late KernelBoot.v (this file is now their
    only user): the one-shot decodes of _entry's two 32-bit prefix instructions. *)
 Lemma decode_auipc s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode w_auipc) s = Some (UTYPE (imm_auipc, Regidx i_auipc, AUIPC), s).
-Proof. intro Hpriv. unfold imm_auipc, i_auipc. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; unfold imm_auipc, i_auipc; decode_any s Hpriv ]. Qed.
 Lemma decode_ld s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode w_ld) s = Some (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8), s).
-Proof. intro Hpriv. unfold imm_ld, i_ld. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; unfold imm_ld, i_ld; decode_any s Hpriv ]. Qed.
 
 Section WpEntryNew.
   Context `{!riscvGS Σ}.
@@ -232,8 +233,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e0 w_auipc H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry) w_auipc 4 pc_e0 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros Hpriv _ _ _ _.
-      exact (decode_auipc σ Hpriv).
+    - iIntros (σ) "_". iPureIntro. intros; apply decode_auipc; assumption.
   Qed.
 
   Lemma entry_instr_ld :
@@ -254,8 +254,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e1 w_ld H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0x4) w_ld 4 pc_e1 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros Hpriv _ _ _ _.
-      exact (decode_ld σ Hpriv).
+    - iIntros (σ) "_". iPureIntro. intros; apply decode_ld; assumption.
   Qed.
 
   Lemma entry_instr_clui :
@@ -305,8 +304,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e3 w_csrr H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0xa) w_csrr 4 pc_e3 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros Hpriv _ _ _ _.
-      rewrite Hz. exact (decode_csrr σ Hpriv).
+    - iIntros (σ) "_". iPureIntro. intros; rewrite Hz; apply decode_csrr; assumption.
   Qed.
 
   Lemma entry_instr_caddi :
@@ -413,8 +411,7 @@ Section WpEntryNew.
     iSplitL "".
     - iApply (instr_bytes_base pc_e7 w_jal H2al Hnrvc).
       iApply (kernel_window_pc (KernelSyms._entry + 0x16) w_jal 4 pc_e7 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros Hpriv _ _ _ _.
-      exact (decode_jal σ Hpriv).
+    - iIntros (σ) "_". iPureIntro. intros; apply decode_jal; assumption.
   Qed.
 
   (* The final gpr_file after the eight writes, in terms of the abstract initial

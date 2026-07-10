@@ -23,6 +23,7 @@ Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpMemsetS WpTimerinit
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -118,22 +119,22 @@ Qed.
 
 (* ---- the three base decodes (one-shot decode_any) ---- *)
 (* cdc: 0x00a60733 -> add a4,a2,a0 *)
-Lemma mdec_cdc s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma mdec_cdc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00a60733 : mword 32)) s
   = Some (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* ce0: 0x00b78023 -> sb a1,0(a5) *)
-Lemma mdec_ce0 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma mdec_ce0 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00b78023 : mword 32)) s
   = Some (STORE (mword_of_int 0, Regidx (mword_of_int 11), Regidx (mword_of_int 15), 1), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* ce6: 0xfee79de3 -> bne a5,a4,ce0 *)
-Lemma mdec_ce6 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma mdec_ce6 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xfee79de3 : mword 32)) s
   = Some (BTYPE (mword_of_int 0x1ffa, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BNE), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* ===================================================================== *)
 (* [instr] constructors from [kernel_text].                              *)

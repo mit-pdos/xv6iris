@@ -66,6 +66,7 @@ Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -263,106 +264,106 @@ Qed.
 
 (* ---- the sixteen 32-bit instructions: one-shot [decode_any] ---- *)
 Lemma st_decode34 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w34) s
     = Some (CSRReg (WpGprCsrrA.csr_mstatus, zreg, Regidx ti_a5, CSRRS), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode36 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w36) s
     = Some (ITYPE (si36, Regidx ti_a4, Regidx ti_a4, ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode39 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w39) s
     = Some (ITYPE (si39, Regidx ti_a4, Regidx ti_a4, ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode41 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w41) s
     = Some (CSRReg (WpGprCsrwA.csr_mstatus, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode42 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w42) s
     = Some (UTYPE (si42, Regidx ti_a5, AUIPC), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode43 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w43) s
     = Some (ITYPE (si43, Regidx ti_a5, Regidx ti_a5, ADDI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode44 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w44) s
     = Some (CSRReg (WpGprCsrwA.csr_mepc, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode46 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w46) s
     = Some (CSRReg (WpGprCsrwB.csr_satp, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode49 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w49) s
     = Some (CSRReg (WpGprCsrwA.csr_medeleg, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode50 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w50) s
     = Some (CSRReg (WpGprCsrwB.csr_mideleg, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode51 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w51) s
     = Some (CSRReg (WpGprCsrrB.csr_sie, zreg, Regidx ti_a5, CSRRS), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode52 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w52) s
     = Some (ITYPE (si52, Regidx ti_a5, Regidx ti_a5, ORI), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode53 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w53) s
     = Some (CSRReg (WpGprCsrwB.csr_sie, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode56 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w56) s
     = Some (CSRReg (WpGprCsrwB.csr_pmpaddr0, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode58 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w58) s
     = Some (CSRReg (WpGprCsrwA.csr_pmpcfg0, Regidx ti_a5, zreg, CSRRW), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode59 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w59) s
     = Some (JAL (sjimm59, Regidx ti_ra), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma st_decode60 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w60) s
     = Some (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* idx 63 MRET: [decode_mret] (WpGprMretWp) applies verbatim (w_mret is the
    same word 0x30200073). *)

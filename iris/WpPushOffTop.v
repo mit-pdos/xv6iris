@@ -26,6 +26,7 @@ Require Import WpRvcBridge.
 Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -217,34 +218,34 @@ Local Ltac po_dbase s Hpriv :=
   po_ast.
 
 (* +0x0a  0x100177f3  csrrci a5,sstatus,2 *)
-Lemma podec_0a s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma podec_0a s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x100177f3 : mword 32)) s
   = Some (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 15), CSRRC), s).
-Proof. intro Hpriv. po_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* +0x10  0x507000ef  jal ra,mycpu *)
-Lemma podec_10 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma podec_10 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x507000ef : mword 32)) s
   = Some (JAL (mword_of_int 0xd06 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. po_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* +0x18  0x4ff000ef  jal ra,mycpu *)
-Lemma podec_18 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma podec_18 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x4ff000ef : mword 32)) s
   = Some (JAL (mword_of_int 0xcfe : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. po_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* +0x2c  0x4eb000ef  jal ra,mycpu *)
-Lemma podec_2c s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma podec_2c s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x4eb000ef : mword 32)) s
   = Some (JAL (mword_of_int 0xcea : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. po_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* +0x30  0x0014d793  srli a5,s1,1 *)
-Lemma podec_30 s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma podec_30 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0014d793 : mword 32)) s
   = Some (SHIFTIOP (mword_of_int 1 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 15), SRLI), s).
-Proof. intro Hpriv. po_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* ===================================================================== *)
 (* creg / immediate reconciliations + bespoke ExecuteAs expansions.       *)

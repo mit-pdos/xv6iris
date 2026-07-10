@@ -10,6 +10,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDeco
 Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 Require Export WpLeafCommon.
+Require Import WpDecodeBridge.
 
 (* ---------------------------------------------------------------------- *)
 (* RVC fetch: a 4-byte-aligned 16-bit instruction reads 4 bytes and takes  *)
@@ -122,9 +123,9 @@ Definition imm_jal : mword 21 :=
     (subrange_vec_dec w_jal 20 20)) (subrange_vec_dec w_jal 30 21)) ('b"0").
 
 Lemma decode_jal s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode w_jal) s = Some (JAL (imm_jal, Regidx i_jal), s).
-Proof. intro Hpriv. unfold imm_jal, i_jal. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; unfold imm_jal, i_jal; decode_any s Hpriv ]. Qed.
 
 Lemma wX_jal_x1 (v : mword 64) :
   wX (Regno (uint i_jal)) v
@@ -374,10 +375,10 @@ End StepMUL.
 
 
 Lemma decode_csrr s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode w_csrr) s
     = Some (CSRReg (csr_csrr, Regidx i_rs1_csrr, Regidx i_rd_csrr, CSRRS), s).
-Proof. intro Hpriv. unfold csr_csrr, i_rs1_csrr, i_rd_csrr. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; unfold csr_csrr, i_rs1_csrr, i_rd_csrr; decode_any s Hpriv ]. Qed.
 
 
 

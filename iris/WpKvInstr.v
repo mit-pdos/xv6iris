@@ -21,6 +21,7 @@ Require Import WpRvcBridge.
 Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -133,10 +134,10 @@ Lemma kv_dec18 s :
 Proof. intro HmisaC. kv_dec_sd (mword_of_int 0xf9fe : mword 16) s HmisaC. Qed.
 
 Lemma kv_dec19 s :
-  priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xa46fd0ef : mword 32)) s
   = Some (JAL (mword_of_int 0x1fd246 : mword 21, Regidx (mword_of_int 1 : mword 5)), s).
-Proof. intro Hpriv. decode_any s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma kv_dec20 s :
   eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->

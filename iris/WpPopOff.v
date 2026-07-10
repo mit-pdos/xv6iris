@@ -44,6 +44,7 @@ Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr WpHo
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -63,29 +64,29 @@ Local Ltac pp_dbase s Hpriv :=
   pp_ast.
 
 (* +0x08  0x495000ef  jal ra,mycpu (offset +0xc94) *)
-Lemma ppdec_jal_mycpu s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma ppdec_jal_mycpu s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x495000ef : mword 32)) s
   = Some (JAL (mword_of_int 0xc94 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. intro Hpriv. pp_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pp_dbase s Hpriv ]. Qed.
 
 (* +0x0c  0x100027f3  csrr a5,sstatus  (csrrs a5,sstatus,x0) *)
-Lemma ppdec_csrr s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma ppdec_csrr s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x100027f3 : mword 32)) s
   = Some (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS), s).
-Proof. intro Hpriv. pp_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pp_dbase s Hpriv ]. Qed.
 
 (* +0x16  0x02f05363  blez a5,+0x26  (bge x0,a5) *)
-Lemma ppdec_blez s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma ppdec_blez s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x02f05363 : mword 32)) s
   = Some (BTYPE (mword_of_int 0x26 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 0), BGE), s).
-Proof. intro Hpriv. pp_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pp_dbase s Hpriv ]. Qed.
 
 (* release +0x16  0x0310000f  fence rw,w *)
-Lemma ppdec_fence s : priv_mSU (register_lookup cur_privilege (sregs s)) = true ->
+Lemma ppdec_fence s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0310000f : mword 32)) s
   = Some (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
                  Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
-Proof. intro Hpriv. pp_dbase s Hpriv. Qed.
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pp_dbase s Hpriv ]. Qed.
 
 (* +0x10  0x8b89  c.andi a5,2 *)
 Lemma ppdec_andi s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
