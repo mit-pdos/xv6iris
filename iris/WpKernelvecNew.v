@@ -24,17 +24,15 @@ From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry.
+Require Import WpLeafCommon.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpKvInstr.
 Require Import VcGen VcGenS.
-From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.

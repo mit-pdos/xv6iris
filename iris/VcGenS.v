@@ -23,18 +23,17 @@
    VcGen.v ([vstate] / [vheap_own] / [vregs_den] / [sval]).  See
    WpMycpu.v / WpPopOff.v for this VCgen applied to mycpu() and
    pop_off(). *)
-From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap bitvector.definitions.
+From Stdlib Require Import ZArith.
+From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec WpLeafCommon WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec WpGpr.
 Require Import MinstretInv InstrBytes.
-Require Import WpGprAddi WpGprLogic WpGprLui WpGprLoad WpGprStore WpGprRvc.
-Require Import WpEntryNew WpSpinNew SmodeCore WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem WpFreelistMem WpAcquireMem.
+Require Import WpGprRvc.
+Require Import SmodeCore WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem WpFreelistMem WpAcquireMem.
 Require Import VcGen.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.

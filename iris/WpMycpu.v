@@ -20,20 +20,20 @@
      +0x1a  800018f0  6402      c.ldsp   s0,0(sp)
      +0x1c  800018f2  0141      c.addi   sp,sp,16     frame free
      +0x1e  800018f4  8082      c.ret                                        *)
-From Stdlib Require Import ZArith Lia List.
+From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+From iris.program_logic Require Import language.
+Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpAdd WpFetch WpLoad WpDecode WpLeafCommon WpEntry WpEntryNew WpAuipc.
-Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLogic WpGprAuipc.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
-Require Import WpTimerinit WpMemsetInstr.
+Require Import WpDecode WpLeafCommon WpEntryNew WpAuipc.
+Require Import WpGpr WpGprRvc.
+Require Import SmodeCore WpMemsetS WpPushOff.
+Require Import WpMemsetInstr.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
