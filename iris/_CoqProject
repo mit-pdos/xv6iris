@@ -69,6 +69,7 @@ UmodeFetch.v
 UmodeStep.v
 UmodeEcall.v
 WpUserEcall.v
+UmodeFetchFault.v
 WpIntrStep.v
 WpIntrInv.v
 WpPushOff.v
