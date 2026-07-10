@@ -51,11 +51,21 @@ Caveats
   build-test every import module (ignoring the glob shortlist) for completeness
   at the cost of many more compiles.
 
+Scope
+-----
+By DEFAULT the checker only considers imports of THIS package's own modules --
+those whose logical path carries the local `-R . <prefix>` prefix (here
+`xv6iris.`).  Imports from other packages (SailStdpp, Riscv, stdpp, iris.*,
+Kernel, Stdlib, ...) are skipped, since removing a stray external import is
+low-value and its provenance is noisier.  Pass `--include-external` to test
+those too.
+
 Usage
 -----
-  detect_unused_imports.py --dir .                  # list glob-only candidates
+  detect_unused_imports.py --dir .                  # list glob-only candidates (local pkg)
   detect_unused_imports.py --dir . --verify         # build-confirm candidates
-  detect_unused_imports.py --dir . --verify --all   # build-test ALL imports
+  detect_unused_imports.py --dir . --verify --all   # build-test ALL local imports
+  detect_unused_imports.py --dir . --verify --include-external   # also other packages
   detect_unused_imports.py --dir . --verify --files WpAdd.v WpAmo.v
   detect_unused_imports.py --dir . --verify --report unused_imports_report.md
 """
@@ -248,7 +258,8 @@ class FileResult:
 
 
 def analyze_file(dir_path: str, vfile: str, local_prefix: str,
-                 include_export: bool, use_all: bool) -> FileResult:
+                 include_export: bool, use_all: bool,
+                 local_only: bool = True) -> FileResult:
     path = os.path.join(dir_path, vfile)
     with open(path) as f:
         text = f.read()
@@ -263,6 +274,12 @@ def analyze_file(dir_path: str, vfile: str, local_prefix: str,
         # non-obvious ways; still a valid candidate, build-confirm decides.
         for token in stmt.modules:
             fp = logical_path(stmt, token, local_prefix)
+            # By default only consider imports of THIS package's own modules
+            # (logical prefix == local_prefix, e.g. `xv6iris.`).  External
+            # packages (SailStdpp, Riscv, stdpp, iris.*, Kernel, Stdlib, ...)
+            # are skipped -- pass --include-external to test them too.
+            if local_only and local_prefix and not fp.startswith(local_prefix + "."):
+                continue
             if use_all or not is_referenced(fp, used):
                 res.candidates.append(Candidate(stmt=stmt, token=token, full_path=fp))
     return res
@@ -526,6 +543,10 @@ def main() -> int:
                     help="build-confirm candidates (else: fast glob-only listing)")
     ap.add_argument("--all", action="store_true",
                     help="build-test EVERY import, ignoring the glob shortlist")
+    ap.add_argument("--include-external", action="store_true",
+                    help="also check imports of OTHER packages (SailStdpp, Riscv, "
+                         "stdpp, iris.*, Kernel, Stdlib). Default: only this "
+                         "package's own modules (local `-R .` prefix).")
     ap.add_argument("--include-export", action="store_true",
                     help="also consider `Require Export` lines (needs --full-make "
                          "to be sound; unsafe with single-file verify)")
@@ -561,7 +582,8 @@ def main() -> int:
             results.append(ckpt[vf])
             continue
         res = analyze_file(dir_path, vf, local_prefix,
-                           args.include_export, args.all)
+                           args.include_export, args.all,
+                           local_only=not args.include_external)
         if args.verify and res.candidates:
             print(f"[verify] {vf}: {len(res.candidates)} candidate(s)...",
                   file=sys.stderr, flush=True)
