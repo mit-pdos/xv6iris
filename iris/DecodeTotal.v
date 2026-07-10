@@ -87,3 +87,5 @@ Lemma total_zicondop_backwards (x : mword 3) s :
   encdec_zicondop_backwards_matches x = true ->
   exists v, exec (encdec_zicondop_backwards x) s = Some (v, s).
 Proof. unfold encdec_zicondop_backwards_matches, encdec_zicondop_backwards. mapper_total. Qed.
+
+(* encdec_creg_backwards is PURE (returns cregidx) -- no totality lemma needed *)
