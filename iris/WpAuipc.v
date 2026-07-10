@@ -69,78 +69,6 @@ Section ForwardAUIPC.
                   (add_vec_int (register_lookup minstret sTa.(sregs)) 1)
          else sTa.
 
-  Lemma forward_exec_auipc :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
-           ('b"1") = false ->
-    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec riscv_step s = Some (tt, sFa).
-  Proof using All.
-    intros Lpc Lpriv Lhs LS LmIE Lelp.
-    (* booting-config reads transfer through the minstret_increment write. *)
-    assert (LpcA  : register_lookup PC sAa.(sregs) = pc).
-    { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpc | vm_compute; reflexivity ]. }
-    assert (LprivA: register_lookup cur_privilege sAa.(sregs) = Machine).
-    { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (LhsA  : register_lookup hart_state sAa.(sregs) = HART_ACTIVE tt).
-    { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAa.(sregs))) ('b"1") = true).
-    { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LS | vm_compute; reflexivity ]. }
-    assert (LmIEA : eq_vec (_get_Mstatus_MIE
-              (register_lookup (R_bitvector_64 mstatus) sAa.(sregs))) ('b"1") = false).
-    { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LmIE | vm_compute; reflexivity ]. }
-    assert (LelpA : eq_vec (register_lookup elp sAa.(sregs))
-              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { unfold sAa, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lelp | vm_compute; reflexivity ]. }
-    (* dispatchInterrupt = None at sAa via the getPendingSet keystone;
-       currentlyEnabled Ext_S reduces for any state (exec_currentlyEnabled_S). *)
-    assert (HdispA : exec (dispatchInterrupt Machine) sAa = Some (None, sAa)).
-    { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAa _ (exec_currentlyEnabled_S sAa) LSA LmIEA). }
-    (* fetch / decode at sAa (state-preserving). *)
-    assert (HfetchA : exec (fetch tt) sAa = Some (F_Base w, sAa))
-      by exact Hfetch_at.
-    assert (HdecA : exec (ext_decode w) sAa = Some (UTYPE (imm, Regidx i, AUIPC), sAa))
-      by (apply Hdec_gen; exact LprivA).
-    (* execute leaf at s_pc = set_reg sAa nextPC (pc+4). *)
-    pose (s_pc := set_reg sAa nextPC (add_vec_int pc 4)).
-    assert (HpcPCpc : register_lookup PC s_pc.(sregs) = pc).
-    { unfold s_pc, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LpcA | vm_compute; reflexivity ]. }
-    assert (HexecA : exec (execute (UTYPE (imm, Regidx i, AUIPC))) s_pc
-              = Some (RETIRE_SUCCESS, sXa)).
-    { change (execute (UTYPE (imm, Regidx i, AUIPC)))
-        with (execute_UTYPE imm (Regidx i) AUIPC).
-      unfold sXa. fold s_pc.
-      exact (exec_execute_UTYPE_AUIPC i imm s_pc Hi). }
-    (* the run_hart_active reduction (exact value) via the generic engine. *)
-    assert (Hha : exec (run_hart_active 0) sAa
-              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXa)).
-    { exact (exec_hart_active_progress sAa sAa sXa sAa w
-               (UTYPE (imm, Regidx i, AUIPC)) pc RETIRE_SUCCESS
-               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecA I). }
-    (* the generic try_step wrapper. *)
-    apply (exec_riscv_step_ADD s sXa w b pc).
-    - exact Lpriv.
-    - exact Hsi_s.
-    - exact LhsA.
-    - exact Hha.
-    - (* hart_state at sXa = HART_ACTIVE tt *)
-      unfold sXa, sAa; cbn zeta. trans_mi. trans_mi. trans_mi. exact Lhs.
-    - (* minstret_increment at sXa = b *)
-      unfold sXa, sAa; cbn zeta. trans_mi. trans_mi.
-      rewrite register_lookup_set. reflexivity.
-    - reflexivity. (* Hrvfi : get_config_rvfi tt = false -- definitional *)
-  Qed.
 
   (* clean-form post-state (concrete values). *)
   Variable mst0 : mword 64.
@@ -157,22 +85,6 @@ Section ForwardAUIPC.
 
   Ltac tmiss := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
-  Lemma sFa_eq : register_lookup PC s.(sregs) = pc -> sFa = sFca.
-  Proof.
-    intro LpcS.
-    assert (Enpc : register_lookup nextPC sXa.(sregs) = add_vec_int pc 4).
-    { unfold sXa; cbv zeta. unfold set_reg; cbn [sregs]. tmiss.
-      rewrite register_lookup_set. reflexivity. }
-    assert (Epc1 : register_lookup PC (set_reg sAa nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { unfold sAa, set_reg; cbn [sregs]. tmiss. tmiss. exact LpcS. }
-    assert (HsT : sTa = base_upd_a).
-    { unfold sTa. rewrite Enpc. unfold sXa; cbv zeta. rewrite Epc1.
-      unfold regval_into_reg, base_upd_a, sAa. reflexivity. }
-    unfold sFa, sFca. rewrite HsT. destruct b; [|reflexivity].
-    assert (Emst : register_lookup minstret base_upd_a.(sregs) = register_lookup minstret s.(sregs)).
-    { unfold base_upd_a, set_reg; cbn [sregs]. tmiss. tmiss. tmiss. tmiss. reflexivity. }
-    rewrite Emst Lmst_a. reflexivity.
-  Qed.
 
 End ForwardAUIPC.
 

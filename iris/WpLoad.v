@@ -464,23 +464,6 @@ Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-Lemma exec_execute_LOAD_8 :
-  exec (execute (LOAD (imm, Regidx i, Regidx i, false, 8))) s
-    = Some (RETIRE_SUCCESS,
-            set_reg s (R_bitvector_64 x2) (regval_into_reg (extend_value false data2))).
-Proof.
-  change (execute (LOAD (imm, Regidx i, Regidx i, false, 8)))
-    with (execute_LOAD imm (Regidx i) (Regidx i) false 8).
-  unfold execute_LOAD.
-  replace (8 <=? xlen_bytes) with true by (vm_compute; reflexivity).
-  assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
-  rewrite (exec_bind_Some _ _ _ _ _ Hass).
-  rewrite (exec_bind_Some _ _ _ _ _
-    (exec_vmem_read_8 i offset v region s Hi Hcp Hmprv Hpmm Halign Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hbytes)).
-  cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_x2 i s (extend_value false data2) Hi)).
-  apply exec_returnM.
-Qed.
 End ExecLoad.
 
 Section ForwardLD.
@@ -516,63 +499,6 @@ Section ForwardLD.
                   (add_vec_int (register_lookup minstret sTl.(sregs)) 1)
          else sTl.
 
-  Lemma forward_exec_ld :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    register_lookup (R_bitvector_64 mideleg) s.(sregs) = zeros' 64 ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
-           ('b"1") = false ->
-    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec riscv_step s = Some (tt, sFl).
-  Proof using All.
-    intros Lpc Lpriv Lhs Lmideleg LS LmIE Lelp.
-    assert (LpcA  : register_lookup PC sAl.(sregs) = pc).
-    { unfold sAl. trans_mi. exact Lpc. }
-    assert (LprivA: register_lookup cur_privilege sAl.(sregs) = Machine).
-    { unfold sAl. trans_mi. exact Lpriv. }
-    assert (LhsA  : register_lookup hart_state sAl.(sregs) = HART_ACTIVE tt).
-    { unfold sAl. trans_mi. exact Lhs. }
-    assert (LmidA : register_lookup (R_bitvector_64 mideleg) sAl.(sregs) = zeros' 64).
-    { unfold sAl. trans_mi. exact Lmideleg. }
-    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAl.(sregs))) ('b"1") = true).
-    { unfold sAl. trans_mi. exact LS. }
-    assert (LmIEA : eq_vec (_get_Mstatus_MIE
-              (register_lookup (R_bitvector_64 mstatus) sAl.(sregs))) ('b"1") = false).
-    { unfold sAl. trans_mi. exact LmIE. }
-    assert (LelpA : eq_vec (register_lookup elp sAl.(sregs))
-              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { unfold sAl. trans_mi. exact Lelp. }
-    assert (HdispA : exec (dispatchInterrupt Machine) sAl = Some (None, sAl)).
-    { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAl _ (exec_currentlyEnabled_S sAl) LSA LmIEA). }
-    assert (HfetchA : exec (fetch tt) sAl = Some (F_Base w, sAl))
-      by exact Hfetch_at.
-    assert (HdecA : exec (ext_decode w) sAl
-              = Some (LOAD (imm, Regidx irs1, Regidx ird, false, 8), sAl))
-      by (apply Hdec_gen; exact LprivA).
-    pose (s_pc := set_reg sAl nextPC (add_vec_int pc 4)).
-    assert (LpcAA : register_lookup PC s_pc.(sregs) = pc).
-    { unfold s_pc. trans_mi. exact LpcA. }
-    assert (HexecA : exec (execute (LOAD (imm, Regidx irs1, Regidx ird, false, 8))) s_pc
-              = Some (RETIRE_SUCCESS, sXl)).
-    { unfold sXl, s_pc, sAl. exact Hexec_spc. }
-    assert (Hha : exec (run_hart_active 0) sAl
-              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), sXl)).
-    { exact (exec_hart_active_progress sAl sAl sXl sAl w
-               (LOAD (imm, Regidx irs1, Regidx ird, false, 8)) pc RETIRE_SUCCESS
-               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecA I). }
-    apply (exec_riscv_step_ADD s sXl w b pc).
-    - exact Lpriv.
-    - exact Hsi_s.
-    - exact LhsA.
-    - exact Hha.
-    - unfold sXl, sAl; cbn zeta. trans_mi. trans_mi. trans_mi. exact Lhs.
-    - unfold sXl, sAl; cbn zeta. trans_mi. trans_mi.
-      rewrite register_lookup_set. reflexivity.
-    - reflexivity.
-  Qed.
 
   (* clean-form post-state for the ld step (x2 value already concrete). *)
   Variable mst0 : mword 64.
@@ -589,18 +515,6 @@ Section ForwardLD.
 
   Ltac tmissl := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
-  Lemma sFl_eq : sFl = sFcl.
-  Proof.
-    assert (Enpc : register_lookup nextPC sXl.(sregs) = add_vec_int pc 4).
-    { unfold sXl; unfold set_reg; cbn [sregs]. tmissl.
-      rewrite register_lookup_set. reflexivity. }
-    assert (HsT : sTl = base_upd_l).
-    { unfold sTl. rewrite Enpc. unfold sXl, sAl, base_upd_l. reflexivity. }
-    unfold sFl, sFcl. rewrite HsT. destruct b; [|reflexivity].
-    assert (Emst : register_lookup minstret base_upd_l.(sregs) = register_lookup minstret s.(sregs)).
-    { unfold base_upd_l, set_reg; cbn [sregs]. tmissl. tmissl. tmissl. tmissl. reflexivity. }
-    rewrite Emst Lmst_l. reflexivity.
-  Qed.
 
 End ForwardLD.
 

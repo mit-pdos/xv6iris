@@ -260,8 +260,4 @@ Section WpAddiwGpr.
     iExact "Hfmap".
   Qed.
 
-  Definition wp_sextw_x15_x15 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) :=
-    wp_addiw_gpr E Φ pc false (mword_of_int 15) (mword_of_int 15) (mword_of_int 0).
-  Definition wp_addiw_x5_x6 (E : coPset) (Φ : mval -> iProp Σ) (pc : mword 64) (imm : mword 12) :=
-    wp_addiw_gpr E Φ pc false (mword_of_int 6) (mword_of_int 5) imm.
 End WpAddiwGpr.

@@ -274,9 +274,6 @@ Proof.
   intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
-Definition i_addi : mword 5 :=
-  autocast (T := mword)
-    (subrange_vec_dec (subrange_vec_dec h_addi 11 7) (Z.sub regidx_bit_width 1) 0).
 
 
 

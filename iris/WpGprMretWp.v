@@ -96,82 +96,6 @@ Section ForwardMRET.
   Hypothesis Hnpm : generic_neq newpriv Machine = true.
   Hypothesis Hlpe : forall sz, exec (get_xLPE newpriv) sz = Some (lpe, sz).
 
-  Lemma forward_exec_mret :
-    register_lookup PC s.(sregs) = pc ->
-    register_lookup cur_privilege s.(sregs) = Machine ->
-    register_lookup hart_state s.(sregs) = HART_ACTIVE tt ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Mstatus_MIE (register_lookup (R_bitvector_64 mstatus) s.(sregs)))
-           ('b"1") = false ->
-    eq_vec (register_lookup elp s.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec riscv_step s = Some (tt, sFm).
-  Proof using All.
-    intros Lpc Lpriv Lhs LS LmIE Lelp.
-    assert (LpcA  : register_lookup PC sAm.(sregs) = pc).
-    { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpc | vm_compute; reflexivity ]. }
-    assert (LprivA: register_lookup cur_privilege sAm.(sregs) = Machine).
-    { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (LhsA  : register_lookup hart_state sAm.(sregs) = HART_ACTIVE tt).
-    { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lhs | vm_compute; reflexivity ]. }
-    assert (LSA : eq_vec (_get_Misa_S (register_lookup misa sAm.(sregs))) ('b"1") = true).
-    { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LS | vm_compute; reflexivity ]. }
-    assert (LmIEA : eq_vec (_get_Mstatus_MIE
-              (register_lookup (R_bitvector_64 mstatus) sAm.(sregs))) ('b"1") = false).
-    { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact LmIE | vm_compute; reflexivity ]. }
-    assert (LelpA : eq_vec (register_lookup elp sAm.(sregs))
-              (landing_pad_bits_backwards LP_EXPECTED) = false).
-    { unfold sAm, set_reg; cbn [sregs]. rewrite irrelevant_register_set;
-        [ exact Lelp | vm_compute; reflexivity ]. }
-    assert (HdispA : exec (dispatchInterrupt Machine) sAm = Some (None, sAm)).
-    { apply exec_dispatchInterrupt_none.
-      apply (exec_getPendingSet_machine_none sAm _ (exec_currentlyEnabled_S sAm) LSA LmIEA). }
-    assert (HfetchA : exec (fetch tt) sAm = Some (F_Base w_mret, sAm))
-      by exact Hfetch_at.
-    assert (HdecA : exec (ext_decode w_mret) sAm = Some (MRET tt, sAm))
-      by (apply decode_mret; rewrite LprivA; reflexivity).
-    (* The MRET execute side-conditions transfer from [s] to [s_pcm]. *)
-    assert (LprivP : register_lookup cur_privilege s_pcm.(sregs) = Machine).
-    { unfold s_pcm, sAm, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [|vm_compute; reflexivity].
-      rewrite irrelevant_register_set; [exact Lpriv | vm_compute; reflexivity]. }
-    assert (HmuP : eq_vec (_get_Misa_U (register_lookup misa s_pcm.(sregs))) ('b"1") = true).
-    { unfold s_pcm, sAm, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [|vm_compute; reflexivity].
-      rewrite irrelevant_register_set; [exact Hmu | vm_compute; reflexivity]. }
-    assert (HmcP : eq_vec (_get_Misa_C (register_lookup misa s_pcm.(sregs))) ('b"1") = true).
-    { unfold s_pcm, sAm, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [|vm_compute; reflexivity].
-      rewrite irrelevant_register_set; [exact Hmc | vm_compute; reflexivity]. }
-    assert (HnpP : privLevel_bits_forwards
-              (_get_Mstatus_MPP (update_subrange_vec_dec
-                 (update_subrange_vec_dec (register_lookup mstatus s_pcm.(sregs)) 3 3
-                    (_get_Mstatus_MPIE (register_lookup mstatus s_pcm.(sregs)))) 7 7 ('b"1")),
-               ('b"0")) = returnM newpriv).
-    { exact Hnp. }
-    assert (HexecM : exec (execute (MRET tt)) s_pcm = Some (RETIRE_SUCCESS, sXm)).
-    { exact (exec_execute_MRET s_pcm newpriv lpe LprivP HmuP HmcP HnpP Hnpm (Hlpe _)). }
-    assert (Hha : exec (run_hart_active 0) sAm
-              = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w_mret), sXm)).
-    { exact (exec_hart_active_progress sAm sAm sXm sAm w_mret
-               (MRET tt) pc RETIRE_SUCCESS
-               LprivA HdispA HfetchA HdecA LelpA ltac:(reflexivity) LpcA HexecM I). }
-    apply (exec_riscv_step_ADD s sXm w_mret b pc).
-    - exact Lpriv.
-    - exact Hsi_s.
-    - exact LhsA.
-    - exact Hha.
-    - unfold sXm, s_pcm, sAm; cbn zeta.
-      repeat (rewrite irrelevant_register_set; [|vm_compute; reflexivity]). exact Lhs.
-    - unfold sXm, s_pcm, sAm; cbn zeta.
-      repeat (rewrite irrelevant_register_set; [|vm_compute; reflexivity]).
-      rewrite register_lookup_set. reflexivity.
-    - reflexivity.
-  Qed.
 End ForwardMRET.
 
 (* ====================================================================== *)
@@ -208,38 +132,6 @@ Section StepMRET.
 
     Ltac tmim := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
-    Lemma sFm_eq :
-      register_lookup PC s.(sregs) = pc ->
-      register_lookup mstatus s.(sregs) = mstatus0 ->
-      register_lookup mepc s.(sregs) = mepc0 ->
-      register_lookup minstret s.(sregs) = mst0 ->
-      sFm s pc b newpriv lpe = sFcm.
-    Proof.
-      intros LpcS LmsS LmepcS LmstS.
-      (* the inner lookups at s_pcm reduce to the owned values *)
-      assert (Lms : register_lookup mstatus (s_pcm s pc b).(sregs) = mstatus0).
-      { unfold s_pcm, sAm, set_reg; cbn [sregs]. tmim. tmim. exact LmsS. }
-      assert (Lmepc : register_lookup mepc (s_pcm s pc b).(sregs) = mepc0).
-      { unfold s_pcm, sAm, set_reg; cbn [sregs]. tmim. tmim. exact LmepcS. }
-      (* sXm: rewrite ms_i and tgt to clean versions *)
-      assert (HsX : sXm s pc b newpriv lpe =
-        set_reg (set_reg (set_reg (set_reg (set_reg
-          (set_reg (set_reg (set_reg (s_pcm s pc b) mstatus cms1) mstatus cms2)
-                   cur_privilege newpriv) mstatus cms3) mstatus cms4)
-          mstatus cms5) elp celpv) nextPC ctgt).
-      { unfold sXm. unfold cms1, cms2, cms3, cms4, cms5, celpv, ctgt.
-        rewrite Lms Lmepc. reflexivity. }
-      assert (Enpc : register_lookup nextPC (sXm s pc b newpriv lpe).(sregs) = ctgt).
-      { rewrite HsX. unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-      assert (HsT : sTm s pc b newpriv lpe = base_upd_m).
-      { unfold sTm. rewrite Enpc. rewrite HsX. unfold base_upd_m, s_pcm, sAm. reflexivity. }
-      unfold sFm, sFcm. rewrite HsT. destruct b; [|reflexivity].
-      assert (Emst : register_lookup minstret base_upd_m.(sregs)
-                     = register_lookup minstret s.(sregs)).
-      { unfold base_upd_m, set_reg; cbn [sregs].
-        tmim. tmim. tmim. tmim. tmim. tmim. tmim. tmim. tmim. tmim. tmim. reflexivity. }
-      rewrite Emst LmstS. reflexivity.
-    Qed.
   End CleanMRET.
 
 End StepMRET.
