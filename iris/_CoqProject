@@ -65,6 +65,7 @@ WpKernelvecNew.v
 WpIntrBits.v
 WpIntrCore.v
 UmodeTrap.v
+UmodeFetch.v
 UmodeStep.v
 WpIntrStep.v
 WpIntrInv.v
