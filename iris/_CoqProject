@@ -87,6 +87,8 @@ WpFreelistMem.v
 WpMemsetPage.v
 WpKalloc.v
 WpKfree.v
+TrampPt.v
+TrampTlb.v
 VcGen.v
 VcGenS.v
 WpSwtchVc.v
