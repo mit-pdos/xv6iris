@@ -90,6 +90,5 @@ WpKfree.v
 VcGen.v
 VcGenDemo.v
 VcGenS.v
-WpKernelvecVc.v
 WpSwtchVc.v
 WpWakeup.v
