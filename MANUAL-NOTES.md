@@ -19,9 +19,9 @@ Some high-level ideas that might be interesting for some eventual paper:
 Big things that still need to be done/explored:
 
 - weak memory
-  -- flat model does instruction re-ordering, which means no sequential stepping through instructions
-  -- promising model requires future-write reasoning
-  -- DRF-SC is probably not sufficient to cover all kernel code
+  - flat model does instruction re-ordering, which means no sequential stepping through instructions
+  - promising model requires future-write reasoning
+  - DRF-SC is probably not sufficient to cover all kernel code
 - devices
 - liveness, or at least deadlock avoidance
 - file system
