@@ -415,6 +415,7 @@ Section WpKernelvecVc.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
     iIntros (mf) "%Hmf Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
+    destruct Hmf as [Hmf _Hpres].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /kv_store_heap1;
            cbn [big_opL fst snd];
            rewrite !sval_den_SX0; cbn [sval_den];
@@ -643,6 +644,7 @@ Section WpKernelvecVc.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
     iIntros (mf) "%Hmf Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
+    destruct Hmf as [Hmf _Hpres].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /kv_store_heap0;
            cbn [big_opL fst snd];
            rewrite !sval_den_SX0; cbn [sval_den];

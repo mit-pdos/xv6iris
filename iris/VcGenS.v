@@ -21,7 +21,7 @@
 
    The symbolic state, heap, and register denotation are shared with
    VcGen.v ([vstate] / [vheap_own] / [vregs_den] / [sval]).  See
-   WpMycpu.v / WpPopOffVc.v for this VCgen applied to mycpu() and
+   WpMycpu.v / WpPopOff.v for this VCgen applied to mycpu() and
    pop_off(). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -718,10 +718,31 @@ Section VcGenSIris.
   (* the post-state agreement.  This is both the cheap-seams and the     *)
   (* cheap-vm_compute interface (small maps normalize in ~ms).           *)
   (* ================================================================== *)
-  Lemma wp_vc_block_s (root_ppn : mword 44) (prog : list vop_s) E
+
+  (* Untouched-register preservation: for registers absent from the
+     symbolic map [vr], the concrete file [mf] still agrees with the
+     block's original input [m0].  [vc_step_s] only ever ADDS a register
+     to [vr] (writes) or leaves it unchanged (stores), so the domain grows
+     monotonically and any register never entered into [vr] keeps its
+     entry value from [m0]. *)
+  Definition agree_off (vr : gmap regidx sval)
+      (mf m0 : gmap regidx (mword 64)) : Prop :=
+    forall r, vr !! r = None -> mf !!! r = m0 !!! r.
+
+  Lemma agree_off_step {vr : gmap regidx sval} {mf m0 : gmap regidx (mword 64)}
+      {r : regidx} {sv : sval} {w : mword 64} :
+    agree_off vr mf m0 -> agree_off (<[r := sv]> vr) (<[r := w]> mf) m0.
+  Proof.
+    intros H r' Hr'. destruct (decide (r' = r)) as [->|Hne].
+    - rewrite lookup_insert in Hr'. discriminate.
+    - rewrite lookup_insert_ne in Hr'; [|congruence].
+      rewrite lookup_total_insert_ne; [|congruence]. exact (H _ Hr').
+  Qed.
+
+  Lemma wp_vc_block_s_aux (root_ppn : mword 44) (prog : list vop_s) E
       (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
-      (m : gmap regidx (mword 64))
+      (m m0 : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     ↑minstretN ⊆ E ->
@@ -735,6 +756,7 @@ Section VcGenSIris.
     menvcfg0 = MENVCFG_S ->
     vc_block_s st prog = Some st' ->
     gpr_matches ρ st.(vregs) m ->
+    agree_off st.(vregs) m m0 ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -746,7 +768,7 @@ Section VcGenSIris.
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
     ( ∀ mf : gmap regidx (mword 64),
-      ⌜ gpr_matches ρ st'.(vregs) mf ⌝ -∗
+      ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m0 ⌝ -∗
       hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
@@ -759,7 +781,7 @@ Section VcGenSIris.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
-    revert st m. induction prog as [|op rest IH]; intros st m Hblk Hmatch.
+    revert st m. induction prog as [|op rest IH]; intros st m Hblk Hmatch Hao.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
       iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -794,7 +816,7 @@ Section VcGenSIris.
         { unfold regval_into_reg.
           rewrite Hm1 (sval_den_add_imm ρ v1 (sign_extend' 12 imm) H64).
           reflexivity. }
-        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScaddi4spn *)
@@ -821,7 +843,7 @@ Section VcGenSIris.
         { unfold regval_into_reg.
           rewrite Hm1 (sval_den_add_imm ρ v1 (caddi4spn_imm nzimm) H64).
           reflexivity. }
-        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScsdsp *)
@@ -854,7 +876,7 @@ Section VcGenSIris.
         iEval (rewrite Hm2 -Hea) in "Hcell".
         iDestruct ("Hheapk" $! (sval_addZ v1 (zoff6 uimm), v2) with "[Hcell]")
           as "Hheap"; [iExact "Hcell"|].
-        iApply (IH _ _ Hblk Hmatch
+        iApply (IH _ _ Hblk Hmatch Hao
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScldsp *)
@@ -889,7 +911,7 @@ Section VcGenSIris.
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
         assert (Hval : regval_into_reg (sval_den ρ vv) = sval_den ρ vv)
           by reflexivity.
-        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSclw *)
@@ -923,7 +945,7 @@ Section VcGenSIris.
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
         assert (Hval : regval_into_reg (sign_extend' 64 (sval32_den ρ w32))
                        = sval_den ρ (S32 w32)) by reflexivity.
-        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScsw *)
@@ -958,7 +980,7 @@ Section VcGenSIris.
         iEval (rewrite Hsv -Hea) in "Hcell".
         iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), sval_trunc32 v2)
                      with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
-        iApply (IH _ _ Hblk Hmatch
+        iApply (IH _ _ Hblk Hmatch Hao
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScaddiw *)
@@ -986,7 +1008,7 @@ Section VcGenSIris.
           unfold zimm32. rewrite mword_of_int_uint32.
           rewrite -trunc32_add.
           rewrite trunc32_subrange. reflexivity. }
-        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSsd : general-base 8-byte store (agreement interface) *)
@@ -1019,7 +1041,7 @@ Section VcGenSIris.
           iEval (rewrite Hm2 -Hea) in "Hcell".
           iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
             as "Hheap"; [iExact "Hcell"|].
-          iApply (IH _ _ Hblk Hmatch
+          iApply (IH _ _ Hblk Hmatch Hao
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
         * iApply (wp_sd_s_ram root_ppn E Φ (mword_of_int (vpc st)) rs2 rs1 imm
@@ -1033,7 +1055,7 @@ Section VcGenSIris.
           iEval (rewrite Hm2 -Hea) in "Hcell".
           iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
             as "Hheap"; [iExact "Hcell"|].
-          iApply (IH _ _ Hblk Hmatch
+          iApply (IH _ _ Hblk Hmatch Hao
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSld : general-base 8-byte load (agreement interface) *)
@@ -1066,7 +1088,7 @@ Section VcGenSIris.
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
-          iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+          iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
         * iApply (wp_ld_s_ram root_ppn E Φ (mword_of_int (vpc st)) rd rs1 imm
@@ -1079,9 +1101,62 @@ Section VcGenSIris.
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
-          iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+          iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+  Qed.
+
+  (* Thin wrapper over [wp_vc_block_s_aux]: instantiate the auxiliary
+     induction at [m0 := m], where the entry agreement [agree_off (vregs st)
+     m m] is reflexive.  Same interface as before EXCEPT the continuation's
+     pure fact now also carries [agree_off st'.(vregs) mf m] -- untouched
+     registers keep their input values. *)
+  Lemma wp_vc_block_s (root_ppn : mword 44) (prog : list vop_s) E
+      (Φ : mval -> iProp Σ)
+      (st st' : vstate) (ρ : nat -> mword 64)
+      (m : gmap regidx (mword 64))
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    vc_block_s st prog = Some st' ->
+    gpr_matches ρ st.(vregs) m ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv root_ppn -∗
+    pc_is (mword_of_int st.(vpc)) -∗
+    gpr_file m -∗
+    block_instrs_s st.(vpc) prog -∗
+    vheap_own ρ st.(vheap) -∗
+    vheap4_own ρ st.(vheap4) -∗
+    ( ∀ mf : gmap regidx (mword 64),
+      ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m ⌝ -∗
+      hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      tlb_inv root_ppn -∗
+      pc_is (mword_of_int st'.(vpc)) -∗
+      gpr_file mf -∗
+      vheap_own ρ st'.(vheap) -∗
+      vheap4_own ρ st'.(vheap4) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hblk Hmatch.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont".
+    iApply (wp_vc_block_s_aux root_ppn prog E Φ st st' ρ m m mstatus0 mie_v mdv0 menvcfg0
+              (dq:=dq) HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hblk Hmatch
+              (fun r _ => eq_refl)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
   Qed.
 
   (* ================================================================== *)
