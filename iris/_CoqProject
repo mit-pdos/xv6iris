@@ -68,8 +68,12 @@ UmodeTrap.v
 UmodeFetch.v
 UmodeStep.v
 UmodeEcall.v
+DecodeTotal.v
 WpUserEcall.v
 UmodeFetchFault.v
+UmodeWalk.v
+UmodeData.v
+WpUserLoop.v
 WpIntrStep.v
 WpIntrInv.v
 WpPushOff.v
