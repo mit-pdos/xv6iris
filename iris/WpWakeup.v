@@ -419,9 +419,9 @@ Section WkLeaves.
   Local Notation WKI off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.wakeup + off) : mword 64) rvc ast).
   Local Notation csdsp_imm u :=
-    (zero_extend' 12 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
+    (zero_extend' 12 (concat_vec (mword_of_int u : mword 6) ('b"000"))) (only parsing).
   Local Notation cld_imm u :=
-    (zero_extend' 12 (concat_vec (mword_of_int u : mword 5) ('b"000"))).
+    (zero_extend' 12 (concat_vec (mword_of_int u : mword 5) ('b"000"))) (only parsing).
 
   (* ---- prologue ---- *)
   Lemma wki_00 : WKI 0x00 true (ITYPE (caddi16sp_imm (mword_of_int 60 : mword 6), sp, sp, ADDI)).

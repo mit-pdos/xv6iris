@@ -308,9 +308,9 @@ Section WpMemsetPage.
                     unfold gpr_rd_val;
                     rewrite Hva Hvb;
                     match goal with
-                    | |- context [ ?mm !!! Regidx (mword_of_int 12 : mword 5) ] =>
+                    | |- context [ ?mm !!! Regidx (mword_of_int 12) ] =>
                         let HA := fresh "HA" in
-                        assert (HA : mm !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int 4096 : mword 64));
+                        assert (HA : mm !!! Regidx (mword_of_int 12) = (mword_of_int 4096));
                         [ rewrite lookup_total_insert; rewrite lookup_total_insert;
                           rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                           rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
@@ -319,9 +319,9 @@ Section WpMemsetPage.
                         | rewrite HA ]
                     end;
                     match goal with
-                    | |- context [ ?mm !!! Regidx (mword_of_int 10 : mword 5) ] =>
+                    | |- context [ ?mm !!! Regidx (mword_of_int 10) ] =>
                         let HB := fresh "HB" in
-                        assert (HB : mm !!! Regidx (mword_of_int 10 : mword 5) = p);
+                        assert (HB : mm !!! Regidx (mword_of_int 10) = p);
                         [ rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                           rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                           rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
