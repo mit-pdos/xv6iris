@@ -554,10 +554,6 @@ Section WpKallocDecode.
   Proof. mk_rvc4 (KA + 0x58)%Z (mword_of_int 0xb7e5 : mword 16) (mword_of_int 0x1141b7e5 : mword 32)
     (mword_of_int (KA + 0x58) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")), zreg)) kdc_b7e5 exec_execute_C_J. Qed.
 
-  Lemma kai_5a : kernel_text -∗ instr (mword_of_int (KA + 0x5a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc2 (KA + 0x5a)%Z (mword_of_int 0x1141 : mword 16)
-    (mword_of_int (KA + 0x5a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) kdc_1141 exec_execute_C_ADDI. Qed.
-
   (* =================================================================== *)
   (*  kfree @ 0x80000a38, offsets 0x00 .. 0x68.                           *)
   (* =================================================================== *)
@@ -704,17 +700,5 @@ Section WpKallocDecode.
   Lemma kfi_5e : kernel_text -∗ instr (mword_of_int (KF + 0x5e) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc2 (KF + 0x5e)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KF + 0x5e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) kdc_8082 exec_execute_C_JR. Qed.
-
-  Lemma kfi_60 : kernel_text -∗ instr (mword_of_int (KF + 0x60) : mword 64) false (UTYPE (mword_of_int 0x6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
-  Proof. mk_base (KF + 0x60)%Z (mword_of_int 0x00006517 : mword 32)
-    (mword_of_int (KF + 0x60) : mword 64) (UTYPE (mword_of_int 0x6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kdb_00006517. Qed.
-
-  Lemma kfi_64 : kernel_text -∗ instr (mword_of_int (KF + 0x64) : mword 64) false (ITYPE (mword_of_int 0x5a0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KF + 0x64)%Z (mword_of_int 0x5a050513 : mword 32)
-    (mword_of_int (KF + 0x64) : mword 64) (ITYPE (mword_of_int 0x5a0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kdb_5a050513. Qed.
-
-  Lemma kfi_68 : kernel_text -∗ instr (mword_of_int (KF + 0x68) : mword 64) false (JAL (mword_of_int 0x1ffd78 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KF + 0x68)%Z (mword_of_int 0xd79ff0ef : mword 32)
-    (mword_of_int (KF + 0x68) : mword 64) (JAL (mword_of_int 0x1ffd78 : mword 21, Regidx (mword_of_int 1))) kdb_d79ff0ef. Qed.
 
 End WpKallocDecode.

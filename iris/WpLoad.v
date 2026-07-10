@@ -18,10 +18,6 @@ Import Defs.
 Lemma rX_x2 : rX (Regno 2) = Defs.read_reg (R_bitvector_64 x2).
 Proof. reflexivity. Qed.
 
-Lemma run_rX_x2 s :
-  run (rX (Regno 2)) s (register_lookup (R_bitvector_64 x2) s.(sregs)) s.
-Proof. rewrite rX_x2. split; reflexivity. Qed.
-
 Lemma exec_rX_x2 s :
   exec (rX (Regno 2)) s = Some (register_lookup (R_bitvector_64 x2) s.(sregs), s).
 Proof. reflexivity. Qed.

@@ -121,25 +121,6 @@ Section WpEntryNew.
      can still see through it where a proof genuinely needs the [big_sepM]. *)
   Global Typeclasses Opaque kernel_text.
 
-  (* THE window extractor: for the instruction word [w] of width [W] bytes at
-     byte address [A], its fetch window (in the per-opcode WPs' form,
-     [pa_add (fetch_pa pc) j ↦ₘ□ nth_byte w j]) is recovered from [kernel_text]
-     by looking up the [W] consecutive bytes [A .. A+W-1].  The byte-equality
-     side condition [Hbytes] (each stored byte = the j-th byte of [w]) is
-     discharged at the call site by [vm_compute] over the concrete image. *)
-  Lemma kernel_window {wd : Z} (A : Z) (w : mword wd) (W : nat) :
-    (forall j, (j < W)%nat ->
-       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j)) ->
-    kernel_text -∗
-    ([∗ list] j ∈ seq 0 W, (pa_add (fetch_pa (mword_of_int A)) j) ↦ₘ□ nth_byte w j).
-  Proof.
-    iIntros (Hbytes) "#Ht". iApply big_sepL_intro. iIntros "!>" (k j Hk).
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt]. simpl.
-    rewrite pa_add_fetch_mword.
-    iApply (big_sepM_lookup _ _ (A + Z.of_nat k)%Z (nth_byte w k) with "Ht").
-    apply Hbytes. exact Hlt.
-  Qed.
-
   (* [pa_add] over a literal address, without the [fetch_pa] wrapper (the
      [instr_bytes] footprints are phrased directly over the instruction
      address; virtual = physical in M-mode). *)
