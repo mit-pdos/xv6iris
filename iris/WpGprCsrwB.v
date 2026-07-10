@@ -94,7 +94,7 @@ Lemma exec_write_CSR_mideleg (v : mword 64) s :
             set_reg s mideleg (mideleg_legalized (register_lookup mideleg s.(sregs)) v)).
 Proof.
   intro HS. unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   (* reached the 0x303 clause *)
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_legalize_mideleg (register_lookup mideleg s.(sregs)) v s HS)).
@@ -161,7 +161,7 @@ Lemma exec_write_CSR_sie (v : mword 64) s :
             set_reg s mie (sie_new_mie (register_lookup mie s.(sregs)) (register_lookup mideleg s.(sregs)) v)).
 Proof.
   unfold write_CSR, sie_new_mie.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   (* reached the 0x104 clause *)
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mie s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
@@ -354,7 +354,7 @@ Lemma exec_write_CSR_satp (v : mword 64) s :
             set_reg s satp (satp_legalized (register_lookup satp s.(sregs)) v)).
 Proof.
   intros HS HSXL. unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_architecture_Supervisor s HSXL)).
@@ -377,7 +377,7 @@ Lemma exec_is_CSR_accessible_satp s :
   exec (is_CSR_accessible csr_satp Machine CSRWrite) s = Some (true, s).
 Proof.
   unfold is_CSR_accessible.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   unfold satp_accessible. cbn match. apply exec_hartSupports_S.
@@ -481,7 +481,7 @@ Lemma exec_write_CSR_pmpaddr0 (v : mword 64) s :
               (register_lookup pmpaddr_n s.(sregs)) v)).
 Proof.
   unfold write_CSR.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   cbn zeta.
@@ -559,7 +559,7 @@ Lemma exec_is_CSR_accessible_stimecmp s :
   exec (is_CSR_accessible csr_stimecmp Machine CSRWrite) s = Some (true, s).
 Proof.
   intro HS. unfold is_CSR_accessible.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   apply (exec_is_stimecmp_accessible_M s HS).
@@ -571,7 +571,7 @@ Lemma exec_write_CSR_stimecmp (v : mword 64) s :
             set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)).
 Proof.
   unfold write_CSR, stimecmp_legalized.
-  repeat (erewrite exec_if_false_g by (vm_compute; reflexivity)).
+  skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stimecmp s)).

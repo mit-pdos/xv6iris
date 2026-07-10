@@ -78,6 +78,13 @@ Qed.
 (* Walk the [read_CSR] dispatch; see WpGprCsrrAny provenance / build-perf note. *)
 Ltac drive_csr :=
   unfold read_CSR;
+  (* Batch-peel the leading false clauses (16 then 4 at a time) before the
+     per-clause loop, mirroring [skip_csr_false_clauses]: the O(tail)-sized
+     retyping that dominates the walk happens ~3x instead of ~90x.  The
+     single-clause loop below still handles the residual clauses and the
+     TRUE guard. *)
+  repeat (erewrite exec_if_false_g16 by (vm_compute; reflexivity));
+  repeat (erewrite exec_if_false_g4 by (vm_compute; reflexivity));
   repeat first
     [ erewrite exec_if_false_g by (vm_compute; reflexivity)
     | match goal with
