@@ -89,6 +89,7 @@ WpKalloc.v
 WpKfree.v
 TrampPt.v
 TrampTlb.v
+WpUserret.v
 VcGen.v
 VcGenS.v
 WpSwtchVc.v

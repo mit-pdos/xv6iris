@@ -1,0 +1,834 @@
+(* WpUserret.v -- verifying the [userret] trampoline (kernel/trampoline.S):
+   the return-to-user path that switches from the kernel page table to a user
+   process page table and sret's to user mode.
+
+   userret sits in the TRAMPOLINE page: physically at KernelSyms.userret
+   (0x8000609c, inside kernel text), but it EXECUTES at virtual address
+   TRAMPOLINE + 0x9c = 0x3FFFFF F09C -- the same page is mapped at TRAMPOLINE
+   in BOTH the kernel page table and every user page table, which is what
+   makes the mid-stream satp switch coherent:
+
+     0x9c  sfence.vma        (fetch via KERNEL PT: walk, fills slot 63)
+     0xa0  csrw satp,a0      (fetch HITS slot 63; satp := user table)
+     0xa4  sfence.vma        (fetch HITS the STALE kernel-PT entry -- same pa!)
+                             (execute flushes the TLB; [utlb_inv] holds now)
+     0xa8.. lui/c.addiw/c.slli  a0 := TRAPFRAME
+     0xb0.. 27 ld/c.ld rd, off(a0)   (loads via the user PT's TRAPFRAME leaf)
+     0x11a c.ld a0, 112(a0)
+     0x11c sret               (SPP=0: to USER mode, pc := sepc)
+
+   This file provides:
+   - [utlb_inv]: the USER page table's TLB/PT invariant (the [tlb_inv] mirror
+     for a user table): satp holds the user root, the TLB is slot-precise
+     (63 = trampoline 4K entry or empty, 62 = trapframe 4K entry or empty,
+     all others empty), and the four user PTEs are owned;
+   - [ktramp_pte_bytes]: the KERNEL page table's trampoline-walk PTEs (the
+     kernel [tlb_inv] only speaks about the kernel-text superpage, so the
+     TRAMPOLINE mapping's three PTEs ride separately);
+   - the unified S-mode fetch over the trampoline mapping (kernel- and
+     user-table phases) and the step engines;
+   - [instr] constructors for the 38 userret instructions;
+   - [wp_userret]: the whole-trampoline WP through sret, ending in USER mode
+     with [utlb_inv] established and the GPR file loaded from the trapframe. *)
+From Stdlib Require Import ZArith.
+From stdpp Require Import bitvector.definitions gmap.
+From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import MinstretInv InstrBytes.
+Require Import WpDecode WpDecodeBridge WpRvcBridge WpLeafCommon.
+Require Import WpGpr WpGprLui WpGprAddi WpGprShift WpGprRvc WpLoad.
+Require Import WpGprCsrwCommon WpGprCsrwB WpGprMretNew WpRelease.
+Require Import SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
+Require Import TrampPt TrampTlb.
+From Kernel Require Import KernelInstrs.
+From Kernel Require KernelSyms.
+Local Open Scope Z_scope.
+Import Defs.
+
+(* ===================================================================== *)
+(* 1. Constants: userret's va/pa windows and the user-PT PTE values.      *)
+(* ===================================================================== *)
+
+(* the userret instruction at trampoline-page offset [off]. *)
+Definition uva (off : Z) : mword 64 := mword_of_int (TRAMPOLINE + off).
+Definition upa (off : Z) : mword 64 := mword_of_int (KernelSyms.trampoline + off).
+
+(* PTE values of the user table's trampoline/trapframe walk. *)
+Definition pte_tramp : mword 64 := mk_pte tramp_ppn PTE_TRAMP.
+Definition pte_tf (tfp : mword 44) : mword 64 := mk_pte tfp PTE_TF.
+Definition pte_ptr (p : mword 44) : mword 64 := mk_pte p PTE_PTR.
+
+(* the walk indices of both top-of-VA pages (VPN2=255, VPN1=511; VPN0 = 511
+   for TRAMPOLINE, 510 for TRAPFRAME). *)
+Local Notation idx2t := (subrange_vec_dec tramp_vpn 26 18).
+Local Notation idx1t := (subrange_vec_dec tramp_vpn 17 9).
+Local Notation idx0t := (subrange_vec_dec tramp_vpn 8 0).
+Local Notation idx2f := (subrange_vec_dec tf_vpn 26 18).
+Local Notation idx1f := (subrange_vec_dec tf_vpn 17 9).
+Local Notation idx0f := (subrange_vec_dec tf_vpn 8 0).
+
+(* the 4K TLB entries the two walks install (asid 0). *)
+Definition tramp_ent (l0 : mword 44) : TLB_Entry :=
+  tlb4k_entry (mword_of_int 0) tramp_vpn tramp_ppn pte_tramp (pte_addr_at l0 idx0t).
+Definition tf_ent (ul0 tfp : mword 44) : TLB_Entry :=
+  tlb4k_entry (mword_of_int 0) tf_vpn tfp (pte_tf tfp) (pte_addr_at ul0 idx0f).
+
+(* ===================================================================== *)
+(* 2. Iris bundles.                                                       *)
+(* ===================================================================== *)
+
+Section UserretIris.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{CID : CpuId}.
+
+  (* 8 owned bytes holding a PTE. *)
+  Definition pte8 (a v : mword 64) (dq : dfrac) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ{ dq } nth_byte v j)%I.
+
+  (* the user table's four PTEs: root[255] -> l1, l1[511] -> l0,
+     l0[511] = trampoline leaf, l0[510] = trapframe leaf. *)
+  Definition upte_bytes (uroot ul1 ul0 tfp : mword 44) (dq : dfrac) : iProp Σ :=
+    (pte8 (pte_addr_at uroot idx2t) (pte_ptr ul1) dq ∗
+     pte8 (pte_addr_at ul1 idx1t) (pte_ptr ul0) dq ∗
+     pte8 (pte_addr_at ul0 idx0t) pte_tramp dq ∗
+     pte8 (pte_addr_at ul0 idx0f) (pte_tf tfp) dq)%I.
+
+  (* the KERNEL table's trampoline-walk PTEs (kroot[255] -> kl1 -> kl0[511]).
+     The kernel [tlb_inv] owns only the kernel-text superpage PTE; the
+     TRAMPOLINE mapping's PTEs ride separately in the userret WP. *)
+  Definition ktramp_pte_bytes (kroot kl1 kl0 : mword 44) (dq : dfrac) : iProp Σ :=
+    (pte8 (pte_addr_at kroot idx2t) (pte_ptr kl1) dq ∗
+     pte8 (pte_addr_at kl1 idx1t) (pte_ptr kl0) dq ∗
+     pte8 (pte_addr_at kl0 idx0t) pte_tramp dq)%I.
+
+  (* slot-precise TLB consistency for the user table: 63 = trampoline or
+     empty, 62 = trapframe or empty, everything else empty. *)
+  Definition utlb_consistent (ul0 tfp : mword 44)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
+    forall i, 0 <= i < 2 ^ 6 ->
+      vec_access_dec tlbvec i = None \/
+      (i = 63 /\ vec_access_dec tlbvec i = Some (tramp_ent ul0)) \/
+      (i = 62 /\ vec_access_dec tlbvec i = Some (tf_ent ul0 tfp)).
+
+  Lemma utlb_consistent_empty (ul0 tfp : mword 44)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    (forall i, 0 <= i < 64 -> vec_access_dec tlbvec i = None) ->
+    utlb_consistent ul0 tfp tlbvec.
+  Proof. intros H i Hi. left. apply H. exact Hi. Qed.
+
+  (* the two fills preserve consistency.  [tlb_hash tramp_vpn] = 63 and
+     [tlb_hash tf_vpn] = 62 (direct-mapped low bits). *)
+  Lemma tramp_hash : tlb_hash (__id 39) tramp_vpn = 63.
+  Proof. vm_compute; reflexivity. Qed.
+  Lemma tf_hash : tlb_hash (__id 39) tf_vpn = 62.
+  Proof. vm_compute; reflexivity. Qed.
+
+  Lemma utlb_consistent_fill63 (ul0 tfp : mword 44)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    utlb_consistent ul0 tfp tlbvec ->
+    utlb_consistent ul0 tfp
+      (vec_update_dec tlbvec (tlb_hash (__id 39) tramp_vpn) (Some (tramp_ent ul0))).
+  Proof.
+    intros Hc i Hi.
+    rewrite tramp_hash.
+    rewrite (vec64_access_update tlbvec 63 i _ ltac:(lia)).
+    destruct (Z.eqb_spec i 63) as [-> | Hne].
+    - right; left. split; reflexivity.
+    - apply Hc. exact Hi.
+  Qed.
+
+  Lemma utlb_consistent_fill62 (ul0 tfp : mword 44)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    utlb_consistent ul0 tfp tlbvec ->
+    utlb_consistent ul0 tfp
+      (vec_update_dec tlbvec (tlb_hash (__id 39) tf_vpn) (Some (tf_ent ul0 tfp))).
+  Proof.
+    intros Hc i Hi.
+    rewrite tf_hash.
+    rewrite (vec64_access_update tlbvec 62 i _ ltac:(lia)).
+    destruct (Z.eqb_spec i 62) as [-> | Hne].
+    - right; right. split; reflexivity.
+    - apply Hc. exact Hi.
+  Qed.
+
+  (* consistency gives [exec_translateAddr_tramp]'s slot disjunction. *)
+  Lemma utlb_slot63 (ul0 tfp : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    utlb_consistent ul0 tfp tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn) = None \/
+    (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn) = Some ent /\
+                 match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) tramp_vpn) = false) \/
+    (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn)
+                  = Some (tlb4k_entry (mword_of_int 0) tramp_vpn tramp_ppn (mk_pte tramp_ppn PTE_TRAMP) ptea)).
+  Proof.
+    intros Hc.
+    rewrite tramp_hash.
+    destruct (Hc 63 ltac:(vm_compute; split; congruence)) as [Hn | [[_ He] | [Habs _]]].
+    - left. exact Hn.
+    - right; right. eexists. exact He.
+    - lia.
+  Qed.
+
+  Lemma utlb_slot62 (ul0 tfp : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    utlb_consistent ul0 tfp tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) tf_vpn) = None \/
+    (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) tf_vpn) = Some ent /\
+                 match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) tf_vpn) = false) \/
+    (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) tf_vpn)
+                  = Some (tlb4k_entry (mword_of_int 0) tf_vpn tfp (mk_pte tfp PTE_TF) ptea)).
+  Proof.
+    intros Hc.
+    rewrite tf_hash.
+    destruct (Hc 62 ltac:(vm_compute; split; congruence)) as [Hn | [[Habs _] | [_ He]]].
+    - left. exact Hn.
+    - lia.
+    - right; right. eexists. exact He.
+  Qed.
+
+  (* the ambient PMP configuration for the user table's PTE reads (mirror of
+     SmodeCore's [pmp_config], covering the FOUR user PTE addresses). *)
+  Definition upmp_config (uroot ul1 ul0 tfp : mword 44) : iProp Σ :=
+    (∃ (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+        (rg2 rg1 rg0t rg0f : PMA_Region),
+       pmpcfg_n ↦ᵣ pmpcfg0 ∗ pmpaddr_n ↦ᵣ pmpaddr00 ∗
+       ⌜ pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at uroot idx2t) ⌝ ∗
+       ⌜ pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at ul1 idx1t) ⌝ ∗
+       ⌜ pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at ul0 idx0t) ⌝ ∗
+       ⌜ pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at ul0 idx0f) ⌝ ∗
+       ⌜ forall pmar0, pma_allows_all pmar0 ->
+           (matching_pma_region pmar0 (Physaddr (pte_addr_at uroot idx2t)) 8 = Some rg2 /\
+            (override_PMA (PMA_Region_attributes rg2) PBMT_PMA).(PMA_supports_pte_read) = true) /\
+           (matching_pma_region pmar0 (Physaddr (pte_addr_at ul1 idx1t)) 8 = Some rg1 /\
+            (override_PMA (PMA_Region_attributes rg1) PBMT_PMA).(PMA_supports_pte_read) = true) /\
+           (matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0t)) 8 = Some rg0t /\
+            (override_PMA (PMA_Region_attributes rg0t) PBMT_PMA).(PMA_supports_pte_read) = true) /\
+           (matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0f)) 8 = Some rg0f /\
+            (override_PMA (PMA_Region_attributes rg0f) PBMT_PMA).(PMA_supports_pte_read) = true) ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ⌝)%I.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE USER-PAGE-TABLE INVARIANT: the [tlb_inv] mirror for a user table. *)
+  (* satp holds the user root; the TLB is [utlb_consistent]; the walk's    *)
+  (* PTEs and the PMP configuration ride inside at full fraction.          *)
+  (* ------------------------------------------------------------------- *)
+  Definition utlb_inv (uroot ul1 ul0 tfp : mword 44) : iProp Σ :=
+    (∃ (usatp : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+       satp ↦ᵣ usatp ∗
+       ⌜ _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ⌝ ∗
+       ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ⌝ ∗
+       tlb ↦ᵣ tlbvec ∗ ⌜ utlb_consistent ul0 tfp tlbvec ⌝ ∗
+       upte_bytes uroot ul1 ul0 tfp (DfracOwn 1) ∗
+       upmp_config uroot ul1 ul0 tfp)%I.
+
+  Lemma utlb_inv_intro (uroot ul1 ul0 tfp : mword 44) (usatp : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ->
+    utlb_consistent ul0 tfp tlbvec ->
+    satp ↦ᵣ usatp -∗ tlb ↦ᵣ tlbvec -∗ upte_bytes uroot ul1 ul0 tfp (DfracOwn 1) -∗
+    upmp_config uroot ul1 ul0 tfp -∗
+    utlb_inv uroot ul1 ul0 tfp.
+  Proof.
+    intros Hmode Hasid Hppn Hc. iIntros "Hsatp Htlb Hpte Hpmp".
+    iExists usatp, tlbvec. iFrame "Hsatp Htlb Hpte Hpmp". iPureIntro. tauto.
+  Qed.
+
+  Lemma utlb_inv_open (uroot ul1 ul0 tfp : mword 44) :
+    utlb_inv uroot ul1 ul0 tfp -∗
+    ∃ (usatp : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+      satp ↦ᵣ usatp ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ⌝ ∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ⌝ ∗
+      tlb ↦ᵣ tlbvec ∗ ⌜ utlb_consistent ul0 tfp tlbvec ⌝ ∗
+      upte_bytes uroot ul1 ul0 tfp (DfracOwn 1) ∗
+      upmp_config uroot ul1 ul0 tfp.
+  Proof. iIntros "H". iExact "H". Qed.
+
+End UserretIris.
+
+(* ===================================================================== *)
+(* 3. The Iris-level fetch translation through the USER table: from       *)
+(* [utlb_inv]'s opened pieces, any trampoline-page va translates to its   *)
+(* physical home, HITTING slot 63 or WALKING the three owned PTEs (fill). *)
+(* ===================================================================== *)
+
+Section UserretFetch.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{CID : CpuId}.
+
+  (* mem-lookup facts for one owned PTE. *)
+  Lemma pte8_facts (σ : mstate) (a v : mword 64) (dq : dfrac) :
+    mstate_interp σ -∗ pte8 a v dq -∗
+    ⌜ (forall j : nat, (N.of_nat j < 8)%N -> σ.(mem) !! (pa_add a j) = Some (nth_byte v j))
+      /\ addr_is_ram a ⌝.
+  Proof.
+    iIntros "[Hreg Hmem] Hp".
+    iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
+               σ.(mem) !! (pa_add a j) = Some (nth_byte v j)⌝)%I as %Hb.
+    { iIntros (j Hj).
+      iDestruct (big_sepL_lookup _ _ j j with "Hp") as "Hbj".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+    iAssert (⌜addr_is_ram a⌝)%I as %Hram.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hp") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+      iPureIntro. exact Hr0. }
+    iPureIntro. tauto.
+  Qed.
+
+  (* the leaf reductions for the two user leaves, discharged once. *)
+  Lemma tramp_chk_fetch : forall (mxr do_sum : bool) s',
+    exec (check_PTE_permission (InstructionFetch tt) Supervisor mxr do_sum
+            (Mk_PTE_Flags (mword_of_int PTE_TRAMP)) (Mk_PTE_Ext (mword_of_int 0)) tt) s'
+    = Some (PTE_Check_Success tt, s').
+  Proof. intros mxr do_sum s'. destruct mxr, do_sum; vm_compute; reflexivity. Qed.
+
+  Lemma tf_chk_load : forall (mxr do_sum : bool) s',
+    exec (check_PTE_permission (Load Data) Supervisor mxr do_sum
+            (Mk_PTE_Flags (mword_of_int PTE_TF)) (Mk_PTE_Ext (mword_of_int 0)) tt) s'
+    = Some (PTE_Check_Success tt, s').
+  Proof. intros mxr do_sum s'. destruct mxr, do_sum; vm_compute; reflexivity. Qed.
+
+  Lemma tramp_inv_red : forall s',
+    exec (pte_is_invalid (Mk_PTE_Flags (mword_of_int PTE_TRAMP)) (Mk_PTE_Ext (mword_of_int 0))) s'
+    = Some (false, s').
+  Proof. intro s'. vm_compute; reflexivity. Qed.
+
+  Lemma tf_inv_red : forall s',
+    exec (pte_is_invalid (Mk_PTE_Flags (mword_of_int PTE_TF)) (Mk_PTE_Ext (mword_of_int 0))) s'
+    = Some (false, s').
+  Proof. intro s'. vm_compute; reflexivity. Qed.
+
+  (* THE per-va fetch translation, USER-phase.  Pure geometry facts about
+     the CONCRETE va/pa pair are premises ([vm_compute] at instantiation). *)
+  Lemma utramp_translate_fetch (uroot ul1 ul0 tfp : mword 44)
+      (σ : mstate) (va pa : mword 64)
+      (usatp mstatus0 misa0 menvcfg0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (rg2 rg1 rg0t rg0f : PMA_Region) (pmar0 : list PMA_Region)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dqp dqs dqm dqe dqa dqh : dfrac} :
+    pma_allows_all pmar0 ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ->
+    utlb_consistent ul0 tfp tlbvec ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at uroot idx2t) ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at ul1 idx1t) ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at ul0 idx0t) ->
+    (matching_pma_region pmar0 (Physaddr (pte_addr_at uroot idx2t)) 8 = Some rg2 /\
+     (override_PMA (PMA_Region_attributes rg2) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (matching_pma_region pmar0 (Physaddr (pte_addr_at ul1 idx1t)) 8 = Some rg1 /\
+     (override_PMA (PMA_Region_attributes rg1) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0t)) 8 = Some rg0t /\
+     (override_PMA (PMA_Region_attributes rg0t) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (* va/pa geometry (vm_compute at concrete instantiation) *)
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    mstate_interp σ -∗
+    cur_privilege ↦ᵣ{ dqp } Supervisor -∗
+    mstatus ↦ᵣ{ dqs } mstatus0 -∗
+    satp ↦ᵣ usatp -∗
+    tlb ↦ᵣ tlbvec -∗
+    menvcfg ↦ᵣ{ dqe } menvcfg0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ pmpaddr00 -∗
+    pma_regions ↦ᵣ{ dqa } pmar0 -∗
+    htif_tohost_base ↦ᵣ{ dqh } None -∗
+    misa ↦ᵣ{ dqm } misa0 -∗
+    upte_bytes uroot ul1 ul0 tfp (DfracOwn 1) -∗
+    ⌜ exists tlbvec2,
+        exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), set_reg σ tlb tlbvec2)
+        /\ utlb_consistent ul0 tfp tlbvec2 ⌝.
+  Proof.
+    iIntros (Hpma0 HmisaS HSXL Hmode Hppn Hasid Hcons HPBMTE Hp2 Hp1 Hp0 Hr2 Hr1 Hr0
+             Hcanon Hvpn Hident)
+      "Hsi Hpriv Hms Hsatp Htlb Hmenv Hpmpc Hpmpa Hpma Hhtif Hmisa Hpte".
+    iDestruct "Hpte" as "(Hpb2 & Hpb1 & Hpb0t & Hpb0f)".
+    iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb2") as %[Hb2 Hram2].
+    iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb1") as %[Hb1 Hram1].
+    iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb0t") as %[Hb0 Hram0].
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
+    iDestruct (reg_valid    with "Hreg Hsatp") as %Lsatp.
+    iDestruct (reg_valid    with "Hreg Htlb")  as %Ltlb.
+    iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
+    iDestruct (reg_valid    with "Hreg Hpmpc") as %Lpmpc.
+    iDestruct (reg_valid    with "Hreg Hpmpa") as %Lpmpa.
+    iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
+    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iPureIntro.
+    destruct Hp2 as (HA & Hord & Hrg2 & HR).
+    destruct Hp1 as (_ & _ & Hrg1 & _).
+    destruct Hp0 as (_ & _ & Hrg0 & _).
+    destruct Hr2 as [Hm2 Hpr2]. destruct Hr1 as [Hm1 Hpr1]. destruct Hr0 as [Hm0 Hpr0].
+    pose proof (addr_is_ram_not_in_clint _ Hram2) as Hnc2.
+    pose proof (addr_is_ram_not_in_sig _ Hram2) as Hns2.
+    pose proof (addr_is_ram_not_in_clint _ Hram1) as Hnc1.
+    pose proof (addr_is_ram_not_in_sig _ Hram1) as Hns1.
+    pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc0.
+    pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns0.
+    destruct (exec_translateAddr_tramp
+                (InstructionFetch tt) tramp_vpn uroot ul1 ul0 tramp_ppn PTE_TRAMP
+                rg2 rg1 rg0t menvcfg0 σ
+                ltac:(unfold PTE_TRAMP; lia)
+                tramp_inv_red
+                ltac:(vm_compute; reflexivity)
+                tramp_chk_fetch
+                ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                ltac:(rewrite Lmisa; exact HmisaS)
+                ltac:(rewrite Lpmpc; exact HA)
+                ltac:(rewrite Lpmpa; exact Hord)
+                ltac:(rewrite Lpmpc; exact HR)
+                Lmenv HPBMTE
+                ltac:(rewrite Lpmpa; exact Hrg2)
+                ltac:(rewrite Lpma; exact Hm2)
+                Hpr2
+                (within_clint_false _ 8 σ Hnc2 ltac:(lia))
+                (within_sig_false _ 8 σ Hns2 ltac:(lia))
+                (within_htif_false _ 8 σ Lhtif)
+                Hb2
+                ltac:(rewrite Lpmpa; exact Hrg1)
+                ltac:(rewrite Lpma; exact Hm1)
+                Hpr1
+                (within_clint_false _ 8 σ Hnc1 ltac:(lia))
+                (within_sig_false _ 8 σ Hns1 ltac:(lia))
+                (within_htif_false _ 8 σ Lhtif)
+                Hb1
+                ltac:(rewrite Lpmpa; exact Hrg0)
+                ltac:(rewrite Lpma; exact Hm0)
+                Hpr0
+                (within_clint_false _ 8 σ Hnc0 ltac:(lia))
+                (within_sig_false _ 8 σ Hns0 ltac:(lia))
+                (within_htif_false _ 8 σ Lhtif)
+                Hb0
+                ltac:(unfold PTE_TRAMP; vm_compute; reflexivity)
+                usatp pa va
+                (exec_effectivePrivilege_fetch _ _ σ)
+                (exec_is_shadow_stack_fetch σ)
+                Lpriv
+                ltac:(rewrite Lms; exact HSXL)
+                Lsatp Hmode Hppn Hasid Hcanon Hvpn Hident
+                tlbvec Ltlb
+                (utlb_slot63 ul0 tfp tlbvec Hcons))
+      as (s' & Htr & Hcase).
+    destruct Hcase as [-> | ->].
+    - exists tlbvec. split.
+      + replace (set_reg σ tlb tlbvec) with σ; [exact Htr |].
+        rewrite <- Ltlb. symmetry. apply set_reg_tlb_id.
+      + exact Hcons.
+    - eexists. split.
+      + exact Htr.
+      + (* the fill installs [tramp_ent ul0] at slot 63 *)
+        change (tramp_tlb_ent tramp_vpn ul0 tramp_ppn PTE_TRAMP) with (tramp_ent ul0).
+        apply utlb_consistent_fill63. exact Hcons.
+  Qed.
+
+End UserretFetch.
+
+(* ===================================================================== *)
+(* 4. The unified USER-phase fetch over [instr_bytes] at the PHYSICAL     *)
+(* trampoline page: every 16-bit chunk translates through slot 63 (hit    *)
+(* or 3-level walk + fill), and the bytes are read at [pa].               *)
+(* ===================================================================== *)
+
+Section UserretFetch2.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma fetch_from_instr_bytes_u (uroot ul1 ul0 tfp : mword 44)
+      (σ : mstate) (va pa : mword 64) (r : FetchResult)
+      (usatp mstatus0 misa0 menvcfg0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (rg2 rg1 rg0t rg0f : PMA_Region) (pmar0 : list PMA_Region)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) {dqp dqs dqm dqe dqa dqh : dfrac} :
+    pma_allows_all pmar0 ->
+    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
+    eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ->
+    utlb_consistent ul0 tfp tlbvec ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at uroot idx2t) ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at ul1 idx1t) ->
+    pmp_tor0_pte_read pmpcfg0 pmpaddr00 (pte_addr_at ul0 idx0t) ->
+    (matching_pma_region pmar0 (Physaddr (pte_addr_at uroot idx2t)) 8 = Some rg2 /\
+     (override_PMA (PMA_Region_attributes rg2) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (matching_pma_region pmar0 (Physaddr (pte_addr_at ul1 idx1t)) 8 = Some rg1 /\
+     (override_PMA (PMA_Region_attributes rg1) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0t)) 8 = Some rg0t /\
+     (override_PMA (PMA_Region_attributes rg0t) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (* --- va/pa geometry (all [vm_compute] at a concrete va/pa) --- *)
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr va) 4 ->
+    is_aligned_paddr (Physaddr pa) 2 = true ->
+    is_aligned_paddr (Physaddr (add_vec_int pa 2)) 2 = true ->
+    (is_aligned_vaddr (Virtaddr va) 4 = true -> is_aligned_paddr (Physaddr pa) 4 = true) ->
+    addr_is_ram pa -> addr_is_ram (pa_add pa 1) ->
+    addr_is_ram (pa_add pa 2) -> addr_is_ram (pa_add pa 3) ->
+    mstate_interp σ -∗
+    PC ↦ᵣ va -∗
+    cur_privilege ↦ᵣ{ dqp } Supervisor -∗
+    mstatus ↦ᵣ{ dqs } mstatus0 -∗
+    satp ↦ᵣ usatp -∗
+    tlb ↦ᵣ tlbvec -∗
+    menvcfg ↦ᵣ{ dqe } menvcfg0 -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ pmpaddr00 -∗
+    pma_regions ↦ᵣ{ dqa } pmar0 -∗
+    htif_tohost_base ↦ᵣ{ dqh } None -∗
+    misa ↦ᵣ{ dqm } misa0 -∗
+    upte_bytes uroot ul1 ul0 tfp (DfracOwn 1) -∗
+    instr_bytes pa r -∗
+    ⌜ exists tlbvec2,
+        exec (fetch tt) σ = Some (r, set_reg σ tlb tlbvec2)
+        /\ utlb_consistent ul0 tfp tlbvec2 ⌝.
+  Proof.
+    iIntros (Hpma0 HmisaS HmisaC HSXL Hmode Hppn Hasid Hcons HPBMTE HX Hcov
+             Hp2 Hp1 Hp0 Hr2 Hr1 Hr0
+             Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2
+             Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al Hram0 Hram1 Hram2b Hram3b)
+      "Hsi Hpc Hpriv Hms Hsatp Htlb Hmenv Hpmpc Hpmpa Hpma Hhtif Hmisa Hpte Hbytes".
+    (* register lookups at σ *)
+    iDestruct (state_interp_reg_dq σ cur_privilege _ _ with "Hsi Hpriv") as %Lpriv.
+    iDestruct (state_interp_reg_dq σ mstatus _ _ with "Hsi Hms") as %Lms.
+    iDestruct (state_interp_reg_dq σ misa _ _ with "Hsi Hmisa") as %Lmisa.
+    iDestruct (state_interp_reg_dq σ menvcfg _ _ with "Hsi Hmenv") as %Lmenv.
+    iDestruct (state_interp_reg_dq σ pma_regions _ _ with "Hsi Hpma") as %Lpma.
+    iDestruct (state_interp_reg_dq σ htif_tohost_base _ _ with "Hsi Hhtif") as %Lhtif.
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid with "Hreg Hpc") as %Lpc.
+    iDestruct (reg_valid with "Hreg Hsatp") as %Lsatp.
+    iDestruct (reg_valid with "Hreg Htlb") as %Ltlb.
+    iDestruct (reg_valid with "Hreg Hpmpc") as %Lpmpc.
+    iDestruct (reg_valid with "Hreg Hpmpa") as %Lpmpa.
+    iAssert (mstate_interp σ) with "[Hreg Hmem]" as "Hsi". { iFrame. }
+    (* the three fetch-walk PTE mem facts *)
+    iDestruct "Hpte" as "(Hpb2 & Hpb1 & Hpb0t & Hpb0f)".
+    iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb2") as %[Hb2 HramP2].
+    iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb1") as %[Hb1 HramP1].
+    iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb0t") as %[Hb0 HramP0].
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    (* the PURE per-chunk translation, applicable at ANY state agreeing with σ
+       on everything but the tlb (whose value/consistency is a parameter). *)
+    destruct Hp2 as (HAx & Hordx & Hrg2 & HRx).
+    pose proof (conj HAx (conj Hordx (conj Hrg2 HRx))) as Hp2'.
+    destruct Hr2 as [Hm2 Hpr2]. destruct Hr1 as [Hm1 Hpr1]. destruct Hr0 as [Hm0 Hpr0].
+    pose proof (addr_is_ram_not_in_clint _ HramP2) as HncP2.
+    pose proof (addr_is_ram_not_in_sig _ HramP2) as HnsP2.
+    pose proof (addr_is_ram_not_in_clint _ HramP1) as HncP1.
+    pose proof (addr_is_ram_not_in_sig _ HramP1) as HnsP1.
+    pose proof (addr_is_ram_not_in_clint _ HramP0) as HncP0.
+    pose proof (addr_is_ram_not_in_sig _ HramP0) as HnsP0.
+    assert (Htrans : forall (s0 : mstate) (tv : vec (option TLB_Entry) (2 ^ 6))
+                       (va0 pa0 : mword 64),
+      s0.(mem) = σ.(mem) ->
+      register_lookup cur_privilege s0.(sregs) = Supervisor ->
+      register_lookup mstatus s0.(sregs) = mstatus0 ->
+      register_lookup satp s0.(sregs) = usatp ->
+      register_lookup menvcfg s0.(sregs) = menvcfg0 ->
+      register_lookup misa s0.(sregs) = misa0 ->
+      register_lookup pmpcfg_n s0.(sregs) = pmpcfg0 ->
+      register_lookup pmpaddr_n s0.(sregs) = pmpaddr00 ->
+      register_lookup pma_regions s0.(sregs) = pmar0 ->
+      register_lookup htif_tohost_base s0.(sregs) = None ->
+      register_lookup tlb s0.(sregs) = tv ->
+      utlb_consistent ul0 tfp tv ->
+      neq_vec (bits_of_virtaddr (Virtaddr va0))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va0)) (Z.sub 39 1) 0)) = false ->
+      autocast (T := mword) (subrange_vec_dec
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va0)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = tramp_vpn ->
+      zero_extend' 64 (concat_vec tramp_ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va0)) (Z.sub pagesize_bits 1) 0)) = pa0 ->
+      exists tv2,
+        exec (translateAddr (Virtaddr va0) (InstructionFetch tt)) s0
+        = Some (Ok (Physaddr pa0, PBMT_PMA, init_ext_ptw), set_reg s0 tlb tv2)
+        /\ utlb_consistent ul0 tfp tv2).
+    { intros s0 tv va0 pa0 Hsm L0priv L0ms L0satp L0menv L0misa L0pmpc L0pmpa L0pma L0htif L0tlb
+             Hcons0 Hcanon0 Hvpn0 Hident0.
+      destruct (exec_translateAddr_tramp
+                  (InstructionFetch tt) tramp_vpn uroot ul1 ul0 tramp_ppn PTE_TRAMP
+                  rg2 rg1 rg0t menvcfg0 s0
+                  ltac:(unfold PTE_TRAMP; lia)
+                  tramp_inv_red
+                  ltac:(vm_compute; reflexivity)
+                  tramp_chk_fetch
+                  ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity)
+                  ltac:(rewrite L0misa; exact HmisaS)
+                  ltac:(rewrite L0pmpc; exact HAx)
+                  ltac:(rewrite L0pmpa; exact Hordx)
+                  ltac:(rewrite L0pmpc; exact HRx)
+                  L0menv HPBMTE
+                  ltac:(rewrite L0pmpa; exact Hrg2)
+                  ltac:(rewrite L0pma; exact Hm2)
+                  Hpr2
+                  (within_clint_false _ 8 s0 HncP2 ltac:(lia))
+                  (within_sig_false _ 8 s0 HnsP2 ltac:(lia))
+                  (within_htif_false _ 8 s0 L0htif)
+                  ltac:(rewrite Hsm; exact Hb2)
+                  ltac:(rewrite L0pmpa; destruct Hp1 as (_&_&HH&_); exact HH)
+                  ltac:(rewrite L0pma; exact Hm1)
+                  Hpr1
+                  (within_clint_false _ 8 s0 HncP1 ltac:(lia))
+                  (within_sig_false _ 8 s0 HnsP1 ltac:(lia))
+                  (within_htif_false _ 8 s0 L0htif)
+                  ltac:(rewrite Hsm; exact Hb1)
+                  ltac:(rewrite L0pmpa; destruct Hp0 as (_&_&HH&_); exact HH)
+                  ltac:(rewrite L0pma; exact Hm0)
+                  Hpr0
+                  (within_clint_false _ 8 s0 HncP0 ltac:(lia))
+                  (within_sig_false _ 8 s0 HnsP0 ltac:(lia))
+                  (within_htif_false _ 8 s0 L0htif)
+                  ltac:(rewrite Hsm; exact Hb0)
+                  ltac:(unfold PTE_TRAMP; vm_compute; reflexivity)
+                  usatp pa0 va0
+                  (exec_effectivePrivilege_fetch _ _ s0)
+                  (exec_is_shadow_stack_fetch s0)
+                  L0priv
+                  ltac:(rewrite L0ms; exact HSXL)
+                  L0satp Hmode Hppn Hasid Hcanon0 Hvpn0 Hident0
+                  tv L0tlb
+                  (utlb_slot63 ul0 tfp tv Hcons0))
+        as (s' & Htr & Hcase).
+      destruct Hcase as [-> | ->].
+      - exists tv. split.
+        + replace (set_reg s0 tlb tv) with s0; [exact Htr |].
+          rewrite <- L0tlb. symmetry. apply set_reg_tlb_id.
+        + exact Hcons0.
+      - eexists. split.
+        + exact Htr.
+        + change (tramp_tlb_ent tramp_vpn ul0 tramp_ppn PTE_TRAMP) with (tramp_ent ul0).
+          apply utlb_consistent_fill63. exact Hcons0. }
+    (* register facts at the (possibly) filled state *)
+    assert (Hreg1 : forall (tv2 : vec (option TLB_Entry) (2 ^ 6)) (rr : register),
+              register_beq rr tlb = false ->
+              register_lookup rr (set_reg σ tlb tv2).(sregs) = register_lookup rr σ.(sregs)).
+    { intros tv2 rr Hne. unfold set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [reflexivity | exact Hne]. }
+    (* instruction-read pmp facts at any state with σ's registers *)
+    pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
+    pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
+    iEval (rewrite /instr_bytes) in "Hbytes".
+    iDestruct "Hbytes" as "[%H2alp Hbytes]".
+    destruct r as [e | w | h | erx].
+    - (* F_Ext_Error *) iDestruct "Hbytes" as %[].
+    - (* F_Base w *)
+      iDestruct "Hbytes" as "[%HnotRVC Hbytes]".
+      iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
+                 σ.(mem) !! (pa_add pa j) = Some (nth_byte w j)⌝)%I as %Hbf.
+      { iIntros (j Hj).
+        iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+        { rewrite lookup_seq_lt; [reflexivity | lia]. }
+        iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+      iPureIntro.
+      destruct (Hpma0 pa 4) as (rgi & Hmi & Hxi & _ & _).
+      destruct (Hpma0 pa 2) as (rgl & Hml & Hxl & _ & _).
+      destruct (Hpma0 (add_vec_int pa 2) 2) as (rgh & Hmh & Hxh & _ & _).
+      destruct (is_aligned_vaddr (Virtaddr va) 4) eqn:Hal4.
+      + (* single 4-byte read *)
+        destruct (Htrans σ tlbvec va pa eq_refl Lpriv Lms Lsatp Lmenv Lmisa Lpmpc Lpmpa
+                    Lpma Lhtif Ltlb Hcons Hcanon Hvpn Hident) as (tv2 & Htr & Hcons2).
+        set (s1 := set_reg σ tlb tv2).
+        exists tv2. split; [| exact Hcons2].
+        apply (exec_fetch_F_Base_4_pa va pa w σ s1 rgi Lpc Hal4 Htr).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HAx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa. exact Hordx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa.
+          exact (ram_fetch_pmp pa (vec_access_dec pmpaddr00 0) 4 3
+                   ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                   Hram0 Hram3b Hcov).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HX.
+        * rewrite (Hreg1 tv2 pma_regions ltac:(vm_compute; reflexivity)). rewrite Lpma. exact Hmi.
+        * exact (Hpa4al eq_refl).
+        * exact Hxi.
+        * exact (within_clint_false pa 4 s1 Hnc ltac:(lia)).
+        * exact (within_sig_false pa 4 s1 Hns ltac:(lia)).
+        * apply within_htif_false.
+          rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * intros j Hj. unfold s1, set_reg; cbn [mem]. exact (Hbf j Hj).
+        * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
+        * exact HnotRVC.
+      + (* 2+2 read: both chunks through slot 63 *)
+        destruct (align2_not4_facts va Hva2 Hal4) as (_ & Hbit0 & Hbit1).
+        destruct (Htrans σ tlbvec va pa eq_refl Lpriv Lms Lsatp Lmenv Lmisa Lpmpc Lpmpa
+                    Lpma Lhtif Ltlb Hcons Hcanon Hvpn Hident) as (tv2 & Htr1 & Hcons2).
+        set (s1 := set_reg σ tlb tv2).
+        assert (L1tlb : register_lookup tlb s1.(sregs) = tv2).
+        { unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+        destruct (Htrans s1 tv2 (add_vec_int va 2) (add_vec_int pa 2) eq_refl
+                    ltac:(rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)); exact Lpriv)
+                    ltac:(rewrite (Hreg1 tv2 mstatus ltac:(vm_compute; reflexivity)); exact Lms)
+                    ltac:(rewrite (Hreg1 tv2 satp ltac:(vm_compute; reflexivity)); exact Lsatp)
+                    ltac:(rewrite (Hreg1 tv2 menvcfg ltac:(vm_compute; reflexivity)); exact Lmenv)
+                    ltac:(rewrite (Hreg1 tv2 misa ltac:(vm_compute; reflexivity)); exact Lmisa)
+                    ltac:(rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)); exact Lpmpc)
+                    ltac:(rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)); exact Lpmpa)
+                    ltac:(rewrite (Hreg1 tv2 pma_regions ltac:(vm_compute; reflexivity)); exact Lpma)
+                    ltac:(rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif)
+                    L1tlb Hcons2 Hcanon2 Hvpn2 Hident2) as (tv3 & Htr2 & Hcons3).
+        assert (Hcollapse : set_reg s1 tlb tv3 = set_reg σ tlb tv3)
+          by (unfold s1; apply set_reg_tlb_overwrite).
+        exists tv3. split; [| exact Hcons3].
+        assert (Haddr : forall j : nat, (N.of_nat j < 2)%N ->
+                  pa_add (add_vec_int pa 2) j = pa_add pa (2 + j)).
+        { intros j _. unfold pa_add. rewrite avi_assoc. f_equal. lia. }
+        apply (exec_fetch_F_Base_2_pa va pa (add_vec_int pa 2) w σ s1 (set_reg σ tlb tv3) rgl rgh
+                 Lpc
+                 ltac:(rewrite (Hreg1 tv2 PC ltac:(vm_compute; reflexivity)); exact Lpc)
+                 ltac:(rewrite Lmisa; exact HmisaC)
+                 Hbit0 Hbit1 Hal4 Htr1
+                 ltac:(rewrite Hcollapse in Htr2; exact Htr2)).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HAx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa. exact Hordx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa.
+          exact (ram_fetch_pmp pa (vec_access_dec pmpaddr00 0) 2 1
+                   ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                   Hram0 Hram1 Hcov).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HX.
+        * rewrite (Hreg1 tv2 pma_regions ltac:(vm_compute; reflexivity)). rewrite Lpma. exact Hml.
+        * exact Hpa2al.
+        * exact Hxl.
+        * exact (within_clint_false pa 2 s1 Hnc ltac:(lia)).
+        * exact (within_sig_false pa 2 s1 Hns ltac:(lia)).
+        * apply within_htif_false.
+          rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * intros j Hj. unfold s1, set_reg; cbn [mem].
+          rewrite nth_byte_subrange_lo; [| exact Hj]. apply Hbf. lia.
+        * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
+        * rewrite (Hreg1 tv3 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HAx.
+        * rewrite (Hreg1 tv3 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa. exact Hordx.
+        * rewrite (Hreg1 tv3 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa.
+          assert (Hramh1 : addr_is_ram (pa_add (add_vec_int pa 2) 1)).
+          { rewrite (Haddr 1%nat ltac:(lia)). change (2 + 1)%nat with 3%nat. exact Hram3b. }
+          assert (Hramh0 : addr_is_ram (add_vec_int pa 2)).
+          { unfold pa_add in Hram2b. change (Z.of_nat 2) with 2 in Hram2b. exact Hram2b. }
+          exact (ram_fetch_pmp (add_vec_int pa 2) (vec_access_dec pmpaddr00 0) 2 1
+                   ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                   Hramh0 Hramh1 Hcov).
+        * rewrite (Hreg1 tv3 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HX.
+        * rewrite (Hreg1 tv3 pma_regions ltac:(vm_compute; reflexivity)). rewrite Lpma. exact Hmh.
+        * exact Hpa2al2.
+        * exact Hxh.
+        * exact (within_clint_false _ 2 (set_reg σ tlb tv3)
+                   (addr_is_ram_not_in_clint _ ltac:(unfold pa_add in Hram2b; change (Z.of_nat 2) with 2 in Hram2b; exact Hram2b)) ltac:(lia)).
+        * exact (within_sig_false _ 2 (set_reg σ tlb tv3)
+                   (addr_is_ram_not_in_sig _ ltac:(unfold pa_add in Hram2b; change (Z.of_nat 2) with 2 in Hram2b; exact Hram2b)) ltac:(lia)).
+        * apply within_htif_false.
+          rewrite (Hreg1 tv3 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * intros j Hj. cbn [mem set_reg].
+          rewrite nth_byte_subrange_hi; [| exact Hj].
+          rewrite (Haddr j Hj). apply Hbf. lia.
+        * rewrite (Hreg1 tv3 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
+        * exact HnotRVC.
+        * apply concat_subranges_id.
+    - (* F_RVC h *)
+      iDestruct "Hbytes" as "[%HisRVC Hbytes]".
+      rewrite Hpa4va4.
+      destruct (is_aligned_vaddr (Virtaddr va) 4) eqn:Hal4.
+      + (* 4-aligned RVC: read the full 4-byte window *)
+        iDestruct "Hbytes" as (w) "[%Hsub Hbytes]".
+        iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
+                   σ.(mem) !! (pa_add pa j) = Some (nth_byte w j)⌝)%I as %Hbf.
+        { iIntros (j Hj).
+          iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+        iPureIntro.
+        destruct (Hpma0 pa 4) as (rgi & Hmi & Hxi & _ & _).
+        destruct (Htrans σ tlbvec va pa eq_refl Lpriv Lms Lsatp Lmenv Lmisa Lpmpc Lpmpa
+                    Lpma Lhtif Ltlb Hcons Hcanon Hvpn Hident) as (tv2 & Htr & Hcons2).
+        set (s1 := set_reg σ tlb tv2).
+        exists tv2. split; [| exact Hcons2].
+        rewrite <- Hsub.
+        apply (exec_fetch_RVC_4_pa va pa w σ s1 rgi Lpc Hal4 Htr).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HAx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa. exact Hordx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa.
+          exact (ram_fetch_pmp pa (vec_access_dec pmpaddr00 0) 4 3
+                   ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                   Hram0 Hram3b Hcov).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HX.
+        * rewrite (Hreg1 tv2 pma_regions ltac:(vm_compute; reflexivity)). rewrite Lpma. exact Hmi.
+        * exact (Hpa4al eq_refl).
+        * exact Hxi.
+        * exact (within_clint_false pa 4 s1 Hnc ltac:(lia)).
+        * exact (within_sig_false pa 4 s1 Hns ltac:(lia)).
+        * apply within_htif_false.
+          rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * intros j Hj. unfold s1, set_reg; cbn [mem]. exact (Hbf j Hj).
+        * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
+        * rewrite Hsub. exact HisRVC.
+      + (* 2-mod-4 RVC: single 2-byte read *)
+        destruct (align2_not4_facts va Hva2 Hal4) as (_ & Hbit0 & Hbit1).
+        iAssert (⌜forall j : nat, (N.of_nat j < 2)%N ->
+                   σ.(mem) !! (pa_add pa j) = Some (nth_byte h j)⌝)%I as %Hbf.
+        { iIntros (j Hj).
+          iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+        iPureIntro.
+        destruct (Hpma0 pa 2) as (rgl & Hml & Hxl & _ & _).
+        destruct (Htrans σ tlbvec va pa eq_refl Lpriv Lms Lsatp Lmenv Lmisa Lpmpc Lpmpa
+                    Lpma Lhtif Ltlb Hcons Hcanon Hvpn Hident) as (tv2 & Htr & Hcons2).
+        set (s1 := set_reg σ tlb tv2).
+        exists tv2. split; [| exact Hcons2].
+        apply (exec_fetch_RVC_2_pa va pa h σ s1 rgl Lpc
+                 ltac:(rewrite Lmisa; exact HmisaC) Hbit0 Hbit1 Hal4 Htr).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HAx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa. exact Hordx.
+        * rewrite (Hreg1 tv2 pmpaddr_n ltac:(vm_compute; reflexivity)). rewrite Lpmpa.
+          exact (ram_fetch_pmp pa (vec_access_dec pmpaddr00 0) 2 1
+                   ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                   Hram0 Hram1 Hcov).
+        * rewrite (Hreg1 tv2 pmpcfg_n ltac:(vm_compute; reflexivity)). rewrite Lpmpc. exact HX.
+        * rewrite (Hreg1 tv2 pma_regions ltac:(vm_compute; reflexivity)). rewrite Lpma. exact Hml.
+        * exact Hpa2al.
+        * exact Hxl.
+        * exact (within_clint_false pa 2 s1 Hnc ltac:(lia)).
+        * exact (within_sig_false pa 2 s1 Hns ltac:(lia)).
+        * apply within_htif_false.
+          rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * intros j Hj. unfold s1, set_reg; cbn [mem]. exact (Hbf j Hj).
+        * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
+        * exact HisRVC.
+    - iDestruct "Hbytes" as %[].
+  Qed.
+
+End UserretFetch2.
