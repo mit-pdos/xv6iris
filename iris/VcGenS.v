@@ -21,7 +21,7 @@
 
    The symbolic state, heap, and register denotation are shared with
    VcGen.v ([vstate] / [vheap_own] / [vregs_den] / [sval]).  See
-   WpMycpuVc.v / WpPopOffVc.v for this VCgen applied to mycpu() and
+   WpMycpu.v / WpPopOffVc.v for this VCgen applied to mycpu() and
    pop_off(). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.

@@ -1,5 +1,5 @@
 (* WpPopOffVc.v -- pop_off() re-proved with the S-mode VCgen (VcGenS.v),
-   including the function it calls (mycpu(), via WpMycpuVc.wp_mycpu_vc).
+   including the function it calls (mycpu(), via WpMycpu.wp_mycpu).
 
    Same statement as WpPopOff.wp_pop_off.  The straight-line runs are VCgen
    blocks (one [vm_compute]d symbolic execution + one [iApply wp_vc_block_s]
@@ -14,7 +14,7 @@
        branch.
 
    The call [jal mycpu] reuses the WpPushOffTop call-composite pattern with
-   [wp_mycpu_vc] as the callee (so mycpu's straight-line runs are ALSO VCgen
+   [wp_mycpu] as the callee (so mycpu's straight-line runs are ALSO VCgen
    blocks), and the value-computing middle (csrr sstatus / c.andi / the
    three branches / c.lw / c.addiw / c.sw / csrsi-skip) keeps the existing
    per-instruction leaves -- branch conditions and 32-bit sign-extension
@@ -36,7 +36,7 @@ Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLog
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
 Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr WpHolding.
 Require Import WpRvcBridge WpPopOff.
-Require Import VcGen VcGenS WpMycpuVc.
+Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 From iris.base_logic.lib Require Import invariants.
@@ -154,7 +154,7 @@ Section WpPopOffVc.
 
   (* ------------------------------------------------------------------ *)
   (* the call composite (jal + the whole mycpu): the WpPushOffTop proof,  *)
-  (* verbatim, with wp_mycpu_vc as the callee.                            *)
+  (* verbatim, with wp_mycpu as the callee.                            *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_call_mycpu_vc (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
@@ -231,7 +231,7 @@ Section WpPopOffVc.
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
       as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
-    iApply (wp_mycpu_vc root_ppn E Φ m0 raold s0old mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
+    iApply (wp_mycpu root_ppn E Φ m0 raold s0old mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hgc Hcont]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".

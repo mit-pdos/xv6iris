@@ -20,7 +20,7 @@
      +0x1a  800018f0  6402      c.ldsp   s0,0(sp)
      +0x1c  800018f2  0141      c.addi   sp,sp,16     frame free
      +0x1e  800018f4  8082      c.ret                                        *)
-From Stdlib Require Import ZArith.
+From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
@@ -38,6 +38,8 @@ Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
+Require Import VcGen VcGenS.
+From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -128,6 +130,53 @@ Definition mycpu_ret (tp0 : mword 64) : mword 64 :=
        (sign_extend' 64 (mword_of_int 0xa94 : mword 12)))
     (mycpu_a5 tp0).
 
+
+(* ---------------------------------------------------------------------- *)
+(* The two straight-line blocks of mycpu, in the VCgen's alphabet.          *)
+(* ---------------------------------------------------------------------- *)
+Definition mycpu_prologue : list vop_s :=
+  [ VScaddi (mword_of_int 48) csp_rs1;                                  (* c.addi sp,-16      *)
+    VScsdsp (mword_of_int 1) (mword_of_int 1);                          (* sd ra,8(sp)        *)
+    VScsdsp (mword_of_int 0) (mword_of_int 8);                          (* sd s0,0(sp)        *)
+    VScaddi4spn (Cregidx (mword_of_int 0)) (mword_of_int 4)
+                (mword_of_int 8) ].                                     (* addi s0,sp,16      *)
+
+Definition mycpu_epilogue : list vop_s :=
+  [ VScldsp (mword_of_int 1) (mword_of_int 1);                          (* ld ra,8(sp)        *)
+    VScldsp (mword_of_int 0) (mword_of_int 8);                          (* ld s0,0(sp)        *)
+    VScaddi (mword_of_int 16) csp_rs1 ].                                (* c.addi sp,16       *)
+
+(* variable convention: xk ↦ SX k 0 (from vregs_init); 33/34 = the two
+   stack-slot contents at block entry. *)
+Definition mycpu_pro_heap0 : list (sval * sval) :=
+  [ (SX 2 (wrap64 (-8)),  SX 33 0);
+    (SX 2 (wrap64 (-16)), SX 34 0) ].
+Definition mycpu_pro_heap1 : list (sval * sval) :=
+  [ (SX 2 (wrap64 (-8)),  SX 1 0);
+    (SX 2 (wrap64 (-16)), SX 8 0) ].
+Definition mycpu_pro_regs1 : gmap regidx sval :=
+  <[Regidx (mword_of_int 8 : mword 5) := SX 2 0]>
+    (<[Regidx csp_rs1 := SX 2 (wrap64 (-16))]> vregs_init).
+
+Lemma mycpu_prologue_run :
+  vc_block_s (VSt KernelSyms.mycpu vregs_init mycpu_pro_heap0 []) mycpu_prologue
+  = Some (VSt (KernelSyms.mycpu + 8) mycpu_pro_regs1 mycpu_pro_heap1 []).
+Proof. vm_compute. reflexivity. Qed.
+
+(* the epilogue runs with sp already at sp' (the decremented value), so its
+   stack slots sit at sp+8 / sp+0. *)
+Definition mycpu_epi_heap : list (sval * sval) :=
+  [ (SX 2 8, SX 33 0);
+    (SX 2 0, SX 34 0) ].
+Definition mycpu_epi_regs1 : gmap regidx sval :=
+  <[Regidx csp_rs1 := SX 2 16]>
+    (<[Regidx (mword_of_int 8 : mword 5) := SX 34 0]>
+       (<[Regidx (mword_of_int 1 : mword 5) := SX 33 0]> vregs_init)).
+
+Lemma mycpu_epilogue_run :
+  vc_block_s (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap []) mycpu_epilogue
+  = Some (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap []).
+Proof. vm_compute. reflexivity. Qed.
 Section WpMycpu.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -267,6 +316,37 @@ Section WpMycpu.
   (*  (the [a0] slot of the returned register file m11 equals mycpu_ret tp0),*)
   (*  a5 is clobbered, and ra/sp/s0 are restored (callee-saved).            *)
   (* =================================================================== *)
+  (* the prologue's / epilogue's [instr] facts, from kernel_text via the
+     existing WpMycpu decode templates. *)
+  Lemma mycpu_prologue_instrs :
+    kernel_text -∗ block_instrs_s KernelSyms.mycpu mycpu_prologue.
+  Proof.
+    iIntros "#Ht". cbn [block_instrs_s mycpu_prologue vop_s_ast].
+    replace (KernelSyms.mycpu + 2 + 2) with (KernelSyms.mycpu + 4) by lia.
+    replace (KernelSyms.mycpu + 4 + 2) with (KernelSyms.mycpu + 6) by lia.
+    iSplitR; [by iApply myi_00|].
+    iSplitR; [by iApply myi_02|].
+    iSplitR; [by iApply myi_04|].
+    iSplitR.
+    { assert (Hcreg : creg2reg_idx (Cregidx (mword_of_int 0 : mword 3))
+                      = Regidx (mword_of_int 8 : mword 5))
+        by (vm_compute; reflexivity).
+      rewrite -Hcreg. by iApply myi_06. }
+    done.
+  Qed.
+
+  Lemma mycpu_epilogue_instrs :
+    kernel_text -∗ block_instrs_s (KernelSyms.mycpu + 24) mycpu_epilogue.
+  Proof.
+    iIntros "#Ht". cbn [block_instrs_s mycpu_epilogue vop_s_ast].
+    replace (KernelSyms.mycpu + 24 + 2) with (KernelSyms.mycpu + 26) by lia.
+    replace (KernelSyms.mycpu + 26 + 2) with (KernelSyms.mycpu + 28) by lia.
+    iSplitR; [by iApply myi_18|].
+    iSplitR; [by iApply myi_1a|].
+    iSplitR; [by iApply myi_1c|].
+    done.
+  Qed.
+
   Lemma wp_mycpu (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64))
       (raold s0old : bv 64)
@@ -340,63 +420,124 @@ Section WpMycpu.
       imm_auipc imm_addi shamt_slli imm_addiw sp' ra0 s00
       ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
-      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe
-      Hal0.
-    assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp')
-      by (unfold m1; rewrite lookup_total_insert; reflexivity).
+      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hbra Hbs0 Hcont".
-    (* derive the fourteen instr resources from the text image *)
-    iPoseProof (myi_00 with "Htext") as "Hi00".
-    iPoseProof (myi_02 with "Htext") as "Hi02".
-    iPoseProof (myi_04 with "Htext") as "Hi04".
-    iPoseProof (myi_06 with "Htext") as "Hi06".
+    (* register-index / offset spelling bridges (pure, concrete) *)
+    assert (Hcsp2 : Regidx (mword_of_int 2 : mword 5) = Regidx csp_rs1)
+      by (f_equal; apply bv_eq; vm_compute; reflexivity).
+    (* ------------------------------------------------------------------ *)
+    (* SEAM 1: enter the prologue block.                                    *)
+    (* ------------------------------------------------------------------ *)
+    iDestruct (gpr_file_dom with "Hfile") as "[%Hdom0 Hfile]".
+    iDestruct (gpr_file_x0 m0 (mword_of_int 0) ltac:(vm_compute; reflexivity)
+                 with "Hfile") as "[%Hx00 Hfile]".
+    set (ρA := fun k : nat =>
+           if (k <? 32)%nat
+           then m0 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
+           else if Nat.eqb k 33 then (raold : mword 64) else (s0old : mword 64)).
+    assert (HdenA : vregs_den ρA vregs_init = m0).
+    { apply (vregs_den_init_agree _ _ Hdom0 Hx00). intros k Hk.
+      unfold ρA. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
+    (* the block's two cells ARE the two stack words *)
+    assert (Hara : sval_den ρA (SX 2 (wrap64 (-8))) = pa_ra).
+    { cbn [sval_den].
+      replace (ρA 2%nat) with (m0 !!! Regidx (mword_of_int 2 : mword 5))
+        by (unfold ρA; reflexivity).
+      rewrite Hcsp2.
+      unfold pa_ra, a8_ra, ea_ra, sp'. rewrite add_vec_off2.
+      f_equal; f_equal; vm_compute; reflexivity. }
+    assert (Has0 : sval_den ρA (SX 2 (wrap64 (-16))) = pa_s0).
+    { cbn [sval_den].
+      replace (ρA 2%nat) with (m0 !!! Regidx (mword_of_int 2 : mword 5))
+        by (unfold ρA; reflexivity).
+      rewrite Hcsp2.
+      unfold pa_s0, a8_s0, ea_s0, sp'. rewrite add_vec_off2.
+      f_equal; f_equal; vm_compute; reflexivity. }
+    assert (Hvra : sval_den ρA (SX 33 0) = (raold : mword 64)).
+    { cbn [sval_den].
+      replace (ρA 33%nat) with (raold : mword 64) by (unfold ρA; reflexivity).
+      change (add_vec (raold : mword 64) (mword_of_int 0))
+        with (add_vec_int (raold : mword 64) 0).
+      apply avi0. }
+    assert (Hvs0 : sval_den ρA (SX 34 0) = (s0old : mword 64)).
+    { cbn [sval_den].
+      replace (ρA 34%nat) with (s0old : mword 64) by (unfold ρA; reflexivity).
+      change (add_vec (s0old : mword 64) (mword_of_int 0))
+        with (add_vec_int (s0old : mword 64) 0).
+      apply avi0. }
+    iDestruct (mycpu_prologue_instrs with "Htext") as "Hbi".
+    iEval (rewrite -HdenA) in "Hfile".
+    iApply (wp_vc_block_s_den root_ppn mycpu_prologue E Φ
+              (VSt KernelSyms.mycpu vregs_init mycpu_pro_heap0 [])
+              (VSt (KernelSyms.mycpu + 8) mycpu_pro_regs1 mycpu_pro_heap1 [])
+              ρA mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 mycpu_prologue_run
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    Hpc Hfile Hbi [Hbra Hbs0] []").
+    { rewrite /vheap_own. cbn [vheap].
+      rewrite /mycpu_pro_heap0.
+      cbn [big_opL fst snd]. rewrite Hara Has0 Hvra Hvs0.
+      iFrame "Hbra Hbs0". }
+    { rewrite /vheap4_own. cbn [vheap4]. done. }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
+    (* SEAM 1 exit: the symbolic post-state denotes to m2 / the stored words *)
+    assert (Hspv : sval_den ρA (SX 2 (wrap64 (-16))) = sp').
+    { cbn [sval_den].
+      replace (ρA 2%nat) with (m0 !!! Regidx (mword_of_int 2 : mword 5))
+        by (unfold ρA; reflexivity).
+      rewrite Hcsp2. unfold sp'. f_equal;
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (Hs0v : sval_den ρA (SX 2 0)
+                   = add_vec (m1 !!! Regidx csp_rs1)
+                             (sign_extend' 64 (caddi4spn_imm nzimm_s0))).
+    { cbn [sval_den].
+      replace (ρA 2%nat) with (m0 !!! Regidx (mword_of_int 2 : mword 5))
+        by (unfold ρA; reflexivity).
+      rewrite Hcsp2.
+      unfold m1. rewrite lookup_total_insert. unfold regval_into_reg, sp'.
+      rewrite add_vec_off2.
+      f_equal; f_equal; vm_compute; reflexivity. }
+    assert (Hm2den : vregs_den ρA mycpu_pro_regs1 = m2).
+    { unfold mycpu_pro_regs1.
+      rewrite -vregs_den_insert -vregs_den_insert HdenA.
+      rewrite Hspv Hs0v.
+      unfold m2, m1, regval_into_reg. reflexivity. }
+    iEval (rewrite Hm2den) in "Hfile".
+    (* the stored words: den (SX 1 0) = ra0, den (SX 8 0) = s00 *)
+    assert (Hvra0 : sval_den ρA (SX 1 0) = ra0).
+    { cbn [sval_den].
+      replace (ρA 1%nat) with (m0 !!! Regidx (mword_of_int 1 : mword 5))
+        by (unfold ρA; reflexivity).
+      change (add_vec (m0 !!! Regidx (mword_of_int 1 : mword 5)) (mword_of_int 0))
+        with (add_vec_int (m0 !!! Regidx (mword_of_int 1 : mword 5)) 0).
+      rewrite avi0. reflexivity. }
+    assert (Hvs00 : sval_den ρA (SX 8 0) = s00).
+    { cbn [sval_den].
+      replace (ρA 8%nat) with (m0 !!! Regidx (mword_of_int 8 : mword 5))
+        by (unfold ρA; reflexivity).
+      change (add_vec (m0 !!! Regidx (mword_of_int 8 : mword 5)) (mword_of_int 0))
+        with (add_vec_int (m0 !!! Regidx (mword_of_int 8 : mword 5)) 0).
+      rewrite avi0. reflexivity. }
+    iEval (rewrite /vheap_own; cbn [vheap]; rewrite /mycpu_pro_heap1;
+           cbn [big_opL fst snd];
+           rewrite Hara Has0 Hvra0 Hvs00) in "Hheap".
+    iDestruct "Hheap" as "(Hbra & Hbs0 & _)".
+    (* pc: mword_of_int (mycpu+8) -> the hand-proof's add_vec_int spelling *)
+    assert (Hpc8 : (mword_of_int (KernelSyms.mycpu + 8) : mword 64)
+                   = add_vec_int pcE 8)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (cbn [vpc]; rewrite Hpc8) in "Hpc".
+    (* ------------------------------------------------------------------ *)
+    (* middle: the six value-computing instructions (as in wp_mycpu).       *)
+    (* ------------------------------------------------------------------ *)
     iPoseProof (myi_08 with "Htext") as "Hi08".
     iPoseProof (myi_0a with "Htext") as "Hi0a".
     iPoseProof (myi_0c with "Htext") as "Hi0c".
     iPoseProof (myi_0e with "Htext") as "Hi0e".
     iPoseProof (myi_12 with "Htext") as "Hi12".
     iPoseProof (myi_16 with "Htext") as "Hi16".
-    iPoseProof (myi_18 with "Htext") as "Hi18".
-    iPoseProof (myi_1a with "Htext") as "Hi1a".
-    iPoseProof (myi_1c with "Htext") as "Hi1c".
     iPoseProof (myi_1e with "Htext") as "Hi1e".
-    (* +0x00 c.addi sp,-16 : sp := sp' *)
-    iApply (wp_caddi_gpr_s_config root_ppn E Φ pcE csp_rs1 imm_entry m0
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi00 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)))]> m0) with m1.
-    (* +0x02 c.sdsp ra,8(sp) : store ra0 to 8(sp') *)
-    iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 raold
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-             
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi02 [Hbra]").
-    { rewrite Hsp1. iExact "Hbra". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra".
-    assert (Hra_eq : m1 !!! Regidx ra_idx = ra0)
-      by (unfold m1; rewrite lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
-    iEval (rewrite Hsp1 Hra_eq) in "Hbra".
-    (* +0x04 c.sdsp s0,0(sp) : store s00 to 0(sp') *)
-    iApply (wp_csdsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 s0old
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-             
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi04 [Hbs0]").
-    { rewrite Hsp1. iExact "Hbs0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbs0".
-    assert (Hs0_eq : m1 !!! Regidx s0_idx = s00)
-      by (unfold m1; rewrite lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
-    iEval (rewrite Hsp1 Hs0_eq) in "Hbs0".
-    (* +0x06 c.addi4spn s0,sp,16 : s0 := sp'+16 *)
-    iApply (wp_caddi4spn_gpr_s_config root_ppn E Φ (add_vec_int pcE 6) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi06 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1) with m2.
     (* +0x08 c.mv a5,tp : a5 := tp *)
     iApply (wp_cmv_gpr_s_config root_ppn E Φ (add_vec_int pcE 8) a5_idx tp_idx m2
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
@@ -441,53 +582,90 @@ Section WpMycpu.
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi16 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7) with m8.
+    (* ------------------------------------------------------------------ *)
+    (* SEAM 2: enter the epilogue block from the abstract file m8.          *)
+    (* ------------------------------------------------------------------ *)
     assert (Hsp8 : m8 !!! Regidx csp_rs1 = sp').
     { unfold m8, m7, m6, m5, m4, m3, m2, m1.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      do 7 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
       rewrite lookup_total_insert. reflexivity. }
-    (* +0x18 c.ldsp ra,8(sp) : ra := ra0 *)
-    iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 24) (mword_of_int 1) ra_idx m8 ra0
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-             
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi18 [Hbra]").
-    { rewrite Hsp8. iExact "Hbra". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra".
-    change (<[Regidx ra_idx := regval_into_reg ra0]> m8) with m9.
-    iEval (rewrite Hsp8) in "Hbra".
-    assert (Hsp9 : m9 !!! Regidx csp_rs1 = sp')
-      by (unfold m9; rewrite lookup_total_insert_ne; [ exact Hsp8 | vm_compute; discriminate ]).
-    (* +0x1a c.ldsp s0,0(sp) : s0 := s00 *)
-    iApply (wp_cldsp_gpr_s_ram root_ppn E Φ (add_vec_int pcE 26) (mword_of_int 0) s0_idx m9 s00
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
-              HN ltac:(vm_compute; discriminate) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-             
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi1a [Hbs0]").
-    { rewrite Hsp9. iExact "Hbs0". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbs0".
-    change (<[Regidx s0_idx := regval_into_reg s00]> m9) with m10.
-    iEval (rewrite Hsp9) in "Hbs0".
-    assert (Hsp10 : m10 !!! Regidx csp_rs1 = sp')
-      by (unfold m10; rewrite lookup_total_insert_ne; [ exact Hsp9 | vm_compute; discriminate ]).
-    (* +0x1c c.addi sp,16 : sp := sp'+16 *)
-    iApply (wp_caddi_gpr_s_config root_ppn E Φ (add_vec_int pcE 28) csp_rs1 imm_dealloc m10
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi1c [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10) with m11.
+    iDestruct (gpr_file_dom with "Hfile") as "[%Hdom8 Hfile]".
+    iDestruct (gpr_file_x0 m8 (mword_of_int 0) ltac:(vm_compute; reflexivity)
+                 with "Hfile") as "[%Hx08 Hfile]".
+    set (ρB := fun k : nat =>
+           if (k <? 32)%nat
+           then m8 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
+           else if Nat.eqb k 33 then ra0 else s00).
+    assert (HdenB : vregs_den ρB vregs_init = m8).
+    { apply (vregs_den_init_agree _ _ Hdom8 Hx08). intros k Hk.
+      unfold ρB. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
+    assert (HspB : ρB 2%nat = sp').
+    { replace (ρB 2%nat) with (m8 !!! Regidx (mword_of_int 2 : mword 5))
+        by (unfold ρB; reflexivity).
+      rewrite Hcsp2. exact Hsp8. }
+    assert (HaraB : sval_den ρB (SX 2 8) = pa_ra).
+    { cbn [sval_den]. rewrite HspB.
+      unfold pa_ra, a8_ra, ea_ra. f_equal;
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (Has0B : sval_den ρB (SX 2 0) = pa_s0).
+    { cbn [sval_den]. rewrite HspB.
+      unfold pa_s0, a8_s0, ea_s0. f_equal;
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (HvraB : sval_den ρB (SX 33 0) = ra0).
+    { cbn [sval_den].
+      replace (ρB 33%nat) with ra0 by (unfold ρB; reflexivity).
+      change (add_vec ra0 (mword_of_int 0)) with (add_vec_int ra0 0).
+      apply avi0. }
+    assert (Hvs0B : sval_den ρB (SX 34 0) = s00).
+    { cbn [sval_den].
+      replace (ρB 34%nat) with s00 by (unfold ρB; reflexivity).
+      change (add_vec s00 (mword_of_int 0)) with (add_vec_int s00 0).
+      apply avi0. }
+    assert (Hpc24 : add_vec_int (add_vec_int pcE 22) 2
+                    = (mword_of_int (KernelSyms.mycpu + 24) : mword 64))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpc24) in "Hpc".
+    iEval (rewrite -HdenB) in "Hfile".
+    iDestruct (mycpu_epilogue_instrs with "Htext") as "Hbi2".
+    iApply (wp_vc_block_s_den root_ppn mycpu_epilogue E Φ
+              (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap [])
+              (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap [])
+              ρB mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 mycpu_epilogue_run
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                    Hpc Hfile Hbi2 [Hbra Hbs0] []").
+    { rewrite /vheap_own. cbn [vheap]. rewrite /mycpu_epi_heap.
+      cbn [big_opL fst snd]. rewrite HaraB Has0B HvraB Hvs0B.
+      iFrame "Hbra Hbs0". }
+    { rewrite /vheap4_own. cbn [vheap4]. done. }
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
+    (* SEAM 2 exit: the symbolic post-state denotes to m11 *)
+    assert (Hsp16B : sval_den ρB (SX 2 16)
+                     = add_vec (m10 !!! Regidx csp_rs1)
+                               (sign_extend' 64 (sign_extend' 12 imm_dealloc))).
+    { cbn [sval_den]. rewrite HspB.
+      assert (Hsp10 : m10 !!! Regidx csp_rs1 = sp').
+      { unfold m10. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        unfold m9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        exact Hsp8. }
+      rewrite Hsp10. f_equal;
+      apply bv_eq; vm_compute; reflexivity. }
+    assert (Hm11den : vregs_den ρB mycpu_epi_regs1 = m11).
+    { unfold mycpu_epi_regs1.
+      rewrite -vregs_den_insert -vregs_den_insert -vregs_den_insert HdenB.
+      rewrite HvraB Hvs0B Hsp16B.
+      unfold m11, m10, m9, regval_into_reg. reflexivity. }
+    iEval (rewrite Hm11den) in "Hfile".
+    iEval (rewrite /vheap_own; cbn [vheap]; rewrite /mycpu_epi_heap;
+           cbn [big_opL fst snd];
+           rewrite HaraB Has0B HvraB Hvs0B) in "Hheap".
+    iDestruct "Hheap" as "(Hbra & Hbs0 & _)".
+    (* +0x1e c.ret : PC := ra0 (low bit cleared) *)
     assert (Hra_final : m11 !!! Regidx ra_idx = ra0).
     { unfold m11. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       unfold m10. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       unfold m9. rewrite lookup_total_insert. reflexivity. }
-    (* +0x1e c.ret : PC := ra0 (low bit cleared) *)
-    iApply (wp_cret_s_zca root_ppn E Φ (add_vec_int pcE 30) ra_idx m11
+    iApply (wp_cret_s_zca root_ppn E Φ (mword_of_int (KernelSyms.mycpu + 30)) ra_idx m11
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
               HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate) Hlpe
               ltac:(rewrite Hra_final; exact Hal0)
