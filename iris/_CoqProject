@@ -64,6 +64,7 @@ WpMemsetInstr.v
 WpKernelvecNew.v
 WpIntrBits.v
 WpIntrCore.v
+UmodeTrap.v
 WpIntrStep.v
 WpIntrInv.v
 WpPushOff.v
