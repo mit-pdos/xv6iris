@@ -295,28 +295,6 @@ Proof.
 Qed.
 
 
-(* ===================================================================== *)
-(* Geometry bundles: shrink [wp_push_off]'s premise list.                 *)
-(* ===================================================================== *)
-Definition po_slot_geom (root_ppn : mword 44)
-    (svpn : mword 27) (a8 : mword 64) (W : Z) : Prop :=
-  neq_vec (bits_of_virtaddr (Virtaddr a8))
-     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false /\
-  autocast (T := mword) (subrange_vec_dec
-     (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn /\
-  zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-     (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 /\
-  and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) /\
-  subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) /\
-  sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) /\
-  zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) /\
-  is_aligned_vaddr (Virtaddr a8) W = true /\
-  is_aligned_paddr (Physaddr a8) W = true.
-
-Definition po_slot_align (a8 : mword 64) (W : Z) : Prop :=
-  is_aligned_vaddr (Virtaddr a8) W = true /\ is_aligned_paddr (Physaddr a8) W = true.
-
-
 (* named form of wp_mycpu's output register file (= call_mycpu's m11 chain),
    so downstream geometry can reference its a0/sp lookups. *)
 Definition po_mycpu_out (P : mword 64) (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
@@ -430,21 +408,6 @@ Proof.
                | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ].
   unfold mycpu_ret, mycpu_a5.
   reflexivity.
-Qed.
-
-(* mycpu's returned a0 depends on the input register file only through tp (x4):
-   the returned pointer is [const + f(m!!!x4)].  Hence two maps agreeing on x4
-   yield the same a0.  This lets a caller whose mycpu-input map is only known
-   up to its tp still discharge the a0 pins. *)
-Lemma po_mycpu_out_a0_cong (P : mword 64) (m1 m2 : gmap regidx (mword 64)) :
-  m1 !!! Regidx (mword_of_int 4 : mword 5) = m2 !!! Regidx (mword_of_int 4 : mword 5) ->
-  po_mycpu_out P m1 !!! Regidx (mword_of_int 10 : mword 5)
-  = po_mycpu_out P m2 !!! Regidx (mword_of_int 10 : mword 5).
-Proof.
-  (* reuse [pt_mycpu_out_a0] rather than re-walking the (cbv-zeta-inlined)
-     nested-lookup tree on both sides: the re-walk cost ~6.5s per -time
-     profiling; via the pinned lemma this is ~0s. *)
-  intros H4. rewrite !pt_mycpu_out_a0. rewrite H4. reflexivity.
 Qed.
 
 (* ===================================================================== *)

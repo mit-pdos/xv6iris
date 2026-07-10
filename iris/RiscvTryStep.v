@@ -264,20 +264,6 @@ Proof. intro H. unfold wX_bits; cbn match. rewrite H. apply run_wX_x12. Qed.
 (*    the register-index values; no axioms.                                *)
 (* --------------------------------------------------------------------- *)
 
-Lemma run_execute_ADD_x12_x10_x11 (rd rs1 rs2 : mword 5) s :
-  uint rs1 = 10 -> uint rs2 = 11 -> uint rd = 12 ->
-  run (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) ADD) s RETIRE_SUCCESS
-      (set_reg s (R_bitvector_64 x12)
-         (regval_into_reg
-            (add_vec (register_lookup (R_bitvector_64 x10) s.(sregs))
-                     (register_lookup (R_bitvector_64 x11) s.(sregs))))).
-Proof.
-  intros H1 H2 H3.
-  eapply run_execute_RTYPE_ADD.
-  - apply run_rX_bits_x10; exact H1.
-  - apply run_rX_bits_x11; exact H2.
-  - apply run_wX_bits_x12; exact H3.
-Qed.
 
 (* ===== RiscvModelMem ===== *)
 (* ====================================================================== *)

@@ -27,15 +27,6 @@ Require Import WpDecodeBridge.
 (* ==== compressed decode: walker + decode_C_lui ==== *)
 
 (* a cE-Zca decode clause whose pattern is false collapses the and_boolM to false. *)
-Lemma exec_cezca_false s pat :
-  eq_vec (_get_Misa_C (register_lookup misa (sregs s))) ('b"1") = true ->
-  pat = false ->
-  exec (Defs.and_boolM (currentlyEnabled Ext_Zca) (returnM pat)) s = Some (false, s).
-Proof.
-  intros HmisaC Hpat.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zca s HmisaC)).
-  cbn match. rewrite Hpat. apply exec_returnm.
-Qed.
 
 Definition rd_clui : regidx :=
   Regidx (autocast (T := mword)
@@ -127,10 +118,6 @@ Lemma decode_jal s :
   exec (ext_decode w_jal) s = Some (JAL (imm_jal, Regidx i_jal), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; unfold imm_jal, i_jal; decode_any s Hpriv ]. Qed.
 
-Lemma wX_jal_x1 (v : mword 64) :
-  wX (Regno (uint i_jal)) v
-  = Defs.bind0 (Defs.write_reg (R_bitvector_64 x1) (regval_into_reg v)) (returnM tt).
-Proof. replace (uint i_jal) with 1%Z by (vm_compute; reflexivity). reflexivity. Qed.
 
 Section ForwardJAL.
   Context (s : mstate) (pc : mword 64) (b : bool).
@@ -249,10 +236,6 @@ Proof.
   apply exec_returnM.
 Qed.
 
-Lemma wX_mul_x10 (v : mword 64) :
-  wX (Regno (uint i_mul_rd)) v
-  = Defs.bind0 (Defs.write_reg (R_bitvector_64 x10) (regval_into_reg v)) (returnM tt).
-Proof. replace (uint i_mul_rd) with 10%Z by (vm_compute; reflexivity). reflexivity. Qed.
 
 
 
@@ -296,10 +279,6 @@ Definition i_addi : mword 5 :=
     (subrange_vec_dec (subrange_vec_dec h_addi 11 7) (Z.sub regidx_bit_width 1) 0).
 
 
-Lemma wX_addi_x11 (v : mword 64) :
-  wX (Regno (uint i_addi)) v
-  = Defs.bind0 (Defs.write_reg (R_bitvector_64 x11) (regval_into_reg v)) (returnM tt).
-Proof. replace (uint i_addi) with 11%Z by (vm_compute; reflexivity). reflexivity. Qed.
 
 Section ForwardADDI.
   Context (s : mstate) (pc : mword 64) (b : bool).

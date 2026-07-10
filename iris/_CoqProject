@@ -88,7 +88,6 @@ WpMemsetPage.v
 WpKalloc.v
 WpKfree.v
 VcGen.v
-VcGenDemo.v
 VcGenS.v
 WpSwtchVc.v
 WpWakeup.v
