@@ -50,6 +50,7 @@ WpGprMretNew.v
 WpGprRvc.v
 WpGprRvcTor.v
 InstrBytes.v
+StackOwn.v
 WpEntryNew.v
 WpSpinNew.v
 SmodeCore.v
