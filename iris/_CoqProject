@@ -72,6 +72,7 @@ DecodeTotal.v
 WpUserEcall.v
 UmodeFetchFault.v
 UmodeWalk.v
+UptInv.v
 UmodeData.v
 WpUserLoop.v
 WpIntrStep.v
