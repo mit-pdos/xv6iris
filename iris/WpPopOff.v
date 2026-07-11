@@ -42,6 +42,7 @@ Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprJalr WpGprStore WpGprLog
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
 Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr WpHolding.
 Require Import StackOwn.
+Require Import CalleeSaved.
 Require Import WpRvcBridge.
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
@@ -1474,17 +1475,7 @@ Section WpPopOffTopSec.
     ( smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mf, gpr_file mf ∗
-        ⌜ mf !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5) /\
-          mf !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5) /\
-          mf !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
-          mf !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
-          mf !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
-          mf !!! Regidx (mword_of_int 10 : mword 5) = a0v /\
-          mf !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) /\
-          mf !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5) /\
-          mf !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5) /\
-          mf !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) ⌝) -∗
+      (∃ mf, gpr_file mf ∗ ⌜ callee_saved m mf ⌝) -∗
       a_noff ↦₄ storeval -∗
       a_int ↦₄{ dqi } intenav -∗
       (∃ (w8 w0 wra ws0 : bv 64),
@@ -1876,8 +1867,14 @@ Section WpPopOffTopSec.
         M3 !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5)
       /\ M3 !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5)
       /\ M3 !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5)
-      /\ M3 !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5)).
-    { split; [| split; [| split]].
+      /\ M3 !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5)
+      /\ M3 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)
+      /\ M3 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)
+      /\ M3 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)
+      /\ M3 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)
+      /\ M3 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)
+      /\ M3 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+    { repeat split.
       - rewrite (HaE1 (Regidx (mword_of_int 18 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 18 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -1901,8 +1898,44 @@ Section WpPopOffTopSec.
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /C po_mycpu_out_s5.
-        exact (HaA1 (Regidx (mword_of_int 21 : mword 5)) ltac:(vm_compute; reflexivity)). }
-    destruct Hpres_M3 as (H18M3 & H19M3 & H20M3 & H21M3).
+        exact (HaA1 (Regidx (mword_of_int 21 : mword 5)) ltac:(vm_compute; reflexivity)).
+      - rewrite (HaE1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite (HaD1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C po_mycpu_out_s6.
+        exact (HaA1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)).
+      - rewrite (HaE1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite (HaD1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C po_mycpu_out_s7.
+        exact (HaA1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)).
+      - rewrite (HaE1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite (HaD1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C po_mycpu_out_s8.
+        exact (HaA1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)).
+      - rewrite (HaE1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite (HaD1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C po_mycpu_out_s9.
+        exact (HaA1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)).
+      - rewrite (HaE1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite (HaD1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C po_mycpu_out_s10.
+        exact (HaA1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)).
+      - rewrite (HaE1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite (HaD1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C po_mycpu_out_s11.
+        exact (HaA1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)). }
+    destruct Hpres_M3 as (H18M3 & H19M3 & H20M3 & H21M3 & H22M3 & H23M3 & H24M3 & H25M3 & H26M3 & H27M3).
     (* +0x1e c.bnez a5: both outcomes (noff-1 <> 0 / = 0) *)
     destruct (neq_vec nv1 zero_reg) eqn:Hnz.
     - (* taken: skip the intena check, straight to the epilogue at +0x28 *)
@@ -2014,6 +2047,18 @@ Section WpPopOffTopSec.
       { rewrite (HaC1 (Regidx (mword_of_int 20 : mword 5)) ltac:(vm_compute; reflexivity)). exact H20M3. }
       assert (H21F : Mf !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5)).
       { rewrite (HaC1 (Regidx (mword_of_int 21 : mword 5)) ltac:(vm_compute; reflexivity)). exact H21M3. }
+      assert (H22F : Mf !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)). exact H22M3. }
+      assert (H23F : Mf !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)). exact H23M3. }
+      assert (H24F : Mf !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)). exact H24M3. }
+      assert (H25F : Mf !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)). exact H25M3. }
+      assert (H26F : Mf !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)). exact H26M3. }
+      assert (H27F : Mf !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)). exact H27M3. }
       (* +0x2e c.ret *)
       iApply (wp_cret_s_zca_scfg root_ppn γc E Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1) Mf
                 (dq:=DfracOwn 1)
@@ -2024,7 +2069,7 @@ Section WpPopOffTopSec.
       iEval (rewrite HraF) in "Hpc".
       iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Mf. iFrame "Hfile". iPureIntro.
-        exact (conj HraF (conj Hs0F (conj Hs1F (conj HspF (conj HtpF (conj Ha0F (conj H18F (conj H19F (conj H20F H21F))))))))). }
+        unfold callee_saved. repeat split; assumption. }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
     - (* fall: noff-1 = 0, read intena (= 0), c.beqz taken to +0x28 *)
       iApply (wp_cbnez_fall_s_scfg root_ppn γc E Φ (mword_of_int (PP + 0x1e)) (mword_of_int 5) (Cregidx (mword_of_int 7)) (mword_of_int 15)
@@ -2177,6 +2222,24 @@ Section WpPopOffTopSec.
       assert (H21F : Mf !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5)).
       { rewrite (HaC1 (Regidx (mword_of_int 21 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H21M3. }
+      assert (H22F : Mf !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H22M3. }
+      assert (H23F : Mf !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H23M3. }
+      assert (H24F : Mf !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H24M3. }
+      assert (H25F : Mf !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H25M3. }
+      assert (H26F : Mf !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H26M3. }
+      assert (H27F : Mf !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+      { rewrite (HaC1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)).
+        rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H27M3. }
       (* +0x2e c.ret *)
       iApply (wp_cret_s_zca_scfg root_ppn γc E Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1) Mf
                 (dq:=DfracOwn 1)
@@ -2187,7 +2250,7 @@ Section WpPopOffTopSec.
       iEval (rewrite HraF) in "Hpc".
       iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
       { iExists Mf. iFrame "Hfile". iPureIntro.
-        exact (conj HraF (conj Hs0F (conj Hs1F (conj HspF (conj HtpF (conj Ha0F (conj H18F (conj H19F (conj H20F H21F))))))))). }
+        unfold callee_saved. repeat split; assumption. }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
   Qed.
 
@@ -2232,17 +2295,7 @@ Section WpPopOffTopSec.
     ( smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mf, gpr_file mf ∗
-        ⌜ mf !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5) /\
-          mf !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5) /\
-          mf !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
-          mf !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
-          mf !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
-          mf !!! Regidx (mword_of_int 10 : mword 5) = a0v /\
-          mf !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) /\
-          mf !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5) /\
-          mf !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5) /\
-          mf !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) ⌝) -∗
+      (∃ mf, gpr_file mf ∗ ⌜ callee_saved m mf ⌝) -∗
       a_noff ↦₄ storeval -∗
       a_int ↦₄{ dqi } intenav -∗
       stack_own (m !!! Regidx csp_rs1) n -∗

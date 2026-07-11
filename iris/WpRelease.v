@@ -36,6 +36,7 @@ Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew.
 Require Import WpMycpu WpPushOffTop WpAcquireTop.
 Require Import WpLock WpLockLeaves WpHoldingInv WpPopOff.
 Require Import StackOwn.
+Require Import CalleeSaved.
 (* subrange_full / mSIE_lower / sie_bit for the sstatus-SIE bridge; kept
    QUALIFIED so the WpGprCsrwC namespace doesn't shadow anything. *)
 Require WpGprCsrwC.
@@ -827,7 +828,8 @@ Section WpReleaseTop.
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     iEval (rewrite HtpM1) in "Hnoff". iEval (rewrite HtpM1) in "Hint".
     iDestruct "Hgpr" as (mf) "[Hfile %Hmff]".
-    destruct Hmff as (Hfra & Hfs0 & Hfs1 & Hfsp & Hftp & Hfa0 & Hfs2 & Hfs3 & Hfs4 & Hfs5).
+    unfold callee_saved in Hmff.
+    destruct Hmff as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & Hfs3 & Hfs4 & Hfs5 & Hfs6 & Hfs7 & Hfs8 & Hfs9 & Hfs10 & Hfs11).
     iDestruct "Hjunk" as (u8 u0 ura us0) "(Hh24 & Hh16 & Hh8 & Hh0)".
     iEval (rewrite HspM1 EQp8) in "Hh24". iEval (rewrite HspM1 EQp0) in "Hh16".
     iEval (rewrite HspM1 EQpfra) in "Hh8". iEval (rewrite HspM1 EQpfs0) in "Hh0".
