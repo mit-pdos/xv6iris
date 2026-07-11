@@ -2224,4 +2224,102 @@ Section WpUserExec.
       va vpn ie w imm rs2 rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ HN
       (fun imm' rs2' rs1' s Ht H0 H1 => exec_execute_BTYPE_BEQ_taken imm' rs2' rs1' s Ht H0 H1).
 
+  (* ------------------------------------------------------------------ *)
+  (* The STATE-PRESERVING retire case: any instruction whose execute      *)
+  (* retires without touching the machine state -- every compute op with  *)
+  (* rd = x0 (their _gpr execute lemmas reduce to Some (RETIRE, s)),      *)
+  (* fences, hints.  Repacks at va + 4 with everything unchanged.         *)
+  (* ------------------------------------------------------------------ *)
+  Lemma ustep_nop (ii : instruction)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) ->
+    is_lpad_instruction ii = false ->
+    upt_tlb_ok spec tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ii, s0)) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hexec_nop Hnlpad Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
+             Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iApply (wp_instr_u_hit va vpn ie w ii
+              ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
+    iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s1 := set_reg σ nextPC (add_vec_int va 4)).
+    iModIntro.
+    iExists s1.
+    iSplitR; [iPureIntro; exact (Hexec_nop s1) |].
+    iSplitL "Hreg Hmem".
+    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
+    assert (Lnpc : register_lookup nextPC s1.(sregs) = add_vec_int va 4).
+    { unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iNext.
+    iApply "Hcont".
+    rewrite /user_frame.
+    iExists ms_v, sc_v, stval_v, sepc_v, (add_vec_int va 4), g, tlbvec.
+    iFrame "Hhs' Hpriv' Hms' Hsc Hstv Hsepc Htlbc' Hgpr Hupt Hcode Hdata Hcfg'".
+    iSplitR; [iPureIntro; exact HSXL |].
+    iSplitR; [iPureIntro; exact Hok |].
+    iFrame "Hpc' Hnpc".
+  Qed.
+
+  (* rd = x0 adapters: every if-form _gpr execute lemma reduces to the
+     state-preserving shape when rd = x0 *)
+  Lemma exec_execute_ITYPE_x0 (op : iop) (imm : mword 12) (rs1 rd : mword 5) :
+    uint rd = 0 ->
+    (forall s', exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, op))) s'
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd) 0 then s'
+               else set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                      (regval_into_reg (gpr_addi_val rs1 imm s')))) ->
+    forall s, exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, op))) s
+      = Some (RETIRE_SUCCESS, s).
+  Proof.
+    intros Hrd0 HE s.
+    rewrite (HE s).
+    replace (Z.eqb (uint rd) 0) with true by (symmetry; apply Z.eqb_eq; exact Hrd0).
+    reflexivity.
+  Qed.
+
 End WpUserExec.
