@@ -25,6 +25,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodeCore.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -42,11 +43,22 @@ Definition u_gbit (pte : mword 64) : bool :=
 Definition u_global (pte2 pte1 pte0 : mword 64) : bool :=
   orb (orb (orb false (u_gbit pte2)) (u_gbit pte1)) (u_gbit pte0).
 
+(* NB: do NOT [destruct Zwf_guarded; vm_compute] here -- the Svnapot probe
+   recurses (via the Zca gate, which reads misa) and vm_compute on an
+   ABSTRACT state diverges.  Transport the concrete-state evaluation via
+   the read-frame bridge instead; the read set is exactly {misa}. *)
+Definition D_misa (r : register) : bool := register_beq r (R_bitvector_64 misa).
+
 Lemma exec_currentlyEnabled_Svnapot s :
+  register_lookup misa s.(sregs) = MISA_C ->
   exec (currentlyEnabled Ext_Svnapot) s = Some (true, s).
 Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  vm_compute. reflexivity.
+  intro Hmisa.
+  apply (decode_state_bridge D_misa _ dstateM).
+  - intros r Hr. unfold D_misa in Hr. apply register_beq_eq in Hr. subst r.
+    rewrite Hmisa. vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
 Qed.
 
 Section UserWalk.
@@ -79,18 +91,19 @@ Section UserWalk.
   (* level 0: the leaf, from any reclimit-0 Acc *)
   Lemma exec_rec_walk_leaf (g : bool) (menvcfg0 : mword 64)
         (wfacc : Acc (Zwf 0) 0) s :
+    register_lookup misa s.(sregs) = MISA_C ->
     exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     exec (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte1) 0 g tt 0 wfacc) s
-      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) (autocast (T := mword) (PPN_of_PTE pte0));
+      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44);
                      PTW_Output_pte := autocast (T := mword) pte0;
                      PTW_Output_pteAddr := Physaddr addr0;
                      PTW_Output_level := 0;
                      PTW_Output_pbmt := PBMT_PMA;
                      PTW_Output_global := orb g (u_gbit pte0) |}, tt), s).
   Proof.
-    intros Hrd0 Hmenv HPBMTE.
+    intros Hmisa Hrd0 Hmenv HPBMTE.
     destruct wfacc as [a0].
     cbn [_rec_pt_walk].
     rewrite exec_catch_early_return.
@@ -114,38 +127,40 @@ Section UserWalk.
     rewrite (execR_bind_Some _ _ _ _ _ HAB).
     cbv iota beta. cbn match.
     change (0 >? 0) with false. cbv iota beta.
-    match goal with |- context[Defs.bind (Defs.and_boolM ?A ?B) _] =>
-      assert (HNB : execR (Defs.and_boolM A B) s = Some (inr false, s)) end.
-    { unfold Defs.and_boolM.
-      rewrite execR_bind. rewrite execR_liftR.
-      rewrite (exec_currentlyEnabled_Svnapot s). cbn match.
-      rewrite execR_returnR. rewrite H0N. reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ HNB).
+    (* the Svnapot gate sits under two binds: decompose with the plain
+       execR_bind equations, resolve the probe, and let the N-bit kill it *)
+    rewrite execR_bind.
+    rewrite execR_bind.
+    unfold Defs.and_boolM.
+    rewrite execR_bind.
+    rewrite execR_liftR.
+    rewrite (exec_currentlyEnabled_Svnapot s Hmisa). cbn match beta.
     cbv iota beta.
-    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    rewrite H0N. cbv iota beta.
+    rewrite execR_returnR. cbn match.
+    rewrite execR_returnR. cbn match beta.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg menvcfg s)).
     rewrite Hmenv. rewrite HPBMTE. cbv iota beta.
-    rewrite execR_bind. rewrite execR_returnR. cbn match.
-    rewrite execR_returnR. cbn match.
-    reflexivity.
+    cbn. reflexivity.
   Qed.
 
   (* level 1: a valid non-leaf step into the leaf, from any reclimit-1 Acc *)
   Lemma exec_rec_walk_l1 (g : bool) (menvcfg0 : mword 64)
         (wfacc : Acc (Zwf 0) 1) s :
+    register_lookup misa s.(sregs) = MISA_C ->
     exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
     exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     exec (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte2) 1 g tt 1 wfacc) s
-      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) (autocast (T := mword) (PPN_of_PTE pte0));
+      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44);
                      PTW_Output_pte := autocast (T := mword) pte0;
                      PTW_Output_pteAddr := Physaddr addr0;
                      PTW_Output_level := 0;
                      PTW_Output_pbmt := PBMT_PMA;
                      PTW_Output_global := orb (orb g (u_gbit pte1)) (u_gbit pte0) |}, tt), s).
   Proof.
-    intros Hrd1 Hrd0 Hmenv HPBMTE.
+    intros Hmisa Hrd1 Hrd0 Hmenv HPBMTE.
     destruct wfacc as [a1].
     cbn [_rec_pt_walk].
     rewrite exec_catch_early_return.
@@ -165,27 +180,27 @@ Section UserWalk.
     rewrite execR_liftR.
     match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (1 - 1)] =>
       change (1 - 1) with 0 end.
-    rewrite (exec_rec_walk_leaf _ menvcfg0 _ s Hrd0 Hmenv HPBMTE).
-    cbn match.
-    rewrite execR_returnR. cbn match. reflexivity.
+    rewrite (exec_rec_walk_leaf _ menvcfg0 _ s Hmisa Hrd0 Hmenv HPBMTE).
+    cbn. reflexivity.
   Qed.
 
   (* level 2 = the full walk *)
   Lemma exec_pt_walk_user (menvcfg0 : mword 64) s :
+    register_lookup misa s.(sregs) = MISA_C ->
     exec (read_pte (Physaddr addr2) 8) s = Some (Ok pte2, s) ->
     exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
     exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     exec (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s
-      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) (autocast (T := mword) (PPN_of_PTE pte0));
+      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44);
                      PTW_Output_pte := autocast (T := mword) pte0;
                      PTW_Output_pteAddr := Physaddr addr0;
                      PTW_Output_level := 0;
                      PTW_Output_pbmt := PBMT_PMA;
                      PTW_Output_global := u_global pte2 pte1 pte0 |}, tt), s).
   Proof.
-    intros Hrd2 Hrd1 Hrd0 Hmenv HPBMTE.
+    intros Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE.
     unfold pt_walk.
     destruct (Defs.Zwf_guarded _) as [a2].
     cbn [_rec_pt_walk].
@@ -206,9 +221,8 @@ Section UserWalk.
     rewrite execR_liftR.
     match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (2 - 1)] =>
       change (2 - 1) with 1 end.
-    rewrite (exec_rec_walk_l1 _ menvcfg0 _ s Hrd1 Hrd0 Hmenv HPBMTE).
-    cbn match.
-    rewrite execR_returnR. cbn match. reflexivity.
+    rewrite (exec_rec_walk_l1 _ menvcfg0 _ s Hmisa Hrd1 Hrd0 Hmenv HPBMTE).
+    cbn. reflexivity.
   Qed.
 
 End UserWalk.
