@@ -391,18 +391,7 @@ Section WpAcquireLock.
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       locked γ -∗ R -∗
-      (∃ mfin, gpr_file mfin ∗
-        ⌜ mfin !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5) /\
-          mfin !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5) /\
-          mfin !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
-          mfin !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
-          mfin !!! Regidx (mword_of_int 10 : mword 5)
-            = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) /\
-          mfin !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
-          mfin !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) /\
-          mfin !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5) /\
-          mfin !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5) /\
-          mfin !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) ⌝) -∗
+      (∃ mfin, gpr_file mfin ∗ ⌜ callee_saved m mfin ⌝) -∗
       a_r24 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
       a_r16 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
       a_r8 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -591,7 +580,7 @@ Section WpAcquireLock.
     iEval (rewrite Hpc10) in "Hpc".
     iDestruct "Hmfin" as (mfin) "[Hfile %Hmf]".
     unfold callee_saved in Hmf.
-    destruct Hmf as (Hfsp_ & Hftp_ & Hfs0_ & Hfs1_ & Hfs2_ & Hfs3_ & Hfs4_ & Hfs5_ & _ & _ & _ & _ & _ & _).
+    destruct Hmf as (Hfsp_ & Hftp_ & Hfs0_ & Hfs1_ & Hfs2_ & Hfs3_ & Hfs4_ & Hfs5_ & Hfs6_ & Hfs7_ & Hfs8_ & Hfs9_ & Hfs10_ & Hfs11_).
     (* canonical values of the tracked registers after push_off *)
     assert (HP0s1 : P0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk).
     { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -626,8 +615,40 @@ Section WpAcquireLock.
       rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    assert (HP0s6 : P0 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)).
+    { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    assert (HP0s7 : P0 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)).
+    { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    assert (HP0s8 : P0 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)).
+    { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    assert (HP0s9 : P0 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)).
+    { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    assert (HP0s10 : P0 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)).
+    { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    assert (HP0s11 : P0 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+    { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
     rewrite HP0s1 in Hfs1_. rewrite HP0csp in Hfsp_. rewrite HP0tp in Hftp_.
     rewrite HP0s2 in Hfs2_. rewrite HP0s3 in Hfs3_. rewrite HP0s4 in Hfs4_. rewrite HP0s5 in Hfs5_.
+    rewrite HP0s6 in Hfs6_. rewrite HP0s7 in Hfs7_. rewrite HP0s8 in Hfs8_.
+    rewrite HP0s9 in Hfs9_. rewrite HP0s10 in Hfs10_. rewrite HP0s11 in Hfs11_.
     (* ---- 0x10: c.mv a0,s1 ---- *)
     iApply (wp_cmv_gpr_s_config root_ppn E Φ (mword_of_int (AQ + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               mfin mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
@@ -698,6 +719,30 @@ Section WpAcquireLock.
     { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       exact Hfs5_. }
+    assert (HB2s6 : B2 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)).
+    { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      exact Hfs6_. }
+    assert (HB2s7 : B2 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)).
+    { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      exact Hfs7_. }
+    assert (HB2s8 : B2 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)).
+    { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      exact Hfs8_. }
+    assert (HB2s9 : B2 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)).
+    { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      exact Hfs9_. }
+    assert (HB2s10 : B2 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)).
+    { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      exact Hfs10_. }
+    assert (HB2s11 : B2 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+    { rewrite /B2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      exact Hfs11_. }
     assert (HAcpu2 : add_vec (B2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu)
       by (rewrite HB2a0 !aq_addv_zero_l; reflexivity).
     assert (Hspdh_eq : add_vec (B2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = po_spd)
@@ -730,7 +775,9 @@ Section WpAcquireLock.
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     iEval (rewrite HAcpu2) in "Hcpu".
     iDestruct "Hmh" as (mh) "[Hfile %Hmhf]".
-    destruct Hmhf as (Hhra & Hhs0 & Hms1 & Hmsp & Hmtp & Hma0 & Hms2 & Hms3 & Hms4 & Hms5).
+    destruct Hmhf as (Hmcs & Hma0).
+    unfold callee_saved in Hmcs.
+    destruct Hmcs as (Hmsp & Hmtp & Hhs0 & Hms1 & Hms2 & Hms3 & Hms4 & Hms5 & Hms6 & Hms7 & Hms8 & Hms9 & Hms10 & Hms11).
     iDestruct "Hhj" as (w24 w16 w8 wra ws0) "(Hp24 & Hp16 & Hp8 & Hfra & Hfs0)".
     iEval (rewrite Hspdh_eq) in "Hp24". iEval (rewrite Hspdh_eq) in "Hp16".
     iEval (rewrite Hspdh_eq) in "Hp8". iEval (rewrite Hspdh_eq) in "Hfra".
@@ -862,6 +909,30 @@ Section WpAcquireLock.
     { rewrite /B8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite Hms5. exact HB2s5. }
+    assert (HB8s6 : B8 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)).
+    { rewrite /B8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms6. exact HB2s6. }
+    assert (HB8s7 : B8 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)).
+    { rewrite /B8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms7. exact HB2s7. }
+    assert (HB8s8 : B8 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)).
+    { rewrite /B8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms8. exact HB2s8. }
+    assert (HB8s9 : B8 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)).
+    { rewrite /B8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms9. exact HB2s9. }
+    assert (HB8s10 : B8 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)).
+    { rewrite /B8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms10. exact HB2s10. }
+    assert (HB8s11 : B8 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+    { rewrite /B8. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms11. exact HB2s11. }
     assert (HC1a0 : C1 !!! Regidx (mword_of_int 10 : mword 5) = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))).
     { rewrite /C1 po_mycpu_out_a0 HB8tp. reflexivity. }
     iEval (rewrite HC1a0) in "Hcpu".
@@ -948,29 +1019,27 @@ Section WpAcquireLock.
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
     (* ---- hand everything to the caller's continuation ---- *)
     iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc Htok HRes [Hfile] Hr24 Hr16 Hr8 [Hfra Hfs0 Hp24 Hp16 Hp8] Hnoff [Hintena] Hcpu").
-    { iExists D4. iFrame "Hfile". iPureIntro.
-      split; [exact HD4ra|]. split; [|split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]]].
-      - rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /D2. apply lookup_total_insert.
-      - rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /D3. apply lookup_total_insert.
-      - rewrite /D4. rewrite lookup_total_insert. rewrite HD3sp.
+    { iExists D4. iFrame "Hfile". iPureIntro. unfold callee_saved. repeat split.
+      - (* sp *)
+        rewrite /D4. rewrite lookup_total_insert. rewrite HD3sp.
         rewrite /spd po_addv_assoc.
         replace (add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))
           with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         apply kv_addv_zero.
-      - rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        exact HC1a0.
-      - rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      - (* tp *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /C1 po_mycpu_out_tp. exact HB8tp.
+      - (* s0 (x8) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D2. apply lookup_total_insert.
+      - (* s1 (x9) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. apply lookup_total_insert.
       - (* s2 (x18): preserved across the whole acquire *)
         rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -995,6 +1064,42 @@ Section WpAcquireLock.
         rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /C1 po_mycpu_out_s5. exact HB8s5.
+      - (* s6 (x22) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C1 po_mycpu_out_s6. exact HB8s6.
+      - (* s7 (x23) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C1 po_mycpu_out_s7. exact HB8s7.
+      - (* s8 (x24) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C1 po_mycpu_out_s8. exact HB8s8.
+      - (* s9 (x25) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C1 po_mycpu_out_s9. exact HB8s9.
+      - (* s10 (x26) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C1 po_mycpu_out_s10. exact HB8s10.
+      - (* s11 (x27) *)
+        rewrite /D4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /C1 po_mycpu_out_s11. exact HB8s11.
     }
     iExists _, _, _, _, _.
     iFrame "Hp24 Hp16 Hp8 Hfra Hfs0".
