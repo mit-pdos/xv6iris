@@ -125,7 +125,7 @@ Section WpKernelNew.
                   vm_compute in H; discriminate H ]).
       reflexivity. }
     (* ---- start(): jal-entry -> MRET (Supervisor mode at <main>) ---- *)
-    iApply (wp_start E Φ (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
+    iApply (wp_start_words E Φ (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
               (m !!! Regidx ti_s0)
               mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in
               mcounteren0 pmpcfg0 pmpaddr00 vsra vss0 vtra vts0
