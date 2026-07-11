@@ -105,6 +105,7 @@ WpUserret.v
 WpUserretEntry.v
 WpUserretTop.v
 WpUserretAll.v
+UptBridge.v
 VcGen.v
 VcGenS.v
 WpSwtchVc.v
