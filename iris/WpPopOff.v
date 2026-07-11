@@ -1161,7 +1161,7 @@ Section WpPopOffTopSec.
     iApply (wp_jal_gpr_s2 root_ppn γc E Φ P (mword_of_int 1) jimm m (1/2)%Qp
               HN ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
-              with "Hhw Hsm Htlbinv Hpc Hfile Hjal [-]").
+              with "Hsm Htlbinv Hpc Hfile Hjal [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite Htarget) in "Hpc".
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
