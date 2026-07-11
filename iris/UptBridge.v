@@ -30,7 +30,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvT
 Require Import MinstretInv InstrBytes.
 Require Import SmodeCore.
 Require Import UmodeWalk UptInv.
-Require Import TrampPt TrampTlb WpUserret.
+Require Import TrampPt TrampTlb WpUserret WpGprRvcTor WpUserretEntry.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -357,6 +357,59 @@ Qed.
 (* ===================================================================== *)
 (* 7. The Iris bridge: [utlb_inv] converts into [upt_inv] + the user       *)
 (*    loop frame's satp/tlb/PMP cells and pure facts.                      *)
+
+(* ===================================================================== *)
+(* 8. The CONVERSE: re-entering the kernel through uservec.  A trap from  *)
+(* user mode lands in the trampoline's uservec, which runs under the      *)
+(* USER page table until IT switches satp back to the kernel table.  The  *)
+(* user-execution frame's pieces reconstruct [utlb_inv], so the uservec   *)
+(* WP can drive the trampoline-page engines (wp_instr_u) from the state   *)
+(* the user loop leaves behind.                                           *)
+(* ===================================================================== *)
+
+(* the direct-mapped hash is surjective on [0,64): slot i is the hash of
+   the 27-bit vpn i *)
+Lemma tlb_hash_surj (i : Z) :
+  0 <= i < 64 ->
+  exists vpn' : mword 27, tlb_hash (__id 39) vpn' = i.
+Proof.
+  intro Hi.
+  assert (H : i = 0 \/ i = 1 \/ i = 2 \/ i = 3 \/ i = 4 \/ i = 5 \/ i = 6 \/ i = 7 \/ i = 8 \/ i = 9 \/ i = 10 \/ i = 11 \/ i = 12 \/ i = 13 \/ i = 14 \/ i = 15 \/ i = 16 \/ i = 17 \/ i = 18 \/ i = 19 \/ i = 20 \/ i = 21 \/ i = 22 \/ i = 23 \/ i = 24 \/ i = 25 \/ i = 26 \/ i = 27 \/ i = 28 \/ i = 29 \/ i = 30 \/ i = 31 \/ i = 32 \/ i = 33 \/ i = 34 \/ i = 35 \/ i = 36 \/ i = 37 \/ i = 38 \/ i = 39 \/ i = 40 \/ i = 41 \/ i = 42 \/ i = 43 \/ i = 44 \/ i = 45 \/ i = 46 \/ i = 47 \/ i = 48 \/ i = 49 \/ i = 50 \/ i = 51 \/ i = 52 \/ i = 53 \/ i = 54 \/ i = 55 \/ i = 56 \/ i = 57 \/ i = 58 \/ i = 59 \/ i = 60 \/ i = 61 \/ i = 62 \/ i = 63) by lia.
+  repeat (destruct H as [-> | H];
+    [ match goal with |- exists _, _ = ?k =>
+        exists (mword_of_int k : mword 27); vm_compute; reflexivity end |]).
+  subst i.
+  exists (mword_of_int 63 : mword 27); vm_compute; reflexivity.
+Qed.
+
+(* [upt_tlb_ok] at the two-vpn spec gives back the slot-precise userret
+   TLB consistency: every present slot is the hash-slot of a spec-mapped
+   vpn, and only slots 63/62 qualify. *)
+Lemma upt_ok_utlb_consistent (ul1 ul0 tfp : mword 44)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  upt_tlb_ok (ur_spec ul1 ul0 tfp) tlbvec ->
+  utlb_consistent ul0 tfp tlbvec.
+Proof.
+  intros Hok i Hi.
+  destruct (vec_access_dec tlbvec i) as [ent |] eqn:Hslot; [| left; reflexivity].
+  destruct (tlb_hash_surj i ltac:(change (2 ^ 6) with 64 in Hi; lia)) as (vpn' & Hh).
+  rewrite <- Hh in Hslot.
+  destruct (Hok vpn' ent Hslot) as (vpn & inf & Hspec & Hhash & ->).
+  unfold ur_spec in Hspec.
+  destruct (decide (vpn = tramp_vpn)) as [-> | Hne].
+  - rewrite lookup_insert in Hspec. injection Hspec as <-.
+    right; left. split.
+    + rewrite <- Hh. rewrite <- Hhash. apply tramp_hash.
+    + rewrite upt_entry_tramp. reflexivity.
+  - rewrite lookup_insert_ne in Hspec; [| congruence].
+    destruct (decide (vpn = tf_vpn)) as [-> | Hne2].
+    2:{ rewrite lookup_singleton_ne in Hspec; [discriminate | congruence]. }
+    rewrite lookup_singleton in Hspec. injection Hspec as <-.
+    right; right. split.
+    + rewrite <- Hh. rewrite <- Hhash. apply tf_hash.
+    + rewrite upt_entry_tf. reflexivity.
+Qed.
+
 (* ===================================================================== *)
 
 Section UptBridge.
@@ -434,6 +487,91 @@ Section UptBridge.
     iSplitL "Hpb1"; [iApply (pte8_word_pointsto with "Hpb1") |].
     iSplitL "Hpb0t"; [iApply (pte8_word_pointsto with "Hpb0t") |].
     iApply (pte8_word_pointsto with "Hpb0f").
+  Qed.
+
+
+  (* the Iris converse: the user frame's satp/tlb/PMP cells + [upt_inv]
+     reconstruct [utlb_inv] for the uservec trampoline steps.  The PMA
+     pte-read regions come back as premises (they are boot facts, exactly
+     as wp_userret takes them). *)
+  Lemma upt_to_utlb_inv (uroot ul1 ul0 tfp : mword 44) (usatp : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
+      (rg2 rg1 rg0t rg0f : PMA_Region) :
+    uroot <> ul1 -> ul1 <> ul0 -> uroot <> ul0 ->
+    _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ->
+    upt_tlb_ok (ur_spec ul1 ul0 tfp) tlbvec ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at uroot idx2t)) 8 = Some rg2 /\
+       (override_PMA (PMA_Region_attributes rg2) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at ul1 idx1t)) 8 = Some rg1 /\
+       (override_PMA (PMA_Region_attributes rg1) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0t)) 8 = Some rg0t /\
+       (override_PMA (PMA_Region_attributes rg0t) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0f)) 8 = Some rg0f /\
+       (override_PMA (PMA_Region_attributes rg0f) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    satp ↦ᵣ usatp -∗
+    tlb ↦ᵣ tlbvec -∗
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗
+    pmpaddr_n ↦ᵣ pmpaddr00 -∗
+    upt_inv uroot (ur_slots uroot ul1 ul0 tfp) (ur_spec ul1 ul0 tfp) -∗
+    utlb_inv uroot ul1 ul0 tfp.
+  Proof.
+    intros Hru1 Hu1u0 Hru0 Hmode Hasid Hppn Hok HA Hord HX HW HR Hcov
+      Hr2 Hr1 Hr0t Hr0f.
+    iIntros "Hsatp Htlb Hpmpc Hpmpa [Hslots _]".
+    unfold upt_slots, ur_slots.
+    rewrite big_sepM_insert.
+    2:{ rewrite lookup_insert_ne;
+          [| apply pte_addr_at_ne_page; congruence].
+        rewrite lookup_insert_ne;
+          [| apply pte_addr_at_ne_page; congruence].
+        apply lookup_singleton_ne. apply pte_addr_at_ne_page; congruence. }
+    rewrite big_sepM_insert.
+    2:{ rewrite lookup_insert_ne;
+          [| apply pte_addr_at_ne_page; congruence].
+        apply lookup_singleton_ne. apply pte_addr_at_ne_page; congruence. }
+    rewrite big_sepM_insert.
+    2:{ apply lookup_singleton_ne. apply ur_leaf_slots_ne'. }
+    rewrite big_sepM_singleton.
+    iDestruct "Hslots" as "(Hw2 & Hw1 & Hw0t & Hw0f)".
+    iDestruct "Hw2" as "[_ Hpb2]".
+    iDestruct "Hw1" as "[_ Hpb1]".
+    iDestruct "Hw0t" as "[_ Hpb0t]".
+    iDestruct "Hw0f" as "[_ Hpb0f]".
+    iDestruct (pte8_ram_bounds with "Hpb2") as %[Hlo2 Hfit2].
+    iDestruct (pte8_ram_bounds with "Hpb1") as %[Hlo1 Hfit1].
+    iDestruct (pte8_ram_bounds with "Hpb0t") as %[Hlo0t Hfit0t].
+    iDestruct (pte8_ram_bounds with "Hpb0f") as %[Hlo0f Hfit0f].
+    pose proof (conj HA (conj Hord (conj (ram_pmp_match _ _ Hlo2 Hfit2 Hcov) HR))) as Hp2.
+    pose proof (conj HA (conj Hord (conj (ram_pmp_match _ _ Hlo1 Hfit1 Hcov) HR))) as Hp1.
+    pose proof (conj HA (conj Hord (conj (ram_pmp_match _ _ Hlo0t Hfit0t Hcov) HR))) as Hp0t.
+    pose proof (conj HA (conj Hord (conj (ram_pmp_match _ _ Hlo0f Hfit0f Hcov) HR))) as Hp0f.
+    iApply (utlb_inv_intro uroot ul1 ul0 tfp usatp tlbvec Hmode Hasid Hppn
+              (upt_ok_utlb_consistent ul1 ul0 tfp tlbvec Hok)
+              with "Hsatp Htlb [Hpb2 Hpb1 Hpb0t Hpb0f] [Hpmpc Hpmpa]").
+    { iSplitL "Hpb2"; [iExact "Hpb2" |].
+      iSplitL "Hpb1"; [iExact "Hpb1" |].
+      iSplitL "Hpb0t"; [iExact "Hpb0t" |].
+      iExact "Hpb0f". }
+    iExists pmpcfg0, pmpaddr00, rg2, rg1, rg0t, rg0f.
+    iFrame "Hpmpc Hpmpa". iPureIntro.
+    exact (conj Hp2 (conj Hp1 (conj Hp0t (conj Hp0f (conj
+            (fun pmar Hall => conj (Hr2 pmar Hall)
+               (conj (Hr1 pmar Hall) (conj (Hr0t pmar Hall) (Hr0f pmar Hall))))
+            (conj HX (conj HW (conj HR Hcov)))))))).
   Qed.
 
 End UptBridge.
