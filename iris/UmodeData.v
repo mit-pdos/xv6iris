@@ -529,3 +529,156 @@ Proof.
   rewrite <- (pm_transform_VA_0 ea) at 2.
   apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §6 The virtual 8-byte user load: mem_read at User, and the             *)
+(*    vmem_read_addr chain through the Sv39 hit translation.              *)
+(* ===================================================================== *)
+
+Lemma exec_mem_read_load_U (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : bv 64) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8
+    = Some region ->
+  is_aligned_paddr (Physaddr addr) 8 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_clint (Physaddr addr) 8) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 8) s = Some (false, s) ->
+  exec (within_htif_readable (Physaddr addr) 8) s = Some (false, s) ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (mem_read (Load Data) pbmt (Physaddr addr) 8 false false false)
+       s = Some (Ok w, s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hbytes Hmprv Hpriv.
+  unfold mem_read.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv.
+  rewrite (exec_bind_Some _ _ _ _ _
+             (exec_effectivePrivilege_load_nm _ _ s Hmprv)).
+  unfold mem_read_priv.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (mem_read_priv_meta _ _ _ _ 8 _ _ _ _) s = Some (Ok (w, default_meta), s))).
+  2:{ unfold mem_read_priv_meta. cbn [orb andb].
+      rewrite (exec_bind_Some _ _ _ _ _
+                (_ : exec (checked_mem_read _ _ _ _ 8 _ _ _ _) s = Some (Ok (w, default_meta), s))).
+      2:{ cbn match.
+          apply exec_checked_mem_read_ram_8_U with (region := region); assumption. }
+      cbn match. unfold mem_read_callback. apply exec_returnM. }
+  cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
+Qed.
+
+Section VRU.
+  Context (ent : TLB_Entry) (vpn : mword 27).
+  Variable a : mword 64.
+  Variable v : bv 64.
+  Variable region : PMA_Region.
+  Variable s : mstate.
+  Let pa := u_pa ent a vpn.
+  Let data2 : mword (8*1*8) :=
+    update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v.
+
+  (* the stored-entry leaf facts, at Load Data *)
+  Hypothesis Hchk : forall (mxr do_sum : bool) s0,
+    exec (check_PTE_permission (Load Data) User mxr do_sum
+            (Mk_PTE_Flags (subrange_vec_dec (tlb_get_pte 8 ent) 7 0))
+            (ext_bits_of_PTE (tlb_get_pte 8 ent)) tt) s0
+      = Some (PTE_Check_Success tt, s0).
+  Hypothesis Hupd : update_PTE_Bits (tlb_get_pte 8 ent) (Load Data)
+                    = (None : option (mword 64)).
+  Hypothesis Hpbmt : forall s0, exec (tlb_get_pbmt ent) s0 = Some (PBMT_PMA, s0).
+  Hypothesis Hmatch : match_TLB_Entry ent (mword_of_int 0 : mword 16)
+                        (sign_extend' (57 - 12) vpn) = true.
+  (* machine-state pins *)
+  Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = User.
+  Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
+  Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false.
+  Hypothesis Hsatpmode : _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s.(sregs))) = ('b"1000" : mword 4).
+  Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) (register_lookup satp s.(sregs)) : mword 64)) = (mword_of_int 0 : mword 16).
+  Hypothesis Hvec : vec_access_dec (register_lookup tlb s.(sregs)) (tlb_hash (__id 39) vpn) = Some ent.
+  (* va geometry at the (aligned) data address *)
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 8 = true.
+  Hypothesis Hcanon : neq_vec (bits_of_virtaddr (Virtaddr a))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) = false.
+  Hypothesis Hvpn_def : autocast (T := mword) (subrange_vec_dec
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn.
+  (* physical-side facts at the translated pa *)
+  Hypothesis HpmpA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
+  Hypothesis Hpmp_ord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false.
+  Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 8)) = PMP_Match.
+  Hypothesis HpmpR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
+  Hypothesis Hpmam : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 8 = Some region.
+  Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 8 = true.
+  Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.
+  Hypothesis Hc : exec (within_clint (Physaddr pa) 8) s = Some (false, s).
+  Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
+  Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
+  Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N ->
+    s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
+
+  Lemma exec_vmem_read_addr_8_U :
+    exec (vmem_read_addr (Virtaddr a) 8 (Load Data) false false false) s
+      = Some (Ok data2, s).
+  Proof.
+    unfold vmem_read_addr.
+    rewrite exec_catch_early_return.
+    rewrite Halign. cbn [Riscv.rv64d.not negb].
+    assert (Hinner : execR (returnR (result (mword (8 * 8)) ExecutionResult) tt >>
+                            liftR (split_misaligned (Virtaddr a) 8)) s = Some (inr (1, 8), s)).
+    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned (Virtaddr a) s Halign). reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+    rewrite misaligned_order_1.
+    match goal with
+    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (data2, true, 0), s))
+    end.
+    { eapply execR_untilMT_1.
+      - reflexivity.
+      - cbn match.
+        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+        assert (Htr : exec (translateAddr
+                  (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * 8)))
+                  (Load Data)) s
+                = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s)).
+        { cbn [bits_of_virtaddr].
+          replace (add_vec_int a (0 * 8)) with a by (symmetry; apply avi0).
+          exact (exec_translateAddr_load_hit_u ent vpn a
+                   (register_lookup satp s.(sregs))
+                   (register_lookup tlb s.(sregs)) s
+                   Hchk Hupd Hpbmt Hmatch Hcp HSXL Hmprv eq_refl Hsatpmode Hasid
+                   eq_refl Hvec Hcanon Hvpn_def). }
+        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
+        cbn match.
+        match goal with
+        | |- execR (Defs.bind ?mrm ?post) s = _ =>
+          assert (Hmrm : execR mrm s = Some (inr data2, s))
+        end.
+        { rewrite (execR_liftR_seq _ _ _ _ _
+            (exec_mem_read_load_U PBMT_PMA pa region v s
+               HpmpA Hpmp_ord Hrange HpmpR Hpmam Hpalign Hread Hc Hsig Hh Hbytes
+               Hmprv Hcp)).
+          cbn match.
+          rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+          rewrite autocast_id. apply execR_returnR_fwd. }
+        rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
+        cbn. apply execR_returnR_fwd.
+      - apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hu).
+    cbn. rewrite autocast_id. reflexivity.
+  Qed.
+
+End VRU.
