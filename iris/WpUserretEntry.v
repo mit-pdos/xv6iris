@@ -493,3 +493,299 @@ Section WpStepTramp.
   Qed.
 
 End WpStepTramp.
+
+(* ===================================================================== *)
+(* 4. wp_userret_entry -- the page-table switch: sfence.vma; csrw satp,a0;*)
+(* sfence.vma.  Consumes the kernel [tlb_inv] (satp leaves it and the PMP *)
+(* cells migrate into the user bundle) and establishes [utlb_inv].        *)
+(* ===================================================================== *)
+
+Section WpUserretEntryTop.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma wp_userret_entry (kroot kl1 kl0 uroot ul1 ul0 tfp : mword 44) E (Φ : mval -> iProp Σ)
+      (m : gmap regidx (mword 64)) (usatp : mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (rg2 rg1 rg0t rg0f rgk2 rgk1 rgk0 : PMA_Region) {dq dqk : dfrac} :
+    ↑minstretN ⊆ E ->
+    (* S-mode config *)
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    eq_vec (_get_Mstatus_TVM mstatus0) ('b"1") = false ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    (* a0 holds the USER satp value *)
+    m !! Regidx (mword_of_int 10) = Some usatp ->
+    _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ->
+    (* PMA pte-read regions: the user path (4, they seed [upmp_config])
+       and the kernel trampoline path (3, they drive the phase-A/B walks) *)
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at uroot idx2t)) 8 = Some rg2 /\
+       (override_PMA (PMA_Region_attributes rg2) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at ul1 idx1t)) 8 = Some rg1 /\
+       (override_PMA (PMA_Region_attributes rg1) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0t)) 8 = Some rg0t /\
+       (override_PMA (PMA_Region_attributes rg0t) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at ul0 idx0f)) 8 = Some rg0f /\
+       (override_PMA (PMA_Region_attributes rg0f) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at kroot idx2t)) 8 = Some rgk2 /\
+       (override_PMA (PMA_Region_attributes rgk2) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at kl1 idx1t)) 8 = Some rgk1 /\
+       (override_PMA (PMA_Region_attributes rgk1) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    (forall pmar0, pma_allows_all pmar0 ->
+       matching_pma_region pmar0 (Physaddr (pte_addr_at kl0 idx0t)) 8 = Some rgk0 /\
+       (override_PMA (PMA_Region_attributes rgk0) PBMT_PMA).(PMA_supports_pte_read) = true) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv kroot -∗
+    ktramp_pte_bytes kroot kl1 kl0 dqk -∗
+    upte_bytes uroot ul1 ul0 tfp (DfracOwn 1) -∗
+    pc_is (uva 0x9c) -∗
+    gpr_file m -∗
+    instr (upa 0x9c) false ai_sfence -∗
+    instr (upa 0xa0) false ai_csrw -∗
+    instr (upa 0xa4) false ai_sfence -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      utlb_inv uroot ul1 ul0 tfp -∗
+      pc_is (uva 0xa8) -∗
+      gpr_file m -∗
+      ktramp_pte_bytes kroot kl1 kl0 dqk -∗
+      pte_super_bytes kroot (DfracOwn 1) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN HSIE HSXL HTVM Hmm HPBMTE Hmenvval0 Ha0 HuMode Huasid Huppn
+      HrU2 HrU1 HrU0t HrU0f HrK2 HrK1 HrK0.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hktramp Hupte
+             [Hpc Hnpc] [%Hdom Hfmap] Hi1 Hi2 Hi3 Hcont".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    (* open the kernel invariant: satp value, tlb value + consistency,
+       the super PTE, and the PMP cells + ambient facts *)
+    iDestruct (tlb_inv_open with "Hktlb") as (ksatp0 tlbvec0)
+      "(Hsatp & %HkMode & %Hkasid & %Hkppn & Htlb & %Hconsk & Hsuper & Hkpmp)".
+    iDestruct "Hkpmp" as (pmpcfg0 pmpaddr00 region_pte)
+      "(Hpmpc & Hpmpa & %Hpk & %Hpkreg & %HX & %HW & %HR & %Hcov)".
+    iDestruct "Hktramp" as "(HkbA & HkbB & HkbC)".
+    iDestruct "Hupte" as "(HubA & HubB & HubC & HubD)".
+    (* PMP read permission for all seven walk PTE addresses, from RAM
+       coverage + the owned cells' RAM bounds *)
+    iDestruct (pte8_ram_bounds with "HkbA") as %[HloKA HfitKA].
+    iDestruct (pte8_ram_bounds with "HkbB") as %[HloKB HfitKB].
+    iDestruct (pte8_ram_bounds with "HkbC") as %[HloKC HfitKC].
+    iDestruct (pte8_ram_bounds with "HubA") as %[HloUA HfitUA].
+    iDestruct (pte8_ram_bounds with "HubB") as %[HloUB HfitUB].
+    iDestruct (pte8_ram_bounds with "HubC") as %[HloUC HfitUC].
+    iDestruct (pte8_ram_bounds with "HubD") as %[HloUD HfitUD].
+    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloKA HfitKA Hcov) as HpKA.
+    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloKB HfitKB Hcov) as HpKB.
+    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloKC HfitKC Hcov) as HpKC.
+    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUA HfitUA Hcov) as HpUA.
+    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUB HfitUB Hcov) as HpUB.
+    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUC HfitUC Hcov) as HpUC.
+    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUD HfitUD Hcov) as HpUD.
+    (* the concrete next-pc equalities *)
+    assert (Hva01 : add_vec_int (uva 0x9c) 4 = uva 0xa0)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hva02 : add_vec_int (uva 0xa0) 4 = uva 0xa4)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hva03 : add_vec_int (uva 0xa4) 4 = uva 0xa8)
+      by (apply bv_eq; vm_compute; reflexivity).
+    (* ================= STEP 1: sfence.vma (kernel PT) ================= *)
+    iApply (wp_step_tramp kroot kl1 kl0 E Φ (uva 0x9c) (upa 0x9c) ai_sfence
+              ksatp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 rgk2 rgk1 rgk0 tlbvec0
+              HN HSIE HSXL Hmm HPBMTE Hmenvval0 HkMode Hkppn Hkasid
+              (ktramp_slot63 kroot tlbvec0 Hconsk)
+              HX Hcov HpKA HpKB HpKC HrK2 HrK1 HrK0
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; split; congruence)
+              ltac:(vm_compute; split; congruence)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Htlb Hpmpc Hpmpa
+                    HkbA HkbB HkbC Hpc Hi1").
+    iIntros (σf1 Hpceq1 tv1 Hout1)
+      "Hpriv Hms Hmie Hmdl Hmenv Hsatp Htlb Hpmpc Hpmpa HkbA HkbB HkbC Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv1.
+    iDestruct (reg_valid_dq with "Hreg Hms") as %Lms1.
+    iMod (reg_update _ nextPC _ (uva 0xa0) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc1 := set_reg σf1 nextPC (uva 0xa0)).
+    assert (Lpriv1p : register_lookup cur_privilege s_pc1.(sregs) = Supervisor)
+      by (unfold s_pc1; tmig; exact Lpriv1).
+    assert (Lms1p : register_lookup mstatus s_pc1.(sregs) = mstatus0)
+      by (unfold s_pc1; tmig; exact Lms1).
+    destruct (exec_execute_SFENCE_VMA_S s_pc1 Lpriv1p
+                ltac:(rewrite Lms1p; exact HTVM)) as (tlbz1 & Hex1 & Hnone1).
+    iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb") as "[Hreg Htlb]".
+    iModIntro.
+    iExists (set_reg s_pc1 tlb tlbz1).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq1. rewrite Hva01. fold s_pc1.
+      change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex1. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs Hpc".
+    assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs) = uva 0xa0).
+    { unfold s_pc1; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc1) in "Hpc".
+    iNext.
+    (* ================= STEP 2: csrw satp, a0 (kernel PT) ================= *)
+    iApply (wp_step_tramp kroot kl1 kl0 E Φ (uva 0xa0) (upa 0xa0) ai_csrw
+              ksatp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 rgk2 rgk1 rgk0 tlbz1
+              HN HSIE HSXL Hmm HPBMTE Hmenvval0 HkMode Hkppn Hkasid
+              (empty_slot63 tlbz1 Hnone1)
+              HX Hcov HpKA HpKB HpKC HrK2 HrK1 HrK0
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; split; congruence)
+              ltac:(vm_compute; split; congruence)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Htlb Hpmpc Hpmpa
+                    HkbA HkbB HkbC Hpc Hi2").
+    iIntros (σf2 Hpceq2 tv2 Hout2)
+      "Hpriv Hms Hmie Hmdl Hmenv Hsatp Htlb Hpmpc Hpmpa HkbA HkbB HkbC Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv2.
+    iDestruct (reg_valid_dq with "Hreg Hms") as %Lms2.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa2.
+    iMod (reg_update _ nextPC _ (uva 0xa4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc2 := set_reg σf2 nextPC (uva 0xa4)).
+    assert (Lpriv2p : register_lookup cur_privilege s_pc2.(sregs) = Supervisor)
+      by (unfold s_pc2; tmig; exact Lpriv2).
+    assert (Lms2p : register_lookup mstatus s_pc2.(sregs) = mstatus0)
+      by (unfold s_pc2; tmig; exact Lms2).
+    assert (Lmisa2p : register_lookup misa s_pc2.(sregs) = misa0)
+      by (unfold s_pc2; tmig; exact Lmisa2).
+    (* a0's value at the executing state *)
+    assert (Hmsp : m !! Regidx (mword_of_int 10 : mword 5)
+                   = Some (m !!! Regidx (mword_of_int 10 : mword 5)))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value (mword_of_int 10) (m !!! Regidx (mword_of_int 10 : mword 5)) s_pc2
+                 with "Hreg Hspc") as %Lva2.
+    iDestruct ("Hfb1" with "Hspc") as "Hfmap".
+    assert (Hma0v : m !!! Regidx (mword_of_int 10 : mword 5) = usatp)
+      by (apply lookup_total_correct; exact Ha0).
+    replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false in Lva2
+      by (vm_compute; reflexivity).
+    rewrite Hma0v in Lva2.
+    pose proof (exec_execute_csrw_satp_S (mword_of_int 10) s_pc2
+                  ltac:(vm_compute; lia) Lpriv2p
+                  ltac:(rewrite Lms2p; exact HTVM)
+                  ltac:(rewrite Lmisa2p; exact HmisaS)
+                  ltac:(rewrite Lms2p; exact HSXL)) as Hex2.
+    rewrite Lva2 in Hex2.
+    rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) usatp HuMode) in Hex2.
+    iMod (reg_update _ satp _ usatp with "Hreg Hsatp") as "[Hreg Hsatp]".
+    iModIntro.
+    iExists (set_reg s_pc2 satp usatp).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq2. rewrite Hva02. fold s_pc2.
+      change ai_csrw with (CSRReg (csr_satp, Regidx (mword_of_int 10 : mword 5), zreg, CSRRW)).
+      exact Hex2. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc2, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs Hpc".
+    assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp usatp).(sregs) = uva 0xa4).
+    { unfold s_pc2; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc2) in "Hpc".
+    iNext.
+    (* ================= STEP 3: sfence.vma (USER PT) ================= *)
+    assert (Hslot3 : vec_access_dec tv2 (tlb_hash (__id 39) tramp_vpn) = None \/
+      (exists ent, vec_access_dec tv2 (tlb_hash (__id 39) tramp_vpn) = Some ent /\
+                   match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) tramp_vpn) = false) \/
+      (exists ptea, vec_access_dec tv2 (tlb_hash (__id 39) tramp_vpn)
+                    = Some (tlb4k_entry (mword_of_int 0) tramp_vpn tramp_ppn
+                              (mk_pte tramp_ppn PTE_TRAMP) ptea))).
+    { destruct Hout2 as [-> | ->].
+      - apply empty_slot63. exact Hnone1.
+      - right; right. exists (pte_addr_at kl0 idx0t).
+        rewrite tramp_hash.
+        rewrite (vec64_access_update tlbz1 63 63 _ ltac:(lia)).
+        replace (Z.eqb 63 63) with true by reflexivity.
+        unfold tramp_ent, pte_tramp. reflexivity. }
+    iApply (wp_step_tramp uroot ul1 ul0 E Φ (uva 0xa4) (upa 0xa4) ai_sfence
+              usatp mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 rg2 rg1 rg0t tv2
+              HN HSIE HSXL Hmm HPBMTE Hmenvval0 HuMode Huppn Huasid
+              Hslot3
+              HX Hcov HpUA HpUB HpUC HrU2 HrU1 HrU0t
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; split; congruence)
+              ltac:(vm_compute; split; congruence)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Htlb Hpmpc Hpmpa
+                    HubA HubB HubC Hpc Hi3").
+    iIntros (σf3 Hpceq3 tv3 Hout3)
+      "Hpriv Hms Hmie Hmdl Hmenv Hsatp Htlb Hpmpc Hpmpa HubA HubB HubC Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv3.
+    iDestruct (reg_valid_dq with "Hreg Hms") as %Lms3.
+    iMod (reg_update _ nextPC _ (uva 0xa8) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc3 := set_reg σf3 nextPC (uva 0xa8)).
+    assert (Lpriv3p : register_lookup cur_privilege s_pc3.(sregs) = Supervisor)
+      by (unfold s_pc3; tmig; exact Lpriv3).
+    assert (Lms3p : register_lookup mstatus s_pc3.(sregs) = mstatus0)
+      by (unfold s_pc3; tmig; exact Lms3).
+    destruct (exec_execute_SFENCE_VMA_S s_pc3 Lpriv3p
+                ltac:(rewrite Lms3p; exact HTVM)) as (tlbz3 & Hex3 & Hnone3).
+    iMod (reg_update _ tlb _ tlbz3 with "Hreg Htlb") as "[Hreg Htlb]".
+    iModIntro.
+    iExists (set_reg s_pc3 tlb tlbz3).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq3. rewrite Hva03. fold s_pc3.
+      change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex3. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc3, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs Hpc".
+    assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs) = uva 0xa8).
+    { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc3) in "Hpc".
+    iNext.
+    (* ================= close: seal [utlb_inv] ================= *)
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv
+                          [Hsatp Htlb HubA HubB HubC HubD Hpmpc Hpmpa]
+                          [$Hpc $Hnpc] [Hfmap] [$HkbA $HkbB $HkbC] Hsuper").
+    { iApply (utlb_inv_intro uroot ul1 ul0 tfp usatp tlbz3 HuMode Huasid Huppn
+                (utlb_consistent_empty ul0 tfp tlbz3 Hnone3)
+                with "Hsatp Htlb [$HubA $HubB $HubC $HubD] [Hpmpc Hpmpa]").
+      iExists pmpcfg0, pmpaddr00, rg2, rg1, rg0t, rg0f.
+      iFrame "Hpmpc Hpmpa". iPureIntro.
+      exact (conj HpUA (conj HpUB (conj HpUC (conj HpUD (conj
+              (fun pmar Hall => conj (HrU2 pmar Hall)
+                 (conj (HrU1 pmar Hall) (conj (HrU0t pmar Hall) (HrU0f pmar Hall))))
+              (conj HX (conj HW (conj HR Hcov)))))))). }
+    iSplitR; [iPureIntro; exact Hdom |].
+    iExact "Hfmap".
+  Qed.
+
+End WpUserretEntryTop.
