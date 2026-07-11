@@ -69,7 +69,11 @@ Definition uw_wf (i : uwalk_info) : Prop :=
                      (ext_bits_of_PTE (uw_pte0 i))) s = Some (false, s)) /\
   pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec (uw_pte0 i) 7 0)) = false /\
   eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE (uw_pte0 i))) ('b"1") = false /\
-  u_global (uw_pte2 i) (uw_pte1 i) (uw_pte0 i) = false.
+  u_global (uw_pte2 i) (uw_pte1 i) (uw_pte0 i) = false /\
+  (* leaf PBMT bits are zero (NOT an A/D bit -- those stay arbitrary): the
+     TLB-hit path recomputes the page type from the STORED pte, so the
+     spec must pin it (the walk path needs only menvcfg.PBMTE = 0) *)
+  _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2).
 
 (* per-access permission fact on the leaf, in U-mode (mxr/do_sum-generic,
    exactly the UserWalk Hchk0 shape) *)
@@ -133,6 +137,127 @@ Proof.
   - apply Z.eqb_eq in Hh. injection Hget as <-.
     exists vpn, i. auto.
   - exact (Hok vpn' ent Hget).
+Qed.
+
+(* ===================================================================== *)
+(* §2b Hit-path bridges: a stored [upt_entry] recovers the leaf facts      *)
+(*     the TLB-hit translation lemmas consume (tlb_get_pte / match /       *)
+(*     tlb_get_pbmt), so a hit at a spec-mapped entry replays the walk's   *)
+(*     leaf.                                                               *)
+(* ===================================================================== *)
+
+(* the 63..0 subrange of a 64-bit word is the word *)
+Lemma subrange64_id (w : mword 64) : subrange_vec_dec w 63 0 = w.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  rewrite bv_extract_0_unsigned.
+  change (MachineWord.MachineWord.Z_idx (63 - 0 + 1)) with 64%N.
+  apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+Lemma eq_vec_refl {n} (x : mword n) : eq_vec x x = true.
+Proof. apply bool_decide_eq_true_2. reflexivity. Qed.
+
+(* dropping a zero-width mask is a no-op, at the two widths the entry uses *)
+Lemma and_ones45 (x : mword 45) :
+  and_vec x (not_vec (zero_extend' (57 - 12) (ones 0 : mword 0))) = x.
+Proof.
+  apply bv_eq.
+  unfold and_vec, word_binop, with_word', with_word, MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  (* uniformize the width forms (Z_idx 45 vs Z_idx (57-12)) so the closed
+     mask converts in place *)
+  change (Z.sub 57 12) with 45.
+  match goal with |- context[Z.land _ (bv_unsigned ?m)] =>
+    change (bv_unsigned m) with (Z.ones 45) end.
+  rewrite Z.land_ones; [|lia].
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr. exact Hr.
+Qed.
+
+Lemma and_ones27 (x : mword 27) :
+  and_vec x (not_vec (zero_extend' 27 (ones 0 : mword 0))) = x.
+Proof.
+  apply bv_eq.
+  unfold and_vec, word_binop, with_word', with_word, MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context[Z.land _ (bv_unsigned ?m)] =>
+    change (bv_unsigned m) with (Z.ones 27) end.
+  rewrite Z.land_ones; [|lia].
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr. exact Hr.
+Qed.
+
+(* the stored 8-byte PTE is the walk's leaf *)
+Lemma upt_entry_pte (vpn : mword 27) (i : uwalk_info) :
+  tlb_get_pte 8 (upt_entry vpn i) = uw_pte0 i.
+Proof.
+  unfold tlb_get_pte, upt_entry, u_walk_entry. cbn [TLB_Entry_pte].
+  rewrite autocast_id. rewrite zero_extend'_id.
+  change (Z.sub (Z.mul 8 8) 1) with 63.
+  rewrite subrange64_id. apply autocast_id.
+Qed.
+
+(* the stored entry matches its own vpn lookup (asid 0) *)
+Lemma upt_entry_match (vpn : mword 27) (i : uwalk_info) :
+  match_TLB_Entry (upt_entry vpn i) (mword_of_int 0) (sign_extend' (57 - 12) vpn) = true.
+Proof.
+  unfold match_TLB_Entry, upt_entry, u_walk_entry.
+  cbn [TLB_Entry_global TLB_Entry_asid TLB_Entry_vpn TLB_Entry_levelMask].
+  rewrite and_ones45. rewrite and_ones27. rewrite !eq_vec_refl.
+  rewrite orb_true_r. reflexivity.
+Qed.
+
+(* the general match fact: a stored walk entry matches a lookup for vpn'
+   iff the sign-extended vpns agree (asid is 0 on both sides) *)
+Lemma upt_entry_match_gen (vpn vpn' : mword 27) (i : uwalk_info) :
+  match_TLB_Entry (upt_entry vpn i) (mword_of_int 0) (sign_extend' (57 - 12) vpn')
+  = eq_vec (sign_extend' (57 - 12) vpn) (sign_extend' (57 - 12) vpn').
+Proof.
+  unfold match_TLB_Entry, upt_entry, u_walk_entry.
+  cbn [TLB_Entry_global TLB_Entry_asid TLB_Entry_vpn TLB_Entry_levelMask].
+  rewrite and_ones45. rewrite and_ones27. rewrite eq_vec_refl.
+  rewrite orb_true_r. reflexivity.
+Qed.
+
+(* sign-extension 27 -> 45 is injective: a hash-slot hit for vpn' at a
+   stored entry for vpn forces vpn = vpn' *)
+Lemma sext45_inj (x y : mword 27) :
+  sign_extend' (57 - 12) x = sign_extend' (57 - 12) y -> x = y.
+Proof.
+  intros H.
+  apply (f_equal bv_signed) in H.
+  cbv [sign_extend' Operators_mwords.sign_extend exts_vec to_word get_word
+       MachineWord.MachineWord.sign_extend] in H.
+  rewrite !bv_sign_extend_signed in H; [| apply N.leb_le; vm_compute; reflexivity ..].
+  apply bv_eq_signed. exact H.
+Qed.
+
+Lemma upt_entry_match_inj (vpn vpn' : mword 27) (i : uwalk_info) :
+  match_TLB_Entry (upt_entry vpn i) (mword_of_int 0) (sign_extend' (57 - 12) vpn')
+    = true ->
+  vpn = vpn'.
+Proof.
+  rewrite upt_entry_match_gen. intros He.
+  apply sext45_inj. apply eq_vec_true_iff. exact He.
+Qed.
+
+(* the stored entry recomputes the walk's page type (leaf PBMT pinned 0) *)
+Lemma upt_entry_pbmt (vpn : mword 27) (i : uwalk_info) (s : mstate) :
+  _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) ->
+  exec (tlb_get_pbmt (upt_entry vpn i)) s = Some (PBMT_PMA, s).
+Proof.
+  intros Hp.
+  unfold tlb_get_pbmt, upt_entry, u_walk_entry. cbn [TLB_Entry_pte].
+  rewrite autocast_id. rewrite zero_extend'_id.
+  rewrite Hp.
+  apply exec_returnm.
 Qed.
 
 (* ===================================================================== *)
