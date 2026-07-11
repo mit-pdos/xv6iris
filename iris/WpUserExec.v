@@ -31,7 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
 Require Import SmodeCore WpIntrCore WpDecodeBridge.
 Require Import UmodeTrap UmodeFetch UmodeStep UmodeEcall UmodeFetchFault UmodeWalk.
-Require Import UptInv WpUserLoop WpUserEcall WpGprAddi WpGprLogic WpGprLui WpAuipc WpGprAuipc WpGprShift WpGprJal.
+Require Import UptInv WpUserLoop WpUserEcall WpGprAddi WpGprLogic WpGprLui WpAuipc WpGprAuipc WpGprShift WpGprJal WpGprJalr.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -614,7 +614,8 @@ Section WpUserExec.
     PC ↦ᵣ va -∗
     user_code -∗
     user_cfg -∗
-    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = va),
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = va)
+       (Hag : agree_on D_u σ dstateU),
        mstate_interp σ ={E ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute ii) (set_reg σ nextPC (add_vec_int va 4))
@@ -740,7 +741,8 @@ Section WpUserExec.
                       (landing_pad_bits_backwards LP_EXPECTED) = false)
       by (rewrite Lelp; exact Help_np).
     (* ---- the caller's execute fact ---- *)
-    iMod ("H" $! σ Lpc with "[$Hreg $Hmem]")
+    iMod ("H" $! σ Lpc (agree_u σ Lpriv Lmenv' Lsenv Lmst0 Lsst0 Lmisa')
+            with "[$Hreg $Hmem]")
       as (s_exec) "(%Hexec & [Hreg' Hmem'] & Hcont)".
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     (* ---- the whole retiring step ---- *)
@@ -1082,7 +1084,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
     (* completeness gives the (total) lookups for rs1 and rd *)
     assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -1217,7 +1219,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
     assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
     assert (Hmd : g !! Regidx rd = Some (g !!! Regidx rd))
@@ -1361,7 +1363,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
     assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
     assert (Hm2 : g !! Regidx rs2 = Some (g !!! Regidx rs2))
@@ -1520,7 +1522,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
     assert (Hmd : g !! Regidx rd = Some (g !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -1651,7 +1653,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
     assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
     assert (Hmd : g !! Regidx rd = Some (g !!! Regidx rd))
@@ -1777,7 +1779,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
     assert (Hmd : g !! Regidx rd = Some (g !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -1824,6 +1826,162 @@ Section WpUserExec.
     iApply "Hcont".
     rewrite /user_frame.
     iExists ms_v, sc_v, stval_v, sepc_v, (add_vec va (sign_extend' 64 imm)),
+            (<[Regidx rd := regval_into_reg (add_vec_int va 4)]> g), tlbvec.
+    iFrame "Hhs' Hpriv' Hms' Hsc Hstv Hsepc Htlbc' Hupt Hcode Hdata Hcfg'".
+    iSplitR; [iPureIntro; exact HSXL |].
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitL "Hpc' Hnpc"; [iFrame "Hpc' Hnpc" |].
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
+  Qed.
+
+  (* decode-state agreement survives a nextPC write (nextPC is outside
+     the decode read set D_u) *)
+  Lemma agree_u_set_nextPC (s : mstate) (v : mword 64) :
+    agree_on D_u s dstateU ->
+    agree_on D_u (set_reg s nextPC v) dstateU.
+  Proof.
+    intros H r Hr.
+    pose proof Hr as Hr'.
+    unfold D_u in Hr'.
+    unfold set_reg; cbn [sregs].
+    repeat (apply orb_true_elim in Hr' as [Hr'|Hr']);
+      apply register_beq_eq in Hr'; subst r;
+      (rewrite irrelevant_register_set; [ exact (H _ Hr) | vm_compute; reflexivity ]).
+  Qed.
+
+  (* Zicfilp is disabled at the user decode state (mseccfg.MLPE = 0,
+     menvcfg.LPE = 0): transported by the read-frame bridge, like the
+     per-word decode facts *)
+  Lemma exec_cE_zicfilp_false_u (s : mstate) :
+    agree_on D_u s dstateU ->
+    exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s).
+  Proof.
+    intros Hag.
+    apply (decode_state_bridge D_u _ dstateU);
+      [ exact Hag | vm_compute; reflexivity | vm_compute; reflexivity ].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* USTEP case: JALR (rd <> x0) -- indirect jump.  Target = (rs1 + imm)  *)
+  (* with bit 0 cleared; rd := va + 4; pc_is repacks at the target.       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma ustep_jalr
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 12) (rs1 rd : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JALR (imm, Regidx rs1, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    (* target alignment, in terms of the FRAME's rs1 value *)
+    eq_vec (access_vec_dec (jalr_target (g !!! Regidx rs1) imm) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (jalr_target (g !!! Regidx rs1) imm) 1) = false ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+           HnotRVC Hdec Hrd Hal0 Hal1.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
+             [%Hdom Hfmap] Hupt #Hcode Hdata Hcfg Hcont".
+    assert (Hnlpad : is_lpad_instruction (JALR (imm, Regidx rs1, Regidx rd)) = false)
+      by reflexivity.
+    iApply (wp_instr_u_hit va vpn ie w (JALR (imm, Regidx rs1, Regidx rd))
+              ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
+    assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmd : g !! Regidx rd = Some (g !!! Regidx rd))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s1 := set_reg σ nextPC (add_vec_int va 4)).
+    assert (HnpcX : register_lookup nextPC s1.(sregs) = add_vec_int va 4).
+    { unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    (* rs1's value at the execute state is the frame's *)
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (g !!! Regidx rs1) s1 with "Hreg Hr1c") as %Hrv.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    assert (Hjb : jbase rs1 s1 = g !!! Regidx rs1).
+    { unfold jbase. rewrite Hrv. reflexivity. }
+    (* the Zicfilp probe at the execute state (agreement survives the
+       nextPC tick -- nextPC is outside the decode read set) *)
+    pose proof (exec_cE_zicfilp_false_u s1
+                  (agree_u_set_nextPC σ (add_vec_int va 4) Hag)) as HZ.
+    (* the execute writes nextPC := target, then rd := va + 4 *)
+    iMod (reg_update _ nextPC _ (jalr_target (g !!! Regidx rs1) imm)
+            with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+            (regval_into_reg (add_vec_int va 4))
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg (add_vec_int va 4)) with "[Hrdc]")
+      as "Hfmap".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg (set_reg s1 nextPC (jalr_target (g !!! Regidx rs1) imm))
+               (R_bitvector_64 (gpr_of_Z (uint rd)))
+               (regval_into_reg (add_vec_int va 4))).
+    iSplitR.
+    { iPureIntro.
+      pose proof (exec_execute_JALR_gpr imm rs1 rd s1 Hrd) as HE.
+      rewrite Hjb in HE.
+      specialize (HE HZ Hal0 Hal1).
+      rewrite HnpcX in HE.
+      change (execute (JALR (imm, Regidx rs1, Regidx rd)))
+        with (execute_JALR imm (Regidx rs1) (Regidx rd)).
+      exact HE. }
+    iSplitL "Hreg Hmem".
+    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg (set_reg s1 nextPC (jalr_target (g !!! Regidx rs1) imm))
+                (R_bitvector_64 (gpr_of_Z (uint rd)))
+                (regval_into_reg (add_vec_int va 4))).(sregs)
+             = jalr_target (g !!! Regidx rs1) imm).
+    { unfold set_reg; cbn [sregs].
+      tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iNext.
+    iApply "Hcont".
+    rewrite /user_frame.
+    iExists ms_v, sc_v, stval_v, sepc_v, (jalr_target (g !!! Regidx rs1) imm),
             (<[Regidx rd := regval_into_reg (add_vec_int va 4)]> g), tlbvec.
     iFrame "Hhs' Hpriv' Hms' Hsc Hstv Hsepc Htlbc' Hupt Hcode Hdata Hcfg'".
     iSplitR; [iPureIntro; exact HSXL |].
