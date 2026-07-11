@@ -241,7 +241,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hvpn Hfwf Hok HSXL Hval Hcanon Hvpn_def.
@@ -425,7 +425,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hok Hvec Hchk Hupd HSXL Hval Hcanon Hvpn_def.
@@ -802,7 +802,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hok HSXL Hval Hcanon.
@@ -974,7 +974,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hsome Hok Hvec Hchk0 HupdN Hcw HSXL Hval Hcanon Hvpn_def Hpaal.
@@ -1014,6 +1014,7 @@ Section WpUserExec.
               with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Hstvec Hmie Hmidl
                     Hmedl Hmip Hmeip Hseip Hsatp Htlbc Hmenv Hsenv Hmst0 Hsst0
                     Hpmpc Hpmpa Hbytes Hpc").
+    iNext.
     iIntros "Hpriv Hms Hsc Hstv Hsepc Hstvec Hmie Hmidl Hmedl Hmip Hmeip Hseip
              Hsatp Htlbc Hmenv Hsenv Hmst0 Hsst0 Hpmpc Hpmpa Hhs Hpc".
     (* ---- repack the trap frame ---- *)
@@ -1078,7 +1079,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
@@ -1213,7 +1214,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_op Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -1357,7 +1358,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_op Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -1516,7 +1517,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_op HV Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -1647,7 +1648,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_op Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -1773,7 +1774,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
@@ -1918,7 +1919,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
@@ -2050,7 +2051,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_f Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -2154,7 +2155,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_t Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -2278,7 +2279,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_nop Hnlpad Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -2410,7 +2411,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_op Hnlpad Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -2775,7 +2776,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros HN Hexec_ill Hnlpad Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
@@ -3062,7 +3063,7 @@ Section WpUserExec.
     user_code -∗
     user_data -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros eaF paD HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval
@@ -3311,7 +3312,7 @@ Section WpUserExec.
     user_code -∗
     ([∗ map] a ↦ b ∈ dm, a ↦ₘ b) -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros eaF paD HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval
@@ -3563,7 +3564,7 @@ Section WpUserExec.
     (* rebuilding [user_data] from the NEW window *)
     (([∗ list] j ∈ seq 0 8, (pa_add paD j) ↦ₘ nth_byte vNew j) -∗ user_data) -∗
     user_cfg -∗
-    (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros eaF paD vNew HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval
@@ -3722,6 +3723,170 @@ Section WpUserExec.
     iSplitL "Hpc' Hnpc"; [iFrame "Hpc' Hnpc" |].
     iSplitL "Hfmap"; [iSplitR; [iPureIntro; exact Hdom |]; iExact "Hfmap" |].
     iApply "Hrestore". iExact "Hwin".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE USTEP ASSEMBLY (v1).  [ustep_case] classifies one frame state    *)
+  (* (pc, gprs, TLB, mstatus) into one of the PROVEN arms -- each         *)
+  (* disjunct is exactly the pure premise bundle of one ustep lemma.      *)
+  (* [user_step_holds] discharges [user_step_obligation] from it: the     *)
+  (* Löb obligation's case tree, dispatching retire arms to the P         *)
+  (* continuation and trap arms to Tr.  Extending coverage = adding a     *)
+  (* disjunct here + its arm above; the classification hypothesis plays   *)
+  (* the role the decode-totality hypothesis was always designed to       *)
+  (* play, now composed with the per-page classification.                 *)
+  (* ------------------------------------------------------------------ *)
+  Definition ustep_case (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
+    (* 1: non-canonical pc *)
+    (is_aligned_vaddr (Virtaddr va) 4 = true /\
+     neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true)
+    \/
+    (* 2: canonical, but the pc's vpn is unmapped / kernel-only *)
+    (exists vpn,
+       spec !! vpn = None /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn)
+    \/
+    (* 3: mapped, TLB hit, but the leaf needs an A update (ADUE = 0) *)
+    (exists vpn i pte',
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = Some pte' /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn)
+    \/
+    (* 4: fetch succeeds via a hit and the word is ECALL *)
+    (exists vpn i,
+       spec !! vpn = Some i /\
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn i) va vpn) j = Some (nth_byte ecall_w j)) /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true)
+    \/
+    (* 5: fetch succeeds via a hit and the word retires as an ITYPE op *)
+    (exists vpn i (w : mword 32) (op : iop)
+            (f : mword 64 -> mword 12 -> mword 64)
+            (imm : mword 12) (rs1 rd : mword 5),
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn i) va vpn) j = Some (nth_byte w j)) /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (ITYPE (imm, Regidx rs1, Regidx rd, op), s0)) /\
+       uint rd <> 0 /\
+       (forall (rs1' rd' : mword 5) (imm' : mword 12) s,
+          exec (execute (ITYPE (imm', Regidx rs1', Regidx rd', op))) s
+          = Some (RETIRE_SUCCESS,
+                  if Z.eqb (uint rd') 0 then s
+                  else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd')))
+                         (regval_into_reg
+                            (f (if Z.eqb (uint rs1') 0 then zero_reg
+                                else register_lookup
+                                       (R_bitvector_64 (gpr_of_Z (uint rs1'))) s.(sregs))
+                               imm'))))).
+
+  (* the assembled Löb step obligation, v1 coverage *)
+  Theorem user_step_holds E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_fault_wf root slots spec ->
+    (forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+            (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+        upt_tlb_ok spec tlbvec ->
+        _get_Mstatus_SXL ms_v = 'b"10" ->
+        ustep_case va ms_v g tlbvec) ->
+    hw_config -∗ minstret_inv -∗ user_step_obligation E Φ.
+  Proof.
+    intros HN Hfwf Hclass.
+    iIntros "#Hhw #Hinv".
+    rewrite /user_step_obligation.
+    iIntros "!> HP Hk".
+    rewrite {1}/user_frame.
+    iDestruct "HP" as (ms_v sc_v stval_v sepc_v va g tlbvec)
+      "(%HSXL & %Hok & Hhs & Hpriv & Hms & Hsc & Hstv & Hsepc & Htlbc & Hpc &
+        Hgpr & Hupt & #Hcode & Hdata & Hcfg)".
+    destruct (Hclass va ms_v g tlbvec Hok HSXL) as
+      [ (Hval & Hcanon)
+      | [ (vpn & Hvpn & Hval & Hcanon & Hvpn_def)
+        | [ (vpn & i & pte' & Hvec & Hchk & Hupd & Hval & Hcanon & Hvpn_def)
+          | [ (vpn & i & Hsome & Hvec & Hchk & Hupd & Hcw & Hval & Hcanon & Hvpn_def & Hpaal)
+            | (vpn & i & w & op & f & imm & rs1 & rd & Hvec & Hchk & Hupd & Hpbmt &
+               Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & Hexec_op) ] ] ] ].
+    - (* non-canonical *)
+      iDestruct "Hk" as "[_ HkT]".
+      iApply (ustep_fetch_noncanonical va ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hok HSXL Hval Hcanon
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkT").
+    - (* unmapped *)
+      iDestruct "Hk" as "[_ HkT]".
+      iApply (ustep_fetch_unmapped va vpn ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hvpn Hfwf Hok HSXL Hval Hcanon Hvpn_def
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkT").
+    - (* A-bit fault on hit *)
+      iDestruct "Hk" as "[_ HkT]".
+      iApply (ustep_fetch_adfault_hit va vpn i pte' ms_v sc_v stval_v sepc_v g
+                tlbvec E Φ HN Hok Hvec Hchk Hupd HSXL Hval Hcanon Hvpn_def
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkT").
+    - (* ecall *)
+      iDestruct "Hk" as "[_ HkT]".
+      iApply (ustep_ecall va vpn i ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hsome Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkT").
+    - (* retiring ITYPE op *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_itype op f va vpn i w imm rs1 rd ms_v sc_v stval_v sepc_v g
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
+  Qed.
+
+  (* the END-TO-END theorem at v1 coverage: the machine runs user code
+     forever, from the frame, with only the kernel re-entry continuation *)
+  Theorem wp_user_exec_v1 E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_fault_wf root slots spec ->
+    (forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+            (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+        upt_tlb_ok spec tlbvec ->
+        _get_Mstatus_SXL ms_v = 'b"10" ->
+        ustep_case va ms_v g tlbvec) ->
+    hw_config -∗ minstret_inv -∗
+    user_frame -∗
+    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hfwf Hclass.
+    iIntros "#Hhw #Hinv HP Htr".
+    iApply (wp_user_exec E Φ with "[] HP Htr").
+    iApply (user_step_holds E Φ HN Hfwf Hclass with "Hhw Hinv").
   Qed.
 
 End WpUserExec.
