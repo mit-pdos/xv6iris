@@ -22,6 +22,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpGpr WpGprRvc WpGprLoad.
 Require Import SmodeCore WpSmodeGpr WpEntryNew WpMemsetS.
 Require Import WpMemsetInstr.
+Require Import CalleeSaved.
 Require Import WpLock KallocInv.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -255,13 +256,7 @@ Section WpMemsetPage.
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       page_own p -∗
-      ( ∃ mfin, gpr_file mfin ∗
-          ⌜ mfin !!! Regidx ra_idx = ra0
-          /\ mfin !!! Regidx s0_idx = s00
-          /\ mfin !!! Regidx (mword_of_int 9 : mword 5)  = m0 !!! Regidx (mword_of_int 9 : mword 5)   (* s1 *)
-          /\ mfin !!! Regidx (mword_of_int 18 : mword 5) = m0 !!! Regidx (mword_of_int 18 : mword 5)  (* s2 *)
-          /\ mfin !!! Regidx csp_rs1 = m0 !!! Regidx csp_rs1
-          /\ mfin !!! Regidx (mword_of_int 4 : mword 5) = m0 !!! Regidx (mword_of_int 4 : mword 5) ⌝ ) -∗  (* tp *)
+      ( ∃ mfin, gpr_file mfin ∗ ⌜ callee_saved m0 mfin ⌝ ) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -347,12 +342,13 @@ Section WpMemsetPage.
     - (* the final register file, with ra/s0/s1/s2/sp pinned to their caller values *)
       iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
       destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
-      iExists mfin. iFrame "Hfile". iPureIntro.
-      split; [exact Hpra |]. split; [exact Hps0 |].
-      split; [apply Hpres; vm_compute; discriminate |].
-      split; [apply Hpres; vm_compute; discriminate |].
-      split; [rewrite Hpcsp; apply add_vec_frame_cancel |].
-      apply Hpres; vm_compute; discriminate.
+      iExists mfin. iFrame "Hfile". iPureIntro. unfold callee_saved.
+      split; [ (* sp *) rewrite Hpcsp; apply add_vec_frame_cancel |].
+      split; [ (* tp *) apply Hpres; vm_compute; discriminate |].
+      split; [ (* s0 *) exact Hps0 |].
+      split; [ (* s1 *) apply Hpres; vm_compute; discriminate |].
+      (* s2..s11 *)
+      repeat split; apply Hpres; vm_compute; discriminate.
   Qed.
 
 End WpMemsetPage.

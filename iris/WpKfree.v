@@ -652,7 +652,8 @@ Section Kfree.
     iEval (rewrite Beq1) in "Hbra". iEval (rewrite Beq2) in "Hbs0".
     iRename "Hbra" into "Hqr24". iRename "Hbs0" into "Hqr16".
     iDestruct "Hgprf" as (mfp) "[Hfile %Hpinsf]".
-    destruct Hpinsf as (Hfra & Hfs0 & Hfs1 & Hfs2 & Hfsp & Hftp).
+    unfold callee_saved in Hpinsf.
+    destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (Hpc36 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x36)).
     { rewrite HMmsra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc36) in "Hpc".
@@ -801,7 +802,8 @@ Section Kfree.
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
     iDestruct "Hgpr" as (macq) "[Hfile %Hacqpins]".
-    destruct Hacqpins as (Hqra & Hqs0 & Hqs1 & Hqsp & Hqa0 & Hqtp & Hqs2 & _ & _ & _).
+    unfold callee_saved in Hacqpins.
+    destruct Hacqpins as (Hqsp & Hqtp & Hqs0 & Hqs1 & Hqs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (Hs1p : macq !!! Regidx (mword_of_int 9 : mword 5) = p) by (rewrite Hqs1; exact Hmacq_s1).
     assert (Hs2km : macq !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int KernelSyms.kmem) by (rewrite Hqs2; exact HKacqs2).
     iPoseProof (kfi_44 with "Htext") as "Hi44".

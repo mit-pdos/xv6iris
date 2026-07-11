@@ -276,7 +276,8 @@ Section Kalloc.
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     (* ---- acquire returned: [locked γ ∗ kmem_res fl] held, pc = +0x16 ---- *)
     iDestruct "Hgpr" as (mfin) "[Hfile %Hpins]".
-    destruct Hpins as (Hmra & Hms0 & Hms1 & Hmsp & Hma0 & Hmtp & Hms2 & _ & _ & _).
+    unfold callee_saved in Hpins.
+    destruct Hpins as (Hmsp & Hmtp & Hms0 & Hms1 & Hms2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (Hmara : mA !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)
       by (rewrite /mA; apply lookup_total_insert).
     assert (Hpc16 : update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x16)).
@@ -893,7 +894,8 @@ Section Kalloc.
         as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
       iEval (rewrite HMmsa0) in "Hpage".
       iDestruct "Hgprf" as (mfp) "[Hfile %Hpinsf]".
-      destruct Hpinsf as (Hfra & Hfs0 & Hfs1 & Hfs2 & Hfsp & Hftp).
+      unfold callee_saved in Hpinsf.
+    destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
       assert (Hpc40 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x40)).
       { rewrite HMmsra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc40) in "Hpc".

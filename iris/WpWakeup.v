@@ -1653,7 +1653,8 @@ Section ProcInv.
       iDestruct "Hgpr" as (Macq) "[Hfile %Hpins]".
       iDestruct (proc_lock_res_elim with "HR") as (st ch) "(Hpst & Hpch & Hctx)".
       (* register-preservation through acquire. *)
-      destruct Hpins as (Hf1 & Hf8 & Hf9 & Hfcsp & Hf10 & Hf4 & Hf18 & Hf19 & Hf20 & Hf21).
+      unfold callee_saved in Hpins.
+      destruct Hpins as (Hfcsp & Hf4 & Hf8 & Hf9 & Hf18 & Hf19 & Hf20 & Hf21 & _ & _ & _ & _ & _ & _).
       assert (HM42s1 : M42 !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k).
       { rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmrets1. }
