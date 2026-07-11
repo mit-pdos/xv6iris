@@ -446,3 +446,333 @@ Proof.
   rewrite execR_returnR. cbn match.
   reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* Fault walks: an INVALID PTE at any level, a leaf PERMISSION failure,   *)
+(* and result-generic descend steps.  This is the exec layer of the       *)
+(* translation trichotomy's FAULT arm: an unmapped or kernel-only vpn     *)
+(* page-faults instead of translating.  The fault paths stop before the   *)
+(* Svnapot gate, so (unlike the success walk) they need no misa premise;  *)
+(* they also perform NO writes -- the machine state is preserved.         *)
+(* ===================================================================== *)
+Section UserWalkFault.
+  Context (vpn : mword 27).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
+
+  (* level 0: the leaf slot holds an INVALID pte *)
+  Lemma exec_rec_walk_leaf_invalid (base : mword 44) (pte : mword 64)
+        (g : bool) (wfacc : Acc (Zwf 0) 0) s :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok pte, s) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (true, s0)) ->
+    exec (_rec_pt_walk 39 vpn acc p mxr do_sum base 0 g tt 0 wfacc) s
+      = Some (Err (PTW_Invalid_PTE tt, tt), s).
+  Proof.
+    intros Hrd Hinv.
+    destruct wfacc as [a0].
+    cbn [_rec_pt_walk].
+    rewrite exec_catch_early_return.
+    assert (Hae1 : exec (Defs.assert_exp' (0 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
+    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 8 0)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrd).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Hinv s)).
+    cbv iota beta.
+    cbn. reflexivity.
+  Qed.
+
+  (* level 0: a valid leaf that FAILS the permission check (e.g. U = 0) *)
+  Lemma exec_rec_walk_leaf_noperm (base : mword 44) (pte : mword 64)
+        (g : bool) (f : pte_check_failure) (wfacc : Acc (Zwf 0) 0) s :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok pte, s) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (false, s0)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = false ->
+    (forall s0, exec (check_PTE_permission acc p mxr do_sum
+                        (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                        (ext_bits_of_PTE pte) tt) s0
+       = Some (PTE_Check_Failure (tt, f), s0)) ->
+    exec (_rec_pt_walk 39 vpn acc p mxr do_sum base 0 g tt 0 wfacc) s
+      = Some (Err (ext_get_ptw_error f, tt), s).
+  Proof.
+    intros Hrd Hinv Hnl Hchk.
+    destruct wfacc as [a0].
+    cbn [_rec_pt_walk].
+    rewrite exec_catch_early_return.
+    assert (Hae1 : exec (Defs.assert_exp' (0 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
+    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 8 0)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrd).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Hinv s)).
+    rewrite Hnl. cbv iota beta.
+    change (0 >? 0) with false. cbv iota beta.
+    match goal with |- context[Defs.bind0 ?A ?B] =>
+      assert (HAB : execR (Defs.bind0 A B) s = Some (inr (PTE_Check_Failure (tt, f)), s)) end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR. rewrite (Hchk s). cbn match. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ HAB).
+    cbv iota beta. cbn match.
+    cbn. reflexivity.
+  Qed.
+
+  (* level 1: the mid slot holds an INVALID pte *)
+  Lemma exec_rec_walk_l1_invalid (base : mword 44) (pte : mword 64)
+        (g : bool) (wfacc : Acc (Zwf 0) 1) s :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 8) s
+      = Some (Ok pte, s) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (true, s0)) ->
+    exec (_rec_pt_walk 39 vpn acc p mxr do_sum base 1 g tt 1 wfacc) s
+      = Some (Err (PTW_Invalid_PTE tt, tt), s).
+  Proof.
+    intros Hrd Hinv.
+    destruct wfacc as [a1].
+    cbn [_rec_pt_walk].
+    rewrite exec_catch_early_return.
+    assert (Hae1 : exec (Defs.assert_exp' (1 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
+    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 17 9)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrd).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Hinv s)).
+    cbv iota beta.
+    cbn. reflexivity.
+  Qed.
+
+  (* level 1: a valid non-leaf step whose LEVEL-0 sub-walk returns [r]
+     (result-generic: instantiate with the invalid/noperm leaf faults;
+     [r] must not depend on the accumulated global bit, which fault
+     results never do) *)
+  Lemma exec_rec_walk_l1_sub (base : mword 44) (pte : mword 64) (g : bool)
+        (r : result (PTW_Output 39 * unit) (PTW_Error * unit))
+        (wfacc : Acc (Zwf 0) 1) s :
+    exec (read_pte (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 8) s
+      = Some (Ok pte, s) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (false, s0)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = true ->
+    (forall (g' : bool) (a : Acc (Zwf 0) 0),
+       exec (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte) 0 g' tt 0 a) s
+         = Some (r, s)) ->
+    exec (_rec_pt_walk 39 vpn acc p mxr do_sum base 1 g tt 1 wfacc) s = Some (r, s).
+  Proof.
+    intros Hrd Hinv Hnl Hsub.
+    destruct wfacc as [a1].
+    cbn [_rec_pt_walk].
+    rewrite exec_catch_early_return.
+    assert (Hae1 : exec (Defs.assert_exp' (1 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
+    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr base (subrange_vec_dec vpn 17 9)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrd).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Hinv s)).
+    rewrite Hnl. cbv iota beta.
+    change (1 >? 0) with true. cbv iota beta.
+    rewrite execR_liftR.
+    match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (1 - 1)] =>
+      change (1 - 1) with 0 end.
+    rewrite Hsub.
+    cbn. reflexivity.
+  Qed.
+
+  (* level 2 (= the full [pt_walk]): the root slot holds an INVALID pte *)
+  Lemma exec_pt_walk_user_l2_invalid (root : mword 44) (pte : mword 64) s :
+    exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s
+      = Some (Ok pte, s) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (true, s0)) ->
+    exec (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s
+      = Some (Err (PTW_Invalid_PTE tt, tt), s).
+  Proof.
+    intros Hrd Hinv.
+    unfold pt_walk.
+    destruct (Defs.Zwf_guarded _) as [a2].
+    cbn [_rec_pt_walk].
+    rewrite exec_catch_early_return.
+    assert (Hae1 : exec (Defs.assert_exp' (2 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
+    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr root (subrange_vec_dec vpn 26 18)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrd).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Hinv s)).
+    cbv iota beta.
+    cbn. reflexivity.
+  Qed.
+
+  (* level 2: a valid non-leaf step whose LEVEL-1 sub-walk returns [r] *)
+  Lemma exec_pt_walk_user_sub (root : mword 44) (pte : mword 64)
+        (r : result (PTW_Output 39 * unit) (PTW_Error * unit)) s :
+    exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s
+      = Some (Ok pte, s) ->
+    (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte 7 0))
+                       (ext_bits_of_PTE pte)) s0 = Some (false, s0)) ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = true ->
+    (forall (g' : bool) (a : Acc (Zwf 0) 1),
+       exec (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte) 1 g' tt 1 a) s
+         = Some (r, s)) ->
+    exec (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s = Some (r, s).
+  Proof.
+    intros Hrd Hinv Hnl Hsub.
+    unfold pt_walk.
+    destruct (Defs.Zwf_guarded _) as [a2].
+    cbn [_rec_pt_walk].
+    rewrite exec_catch_early_return.
+    assert (Hae1 : exec (Defs.assert_exp' (2 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
+    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with (u_pte_addr root (subrange_vec_dec vpn 26 18)) by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrd).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Hinv s)).
+    rewrite Hnl. cbv iota beta.
+    change (2 >? 0) with true. cbv iota beta.
+    rewrite execR_liftR.
+    match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (2 - 1)] =>
+      change (2 - 1) with 1 end.
+    rewrite Hsub.
+    cbn. reflexivity.
+  Qed.
+
+  (* a faulting walk propagates through translate_TLB_miss unchanged
+     (no TLB write on the fault path) *)
+  Lemma exec_translate_TLB_miss_user_walk_err (asid : mword 16) (root : mword 44)
+        (f : PTW_Error) s :
+    exec (pt_walk 39 vpn acc p mxr do_sum root 2 false tt) s
+      = Some (Err (f, tt), s) ->
+    exec (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt) s
+      = Some (Err (f, tt), s).
+  Proof.
+    intros Hwalk.
+    unfold translate_TLB_miss. cbn zeta.
+    rewrite (exec_bind_Some _ _ _ _ _ Hwalk).
+    cbn match.
+    apply exec_returnm.
+  Qed.
+
+  (* ...and through translate, given a TLB miss (empty or colliding slot) *)
+  Lemma exec_translate_walk_user_err (asid : mword 16) (root : mword 44)
+        (f : PTW_Error) s :
+    exec (lookup_TLB 39 asid vpn) s = Some (None, s) ->
+    exec (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt) s
+      = Some (Err (f, tt), s) ->
+    exec (translate 39 asid root vpn acc p mxr do_sum tt) s
+      = Some (Err (f, tt), s).
+  Proof.
+    intros Hlk Hmiss.
+    unfold translate.
+    rewrite (exec_bind_Some _ _ _ _ _ Hlk).
+    cbn match.
+    exact Hmiss.
+  Qed.
+
+End UserWalkFault.
+
+(* ===================================================================== *)
+(* The translateAddr wrapper for a FETCH whose miss-path walk FAULTS:     *)
+(* TLB miss -> walk hits an invalid/no-permission PTE -> fetch page       *)
+(* fault.  No state change.  [Hte] is discharged per concrete PTW error   *)
+(* by [unfold translationException; cbn match; apply exec_returnm].       *)
+(* ===================================================================== *)
+Lemma exec_translateAddr_fetch_walk_u_pagefault
+    (vpn : mword 27) (root : mword 44) (f : PTW_Error)
+    (mxr do_sum : bool) (va satp0 : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = User ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  register_lookup satp s.(sregs) = satp0 ->
+  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+  zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+  autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+  exec (lookup_TLB 39 (mword_of_int 0) vpn) s = Some (None, s) ->
+  exec (pt_walk 39 vpn (InstructionFetch tt) User mxr do_sum root 2 false tt) s
+    = Some (Err (f, tt), s) ->
+  exec (translationException (InstructionFetch tt) f) s
+    = Some (E_Fetch_Page_Fault tt, s) ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+  autocast (T := mword) (subrange_vec_dec
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+  exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+    = Some (Err (E_Fetch_Page_Fault tt, tt), s).
+Proof.
+  intros Hcp HSXL Hsatp Hmode Hasid Hppn Hlk Hwalk Hte Hcanon Hvpn_def.
+  unfold translateAddr.
+  rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_fetch _ _ s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_U_sv39 satp0 s HSXL Hsatp Hmode)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_fetch s)).
+  unfold Defs.bind0.
+  replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
+  rewrite execR_bind. rewrite execR_returnR. cbn match.
+  assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
+    by (cbn; apply exec_returnm).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
+  assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
+  { unfold get_satp.
+    assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
+                          "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
+    { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+      unfold assert_exp'. cbn match. apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hae).
+    change (Z.eqb 39 32) with false. cbn match.
+    unfold autocast_m.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+    rewrite Hsatp. apply exec_returnm. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgs).
+  assert (Hae2 : exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
+                        "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s)).
+  { replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+    unfold assert_exp'. cbn match. apply exec_returnm. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+  rewrite Hcanon. cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
+    replace vpnx with vpn by (symmetry; exact Hvpn_def);
+    replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid);
+    replace bppn with root by (symmetry; exact Hppn) end.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (exec_translate_walk_user_err vpn (InstructionFetch tt) User mxr do_sum
+                (mword_of_int 0) root f s Hlk
+                (exec_translate_TLB_miss_user_walk_err vpn (InstructionFetch tt) User
+                   mxr do_sum (mword_of_int 0) root f s Hwalk))).
+  cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hte).
+  rewrite execR_returnR. cbn match.
+  reflexivity.
+Qed.
