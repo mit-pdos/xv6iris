@@ -31,7 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
 Require Import SmodeCore WpIntrCore.
 Require Import UmodeTrap UmodeFetch UmodeStep UmodeEcall UmodeFetchFault UmodeWalk.
-Require Import UptInv WpUserLoop.
+Require Import UptInv WpUserLoop WpUserEcall.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -568,6 +568,104 @@ Section WpUserExec.
     iFrame "Hstvec Hmie Hmidl Hmedl Hmip Hmeip Hseip Hsatp Hmenv Hsenv
             Hmst0 Hsst0 Hpmpc Hpmpa".
     iFrame "Hpcr Hnpc".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* USTEP case: ECALL.  The pc's vpn is mapped, hits the TLB at its walk *)
+  (* entry, A bit set, the code bytes at the translated pa spell ecall -- *)
+  (* the whole wp_user_ecall vertical slice, replayed against the loop    *)
+  (* frames and landing in [user_trap_frame].                             *)
+  (* ------------------------------------------------------------------ *)
+  Lemma ustep_ecall
+      (va : mword 64) (vpn : mword 27) (i : uwalk_info)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    spec !! vpn = Some i ->
+    upt_tlb_ok spec tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) ->
+    uw_check_ok (InstructionFetch tt) i ->
+    update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None ->
+    (* the fetched bytes are the ecall word *)
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn i) va vpn) j = Some (nth_byte ecall_w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hsome Hok Hvec Hchk0 HupdN Hcw HSXL Hval Hcanon Hvpn_def Hpaal.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmidl & Hmedl & Hmip & Hmeip & Hseip &
+                          Hsatp & Hmenv & Hsenv & Hmst0 & Hsst0 & Hpmpc & Hpmpa)".
+    (* the leaf facts, transported onto the stored TLB entry *)
+    destruct (Hspec vpn i Hsome) as (_ & _ & _ & Hwf).
+    destruct Hwf as (_ & _ & _ & _ & _ & _ & _ & _ & Hpbmt0).
+    assert (Hchk' : forall (mxr do_sum : bool) s0,
+      exec (check_PTE_permission (InstructionFetch tt) User mxr do_sum
+              (Mk_PTE_Flags (subrange_vec_dec (tlb_get_pte 8 (upt_entry vpn i)) 7 0))
+              (ext_bits_of_PTE (tlb_get_pte 8 (upt_entry vpn i))) tt) s0
+        = Some (PTE_Check_Success tt, s0)).
+    { rewrite upt_entry_pte. exact Hchk0. }
+    assert (Hupd' : update_PTE_Bits (tlb_get_pte 8 (upt_entry vpn i)) (InstructionFetch tt)
+                      = (None : option (mword 64))).
+    { rewrite upt_entry_pte. exact HupdN. }
+    assert (Hpbmt' : forall s0, exec (tlb_get_pbmt (upt_entry vpn i)) s0
+                                  = Some (PBMT_PMA, s0)).
+    { intros s0. exact (upt_entry_pbmt vpn i s0 Hpbmt0). }
+    (* the persistent ecall bytes, looked up in the code image *)
+    iAssert ([∗ list] j ∈ seq 0 4,
+               (pa_add (u_pa (upt_entry vpn i) va vpn) j) ↦ₘ□ nth_byte ecall_w j)%I
+      as "#Hbytes".
+    { iApply big_sepL_intro. iIntros "!>" (k y Hky).
+      apply lookup_seq in Hky. destruct Hky as [-> Hk].
+      assert (Heq : (0 + k)%nat = k) by lia. rewrite Heq.
+      iApply (big_sepM_lookup _ _ _ _ (Hcw k Hk) with "Hcode"). }
+    iApply (wp_user_ecall (upt_entry vpn i) vpn va satp0 ms_v sc_v stval_v sepc_v
+              stvec_v mie_v midl_v mip_v medl_v MENVCFG_S meip seip tlbvec
+              pmpcfg0 pmpaddr00 E Φ
+              HN Hmm Hs0 HSXL Hsatpmode Hasid Hvec Hchk' Hupd' Hpbmt'
+              (upt_entry_match vpn i) Hval Hcanon Hvpn_def Hpaal
+              HpmpA Hpmp_ord HpmpX Hpmp_cov Htvd Hdel_ecall eq_refl
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Hstvec Hmie Hmidl
+                    Hmedl Hmip Hmeip Hseip Hsatp Htlbc Hmenv Hsenv Hmst0 Hsst0
+                    Hpmpc Hpmpa Hbytes Hpc").
+    iIntros "Hpriv Hms Hsc Hstv Hsepc Hstvec Hmie Hmidl Hmedl Hmip Hmeip Hseip
+             Hsatp Htlbc Hmenv Hsenv Hmst0 Hsst0 Hpmpc Hpmpa Hhs Hpc".
+    (* ---- repack the trap frame ---- *)
+    iApply "Hcont".
+    rewrite /user_trap_frame.
+    iExists (u_trap_ms ms_v (landing_pad_bits_backwards NO_LP_EXPECTED)),
+            (u_trap_cause sc_v), (tval None), va, g, tlbvec.
+    iFrame "Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hgpr Hupt Hcode Hdata".
+    iSplitR; [iPureIntro; exact Hok |].
+    rewrite /user_cfg.
+    iFrame "Hstvec Hmie Hmidl Hmedl Hmip Hmeip Hseip Hsatp Hmenv Hsenv
+            Hmst0 Hsst0 Hpmpc Hpmpa".
+    iFrame "Hpc".
   Qed.
 
 End WpUserExec.
