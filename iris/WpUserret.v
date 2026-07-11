@@ -40,7 +40,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpDecodeBridge WpRvcBridge WpLeafCommon.
-Require Import WpGpr WpGprLui WpGprAddi WpGprShift WpGprRvc WpLoad.
+Require Import WpGpr WpGprLui WpGprAddi WpGprShift WpGprRvc WpGprRvcTor WpGprLoad WpLoad.
 Require Import WpGprCsrwCommon WpGprCsrwB WpGprMretNew WpRelease.
 Require Import WpEntryNew SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
 Require Import TrampPt TrampTlb.
@@ -1066,8 +1066,7 @@ Definition ai_sret : instruction := SRET tt.
 Definition ai_ld (rd : Z) (imm : Z) : instruction :=
   LOAD (mword_of_int imm, ureg 10, ureg rd, false, 8).
 Definition ai_cld_tgt (rdc : Z) (uimm : Z) : instruction :=
-  LOAD (zero_extend' 12 (concat_vec (mword_of_int uimm : mword 5) ('b"000")),
-        creg2reg_idx (ucreg 2), creg2reg_idx (ucreg rdc), false, 8).
+  LOAD (mword_of_int (uimm * 8), ureg 10, ureg (8 + rdc), false, 8).
 
 (* --- decode facts --- *)
 Lemma udec_sfence s :
