@@ -805,7 +805,7 @@ Section WpReleaseTop.
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-    iApply (wp_pop_off root_ppn γc E Φ M1 noffv intenav
+    iApply (wp_pop_off_words root_ppn γc E Φ M1 noffv intenav
               w24 w16 w8 vh0 (dqi:=dqi)
               HN Hnoffpos Hint
               ltac:(rewrite HraM1; vm_compute; reflexivity)
