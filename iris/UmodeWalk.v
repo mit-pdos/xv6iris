@@ -26,6 +26,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodeCore.
 Require Import WpDecodeBridge.
+Require Import UmodeFetchFault.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -224,5 +225,127 @@ Section UserWalk.
     rewrite (exec_rec_walk_l1 _ menvcfg0 _ s Hmisa Hrd1 Hrd0 Hmenv HPBMTE).
     cbn. reflexivity.
   Qed.
+
+  (* the TLB entry a level-0 walk installs (masks are empty at level 0) *)
+  Definition u_walk_entry (asid : mword 16) : TLB_Entry :=
+    {| TLB_Entry_asid := asid;
+       TLB_Entry_global := u_global pte2 pte1 pte0;
+       TLB_Entry_pte := zero_extend' 64 ((autocast (T := mword) pte0) : mword 64);
+       TLB_Entry_pteAddr := Physaddr addr0;
+       TLB_Entry_levelMask := zero_extend' (57 - 12) (ones 0 : mword 0);
+       TLB_Entry_vpn := sign_extend' (57 - 12)
+                          (and_vec vpn (not_vec (zero_extend' 27 (ones 0 : mword 0))));
+       TLB_Entry_ppn := zero_extend' 44
+                          (and_vec ((autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44)) : mword 44)
+                                   (not_vec (zero_extend' 44 (ones 0 : mword 0)))) |}.
+
+  Lemma exec_add_to_TLB_user (asid : mword 16) s :
+    exec (add_to_TLB 39 asid vpn
+            (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44))
+            (autocast (T := mword) pte0) (Physaddr addr0) 0 (u_global pte2 pte1 pte0)) s
+      = Some (tt, set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
+                                   (tlb_hash (__id 39) vpn) (Some (u_walk_entry asid)))).
+  Proof.
+    unfold add_to_TLB. cbn zeta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_reg tlb _ s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb _)).
+    rewrite exec_returnm.
+    reflexivity.
+  Qed.
+
+  (* success: the leaf's A (and D) bits need no update *)
+  Lemma exec_translate_TLB_miss_user (asid : mword 16) (menvcfg0 : mword 64) s :
+    register_lookup misa s.(sregs) = MISA_C ->
+    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = None ->
+    exec (read_pte (Physaddr addr2) 8) s = Some (Ok pte2, s) ->
+    exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
+    exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
+    register_lookup menvcfg s.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    exec (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt) s
+      = Some (Ok (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44), PBMT_PMA, tt),
+              set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
+                               (tlb_hash (__id 39) vpn) (Some (u_walk_entry asid)))).
+  Proof.
+    intros Hmisa Hnoupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE.
+    unfold translate_TLB_miss. cbn zeta.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pt_walk_user menvcfg0 s Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE)).
+    cbn match.
+    match goal with |- context[update_and_write_pte ?a ?wd ?pv ?ac] =>
+      assert (Hupd : exec (update_and_write_pte a wd pv ac) s = Some (Ok None, s)) end.
+    { unfold update_and_write_pte. rewrite Hnoupd. cbn match. apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hupd). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_add_to_TLB_user asid s)).
+    apply exec_returnm.
+  Qed.
+
+  (* fault: the leaf needs an A/D update the config forbids (ADUE = 0) *)
+  Lemma exec_translate_TLB_miss_user_needs_update (asid : mword 16) (pte' : mword 64) s :
+    register_lookup misa s.(sregs) = MISA_C ->
+    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = Some pte' ->
+    exec (read_pte (Physaddr addr2) 8) s = Some (Ok pte2, s) ->
+    exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
+    exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
+    register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+    exec (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt) s
+      = Some (Err (PTW_PTE_Needs_Update tt, tt), s).
+  Proof.
+    intros Hmisa Hupd_some Hrd2 Hrd1 Hrd0 Hmenv.
+    unfold translate_TLB_miss. cbn zeta.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pt_walk_user MENVCFG_S s Hmisa Hrd2 Hrd1 Hrd0 Hmenv
+                  ltac:(vm_compute; reflexivity))).
+    cbn match.
+    erewrite exec_bind_Some.
+    2:{ eapply exec_update_and_write_pte_needs_update; [ exact Hupd_some | exact Hmenv ]. }
+    cbn match.
+    apply exec_returnm.
+  Qed.
+
+  Lemma exec_translate_walk_user (asid : mword 16) (menvcfg0 : mword 64)
+        (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    register_lookup misa s.(sregs) = MISA_C ->
+    register_lookup tlb s.(sregs) = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None ->
+    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = None ->
+    exec (read_pte (Physaddr addr2) 8) s = Some (Ok pte2, s) ->
+    exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
+    exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
+    register_lookup menvcfg s.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    exec (translate 39 asid root vpn acc p mxr do_sum tt) s
+      = Some (Ok (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44), PBMT_PMA, tt),
+              set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                               (Some (u_walk_entry asid)))).
+  Proof.
+    intros Hmisa Htlb Hvec Hnoupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE.
+    unfold translate.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_miss vpn asid tlbvec s Htlb Hvec)).
+    cbn match.
+    rewrite <- Htlb.
+    apply (exec_translate_TLB_miss_user asid menvcfg0 s Hmisa Hnoupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE).
+  Qed.
+
+  (* miss via hash collision: the slot holds a NON-matching entry *)
+  Lemma exec_lookup_TLB_nomatch (asid : mword 16) (ent' : TLB_Entry)
+        (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    register_lookup tlb s.(sregs) = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' ->
+    match_TLB_Entry ent' asid (sign_extend' (57 - 12) vpn) = false ->
+    exec (lookup_TLB 39 asid vpn) s = Some (None, s).
+  Proof.
+    intros Htlb Hvec Hnm.
+    unfold lookup_TLB.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
+    rewrite Htlb. rewrite Hvec. rewrite Hnm. apply exec_returnm.
+  Qed.
+
+  (* the translated physical address a level-0 walk yields for [va] *)
+  Definition u_walk_pa (va : mword 64) : mword 64 :=
+    zero_extend' 64 (concat_vec
+      ((autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44)) : mword 44)
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)).
 
 End UserWalk.
