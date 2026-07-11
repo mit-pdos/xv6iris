@@ -29,6 +29,7 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import ghost_var.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -190,7 +191,13 @@ Section WpIntrInv.
       - rewrite trap_ms_VS; exact HVS.
       - rewrite trap_ms_SD; exact HSD.
       - rewrite trap_ms_MPP; exact HMPP. }
-    iApply (wp_kernelvec root_ppn m (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
+    (* kernelvec assumes the SIE ghost half already exists in its precondition;
+       there is no ambient S-mode config at the trap boundary, so allocate it
+       here for this handler run and hand kernelvec one half. *)
+    iMod (ghost_var_alloc (_get_Mstatus_SIE (trap_ms elp_v ms))) as (γ) "Hg".
+    iEval (rewrite -Qp.half_half) in "Hg".
+    iDestruct (ghost_var_split with "Hg") as "[Hsie _]".
+    iApply (wp_kernelvec root_ppn γ m (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
               w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 E Φ
               HN
               (trap_ms_SIE_false elp_v ms)
@@ -204,7 +211,7 @@ Section WpIntrInv.
               Hlpe0
               HFIOM
               Hleg_trap
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc
+              with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc
                     Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".

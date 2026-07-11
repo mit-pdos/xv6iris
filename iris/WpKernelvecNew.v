@@ -1504,7 +1504,7 @@ Section WpKernelvecNew.
   (* the axiom preserves the callee-saved rest; -256/+256 cancels on     *)
   (* sp).  Only [kerneltrap_returns] + platform externs are assumed.     *)
   (* =================================================================== *)
-  Lemma wp_kernelvec (root_ppn : mword 44)
+  Lemma wp_kernelvec (root_ppn : mword 44) (γ : gname)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       
@@ -1534,6 +1534,7 @@ Section WpKernelvecNew.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ mstatus0 -∗
+    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
@@ -1591,13 +1592,11 @@ Section WpKernelvecNew.
   Proof.
     intros HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm
       HTSR Hsup Hlpe0 Hfiom Hleg.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
-    (* allocate the SIE ghost variable for this hart's kernelvec run: one half
-       rides inside the per-instruction [smode_config], the other is dropped. *)
-    iMod (ghost_var_alloc (_get_Mstatus_SIE mstatus0)) as (γ) "Hg".
-    iEval (rewrite -Qp.half_half) in "Hg".
-    iDestruct (ghost_var_split with "Hg") as "[Hsie _]".
+    (* the SIE ghost half rides in from the precondition (the ambient S-mode
+       config context owns it); it feeds the per-instruction [smode_config] via
+       [kv_cfg_split] and is handed back to the caller at the sret. *)
     (* totality of the entry file (for the final map_eq) *)
     iDestruct "Hfile" as "[%HdomM Hfmap]".
     iAssert (gpr_file m) with "[Hfmap]" as "Hfile".
