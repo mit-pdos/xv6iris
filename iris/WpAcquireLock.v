@@ -701,15 +701,17 @@ Section WpAcquireLock.
     assert (Hspdh_eq : add_vec (B2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = po_spd)
       by (rewrite HB2sp; reflexivity).
     iDestruct "Hjunk" as (vfra0 vfs00) "[Hfra2 Hfs02]".
+    iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
     iApply (wp_holding_lockinv root_ppn γc E Φ γ lk R B2 cpuold
               (P0 !!! Regidx (mword_of_int 1 : mword 5)) (P0 !!! Regidx (mword_of_int 8 : mword 5))
               (P0 !!! Regidx (mword_of_int 9 : mword 5)) vfra0 vfs00
-              mstatus0 mie_v mdv0 menvcfg0
               (dqc:=DfracOwn 1)
-              HN HNl HAlk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe HFIOM Hlegal
+              HN HNl HAlk
               ltac:(rewrite HB2tp; exact Hnotmine)
               ltac:(rewrite HB2ra; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile
+              with "Hcfg Htlbinv Htext Hpc Hfile
                     Hlk [Hcpu] [Hp24] [Hp16] [Hp8] [Hfra2] [Hfs02] [-]").
     { iEval (rewrite HAcpu2). iExact "Hcpu". }
     { iEval (rewrite Hspdh_eq). iExact "Hp24". }
@@ -717,7 +719,13 @@ Section WpAcquireLock.
     { iEval (rewrite Hspdh_eq). iExact "Hp8". }
     { iEval (rewrite Hspdh_eq). iExact "Hfra2". }
     { iEval (rewrite Hspdh_eq). iExact "Hfs02". }
-    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hmh Hcpu Hhj".
+    iIntros "Hcfg Htlbinv Hpc Hmh Hcpu Hhj".
+    clear HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0 mstatus0 mie_v mdv0 menvcfg0.
+    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
+      as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     iEval (rewrite HAcpu2) in "Hcpu".
     iDestruct "Hmh" as (mh) "[Hfile %Hmhf]".
     destruct Hmhf as (Hhra & Hhs0 & Hms1 & Hmsp & Hmtp & Hma0 & Hms2 & Hms3 & Hms4 & Hms5).
