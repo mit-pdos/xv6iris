@@ -481,16 +481,7 @@ Section WpReleaseTop.
       ghost_var γc (1/2) b -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mr, gpr_file mr ∗
-        ⌜ mr !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5) /\
-          mr !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5) /\
-          mr !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
-          mr !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
-          mr !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
-          mr !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) /\
-          mr !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5) /\
-          mr !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5) /\
-          mr !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) ⌝) -∗
+      (∃ mr, gpr_file mr ∗ ⌜ callee_saved m mr ⌝) -∗
       a_cpu ↦₈ (zero_reg : mword 64) -∗
       a_noff ↦₄ storeval_noff -∗
       a_int ↦₄{ dqi } intenav -∗
@@ -666,6 +657,36 @@ Section WpReleaseTop.
       rewrite /R3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /R2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (HR4s6 : R4 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)).
+    { rewrite /R4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (HR4s7 : R4 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)).
+    { rewrite /R4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (HR4s8 : R4 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)).
+    { rewrite /R4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (HR4s9 : R4 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)).
+    { rewrite /R4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (HR4s10 : R4 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)).
+    { rewrite /R4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (HR4s11 : R4 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+    { rewrite /R4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     assert (HraR4 : R4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RL + 0x0c) : mword 64) 4)
       by (rewrite /R4; apply lookup_total_insert).
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
@@ -694,7 +715,9 @@ Section WpReleaseTop.
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     iEval (rewrite Ha0R4) in "Hcpu".
     iDestruct "Hgpr" as (mh) "[Hfile %Hmhf]".
-    destruct Hmhf as (Hmra & Hms0 & Hms1 & Hmsp & Hmtp & Hma0 & Hms2 & Hms3 & Hms4 & Hms5).
+    destruct Hmhf as (Hmcs & Hma0).
+    unfold callee_saved in Hmcs.
+    destruct Hmcs as (Hmsp & Hmtp & Hms0 & Hms1 & Hms2 & Hms3 & Hms4 & Hms5 & Hms6 & Hms7 & Hms8 & Hms9 & Hms10 & Hms11).
     iDestruct "Hjunk" as (w24 w16 w8 wra ws0) "(Hh24 & Hh16 & Hh8 & Hhfra & Hhfs0)".
     iEval (rewrite HspR4) in "Hh24". iEval (rewrite HspR4) in "Hh16".
     iEval (rewrite HspR4) in "Hh8". iEval (rewrite HspR4) in "Hhfra".
@@ -787,6 +810,24 @@ Section WpReleaseTop.
     assert (HM1s5 : M1 !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5)).
     { rewrite /M1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite Hms5. exact HR4s5. }
+    assert (HM1s6 : M1 !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5)).
+    { rewrite /M1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms6. exact HR4s6. }
+    assert (HM1s7 : M1 !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5)).
+    { rewrite /M1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms7. exact HR4s7. }
+    assert (HM1s8 : M1 !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5)).
+    { rewrite /M1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms8. exact HR4s8. }
+    assert (HM1s9 : M1 !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)).
+    { rewrite /M1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms9. exact HR4s9. }
+    assert (HM1s10 : M1 !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5)).
+    { rewrite /M1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms10. exact HR4s10. }
+    assert (HM1s11 : M1 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
+    { rewrite /M1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite Hms11. exact HR4s11. }
     assert (HraM1 : M1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RL + 0x1e) : mword 64) 4)
       by (rewrite /M1; apply lookup_total_insert).
     (* pop_off's frame slots coincide with (parts of) holding's dead frame *)
@@ -915,23 +956,27 @@ Section WpReleaseTop.
     iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc [Hfile] Hcpu Hnoff Hint
                           [Hr24 Hr16 Hr8 Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0]").
     { iExists Q4. iFrame "Hfile". iPureIntro.
-      split; [exact HraQ4|]. split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]].
-      - rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /Q2. apply lookup_total_insert.
-      - rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /Q3. apply lookup_total_insert.
-      - rewrite /Q4. rewrite lookup_total_insert. rewrite HspQ3.
+      unfold callee_saved. repeat split.
+      - (* sp *)
+        rewrite /Q4. rewrite lookup_total_insert. rewrite HspQ3.
         rewrite /spr po_addv_assoc.
         replace (add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))
           with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         apply kv_addv_zero.
-      - rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      - (* tp *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite Hftp. exact HtpM1.
+      - (* s0 (x8) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q2. apply lookup_total_insert.
+      - (* s1 (x9) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. apply lookup_total_insert.
       - (* s2 (x18) *)
         rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -956,6 +1001,42 @@ Section WpReleaseTop.
         rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite Hfs5. exact HM1s5.
+      - (* s6 (x22) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hfs6. exact HM1s6.
+      - (* s7 (x23) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hfs7. exact HM1s7.
+      - (* s8 (x24) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hfs8. exact HM1s8.
+      - (* s9 (x25) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hfs9. exact HM1s9.
+      - (* s10 (x26) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hfs10. exact HM1s10.
+      - (* s11 (x27) *)
+        rewrite /Q4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hfs11. exact HM1s11.
     }
     iExists _, _, _, _, _, _, _, _, _.
     iFrame "Hr24 Hr16 Hr8 Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0".
@@ -1006,16 +1087,7 @@ Section WpReleaseTop.
       ghost_var γc (1/2) b -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mr, gpr_file mr ∗
-        ⌜ mr !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5) /\
-          mr !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5) /\
-          mr !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
-          mr !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
-          mr !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
-          mr !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) /\
-          mr !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5) /\
-          mr !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5) /\
-          mr !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) ⌝) -∗
+      (∃ mr, gpr_file mr ∗ ⌜ callee_saved m mr ⌝) -∗
       a_cpu ↦₈ (zero_reg : mword 64) -∗
       a_noff ↦₄ storeval_noff -∗
       a_int ↦₄{ dqi } intenav -∗

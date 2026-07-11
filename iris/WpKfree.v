@@ -30,6 +30,7 @@ Require Import WpMycpu WpHolding WpAcquireMem.
 Require Import WpLock.
 Require Import WpAcquireLock WpRelease WpMemsetPage WpFreelistMem.
 Require Import StackOwn.
+Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -966,7 +967,8 @@ Section Kfree.
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".
     iDestruct "Hgprr" as (mrel) "[Hfile %Hrelpins]".
-    destruct Hrelpins as (Hrra & Hrs0 & Hrs1 & Hrsp & Hrtp & _ & _ & _ & _).
+    unfold callee_saved in Hrelpins.
+    destruct Hrelpins as (Hrsp & Hrtp & Hrs0 & Hrs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (HspMrel : mrel !!! Regidx csp_rs1 = spr) by (rewrite Hrsp; exact HRrelcsp).
     iPoseProof (kfi_54 with "Htext") as "Hi54".
     iPoseProof (kfi_56 with "Htext") as "Hi56".

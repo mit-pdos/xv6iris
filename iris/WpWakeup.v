@@ -37,6 +37,7 @@ Require Import WpLock.
 Require Import WpGprAddi WpGprRvc.
 Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGen VcGenS.
 Require Import WpAcquireTop WpAcquireLock WpAcquireMem WpRelease WpMycpu WpPushOffTop.
+Require Import CalleeSaved.
 Require Import WpSwtchVc.
 Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge WpKallocDecode WpAuipc.
 From Kernel Require Import KernelSyms KernelInstrs.
@@ -1800,7 +1801,8 @@ Section ProcInv.
         { rewrite HMr2c_ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc30) in "Hpc".
         iDestruct "Hgpr" as (mr) "[Hfile %Hpinsr]".
-        destruct Hpinsr as (Hr'1 & Hr'8 & Hr'9 & Hr'csp & Hr'4 & Hr'18 & Hr'19 & Hr'20 & Hr'21).
+        unfold callee_saved in Hpinsr.
+        destruct Hpinsr as (Hr'csp & Hr'4 & Hr'8 & Hr'9 & Hr'18 & Hr'19 & Hr'20 & Hr'21 & _ & _ & _ & _ & _ & _).
         iDestruct (gpr_file_dom with "Hfile") as "[%Hdommr Hfile]".
         (* reassemble [wk_res] for the next iteration: scratch (release junk),
            noff (restored to noffv via the round-trip), intena (0), lock words. *)
