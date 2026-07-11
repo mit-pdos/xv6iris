@@ -409,3 +409,123 @@ Section UTranslateDataWrappers.
   Qed.
 
 End UTranslateDataWrappers.
+
+(* ===================================================================== *)
+(* §5 The pointer-masking transform at User: PMM disabled (senvcfg = 0),  *)
+(*    so the effective address passes through unchanged.                  *)
+(* ===================================================================== *)
+
+Lemma exec_is_pmm_applicable_load_u s :
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  exec (is_pmm_applicable (Load Data) User) s = Some (true, s).
+Proof.
+  intro Hmxr.
+  unfold is_pmm_applicable.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (Load Data) (InstructionFetch tt)) with true by (vm_compute; reflexivity). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (Load Data) (Load PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (Load Data) (Store PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  match goal with
+  | |- context [ and_boolM ?orb _ ] => assert (Hor : exec orb s = Some (true, s))
+  end.
+  { rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+    replace (generic_eq User Machine) with false by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (exec_returnM _ s). rewrite Hmxr. reflexivity. }
+  rewrite (exec_and_boolM_Some _ _ _ _ _ Hor).
+  cbn match.
+  rewrite (exec_returnM _ s).
+  replace (xlen =? 64) with true by (vm_compute; reflexivity). reflexivity.
+Qed.
+
+Lemma exec_get_pmm_user s :
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup senvcfg s.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (get_pmm User) s = Some (PMM_Disabled, s).
+Proof.
+  intros HES Hsenv Hmenv.
+  unfold get_pmm.
+  rewrite (exec_bind_Some _ _ _ _ _ HES). cbn match.
+  assert (Hrs : exec (read_senvcfg tt) s
+                = Some (_update_SEnvcfg_SSE (mword_of_int 0)
+                          (and_vec (_get_MEnvcfg_SSE MENVCFG_S)
+                                   (_get_SEnvcfg_SSE (mword_of_int 0))), s)).
+  { unfold read_senvcfg.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg s)).
+    rewrite Hsenv Hmenv. apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hrs).
+  match goal with |- context[pmm_mode_backwards ?x] =>
+    replace (pmm_mode_backwards x) with PMM_Disabled by (vm_compute; reflexivity) end.
+  apply exec_returnM.
+Qed.
+
+Lemma exec_get_pmlen_load_u s :
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup senvcfg s.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (get_pmlen (Load Data) User) s = Some (0, s).
+Proof.
+  intros Hmxr HES Hsenv Hmenv. unfold get_pmlen.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_is_pmm_applicable_load_u s Hmxr)).
+  cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_get_pmm_user s HES Hsenv Hmenv)).
+  apply exec_returnM.
+Qed.
+
+(* the pmlen-0 VA transform is the identity: sign-extending the full
+   64-bit subrange returns the address unchanged *)
+Require Import UptInv.
+
+Lemma sext64_subrange63_id (x : mword 64) :
+  sign_extend' 64 (subrange_vec_dec x (Z.sub (Z.sub xlen 0) 1) 0) = x.
+Proof.
+  change (Z.sub (Z.sub xlen 0) 1) with 63.
+  rewrite subrange64_id.
+  cbv [sign_extend' Operators_mwords.sign_extend exts_vec to_word get_word
+       MachineWord.MachineWord.sign_extend].
+  apply bv_eq_signed.
+  rewrite bv_sign_extend_signed; [| apply N.leb_le; vm_compute; reflexivity].
+  reflexivity.
+Qed.
+
+Lemma pm_transform_VA_0 (ea : mword 64) :
+  pm_transform_VA (Virtaddr ea) 0 = Virtaddr ea.
+Proof.
+  unfold pm_transform_VA.
+  f_equal.
+  change (Z.sub (Z.sub xlen 0) 1) with (Z.sub (Z.sub xlen 0) 1).
+  exact (sext64_subrange63_id ea).
+Qed.
+
+Lemma exec_transform_effective_address_load_u (ea : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = User ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup senvcfg s.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s.(sregs))) = ('b"1000" : mword 4) ->
+  exec (transform_effective_address (Virtaddr ea) (Load Data)) s
+    = Some (Virtaddr ea, s).
+Proof.
+  intros Hcp Hmprv Hmxr HSXL HES Hsenv Hmenv Hmode.
+  unfold transform_effective_address.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_load_nm _ _ s Hmprv)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_get_pmlen_load_u s Hmxr HES Hsenv Hmenv)).
+  rewrite (exec_bind_Some _ _ _ _ _
+             (exec_translationMode_U_sv39 (register_lookup satp s.(sregs)) s
+                HSXL eq_refl Hmode)).
+  replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity). cbn match.
+  rewrite <- (pm_transform_VA_0 ea) at 2.
+  apply exec_returnM.
+Qed.
