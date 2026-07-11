@@ -90,6 +90,7 @@ WpKfree.v
 TrampPt.v
 TrampTlb.v
 WpUserret.v
+WpUserretEntry.v
 WpUserretTop.v
 VcGen.v
 VcGenS.v
