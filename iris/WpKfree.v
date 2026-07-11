@@ -29,6 +29,7 @@ Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpHolding WpAcquireMem.
 Require Import WpLock.
 Require Import WpAcquireLock WpRelease WpMemsetPage WpFreelistMem.
+Require Import StackOwn.
 Require Import KallocInv WpKallocDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -131,7 +132,7 @@ Section Kfree.
       (γ : gname) (lk fl : mword 64)
       (m : gmap regidx (mword 64))
       (vr24 vr16 vr8 vr0 mvra mvs0 : bv 64)
-      (qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qpr0 qfraold qfs0old qcpuold : bv 64)
+      (qvr8 qpr24 qpr16 qpr8 qpr0 qfraold qfs0old qcpuold : bv 64)
       (qnoff qintena_old : mword 32) (a0f : mword 64)
       (γc : gname) (bsie : mword 1)
       :
@@ -195,9 +196,12 @@ Section Kfree.
     a_r0 ↦₈ vr0 -∗
     ms_ra ↦₈ mvra -∗
     ms_s0 ↦₈ mvs0 -∗
-    (* ---- acquire's/release's scratch-stack windows (below kfree's frame) ---- *)
-    q_r24 ↦₈ qvr24 -∗
-    q_r16 ↦₈ qvr16 -∗
+    (* ---- acquire's/release's scratch-stack windows (below kfree's frame).
+       NOTE: [ms_ra]/[ms_s0] above ARE the same physical addresses as the
+       acquire/release scratch slots [q_r24]/[q_r16] (spr-8 / spr-16): the
+       assembly reuses that memory -- memset's frame first, then acquire's
+       saved ra/s0.  So they are owned ONCE here and threaded from memset's
+       return into acquire/release below (and back out to the post). ---- *)
     q_r8  ↦₈ qvr8 -∗
     q_p24 ↦₈ qpr24 -∗
     q_p16 ↦₈ qpr16 -∗
@@ -223,7 +227,7 @@ Section Kfree.
       HN HNl Hcpune Hretm Hlk Hfl Ha0fcpu Hnoffpos Hintena0.
     iIntros "Hcfg Htoken Htlbinv
              #Htext Hpc Hfile #Hkmem Hpre Hr24 Hr16 Hr8 Hr0 Hmra Hms0
-             Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqp0 Hqfra Hqfs0 Hqnoff Hqint Hqcpu Hcont".
+             Hqr8 Hqp24 Hqp16 Hqp8 Hqp0 Hqfra Hqfs0 Hqnoff Hqint Hqcpu Hcont".
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
       as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
     iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
@@ -638,6 +642,14 @@ Section Kfree.
       as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
     iEval (rewrite HMmsa0) in "Hpage".
     iEval (rewrite Hpara) in "Hbra". iEval (rewrite Hps0) in "Hbs0".
+    (* memset's frame [ms_ra]/[ms_s0] are the SAME PAs as the acquire/release
+       scratch [q_r24]/[q_r16]; thread the restored frame on as [q_r24]/[q_r16]. *)
+    assert (Beq1 : ms_ra = q_r24).
+    { rewrite /ms_ra /ms_sp /q_r24 /spdA. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Beq2 : ms_s0 = q_r16).
+    { rewrite /ms_s0 /ms_sp /q_r16 /spdA. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite Beq1) in "Hbra". iEval (rewrite Beq2) in "Hbs0".
+    iRename "Hbra" into "Hqr24". iRename "Hbs0" into "Hqr16".
     iDestruct "Hgprf" as (mfp) "[Hfile %Hpinsf]".
     destruct Hpinsf as (Hfra & Hfs0 & Hfs1 & Hfs2 & Hfsp & Hftp).
     assert (Hpc36 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x36)).
@@ -757,7 +769,7 @@ Section Kfree.
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
     iApply (wp_acquire_lock root_ppn E Φ γ (kmem_res fl) Kacq
-              qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qfraold qfs0old qcpuold
+              _ _ qvr8 qpr24 qpr16 qpr8 qfraold qfs0old qcpuold
               qnoff qintena_old a0f γc bsie
               HN HNl
               ltac:(rewrite HKacqtp; exact (eq_sym Ha0fcpu))
@@ -939,6 +951,16 @@ Section Kfree.
     iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
+    (* release returned the scratch frame; its a_r24/a_r16 are the ms_ra/ms_s0
+       PAs, so route them back out as the post's memset-frame slots (the rest of
+       the scratch region is dropped, as before). *)
+    iDestruct "Hjunk2" as (w1 w2 w3 w4 w5 w6 w7 w8 w9)
+      "(Hbra & Hbs0 & Hjd1 & Hjd2 & Hjd3 & Hjd4 & Hjd5 & Hjd6 & Hjd7)".
+    assert (BrA24 : add_vec (add_vec (Rrel !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = ms_ra).
+    { rewrite HRrelcsp /ms_ra /ms_sp. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (BrA16 : add_vec (add_vec (Rrel !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = ms_s0).
+    { rewrite HRrelcsp /ms_s0 /ms_sp. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite BrA24) in "Hbra". iEval (rewrite BrA16) in "Hbs0".
     (* pc = ret_tgt(Rrel) = +0x54 ; lock released. epilogue restores the frame. *)
     assert (Hpc54 : update_vec_dec (add_vec (Rrel !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
@@ -1040,7 +1062,7 @@ Section Kfree.
     { iExists Q5c. iFrame "Hfile". }
     { iExists (R1 !!! Regidx (mword_of_int 1 : mword 5)), (R1 !!! Regidx (mword_of_int 8 : mword 5)),
         (R1 !!! Regidx (mword_of_int 9 : mword 5)), (R1 !!! Regidx (mword_of_int 18 : mword 5)),
-        (Mms !!! Regidx (mword_of_int 1 : mword 5)), (Mms !!! Regidx (mword_of_int 8 : mword 5)).
+        w1, w2.
       iFrame "Hr24 Hr16 Hr8 Hr0 Hbra Hbs0". }
   Qed.
 
