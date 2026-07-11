@@ -261,6 +261,54 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(* §2c The FAULT side of the spec: where the walk stops for vpns the      *)
+(*     table does NOT map for user access.  [upt_fault_wf] pins, for      *)
+(*     every unmapped vpn, the slot(s) the walk reads and the fact that   *)
+(*     makes it fault -- an invalid PTE at some level, or a valid leaf    *)
+(*     that denies every user access (a kernel page, U = 0).  The         *)
+(*     disjunction is NOT exhaustive over arbitrary bit patterns (no      *)
+(*     superpages, no L0 non-leaf); it covers exactly the tables xv6      *)
+(*     builds, and the kernel-side instantiation proves it.               *)
+(* ===================================================================== *)
+
+Definition upte_invalid (w : mword 64) : Prop :=
+  forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                   (ext_bits_of_PTE w)) s = Some (true, s).
+Definition upte_valid (w : mword 64) : Prop :=
+  forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                   (ext_bits_of_PTE w)) s = Some (false, s).
+Definition upte_nonleaf (w : mword 64) : Prop :=
+  pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = true.
+Definition upte_leaf (w : mword 64) : Prop :=
+  pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = false.
+(* a leaf that DENIES every user access (U = 0 kernel page) *)
+Definition upte_user_denied (w : mword 64) : Prop :=
+  forall (acc : MemoryAccessType mem_payload) (mxr do_sum : bool) s,
+    exec (check_PTE_permission acc User mxr do_sum
+            (Mk_PTE_Flags (subrange_vec_dec w 7 0)) (ext_bits_of_PTE w) tt) s
+      = Some (PTE_Check_Failure (tt, PTE_No_Permission tt), s).
+
+Definition upt_fault_wf (root : mword 44)
+    (slots : gmap (mword 64) (mword 64))
+    (spec : gmap (mword 27) uwalk_info) : Prop :=
+  forall vpn, spec !! vpn = None ->
+    (* the root slot is invalid *)
+    (exists w2,
+        slots !! uw_addr2 root vpn = Some w2 /\ upte_invalid w2)
+    (* the root descends but the mid slot is invalid *)
+    \/ (exists w2 w1,
+        slots !! uw_addr2 root vpn = Some w2 /\ upte_valid w2 /\ upte_nonleaf w2 /\
+        slots !! u_pte_addr (u_next_base w2) (subrange_vec_dec vpn 17 9) = Some w1 /\
+        upte_invalid w1)
+    (* both levels descend; the leaf slot is invalid, or is a kernel page *)
+    \/ (exists w2 w1 w0,
+        slots !! uw_addr2 root vpn = Some w2 /\ upte_valid w2 /\ upte_nonleaf w2 /\
+        slots !! u_pte_addr (u_next_base w2) (subrange_vec_dec vpn 17 9) = Some w1 /\
+        upte_valid w1 /\ upte_nonleaf w1 /\
+        slots !! u_pte_addr (u_next_base w1) (subrange_vec_dec vpn 8 0) = Some w0 /\
+        (upte_invalid w0 \/ (upte_valid w0 /\ upte_leaf w0 /\ upte_user_denied w0))).
+
+(* ===================================================================== *)
 (* §3 The pte-read PMA fact (pinned by the concrete boot PMA list, the     *)
 (*    same way WpSmodeGpr threads Hpteregion)                              *)
 (* ===================================================================== *)
@@ -390,6 +438,176 @@ Section UptInv.
       iApply (upt_slot_read_pte _ _ _ _ HA Hord HR Hcov Hpter
                 with "Hhw Hint Hw0"). }
     iPureIntro. auto.
+  Qed.
+
+  (* the FAULT twin: an unmapped vpn's walk stops with Invalid_PTE or
+     No_Permission, touching only owned slots and writing nothing *)
+  Lemma upt_unmapped_walk_fault (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (acc : MemoryAccessType mem_payload)
+      (mxr do_sum : bool) (σ : mstate) :
+    spec !! vpn = None ->
+    upt_fault_wf root slots spec ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exists f : PTW_Error,
+       exec (pt_walk 39 vpn acc User mxr do_sum root 2 false tt) σ
+         = Some (Err (f, tt), σ) /\
+       (f = PTW_Invalid_PTE tt \/ f = PTW_No_Permission tt)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf HA Hord HR Hcov Hpter) "#Hhw Hint [Hslots %Hspec]".
+    destruct (Hfwf vpn Hvpn) as
+      [ (w2 & Hs2 & Hi2)
+      | [ (w2 & w1 & Hs2 & Hv2 & Hn2 & Hs1 & Hi1)
+        | (w2 & w1 & w0 & Hs2 & Hv2 & Hn2 & Hs1 & Hv1 & Hn1 & Hs0 & Hleaf) ] ].
+    - (* root invalid *)
+      iAssert (⌜exec (read_pte (Physaddr (uw_addr2 root vpn)) 8) σ
+                 = Some (Ok w2, σ)⌝)%I as %Hr2.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs2 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte _ _ _ _ HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iPureIntro. exists (PTW_Invalid_PTE tt). split; [|by left].
+      exact (exec_pt_walk_user_l2_invalid vpn acc User mxr do_sum root w2 σ Hr2 Hi2).
+    - (* mid invalid *)
+      iAssert (⌜exec (read_pte (Physaddr (uw_addr2 root vpn)) 8) σ
+                 = Some (Ok w2, σ)⌝)%I as %Hr2.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs2 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte _ _ _ _ HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iAssert (⌜exec (read_pte (Physaddr (u_pte_addr (u_next_base w2)
+                        (subrange_vec_dec vpn 17 9))) 8) σ
+                 = Some (Ok w1, σ)⌝)%I as %Hr1.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs1 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte _ _ _ _ HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iPureIntro. exists (PTW_Invalid_PTE tt). split; [|by left].
+      apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root w2 _ σ Hr2 Hv2 Hn2).
+      intros g' a.
+      exact (exec_rec_walk_l1_invalid vpn acc User mxr do_sum
+               (u_next_base w2) w1 g' a σ Hr1 Hi1).
+    - (* leaf invalid or kernel page *)
+      iAssert (⌜exec (read_pte (Physaddr (uw_addr2 root vpn)) 8) σ
+                 = Some (Ok w2, σ)⌝)%I as %Hr2.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs2 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte _ _ _ _ HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iAssert (⌜exec (read_pte (Physaddr (u_pte_addr (u_next_base w2)
+                        (subrange_vec_dec vpn 17 9))) 8) σ
+                 = Some (Ok w1, σ)⌝)%I as %Hr1.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs1 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte _ _ _ _ HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iAssert (⌜exec (read_pte (Physaddr (u_pte_addr (u_next_base w1)
+                        (subrange_vec_dec vpn 8 0))) 8) σ
+                 = Some (Ok w0, σ)⌝)%I as %Hr0.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs0 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte _ _ _ _ HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iPureIntro.
+      destruct Hleaf as [Hi0 | (Hv0 & Hl0 & Hden0)].
+      + exists (PTW_Invalid_PTE tt). split; [|by left].
+        apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root w2 _ σ Hr2 Hv2 Hn2).
+        intros g' a.
+        apply (exec_rec_walk_l1_sub vpn acc User mxr do_sum
+                 (u_next_base w2) w1 g' _ a σ Hr1 Hv1 Hn1).
+        intros g'' a0.
+        exact (exec_rec_walk_leaf_invalid vpn acc User mxr do_sum
+                 (u_next_base w1) w0 g'' a0 σ Hr0 Hi0).
+      + exists (PTW_No_Permission tt). split; [|by right].
+        apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root w2 _ σ Hr2 Hv2 Hn2).
+        intros g' a.
+        apply (exec_rec_walk_l1_sub vpn acc User mxr do_sum
+                 (u_next_base w2) w1 g' _ a σ Hr1 Hv1 Hn1).
+        intros g'' a0.
+        exact (exec_rec_walk_leaf_noperm vpn acc User mxr do_sum
+                 (u_next_base w1) w0 g'' (PTE_No_Permission tt) a0 σ Hr0 Hv0 Hl0
+                 (fun s0 => Hden0 acc mxr do_sum s0)).
+  Qed.
+
+  (* an UNMAPPED vpn can never hit the TLB: a colliding slot holds some
+     mapped vpn's entry, whose match would force vpn equality *)
+  Lemma upt_lookup_TLB_unmapped
+      (spec : gmap (mword 27) uwalk_info) (vpn : mword 27)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) :
+    spec !! vpn = None ->
+    upt_tlb_ok spec tlbvec ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ).
+  Proof.
+    intros Hvpn Hok Ltlb.
+    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
+    - destruct (Hok vpn ent Hslot) as (vpn' & i & Hvpn' & _ & ->).
+      apply (exec_lookup_TLB_nomatch vpn (mword_of_int 0) (upt_entry vpn' i) tlbvec σ
+               Ltlb Hslot).
+      rewrite upt_entry_match_gen.
+      match goal with |- ?E = false => destruct E eqn:He; [exfalso|reflexivity] end.
+      apply eq_vec_true_iff in He.
+      apply sext45_inj in He.
+      rewrite He in Hvpn'.
+      rewrite Hvpn in Hvpn'. discriminate.
+    - exact (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec σ Ltlb Hslot).
+  Qed.
+
+  (* the frame-level FAULT arm of the fetch trichotomy: fetching from an
+     unmapped (or kernel-only) vpn page-faults, with NO state change *)
+  Lemma upt_translateAddr_fetch_unmapped (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (va satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (mxr do_sum : bool) (σ : mstate) :
+    spec !! vpn = None ->
+    upt_fault_wf root slots spec ->
+    upt_tlb_ok spec tlbvec ->
+    (* machine-state pins *)
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    register_lookup satp σ.(sregs) = satp0 ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    (* satp geometry *)
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    (* va geometry *)
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    (* PMP for the slot reads *)
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+       = Some (Err (E_Fetch_Page_Fault tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf Hok Lpriv LSXL Lsatp Ltlb Hmode Hasid Hroot Hcanon Hvpn_def
+             HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_unmapped_walk_fault root slots spec vpn (InstructionFetch tt)
+                 mxr do_sum σ Hvpn Hfwf HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(f & Hwalk & Hf).
+    iPureIntro.
+    assert (Hte : exec (translationException (InstructionFetch tt) f) σ
+                    = Some (E_Fetch_Page_Fault tt, σ)).
+    { destruct Hf as [-> | ->];
+        unfold translationException; cbn match; apply exec_returnm. }
+    exact (exec_translateAddr_fetch_walk_u_pagefault vpn root f mxr do_sum va satp0 σ
+             Lpriv LSXL Lsatp Hmode Hasid Hroot
+             (upt_lookup_TLB_unmapped spec vpn tlbvec σ Hvpn Hok Ltlb)
+             Hwalk Hte Hcanon Hvpn_def).
   Qed.
 
 End UptInv.
