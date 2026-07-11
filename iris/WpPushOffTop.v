@@ -398,6 +398,48 @@ Proof.
   repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
 Qed.
 
+Lemma po_mycpu_out_s6 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
+Qed.
+
+Lemma po_mycpu_out_s7 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
+Qed.
+
+Lemma po_mycpu_out_s8 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
+Qed.
+
+Lemma po_mycpu_out_s9 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
+Qed.
+
+Lemma po_mycpu_out_s10 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
+Qed.
+
+Lemma po_mycpu_out_s11 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
+Qed.
+
 (* po_mycpu_out's a0 output depends on the input map only through tp (x4)
    (local copy; WpHolding.po_mycpu_out_a0 is downstream of this file). *)
 Lemma pt_mycpu_out_a0 (P : mword 64) (m : gmap regidx (mword 64)) :
