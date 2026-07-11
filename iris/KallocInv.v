@@ -188,20 +188,6 @@ Section Kalloc.
   (* kalloc's logical core: the opened invariant either has an empty list (put
      it back unchanged, kalloc returns null) or exposes the head page [p] -- its
      [next] pointer, its 4KB, and the tail -- for the caller to take. *)
-  Lemma kmem_res_pop fl :
-    kmem_res fl ⊢
-       (kmem_res fl)
-     ∨ (∃ (p nxt : mword 64) (ps : list (mword 64)),
-          ⌜page_valid p⌝ ∗ word_at fl p ∗ run_page p nxt ∗ freelist_chain nxt ps).
-  Proof.
-    iIntros "H". iDestruct "H" as (head pages) "[Hfl Hchain]".
-    destruct pages as [|p ps].
-    - iLeft. iApply kmem_res_close. iFrame.
-    - iRight. rewrite freelist_chain_cons.
-      iDestruct "Hchain" as "(-> & %Hp & Hrun)".
-      iDestruct "Hrun" as (nxt) "[Hrun Hchain]".
-      iExists p, nxt, ps. iFrame "Hfl Hrun Hchain". done.
-  Qed.
 
   (* kfree's logical core: after the function has written [p->next := oldhead]
      and [fl := p], the pieces refold into the invariant with [p] prepended. *)

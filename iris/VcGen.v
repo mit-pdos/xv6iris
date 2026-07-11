@@ -143,15 +143,6 @@ Definition sval_addZ (v : sval) (d : Z) : sval :=
 
 (* symbolic ADD: defined when at least one side is a constant.  var + var is
    representable in no normal form here, so the VCgen (honestly) fails on it. *)
-Definition sval_add (v w : sval) : option sval :=
-  match v with
-  | SC z => if sval_is64 w then Some (sval_addZ w z) else None
-  | SX _ _ => match w with
-              | SC z => Some (sval_addZ v z)
-              | _ => None
-              end
-  | S32 _ => None
-  end.
 
 Definition sval_beq (v w : sval) : bool :=
   match v, w with
@@ -199,12 +190,6 @@ Proof.
   apply Z_to_bv_bv_unsigned.
 Qed.
 
-Lemma add_vec_comm (a b : mword 64) : add_vec a b = add_vec b a.
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-         SailStdpp.Values.with_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite !bv_add_unsigned. f_equal. lia.
-Qed.
 
 (* the one lemma every register/address computation reduces to (for the
    64-bit shapes; the executors never apply [sval_addZ] to an [S32]) *)
@@ -225,24 +210,6 @@ Proof.
     symmetry. apply avi_assoc.
 Qed.
 
-Lemma sval_add_sound (ρ : nat -> mword 64) (u v w : sval) :
-  sval_add u v = Some w ->
-  sval_den ρ w = add_vec (sval_den ρ u) (sval_den ρ v).
-Proof.
-  destruct u as [za|xa oa|wa]; cbn [sval_add]; intro H; [| |discriminate].
-  - destruct (sval_is64 v) eqn:H64; [|discriminate].
-    injection H as <-. rewrite (sval_den_addZ _ _ _ H64). cbn [sval_den].
-    apply add_vec_comm.
-  - destruct v as [zb|xb ob|wb]; [|discriminate|discriminate].
-    injection H as <-. cbn [sval_den].
-    (* injection normalizes [sval_addZ (SX xa oa) zb]; redo its SX case *)
-    rewrite mword_of_int_wrap.
-    change (add_vec (ρ xa) (mword_of_int (oa + zb)))
-      with (add_vec_int (ρ xa) (oa + zb)).
-    change (add_vec (add_vec (ρ xa) (mword_of_int oa)) (mword_of_int zb))
-      with (add_vec_int (add_vec_int (ρ xa) oa) zb).
-    symmetry. apply avi_assoc.
-Qed.
 
 (* the immediate of an I-type/load/store instruction, as the canonical Z of
    its sign-extension -- so that [mword_of_int (zimm12 imm)] IS the model's
@@ -465,24 +432,9 @@ Definition regidx_eqb (a b : regidx) : bool :=
    TARGET instruction of an [instr pc is_rvc i] fact, so RVC forms (c.addi /
    c.mv / c.ldsp / c.sdsp / ...) are covered through the [instr] ExecuteAs
    indirection with [is_rvc = true], exactly as for the leaf WPs. *)
-Inductive vop : Type :=
-  | Vaddi (imm : mword 12) (rs1 rd : mword 5)      (* addi rd, rs1, imm     *)
-  | Vadd  (rs2 rs1 rd : mword 5)                   (* add  rd, rs1, rs2     *)
-  | Vlui  (imm : mword 20) (rd : mword 5)          (* lui  rd, imm          *)
-  | Vld   (imm : mword 12) (rs1 rd : mword 5)      (* ld   rd, imm(rs1)     *)
-  | Vsd   (imm : mword 12) (rs2 rs1 : mword 5).    (* sd   rs2, imm(rs1)    *)
 
-Definition vop_ast (op : vop) : instruction :=
-  match op with
-  | Vaddi imm rs1 rd => ITYPE (imm, Regidx rs1, Regidx rd, ADDI)
-  | Vadd rs2 rs1 rd  => RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)
-  | Vlui imm rd      => UTYPE (imm, Regidx rd, LUI)
-  | Vld imm rs1 rd   => LOAD (imm, Regidx rs1, Regidx rd, false, 8)
-  | Vsd imm rs2 rs1  => STORE (imm, Regidx rs2, Regidx rs1, 8)
-  end.
 
 (* one program entry: fetch width (RVC?) + the target instruction *)
-Definition vinstr : Type := bool * vop.
 
 (* symbolic state: concrete pc, symbolic registers, symbolic word heap.
    The heap holds 8-byte cells (address, value); every cell corresponds to
@@ -522,70 +474,7 @@ Qed.
 (* 3. The symbolic executor.                                               *)
 (* ====================================================================== *)
 
-Definition vc_step (st : vstate) (x : vinstr) : option vstate :=
-  let '(rvc, op) := x in
-  let pc' := st.(vpc) + (if rvc then 2 else 4) in
-  match op with
-  | Vaddi imm rs1 rd =>
-      if Z.eqb (uint rd) 0 then None else
-      match st.(vregs) !! Regidx rs1 with
-      | Some v1 =>
-          if sval_is64 v1 then
-            Some (VSt pc' (<[Regidx rd := sval_addZ v1 (zimm12 imm)]> st.(vregs))
-                      st.(vheap) st.(vheap4))
-          else None
-      | None => None
-      end
-  | Vadd rs2 rs1 rd =>
-      if Z.eqb (uint rd) 0 then None else
-      match st.(vregs) !! Regidx rs1, st.(vregs) !! Regidx rs2 with
-      | Some v1, Some v2 =>
-          match sval_add v1 v2 with
-          | Some v =>
-              Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap) st.(vheap4))
-          | None => None
-          end
-      | _, _ => None
-      end
-  | Vlui imm rd =>
-      if Z.eqb (uint rd) 0 then None else
-      Some (VSt pc' (<[Regidx rd := SC (uint (luival imm))]> st.(vregs))
-                st.(vheap) st.(vheap4))
-  | Vld imm rs1 rd =>
-      if Z.eqb (uint rd) 0 then None else
-      match st.(vregs) !! Regidx rs1 with
-      | Some v1 =>
-          if negb (sval_is64 v1) then None else
-          match vheap_find st.(vheap) (sval_addZ v1 (zimm12 imm)) with
-          | Some (_, v) =>
-              Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap) st.(vheap4))
-          | None => None
-          end
-      | None => None
-      end
-  | Vsd imm rs2 rs1 =>
-      match st.(vregs) !! Regidx rs1, st.(vregs) !! Regidx rs2 with
-      | Some v1, Some v2 =>
-          if negb (sval_is64 v1) then None else
-          let a := sval_addZ v1 (zimm12 imm) in
-          match vheap_find st.(vheap) a with
-          | Some (i, _) =>
-              Some (VSt pc' st.(vregs) (<[i := (a, v2)]> st.(vheap)) st.(vheap4))
-          | None => None
-          end
-      | _, _ => None
-      end
-  end.
 
-Fixpoint vc_block (st : vstate) (prog : list vinstr) : option vstate :=
-  match prog with
-  | nil => Some st
-  | x :: rest =>
-      match vc_step st x with
-      | Some st1 => vc_block st1 rest
-      | None => None
-      end
-  end.
 
 (* ====================================================================== *)
 (* 4. Denotation of a symbolic state into resources.                       *)
@@ -613,13 +502,6 @@ Section VcGenIris.
     ([∗ list] c ∈ h, (sval_den ρ c.1) ↦₈ (sval_den ρ c.2))%I.
 
   (* the block's code: one [instr] fact per program entry, at consecutive pcs *)
-  Fixpoint block_instrs (pc : Z) (prog : list vinstr) : iProp Σ :=
-    match prog with
-    | nil => emp%I
-    | (rvc, op) :: rest =>
-        (instr (mword_of_int pc) rvc (vop_ast op) ∗
-         block_instrs (pc + (if rvc then 2 else 4)) rest)%I
-    end.
 
 
 End VcGenIris.
@@ -711,18 +593,6 @@ Proof.
 Qed.
 
 (* the canonical-valuation corollary (ρ k := m !!! xk). *)
-Lemma vregs_den_init (m : gmap regidx (mword 64)) :
-  (forall r : regidx, r ∈ dom m) ->
-  m !!! Regidx (mword_of_int 0 : mword 5) = zero_reg ->
-  vregs_den (fun x => m !!! Regidx (mword_of_int (Z.of_nat x) : mword 5)) vregs_init
-  = m.
-Proof.
-  intros Hdom Hx0. apply (vregs_den_init_agree _ _ Hdom Hx0).
-  intros k _. reflexivity.
-Qed.
 
 (* dom-completeness is preserved by insert (for threading a complete file
    through a chain of register writes). *)
-Lemma vregs_dom_insert (m : gmap regidx (mword 64)) (k : regidx) (v : mword 64) :
-  (forall r : regidx, r ∈ dom m) -> (forall r : regidx, r ∈ dom (<[k := v]> m)).
-Proof. intros H r. rewrite dom_insert_L. apply elem_of_union_r, H. Qed.

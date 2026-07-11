@@ -66,23 +66,6 @@ Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 (* the mcountinhibit and minstretcfg cells.  Owning those two CSRs thus     *)
 (* discharges the `should_inc` exec-condition (no `forall s0` needed).      *)
 (* ---------------------------------------------------------------------- *)
-Lemma exec_should_inc_M (mc : mword 32) (mcfg : mword 64) s :
-  register_lookup mcountinhibit s.(sregs) = mc ->
-  register_lookup minstretcfg s.(sregs) = mcfg ->
-  exec (should_inc_minstret Machine) s
-    = Some (andb (eq_vec (_get_Counterin_IR mc) ('b"0"))
-                 (eq_vec (counter_priv_filter_bit mcfg Machine) ('b"0")), s).
-Proof.
-  intros Hmc Hmcfg. unfold should_inc_minstret.
-  assert (HA : exec ((read_reg mcountinhibit : M (mword 32)) >>=
-                     (fun w__0 => returnM (eq_vec (_get_Counterin_IR w__0) ('b"0")))) s
-               = Some (eq_vec (_get_Counterin_IR mc) ('b"0"), s)).
-  { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcountinhibit s)). rewrite Hmc. apply exec_returnm. }
-  rewrite (exec_and_boolM_Some _ _ _ _ _ HA).
-  destruct (eq_vec (_get_Counterin_IR mc) ('b"0")) eqn:Ea; cbn [andb].
-  - rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg minstretcfg s)). rewrite Hmcfg. apply exec_returnm.
-  - reflexivity.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* MMIO-range discharge: an access whose base address is RAM (outside the  *)
@@ -498,9 +481,6 @@ Qed.
    address [A] is the physical byte address [A + j].  This is what lets a
    per-byte image (keyed by absolute byte address) feed the WP fetch windows,
    which are phrased as [pa_add (fetch_pa pc) j]. *)
-Lemma pa_add_fetch_mword (A : Z) (j : nat) :
-  pa_add (fetch_pa (mword_of_int A)) j = mword_of_int (A + Z.of_nat j).
-Proof. unfold pa_add. rewrite fetch_pa_id. apply avi_mword. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Leaf 2: rX / rX_bits read leaf for x2 (sp), mirroring run_rX_x10.        *)
@@ -526,15 +506,7 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Lemma run_wX_bits_x2 (i : mword 5) s (v : mword 64) :
-  uint i = 2 ->
-  run (wX_bits (Regidx i) v) s tt (set_reg s (R_bitvector_64 x2) (regval_into_reg v)).
-Proof. intro H. unfold wX_bits; cbn match. rewrite H. apply run_wX_x2. Qed.
 
-Lemma exec_wX_bits_x2 (i : mword 5) s (v : mword 64) :
-  uint i = 2 ->
-  exec (wX_bits (Regidx i) v) s = Some (tt, set_reg s (R_bitvector_64 x2) (regval_into_reg v)).
-Proof. intro H. unfold wX_bits; cbn match. rewrite H. apply exec_wX_x2. Qed.
 
 (* Single SHARED, OPAQUE minstret bump.  The chunk WPs thread [minstret] through
    ~20 bumps; written inline as [fun x => if b then add_vec_int x 1 else x] the

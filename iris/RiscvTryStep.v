@@ -171,24 +171,6 @@ Import Defs.
 (*    the rd-write's effect.                                               *)
 (* --------------------------------------------------------------------- *)
 
-Lemma run_execute_RTYPE_ADD (rs2 rs1 rd : regidx) (a b : mword 64) s s' :
-  run (rX_bits rs1) s a s ->
-  run (rX_bits rs2) s b s ->
-  run (wX_bits rd (add_vec a b)) s tt s' ->
-  run (execute_RTYPE rs2 rs1 rd ADD) s RETIRE_SUCCESS s'.
-Proof.
-  intros Ha Hb Hw.
-  unfold execute_RTYPE. cbn match.
-  (* outer bind: inner computes (add_vec a b) leaving state s *)
-  apply run_bind. exists (add_vec a b), s. split.
-  - (* inner: rX_bits rs1 >>= rX_bits rs2 >>= returnM (add_vec) *)
-    apply run_bind. exists a, s. split; [exact Ha|].
-    apply run_bind. exists b, s. split; [exact Hb|].
-    apply run_returnM. split; reflexivity.
-  - (* wX_bits rd (add_vec a b) >> returnM RETIRE_SUCCESS *)
-    apply run_bind0. exists s'. split; [exact Hw|].
-    apply run_returnM. split; reflexivity.
-Qed.
 
 (* ===== RiscvModelRegs ===== *)
 (* ===================================================================== *)
@@ -218,12 +200,6 @@ Proof. reflexivity. Qed.
    kept symbolic here since it does not auto-reduce under conversion). *)
 
 (* run versions: register reads are state-pure, writes go via set_reg. *)
-Lemma run_rX_x10 s :
-  run (rX (Regno 10)) s (register_lookup (R_bitvector_64 x10) s.(sregs)) s.
-Proof. rewrite rX_x10. split; reflexivity. Qed.
-Lemma run_rX_x11 s :
-  run (rX (Regno 11)) s (register_lookup (R_bitvector_64 x11) s.(sregs)) s.
-Proof. rewrite rX_x11. split; reflexivity. Qed.
 (* wX = write_reg .. >> returnM (xreg_full_write_callback ..); the callback is
    [tt] (xreg_full_write_callback _ _ _ := tt), so wX is a write then return tt. *)
 Lemma wX_x12_eq (v : mword 64) :
@@ -231,32 +207,12 @@ Lemma wX_x12_eq (v : mword 64) :
   = Defs.bind0 (Defs.write_reg (R_bitvector_64 x12) (regval_into_reg v)) (returnM tt).
 Proof. reflexivity. Qed.
 
-Lemma run_wX_x12 s (v : mword 64) :
-  run (wX (Regno 12) v) s tt (set_reg s (R_bitvector_64 x12) (regval_into_reg v)).
-Proof.
-  rewrite wX_x12_eq. apply run_bind0.
-  exists (set_reg s (R_bitvector_64 x12) (regval_into_reg v)). split.
-  - split; reflexivity.
-  - split; reflexivity.
-Qed.
 
 (* --------------------------------------------------------------------- *)
 (* 2. Lift to rX_bits / wX_bits given the register index value.            *)
 (*    rX_bits (Regidx i) = rX (Regno (uint i)); supply `uint i = n`.        *)
 (* --------------------------------------------------------------------- *)
 
-Lemma run_rX_bits_x10 (i : mword 5) s :
-  uint i = 10 ->
-  run (rX_bits (Regidx i)) s (register_lookup (R_bitvector_64 x10) s.(sregs)) s.
-Proof. intro H. unfold rX_bits; cbn match. rewrite H. apply run_rX_x10. Qed.
-Lemma run_rX_bits_x11 (i : mword 5) s :
-  uint i = 11 ->
-  run (rX_bits (Regidx i)) s (register_lookup (R_bitvector_64 x11) s.(sregs)) s.
-Proof. intro H. unfold rX_bits; cbn match. rewrite H. apply run_rX_x11. Qed.
-Lemma run_wX_bits_x12 (i : mword 5) s (v : mword 64) :
-  uint i = 12 ->
-  run (wX_bits (Regidx i) v) s tt (set_reg s (R_bitvector_64 x12) (regval_into_reg v)).
-Proof. intro H. unfold wX_bits; cbn match. rewrite H. apply run_wX_x12. Qed.
 
 (* --------------------------------------------------------------------- *)
 (* 3. FULLY CONCRETE execute(ADD): add x12, x10, x11 over the real model.  *)
