@@ -3980,7 +3980,93 @@ Section WpUserExec.
        is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
        isRVC (subrange_vec_dec w 15 0) = false /\
        (forall s0, agree_on D_u s0 dstateU ->
-          exec (ext_decode w) s0 = Some (ii, s0))).
+          exec (ext_decode w) s0 = Some (ii, s0)))
+    \/
+    (* 13: fetch hit, BTYPE branch NOT taken (falls through to pc+4) *)
+    (exists vpn i (w : mword 32) (op : bop) (c : mword 64 -> mword 64 -> bool)
+            (imm : mword 13) (rs2 rs1 : mword 5),
+       (forall (imm' : mword 13) (rs2' rs1' : mword 5) s,
+          c (rvv rs1' s) (rvv rs2' s) = false ->
+          exec (execute (BTYPE (imm', Regidx rs2', Regidx rs1', op))) s
+            = Some (RETIRE_SUCCESS, s)) /\
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn i) va vpn) j = Some (nth_byte w j)) /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) /\
+       c (g !!! Regidx rs1) (g !!! Regidx rs2) = false)
+    \/
+    (* 14: fetch hit, BTYPE branch TAKEN (aligned target) *)
+    (exists vpn i (w : mword 32) (op : bop) (c : mword 64 -> mword 64 -> bool)
+            (imm : mword 13) (rs2 rs1 : mword 5),
+       (forall (imm' : mword 13) (rs2' rs1' : mword 5) s,
+          c (rvv rs1' s) (rvv rs2' s) = true ->
+          eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs))
+                    (sign_extend' 64 imm')) 0) ('b"0") = true ->
+          bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs))
+                    (sign_extend' 64 imm')) 1) = false ->
+          exec (execute (BTYPE (imm', Regidx rs2', Regidx rs1', op))) s
+            = Some (RETIRE_SUCCESS,
+                    set_reg s nextPC (add_vec (register_lookup PC s.(sregs))
+                                        (sign_extend' 64 imm')))) /\
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn i) va vpn) j = Some (nth_byte w j)) /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) /\
+       c (g !!! Regidx rs1) (g !!! Regidx rs2) = true /\
+       eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true /\
+       bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false)
+    \/
+    (* 15: fetch hit, single-source compute (ADDIW etc.) *)
+    (exists vpn i (w : mword 32) (mk : mword 5 -> mword 5 -> instruction)
+            (F : mword 64 -> mword 64) (rs1 rd : mword 5),
+       (forall (rs1' rd' : mword 5) s,
+          exec (execute (mk rs1' rd')) s
+          = Some (RETIRE_SUCCESS,
+                  if Z.eqb (uint rd') 0 then s
+                  else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd')))
+                         (regval_into_reg
+                            (F (if Z.eqb (uint rs1') 0 then zero_reg
+                                else register_lookup
+                                       (R_bitvector_64 (gpr_of_Z (uint rs1'))) s.(sregs)))))) /\
+       is_lpad_instruction (mk rs1 rd) = false /\
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn i) va vpn) j = Some (nth_byte w j)) /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (mk rs1 rd, s0)) /\
+       uint rd <> 0).
 
   (* the assembled Löb step obligation, v1 coverage *)
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :
@@ -4020,9 +4106,16 @@ Section WpUserExec.
                            Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & Halign0 & Halign1)
                         | [ (vpn & i & w & ii & Hexec_op & Hlpad & Hvec & Hchk & Hupd & Hpbmt & Hcw &
                              Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec)
-                          | (vpn & i & w & ii & Hexec_op & Hlpad & Hvec & Hchk & Hupd & Hpbmt & Hcw &
-                             Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec)
-                          ] ] ] ] ] ] ] ] ] ] ].
+                          | [ (vpn & i & w & ii & Hexec_op & Hlpad & Hvec & Hchk & Hupd & Hpbmt & Hcw &
+                               Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec)
+                            | [ (vpn & i & w & op & c & imm & rs2 & rs1 & Hexec_op & Hvec & Hchk & Hupd &
+                                 Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hcfalse)
+                              | [ (vpn & i & w & op & c & imm & rs2 & rs1 & Hexec_op & Hvec & Hchk & Hupd &
+                                   Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hctrue &
+                                   Halign0 & Halign1)
+                                | (vpn & i & w & mk & F & rs1 & rd & Hexec_op & Hlpad & Hvec & Hchk & Hupd &
+                                   Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd)
+                                ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_fetch_noncanonical va ms_v sc_v stval_v sepc_v g tlbvec E Φ
@@ -4103,6 +4196,27 @@ Section WpUserExec.
                 Hvpn_def Hpaal HnotRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
+    - (* BTYPE branch not taken *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_branch_fall op c va vpn i w imm rs2 rs1 ms_v sc_v stval_v sepc_v
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hcfalse
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
+    - (* BTYPE branch taken *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_branch_taken op c va vpn i w imm rs2 rs1 ms_v sc_v stval_v sepc_v
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hctrue Halign0 Halign1
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
+    - (* single-source compute (ADDIW etc.) *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_compute1 mk F va vpn i w rs1 rd ms_v sc_v stval_v sepc_v g
+                tlbvec E Φ HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
   Qed.
 
   (* the END-TO-END theorem at v1 coverage: the machine runs user code
