@@ -183,7 +183,7 @@ Proof.
 Qed.
 
 Section WpMemsetPage.
-  Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   (* Choice: a big-sep of per-element existentials over a [seq] yields a single
@@ -216,8 +216,7 @@ Section WpMemsetPage.
   (* =================================================================== *)
   Lemma wp_memset_page (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (cval : mword 64) (vra vs0 : bv 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
+      (γ : gname) {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -241,30 +240,16 @@ Section WpMemsetPage.
     m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
     (* standard S-mode config side conditions (unchanged from the callee) *)
     ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     (* the caller's return target's low bit is clear (a 2-aligned target is
        fine: memset returns via [exec_jump_to_zca], Zca always enabled) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    smode_config γ dq -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
     page_own p -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    ( smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈ ra0 -∗
@@ -282,8 +267,8 @@ Section WpMemsetPage.
   Proof.
     intros ra_idx s0_idx a0_idx a1_idx a2_idx pcE imm_entry sp' ra0 s00 p
       ea_ra pa_ra ea_s0 pa_s0 ret_tgt
-      Hpv Hcval Ha2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hret0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+      Hpv Hcval Ha2 HN Hret0.
+    iIntros "Hsm Htlbinv
              #Htext Hpc Hfile Hbra Hbs0 Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
@@ -297,8 +282,8 @@ Section WpMemsetPage.
     pose proof (page_valid_ram p Hpv) as Hramp.
     iApply (wp_memset_s_full_kt root_ppn E Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds vra vs0
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN ltac:(lia) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe
+              γ (dq:=dq)
+              HN ltac:(lia)
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
                     cbn [execute];
@@ -350,11 +335,11 @@ Section WpMemsetPage.
               (* Hincr / Hcmp : pointer arithmetic *)
               ltac:(intros j; exact (ms_incr_step p j))
               ltac:(intros j Hj; exact (ms_cmp_page p j Hpv Hj))
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+              with "Hsm Htlbinv
                     Htext Hpc Hfile Hbra Hbs0 Hbuf [Hcont]").
     (* --- continuation: rebuild [page_own p] and re-expose gpr_file --- *)
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 [Hbuf] [Hmfin]").
+    iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hbra Hbs0 [Hbuf] [Hmfin]").
     - (* page_own p from the returned all-cbyte buffer *)
       iEval (rewrite /page_own /byte_any).
       iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".

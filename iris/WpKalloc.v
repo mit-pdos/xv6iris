@@ -869,17 +869,24 @@ Section Kalloc.
       { rewrite HMmssp HR12csp !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
       iDestruct "Hjunk2" as (u1 u2 u3 u4 u5 u6 u7 u8 u9) "(Hbra & Hbs0 & Hq8 & Hqp24 & Hqp16 & Hqp8 & Hqp0 & Hqfra & Hqfs0)".
       (* +0x3c memset(p, 5, 4096) : fills the page, returns [page_own p] + gpr_file *)
+      iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0
+                   HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
+                   with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv")
+        as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
       iApply (wp_memset_page root_ppn E Φ Mms (mword_of_int 5 : mword 64) u1 u2
-                mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
+                γc (dq:=DfracOwn (1/2))
                 ltac:(rewrite HMmsa0; exact Hpv)
                 HMmsa1 HMmsa2
-                HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe
+                HN
                 ltac:(rewrite HMmsra; vm_compute; reflexivity)
-                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile [Hbra] [Hbs0] [Hpage] [-]").
+                with "Hsm Htlbinv Htext Hpc Hfile [Hbra] [Hbs0] [Hpage] [-]").
       { iEval (rewrite Hpara). iExact "Hbra". }
       { iEval (rewrite Hps0). iExact "Hbs0". }
       { iEval (rewrite HMmsa0). iExact "Hpage". }
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 Hpage Hgprf".
+      iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hpage Hgprf".
+      iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
+                   with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
+        as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
       iEval (rewrite HMmsa0) in "Hpage".
       iDestruct "Hgprf" as (mfp) "[Hfile %Hpinsf]".
       destruct Hpinsf as (Hfra & Hfs0 & Hfs1 & Hfs2 & Hfsp & Hftp).

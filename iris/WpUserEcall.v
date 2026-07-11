@@ -131,7 +131,7 @@ Section WpUserEcall.
     pmpaddr_n ↦ᵣ{ dqc } pmpaddr00 -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (u_pa ent va vpn) j) ↦ₘ□ nth_byte ecall_w j) -∗
     pc_is va -∗
-    ( cur_privilege ↦ᵣ Supervisor -∗
+    ▷ ( cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ u_trap_ms ms_v (landing_pad_bits_backwards NO_LP_EXPECTED) -∗
       scause ↦ᵣ u_trap_cause sc_old -∗
       stval ↦ᵣ tval None -∗
