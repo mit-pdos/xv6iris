@@ -73,6 +73,7 @@ DecodeTotal.v
 WpUserEcall.v
 UmodeFetchFault.v
 UmodeWalk.v
+UptInv.v
 UmodeData.v
 WpUserLoop.v
 WpIntrStep.v
@@ -104,7 +105,9 @@ WpUserret.v
 WpUserretEntry.v
 WpUserretTop.v
 WpUserretAll.v
+UptBridge.v
 VcGen.v
 VcGenS.v
 WpSwtchVc.v
 WpWakeup.v
+WpUserExec.v

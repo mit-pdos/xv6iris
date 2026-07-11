@@ -666,14 +666,16 @@ Section WpReleaseTop.
       rewrite /R1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     assert (HraR4 : R4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RL + 0x0c) : mword 64) 4)
       by (rewrite /R4; apply lookup_total_insert).
+    iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
     iApply (wp_holding_lockinv_locked root_ppn γc E Φ γ lka R R4 cpuold
               vh24 vh16 vh8 vhra vhs0
-              mstatus0 mie_v mdv0 menvcfg0 (dqc:=DfracOwn 1)
+              (dqc:=DfracOwn 1)
               HN HNl ltac:(rewrite Ha0R4; exact Hlkeq)
-              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe HFIOM Hleg
               ltac:(rewrite HtpR4; exact Hmine)
               ltac:(rewrite HraR4; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hlock Htok
+              with "Hcfg Htlbinv Htext Hpc Hfile Hlock Htok
                     [Hcpu] [Hh24] [Hh16] [Hh8] [Hhfra] [Hhfs0] [-]").
     { iEval (rewrite Ha0R4). iExact "Hcpu". }
     { iEval (rewrite HspR4). iExact "Hh24". }
@@ -681,7 +683,13 @@ Section WpReleaseTop.
     { iEval (rewrite HspR4). iExact "Hh8". }
     { iEval (rewrite HspR4). iExact "Hhfra". }
     { iEval (rewrite HspR4). iExact "Hhfs0". }
-    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Htok Hgpr Hcpu Hjunk".
+    iIntros "Hcfg Htlbinv Hpc Htok Hgpr Hcpu Hjunk".
+    clear HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0 Hsst2 mstatus0 mie_v mdv0 menvcfg0.
+    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
+      as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     iEval (rewrite Ha0R4) in "Hcpu".
     iDestruct "Hgpr" as (mh) "[Hfile %Hmhf]".
     destruct Hmhf as (Hmra & Hms0 & Hms1 & Hmsp & Hmtp & Hma0 & Hms2 & Hms3 & Hms4 & Hms5).
@@ -810,7 +818,7 @@ Section WpReleaseTop.
     { iEval (rewrite HtpM1). iExact "Hnoff". }
     { iEval (rewrite HtpM1). iExact "Hint". }
     iIntros "Hcfg Htlbinv Hpc Hgpr Hnoff Hint Hjunk".
-    clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0 Hsst2.
+    clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
       as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
     iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".

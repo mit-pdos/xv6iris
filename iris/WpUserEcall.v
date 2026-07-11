@@ -69,7 +69,7 @@ Section WpUserEcall.
       (mie_v midl_v mip_v medl_v menvcfg0 : mword 64) (meip seip : mword 1)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      E (Φ : mval -> iProp Σ) {dq dqc : dfrac} :
+      E (Φ : mval -> iProp Σ) {dq dqc dqt : dfrac} :
     ↑minstretN ⊆ E ->
     (* no interrupt can be pending *)
     and_vec mie_v (not_vec midl_v) = zeros' 64 ->
@@ -122,7 +122,7 @@ Section WpUserEcall.
     sig_meip ↦ᵣ{ dqc } meip -∗
     sig_seip ↦ᵣ{ dqc } seip -∗
     satp ↦ᵣ{ dqc } satp0 -∗
-    tlb ↦ᵣ{ dqc } tlbvec -∗
+    tlb ↦ᵣ{ dqt } tlbvec -∗
     menvcfg ↦ᵣ{ dqc } menvcfg0 -∗
     senvcfg ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) -∗
     mstateen0 ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) -∗
@@ -131,7 +131,7 @@ Section WpUserEcall.
     pmpaddr_n ↦ᵣ{ dqc } pmpaddr00 -∗
     ([∗ list] j ∈ seq 0 4, (pa_add (u_pa ent va vpn) j) ↦ₘ□ nth_byte ecall_w j) -∗
     pc_is va -∗
-    ( cur_privilege ↦ᵣ Supervisor -∗
+    ▷ ( cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ u_trap_ms ms_v (landing_pad_bits_backwards NO_LP_EXPECTED) -∗
       scause ↦ᵣ u_trap_cause sc_old -∗
       stval ↦ᵣ tval None -∗
@@ -144,7 +144,7 @@ Section WpUserEcall.
       sig_meip ↦ᵣ{ dqc } meip -∗
       sig_seip ↦ᵣ{ dqc } seip -∗
       satp ↦ᵣ{ dqc } satp0 -∗
-      tlb ↦ᵣ{ dqc } tlbvec -∗
+      tlb ↦ᵣ{ dqt } tlbvec -∗
       menvcfg ↦ᵣ{ dqc } menvcfg0 -∗
       senvcfg ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) -∗
       mstateen0 ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) -∗
