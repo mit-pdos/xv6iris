@@ -27,6 +27,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap.
 Require Import SailStdpp.Operators_mwords.
+Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
@@ -53,6 +54,41 @@ Qed.
 Lemma pa_stk_shift (sp : Arch.pa) (a i : nat) :
   pa_stk sp (S (a + i)) = pa_stk (pa_stk sp a) (S i).
 Proof. rewrite pa_stk_assoc. f_equal. lia. Qed.
+
+(* Address-arithmetic bridge for converting a proof's raw SP-relative slot
+   spelling [add_vec (add_vec sp Cframe) Coffset] into [pa_stk sp k].  These
+   mirror [VcGen.mword_of_int_wrap/_uint/add_vec_off2] but are kept here (early,
+   depending only on [InstrBytes.avi_assoc]) so functions that don't import
+   VcGen can still discharge the bridge; distinct names avoid clashing when both
+   are in scope. *)
+Lemma stk_mword_of_int_wrap (z : Z) :
+  (mword_of_int (bv_wrap 64 z) : mword 64) = mword_of_int z.
+Proof.
+  unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
+  apply bv_eq. rewrite !Z_to_bv_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  apply bv_wrap_bv_wrap. lia.
+Qed.
+
+Lemma stk_mword_of_int_uint (w : mword 64) : mword_of_int (uint w) = w.
+Proof.
+  unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite uint_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  apply Z_to_bv_bv_unsigned.
+Qed.
+
+Lemma pa_stk_off2 (x o1 o2 : mword 64) :
+  add_vec (add_vec x o1) o2 = add_vec x (mword_of_int (bv_wrap 64 (uint o1 + uint o2))).
+Proof.
+  rewrite -{1}(stk_mword_of_int_uint o1) -{1}(stk_mword_of_int_uint o2).
+  rewrite stk_mword_of_int_wrap.
+  change (add_vec (add_vec x (mword_of_int (uint o1))) (mword_of_int (uint o2)))
+    with (add_vec_int (add_vec_int x (uint o1)) (uint o2)).
+  change (add_vec x (mword_of_int (uint o1 + uint o2)))
+    with (add_vec_int x (uint o1 + uint o2)).
+  apply avi_assoc.
+Qed.
 
 Section stack_own.
   Context `{!riscvGS Σ}.

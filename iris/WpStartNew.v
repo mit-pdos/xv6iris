@@ -1619,7 +1619,7 @@ Section WpStartThm.
     assert (L59s0 : st_m59 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_s0 = sp0)
       by (st_unfold; st_look).
     iDestruct "Hpaddr" as "[HpaA HpaK]".
-    iApply (wp_timerinit E Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
+    iApply (wp_timerinit_words E Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
               st_ra_link sp0 menvcfg0 mtime0 stimecmp0 mcounteren0
               (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) vtra vts0
               HN Hpmp1 Htor_ra Htor_s0 Hcret_al L59sp L59ra L59s0

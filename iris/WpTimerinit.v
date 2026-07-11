@@ -49,6 +49,7 @@ Require Import WpGprLui WpGprAddi WpGprShift WpGprLogic WpGprRvc WpGprRvcTor.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB.
 Require Import MinstretInv InstrBytes WpEntryNew.
 Require Import WpRvcBridge.
+Require Import StackOwn.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -565,7 +566,10 @@ Section WpTimerinitThm.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_timerinit E (Φ : mval -> iProp Σ) (q : Qp)
+  (* [wp_timerinit_words]: legacy word-level interface (two explicit stack-slot
+     points-to), retained for callers not yet migrated to [stack_own].
+     [wp_timerinit] below is the same theorem over the [stack_own] abstraction. *)
+  Lemma wp_timerinit_words E (Φ : mval -> iProp Σ) (q : Qp)
       (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)
       (menv0 mtime0 stimecmp0 : mword 64) (mcen0 : mword 32)
       (pmpcfg1 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
@@ -912,6 +916,68 @@ Section WpTimerinitThm.
 
     (* hand everything to the caller's continuation *)
     iApply ("Hcont" with "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hmtime Hstc Hstkra Hstks0").
+  Qed.
+
+  (* Public interface: timerinit's 16-byte ra/s0 frame expressed as
+     [stack_own sp0 n] (any depth n >= 2), a thin peel / re-bundle wrapper
+     over [wp_timerinit_words]. *)
+  Lemma wp_timerinit E (Φ : mval -> iProp Σ) (q : Qp)
+      (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)
+      (menv0 mtime0 stimecmp0 : mword 64) (mcen0 : mword 32)
+      (pmpcfg1 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
+      (n : nat) :
+    (2 ≤ n)%nat ->
+    ↑minstretN ⊆ E ->
+    pmp_allows_all pmpcfg1 ->
+    pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_ra sp0) 8 ->
+    pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_s0 sp0) 8 ->
+    is_aligned_paddr (Physaddr (cret_target ra0)) 4 = true ->
+    m !!! Regidx csp_rs1 = sp0 ->
+    m !!! Regidx ti_ra = ra0 ->
+    m !!! Regidx ti_s0 = s00 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg1 -∗
+    pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+    pc_is ti_pc9 -∗
+    gpr_file m -∗
+    menvcfg ↦ᵣ menv0 -∗
+    mcounteren ↦ᵣ mcen0 -∗
+    mtime ↦ᵣ mtime0 -∗
+    stimecmp ↦ᵣ stimecmp0 -∗
+    stack_own sp0 n -∗
+    kernel_text -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg1 -∗
+      pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
+      pc_is (cret_target ra0) -∗
+      gpr_file (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00) -∗
+      menvcfg ↦ᵣ menvcfg_legalized menv0 (ti_menv1 menv0) -∗
+      mcounteren ↦ᵣ legalize_mcounteren mcen0 (ti_mcen1 mcen0) -∗
+      mtime ↦ᵣ mtime0 -∗
+      stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
+      stack_own sp0 n -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros Hn2 HN Hpmp Htor_ra Htor_s0 Hret_al Hsp Hra Hs0.
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hmtime Hstc Hstk #Htext Hcont".
+    iDestruct (stack_own_split_1 sp0 2 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iDestruct (stack_own_2_elim with "Htop") as (vold_ra vold_s0) "[Hstkra Hstks0]".
+    assert (Hpra : ti_ea_ra sp0 = pa_stk sp0 1).
+    { unfold ti_ea_ra, ti_sp1, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hps0 : ti_ea_s0 sp0 = pa_stk sp0 2).
+    { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hpra) in "Hstkra".
+    iEval (rewrite -Hps0) in "Hstks0".
+    iApply (wp_timerinit_words E Φ q m sp0 ra0 s00 menv0 mtime0 stimecmp0 mcen0 pmpcfg1 pmpaddrs vold_ra vold_s0
+              HN Hpmp Htor_ra Htor_s0 Hret_al Hsp Hra Hs0
+              with "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hmtime Hstc Hstkra Hstks0 Htext [-]").
+    iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hmtime Hstc Hstkra Hstks0".
+    iEval (rewrite Hpra) in "Hstkra".
+    iEval (rewrite Hps0) in "Hstks0".
+    iDestruct (stack_own_2_intro with "Hstkra Hstks0") as "Htop".
+    iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
+    iApply ("Hcont" with "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hmtime Hstc Hstk").
   Qed.
 
 End WpTimerinitThm.
