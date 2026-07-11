@@ -117,6 +117,24 @@ Proof.
   intros Hnone vpn' ent Hget. rewrite Hnone in Hget. discriminate.
 Qed.
 
+(* consistency survives a walk-induced fill -- the ONLY TLB write user
+   execution can cause (add_to_TLB at the end of a successful miss walk) *)
+Lemma upt_tlb_ok_fill (spec : gmap (mword 27) uwalk_info)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+    (vpn : mword 27) (i : uwalk_info) :
+  spec !! vpn = Some i ->
+  upt_tlb_ok spec tlbvec ->
+  upt_tlb_ok spec (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                     (Some (upt_entry vpn i))).
+Proof.
+  intros Hvpn Hok vpn' ent Hget.
+  rewrite (vec64_access_update _ _ _ _ (tlb_hash_range vpn)) in Hget.
+  destruct (Z.eqb (tlb_hash (__id 39) vpn') (tlb_hash (__id 39) vpn)) eqn:Hh.
+  - apply Z.eqb_eq in Hh. injection Hget as <-.
+    exists vpn, i. auto.
+  - exact (Hok vpn' ent Hget).
+Qed.
+
 (* ===================================================================== *)
 (* §3 The pte-read PMA fact (pinned by the concrete boot PMA list, the     *)
 (*    same way WpSmodeGpr threads Hpteregion)                              *)
