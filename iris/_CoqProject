@@ -75,6 +75,7 @@ UmodeWalk.v
 UptInv.v
 UmodeData.v
 WpUserLoop.v
+WpUserExec.v
 WpIntrStep.v
 WpIntrInv.v
 WpPushOff.v
