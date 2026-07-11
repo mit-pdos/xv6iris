@@ -2504,8 +2504,12 @@ Section WpUserExec.
       E (Φ : mval -> iProp Σ) :
     ↑minstretN ⊆ E ->
     spec !! vpn = Some ie ->
-    (* the hash slot is EMPTY (the colliding-entry miss is a separate arm) *)
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None ->
+    (* the lookup MISSES: the hash slot is empty, or holds a non-matching
+       (colliding) entry *)
+    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
+     (exists ent', vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' /\
+        match_TLB_Entry ent' (mword_of_int 0 : mword 16)
+          (sign_extend' (57 - 12) vpn) = false)) ->
     uw_check_ok (InstructionFetch tt) ie ->
     update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
     (forall j : nat, (j < 4)%nat ->
@@ -2614,13 +2618,21 @@ Section WpUserExec.
     assert (Htr : exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
                     = Some (Ok (Physaddr (u_walk_pa (uw_pte0 ie) va),
                                 PBMT_PMA, init_ext_ptw), σ')).
-    { exact (exec_translateAddr_fetch_walk_u vpn root
-               (uw_pte2 ie) (uw_pte1 ie) (uw_pte0 ie) false false va satp0
-               MENVCFG_S tlbvec σ
-               H2i H2nl H1i H1nl H0i H0nl (fun s0 => Hchk0 false false s0) H0N
-               Lmisa' Lpriv HSXL' Lsatp Hsatpmode Hasid Hroot Ltlb Hvec HupdN
-               Hrd2 Hrd1 Hrd0 Lmenv' ltac:(vm_compute; reflexivity)
-               Hcanon Hvpn_def). }
+    { destruct Hvec as [Hvec | (ent' & Hvec & Hnm)].
+      - exact (exec_translateAddr_fetch_walk_u vpn root
+                 (uw_pte2 ie) (uw_pte1 ie) (uw_pte0 ie) false false va satp0
+                 MENVCFG_S tlbvec σ
+                 H2i H2nl H1i H1nl H0i H0nl (fun s0 => Hchk0 false false s0) H0N
+                 Lmisa' Lpriv HSXL' Lsatp Hsatpmode Hasid Hroot Ltlb Hvec HupdN
+                 Hrd2 Hrd1 Hrd0 Lmenv' ltac:(vm_compute; reflexivity)
+                 Hcanon Hvpn_def).
+      - exact (exec_translateAddr_fetch_walk_u_nomatch ent' vpn root
+                 (uw_pte2 ie) (uw_pte1 ie) (uw_pte0 ie) false false va satp0
+                 MENVCFG_S tlbvec σ
+                 H2i H2nl H1i H1nl H0i H0nl (fun s0 => Hchk0 false false s0) H0N
+                 Lmisa' Lpriv HSXL' Lsatp Hsatpmode Hasid Hroot Ltlb Hvec Hnm HupdN
+                 Hrd2 Hrd1 Hrd0 Lmenv' ltac:(vm_compute; reflexivity)
+                 Hcanon Hvpn_def). }
     (* ---- fetch through the FILLED state σ' ---- *)
     set (pa := u_walk_pa (uw_pte0 ie) va) in *.
     iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
