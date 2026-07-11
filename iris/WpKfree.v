@@ -904,7 +904,7 @@ Section Kfree.
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-    iApply (wp_release root_ppn E Φ γ γc bsie lk (kmem_res fl) Rrel
+    iApply (wp_release_words root_ppn E Φ γ γc bsie lk (kmem_res fl) Rrel
               (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
               q_noff_store
               (if eq_vec (sign_extend' 64 qnoff) zero_reg then (zeros' 32) else qintena_old)

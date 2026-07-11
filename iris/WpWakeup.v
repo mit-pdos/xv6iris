@@ -1771,7 +1771,7 @@ Section ProcInv.
         { rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr4. }
         (* release(&proc[k]->lock) : returns the lock+resource into the invariant. *)
-        iApply (wp_release root_ppn E Phi γk γc bsie (proc_addr k) (proc_lock_res γk (proc_addr k)) Mr2c
+        iApply (wp_release_words root_ppn E Phi γk γc bsie (proc_addr k) (proc_lock_res γk (proc_addr k)) Mr2c
                   (mycpu_ret rtp) (wk_noff_acq noffv) (zeros' 32)
                   _ _ _ _ _ _ _ _ _ (dqi:=DfracOwn 1)
                   HN HNl

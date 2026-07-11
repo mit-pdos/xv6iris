@@ -398,7 +398,7 @@ Section Kalloc.
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply (wp_release root_ppn E Φ γ γc bsie lkA (kmem_res fl) E3
+      iApply (wp_release_words root_ppn E Φ γ γc bsie lkA (kmem_res fl) E3
                 (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)))
                 q_noff_store
                 (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)
@@ -709,7 +709,7 @@ Section Kalloc.
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply (wp_release root_ppn E Φ γ γc bsie lkA (kmem_res fl) R12
+      iApply (wp_release_words root_ppn E Φ γ γc bsie lkA (kmem_res fl) R12
                 (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)))
                 q_noff_store
                 (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)
