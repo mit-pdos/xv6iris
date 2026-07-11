@@ -484,3 +484,157 @@ Section WpUld.
   Qed.
 
 End WpUld.
+
+(* ===================================================================== *)
+(* 8. wp_ualu -- one pure a0-updating step (lui / c.addiw / c.slli).      *)
+(* ===================================================================== *)
+
+Section WpUalu.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{CID : CpuId}.
+
+  (* Generic over the executed AST [ast] and its (state-dependent) result
+     value [vf]: all three a0-arithmetic steps of userret instantiate this
+     with the corresponding WpGpr* execute lemma and a pure value fact. *)
+  Lemma wp_ualu (uroot ul1 ul0 tfp : mword 44) E (Φ : mval -> iProp Σ)
+      (off : Z) (is_rvc : bool) (ast : instruction)
+      (m : gmap regidx (mword 64)) (a0v vnew : mword 64)
+      (vf : mstate -> mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
+    let va := uva off in
+    let pa := upa off in
+    ↑minstretN ⊆ E ->
+    (* S-mode config facts *)
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    (* the execute: a0 := vf s *)
+    (forall s : mstate,
+       exec (execute ast) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint (mword_of_int 10 : mword 5)) 0 then s
+               else set_reg s (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5))))
+                      (regval_into_reg (vf s)))) ->
+    (* the value, given a0's current contents *)
+    (forall s : mstate,
+       register_lookup (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5)))) s.(sregs) = a0v ->
+       vf s = vnew) ->
+    (* GPR: a0's current contents *)
+    m !! Regidx (mword_of_int 10) = Some a0v ->
+    (* fetch va/pa geometry (vm_compute per instruction) *)
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr va) 4 ->
+    is_aligned_paddr (Physaddr pa) 2 = true ->
+    is_aligned_paddr (Physaddr (add_vec_int pa 2)) 2 = true ->
+    (is_aligned_vaddr (Virtaddr va) 4 = true -> is_aligned_paddr (Physaddr pa) 4 = true) ->
+    addr_is_ram pa -> addr_is_ram (pa_add pa 1) ->
+    addr_is_ram (pa_add pa 2) -> addr_is_ram (pa_add pa 3) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    utlb_inv uroot ul1 ul0 tfp -∗
+    pc_is va -∗
+    gpr_file m -∗
+    instr pa is_rvc ast -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      utlb_inv uroot ul1 ul0 tfp -∗
+      pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
+      gpr_file (<[Regidx (mword_of_int 10) := regval_into_reg vnew]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros va pa HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hexec Hval Ha0
+      Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
+      Hram0 Hram1 Hram2b Hram3b.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_u uroot ul1 ul0 tfp E Φ va pa is_rvc ast
+              mstatus0 mie_v mdv0 menvcfg0
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+              Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
+              Hram0 Hram1 Hram2b Hram3b
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hinstr").
+    iIntros (σ Hpceq usatp tlbvec_f Hmode Hasid Hppn Hconsf)
+      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hrd10 : uint (mword_of_int 10 : mword 5) <> 0) by (vm_compute; lia).
+    assert (Hma0v : m !!! Regidx (mword_of_int 10 : mword 5) = a0v)
+      by (apply lookup_total_correct; exact Ha0).
+    assert (Hmsp : m !! Regidx (mword_of_int 10 : mword 5) = Some (m !!! Regidx (mword_of_int 10 : mword 5)))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    (* tick nextPC *)
+    iMod (reg_update _ nextPC _ (add_vec_int va (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int va (if is_rvc then 2 else 4))).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value (mword_of_int 10) (m !!! Regidx (mword_of_int 10 : mword 5)) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct ("Hfb1" with "Hspc") as "Hfmap".
+    replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false in Lva
+      by (vm_compute; reflexivity).
+    rewrite Hma0v in Lva.
+    (* the execute at s_pc *)
+    assert (Hload : exec (execute ast)
+                      (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
+                                           (if is_rvc then 2 else 4)))
+                    = Some (RETIRE_SUCCESS,
+                            set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5))))
+                              (regval_into_reg vnew))).
+    { rewrite Hpceq. fold s_pc. rewrite (Hexec s_pc).
+      replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false
+        by (vm_compute; reflexivity).
+      rewrite (Hval s_pc Lva). reflexivity. }
+    (* a0 := vnew in the ghost gpr file *)
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmsp with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz (mword_of_int 10) _ Hrd10).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5)))) _ (regval_into_reg vnew)
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg vnew) with "[Hrdc]") as "Hfmap".
+    { rewrite (gpr_pt_nz (mword_of_int 10) _ Hrd10). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5))))
+               (regval_into_reg vnew)).
+    iSplitR.
+    { iPureIntro. exact Hload. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5))))
+                (regval_into_reg vnew)).(sregs)
+             = add_vec_int va (if is_rvc then 2 else 4)).
+    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv
+                          [Hsatp Htlb Hpbytes Hpmp]
+                          [$Hpc' $Hnpc] [Hfmap]").
+    { iApply (utlb_inv_intro uroot ul1 ul0 tfp usatp tlbvec_f Hmode Hasid Hppn Hconsf
+                with "Hsatp Htlb Hpbytes Hpmp"). }
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
+  Qed.
+
+End WpUalu.
