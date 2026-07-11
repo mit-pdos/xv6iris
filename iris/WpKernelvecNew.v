@@ -751,11 +751,6 @@ Section WpKernelvecNew.
     intros HN.
     iIntros "Hsm Htlbinv
              Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iDestruct "Hfile" as "(%Hdomm & Hfilemap)".
     iAssert (gpr_file m) with "[Hfilemap]" as "Hfile".
     { rewrite /gpr_file. iSplit; [iPureIntro; exact Hdomm | iExact "Hfilemap"]. }
@@ -840,10 +835,10 @@ Section WpKernelvecNew.
     iApply (wp_vc_block_s root_ppn kv_store_prog E Φ
               (VSt (KV + 0x2) kv_store_regs0 kv_store_heap0 [])
               (VSt (KV + 0x24) kv_store_regs0 kv_store_heap1 [])
-              ρ m mstatus0 mie_v mdv0 menvcfg0
+              ρ m γ
               (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 kv_store_run HmS
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+              HN kv_store_run HmS
+              with "Hsm Htlbinv
                     Hpc Hfile Hbi [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
       cbn [big_opL fst snd].
@@ -851,7 +846,7 @@ Section WpKernelvecNew.
       rewrite !HR2 HVo1 HVo2 HVo3 HVo4 HVo5 HVo6 HVo7 HVo8 HVo9 HVo10 HVo11 HVo12 HVo13 HVo14 HVo15 HVo16 HVo17.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros (mf) "%Hmf Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
+    iIntros (mf) "%Hmf Hsm Htlbinv Hpc Hfile Hheap _".
     destruct Hmf as [Hmf Hpres].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /kv_store_heap1;
            cbn [big_opL fst snd];
@@ -863,9 +858,6 @@ Section WpKernelvecNew.
       - rewrite (Hmf r sv Er). rewrite (HmS r sv Er). reflexivity.
       - exact (Hpres r Er). }
     iDestruct (gpr_file_ext mf m Hdomm Hall with "Hfile") as "Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
   Qed.
 
@@ -925,11 +917,6 @@ Section WpKernelvecNew.
     intros HN.
     iIntros "Hsm Htlbinv
              Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iDestruct "Hfile" as "(%Hdomm & Hfilemap)".
     iAssert (gpr_file m) with "[Hfilemap]" as "Hfile".
     { rewrite /gpr_file. iSplit; [iPureIntro; exact Hdomm | iExact "Hfilemap"]. }
@@ -980,10 +967,10 @@ Section WpKernelvecNew.
     iApply (wp_vc_block_s root_ppn kv_load_prog E Φ
               (VSt (KV + 0x28) kv_load_regs0 kv_store_heap0 [])
               (VSt (KV + 0x4a) kv_load_regs1 kv_store_heap0 [])
-              ρ m mstatus0 mie_v mdv0 menvcfg0
+              ρ m γ
               (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 kv_load_run HmL
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+              HN kv_load_run HmL
+              with "Hsm Htlbinv
                     Hpc Hfile Hbi [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
       cbn [big_opL fst snd].
@@ -991,7 +978,7 @@ Section WpKernelvecNew.
       rewrite !HR2 HVw1 HVw2 HVw3 HVw4 HVw5 HVw6 HVw7 HVw8 HVw9 HVw10 HVw11 HVw12 HVw13 HVw14 HVw15 HVw16 HVw17.
       iFrame "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros (mf) "%Hmf Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
+    iIntros (mf) "%Hmf Hsm Htlbinv Hpc Hfile Hheap _".
     destruct Hmf as [Hmf Hpres].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /kv_store_heap0;
            cbn [big_opL fst snd];
@@ -1118,9 +1105,6 @@ Section WpKernelvecNew.
     { intro r. unfold kv_load_result. rewrite !dom_insert_L.
       repeat (apply elem_of_union_r). exact (Hdomm r). }
     iDestruct (gpr_file_ext mf (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17) Hdomt Hall with "Hfile") as "Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
   Qed.
 

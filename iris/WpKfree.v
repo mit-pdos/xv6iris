@@ -618,17 +618,24 @@ Section Kfree.
     (* +0x32 memset(p, 1, 4096) : fills the page, returns [page_own p] + gpr_file
        (ra/s0/s1/s2/sp/tp preserved).  The return target KF+0x36 is 2-aligned;
        wp_memset_page now supports that (Zca return), so only bit0 = 0 is needed. *)
+    iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv")
+      as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
     iApply (wp_memset_page root_ppn E Φ Mms (mword_of_int 1 : mword 64) mvra mvs0
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
+              γc (dq:=DfracOwn (1/2))
               ltac:(rewrite HMmsa0; exact Hpv)
               HMmsa1 HMmsa2
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe
+              HN
               ltac:(rewrite HMmsra; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile [Hmra] [Hms0] [Hpown] [-]").
+              with "Hsm Htlbinv Htext Hpc Hfile [Hmra] [Hms0] [Hpown] [-]").
     { iEval (rewrite Hpara). iExact "Hmra". }
     { iEval (rewrite Hps0). iExact "Hms0". }
     { iEval (rewrite HMmsa0). iExact "Hpown". }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbra Hbs0 Hpage Hgprf".
+    iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hpage Hgprf".
+    iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
+                 with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
+      as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
     iEval (rewrite HMmsa0) in "Hpage".
     iEval (rewrite Hpara) in "Hbra". iEval (rewrite Hps0) in "Hbs0".
     iDestruct "Hgprf" as (mfp) "[Hfile %Hpinsf]".
