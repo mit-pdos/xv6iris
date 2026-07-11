@@ -4066,7 +4066,42 @@ Section WpUserExec.
        isRVC (subrange_vec_dec w 15 0) = false /\
        (forall s0, agree_on D_u s0 dstateU ->
           exec (ext_decode w) s0 = Some (mk rs1 rd, s0)) /\
-       uint rd <> 0).
+       uint rd <> 0)
+    \/
+    (* 16: fetch hit, retiring 8-byte LOAD from a code page *)
+    (exists vpn i vpnD ieD (w : mword 32) (imm : mword 12) (rs1 rd : mword 5) (v : mword 64),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn i) va vpn) j = Some (nth_byte w j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8), s0)) /\
+       uint rd <> 0 /\
+       spec !! vpnD = Some ieD /\
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       uw_check_ok (Load Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 8 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 8 = true /\
+       (forall j : nat, (j < 8)%nat -> code !! pa_add paD j = Some (nth_byte v j))).
 
   (* the assembled Löb step obligation, v1 coverage *)
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :
@@ -4113,9 +4148,13 @@ Section WpUserExec.
                               | [ (vpn & i & w & op & c & imm & rs2 & rs1 & Hexec_op & Hvec & Hchk & Hupd &
                                    Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hctrue &
                                    Halign0 & Halign1)
-                                | (vpn & i & w & mk & F & rs1 & rd & Hexec_op & Hlpad & Hvec & Hchk & Hupd &
-                                   Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd)
-                                ] ] ] ] ] ] ] ] ] ] ] ] ] ].
+                                | [ (vpn & i & w & mk & F & rs1 & rd & Hexec_op & Hlpad & Hvec & Hchk & Hupd &
+                                     Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd)
+                                  | (vpn & i & vpnD & ieD & w & imm & rs1 & rd & v & Hvec & Hchk & Hupd &
+                                     Hpbmt & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC &
+                                     Hdec & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD &
+                                     Hvpn_defD & HpaalD & Hcwd)
+                                  ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_fetch_noncanonical va ms_v sc_v stval_v sepc_v g tlbvec E Φ
@@ -4215,6 +4254,14 @@ Section WpUserExec.
       iApply (ustep_compute1 mk F va vpn i w rs1 rd ms_v sc_v stval_v sepc_v g
                 tlbvec E Φ HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
+    - (* 8-byte LOAD from a code page *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_ld_code va vpn i w vpnD ieD imm rs1 rd v ms_v sc_v stval_v sepc_v
+                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt Hcw HSXL HMPRV HMXR Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HvecD HchkD HupdD HpbmtD
+                HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
   Qed.
