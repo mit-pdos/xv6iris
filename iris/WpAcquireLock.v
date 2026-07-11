@@ -25,6 +25,7 @@ Require Import WpEntryNew.
 Require Import WpGpr WpGprAddi WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpPushOffTop WpAmo WpAcquireMem WpHolding WpAcquireTop.
+Require Import CalleeSaved.
 Require Import WpLock WpLockLeaves WpHoldingInv.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for hiding mstatus0. *)
 Require WpGprCsrwC.
@@ -589,7 +590,8 @@ Section WpAcquireLock.
       by (rewrite HP0ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc10) in "Hpc".
     iDestruct "Hmfin" as (mfin) "[Hfile %Hmf]".
-    destruct Hmf as (Hfra_ & Hfs0_ & Hfs1_ & Hfsp_ & Hftp_ & Hfs2_ & Hfs3_ & Hfs4_ & Hfs5_).
+    unfold callee_saved in Hmf.
+    destruct Hmf as (Hfsp_ & Hftp_ & Hfs0_ & Hfs1_ & Hfs2_ & Hfs3_ & Hfs4_ & Hfs5_ & _ & _ & _ & _ & _ & _).
     (* canonical values of the tracked registers after push_off *)
     assert (HP0s1 : P0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk).
     { rewrite /P0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -624,7 +626,7 @@ Section WpAcquireLock.
       rewrite /A2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /A1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /A0. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
-    rewrite HP0s1 in Hfs1_. rewrite HP0csp in Hfsp_. rewrite HP0tp in Hftp_. rewrite HP0ra in Hfra_.
+    rewrite HP0s1 in Hfs1_. rewrite HP0csp in Hfsp_. rewrite HP0tp in Hftp_.
     rewrite HP0s2 in Hfs2_. rewrite HP0s3 in Hfs3_. rewrite HP0s4 in Hfs4_. rewrite HP0s5 in Hfs5_.
     (* ---- 0x10: c.mv a0,s1 ---- *)
     iApply (wp_cmv_gpr_s_config root_ppn E Φ (mword_of_int (AQ + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
