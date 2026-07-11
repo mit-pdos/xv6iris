@@ -15,6 +15,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - re-proving across source code changes (symbolic names, agent does gruntwork)
 - background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)
+- user-mode exec: TBD what's the best way to reason about all instructions
 
 Big things that still need to be done/explored:
 
@@ -26,7 +27,6 @@ Big things that still need to be done/explored:
 - liveness, or at least deadlock avoidance
 - file system
 - virtual memory / page tables
-- switch to user, trampolines, taking syscall
 
 Don't know where else to put this:
 

@@ -79,15 +79,6 @@ Section ForwardMRET.
   Let ms5 := update_subrange_vec_dec ms4 41 41 (landing_pad_bits_backwards NO_LP_EXPECTED).
   Let elpv := if lpe then _get_Mstatus_MPELP ms4 else landing_pad_bits_backwards NO_LP_EXPECTED.
   Let tgt := update_vec_dec (register_lookup mepc s_pcm.(sregs)) 0 ('b"0").
-  Definition sXm : mstate :=
-    set_reg (set_reg (set_reg (set_reg (set_reg
-              (set_reg (set_reg (set_reg s_pcm mstatus ms1) mstatus ms2)
-                       cur_privilege newpriv) mstatus ms3) mstatus ms4)
-              mstatus ms5) elp elpv) nextPC tgt.
-  Definition sTm : mstate := set_reg sXm PC (register_lookup nextPC sXm.(sregs)).
-  Definition sFm : mstate :=
-    if b then set_reg sTm minstret (add_vec_int (register_lookup minstret sTm.(sregs)) 1)
-         else sTm.
 
   (* The 6 MRET execute side-conditions, stated at [s] (transferred to [s_pcm]). *)
   Hypothesis Hmu : eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true.
@@ -117,18 +108,8 @@ Section StepMRET.
     Definition cms3 := update_subrange_vec_dec cms2 12 11 (privLevel_to_bits User).
     Definition cms4 := update_subrange_vec_dec cms3 17 17 ('b"0").
     Definition cms5 := update_subrange_vec_dec cms4 41 41 (landing_pad_bits_backwards NO_LP_EXPECTED).
-    Definition celpv := if lpe then _get_Mstatus_MPELP cms4 else landing_pad_bits_backwards NO_LP_EXPECTED.
     Definition ctgt := update_vec_dec mepc0 0 ('b"0").
 
-    Definition base_upd_m : mstate :=
-      set_reg
-        (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg
-          (set_reg (set_reg s (R_bool minstret_increment) b) nextPC (add_vec_int pc 4))
-            mstatus cms1) mstatus cms2) cur_privilege newpriv) mstatus cms3)
-            mstatus cms4) mstatus cms5) elp celpv) nextPC ctgt)
-        PC ctgt.
-    Definition sFcm : mstate :=
-      if b then set_reg base_upd_m minstret (add_vec_int mst0 1) else base_upd_m.
 
     Ltac tmim := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 

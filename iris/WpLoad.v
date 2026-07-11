@@ -16,27 +16,11 @@ Local Open Scope Z_scope.
 Import Defs.
 
 
-Lemma exec_rX_x2 s :
-  exec (rX (Regno 2)) s = Some (register_lookup (R_bitvector_64 x2) s.(sregs), s).
-Proof. reflexivity. Qed.
 
-Lemma exec_rX_bits_x2 (i : mword 5) s :
-  uint i = 2 ->
-  exec (rX_bits (Regidx i)) s = Some (register_lookup (R_bitvector_64 x2) s.(sregs), s).
-Proof. intro H. unfold rX_bits; cbn match. rewrite H. apply exec_rX_x2. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Leaf 3: ext_data_get_addr base offset acc w = read base, return OK vaddr *)
 (* ---------------------------------------------------------------------- *)
-Lemma exec_ext_data_get_addr_x2 (i : mword 5) (offset : mword 64) acc w s :
-  uint i = 2 ->
-  exec (ext_data_get_addr (Regidx i) offset acc w) s
-  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (register_lookup (R_bitvector_64 x2) s.(sregs)) offset)), s).
-Proof.
-  intro H. unfold ext_data_get_addr.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_x2 i s H)).
-  apply exec_returnm.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* Leaf 4: effectivePrivilege (Load Data) m Machine = Machine, given MPRV=0 *)
@@ -416,24 +400,6 @@ Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-Lemma exec_vmem_read_8 :
-  exec (vmem_read (Regidx i) offset 8 (Load Data) false false false) s = Some (Ok data2, s).
-Proof.
-  unfold vmem_read. rewrite exec_catch_early_return.
-  assert (Hgta : exec (get_transformed_data_addr (Regidx i) offset (Load Data) 8) s
-                 = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
-  { unfold get_transformed_data_addr.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_x2 i offset (Load Data) 8 s Hi)).
-    cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_load ea s Hcp Hmprv Hpmm)).
-    apply exec_returnM. }
-  rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
-  cbn match.
-  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
-  rewrite execR_liftR.
-  rewrite (exec_vmem_read_addr_8 a8 v region s Halign Hcp Hmprv Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hbytes).
-  reflexivity.
-Qed.
 End VR.
 
 (* ---- exec_execute_LOAD_8 + forward_exec_ld (moved from KernelBoot) ---- *)
@@ -489,29 +455,12 @@ Section ForwardLD.
             set_reg (set_reg (set_reg s (R_bool minstret_increment) b) nextPC (add_vec_int pc 4))
                     (R_bitvector_64 x2) (regval_into_reg (extend_value false data))).
 
-  Definition sAl : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition sXl : mstate :=
-    set_reg (set_reg sAl nextPC (add_vec_int pc 4)) (R_bitvector_64 x2)
-            (regval_into_reg (extend_value false data)).
-  Definition sTl : mstate := set_reg sXl PC (register_lookup nextPC sXl.(sregs)).
-  Definition sFl : mstate :=
-    if b then set_reg sTl minstret
-                  (add_vec_int (register_lookup minstret sTl.(sregs)) 1)
-         else sTl.
 
 
   (* clean-form post-state for the ld step (x2 value already concrete). *)
   Variable mst0 : mword 64.
   Hypothesis Lmst_l : register_lookup minstret s.(sregs) = mst0.
 
-  Definition base_upd_l : mstate :=
-    set_reg (set_reg (set_reg (set_reg s (R_bool minstret_increment) b)
-                              nextPC (add_vec_int pc 4))
-                     (R_bitvector_64 x2) (regval_into_reg (extend_value false data)))
-            PC (add_vec_int pc 4).
-  Definition sFcl : mstate :=
-    if b then set_reg base_upd_l minstret (add_vec_int mst0 1)
-         else base_upd_l.
 
   Ltac tmissl := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 

@@ -21,22 +21,6 @@ Proof. unfold get_arch_pc. exact (exec_read_reg PC s). Qed.
 Definition auipc_off (imm : mword 20) : mword 64 :=
   sign_extend' 64 (concat_vec imm (Ox"000")).
 
-Lemma exec_execute_UTYPE_AUIPC (i : mword 5) (imm : mword 20) s :
-  uint i = 2 ->
-  exec (execute_UTYPE imm (Regidx i) AUIPC) s
-  = Some (RETIRE_SUCCESS,
-          set_reg s (R_bitvector_64 x2)
-            (regval_into_reg
-               (add_vec (register_lookup PC s.(sregs)) (auipc_off imm)))).
-Proof.
-  intro Hi.
-  unfold execute_UTYPE, auipc_off. cbn match.
-  rewrite (exec_bind_Some _ _ _
-             (add_vec (register_lookup PC s.(sregs))
-                      (sign_extend' 64 (concat_vec imm (Ox"000")))) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_get_arch_pc s)). apply exec_returnm. }
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_x2 i s _ Hi)). apply exec_returnm.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* forward_exec_auipc: thread the generic try_step wrapper + the generic    *)
@@ -58,30 +42,12 @@ Section ForwardAUIPC.
     exec (ext_decode w) s0 = Some (UTYPE (imm, Regidx i, AUIPC), s0).
   Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
 
-  Definition sAa : mstate := set_reg s (R_bool minstret_increment) b.
-  Definition sXa : mstate :=
-    let s1 := set_reg sAa nextPC (add_vec_int pc 4) in
-    set_reg s1 (R_bitvector_64 x2)
-      (regval_into_reg (add_vec (register_lookup PC s1.(sregs)) (auipc_off imm))).
-  Definition sTa : mstate := set_reg sXa PC (register_lookup nextPC sXa.(sregs)).
-  Definition sFa : mstate :=
-    if b then set_reg sTa minstret
-                  (add_vec_int (register_lookup minstret sTa.(sregs)) 1)
-         else sTa.
 
 
   (* clean-form post-state (concrete values). *)
   Variable mst0 : mword 64.
   Hypothesis Lmst_a : register_lookup minstret s.(sregs) = mst0.
 
-  Definition base_upd_a : mstate :=
-    set_reg (set_reg (set_reg (set_reg s (R_bool minstret_increment) b)
-                              nextPC (add_vec_int pc 4))
-                     (R_bitvector_64 x2) (regval_into_reg (add_vec pc (auipc_off imm))))
-            PC (add_vec_int pc 4).
-  Definition sFca : mstate :=
-    if b then set_reg base_upd_a minstret (add_vec_int mst0 1)
-         else base_upd_a.
 
   Ltac tmiss := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
 
