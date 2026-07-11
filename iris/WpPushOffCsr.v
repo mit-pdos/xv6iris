@@ -214,7 +214,7 @@ Qed.
 
 
 Section WpPushOffCsr.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   (* ---- csrrci rd,sstatus,imm5 at Supervisor, SIE already 0 (idempotent) ----
@@ -318,6 +318,48 @@ Section WpPushOffCsr.
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
+  Qed.
+
+  (* [smode_config] view of the sstatus SIE-clear read (csrrci rd,sstatus,2):
+     [mstatus] is PRESERVED -- the SIE-clear collapses because SIE=0, which is
+     exactly the [legalize] fact the bundle already carries -- so the config
+     round-trips through the bundle.  The value read into [rd] is exposed only
+     through the ghost SIE flag: [sstatus_read ms] for SOME [ms] with SIE=0.
+     The kernel reads/writes sstatus only to inspect/clear SIE, so that is all
+     a caller ever needs (e.g. [po_storeval32_zero] uses only SIE=0). *)
+  Lemma wp_csrrci_sstatus_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    smode_config γ dq -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
+    ( smode_config γ dq -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      (∃ ms : mword 64, ⌜ eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ⌝ ∗
+         gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    iDestruct (smode_config_unbundle with "Hsm") as
+      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
+    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+    iApply (wp_csrrci_sstatus_s root_ppn E Φ pc rd (mword_of_int 2) m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
+              ltac:(vm_compute; reflexivity) Hleg
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm Htlbinv Hpc [Hfile]").
+    iExists mstatus0. iFrame "Hfile". iPureIntro. exact HSIE.
   Qed.
 
 End WpPushOffCsr.
