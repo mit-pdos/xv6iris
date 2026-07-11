@@ -560,7 +560,7 @@ Section WpAcquireLock.
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-    iApply (wp_push_off root_ppn γc E Φ P0 pr24 pr16 pr8 fraold fs0old noff intena_old a0f
+    iApply (wp_push_off_words root_ppn γc E Φ P0 pr24 pr16 pr8 fraold fs0old noff intena_old a0f
               HN ltac:(vm_compute; reflexivity)
               ltac:(rewrite HP0ra; vm_compute; reflexivity)
               ltac:(rewrite /P0 lookup_total_insert_ne; [| vm_compute; discriminate];

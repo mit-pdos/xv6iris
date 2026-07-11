@@ -21,6 +21,7 @@ Require Import WpDecode WpLeafCommon WpEntryNew WpAuipc.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew.
 Require Import WpPushOff WpPushOffMem WpPushOffCsr WpMycpu.
+Require Import StackOwn.
 Require Import WpRvcBridge.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for the saved-intena = 0 fact. *)
 Require WpGprCsrwC.
@@ -1355,7 +1356,7 @@ Section WpPushOffTop.
   Qed.
 
   (* ============ the full push_off, entry (0x80000bc0) to caller return ============ *)
-  Lemma wp_push_off (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_push_off_words (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (vr24 vr16 vr8 raold0 s0old0 : bv 64) (noff intena_old : mword 32) (a0f : mword 64)
       :
@@ -1795,6 +1796,105 @@ Section WpPushOffTop.
           rewrite /N0 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
       { iExists _, _. iFrame "Hfra Hfs0". }
       { first [ iExact "Hintena" | (iEval (rewrite -Hsv32); iExact "Hintena") ]. }
+  Qed.
+
+  (* [stack_own] wrapper over [wp_push_off_words]: push_off's whole 6-slot frame
+     [sp0-48, sp0) is a single [stack_own sp0 n] (n >= 6).  Slots 1,2,3 hold the
+     saved ra/s0/s1 (a_r24/a_r16/a_r8), slots 5,6 the mycpu ra/s0 (a_fra/a_fs0);
+     slot 4 (= spd = sp0-32) is a genuine gap that push_off never touches — the
+     wrapper just frames it through.  Saved values are existential (scratch), so
+     the post rebundles the whole region as [stack_own sp0 n] again. *)
+  Lemma wp_push_off (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (m : gmap regidx (mword 64))
+      (noff intena_old : mword 32) (a0f : mword 64) (n : nat)
+      :
+    let sp0 := m !!! Regidx csp_rs1 in
+    let noff_a5 := sign_extend' 64 (subrange_vec_dec
+        (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
+    let noff_store := (autocast (T := mword) (subrange_vec_dec noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    let a_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
+    let a_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
+    let caller_ret := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (6 ≤ n)%nat ->
+    ↑minstretN ⊆ E ->
+    eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false ->
+    eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
+    mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
+    smode_config γ (DfracOwn 1) -∗
+    tlb_inv root_ppn -∗
+    kernel_text -∗ pc_is (mword_of_int (PO + 0x00) : mword 64) -∗ gpr_file m -∗
+    stack_own sp0 n -∗
+    a_noff ↦₄ noff -∗
+    a_intena ↦₄ intena_old -∗
+    ( smode_config γ (DfracOwn 1) -∗
+      tlb_inv root_ppn -∗
+      pc_is caller_ret -∗
+      (∃ mfin, gpr_file mfin ∗ ⌜ mfin !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5) /\
+                                 mfin !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5) /\
+                                 mfin !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5) /\
+                                 mfin !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\
+                                 mfin !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) /\
+                                 mfin !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) /\
+                                 mfin !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5) /\
+                                 mfin !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5) /\
+                                 mfin !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) ⌝) -∗
+      stack_own sp0 n -∗
+      a_noff ↦₄ noff_store -∗
+      a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then (zeros' 32) else intena_old) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros sp0 noff_a5 noff_store a_noff a_intena caller_ret
+      Hn HN Himm5 Hcret0 Ha0.
+    iIntros "Hsm Htlbinv #Htext Hpc Hfile Hstk Hnoff Hintena Hcont".
+    (* peel the top 6 slots off, frame the deeper region *)
+    iDestruct (stack_own_split_1 sp0 6 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iEval (rewrite stack_own_slots; cbn [seq]) in "Htop".
+    iDestruct "Htop" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
+    iDestruct "S1" as (vr24) "Hr24".
+    iDestruct "S2" as (vr16) "Hr16".
+    iDestruct "S3" as (vr8) "Hr8".
+    iDestruct "S4" as (vgap) "Hgap".
+    iDestruct "S5" as (raold0) "Hfra".
+    iDestruct "S6" as (s0old0) "Hfs0".
+    (* bridges: each clean [pa_stk sp0 k] equals the raw slot spelling that
+       [wp_push_off_words] produces (its a_r24/... lets zeta-reduce to these). *)
+    assert (Hb1 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb3 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb5 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 5).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb6 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 6).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hb1) in "Hr24". iEval (rewrite -Hb2) in "Hr16".
+    iEval (rewrite -Hb3) in "Hr8". iEval (rewrite -Hb5) in "Hfra".
+    iEval (rewrite -Hb6) in "Hfs0".
+    iApply (wp_push_off_words root_ppn γ E Φ m vr24 vr16 vr8 raold0 s0old0 noff intena_old a0f
+              HN Himm5 Hcret0 Ha0
+              with "Hsm Htlbinv Htext Hpc Hfile [Hr24] [Hr16] [Hr8] [Hfra] [Hfs0] [Hnoff] [Hintena] [-]").
+    { iExact "Hr24". }
+    { iExact "Hr16". }
+    { iExact "Hr8". }
+    { iExact "Hfra". }
+    { iExact "Hfs0". }
+    { iExact "Hnoff". }
+    { iExact "Hintena". }
+    iIntros "Hsm Htlbinv Hpc Hmfin Hr24 Hr16 Hr8 Hfrablk Hnoff Hintena".
+    iDestruct "Hfrablk" as (vfra vfs0) "[Hfra Hfs0]".
+    iEval (rewrite Hb1) in "Hr24". iEval (rewrite Hb2) in "Hr16".
+    iEval (rewrite Hb3) in "Hr8". iEval (rewrite Hb5) in "Hfra".
+    iEval (rewrite Hb6) in "Hfs0".
+    (* rebundle all 6 slots (values now existential) back into [stack_own sp0 n] *)
+    iAssert (stack_own sp0 6) with "[Hr24 Hr16 Hr8 Hgap Hfra Hfs0]" as "Htop".
+    { rewrite stack_own_slots. cbn [seq]. iSplitL "Hr24"; [by iExists _|].
+      iSplitL "Hr16"; [by iExists _|]. iSplitL "Hr8"; [by iExists _|].
+      iSplitL "Hgap"; [by iExists _|]. iSplitL "Hfra"; [by iExists _|].
+      iSplitL "Hfs0"; [by iExists _|]. done. }
+    iDestruct (stack_own_split_2 sp0 6 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hmfin Hstk Hnoff Hintena").
   Qed.
 
 

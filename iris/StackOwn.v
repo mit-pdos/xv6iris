@@ -162,6 +162,26 @@ Section stack_own.
     word_pointsto (pa_stk sp 1) (DfracOwn 1) w ⊢ stack_own sp 1.
   Proof. rewrite stack_own_1. iIntros "H". by iExists w. Qed.
 
+  (* Expose the whole region as [n] cleanly-addressed slots (slot [k] at
+     [pa_stk sp k], k = 1..n).  With [cbn [seq]] the [big_sepL] over a concrete
+     [seq 1 n] unfolds to a flat conjunction, so an N-slot frame peels/rebundles
+     with a single [iDestruct "(S1 & .. & Sn & _)"] and no nested [pa_stk]. *)
+  Lemma stack_own_slots (sp : Arch.pa) (n : nat) :
+    stack_own sp n ⊣⊢
+    [∗ list] k ∈ seq 1 n, ∃ w : bv 64, word_pointsto (pa_stk sp k) (DfracOwn 1) w.
+  Proof.
+    revert sp. induction n as [|n IH]; intro sp.
+    - rewrite stack_own_0. by rewrite big_sepL_nil.
+    - replace (S n) with (1 + n)%nat by lia.
+      rewrite stack_own_app stack_own_1 IH.
+      change (seq 1 (1 + n)) with (1%nat :: seq 2 n).
+      rewrite big_sepL_cons.
+      f_equiv.
+      rewrite -(fmap_S_seq 1 n) big_sepL_fmap.
+      apply big_sepL_proper. intros k y _.
+      by rewrite (pa_stk_assoc sp 1 y).
+  Qed.
+
   (* ---- directional forms of the split, for [iDestruct] / [iApply] ---- *)
   Lemma stack_own_split_1 (sp : Arch.pa) (a n : nat) :
     (a ≤ n)%nat ->
