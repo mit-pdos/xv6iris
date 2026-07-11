@@ -1174,6 +1174,44 @@ Section WpPopOffTopSec.
     iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0").
   Qed.
 
+  (* [smode_config] view of the pure sstatus read (csrrs rd,sstatus,x0): mstatus
+     is untouched, and the value read into [rd] is exposed only through the ghost
+     SIE flag as [sstatus_read ms] for SOME ms with SIE=0 (mirror of
+     [wp_csrrci_sstatus_scfg]). *)
+  Lemma wp_csrr_sstatus_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    smode_config γ dq -∗
+    tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
+    ( smode_config γ dq -∗
+      tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      (∃ ms : mword 64, ⌜ eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ⌝ ∗
+         gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    iDestruct (smode_config_unbundle with "Hsm") as
+      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
+    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+    iApply (wp_csrr_sstatus_s root_ppn E Φ pc rd m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm Htlbinv Hpc [Hfile]").
+    iExists mstatus0. iFrame "Hfile". iPureIntro. exact HSIE.
+  Qed.
+
   Lemma wp_pop_off (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
