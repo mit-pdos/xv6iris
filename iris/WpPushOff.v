@@ -52,7 +52,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpAuipc.
-Require Import WpGpr WpGprAddi WpGprShift WpGprLogic WpGprAuipc.
+Require Import WpGpr WpGprAddi WpMmodeShiftiop WpGprLogic WpGprAuipc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

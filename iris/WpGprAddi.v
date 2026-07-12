@@ -32,8 +32,8 @@ Qed.
 
 
 (* ADDIW: sign-extend the low 32 bits of (rs1 + imm).  An add-immediate variant,
-   so it lives here rather than in WpGprShift.  Value inlined (like gpr_addi_val),
-   so no dependency on WpGprShift's gpr_src. *)
+   so it lives here rather than in WpMmodeShiftiop.  Value inlined (like gpr_addi_val),
+   so no dependency on WpMmodeShiftiop's gpr_src. *)
 Lemma exec_execute_ADDIW_base (imm : mword 12) (rs1 rd : regidx) (a : mword 64) s s' :
   exec (rX_bits rs1) s = Some (a, s) ->
   exec (wX_bits rd (sign_extend' 64 (subrange_vec_dec (add_vec a (sign_extend' 64 imm)) 31 0))) s
@@ -181,7 +181,7 @@ Section WpAddiGpr.
   Qed.
 End WpAddiGpr.
 
-(* ADDIW WP -- moved here from WpGprShift (add-immediate variant). *)
+(* ADDIW WP -- moved here from WpMmodeShiftiop (add-immediate variant). *)
 Section WpAddiwGpr.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.

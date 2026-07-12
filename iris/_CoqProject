@@ -29,14 +29,14 @@ WpGprLoad.v
 WpGprLui.v
 WpGprAddi.v
 WpGprAuipc.v
-WpGprMul.v
+WpMmodeMul.v
 WpGprCsrrCommon.v
 WpGprCsrrA.v
 WpGprCsrrB.v
 WpGprCsrr.v
-WpGprJal.v
+WpMmodeJal.v
 WpGprLogic.v
-WpGprShift.v
+WpMmodeShiftiop.v
 WpGprJalr.v
 WpGprStore.v
 WpGprCsrwCommon.v
