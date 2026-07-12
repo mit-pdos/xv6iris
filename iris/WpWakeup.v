@@ -718,7 +718,8 @@ Section ProcInv.
      the loop/callee-saved registers hold their fixed values (a0/a5 are scratch,
      hence existential in the map). *)
   Definition wk_regs (M : gmap regidx (mword 64))
-      (spF sp0 rra rtp : mword 64) (chan : mword 64) (i : nat) : Prop :=
+      (spF sp0 rra rtp : mword 64) (chan : mword 64)
+      (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (i : nat) : Prop :=
     M !!! Regidx (mword_of_int 1)  = rra /\
     M !!! Regidx (mword_of_int 2)  = spF /\
     M !!! Regidx (mword_of_int 9)  = proc_addr i /\
@@ -727,6 +728,12 @@ Section ProcInv.
     M !!! Regidx (mword_of_int 19) = (mword_of_int 2 : mword 64) /\
     M !!! Regidx (mword_of_int 20) = chan /\
     M !!! Regidx (mword_of_int 21) = (mword_of_int 3 : mword 64) /\
+    M !!! Regidx (mword_of_int 22) = vs6 /\
+    M !!! Regidx (mword_of_int 23) = vs7 /\
+    M !!! Regidx (mword_of_int 24) = vs8 /\
+    M !!! Regidx (mword_of_int 25) = vs9 /\
+    M !!! Regidx (mword_of_int 26) = vs10 /\
+    M !!! Regidx (mword_of_int 27) = vs11 /\
     (forall r : regidx, r ∈ dom M).
 
   (* ===================================================================== *)
@@ -755,7 +762,10 @@ Section ProcInv.
     ( ∀ M : gmap regidx (mword 64),
         ⌜ wk_regs M spF (m !!! Regidx (mword_of_int 2 : mword 5))
             (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 4 : mword 5))
-            (m !!! Regidx (mword_of_int 10 : mword 5)) 0 ⌝ -∗
+            (m !!! Regidx (mword_of_int 10 : mword 5))
+            (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5))
+            (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
+            (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) 0 ⌝ -∗
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗ gpr_file M -∗
         wk_frame spF (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
@@ -1023,6 +1033,12 @@ Section ProcInv.
       - (* s4 = chan *) wk_peel. rewrite aq_addv_zero_l. reflexivity.
       - (* s5 = 3 *) wk_peel.
         apply bv_eq; vm_compute; reflexivity.
+      - (* s6 *) wk_peel. reflexivity.
+      - (* s7 *) wk_peel. reflexivity.
+      - (* s8 *) wk_peel. reflexivity.
+      - (* s9 *) wk_peel. reflexivity.
+      - (* s10 *) wk_peel. reflexivity.
+      - (* s11 *) wk_peel. reflexivity.
       - (* dom *) intro r. pose proof (Hdom r) as Hr.
         (* was [set_solver] -- ~128s here, as naive_solver rescans the whole
            (huge) proof context; the goal is just [r ∈ union-tower ∪ dom base]
@@ -1062,6 +1078,13 @@ Section ProcInv.
         /\ Mf !!! Regidx (mword_of_int 21) = vs5
         /\ Mf !!! Regidx csp_rs1 =
              add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))
+        /\ Mf !!! Regidx (mword_of_int 4)  = M !!! Regidx (mword_of_int 4)
+        /\ Mf !!! Regidx (mword_of_int 22) = M !!! Regidx (mword_of_int 22)
+        /\ Mf !!! Regidx (mword_of_int 23) = M !!! Regidx (mword_of_int 23)
+        /\ Mf !!! Regidx (mword_of_int 24) = M !!! Regidx (mword_of_int 24)
+        /\ Mf !!! Regidx (mword_of_int 25) = M !!! Regidx (mword_of_int 25)
+        /\ Mf !!! Regidx (mword_of_int 26) = M !!! Regidx (mword_of_int 26)
+        /\ Mf !!! Regidx (mword_of_int 27) = M !!! Regidx (mword_of_int 27)
         /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
         kernel_text -∗ pc_is rettgt -∗ gpr_file Mf -∗
@@ -1239,6 +1262,13 @@ Section ProcInv.
       - (* s4 *) wk_peel. reflexivity.
       - (* s5 *) wk_peel. reflexivity.
       - (* sp *) wk_peel. rewrite HspF. reflexivity.
+      - (* tp x4 *) wk_peel. reflexivity.
+      - (* s6 *) wk_peel. reflexivity.
+      - (* s7 *) wk_peel. reflexivity.
+      - (* s8 *) wk_peel. reflexivity.
+      - (* s9 *) wk_peel. reflexivity.
+      - (* s10 *) wk_peel. reflexivity.
+      - (* s11 *) wk_peel. reflexivity.
       - (* dom *) intro r. pose proof (Hdom r) as Hr.
         (* context-free replacement for [set_solver] -- see wp_wakeup_prologue. *)
         rewrite !dom_insert_L. repeat apply elem_of_union_r. exact Hr. }
@@ -1249,7 +1279,8 @@ Section ProcInv.
   (* register-map shape at the loop header [pc = wakeup+0x38] with counter [k].
      Same as [wk_regs] but WITHOUT the [ra] constraint: [ra] is dead at the
      header (immediately clobbered by the [jal myproc]). *)
-  Definition wk_loop_regs (M : gmap regidx (mword 64)) (spF rtp chan : mword 64) (k : nat) : Prop :=
+  Definition wk_loop_regs (M : gmap regidx (mword 64)) (spF rtp chan : mword 64)
+      (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (k : nat) : Prop :=
     M !!! Regidx (mword_of_int 9)  = proc_addr k /\
     M !!! Regidx (mword_of_int 2)  = spF /\
     M !!! Regidx (mword_of_int 4)  = rtp /\
@@ -1257,6 +1288,12 @@ Section ProcInv.
     M !!! Regidx (mword_of_int 19) = (mword_of_int 2 : mword 64) /\
     M !!! Regidx (mword_of_int 20) = chan /\
     M !!! Regidx (mword_of_int 21) = (mword_of_int 3 : mword 64) /\
+    M !!! Regidx (mword_of_int 22) = vs6 /\
+    M !!! Regidx (mword_of_int 23) = vs7 /\
+    M !!! Regidx (mword_of_int 24) = vs8 /\
+    M !!! Regidx (mword_of_int 25) = vs9 /\
+    M !!! Regidx (mword_of_int 26) = vs10 /\
+    M !!! Regidx (mword_of_int 27) = vs11 /\
     (forall r : regidx, r ∈ dom M).
 
   (* eq_vec is reflexive: used at the termination beq to derive that the last
@@ -1317,7 +1354,8 @@ Section ProcInv.
   (* ===================================================================== *)
   Lemma wp_wakeup_loop
       (γs : list gname) (spF a0f rtp chan : mword 64) (noffv : mword 32)
-      (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64) :
+      (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
+      (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) :
     ↑minstretN ⊆ E -> ↑lockN ⊆ E ->
     length γs = NPROC ->
     mycpu_ret rtp = a0f ->
@@ -1327,13 +1365,21 @@ Section ProcInv.
     procs_inv γs -∗
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x58]. *)
     ( ∀ Mexit : gmap regidx (mword 64),
-        ⌜ Mexit !!! Regidx csp_rs1 = spF /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
+        ⌜ Mexit !!! Regidx csp_rs1 = spF
+          /\ Mexit !!! Regidx (mword_of_int 4)  = rtp
+          /\ Mexit !!! Regidx (mword_of_int 22) = vs6
+          /\ Mexit !!! Regidx (mword_of_int 23) = vs7
+          /\ Mexit !!! Regidx (mword_of_int 24) = vs8
+          /\ Mexit !!! Regidx (mword_of_int 25) = vs9
+          /\ Mexit !!! Regidx (mword_of_int 26) = vs10
+          /\ Mexit !!! Regidx (mword_of_int 27) = vs11
+          /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗ gpr_file Mexit -∗
         wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     ∀ (k : nat) (M : gmap regidx (mword 64)),
-      ⌜(k < NPROC)%nat⌝ -∗ ⌜wk_loop_regs M spF rtp chan k⌝ -∗
+      ⌜(k < NPROC)%nat⌝ -∗ ⌜wk_loop_regs M spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗ gpr_file M -∗
       wk_res γs spF a0f noffv -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
@@ -1346,9 +1392,17 @@ Section ProcInv.
        Löb/▷ needed, so the packaged S-mode leaves (which hide the step's later)
        compose cleanly. *)
     iAssert (∀ (fuel k : nat) (M : gmap regidx (mword 64)),
-               ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗ ⌜wk_loop_regs M spF rtp chan k⌝ -∗
+               ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗ ⌜wk_loop_regs M spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
                ( ∀ Mexit : gmap regidx (mword 64),
-                   ⌜ Mexit !!! Regidx csp_rs1 = spF /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
+                   ⌜ Mexit !!! Regidx csp_rs1 = spF
+          /\ Mexit !!! Regidx (mword_of_int 4)  = rtp
+          /\ Mexit !!! Regidx (mword_of_int 22) = vs6
+          /\ Mexit !!! Regidx (mword_of_int 23) = vs7
+          /\ Mexit !!! Regidx (mword_of_int 24) = vs8
+          /\ Mexit !!! Regidx (mword_of_int 25) = vs9
+          /\ Mexit !!! Regidx (mword_of_int 26) = vs10
+          /\ Mexit !!! Regidx (mword_of_int 27) = vs11
+          /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
                    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗ gpr_file Mexit -∗
                    wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
@@ -1362,21 +1416,21 @@ Section ProcInv.
         iIntros (k M) "%Hfuel %Hk %Hregs Hqexit Hsm Hgc Htlb Htext Hpc Hfile Hres Hframe".
         exfalso. lia. }
     iIntros (k M) "%Hfuel %Hk %Hregs Hqexit Hsm Hgc Htlb #Htext Hpc Hfile Hres Hframe".
-    destruct Hregs as (Hs1 & Hsp & Htp & Hs2 & Hs3 & Hs4 & Hs5 & Hdom).
+    destruct Hregs as (Hs1 & Hsp & Htp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11 & Hdom).
     (* ---- shared tail [pc = wakeup+0x30]: p++ (0x30 addi s1,s1,360), then the
        termination test (0x34 beq s1,s2): exit to the epilogue when p reaches
        &proc[NPROC], else recurse (Löb) into the next iteration. Captures the
        exit continuation [Hqexit] once; reached from both the skip-self path
        (0x3c taken) and the release-return path (0x2c). ---- *)
     iAssert (∀ Mt : gmap regidx (mword 64),
-               ⌜ wk_loop_regs Mt spF rtp chan k ⌝ -∗
+               ⌜ wk_loop_regs Mt spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
                pc_is (mword_of_int (KernelSyms.wakeup + 0x30)) -∗ gpr_file Mt -∗
                wk_res γs spF a0f noffv -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                WP (Loop : expr riscv_lang) @ E {{ Phi }})%I
       with "[Hqexit]" as "Htail".
     { iIntros (Mt) "%Hmt Hsm Hgc Htlb Hpc Hfile Hres Hframe".
-      destruct Hmt as (Ht1 & Htsp & Http & Ht18 & Ht19 & Ht20 & Ht21 & Htdom).
+      destruct Hmt as (Ht1 & Htsp & Http & Ht18 & Ht19 & Ht20 & Ht21 & Ht22 & Ht23 & Ht24 & Ht25 & Ht26 & Ht27 & Htdom).
       iPoseProof (wki_30 with "Htext") as "Hi30".
       iPoseProof (wki_34 with "Htext") as "Hi34".
       iDestruct (smode_config_unbundle with "Hsm") as
@@ -1428,9 +1482,16 @@ Section ProcInv.
                      HSIEA HMPRVA HSXLA HMXRA HlegA HmmA HPBMTEA HpmmA HLPEA HFIOMA HmenvvalA
                      with "Hhw Hinv Hhs Hpriv Hms Hsieg Hmie Hmdl Hmenv") as "Hsm".
         iApply ("Hqexit" $! Mt30 with "[] Hsm Hgc Htlb Htext Hpc Hfile Hframe").
-        iPureIntro. split.
-        * rewrite /Mt30 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Htsp.
-        * intro r. rewrite /Mt30 dom_insert_L. apply elem_of_union_r. apply Htdom.
+        iPureIntro.
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Htsp | vm_compute; discriminate]|].
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Http | vm_compute; discriminate]|].
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht22 | vm_compute; discriminate]|].
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht23 | vm_compute; discriminate]|].
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht24 | vm_compute; discriminate]|].
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht25 | vm_compute; discriminate]|].
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht26 | vm_compute; discriminate]|].
+        split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht27 | vm_compute; discriminate]|].
+        intro r. rewrite /Mt30 dom_insert_L. apply elem_of_union_r. apply Htdom.
       + (* FALL: p < &proc[NPROC]; recurse into iteration k+1 *)
         iApply (wp_beq_fall_s_config root_ppn E Phi (mword_of_int (KernelSyms.wakeup + 0x34))
                   (mword_of_int 36 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5)
@@ -1465,6 +1526,12 @@ Section ProcInv.
           split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht19 | vm_compute; discriminate]|].
           split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht20 | vm_compute; discriminate]|].
           split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht21 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht22 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht23 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht24 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht25 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht26 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht27 | vm_compute; discriminate]|].
           intro r. rewrite /Mt30 dom_insert_L. apply elem_of_union_r. apply Htdom. }
     iPoseProof (wki_38 with "Htext") as "Hi38".
     (* extract the persistent hw_config/minstret_inv for the (2-aligned-target)
@@ -1548,6 +1615,18 @@ Section ProcInv.
               rewrite /Mj lookup_total_insert_ne; [exact Hs4 | vm_compute; discriminate]|].
       split; [rewrite (Hpres (mword_of_int 21 : mword 5) ltac:(compute_done));
               rewrite /Mj lookup_total_insert_ne; [exact Hs5 | vm_compute; discriminate]|].
+      split; [rewrite (Hpres (mword_of_int 22 : mword 5) ltac:(compute_done));
+              rewrite /Mj lookup_total_insert_ne; [exact Hs6 | vm_compute; discriminate]|].
+      split; [rewrite (Hpres (mword_of_int 23 : mword 5) ltac:(compute_done));
+              rewrite /Mj lookup_total_insert_ne; [exact Hs7 | vm_compute; discriminate]|].
+      split; [rewrite (Hpres (mword_of_int 24 : mword 5) ltac:(compute_done));
+              rewrite /Mj lookup_total_insert_ne; [exact Hs8 | vm_compute; discriminate]|].
+      split; [rewrite (Hpres (mword_of_int 25 : mword 5) ltac:(compute_done));
+              rewrite /Mj lookup_total_insert_ne; [exact Hs9 | vm_compute; discriminate]|].
+      split; [rewrite (Hpres (mword_of_int 26 : mword 5) ltac:(compute_done));
+              rewrite /Mj lookup_total_insert_ne; [exact Hs10 | vm_compute; discriminate]|].
+      split; [rewrite (Hpres (mword_of_int 27 : mword 5) ltac:(compute_done));
+              rewrite /Mj lookup_total_insert_ne; [exact Hs11 | vm_compute; discriminate]|].
       exact Hdommret.
     - (* FALL: a0 <> s1: acquire proc[k], check state/chan, maybe wake, release *)
       iApply (wp_beq_fall_s_config root_ppn E Phi (mword_of_int (KernelSyms.wakeup + 0x3c))
@@ -1653,7 +1732,7 @@ Section ProcInv.
       iDestruct (proc_lock_res_elim with "HR") as (st ch) "(Hpst & Hpch & Hctx)".
       (* register-preservation through acquire. *)
       unfold callee_saved in Hpins.
-      destruct Hpins as (Hfcsp & Hf4 & Hf8 & Hf9 & Hf18 & Hf19 & Hf20 & Hf21 & _ & _ & _ & _ & _ & _).
+      destruct Hpins as (Hfcsp & Hf4 & Hf8 & Hf9 & Hf18 & Hf19 & Hf20 & Hf21 & Hf22 & Hf23 & Hf24 & Hf25 & Hf26 & Hf27).
       assert (HM42s1 : M42 !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k).
       { rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmrets1. }
@@ -1688,6 +1767,36 @@ Section ProcInv.
       assert (HMacq19 : Macq !!! Regidx (mword_of_int 19 : mword 5) = (mword_of_int 2 : mword 64)) by (rewrite Hf19; exact HM42s3).
       assert (HMacq20 : Macq !!! Regidx (mword_of_int 20 : mword 5) = chan) by (rewrite Hf20; exact HM42s4).
       assert (HMacq21 : Macq !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64)) by (rewrite Hf21; exact HM42s5).
+      assert (HMacq22 : Macq !!! Regidx (mword_of_int 22 : mword 5) = vs6).
+      { rewrite Hf22. rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite (Hpres (mword_of_int 22 : mword 5) ltac:(compute_done)).
+        rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs6. }
+      assert (HMacq23 : Macq !!! Regidx (mword_of_int 23 : mword 5) = vs7).
+      { rewrite Hf23. rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite (Hpres (mword_of_int 23 : mword 5) ltac:(compute_done)).
+        rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs7. }
+      assert (HMacq24 : Macq !!! Regidx (mword_of_int 24 : mword 5) = vs8).
+      { rewrite Hf24. rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite (Hpres (mword_of_int 24 : mword 5) ltac:(compute_done)).
+        rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs8. }
+      assert (HMacq25 : Macq !!! Regidx (mword_of_int 25 : mword 5) = vs9).
+      { rewrite Hf25. rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite (Hpres (mword_of_int 25 : mword 5) ltac:(compute_done)).
+        rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs9. }
+      assert (HMacq26 : Macq !!! Regidx (mword_of_int 26 : mword 5) = vs10).
+      { rewrite Hf26. rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite (Hpres (mword_of_int 26 : mword 5) ltac:(compute_done)).
+        rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs10. }
+      assert (HMacq27 : Macq !!! Regidx (mword_of_int 27 : mword 5) = vs11).
+      { rewrite Hf27. rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite (Hpres (mword_of_int 27 : mword 5) ltac:(compute_done)).
+        rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs11. }
       (* clean the acquire-returned frame cells into [wk_cell spF] / [proc_addr k] form. *)
       iEval (rewrite HM42csp) in "Har24".
       iEval (rewrite HM42csp) in "Har16".
@@ -1719,6 +1828,12 @@ Section ProcInv.
                    Mr !!! Regidx (mword_of_int 19 : mword 5) = (mword_of_int 2 : mword 64) /\
                    Mr !!! Regidx (mword_of_int 20 : mword 5) = chan /\
                    Mr !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64) /\
+                   Mr !!! Regidx (mword_of_int 22 : mword 5) = vs6 /\
+                   Mr !!! Regidx (mword_of_int 23 : mword 5) = vs7 /\
+                   Mr !!! Regidx (mword_of_int 24 : mword 5) = vs8 /\
+                   Mr !!! Regidx (mword_of_int 25 : mword 5) = vs9 /\
+                   Mr !!! Regidx (mword_of_int 26 : mword 5) = vs10 /\
+                   Mr !!! Regidx (mword_of_int 27 : mword 5) = vs11 /\
                    (forall r : regidx, r ∈ dom Mr) ⌝ -∗
                  hart_state ↦ᵣ{ DfracOwn 1 } HART_ACTIVE tt -∗
                  cur_privilege ↦ᵣ{ DfracOwn 1 } Supervisor -∗
@@ -1730,7 +1845,7 @@ Section ProcInv.
         with "[Hgc Hsieg Har24 Har16 Har8 Hp24 Hp16 Hp8 Hu7 Hfra Hfs0 Hnoff2 Hint2 Hcpu2 Hlockback Hframe Htail]"
         as "Hrel".
       { iIntros (Mr) "%Hmr Hhs Hpriv Hms Hmie Hmdl Hmenv Htlb Hpc Hfile Htok HR".
-        destruct Hmr as (Hr9 & Hr2 & Hr4 & Hr18 & Hr19 & Hr20 & Hr21 & Hrdom).
+        destruct Hmr as (Hr9 & Hr2 & Hr4 & Hr18 & Hr19 & Hr20 & Hr21 & Hr22 & Hr23 & Hr24 & Hr25 & Hr26 & Hr27 & Hrdom).
         iPoseProof (wki_2a with "Htext") as "Hi2a".
         iPoseProof (wki_2c with "Htext") as "Hi2c".
         (* 0x2a c.mv a0,s1 : a0 := &proc[k] *)
@@ -1801,7 +1916,7 @@ Section ProcInv.
         { rewrite HMr2c_ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc30) in "Hpc".
         unfold callee_saved in Hpinsr.
-        destruct Hpinsr as (Hr'csp & Hr'4 & Hr'8 & Hr'9 & Hr'18 & Hr'19 & Hr'20 & Hr'21 & _ & _ & _ & _ & _ & _).
+        destruct Hpinsr as (Hr'csp & Hr'4 & Hr'8 & Hr'9 & Hr'18 & Hr'19 & Hr'20 & Hr'21 & Hr'22 & Hr'23 & Hr'24 & Hr'25 & Hr'26 & Hr'27).
         iDestruct (gpr_file_dom with "Hfile") as "[%Hdommr Hfile]".
         (* reassemble [wk_res] for the next iteration: scratch (release junk),
            noff (restored to noffv via the round-trip), intena (0), lock words. *)
@@ -1838,6 +1953,24 @@ Section ProcInv.
           split.
           { rewrite Hr'21. rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
             rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr21. }
+          split.
+          { rewrite Hr'22. rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr22. }
+          split.
+          { rewrite Hr'23. rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr23. }
+          split.
+          { rewrite Hr'24. rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr24. }
+          split.
+          { rewrite Hr'25. rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr25. }
+          split.
+          { rewrite Hr'26. rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr26. }
+          split.
+          { rewrite Hr'27. rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr27. }
           exact Hdommr.
         - (* wk_res: scratch ∗ noff ∗ intena ∗ lockcells *)
           rewrite /wk_res. iSplitL "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9".
@@ -1902,6 +2035,18 @@ Section ProcInv.
         by (rewrite /M48 lookup_total_insert_ne; [exact HMacq20 | vm_compute; discriminate]).
       assert (HM48_21 : M48 !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64))
         by (rewrite /M48 lookup_total_insert_ne; [exact HMacq21 | vm_compute; discriminate]).
+      assert (HM48_22 : M48 !!! Regidx (mword_of_int 22 : mword 5) = vs6)
+        by (rewrite /M48 lookup_total_insert_ne; [exact HMacq22 | vm_compute; discriminate]).
+      assert (HM48_23 : M48 !!! Regidx (mword_of_int 23 : mword 5) = vs7)
+        by (rewrite /M48 lookup_total_insert_ne; [exact HMacq23 | vm_compute; discriminate]).
+      assert (HM48_24 : M48 !!! Regidx (mword_of_int 24 : mword 5) = vs8)
+        by (rewrite /M48 lookup_total_insert_ne; [exact HMacq24 | vm_compute; discriminate]).
+      assert (HM48_25 : M48 !!! Regidx (mword_of_int 25 : mword 5) = vs9)
+        by (rewrite /M48 lookup_total_insert_ne; [exact HMacq25 | vm_compute; discriminate]).
+      assert (HM48_26 : M48 !!! Regidx (mword_of_int 26 : mword 5) = vs10)
+        by (rewrite /M48 lookup_total_insert_ne; [exact HMacq26 | vm_compute; discriminate]).
+      assert (HM48_27 : M48 !!! Regidx (mword_of_int 27 : mword 5) = vs11)
+        by (rewrite /M48 lookup_total_insert_ne; [exact HMacq27 | vm_compute; discriminate]).
       assert (HdomM48 : forall r : regidx, r ∈ dom M48).
       { intro r. rewrite /M48 dom_insert_L. apply elem_of_union_r. apply Hdomacq. }
       (* ---- 0x48 bne a5,s3 : if state != SLEEPING -> release ---- *)
@@ -1924,7 +2069,9 @@ Section ProcInv.
         iDestruct (proc_lock_res_intro γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
         iApply ("Hrel" $! M48 with "[%] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlb Hpc Hfile Htok HR").
         repeat split; [exact HM48_9 | exact HM48_2 | exact HM48_4 | exact HM48_18
-                      | exact HM48_19 | exact HM48_20 | exact HM48_21 | exact HdomM48].
+                      | exact HM48_19 | exact HM48_20 | exact HM48_21
+                      | exact HM48_22 | exact HM48_23 | exact HM48_24
+                      | exact HM48_25 | exact HM48_26 | exact HM48_27 | exact HdomM48].
       + (* FALL: state == SLEEPING -> load chan ---- *)
         iApply (wp_bne_fall_s_config root_ppn E Phi (mword_of_int (KernelSyms.wakeup + 0x48))
                   (mword_of_int 8162 : mword 13) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
@@ -1979,6 +2126,18 @@ Section ProcInv.
           by (rewrite /M4e lookup_total_insert_ne; [exact HM48_20 | vm_compute; discriminate]).
         assert (HM4e_21 : M4e !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64))
           by (rewrite /M4e lookup_total_insert_ne; [exact HM48_21 | vm_compute; discriminate]).
+        assert (HM4e_22 : M4e !!! Regidx (mword_of_int 22 : mword 5) = vs6)
+          by (rewrite /M4e lookup_total_insert_ne; [exact HM48_22 | vm_compute; discriminate]).
+        assert (HM4e_23 : M4e !!! Regidx (mword_of_int 23 : mword 5) = vs7)
+          by (rewrite /M4e lookup_total_insert_ne; [exact HM48_23 | vm_compute; discriminate]).
+        assert (HM4e_24 : M4e !!! Regidx (mword_of_int 24 : mword 5) = vs8)
+          by (rewrite /M4e lookup_total_insert_ne; [exact HM48_24 | vm_compute; discriminate]).
+        assert (HM4e_25 : M4e !!! Regidx (mword_of_int 25 : mword 5) = vs9)
+          by (rewrite /M4e lookup_total_insert_ne; [exact HM48_25 | vm_compute; discriminate]).
+        assert (HM4e_26 : M4e !!! Regidx (mword_of_int 26 : mword 5) = vs10)
+          by (rewrite /M4e lookup_total_insert_ne; [exact HM48_26 | vm_compute; discriminate]).
+        assert (HM4e_27 : M4e !!! Regidx (mword_of_int 27 : mword 5) = vs11)
+          by (rewrite /M4e lookup_total_insert_ne; [exact HM48_27 | vm_compute; discriminate]).
         assert (HdomM4e : forall r : regidx, r ∈ dom M4e).
         { intro r. rewrite /M4e dom_insert_L. apply elem_of_union_r. apply HdomM48. }
         (* ---- 0x4e bne a5,s4 : if chan != arg -> release ---- *)
@@ -2001,7 +2160,9 @@ Section ProcInv.
           iDestruct (proc_lock_res_intro γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
           iApply ("Hrel" $! M4e with "[%] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlb Hpc Hfile Htok HR").
           repeat split; [exact HM4e_9 | exact HM4e_2 | exact HM4e_4 | exact HM4e_18
-                        | exact HM4e_19 | exact HM4e_20 | exact HM4e_21 | exact HdomM4e].
+                        | exact HM4e_19 | exact HM4e_20 | exact HM4e_21
+                        | exact HM4e_22 | exact HM4e_23 | exact HM4e_24
+                        | exact HM4e_25 | exact HM4e_26 | exact HM4e_27 | exact HdomM4e].
         * (* FALL: chan matches -> wake (state := RUNNABLE) *)
           iApply (wp_bne_fall_s_config root_ppn E Phi (mword_of_int (KernelSyms.wakeup + 0x4e))
                     (mword_of_int 8156 : mword 13) (mword_of_int 20 : mword 5) (mword_of_int 15 : mword 5)
@@ -2055,7 +2216,9 @@ Section ProcInv.
           iEval (rewrite H56tgt) in "Hpc".
           iApply ("Hrel" $! M4e with "[%] Hhs Hpriv Hms Hmie Hmdl Hmenv Htlb Hpc Hfile Htok HR").
           repeat split; [exact HM4e_9 | exact HM4e_2 | exact HM4e_4 | exact HM4e_18
-                        | exact HM4e_19 | exact HM4e_20 | exact HM4e_21 | exact HdomM4e].
+                        | exact HM4e_19 | exact HM4e_20 | exact HM4e_21
+                        | exact HM4e_22 | exact HM4e_23 | exact HM4e_24
+                        | exact HM4e_25 | exact HM4e_26 | exact HM4e_27 | exact HdomM4e].
     }
     (* discharge the loop at [fuel := NPROC], [k] (the caller's start index). *)
     iIntros (k M) "%Hk %Hregs Hsm Hgc Htlb #Htext Hpc Hfile Hres Hframe".
@@ -2068,12 +2231,34 @@ Section ProcInv.
   (* the prologue's exit register shape [wk_regs .. k] refines the loop's
      entry shape [wk_loop_regs .. k] (NPROC = 64, so proc_addr NPROC = proc_addr 64;
      the extra [ra] constraint is simply dropped). *)
-  Lemma wk_regs_loop (M : gmap regidx (mword 64)) (spF sp0 rra rtp chan : mword 64) (k : nat) :
-    wk_regs M spF sp0 rra rtp chan k -> wk_loop_regs M spF rtp chan k.
+  Lemma wk_regs_loop (M : gmap regidx (mword 64)) (spF sp0 rra rtp chan : mword 64)
+      (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (k : nat) :
+    wk_regs M spF sp0 rra rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k ->
+    wk_loop_regs M spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k.
   Proof.
-    intros (Hra & Hsp & H9 & H4 & H18 & H19 & H20 & H21 & Hdom).
+    intros (Hra & Hsp & H9 & H4 & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & Hdom).
     unfold wk_loop_regs.
-    repeat split; [exact H9 | exact Hsp | exact H4 | exact H18 | exact H19 | exact H20 | exact H21 | exact Hdom].
+    repeat split; [exact H9 | exact Hsp | exact H4 | exact H18 | exact H19 | exact H20 | exact H21
+      | exact H22 | exact H23 | exact H24 | exact H25 | exact H26 | exact H27 | exact Hdom].
+  Qed.
+
+  (* the epilogue restores sp by [+60][+4], which cancels the prologue's
+     [-64] frame allocation, so the final sp equals the caller's sp. *)
+  Lemma wakeup_sp_cancel (X : mword 64) :
+    add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))
+            (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
+  Proof.
+    assert (add_vec_unsigned : forall x y : mword 64,
+              bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
+    { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+        SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+      rewrite bv_add_unsigned. reflexivity. }
+    apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+    assert (HA : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)) : mword 64) = 18446744073709551552) by (vm_compute; reflexivity).
+    assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)) : mword 64) = 64) by (vm_compute; reflexivity).
+    rewrite HA HB. rewrite <- Z.add_assoc.
+    replace (18446744073709551552 + 64) with (bv_modulus 64) by (vm_compute; reflexivity).
+    rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
   Qed.
 
   (* ===================================================================== *)
@@ -2104,16 +2289,7 @@ Section ProcInv.
     wk_fcell spF 1 ↦₈ f1 -∗
     wk_res γs spF a0f noffv -∗ procs_inv γs -∗
     ( ∀ Mf : gmap regidx (mword 64),
-        ⌜ Mf !!! Regidx (mword_of_int 1)  = m !!! Regidx (mword_of_int 1 : mword 5)
-        /\ Mf !!! Regidx (mword_of_int 8)  = m !!! Regidx (mword_of_int 8 : mword 5)
-        /\ Mf !!! Regidx (mword_of_int 9)  = m !!! Regidx (mword_of_int 9 : mword 5)
-        /\ Mf !!! Regidx (mword_of_int 18) = m !!! Regidx (mword_of_int 18 : mword 5)
-        /\ Mf !!! Regidx (mword_of_int 19) = m !!! Regidx (mword_of_int 19 : mword 5)
-        /\ Mf !!! Regidx (mword_of_int 20) = m !!! Regidx (mword_of_int 20 : mword 5)
-        /\ Mf !!! Regidx (mword_of_int 21) = m !!! Regidx (mword_of_int 21 : mword 5)
-        /\ Mf !!! Regidx csp_rs1 =
-             add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))
-        /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
+        ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
         kernel_text -∗
         pc_is (update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -2138,23 +2314,50 @@ Section ProcInv.
                   (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                   (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
                   (m !!! Regidx (mword_of_int 21 : mword 5))
+                  (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5))
+                  (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
+                  (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5))
                   HN HNl Hlen Hmycpu Hmycpu_nz Hnf_pos Hnf_rt
                   with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
     { (* Qexit = epilogue at wakeup+0x58 *)
-      iIntros (Mexit) "[%Hcsp %Hedom] Hsm Hgc Htlb Htextx Hpc Hfile Hframe".
+      iIntros (Mexit) "(%Hcsp & %Htp & %H22 & %H23 & %H24 & %H25 & %H26 & %H27 & %Hedom) Hsm Hgc Htlb Htextx Hpc Hfile Hframe".
       iApply (wp_wakeup_epilogue Mexit spF
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
                 (m !!! Regidx (mword_of_int 21 : mword 5))
                 HN Hcsp Hedom Halign
-                with "Hsm Hgc Htlb Htextx Hpc Hfile Hframe Hcont"). }
+                with "Hsm Hgc Htlb Htextx Hpc Hfile Hframe [Hcont]").
+      iIntros (Mf) "%Hepi Hsm Hgc Htlb Htextx Hpc Hfile Hframe".
+      iApply ("Hcont" $! Mf with "[%] Hsm Hgc Htlb Htextx Hpc Hfile Hframe").
+      destruct Hepi as (Hfra & Hfs0 & Hfs1 & Hfs2 & Hfs3 & Hfs4 & Hfs5 & Hfcsp
+                        & Hftp & Hf22 & Hf23 & Hf24 & Hf25 & Hf26 & Hf27 & Hfdom).
+      split; [| exact Hfdom].
+      unfold callee_saved. repeat split.
+      - (* x2 sp *) rewrite Hfcsp. subst spF. apply wakeup_sp_cancel.
+      - (* x4 tp *) rewrite Hftp. exact Htp.
+      - (* x8 s0 *) exact Hfs0.
+      - (* x9 s1 *) exact Hfs1.
+      - (* x18 s2 *) exact Hfs2.
+      - (* x19 s3 *) exact Hfs3.
+      - (* x20 s4 *) exact Hfs4.
+      - (* x21 s5 *) exact Hfs5.
+      - (* x22 s6 *) rewrite Hf22. exact H22.
+      - (* x23 s7 *) rewrite Hf23. exact H23.
+      - (* x24 s8 *) rewrite Hf24. exact H24.
+      - (* x25 s9 *) rewrite Hf25. exact H25.
+      - (* x26 s10 *) rewrite Hf26. exact H26.
+      - (* x27 s11 *) rewrite Hf27. exact H27. }
     iApply ("Hloop" $! 0%nat M with "[%] [%] Hsm Hgc Htlb Htextp Hpc Hfile Hres Hframe").
     - unfold NPROC. lia.
     - exact (wk_regs_loop M spF (m !!! Regidx (mword_of_int 2 : mword 5))
                (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 4 : mword 5))
-               (m !!! Regidx (mword_of_int 10 : mword 5)) 0 Hwkregs).
+               (m !!! Regidx (mword_of_int 10 : mword 5))
+               (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5))
+               (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
+               (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5))
+               0 Hwkregs).
   Qed.
 
 End ProcInv.
