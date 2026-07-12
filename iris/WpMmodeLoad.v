@@ -1,6 +1,14 @@
 (* M-mode Load leaf lemmas (mmode_config, decode family).
    Relocated from WpGpr*.v; helpers in WpMmodeLeafBase. *)
 Require Import WpMmodeLeafBase.
+From Stdlib Require Import ZArith.
+From stdpp Require Import bitvector.definitions gmap.
+From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language.
+From iris.base_logic.lib Require Import gen_heap invariants.
+From iris.bi.lib Require Import fractional.
+Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr MinstretInv InstrBytes RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
+Import Defs.
 Import Defs.
 
 (* from WpGprLoad.v *)

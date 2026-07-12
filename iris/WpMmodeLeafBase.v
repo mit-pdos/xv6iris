@@ -1,13 +1,13 @@
 (* Shared base for the M-mode per-decode-family leaf files (WpMmode<Family>.v).
    Holds exec-result helpers, value-defs, and utility lemmas shared by the
    M-mode (mmode_config) instruction leaves. Relocated from the WpGpr*.v files. *)
-From Stdlib Require Export ZArith.
-From stdpp Require Export bitvector.definitions gmap.
-From iris.proofmode Require Export proofmode.
-From iris.program_logic Require Export language.
-From iris.base_logic.lib Require Export gen_heap invariants.
-From iris.bi.lib Require Export fractional.
-Require Export SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr MinstretInv InstrBytes RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
+From Stdlib Require Import ZArith.
+From stdpp Require Import bitvector.definitions gmap.
+From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language.
+From iris.base_logic.lib Require Import gen_heap invariants.
+From iris.bi.lib Require Import fractional.
+Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr MinstretInv InstrBytes RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
