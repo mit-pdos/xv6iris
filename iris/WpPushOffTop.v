@@ -1030,15 +1030,17 @@ Section WpPushOffTop.
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
     pa_ra ↦₈ raold -∗
     pa_s0 ↦₈ s0old -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
+    ( ∀ mo,
+      hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mo, gpr_file mo ∗ ⌜ callee_saved m mo /\
-              mo !!! Regidx (mword_of_int 10 : mword 5)
-                = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝) -∗
+      gpr_file mo -∗
+      ⌜ callee_saved m mo /\
+        mo !!! Regidx (mword_of_int 10 : mword 5)
+          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -1070,8 +1072,8 @@ Section WpPushOffTop.
               Hal0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hsie Hcont]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hbra Hbs0").
-    iExists (po_mycpu_out P m). iFrame "Hfile". iPureIntro.
+    iApply ("Hcont" $! (po_mycpu_out P m)
+              with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hbra Hbs0").
     split; [ apply po_mycpu_out_callee_saved | apply pt_mycpu_out_a0 ].
   Qed.
 
@@ -1530,10 +1532,12 @@ Section WpPushOffTop.
     a_fs0 ↦₈ s0old0 -∗
     a_noff ↦₄ noff -∗
     a_intena ↦₄ intena_old -∗
-    ( smode_config γ (DfracOwn 1) -∗
+    ( ∀ mfin,
+      smode_config γ (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is caller_ret -∗
-      (∃ mfin, gpr_file mfin ∗ ⌜ callee_saved m mfin ⌝) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m mfin ⌝ -∗
       a_r24 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
       a_r16 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
       a_r8 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -1792,10 +1796,10 @@ Section WpPushOffTop.
       iEval (rewrite HcspN8) in "Hfra". iEval (rewrite HcspN8) in "Hfs0".
       iEval (rewrite Ha0_18t) in "Hnoff". iEval (rewrite !lookup_total_insert) in "Hnoff".
       iEval (rewrite HcspN8) in "Hr24". iEval (rewrite HcspN8) in "Hr16". iEval (rewrite HcspN8) in "Hr8".
-      iApply ("Hcont" with "Hsm Htlbinv Hpc [Hmfin] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff [Hintena]").
-      { iDestruct "Hmfin" as (mfin) "[Hmf %Hp]".
-        destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Htp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
-        iExists mfin. iFrame "Hmf". iPureIntro. unfold callee_saved. repeat split.
+      iDestruct "Hmfin" as (mfin) "[Hmf %Hp]".
+      destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Htp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
+      iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hmf [%] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff [Hintena]").
+      { unfold callee_saved. repeat split.
         - (* sp *)
           rewrite Hsp HcspN8 /spd /sp0 po_addv_assoc.
           assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
@@ -1950,10 +1954,10 @@ Section WpPushOffTop.
       iEval (rewrite HcspN5) in "Hfra". iEval (rewrite HcspN5) in "Hfs0".
       iEval (rewrite Ha0_18f) in "Hnoff". iEval (rewrite !lookup_total_insert) in "Hnoff".
       iEval (rewrite HcspN5) in "Hr24". iEval (rewrite HcspN5) in "Hr16". iEval (rewrite HcspN5) in "Hr8".
-      iApply ("Hcont" with "Hsm Htlbinv Hpc [Hmfin] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff [Hintena]").
-      { iDestruct "Hmfin" as (mfin) "[Hmf %Hp]".
-        destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Htp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
-        iExists mfin. iFrame "Hmf". iPureIntro. unfold callee_saved. repeat split.
+      iDestruct "Hmfin" as (mfin) "[Hmf %Hp]".
+      destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Htp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
+      iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hmf [%] Hr24 Hr16 Hr8 [Hfra Hfs0] Hnoff [Hintena]").
+      { unfold callee_saved. repeat split.
         - (* sp *)
           rewrite Hsp HcspN5 /spd /sp0 po_addv_assoc.
           assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
@@ -2082,10 +2086,12 @@ Section WpPushOffTop.
     stack_own sp0 n -∗
     a_noff ↦₄ noff -∗
     a_intena ↦₄ intena_old -∗
-    ( smode_config γ (DfracOwn 1) -∗
+    ( ∀ mfin,
+      smode_config γ (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is caller_ret -∗
-      (∃ mfin, gpr_file mfin ∗ ⌜ callee_saved m mfin ⌝) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m mfin ⌝ -∗
       stack_own sp0 n -∗
       a_noff ↦₄ noff_store -∗
       a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then (zeros' 32) else intena_old) -∗
@@ -2130,7 +2136,7 @@ Section WpPushOffTop.
     { iExact "Hfs0". }
     { iExact "Hnoff". }
     { iExact "Hintena". }
-    iIntros "Hsm Htlbinv Hpc Hmfin Hr24 Hr16 Hr8 Hfrablk Hnoff Hintena".
+    iIntros (mfin) "Hsm Htlbinv Hpc Hmf %Hcs Hr24 Hr16 Hr8 Hfrablk Hnoff Hintena".
     iDestruct "Hfrablk" as (vfra vfs0) "[Hfra Hfs0]".
     iEval (rewrite Hb1) in "Hr24". iEval (rewrite Hb2) in "Hr16".
     iEval (rewrite Hb3) in "Hr8". iEval (rewrite Hb5) in "Hfra".
@@ -2142,7 +2148,8 @@ Section WpPushOffTop.
       iSplitL "Hgap"; [by iExists _|]. iSplitL "Hfra"; [by iExists _|].
       iSplitL "Hfs0"; [by iExists _|]. done. }
     iDestruct (stack_own_split_2 sp0 6 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hmfin Hstk Hnoff Hintena").
+    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hmf [%] Hstk Hnoff Hintena").
+    exact Hcs.
   Qed.
 
 

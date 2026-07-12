@@ -139,12 +139,13 @@ Section Kalloc.
     q_intena ↦₄ qintena_old -∗
     is_lock γ lkA (kmem_res fl) -∗
     q_cpu ↦₈ qcpuold -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ (mr : gmap regidx (mword 64)),
+      smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) bsie -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ (mr : gmap regidx (mword 64)), gpr_file mr ∗
-         kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5))) -∗
+      gpr_file mr -∗
+      kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (∃ u1 u2 u3 : bv 64, a_r24 ↦₈ u1 ∗ a_r16 ↦₈ u2 ∗ a_r8 ↦₈ u3) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -264,7 +265,7 @@ Section Kalloc.
               HN HNl (eq_sym Ha0fcpu) Hcpune Hret0
               with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                     Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqfra Hqfs0 Hnoff Hint Hlock Hcpu [-]").
-    iIntros "Hcfg Htoken Htlbinv Hpc Htok HRres Hgpr
+    iIntros (mfin) "Hcfg Htoken Htlbinv Hpc Htok HRres Hfile %Hpins
              Hqr24 Hqr16 Hqr8 Hqjunk Hnoff Hint Hcpu".
     (* re-open the config for kalloc's own post-acquire leaves (fresh existential,
        rebound to the same names after clearing the consumed pre-acquire ones) *)
@@ -275,7 +276,6 @@ Section Kalloc.
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     (* ---- acquire returned: [locked γ ∗ kmem_res fl] held, pc = +0x16 ---- *)
-    iDestruct "Hgpr" as (mfin) "[Hfile %Hpins]".
     unfold callee_saved in Hpins.
     destruct Hpins as (Hmsp & Hmtp & Hms0 & Hms1 & Hms2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (Hmara : mA !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)
@@ -430,7 +430,7 @@ Section Kalloc.
       { iEval (rewrite HE3csp). iExact "Hqp0". }
       { iEval (rewrite HE3csp). iExact "Hqfra". }
       { iEval (rewrite HE3csp). iExact "Hqfs0". }
-      iIntros "Hcfg Htoken Htlbinv Hpc Hgpr2 Hcpu2 Hnoff2 Hint2 Hjunk2".
+      iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile %Hpins2 Hcpu2 Hnoff2 Hint2 Hjunk2".
       clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
       iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
         as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
@@ -440,7 +440,6 @@ Section Kalloc.
       assert (Hpc58 : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x58)).
       { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc58) in "Hpc".
-      iDestruct "Hgpr2" as (mr) "[Hfile %Hpins2]".
       unfold callee_saved in Hpins2.
       destruct Hpins2 as (Hmrcsp & Hmrtp & Hmrs0 & Hmrs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
       assert (HE3s1 : E3 !!! Regidx (mword_of_int 9 : mword 5) = nullp).
@@ -566,8 +565,8 @@ Section Kalloc.
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc [Hfile] [Hr24 Hr16 Hr8]").
-      { iExists P45. iFrame "Hfile". rewrite /kalloc_post. iLeft. iPureIntro. exact HP45a0. }
+      iApply ("Hcont" $! P45 with "Hcfg Htoken Htlbinv Hpc Hfile [] [Hr24 Hr16 Hr8]").
+      { rewrite /kalloc_post. iLeft. iPureIntro. exact HP45a0. }
       { iExists (R1 !!! Regidx (mword_of_int 1 : mword 5)), (R1 !!! Regidx (mword_of_int 8 : mword 5)), (R1 !!! Regidx (mword_of_int 9 : mword 5)).
         iFrame "Hr24 Hr16 Hr8". }
     - (* ---- NONEMPTY: head = p, page_valid p, p <> nullp, fall through to +0x20 ---- *)
@@ -742,7 +741,7 @@ Section Kalloc.
       { iEval (rewrite HR12csp). iExact "Hqp0". }
       { iEval (rewrite HR12csp). iExact "Hqfra". }
       { iEval (rewrite HR12csp). iExact "Hqfs0". }
-      iIntros "Hcfg Htoken Htlbinv Hpc Hgpr2 Hcpu2 Hnoff2 Hint2 Hjunk2".
+      iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile %Hpins2 Hcpu2 Hnoff2 Hint2 Hjunk2".
       clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
       iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
         as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
@@ -753,7 +752,6 @@ Section Kalloc.
       assert (Hpc36 : update_vec_dec (add_vec (R12 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x36)).
       { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc36) in "Hpc".
-      iDestruct "Hgpr2" as (mr) "[Hfile %Hpins2]".
       iPoseProof (kai_36 with "Htext") as "Hi36".
       iPoseProof (kai_38 with "Htext") as "Hi38".
       iPoseProof (kai_3a with "Htext") as "Hi3a".
@@ -888,12 +886,11 @@ Section Kalloc.
       { iEval (rewrite Hpara). iExact "Hbra". }
       { iEval (rewrite Hps0). iExact "Hbs0". }
       { iEval (rewrite HMmsa0). iExact "Hpage". }
-      iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hpage Hgprf".
+      iIntros (mfp) "Hsm Htlbinv Hpc Hbra Hbs0 Hpage Hfile %Hpinsf".
       iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                    with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
         as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
       iEval (rewrite HMmsa0) in "Hpage".
-      iDestruct "Hgprf" as (mfp) "[Hfile %Hpinsf]".
       unfold callee_saved in Hpinsf.
     destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
       assert (Hpc40 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x40)).
@@ -999,8 +996,8 @@ Section Kalloc.
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc [Hfile Hpage] [Hr24 Hr16 Hr8]").
-      { iExists Q45. iFrame "Hfile". rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage". iPureIntro. exact Hpv. }
+      iApply ("Hcont" $! Q45 with "Hcfg Htoken Htlbinv Hpc Hfile [Hpage] [Hr24 Hr16 Hr8]").
+      { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage". iPureIntro. exact Hpv. }
       { iExists (R1 !!! Regidx (mword_of_int 1 : mword 5)), (R1 !!! Regidx (mword_of_int 8 : mword 5)), (R1 !!! Regidx (mword_of_int 9 : mword 5)).
         iFrame "Hr24 Hr16 Hr8". }
   Qed.
@@ -1076,12 +1073,13 @@ Section Kalloc.
     q_intena ↦₄ qintena_old -∗
     is_lock γ lkA (kmem_res fl) -∗
     q_cpu ↦₈ qcpuold -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ (mr : gmap regidx (mword 64)),
+      smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) bsie -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ (mr : gmap regidx (mword 64)), gpr_file mr ∗
-         kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5))) -∗
+      gpr_file mr -∗
+      kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (stack_own sp0 4 ∗ stack_own (pa_stk sp0 14) (n - 14)) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -1155,7 +1153,7 @@ Section Kalloc.
               with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                     Hr24 Hr16 Hr8 Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqp0 Hqfra Hqfs0
                     Hnoff Hint Hlock Hcpu [-]").
-    iIntros "Hcfg Htoken Htlbinv Hpc Hgpr Hjunk".
+    iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile Hkp Hjunk".
     iDestruct "Hjunk" as (u1 u2 u3) "(Hr24 & Hr16 & Hr8)".
     iEval (rewrite Hbr1) in "Hr24". iEval (rewrite Hbr2) in "Hr16". iEval (rewrite Hbr3) in "Hr8".
     (* rebundle kalloc's own 4-slot frame; the scratch below is consumed *)
@@ -1163,7 +1161,7 @@ Section Kalloc.
     { rewrite stack_own_slots. cbn [seq].
       iSplitL "Hr24"; [by iExists _|]. iSplitL "Hr16"; [by iExists _|].
       iSplitL "Hr8"; [by iExists _|]. iSplitL "Hg4"; [by iExists _|]. done. }
-    iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc Hgpr [$Htop $Hdeep]").
+    iApply ("Hcont" $! mr with "Hcfg Htoken Htlbinv Hpc Hfile Hkp [$Htop $Hdeep]").
   Qed.
 
 End Kalloc.

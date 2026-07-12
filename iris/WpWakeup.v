@@ -1638,7 +1638,7 @@ Section ProcInv.
       { iExact "Hintc". }
       { iEval (rewrite HM42a0). iExact "Hlockk". }
       { iEval (rewrite HM42a0). iExact "Hcpuk". }
-      iIntros "Hsm Hgc Htlb Hpc Htok HR Hgpr Har24 Har16 Har8 Hjunk Hnoff2 Hint2 Hcpu2".
+      iIntros (Macq) "Hsm Hgc Htlb Hpc Htok HR Hfile %Hpins Har24 Har16 Har8 Hjunk Hnoff2 Hint2 Hcpu2".
       (* acquire's push_off saved the intena as [if <old noff=0> then 0 else 0];
          collapse the (trivially constant) conditional so it matches [wk_res]'s
          bare [zeros' 32] on the release round-trip. *)
@@ -1650,7 +1650,6 @@ Section ProcInv.
                       = mword_of_int (KernelSyms.wakeup + 0x46)).
       { rewrite HM42ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc46) in "Hpc".
-      iDestruct "Hgpr" as (Macq) "[Hfile %Hpins]".
       iDestruct (proc_lock_res_elim with "HR") as (st ch) "(Hpst & Hpch & Hctx)".
       (* register-preservation through acquire. *)
       unfold callee_saved in Hpins.
@@ -1795,13 +1794,12 @@ Section ProcInv.
         { iEval (rewrite HMr2c_csp). iExact "Hu7". }
         { iEval (rewrite HMr2c_csp). iExact "Hfra". }
         { iEval (rewrite HMr2c_csp). iExact "Hfs0". }
-        iIntros "Hsm Hgc Htlb Hpc Hgpr Hcpu3 Hnoff3 Hint3 Hjunk3".
+        iIntros (mr) "Hsm Hgc Htlb Hpc Hfile %Hpinsr Hcpu3 Hnoff3 Hint3 Hjunk3".
         (* pc = wakeup+0x30 (release's return target). *)
         assert (Hpc30 : update_vec_dec (add_vec (Mr2c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                         = mword_of_int (KernelSyms.wakeup + 0x30)).
         { rewrite HMr2c_ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc30) in "Hpc".
-        iDestruct "Hgpr" as (mr) "[Hfile %Hpinsr]".
         unfold callee_saved in Hpinsr.
         destruct Hpinsr as (Hr'csp & Hr'4 & Hr'8 & Hr'9 & Hr'18 & Hr'19 & Hr'20 & Hr'21 & _ & _ & _ & _ & _ & _).
         iDestruct (gpr_file_dom with "Hfile") as "[%Hdommr Hfile]".

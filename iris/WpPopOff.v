@@ -1141,15 +1141,17 @@ Section WpPopOffTopSec.
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
     pa_ra ↦₈ raold -∗
     pa_s0 ↦₈ s0old -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
+    ( ∀ mo,
+      hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mo, gpr_file mo ∗ ⌜ callee_saved m mo /\
-              mo !!! Regidx (mword_of_int 10 : mword 5)
-                = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝) -∗
+      gpr_file mo -∗
+      ⌜ callee_saved m mo /\
+        mo !!! Regidx (mword_of_int 10 : mword 5)
+          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -1176,8 +1178,8 @@ Section WpPopOffTopSec.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hgc Hcont]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hbra Hbs0").
-    iExists (po_mycpu_out P m). iFrame "Hfile". iPureIntro.
+    iApply ("Hcont" $! (po_mycpu_out P m)
+              with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hbra Hbs0").
     split; [ apply po_mycpu_out_callee_saved | apply pt_mycpu_out_a0 ].
   Qed.
 
@@ -1477,10 +1479,12 @@ Section WpPopOffTopSec.
     a_fs0 ↦₈ vfs0 -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mf,
+      smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mf, gpr_file mf ∗ ⌜ callee_saved m mf ⌝) -∗
+      gpr_file mf -∗
+      ⌜ callee_saved m mf ⌝ -∗
       a_noff ↦₄ storeval -∗
       a_int ↦₄{ dqi } intenav -∗
       (∃ (w8 w0 wra ws0 : bv 64),
@@ -1600,7 +1604,7 @@ Section WpPopOffTopSec.
               with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
     { iEval (rewrite HspP2r). iExact "Hfra". }
     { iEval (rewrite HspP2r). iExact "Hfs0". }
-    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hmycpu Hfra Hfs0".
+    iIntros (C) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
@@ -1609,7 +1613,6 @@ Section WpPopOffTopSec.
     assert (Hpc0c : update_vec_dec (add_vec (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (PP + 0x0c) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
-    iDestruct "Hmycpu" as (C) "[Hfile %Hmc]".
     destruct Hmc as (Hmc_cs & Hmc_a0).
     unfold callee_saved in Hmc_cs.
     destruct Hmc_cs as (Hmc_csp & Hmc_tp & Hmc_s0 & Hmc_s1 & Hmc_s2 & Hmc_s3 & Hmc_s4 & Hmc_s5 & Hmc_s6 & Hmc_s7 & Hmc_s8 & Hmc_s9 & Hmc_s10 & Hmc_s11).
@@ -2075,9 +2078,8 @@ Section WpPopOffTopSec.
                 with "Hcfg Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
-      { iExists Mf. iFrame "Hfile". iPureIntro.
-        unfold callee_saved. repeat split; assumption. }
+      iApply ("Hcont" $! Mf with "Hcfg Htlbinv Hpc Hfile [%] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      { unfold callee_saved. repeat split; assumption. }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
     - (* fall: noff-1 = 0, read intena (= 0), c.beqz taken to +0x28 *)
       iApply (wp_cbnez_fall_s_scfg root_ppn γc E Φ (mword_of_int (PP + 0x1e)) (mword_of_int 5) (Cregidx (mword_of_int 7)) (mword_of_int 15)
@@ -2256,9 +2258,8 @@ Section WpPopOffTopSec.
                 with "Hcfg Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
-      { iExists Mf. iFrame "Hfile". iPureIntro.
-        unfold callee_saved. repeat split; assumption. }
+      iApply ("Hcont" $! Mf with "Hcfg Htlbinv Hpc Hfile [%] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      { unfold callee_saved. repeat split; assumption. }
       iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
   Qed.
 
@@ -2300,10 +2301,12 @@ Section WpPopOffTopSec.
     stack_own (m !!! Regidx csp_rs1) n -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mf,
+      smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mf, gpr_file mf ∗ ⌜ callee_saved m mf ⌝) -∗
+      gpr_file mf -∗
+      ⌜ callee_saved m mf ⌝ -∗
       a_noff ↦₄ storeval -∗
       a_int ↦₄{ dqi } intenav -∗
       stack_own (m !!! Regidx csp_rs1) n -∗
@@ -2335,7 +2338,7 @@ Section WpPopOffTopSec.
     iApply (wp_pop_off_words root_ppn γc E Φ m noffv intenav vp8 vp0 vfra vfs0 (dqi:=dqi)
               HN Hnoffpos Hint Hal0
               with "Hcfg Htlbinv Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Haint [-]").
-    iIntros "Hcfg Htlbinv Hpc Hmf Hnoff Haint Hblk".
+    iIntros (mf) "Hcfg Htlbinv Hpc Hmf %Hcs Hnoff Haint Hblk".
     iDestruct "Hblk" as (w8 w0 wra ws0) "(Hp8 & Hp0 & Hfra & Hfs0)".
     iEval (rewrite Hb1) in "Hp8". iEval (rewrite Hb2) in "Hp0".
     iEval (rewrite Hb3) in "Hfra". iEval (rewrite Hb4) in "Hfs0".
@@ -2345,7 +2348,8 @@ Section WpPopOffTopSec.
     iDestruct (stack_own_2_intro with "Hfra Hfs0") as "Ht34".
     iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 2 4 ltac:(lia) with "[$Ht12 $Ht34]") as "Htop".
     iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hcfg Htlbinv Hpc Hmf Hnoff Haint Hstk").
+    iApply ("Hcont" $! mf with "Hcfg Htlbinv Hpc Hmf [%] Hnoff Haint Hstk").
+    exact Hcs.
   Qed.
 
 End WpPopOffTopSec.

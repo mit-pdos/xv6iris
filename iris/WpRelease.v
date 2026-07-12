@@ -477,11 +477,13 @@ Section WpReleaseTop.
     a_h0 ↦₈ vh0 -∗
     a_hfra ↦₈ vhra -∗
     a_hfs0 ↦₈ vhs0 -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mr,
+      smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) b -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mr, gpr_file mr ∗ ⌜ callee_saved m mr ⌝) -∗
+      gpr_file mr -∗
+      ⌜ callee_saved m mr ⌝ -∗
       a_cpu ↦₈ (zero_reg : mword 64) -∗
       a_noff ↦₄ storeval_noff -∗
       a_int ↦₄{ dqi } intenav -∗
@@ -706,7 +708,7 @@ Section WpReleaseTop.
     { iEval (rewrite HspR4). iExact "Hh8". }
     { iEval (rewrite HspR4). iExact "Hhfra". }
     { iEval (rewrite HspR4). iExact "Hhfs0". }
-    iIntros "Hcfg Htlbinv Hpc Htok Hgpr Hcpu Hjunk".
+    iIntros (mh) "Hcfg Htlbinv Hpc Htok Hfile %Hmhf Hcpu Hjunk".
     clear HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0 Hsst2 mstatus0 mie_v mdv0 menvcfg0.
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
       as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
@@ -714,7 +716,6 @@ Section WpReleaseTop.
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     iEval (rewrite Ha0R4) in "Hcpu".
-    iDestruct "Hgpr" as (mh) "[Hfile %Hmhf]".
     destruct Hmhf as (Hmcs & Hma0).
     unfold callee_saved in Hmcs.
     destruct Hmcs as (Hmsp & Hmtp & Hms0 & Hms1 & Hms2 & Hms3 & Hms4 & Hms5 & Hms6 & Hms7 & Hms8 & Hms9 & Hms10 & Hms11).
@@ -860,7 +861,7 @@ Section WpReleaseTop.
     { iEval (rewrite HspM1 EQpfs0). iExact "Hh0". }
     { iEval (rewrite HtpM1). iExact "Hnoff". }
     { iEval (rewrite HtpM1). iExact "Hint". }
-    iIntros "Hcfg Htlbinv Hpc Hgpr Hnoff Hint Hjunk".
+    iIntros (mf) "Hcfg Htlbinv Hpc Hfile %Hmff Hnoff Hint Hjunk".
     clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
       as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
@@ -868,7 +869,6 @@ Section WpReleaseTop.
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
     iEval (rewrite HtpM1) in "Hnoff". iEval (rewrite HtpM1) in "Hint".
-    iDestruct "Hgpr" as (mf) "[Hfile %Hmff]".
     unfold callee_saved in Hmff.
     destruct Hmff as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & Hfs3 & Hfs4 & Hfs5 & Hfs6 & Hfs7 & Hfs8 & Hfs9 & Hfs10 & Hfs11).
     iDestruct "Hjunk" as (u8 u0 ura us0) "(Hh24 & Hh16 & Hh8 & Hh0)".
@@ -953,10 +953,9 @@ Section WpReleaseTop.
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-    iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc [Hfile] Hcpu Hnoff Hint
+    iApply ("Hcont" $! Q4 with "Hcfg Htoken Htlbinv Hpc Hfile [%] Hcpu Hnoff Hint
                           [Hr24 Hr16 Hr8 Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0]").
-    { iExists Q4. iFrame "Hfile". iPureIntro.
-      unfold callee_saved. repeat split.
+    { unfold callee_saved. repeat split.
       - (* sp *)
         rewrite /Q4. rewrite lookup_total_insert. rewrite HspQ3.
         rewrite /spr po_addv_assoc.
@@ -1083,11 +1082,13 @@ Section WpReleaseTop.
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
     stack_own sp0 n -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mr,
+      smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) b -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mr, gpr_file mr ∗ ⌜ callee_saved m mr ⌝) -∗
+      gpr_file mr -∗
+      ⌜ callee_saved m mr ⌝ -∗
       a_cpu ↦₈ (zero_reg : mword 64) -∗
       a_noff ↦₄ storeval_noff -∗
       a_int ↦₄{ dqi } intenav -∗
@@ -1138,7 +1139,7 @@ Section WpReleaseTop.
     { iExact "Hr24". } { iExact "Hr16". } { iExact "Hr8". }
     { iExact "Hh24". } { iExact "Hh16". } { iExact "Hh8". } { iExact "Hh0". }
     { iExact "Hhfra". } { iExact "Hhfs0". }
-    iIntros "Hcfg Htoken Htlbinv Hpc Hmr Hcpu Hnoff Hint Hblk".
+    iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hmr %Hcs Hcpu Hnoff Hint Hblk".
     iDestruct "Hblk" as (u1 u2 u3 u4 u5 u6 u7 u8 u9) "(Hr24 & Hr16 & Hr8 & Hh24 & Hh16 & Hh8 & Hh0 & Hhfra & Hhfs0)".
     iEval (rewrite Hb1) in "Hr24".  iEval (rewrite Hb2) in "Hr16".
     iEval (rewrite Hb3) in "Hr8".   iEval (rewrite Hb5) in "Hh24".
@@ -1153,7 +1154,8 @@ Section WpReleaseTop.
       iSplitL "Hh8"; [by iExists _|].  iSplitL "Hh0"; [by iExists _|].
       iSplitL "Hhfra"; [by iExists _|]. iSplitL "Hhfs0"; [by iExists _|]. done. }
     iDestruct (stack_own_split_2 sp0 10 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc Hmr Hcpu Hnoff Hint Hstk").
+    iApply ("Hcont" $! mr with "Hcfg Htoken Htlbinv Hpc Hmr [%] Hcpu Hnoff Hint Hstk").
+    exact Hcs.
   Qed.
 
 End WpReleaseTop.

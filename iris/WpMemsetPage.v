@@ -250,13 +250,15 @@ Section WpMemsetPage.
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
     page_own p -∗
-    ( smode_config γ dq -∗
+    ( ∀ mfin,
+      smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       page_own p -∗
-      ( ∃ mfin, gpr_file mfin ∗ ⌜ callee_saved m0 mfin ⌝ ) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m0 mfin ⌝ -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -334,15 +336,15 @@ Section WpMemsetPage.
                     Htext Hpc Hfile Hbra Hbs0 Hbuf [Hcont]").
     (* --- continuation: rebuild [page_own p] and re-expose gpr_file --- *)
     iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hbra Hbs0 [Hbuf] [Hmfin]").
+    iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
+    destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
+    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hbra Hbs0 [Hbuf] Hfile [%]").
     - (* page_own p from the returned all-cbyte buffer *)
       iEval (rewrite /page_own /byte_any).
       iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
       iEval (rewrite ms_pa_ms_addr) in "H". iExists _. iExact "H".
     - (* the final register file, with ra/s0/s1/s2/sp pinned to their caller values *)
-      iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
-      destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
-      iExists mfin. iFrame "Hfile". iPureIntro. unfold callee_saved.
+      unfold callee_saved.
       split; [ (* sp *) rewrite Hpcsp; apply add_vec_frame_cancel |].
       split; [ (* tp *) apply Hpres; vm_compute; discriminate |].
       split; [ (* s0 *) exact Hps0 |].

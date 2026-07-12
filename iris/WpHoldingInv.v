@@ -469,12 +469,13 @@ Section WpHoldingInv.
     a_h8 ↦₈ vp8 -∗
     a_fra ↦₈ vfra -∗
     a_fs0 ↦₈ vfs0 -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mh,
+      smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mh, gpr_file mh ∗
-        ⌜ callee_saved m mh /\
-          mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) ⌝) -∗
+      gpr_file mh -∗
+      ⌜ callee_saved m mh /\
+        mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) ⌝ -∗
       a_cpu ↦₈{ dqc } cpuold -∗
       (∃ (w24 w16 w8 wra ws0 : bv 64),
         a_h24 ↦₈ w24 ∗
@@ -651,7 +652,7 @@ Section WpHoldingInv.
                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
       { iEval (rewrite HspH6). iExact "Hfra". }
       { iEval (rewrite HspH6). iExact "Hfs0". }
-      iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hmycpu Hfra Hfs0".
+      iIntros (C) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
@@ -660,7 +661,6 @@ Section WpHoldingInv.
       assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                       = (mword_of_int (KernelSyms.holding + 0x1a) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc1a) in "Hpc".
-      iDestruct "Hmycpu" as (C) "[Hfile %Hmc]".
       destruct Hmc as (Hmc_cs & Hmc_a0).
       unfold callee_saved in Hmc_cs.
       destruct Hmc_cs as (Hmc_csp & Hmc_tp & Hmc_s0 & Hmc_s1 & Hmc_s2 & Hmc_s3 & Hmc_s4 & Hmc_s5 & Hmc_s6 & Hmc_s7 & Hmc_s8 & Hmc_s9 & Hmc_s10 & Hmc_s11).
@@ -787,9 +787,8 @@ Section WpHoldingInv.
                 with "Hcfg Htlbinv Hpc Hfile Hi2a [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       iEval (rewrite HraH11) in "Hpc".
-      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
-      { iExists H11. iFrame "Hfile". iPureIntro.
-        split.
+      iApply ("Hcont" $! H11 with "Hcfg Htlbinv Hpc Hfile [%] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
+      { split.
         { unfold callee_saved. repeat split.
         - (* sp *)
           rewrite /H11. rewrite lookup_total_insert. rewrite HspH10.
@@ -1003,9 +1002,8 @@ Section WpHoldingInv.
                 with "Hcfg Htlbinv Hpc Hfile Hi06 [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       iEval (rewrite HraH2f) in "Hpc".
-      iApply ("Hcont" with "Hcfg Htlbinv Hpc [Hfile] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
-      { iExists H2f. iFrame "Hfile". iPureIntro.
-        split.
+      iApply ("Hcont" $! H2f with "Hcfg Htlbinv Hpc Hfile [%] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
+      { split.
         { unfold callee_saved. repeat split;
             (rewrite /H2f; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
              rewrite /H1; rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]). }
@@ -1053,13 +1051,14 @@ Section WpHoldingInv.
     a_h8 ↦₈ vp8 -∗
     a_fra ↦₈ vfra -∗
     a_fs0 ↦₈ vfs0 -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mh,
+      smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       locked γ -∗
-      (∃ mh, gpr_file mh ∗
-        ⌜ callee_saved m mh /\
-          mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝) -∗
+      gpr_file mh -∗
+      ⌜ callee_saved m mh /\
+        mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
       a_cpu ↦₈{ dqc } cpuold -∗
       (∃ (w24 w16 w8 wra ws0 : bv 64),
         a_h24 ↦₈ w24 ∗
@@ -1237,7 +1236,7 @@ Section WpHoldingInv.
                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
       { iEval (rewrite HspH6). iExact "Hfra". }
       { iEval (rewrite HspH6). iExact "Hfs0". }
-      iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hmycpu Hfra Hfs0".
+      iIntros (C) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
@@ -1246,7 +1245,6 @@ Section WpHoldingInv.
       assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                       = (mword_of_int (KernelSyms.holding + 0x1a) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc1a) in "Hpc".
-      iDestruct "Hmycpu" as (C) "[Hfile %Hmc]".
       destruct Hmc as (Hmc_cs & Hmc_a0).
       unfold callee_saved in Hmc_cs.
       destruct Hmc_cs as (Hmc_csp & Hmc_tp & Hmc_s0 & Hmc_s1 & Hmc_s2 & Hmc_s3 & Hmc_s4 & Hmc_s5 & Hmc_s6 & Hmc_s7 & Hmc_s8 & Hmc_s9 & Hmc_s10 & Hmc_s11).
@@ -1373,9 +1371,8 @@ Section WpHoldingInv.
                 with "Hcfg Htlbinv Hpc Hfile Hi2a [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       iEval (rewrite HraH11) in "Hpc".
-      iApply ("Hcont" with "Hcfg Htlbinv Hpc Htok [Hfile] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
-      { iExists H11. iFrame "Hfile". iPureIntro.
-        split.
+      iApply ("Hcont" $! H11 with "Hcfg Htlbinv Hpc Htok Hfile [%] Hcpu [Hh24 Hh16 Hh8 Hfra Hfs0]").
+      { split.
         { unfold callee_saved. repeat split.
         - (* sp *)
           rewrite /H11. rewrite lookup_total_insert. rewrite HspH10.

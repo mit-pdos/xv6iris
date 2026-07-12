@@ -637,7 +637,7 @@ Section Kfree.
     { iEval (rewrite Hpara). iExact "Hmra". }
     { iEval (rewrite Hps0). iExact "Hms0". }
     { iEval (rewrite HMmsa0). iExact "Hpown". }
-    iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hpage Hgprf".
+    iIntros (mfp) "Hsm Htlbinv Hpc Hbra Hbs0 Hpage Hfile %Hpinsf".
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
       as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
@@ -651,7 +651,6 @@ Section Kfree.
     { rewrite /ms_s0 /ms_sp /q_r16 /spdA. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite Beq1) in "Hbra". iEval (rewrite Beq2) in "Hbs0".
     iRename "Hbra" into "Hqr24". iRename "Hbs0" into "Hqr16".
-    iDestruct "Hgprf" as (mfp) "[Hfile %Hpinsf]".
     unfold callee_saved in Hpinsf.
     destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (Hpc36 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x36)).
@@ -789,7 +788,7 @@ Section Kfree.
     { iEval (rewrite HKacqcsp). iExact "Hqfs0". }
     { iEval (rewrite HKacqa0 -Hlk). rewrite /is_kmem. iExact "Hkmem". }
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hqcpu". }
-    iIntros "Hcfg Htoken Htlbinv Hpc Htok HRres Hgpr
+    iIntros (macq) "Hcfg Htoken Htlbinv Hpc Htok HRres Hfile %Hacqpins
              Har24 Har16 Har8 Hajunk Hanoff Haint Hacpu".
     clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
@@ -801,7 +800,6 @@ Section Kfree.
     assert (Hpc44 : update_vec_dec (add_vec (Kacq !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x44)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
-    iDestruct "Hgpr" as (macq) "[Hfile %Hacqpins]".
     unfold callee_saved in Hacqpins.
     destruct Hacqpins as (Hqsp & Hqtp & Hqs0 & Hqs1 & Hqs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (Hs1p : macq !!! Regidx (mword_of_int 9 : mword 5) = p) by (rewrite Hqs1; exact Hmacq_s1).
@@ -947,7 +945,7 @@ Section Kfree.
     { iEval (rewrite HRrelcsp). iExact "Hqp0". }
     { iEval (rewrite HRrelcsp). iExact "Hqfra". }
     { iEval (rewrite HRrelcsp). iExact "Hqfs0". }
-    iIntros "Hcfg Htoken Htlbinv Hpc Hgprr Hcpu2 Hnoff2 Hint2 Hjunk2".
+    iIntros (mrel) "Hcfg Htoken Htlbinv Hpc Hfile %Hrelpins Hcpu2 Hnoff2 Hint2 Hjunk2".
     clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
       as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
@@ -968,7 +966,6 @@ Section Kfree.
     assert (Hpc54 : update_vec_dec (add_vec (Rrel !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".
-    iDestruct "Hgprr" as (mrel) "[Hfile %Hrelpins]".
     unfold callee_saved in Hrelpins.
     destruct Hrelpins as (Hrsp & Hrtp & Hrs0 & Hrs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (HspMrel : mrel !!! Regidx csp_rs1 = spr) by (rewrite Hrsp; exact HRrelcsp).

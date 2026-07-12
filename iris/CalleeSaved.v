@@ -11,9 +11,12 @@
 
    The preserved set is: sp (x2), s0 (x8), s1 (x9), s2..s11 (x18..x27) -- the
    classic RISC-V callee-saved registers -- plus tp (x4), which this kernel pins
-   to the cpuid and every function preserves.  Function-call WPs put
-   [∃ m', gpr_file m' ∗ ⌜callee_saved m m'⌝] in their postcondition in place of
-   an ad-hoc, per-function list of individual register-preservation facts. *)
+   to the cpuid and every function preserves.  Function-call WPs universally
+   quantify the return register map over the whole continuation --
+   [∀ m', ... -∗ gpr_file m' -∗ ⌜callee_saved m m'⌝ -∗ ... -∗ WP ...] -- in place
+   of an ad-hoc, per-function list of individual register-preservation facts.
+   (Callers thus receive [m'] and the preservation fact directly, rather than
+   destructing an [∃ m', gpr_file m' ∗ ⌜callee_saved m m'⌝] package.) *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.

@@ -974,11 +974,13 @@ Section WpTimerinitThm.
     stimecmp ↦ᵣ stimecmp0 -∗
     stack_own sp0 n -∗
     kernel_text -∗
-    ( mmode_config (DfracOwn q) -∗
+    ( ∀ mo,
+      mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg1 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (cret_target ra0) -∗
-      (∃ mo, gpr_file mo ∗ ⌜ callee_saved m mo ⌝) -∗
+      gpr_file mo -∗
+      ⌜ callee_saved m mo ⌝ -∗
       menvcfg ↦ᵣ menvcfg_legalized menv0 (ti_menv1 menv0) -∗
       mcounteren ↦ᵣ legalize_mcounteren mcen0 (ti_mcen1 mcen0) -∗
       mtime ↦ᵣ mtime0 -∗
@@ -1005,9 +1007,9 @@ Section WpTimerinitThm.
     iEval (rewrite Hps0) in "Hstks0".
     iDestruct (stack_own_2_intro with "Hstkra Hstks0") as "Htop".
     iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hmm Hpmpc Hpaddr Hpc [Hfile] Hmenv Hmcen Hmtime Hstc Hstk").
-    iExists (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00). iFrame "Hfile".
-    iPureIntro. apply ti_mout_callee_saved; assumption.
+    iApply ("Hcont" $! (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00)
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [%] Hmenv Hmcen Hmtime Hstc Hstk").
+    apply ti_mout_callee_saved; assumption.
   Qed.
 
 End WpTimerinitThm.
