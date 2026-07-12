@@ -60,6 +60,11 @@ WpMmodeJalr.v
 WpMmodeMret.v
 WpSmodeLeafBase.v
 WpSmodeFence.v
+WpSmodeToBeDeleted.v
+WpSmodeAddiw.v
+WpSmodeShiftiop.v
+WpSmodeRtype.v
+WpSmodeItype.v
 InstrBytes.v
 StackOwn.v
 CalleeSaved.v
