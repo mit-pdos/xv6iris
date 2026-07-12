@@ -1444,6 +1444,76 @@ Section WpPopOffTopSec.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
+  (* [smode_config] view of the mycpu() VCgen callee: the raw callee needs full
+     config cells + the SIE ghost half, so unbundle here and rebundle on return
+     (pop_off's post is existential, so re-pinning a value is fine). *)
+  Lemma wp_call_mycpu_vc_scfg (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
+      (P : mword 64) (jimm : mword 21)
+      (m : gmap regidx (mword 64))
+      (raold s0old : bv 64)
+      :
+    let ra_idx : mword 5 := mword_of_int 1 in
+    let tp_idx : mword 5 := mword_of_int 4 in
+    let s0_idx : mword 5 := mword_of_int 8 in
+    let a0_idx : mword 5 := mword_of_int 10 in
+    let a5_idx : mword 5 := mword_of_int 15 in
+    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
+    let pcE := mword_of_int KernelSyms.mycpu in
+    let imm_entry : mword 6 := mword_of_int 48 in
+    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
+    let ra0 := m0 !!! Regidx ra_idx in
+    let s00 := m0 !!! Regidx s0_idx in
+    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
+    let pa_ra := ea_ra in
+    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
+    let pa_s0 := ea_s0 in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    ↑minstretN ⊆ E ->
+    add_vec P (sign_extend' 64 jimm) = pcE ->
+    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    smode_config γc (DfracOwn 1) -∗
+    tlb_inv root_ppn -∗
+    kernel_text -∗ pc_is P -∗ gpr_file m -∗
+    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
+    pa_ra ↦₈ raold -∗
+    pa_s0 ↦₈ s0old -∗
+    ( ∀ mo,
+      smode_config γc (DfracOwn 1) -∗
+      tlb_inv root_ppn -∗
+      pc_is ret_tgt -∗
+      gpr_file mo -∗
+      ⌜ callee_saved m mo /\
+        mo !!! Regidx (mword_of_int 10 : mword 5)
+          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
+      pa_ra ↦₈ ra0 -∗
+      pa_s0 ↦₈ s00 -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros ra_idx tp_idx s0_idx a0_idx a5_idx m0 pcE imm_entry sp' ra0 s00
+      ea_ra pa_ra ea_s0 pa_s0 ret_tgt
+      HN Htarget Halign_tgt Hal0.
+    iIntros "Hcfg Htlbinv Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
+    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
+      as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
+    iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
+    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
+    iApply (wp_call_mycpu_vc root_ppn γc E Φ P jimm m raold s0old
+              mstatus0 mie_v mdv0 menvcfg0
+              HN Htarget Halign_tgt
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe HFIOM Hlegal Hal0
+              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hjal Hbra Hbs0 [-]").
+    iIntros (mo) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hbra Hbs0".
+    iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+    iApply ("Hcont" $! mo with "Hcfg Htlbinv Hpc Hfile [%] Hbra Hbs0").
+    exact Hmc.
+  Qed.
+
   Lemma wp_pop_off_words (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
@@ -1589,25 +1659,14 @@ Section WpPopOffTopSec.
     (* +0x08 jal ra,mycpu; the callee needs raw config cells + the SIE ghost, so
        unbundle here and rebundle when it returns (pop_off's post is existential,
        so re-pinning a value is fine). *)
-    iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
-      as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
-    iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
-    iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
-    iApply (wp_call_mycpu_vc root_ppn γc E Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) M1 vfra vfs0
-              mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_call_mycpu_vc_scfg root_ppn γc E Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) M1 vfra vfs0
               HN ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe HFIOM Hlegal
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
+              with "Hcfg Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
     { iEval (rewrite HspP2r). iExact "Hfra". }
     { iEval (rewrite HspP2r). iExact "Hfs0". }
-    iIntros (C) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
-    iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+    iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
     iEval (rewrite HspP2r) in "Hfra". iEval (rewrite HspP2r) in "Hfs0".
     iEval (rewrite lookup_total_insert) in "Hpc".
     assert (Hpc0c : update_vec_dec (add_vec (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
