@@ -71,6 +71,7 @@ UmodeFetch.v
 UmodeStep.v
 UmodeEcall.v
 DecodeTotal.v
+DecodeTotalU.v
 WpUserEcall.v
 UmodeFetchFault.v
 UmodeWalk.v
