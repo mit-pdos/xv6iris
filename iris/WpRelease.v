@@ -418,15 +418,16 @@ Section WpReleaseTop.
 
   Notation RL := KernelSyms.release.
 
-  Lemma wp_release_words (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_release (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (γc : gname) (b : mword 1) (lka : mword 64) (R : iProp Σ)
       (m : gmap regidx (mword 64))
       (cpuold : mword 64) (noffv intenav : mword 32)
-      (vr24 vr16 vr8 vh24 vh16 vh8 vh0 vhra vhs0 : bv 64)
+      (n : nat)
       {dqi : dfrac} :
     let pcE : mword 64 := mword_of_int RL in
     let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
     let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
+    let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     let a_r24 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
     let a_r16 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
@@ -445,6 +446,7 @@ Section WpReleaseTop.
     let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
     let storeval_noff := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (10 <= n)%nat ->
     ↑minstretN ⊆ E ->
     ↑lockN ⊆ E ->
     (* the lock word (through the invariant) and the data slots *)
@@ -468,15 +470,7 @@ Section WpReleaseTop.
     a_cpu ↦₈ cpuold -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
-    a_r24 ↦₈ vr24 -∗
-    a_r16 ↦₈ vr16 -∗
-    a_r8 ↦₈ vr8 -∗
-    a_h24 ↦₈ vh24 -∗
-    a_h16 ↦₈ vh16 -∗
-    a_h8 ↦₈ vh8 -∗
-    a_h0 ↦₈ vh0 -∗
-    a_hfra ↦₈ vhra -∗
-    a_hfs0 ↦₈ vhs0 -∗
+    stack_own sp0 n -∗
     ( ∀ mr,
       smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) b -∗
@@ -487,27 +481,51 @@ Section WpReleaseTop.
       a_cpu ↦₈ (zero_reg : mword 64) -∗
       a_noff ↦₄ storeval_noff -∗
       a_int ↦₄{ dqi } intenav -∗
-      (∃ (u1 u2 u3 u4 u5 u6 u7 u8 u9 : bv 64),
-        a_r24 ↦₈ u1 ∗
-        a_r16 ↦₈ u2 ∗
-        a_r8 ↦₈ u3 ∗
-        a_h24 ↦₈ u4 ∗
-        a_h16 ↦₈ u5 ∗
-        a_h8 ↦₈ u6 ∗
-        a_h0 ↦₈ u7 ∗
-        a_hfra ↦₈ u8 ∗
-        a_hfs0 ↦₈ u9) -∗
+      stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros pcE lk0 a_cpu spr a_r24 a_r16 a_r8 spdh a_h24 a_h16 a_h8 a_h0 mch a_hfra a_hfs0
+    intros pcE lk0 a_cpu sp0 spr a_r24 a_r16 a_r8 spdh a_h24 a_h16 a_h8 a_h0 mch a_hfra a_hfs0
       cpuv a_noff a_int nv1 storeval_noff ret_tgt
-      HN HNl
+      Hn HN HNl
       Hlkeq
       Hmine Hnoffpos Hint Hal0.
     iIntros "Hcfg Htoken Htlbinv
              #Htext Hpc Hfile #Hlock Htok HRes Hcpu Hnoff Hint
-             Hr24 Hr16 Hr8 Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0 Hcont".
+             Hstk Hcont".
+    (* peel the top 10 slots, frame the deeper region *)
+    iDestruct (stack_own_split_1 sp0 10 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iEval (rewrite stack_own_slots; cbn [seq]) in "Htop".
+    iDestruct "Htop" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
+    iDestruct "S1" as (vr24) "Hr24".   iDestruct "S2" as (vr16) "Hr16".
+    iDestruct "S3" as (vr8) "Hr8".     iDestruct "S4" as (vgap) "Hgap".
+    iDestruct "S5" as (vh24) "Hh24".   iDestruct "S6" as (vh16) "Hh16".
+    iDestruct "S7" as (vh8) "Hh8".     iDestruct "S8" as (vh0) "Hh0".
+    iDestruct "S9" as (vhra) "Hhfra".  iDestruct "S10" as (vhs0) "Hhfs0".
+    (* bridges: clean [pa_stk sp0 k] = raw slot spelling the body uses *)
+    assert (Hb1 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb3 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb5 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 5).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb6 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 6).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb7 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 7).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb8 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 8).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb9 : add_vec (add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 9).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb10 : add_vec (add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 10).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hb1) in "Hr24".  iEval (rewrite -Hb2) in "Hr16".
+    iEval (rewrite -Hb3) in "Hr8".   iEval (rewrite -Hb5) in "Hh24".
+    iEval (rewrite -Hb6) in "Hh16".  iEval (rewrite -Hb7) in "Hh8".
+    iEval (rewrite -Hb8) in "Hh0".   iEval (rewrite -Hb9) in "Hhfra".
+    iEval (rewrite -Hb10) in "Hhfs0".
     (* unbundle the ambient S-mode config: recovers the raw cells, the folded
        facts, and smode_config's half of the SIE ghost var (Hgc). *)
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
@@ -953,8 +971,27 @@ Section WpReleaseTop.
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-    iApply ("Hcont" $! Q4 with "Hcfg Htoken Htlbinv Hpc Hfile [%] Hcpu Hnoff Hint
-                          [Hr24 Hr16 Hr8 Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0]").
+    (* the four pop_off slots return at the folded [a_h*] cell names; key their
+       rebundle bridges on those variables.  the r-slots and holding's fra/fs0
+       slots return as [add_vec spr ...] and match the raw Hb bridges directly. *)
+    assert (Hd5 : a_h24 = pa_stk sp0 5) by exact Hb5.
+    assert (Hd6 : a_h16 = pa_stk sp0 6) by exact Hb6.
+    assert (Hd7 : a_h8 = pa_stk sp0 7) by exact Hb7.
+    assert (Hd8 : a_h0 = pa_stk sp0 8) by exact Hb8.
+    iEval (rewrite Hb1) in "Hr24".  iEval (rewrite Hb2) in "Hr16".
+    iEval (rewrite Hb3) in "Hr8".   iEval (rewrite Hd5) in "Hh24".
+    iEval (rewrite Hd6) in "Hh16".  iEval (rewrite Hd7) in "Hh8".
+    iEval (rewrite Hd8) in "Hh0".   iEval (rewrite Hb9) in "Hhfra".
+    iEval (rewrite Hb10) in "Hhfs0".
+    iAssert (stack_own sp0 10) with "[Hr24 Hr16 Hr8 Hgap Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0]" as "Htop".
+    { rewrite stack_own_slots. cbn [seq].
+      iSplitL "Hr24"; [by iExists _|]. iSplitL "Hr16"; [by iExists _|].
+      iSplitL "Hr8"; [by iExists _|].  iSplitL "Hgap"; [by iExists _|].
+      iSplitL "Hh24"; [by iExists _|]. iSplitL "Hh16"; [by iExists _|].
+      iSplitL "Hh8"; [by iExists _|].  iSplitL "Hh0"; [by iExists _|].
+      iSplitL "Hhfra"; [by iExists _|]. iSplitL "Hhfs0"; [by iExists _|]. done. }
+    iDestruct (stack_own_split_2 sp0 10 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
+    iApply ("Hcont" $! Q4 with "Hcfg Htoken Htlbinv Hpc Hfile [%] Hcpu Hnoff Hint Hstk").
     { unfold callee_saved. repeat split.
       - (* sp *)
         rewrite /Q4. rewrite lookup_total_insert. rewrite HspQ3.
@@ -1037,125 +1074,6 @@ Section WpReleaseTop.
         rewrite /Q1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite Hfs11. exact HM1s11.
     }
-    iExists _, _, _, _, _, _, _, _, _.
-    iFrame "Hr24 Hr16 Hr8 Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0".
-  Qed.
-
-  (* [stack_own] wrapper over [wp_release_words]: release's two save frames
-     ([sp0-8..sp0-24] = its own r-slots, [sp0-40..sp0-80] = the pop_off/mycpu
-     h-slots) plus the [sp0-32] gap between them form one contiguous
-     [stack_own sp0 n] (n >= 10).  a_cpu (lock field) / a_noff / a_int
-     (cpu struct) stay explicit.  release's post already existentialises all
-     9 saved slots, so the whole region rebundles as [stack_own sp0 n]. *)
-  Lemma wp_release (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (γ : gname) (γc : gname) (b : mword 1) (lka : mword 64) (R : iProp Σ)
-      (m : gmap regidx (mword 64))
-      (cpuold : mword 64) (noffv intenav : mword 32)
-      (n : nat)
-      {dqi : dfrac} :
-    let pcE : mword 64 := mword_of_int RL in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
-    let storeval_noff := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (10 ≤ n)%nat ->
-    ↑minstretN ⊆ E ->
-    ↑lockN ⊆ E ->
-    add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-    eq_vec cpuold cpuv = true ->
-    zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
-    eq_vec (sign_extend' 64 intenav) zero_reg = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    ghost_var γc (1/2) b -∗
-    tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    is_lock γ lka R -∗
-    locked γ -∗
-    R -∗
-    a_cpu ↦₈ cpuold -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄{ dqi } intenav -∗
-    stack_own sp0 n -∗
-    ( ∀ mr,
-      smode_config γc (DfracOwn 1) -∗
-      ghost_var γc (1/2) b -∗
-      tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mr -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      a_cpu ↦₈ (zero_reg : mword 64) -∗
-      a_noff ↦₄ storeval_noff -∗
-      a_int ↦₄{ dqi } intenav -∗
-      stack_own sp0 n -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros pcE sp0 lk0 a_cpu cpuv a_noff a_int nv1 storeval_noff ret_tgt
-      Hn HN HNl Hlkeq Hmine Hnoffpos Hint Hal0.
-    iIntros "Hcfg Htoken Htlbinv #Htext Hpc Hfile #Hlock Htok HRes Hcpu Hnoff Hint Hstk Hcont".
-    (* peel the top 10 slots, frame the deeper region *)
-    iDestruct (stack_own_split_1 sp0 10 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Htop".
-    iDestruct "Htop" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
-    iDestruct "S1" as (vr24) "Hr24".   iDestruct "S2" as (vr16) "Hr16".
-    iDestruct "S3" as (vr8) "Hr8".     iDestruct "S4" as (vgap) "Hgap".
-    iDestruct "S5" as (vh24) "Hh24".   iDestruct "S6" as (vh16) "Hh16".
-    iDestruct "S7" as (vh8) "Hh8".     iDestruct "S8" as (vh0) "Hh0".
-    iDestruct "S9" as (vhra) "Hhfra".  iDestruct "S10" as (vhs0) "Hhfs0".
-    (* bridges: clean [pa_stk sp0 k] = raw slot spelling [wp_release_words] uses *)
-    assert (Hb1 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb2 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb3 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb5 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 5).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb6 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 6).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb7 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 7).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb8 : add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 8).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb9 : add_vec (add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 9).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb10 : add_vec (add_vec (add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 10).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite -Hb1) in "Hr24".  iEval (rewrite -Hb2) in "Hr16".
-    iEval (rewrite -Hb3) in "Hr8".   iEval (rewrite -Hb5) in "Hh24".
-    iEval (rewrite -Hb6) in "Hh16".  iEval (rewrite -Hb7) in "Hh8".
-    iEval (rewrite -Hb8) in "Hh0".   iEval (rewrite -Hb9) in "Hhfra".
-    iEval (rewrite -Hb10) in "Hhfs0".
-    iApply (wp_release_words root_ppn E Φ γ γc b lka R m cpuold noffv intenav
-              vr24 vr16 vr8 vh24 vh16 vh8 vh0 vhra vhs0 (dqi:=dqi)
-              HN HNl Hlkeq Hmine Hnoffpos Hint Hal0
-              with "Hcfg Htoken Htlbinv Htext Hpc Hfile Hlock Htok HRes Hcpu Hnoff Hint [Hr24] [Hr16] [Hr8] [Hh24] [Hh16] [Hh8] [Hh0] [Hhfra] [Hhfs0] [-]").
-    { iExact "Hr24". } { iExact "Hr16". } { iExact "Hr8". }
-    { iExact "Hh24". } { iExact "Hh16". } { iExact "Hh8". } { iExact "Hh0". }
-    { iExact "Hhfra". } { iExact "Hhfs0". }
-    iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hmr %Hcs Hcpu Hnoff Hint Hblk".
-    iDestruct "Hblk" as (u1 u2 u3 u4 u5 u6 u7 u8 u9) "(Hr24 & Hr16 & Hr8 & Hh24 & Hh16 & Hh8 & Hh0 & Hhfra & Hhfs0)".
-    iEval (rewrite Hb1) in "Hr24".  iEval (rewrite Hb2) in "Hr16".
-    iEval (rewrite Hb3) in "Hr8".   iEval (rewrite Hb5) in "Hh24".
-    iEval (rewrite Hb6) in "Hh16".  iEval (rewrite Hb7) in "Hh8".
-    iEval (rewrite Hb8) in "Hh0".   iEval (rewrite Hb9) in "Hhfra".
-    iEval (rewrite Hb10) in "Hhfs0".
-    iAssert (stack_own sp0 10) with "[Hr24 Hr16 Hr8 Hgap Hh24 Hh16 Hh8 Hh0 Hhfra Hhfs0]" as "Htop".
-    { rewrite stack_own_slots. cbn [seq].
-      iSplitL "Hr24"; [by iExists _|]. iSplitL "Hr16"; [by iExists _|].
-      iSplitL "Hr8"; [by iExists _|].  iSplitL "Hgap"; [by iExists _|].
-      iSplitL "Hh24"; [by iExists _|]. iSplitL "Hh16"; [by iExists _|].
-      iSplitL "Hh8"; [by iExists _|].  iSplitL "Hh0"; [by iExists _|].
-      iSplitL "Hhfra"; [by iExists _|]. iSplitL "Hhfs0"; [by iExists _|]. done. }
-    iDestruct (stack_own_split_2 sp0 10 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! mr with "Hcfg Htoken Htlbinv Hpc Hmr [%] Hcpu Hnoff Hint Hstk").
-    exact Hcs.
   Qed.
 
 End WpReleaseTop.
