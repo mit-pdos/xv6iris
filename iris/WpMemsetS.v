@@ -2598,44 +2598,6 @@ Qed.
   Qed.
 
   (* =================================================================== *)
-  (*  THE THEOREM: [memset]'s entry step in S-mode allocates its frame.  *)
-  (* =================================================================== *)
-
-  Lemma wp_memset_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64))
-      (q : Qp) :
-    ↑minstretN ⊆ E ->
-    smode_config γ (DfracOwn q) -∗
-    tlb_inv root_ppn -∗
-    pc_is pc_memset -∗
-    gpr_file m -∗
-    kernel_text -∗
-    ( smode_config γ (DfracOwn q) -∗
-      tlb_inv root_ppn -∗
-      pc_is (add_vec_int pc_memset 2) -∗
-      (* the stack frame is allocated: sp := sp - 16 *)
-      gpr_file (<[Regidx csp_rs1 :=
-                    regval_into_reg (add_vec (m !!! Regidx csp_rs1)
-                                       (mword_of_int (-16) : mword 64))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    iIntros (HN) "Hsm Htlbinv Hpc Hfile Htext Hcont".
-    iPoseProof (memset_instr0 with "Htext") as "Hinstr".
-    assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_rvc_gpr_write_s root_ppn γ E Φ pc_memset csp_rs1 csp_rs1 csp_rs1
-              (ITYPE (sign_extend' 12 imm_memset0, Regidx csp_rs1, Regidx csp_rs1, ADDI))
-              (add_vec (m !!! Regidx csp_rs1) (mword_of_int (-16) : mword 64))
-              m q HN Hsp
-              _
-              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (sign_extend' 12 imm_memset0) s_pc).
-    replace (Z.eqb (uint csp_rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hsp).
-    unfold gpr_addi_val. rewrite Hva. rewrite imm_memset0_val. reflexivity.
-  Qed.
-
-  (* =================================================================== *)
   (*  memset SUFFIX, 0xcea..0xcf0: restore ra/s0 from the frame, pop it,   *)
   (*  and return.                                                          *)
   (*     cea: c.ldsp ra,8(sp)   cec: c.ldsp s0,0(sp)                        *)
