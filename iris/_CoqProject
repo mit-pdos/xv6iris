@@ -58,6 +58,8 @@ WpMmodeStore.v
 WpMmodeUtype.v
 WpMmodeJalr.v
 WpMmodeMret.v
+WpSmodeLeafBase.v
+WpSmodeFence.v
 InstrBytes.v
 StackOwn.v
 CalleeSaved.v

@@ -43,6 +43,7 @@ Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
+Require Export WpSmodeFence.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -428,34 +429,6 @@ Section WpReleaseTop.
 
   (* ===== [smode_config] leaf wrappers release's body needs ===== *)
 
-  Lemma wp_fence_s_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
-    smode_config γ dq -∗ tlb_inv root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
-                           Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros HN.
-    iIntros "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_fence_s root_ppn E Φ pc m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hfiom
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
 
   Lemma wp_cbeqz_fall_s_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)

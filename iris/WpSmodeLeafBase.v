@@ -1,15 +1,22 @@
 (* Shared base for the S-mode per-decode-family leaf files (WpSmode<Family>.v).
-   Holds the smode_config step engine, the shared kernel-window instruction
-   tactics, and re-exports the M-mode leaf base (for shared exec_execute_C_*
-   helpers).  Import footprint is limited to modules the S-mode leaves already
-   depend on, to avoid changing notation resolution in downstream files. *)
-Require Export WpMmodeLeafBase.
-Require Export SmodeCore WpSmodeGpr.
-Require Export StackOwn CalleeSaved.
+   Holds the shared kernel-window instruction tactics and re-exports the M-mode
+   leaf base. Primitives are Require Import (local, non-propagating) to avoid
+   changing notation resolution in downstream files. *)
+Require Import WpMmodeLeafBase.
+Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras RiscvTryStep.
+Require Import WpLeafCommon WpGpr MinstretInv InstrBytes RiscvModelBytes WpDecode.
+From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language.
+From stdpp Require Import bitvector.definitions gmap.
+
+Require Import SmodeCore WpSmodeGpr.
+Require Import StackOwn CalleeSaved WpEntryNew.
 From Kernel Require Import KernelInstrs KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
 
+Ltac mk_rvc4 A h w pc ast decname expname :=
   let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
   let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
   let Hsub := fresh "Hsub" in let Hbytes := fresh "Hbytes" in
