@@ -636,26 +636,15 @@ Section WpHoldingInv.
         by (rewrite lookup_total_insert_ne; [ exact HspH5 | vm_compute; discriminate ]).
       assert (EQ18 : add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.holding + 0x18))
         by (apply bv_eq; vm_compute; reflexivity).
-      (* mycpu callee needs raw cells + the SIE ghost: unbundle here, rebundle after *)
-      iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
-        as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
-      iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
-      iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-      iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-      iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-      iApply (wp_pushoff_call_mycpu root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5 vfra vfs0
-                mstatus0 mie_v mdv0 menvcfg0
+      (* mycpu callee, [smode_config] view -- no unbundle island needed *)
+      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5 vfra vfs0
                 HN ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
-                HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hfiom Hleg
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-                with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
+                with "Hcfg Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
       { iEval (rewrite HspH6). iExact "Hfra". }
       { iEval (rewrite HspH6). iExact "Hfs0". }
-      iIntros (C) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
-      iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
-                   HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                   with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+      iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
       iEval (rewrite HspH6) in "Hfra". iEval (rewrite HspH6) in "Hfs0".
       iEval (rewrite lookup_total_insert) in "Hpc".
       assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
@@ -1220,26 +1209,15 @@ Section WpHoldingInv.
         by (rewrite lookup_total_insert_ne; [ exact HspH5 | vm_compute; discriminate ]).
       assert (EQ18 : add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.holding + 0x18))
         by (apply bv_eq; vm_compute; reflexivity).
-      (* mycpu callee needs raw cells + the SIE ghost: unbundle here, rebundle after *)
-      iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
-        as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
-      iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
-      iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-      iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-      iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-      iApply (wp_pushoff_call_mycpu root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5 vfra vfs0
-                mstatus0 mie_v mdv0 menvcfg0
+      (* mycpu callee, [smode_config] view -- no unbundle island needed *)
+      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5 vfra vfs0
                 HN ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
-                HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hfiom Hleg
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-                with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
+                with "Hcfg Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
       { iEval (rewrite HspH6). iExact "Hfra". }
       { iEval (rewrite HspH6). iExact "Hfs0". }
-      iIntros (C) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
-      iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
-                   HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                   with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+      iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
       iEval (rewrite HspH6) in "Hfra". iEval (rewrite HspH6) in "Hfs0".
       iEval (rewrite lookup_total_insert) in "Hpc".
       assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")

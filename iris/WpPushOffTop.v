@@ -1174,6 +1174,86 @@ Section WpPushOffTop.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hbra Hbs0").
   Qed.
 
+  (* ============ jal->mycpu->return block, [smode_config] view with the ====
+     ABSTRACT callee_saved post (mirrors the raw [wp_pushoff_call_mycpu]).
+     For the concrete-mstatus0 callers WpHoldingInv/WpAcquireLock, which want
+     the returned register file abstractly (mo + callee_saved + a0) rather
+     than pinned to [po_mycpu_out]; lets them drop their unbundle island. *)
+  Lemma wp_pushoff_call_mycpu_scfg_cs (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (P : mword 64) (jimm : mword 21)
+      (m : gmap regidx (mword 64))
+      (raold s0old : bv 64)
+      :
+    let ra_idx : mword 5 := mword_of_int 1 in
+    let tp_idx : mword 5 := mword_of_int 4 in
+    let s0_idx : mword 5 := mword_of_int 8 in
+    let a0_idx : mword 5 := mword_of_int 10 in
+    let a5_idx : mword 5 := mword_of_int 15 in
+    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
+    let pcE := mword_of_int KernelSyms.mycpu in
+    let imm_entry : mword 6 := mword_of_int 48 in
+    let imm_dealloc : mword 6 := mword_of_int 16 in
+    let nzimm_s0 : mword 8 := mword_of_int 4 in
+    let imm_auipc : mword 20 := mword_of_int 0x11 in
+    let imm_addi : mword 12 := mword_of_int 0xa94 in
+    let shamt_slli : mword 6 := mword_of_int 7 in
+    let imm_addiw : mword 6 := mword_of_int 0 in
+    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
+    let ra0 := m0 !!! Regidx ra_idx in
+    let s00 := m0 !!! Regidx s0_idx in
+    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
+    let a8_ra := ea_ra in
+    let pa_ra := a8_ra in
+    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
+    let a8_s0 := ea_s0 in
+    let pa_s0 := a8_s0 in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    ↑minstretN ⊆ E ->
+    add_vec P (sign_extend' 64 jimm) = pcE ->
+    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    smode_config γ (DfracOwn 1) -∗
+    tlb_inv root_ppn -∗
+    kernel_text -∗ pc_is P -∗ gpr_file m -∗
+    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
+    pa_ra ↦₈ raold -∗
+    pa_s0 ↦₈ s0old -∗
+    ( ∀ mo,
+      smode_config γ (DfracOwn 1) -∗
+      tlb_inv root_ppn -∗
+      pc_is ret_tgt -∗
+      gpr_file mo -∗
+      ⌜ callee_saved m mo /\
+        mo !!! Regidx (mword_of_int 10 : mword 5)
+          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
+      pa_ra ↦₈ ra0 -∗
+      pa_s0 ↦₈ s00 -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros ra_idx tp_idx s0_idx a0_idx a5_idx m0 pcE imm_entry imm_dealloc nzimm_s0
+      imm_auipc imm_addi shamt_slli imm_addiw sp' ra0 s00
+      ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0 ret_tgt
+      HN Htarget Halign_tgt Hal0.
+    iIntros "Hsm Htlbinv #Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
+    iDestruct (smode_config_unbundle with "Hsm") as
+      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
+    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+    iApply (wp_pushoff_call_mycpu root_ppn γ E Φ P jimm m raold s0old
+              mstatus0 mie_v mdv0 menvcfg0
+              HN Htarget Halign_tgt
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hfiom Hleg Hal0
+              with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hjal Hbra Hbs0 [-]").
+    iIntros (mo) "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hcs Hbra Hbs0".
+    iDestruct (smode_config_rebuild γ (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" $! mo with "Hsm Htlbinv Hpc Hfile [] Hbra Hbs0").
+    iPureIntro. exact Hcs.
+  Qed.
+
   (* ============ the suffix from 0x80000bd8 (PO+0x18) to c.ret ============ *)
   Lemma wp_push_off_suffix (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (ms : gmap regidx (mword 64))
