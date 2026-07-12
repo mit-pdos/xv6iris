@@ -672,12 +672,6 @@ Section ProcInv.
   Definition wk_cell (base : mword 64) (n : Z) : mword 64 :=
     add_vec base (zero_extend' 64 (concat_vec (mword_of_int n : mword 6) ('b"000"))).
 
-  (* the acquire/release scratch region, held as a single [stack_own spF 10]
-     (10 cells at spF-8 .. spF-80).  acquire/release are now specced against a
-     single [stack_own], so the loop threads this whole region through them. *)
-  Definition wk_scratch (spF : mword 64) : iProp Σ :=
-    stack_own spF 10.
-
   (* the current cpu's per-cpu push_off bookkeeping words, at cpu+120/+124.
      [noff] is restored to its entry value by each acquire/release pair;
      [intena] stays 0 throughout (our S-mode config has SIE=0). *)
@@ -704,9 +698,11 @@ Section ProcInv.
      wk_fcell spF 1 ↦₈ vs5)%I.
 
   (* the mutable stack/lock/percpu resources that the loop threads; [noffv] is
-     the (fixed) entry noff, restored by each acquire/release pair. *)
-  Definition wk_res (γs : list gname) (spF a0f : mword 64) (noffv : mword 32) : iProp Σ :=
-    (wk_scratch spF ∗
+     the (fixed) entry noff, restored by each acquire/release pair.  The scratch
+     region is a single [stack_own spF n] for any depth [n >= 10] that covers the
+     acquire/release frame -- the loop never needs a precise [n]. *)
+  Definition wk_res (γs : list gname) (spF a0f : mword 64) (noffv : mword 32) (n : nat) : iProp Σ :=
+    (stack_own spF n ∗
      wk_noff_addr a0f ↦₄ noffv ∗
      wk_intena_addr a0f ↦₄ (zeros' 32) ∗
      wk_lockcells γs)%I.
@@ -1352,8 +1348,9 @@ Section ProcInv.
   Lemma wp_wakeup_loop
       (γs : list gname) (spF a0f rtp chan : mword 64) (noffv : mword 32)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
-      (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) :
+      (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (n : nat) :
     ↑minstretN ⊆ E -> ↑lockN ⊆ E ->
+    (10 <= n)%nat ->
     length γs = NPROC ->
     mycpu_ret rtp = a0f ->
     eq_vec (zero_reg : mword 64) (mycpu_ret rtp) = false ->
@@ -1379,10 +1376,10 @@ Section ProcInv.
       ⌜(k < NPROC)%nat⌝ -∗ ⌜wk_loop_regs M spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗ gpr_file M -∗
-      wk_res γs spF a0f noffv -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+      wk_res γs spF a0f noffv n -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
       WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros HN HNl Hlen Ha0f Hmycpu_nz Hnf_pos Hnf_rt.
+    intros HN HNl Hn Hlen Ha0f Hmycpu_nz Hnf_pos Hnf_rt.
     iIntros "#Hpinv Hqexit".
     (* the loop is BOUNDED (at most NPROC iterations), so we do ordinary Coq
        induction on a [fuel] bounding the remaining iterations [NPROC - k] -- no
@@ -1406,7 +1403,7 @@ Section ProcInv.
                    WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
                smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
                kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗ gpr_file M -∗
-               wk_res γs spF a0f noffv -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+               wk_res γs spF a0f noffv n -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                WP (Loop : expr riscv_lang) @ E {{ Phi }})%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { (* fuel = 0 : [NPROC - k <= 0] with [k < NPROC] is absurd *)
@@ -1423,7 +1420,7 @@ Section ProcInv.
                ⌜ wk_loop_regs Mt spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
                pc_is (mword_of_int (KernelSyms.wakeup + 0x30)) -∗ gpr_file Mt -∗
-               wk_res γs spF a0f noffv -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
+               wk_res γs spF a0f noffv n -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                WP (Loop : expr riscv_lang) @ E {{ Phi }})%I
       with "[Hqexit]" as "Htail".
     { iIntros (Mt) "%Hmt Hsm Hgc Htlb Hpc Hfile Hres Hframe".
@@ -1645,7 +1642,6 @@ Section ProcInv.
       iDestruct (big_sepL_lookup_acc _ _ _ _ Hγk with "Hlockcells") as "[Hcpuk Hlockback]".
       (* [Hscr] is the whole scratch region [stack_own spF 10]; unfold and carry
          it straight to acquire/release (no per-cell destructure). *)
-      iEval (rewrite /wk_scratch) in "Hscr".
       iRename "Hscr" into "Hstk".
       (* sp/tp preserved through myproc (needed for acquire's frame + a0f). *)
       assert (Hmret2 : mret !!! Regidx (mword_of_int 2 : mword 5) = spF).
@@ -1696,7 +1692,7 @@ Section ProcInv.
         rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmret4. }
       (* acquire(&proc[k]->lock): CSL acquire returns [locked γk ∗ proc_lock_res]. *)
       iApply (wp_acquire_lock root_ppn E Phi γk (proc_lock_res γk (proc_addr k)) M42
-                (zero_reg : mword 64) 10%nat
+                (zero_reg : mword 64) n
                 noffv (zeros' 32) a0f γc bsie
                 HN HNl ltac:(lia)
                 ltac:(rewrite HM42tp; exact Ha0f)
@@ -1874,7 +1870,7 @@ Section ProcInv.
         (* release(&proc[k]->lock) : returns the lock+resource into the invariant. *)
         iApply (wp_release root_ppn E Phi γk γc bsie (proc_addr k) (proc_lock_res γk (proc_addr k)) Mr2c
                   (mycpu_ret rtp) (wk_noff_acq noffv) (zeros' 32)
-                  10%nat (dqi:=DfracOwn 1)
+                  n (dqi:=DfracOwn 1)
                   ltac:(lia) HN HNl
                   ltac:(rewrite HMr2c_a0; apply wk_add_vec_0)
                   ltac:(rewrite HMr2c_tp; apply wk_eq_vec_refl)
@@ -1942,7 +1938,7 @@ Section ProcInv.
           exact Hdommr.
         - (* wk_res: scratch ∗ noff ∗ intena ∗ lockcells *)
           rewrite /wk_res. iSplitL "Hstk".
-          { rewrite /wk_scratch. iExact "Hstk". }
+          { iExact "Hstk". }
           iSplitL "Hnoff3".
           { (* rewrite ONLY the goal (via iEval): a bare Coq [rewrite] would also
                hit [noffv] inside Hnoff3 in the proof-mode context, desyncing them.
@@ -2238,8 +2234,9 @@ Section ProcInv.
   (* are the caller's obligations on the current cpu's bookkeeping.          *)
   (* ===================================================================== *)
   Lemma wp_wakeup (m : gmap regidx (mword 64)) (γs : list gname) (a0f : mword 64)
-      (noffv : mword 32) (f7 f6 f5 f4 f3 f2 f1 : bv 64) :
+      (noffv : mword 32) (f7 f6 f5 f4 f3 f2 f1 : bv 64) (n : nat) :
     ↑minstretN ⊆ E -> ↑lockN ⊆ E ->
+    (10 <= n)%nat ->
     (forall r : regidx, r ∈ dom m) ->
     length γs = NPROC ->
     let spF := add_vec (m !!! Regidx (mword_of_int 2 : mword 5))
@@ -2255,7 +2252,7 @@ Section ProcInv.
     wk_fcell spF 7 ↦₈ f7 -∗ wk_fcell spF 6 ↦₈ f6 -∗ wk_fcell spF 5 ↦₈ f5 -∗
     wk_fcell spF 4 ↦₈ f4 -∗ wk_fcell spF 3 ↦₈ f3 -∗ wk_fcell spF 2 ↦₈ f2 -∗
     wk_fcell spF 1 ↦₈ f1 -∗
-    wk_res γs spF a0f noffv -∗ procs_inv γs -∗
+    wk_res γs spF a0f noffv n -∗ procs_inv γs -∗
     ( ∀ Mf : gmap regidx (mword 64),
         ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
@@ -2269,7 +2266,7 @@ Section ProcInv.
         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Phi }}.
   Proof.
-    intros HN HNl Hdom Hlen spF Hmycpu Hmycpu_nz Hnf_pos Hnf_rt Halign.
+    intros HN HNl Hn Hdom Hlen spF Hmycpu Hmycpu_nz Hnf_pos Hnf_rt Halign.
     iIntros "Hsm Hgc Htlb #Htext Hpc Hfile Hc7 Hc6 Hc5 Hc4 Hc3 Hc2 Hc1 Hres #Hpinv Hcont".
     (* ---- prologue: save frame, set up loop registers, jump to the test ---- *)
     iApply (wp_wakeup_prologue m f7 f6 f5 f4 f3 f2 f1 HN Hdom
@@ -2285,7 +2282,8 @@ Section ProcInv.
                   (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5))
                   (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
                   (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5))
-                  HN HNl Hlen Hmycpu Hmycpu_nz Hnf_pos Hnf_rt
+                  n
+                  HN HNl Hn Hlen Hmycpu Hmycpu_nz Hnf_pos Hnf_rt
                   with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
     { (* Qexit = epilogue at wakeup+0x58 *)
