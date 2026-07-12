@@ -591,7 +591,7 @@ Section Kfree.
               R14 (1/2)%Qp
               HN ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hsm Htlbinv Hpc Hfile Hi32 [-]").
+              with "Hsm Htlbinv Hpc Hfile Hi32 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
@@ -704,7 +704,7 @@ Section Kfree.
     iApply (wp_jal_gpr_s_zca root_ppn γc E Φ (mword_of_int (KF + 0x40)) (mword_of_int 1 : mword 5) (mword_of_int 0x182 : mword 21)
               S3 (1/2)%Qp
               HN ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
-              with "Hhw Hsm Htlbinv Hpc Hfile Hi40 [-]").
+              with "Hsm Htlbinv Hpc Hfile Hi40 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
@@ -864,7 +864,7 @@ Section Kfree.
     iApply (wp_jal_gpr_s_zca root_ppn γc E Φ (mword_of_int (KF + 0x50)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fa : mword 21)
               Rae (1/2)%Qp
               HN ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
-              with "Hhw Hsm Htlbinv Hpc Hfile Hi50 [-]").
+              with "Hsm Htlbinv Hpc Hfile Hi50 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")

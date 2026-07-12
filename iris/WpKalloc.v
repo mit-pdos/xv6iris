@@ -241,7 +241,7 @@ Section Kalloc.
               R4 (1/2)%Qp
               HN ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
-              with "Hhw Hsm Htlbinv Hpc Hfile Hi12 [-]").
+              with "Hsm Htlbinv Hpc Hfile Hi12 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
@@ -355,7 +355,7 @@ Section Kalloc.
                 E2 (1/2)%Qp
                 HN ltac:(vm_compute; discriminate)
                 ltac:(vm_compute; reflexivity)
-                with "Hhw Hsm Htlbinv Hpc Hfile Hi54 [-]").
+                with "Hsm Htlbinv Hpc Hfile Hi54 [-]").
       iIntros "Hsm Htlbinv Hpc Hfile".
       iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                    with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
@@ -651,7 +651,7 @@ Section Kalloc.
                 R11 (1/2)%Qp
                 HN ltac:(vm_compute; discriminate)
                 ltac:(vm_compute; reflexivity)
-                with "Hhw Hsm Htlbinv Hpc Hfile Hi32 [-]").
+                with "Hsm Htlbinv Hpc Hfile Hi32 [-]").
       iIntros "Hsm Htlbinv Hpc Hfile".
       iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                    with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
@@ -793,7 +793,7 @@ Section Kalloc.
                 M3a (1/2)%Qp
                 HN ltac:(vm_compute; discriminate)
                 ltac:(vm_compute; reflexivity)
-                with "Hhw Hsm Htlbinv Hpc Hfile Hi3c [-]").
+                with "Hsm Htlbinv Hpc Hfile Hi3c [-]").
       iIntros "Hsm Htlbinv Hpc Hfile".
       iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                    with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")

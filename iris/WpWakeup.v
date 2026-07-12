@@ -1542,7 +1542,7 @@ Section ProcInv.
     iApply (wp_jal_gpr_s_zca root_ppn γc E Phi (mword_of_int (KernelSyms.wakeup + 0x38))
               (mword_of_int 1 : mword 5) (mword_of_int 2095482 : mword 21) M 1%Qp
               HN ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
-              with "Hhw Hsm Htlb Hpc Hfile Hi38 [-]").
+              with "Hsm Htlb Hpc Hfile Hi38 [-]").
     iIntros "Hsm Htlb Hpc Hfile".
     set (Mj := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.wakeup + 0x38) : mword 64) 4)]> M).
@@ -1671,7 +1671,7 @@ Section ProcInv.
       iApply (wp_jal_gpr_s_zca root_ppn γc E Phi (mword_of_int (KernelSyms.wakeup + 0x42))
                 (mword_of_int 1 : mword 5) (mword_of_int 2092148 : mword 21) M40 1%Qp
                 HN ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
-                with "Hhw Hsm Htlb Hpc Hfile Hi42 [-]").
+                with "Hsm Htlb Hpc Hfile Hi42 [-]").
       iIntros "Hsm Htlb Hpc Hfile".
       set (M42 := <[Regidx (mword_of_int 1 : mword 5) :=
                     regval_into_reg (add_vec_int (mword_of_int (KernelSyms.wakeup + 0x42) : mword 64) 4)]> M40).
@@ -1848,7 +1848,7 @@ Section ProcInv.
         iApply (wp_jal_gpr_s_zca root_ppn γc E Phi (mword_of_int (KernelSyms.wakeup + 0x2c))
                   (mword_of_int 1 : mword 5) (mword_of_int 2092306 : mword 21) Mr2a 1%Qp
                   HN ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
-                  with "Hhw Hsm Htlb Hpc Hfile Hi2c [-]").
+                  with "Hsm Htlb Hpc Hfile Hi2c [-]").
         iIntros "Hsm Htlb Hpc Hfile".
         set (Mr2c := <[Regidx (mword_of_int 1 : mword 5) :=
                        regval_into_reg (add_vec_int (mword_of_int (KernelSyms.wakeup + 0x2c) : mword 64) 4)]> Mr2a).
