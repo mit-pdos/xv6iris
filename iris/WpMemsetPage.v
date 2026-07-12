@@ -218,11 +218,11 @@ Section WpMemsetPage.
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- apply the whole-function memset WP.  The Sv39 geometry is now
        derived inside the memset proof (at the [wp_sb_s] leaf); only the
-       argument-setup couplings [Hbexec_add / Hn0 / Hret0 / Hcmp] remain. --- *)
+       argument-setup couplings [Hbexec_add / Hcount0 / Hret0 / Hcmp] remain. --- *)
     iApply (wp_memset_s_full_kt root_ppn E Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) olds n
               γ (dq:=dq)
-              Hn2 HN ltac:(lia)
+              Hn2 HN
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
                     cbn [execute];
@@ -254,7 +254,7 @@ Section WpMemsetPage.
                         | rewrite HB ]
                     end;
                     reflexivity)
-              (* Hn0 : a2 = 4096 <> 0 *)
+              (* Hcount0 : count register a2 = 4096, so [eq_vec a2 0 = Nat.eqb 4096 0 = false] *)
               ltac:(rewrite Ha2; vm_compute; reflexivity)
               Hret0
               (* Hcmp : the end pointer [p + 4096] couples to the buffer *)
