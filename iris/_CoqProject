@@ -49,6 +49,15 @@ WpGprMretWp.v
 WpGprMretNew.v
 WpGprRvc.v
 WpGprRvcTor.v
+WpMmodeLeafBase.v
+WpMmodeItype.v
+WpMmodeAddiw.v
+WpMmodeRtype.v
+WpMmodeLoad.v
+WpMmodeStore.v
+WpMmodeUtype.v
+WpMmodeJalr.v
+WpMmodeMret.v
 InstrBytes.v
 StackOwn.v
 CalleeSaved.v

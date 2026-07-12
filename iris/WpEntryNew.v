@@ -409,7 +409,7 @@ Section WpEntryNew.
   Definition m_clui (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
       : gmap regidx (mword 64) :=
     <[Regidx (regidx_bits rd_clui) :=
-        regval_into_reg (WpGprLui.luival (sign_extend' 20 imm_clui))]> (m_ld m v_stack0).
+        regval_into_reg (luival (sign_extend' 20 imm_clui))]> (m_ld m v_stack0).
   Definition m_csrr (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
       (mhartid_in : mword 64) : gmap regidx (mword 64) :=
     <[Regidx i_rd_csrr := regval_into_reg mhartid_in]> (m_clui m v_stack0).
@@ -533,7 +533,7 @@ Section WpEntryNew.
     iEval (rewrite pc_e2_e3).
     iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx (regidx_bits rd_clui) :=
-                      regval_into_reg (WpGprLui.luival (sign_extend' 20 imm_clui))]> (m_ld m v_stack0))
+                      regval_into_reg (luival (sign_extend' 20 imm_clui))]> (m_ld m v_stack0))
              with (m_clui m v_stack0)) in "Hfile".
 
     (* ---- 4. CSRRS @ pc_e3 (2-aligned): a1 := mhartid ---- *)

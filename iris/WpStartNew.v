@@ -1019,13 +1019,13 @@ Definition st_m33 (m : gmap regidx (mword 64)) (sp0 : mword 64) :=
 Definition st_m34 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg ms0]> (st_m33 m sp0).
 Definition st_m35 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
-  <[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si35))]> (st_m34 m sp0 ms0).
+  <[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si35))]> (st_m34 m sp0 ms0).
 Definition st_m36 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg st_mask_and]> (st_m35 m sp0 ms0).
 Definition st_m37 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (and_vec ms0 st_mask_and)]> (st_m36 m sp0 ms0).
 Definition st_m38 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
-  <[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si38))]> (st_m37 m sp0 ms0).
+  <[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si38))]> (st_m37 m sp0 ms0).
 Definition st_m39 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg st_mask_or]> (st_m38 m sp0 ms0).
 Definition st_m40 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
@@ -1037,7 +1037,7 @@ Definition st_m43 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
 Definition st_m45 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (mword_of_int 0)]> (st_m43 m sp0 ms0).
 Definition st_m47 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
-  <[Regidx ti_a5 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si47))]> (st_m45 m sp0 ms0).
+  <[Regidx ti_a5 := regval_into_reg (luival (sign_extend' 20 si47))]> (st_m45 m sp0 ms0).
 Definition st_m48 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg st_ffff]> (st_m47 m sp0 ms0).
 Definition st_m51 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
@@ -1270,9 +1270,9 @@ Section WpStartThm.
     assert (P61 : add_vec_int st_pc61 2 = st_pc62) by (vm_compute; reflexivity).
     assert (P62 : add_vec_int st_pc62 2 = st_pc63) by (vm_compute; reflexivity).
     (* closed-value bridges *)
-    assert (Hm1v : add_vec (WpGprLui.luival (sign_extend' 20 si35)) (sign_extend' 64 si36) = st_mask_and)
+    assert (Hm1v : add_vec (luival (sign_extend' 20 si35)) (sign_extend' 64 si36) = st_mask_and)
       by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hm2v : add_vec (WpGprLui.luival (sign_extend' 20 si38)) (sign_extend' 64 si39) = st_mask_or)
+    assert (Hm2v : add_vec (luival (sign_extend' 20 si38)) (sign_extend' 64 si39) = st_mask_or)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Ha42v : add_vec st_pc42 (auipc_off si42) = st_a42v)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1282,7 +1282,7 @@ Section WpStartThm.
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hz45 : sign_extend' 64 si45 = (mword_of_int 0 : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hffv : add_vec (WpGprLui.luival (sign_extend' 20 si47)) (sign_extend' 64 si48) = st_ffff)
+    assert (Hffv : add_vec (luival (sign_extend' 20 si47)) (sign_extend' 64 si48) = st_ffff)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hshv : shift_bits_right (cli_wval si54)
                      (subrange_vec_dec ssh55 (Z.sub log2_xlen 1) 0) = st_pmpw)
@@ -1371,12 +1371,12 @@ Section WpStartThm.
     iApply (wp_lui_gpr E Φ st_pc35 true ti_a4 (sign_extend' 20 si35) (st_m34 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi35").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P35). iIntros "Hmm HpcfA Hpc Hfile".
-    iEval (change (<[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si35))]>
+    iEval (change (<[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si35))]>
                      (st_m34 m sp0 ms0))
              with (st_m35 m sp0 ms0)) in "Hfile".
 
     (* ---- 36. addi a4, a4, 2047 (a4 := 0xffffffffffffe7ff) ---- *)
-    assert (L36a4 : st_m35 m sp0 ms0 !!! Regidx ti_a4 = WpGprLui.luival (sign_extend' 20 si35))
+    assert (L36a4 : st_m35 m sp0 ms0 !!! Regidx ti_a4 = luival (sign_extend' 20 si35))
       by (st_unfold; st_look).
     iApply (wp_addi_gpr E Φ st_pc36 false ti_a4 ti_a4 si36 (st_m35 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi36").
@@ -1397,12 +1397,12 @@ Section WpStartThm.
     iApply (wp_lui_gpr E Φ st_pc38 true ti_a4 (sign_extend' 20 si38) (st_m37 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi38").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P38). iIntros "Hmm HpcfA Hpc Hfile".
-    iEval (change (<[Regidx ti_a4 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si38))]>
+    iEval (change (<[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si38))]>
                      (st_m37 m sp0 ms0))
              with (st_m38 m sp0 ms0)) in "Hfile".
 
     (* ---- 39. addi a4, a4, -2048 (a4 := 0x800) ---- *)
-    assert (L39a4 : st_m38 m sp0 ms0 !!! Regidx ti_a4 = WpGprLui.luival (sign_extend' 20 si38))
+    assert (L39a4 : st_m38 m sp0 ms0 !!! Regidx ti_a4 = luival (sign_extend' 20 si38))
       by (st_unfold; st_look).
     iApply (wp_addi_gpr E Φ st_pc39 false ti_a4 ti_a4 si39 (st_m38 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HN HpmpU Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi39").
@@ -1484,12 +1484,12 @@ Section WpStartThm.
     iApply (wp_lui_gpr E Φ st_pc47 true ti_a5 (sign_extend' 20 si47) (st_m45 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi47").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P47). iIntros "Hmm HpcfA Hpc Hfile".
-    iEval (change (<[Regidx ti_a5 := regval_into_reg (WpGprLui.luival (sign_extend' 20 si47))]>
+    iEval (change (<[Regidx ti_a5 := regval_into_reg (luival (sign_extend' 20 si47))]>
                      (st_m45 m sp0 ms0))
              with (st_m47 m sp0 ms0)) in "Hfile".
 
     (* ---- 48. c.addi a5, -1 (a5 := 0xffff) ---- *)
-    assert (L48a5 : st_m47 m sp0 ms0 !!! Regidx ti_a5 = WpGprLui.luival (sign_extend' 20 si47))
+    assert (L48a5 : st_m47 m sp0 ms0 !!! Regidx ti_a5 = luival (sign_extend' 20 si47))
       by (st_unfold; st_look).
     iApply (wp_addi_gpr E Φ st_pc48 true ti_a5 ti_a5 (sign_extend' 12 si48) (st_m47 m sp0 ms0)
               pmpcfg0 (1/2)%Qp HN HpmpU Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi48").

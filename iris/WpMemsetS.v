@@ -306,7 +306,7 @@ Qed.
   (*  so this runs on [wp_instr_s_config] (menvcfg value exposed).          *)
   (* =================================================================== *)
 
-  (* Supervisor mirror of WpGprJalr.exec_cE_zicfilp_false: get_xLPE reads
+  (* Supervisor mirror of exec_cE_zicfilp_false: get_xLPE reads
      menvcfg.LPE at Supervisor (vs mseccfg.MLPE at Machine). *)
   Lemma exec_cE_zicfilp_false_S s :
     register_lookup cur_privilege (sregs s) = Supervisor ->
