@@ -11,59 +11,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
-Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved.
+Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved WpAuipc WpLoad.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
 Require Import WpSmodeToBeDeleted.
-
-(* helper: auipc_off *)
-Definition auipc_off (imm : mword 20) : mword 64 :=
-  sign_extend' 64 (concat_vec imm (Ox"000")).
-
-
-(* ---------------------------------------------------------------------- *)
-(* forward_exec_auipc: thread the generic try_step wrapper + the generic    *)
-(* run_hart_active progress engine around the AUIPC execute leaf.           *)
-(* Hypotheses mirror forward_exec_final's: universally-quantified fetch /    *)
-(* decode / should_inc facts + booting-Machine register conditions.         *)
-(* ---------------------------------------------------------------------- *)
-
-Section ForwardAUIPC.
-  Context (s : mstate) (w : mword 32) (pc : mword 64) (imm : mword 20)
-          (i : mword 5) (b : bool).
-
-  Hypothesis Hi : uint i = 2.
-  Hypothesis Hfetch_at :
-    exec (fetch tt) (set_reg s (R_bool minstret_increment) b)
-      = Some (F_Base w, set_reg s (R_bool minstret_increment) b).
-  Hypothesis Hdec_gen : forall s0 : mstate,
-    register_lookup cur_privilege (sregs s0) = Machine ->
-    exec (ext_decode w) s0 = Some (UTYPE (imm, Regidx i, AUIPC), s0).
-  Hypothesis Hsi_s : exec (should_inc_minstret Machine) s = Some (b, s).
-
-
-
-  (* clean-form post-state (concrete values). *)
-  Variable mst0 : mword 64.
-  Hypothesis Lmst_a : register_lookup minstret s.(sregs) = mst0.
-
-
-  Ltac tmiss := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
-
-
-End ForwardAUIPC.
-
-Section StepAUIPC.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  Context {dqc : dfrac}.
-
-  (* ---------------------------------------------------------------------- *)
-  (* Single-step WP for `ld rd,imm(rs1)` (rs1=rd=x2), via wp_exec_step +     *)
-  (* forward_exec_ld + sFl_eq, discharging Hexec_spc via exec_execute_LOAD_8.*)
-  (* ---------------------------------------------------------------------- *)
-End StepAUIPC.
-
+Require Import WpMmodeUtype.
 
 Section WpSmodeUtype.
   Context `{!riscvGS Σ, !sieG Σ}.
