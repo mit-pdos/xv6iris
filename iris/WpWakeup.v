@@ -38,6 +38,7 @@ Require Import WpGprAddi WpGprRvc.
 Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGen VcGenS.
 Require Import WpAcquireTop WpAcquireLock WpAcquireMem WpRelease WpMycpu WpPushOffTop.
 Require Import CalleeSaved.
+Require Import StackOwn.
 Require Import WpSwtchVc.
 Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge WpKallocDecode WpAuipc.
 From Kernel Require Import KernelSyms KernelInstrs.
@@ -671,15 +672,11 @@ Section ProcInv.
   Definition wk_cell (base : mword 64) (n : Z) : mword 64 :=
     add_vec base (zero_extend' 64 (concat_vec (mword_of_int n : mword 6) ('b"000"))).
 
-  (* the 9 acquire/release scratch cells (shared: spd+{1,2,3}, pospd+{1,2,3};
-     release-only: pospd+0; both: pospm+{0,1}), contents irrelevant. *)
+  (* the acquire/release scratch region, held as a single [stack_own spF 10]
+     (10 cells at spF-8 .. spF-80).  acquire/release are now specced against a
+     single [stack_own], so the loop threads this whole region through them. *)
   Definition wk_scratch (spF : mword 64) : iProp Σ :=
-    (∃ u1 u2 u3 u4 u5 u6 u7 u8 u9 : bv 64,
-       wk_cell (wk_spd spF) 3 ↦₈ u1 ∗ wk_cell (wk_spd spF) 2 ↦₈ u2 ∗
-       wk_cell (wk_spd spF) 1 ↦₈ u3 ∗
-       wk_cell (wk_pospd spF) 3 ↦₈ u4 ∗ wk_cell (wk_pospd spF) 2 ↦₈ u5 ∗
-       wk_cell (wk_pospd spF) 1 ↦₈ u6 ∗ wk_cell (wk_pospd spF) 0 ↦₈ u7 ∗
-       wk_cell (wk_pospm spF) 1 ↦₈ u8 ∗ wk_cell (wk_pospm spF) 0 ↦₈ u9)%I.
+    stack_own spF 10.
 
   (* the current cpu's per-cpu push_off bookkeeping words, at cpu+120/+124.
      [noff] is restored to its entry value by each acquire/release pair;
@@ -1646,8 +1643,10 @@ Section ProcInv.
       (* open [wk_res]: scratch cells, noff/intena words, per-proc lock->cpu words. *)
       iDestruct "Hres" as "(Hscr & Hnoffc & Hintc & Hlockcells)".
       iDestruct (big_sepL_lookup_acc _ _ _ _ Hγk with "Hlockcells") as "[Hcpuk Hlockback]".
-      iDestruct "Hscr" as (u1 u2 u3 u4 u5 u6 u7 u8 u9)
-        "(Hu1 & Hu2 & Hu3 & Hu4 & Hu5 & Hu6 & Hu7 & Hu8 & Hu9)".
+      (* [Hscr] is the whole scratch region [stack_own spF 10]; unfold and carry
+         it straight to acquire/release (no per-cell destructure). *)
+      iEval (rewrite /wk_scratch) in "Hscr".
+      iRename "Hscr" into "Hstk".
       (* sp/tp preserved through myproc (needed for acquire's frame + a0f). *)
       assert (Hmret2 : mret !!! Regidx (mword_of_int 2 : mword 5) = spF).
       { rewrite (Hpres (mword_of_int 2 : mword 5) ltac:(compute_done)).
@@ -1697,27 +1696,21 @@ Section ProcInv.
         rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmret4. }
       (* acquire(&proc[k]->lock): CSL acquire returns [locked γk ∗ proc_lock_res]. *)
       iApply (wp_acquire_lock root_ppn E Phi γk (proc_lock_res γk (proc_addr k)) M42
-                u1 u2 u3 u4 u5 u6 u8 u9 (zero_reg : mword 64)
+                (zero_reg : mword 64) 10%nat
                 noffv (zeros' 32) a0f γc bsie
-                HN HNl
+                HN HNl ltac:(lia)
                 ltac:(rewrite HM42tp; exact Ha0f)
                 ltac:(rewrite HM42tp; exact Hmycpu_nz)
                 ltac:(rewrite HM42ra; vm_compute; reflexivity)
                 with "Hsm Hgc Htlb Htext Hpc Hfile
-                      [Hu1] [Hu2] [Hu3] [Hu4] [Hu5] [Hu6] [Hu8] [Hu9] [Hnoffc] [Hintc] [Hlockk] [Hcpuk] [-]").
-      { iEval (rewrite HM42csp). iExact "Hu1". }
-      { iEval (rewrite HM42csp). iExact "Hu2". }
-      { iEval (rewrite HM42csp). iExact "Hu3". }
-      { iEval (rewrite HM42csp). iExact "Hu4". }
-      { iEval (rewrite HM42csp). iExact "Hu5". }
-      { iEval (rewrite HM42csp). iExact "Hu6". }
-      { iEval (rewrite HM42csp). iExact "Hu8". }
-      { iEval (rewrite HM42csp). iExact "Hu9". }
+                      [Hstk] [Hnoffc] [Hintc] [Hlockk] [Hcpuk] [-]").
+      { iEval (rewrite HM42csp). iExact "Hstk". }
       { iExact "Hnoffc". }
       { iExact "Hintc". }
       { iEval (rewrite HM42a0). iExact "Hlockk". }
       { iEval (rewrite HM42a0). iExact "Hcpuk". }
-      iIntros (Macq) "Hsm Hgc Htlb Hpc Htok HR Hfile %Hpins Har24 Har16 Har8 Hjunk Hnoff2 Hint2 Hcpu2".
+      iIntros (Macq) "Hsm Hgc Htlb Hpc Htok HR Hfile %Hpins Hstk Hnoff2 Hint2 Hcpu2".
+      iEval (rewrite HM42csp) in "Hstk".
       (* acquire's push_off saved the intena as [if <old noff=0> then 0 else 0];
          collapse the (trivially constant) conditional so it matches [wk_res]'s
          bare [zeros' 32] on the release round-trip. *)
@@ -1797,18 +1790,10 @@ Section ProcInv.
         rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite (Hpres (mword_of_int 27 : mword 5) ltac:(compute_done)).
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs11. }
-      (* clean the acquire-returned frame cells into [wk_cell spF] / [proc_addr k] form. *)
-      iEval (rewrite HM42csp) in "Har24".
-      iEval (rewrite HM42csp) in "Har16".
-      iEval (rewrite HM42csp) in "Har8".
+      (* the acquire-returned [a_cpu] word: rewrite its address/value into the
+         [wk_cpu_addr (proc_addr k)] / [mycpu_ret rtp] form the release wants. *)
       iEval (rewrite HM42a0) in "Hcpu2".
       iEval (rewrite HM42tp) in "Hcpu2".
-      iDestruct "Hjunk" as (vp24 vp16 vp8 vfra vfs0) "(Hp24 & Hp16 & Hp8 & Hfra & Hfs0)".
-      iEval (rewrite HM42csp) in "Hp24".
-      iEval (rewrite HM42csp) in "Hp16".
-      iEval (rewrite HM42csp) in "Hp8".
-      iEval (rewrite HM42csp) in "Hfra".
-      iEval (rewrite HM42csp) in "Hfs0".
       (* unbundle the config for the post-acquire straight-line leaves. *)
       iDestruct (smode_config_unbundle with "Hsm") as
         "(_ & _ & Hhs & Hpriv & Hms2 & Hmie2 & Hmenv2)".
@@ -1842,7 +1827,7 @@ Section ProcInv.
                  tlb_inv root_ppn -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
                  gpr_file Mr -∗ locked γk -∗ proc_lock_res γk (proc_addr k) -∗
                  WP (Loop : expr riscv_lang) @ E {{ Phi }})%I
-        with "[Hgc Hsieg Har24 Har16 Har8 Hp24 Hp16 Hp8 Hu7 Hfra Hfs0 Hnoff2 Hint2 Hcpu2 Hlockback Hframe Htail]"
+        with "[Hgc Hsieg Hstk Hnoff2 Hint2 Hcpu2 Hlockback Hframe Htail]"
         as "Hrel".
       { iIntros (Mr) "%Hmr Hhs Hpriv Hms Hmie Hmdl Hmenv Htlb Hpc Hfile Htok HR".
         destruct Hmr as (Hr9 & Hr2 & Hr4 & Hr18 & Hr19 & Hr20 & Hr21 & Hr22 & Hr23 & Hr24 & Hr25 & Hr26 & Hr27 & Hrdom).
@@ -1887,29 +1872,22 @@ Section ProcInv.
         { rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr4. }
         (* release(&proc[k]->lock) : returns the lock+resource into the invariant. *)
-        iApply (wp_release_words root_ppn E Phi γk γc bsie (proc_addr k) (proc_lock_res γk (proc_addr k)) Mr2c
+        iApply (wp_release root_ppn E Phi γk γc bsie (proc_addr k) (proc_lock_res γk (proc_addr k)) Mr2c
                   (mycpu_ret rtp) (wk_noff_acq noffv) (zeros' 32)
-                  _ _ _ _ _ _ _ _ _ (dqi:=DfracOwn 1)
-                  HN HNl
+                  10%nat (dqi:=DfracOwn 1)
+                  ltac:(lia) HN HNl
                   ltac:(rewrite HMr2c_a0; apply wk_add_vec_0)
                   ltac:(rewrite HMr2c_tp; apply wk_eq_vec_refl)
                   Hnf_pos
                   ltac:(vm_compute; reflexivity)
                   ltac:(rewrite HMr2c_ra; vm_compute; reflexivity)
-                  with "Hsm Hgc Htlb Htext Hpc Hfile Hlockk Htok HR [Hcpu2] [Hnoff2] [Hint2] [Har24] [Har16] [Har8] [Hp24] [Hp16] [Hp8] [Hu7] [Hfra] [Hfs0] [-]").
+                  with "Hsm Hgc Htlb Htext Hpc Hfile Hlockk Htok HR [Hcpu2] [Hnoff2] [Hint2] [Hstk] [-]").
         { iEval (rewrite HMr2c_a0). iExact "Hcpu2". }
         { iEval (rewrite HMr2c_tp). iEval (rewrite Ha0f). iExact "Hnoff2". }
         { iEval (rewrite HMr2c_tp). iEval (rewrite Ha0f). iExact "Hint2". }
-        { iEval (rewrite HMr2c_csp). iExact "Har24". }
-        { iEval (rewrite HMr2c_csp). iExact "Har16". }
-        { iEval (rewrite HMr2c_csp). iExact "Har8". }
-        { iEval (rewrite HMr2c_csp). iExact "Hp24". }
-        { iEval (rewrite HMr2c_csp). iExact "Hp16". }
-        { iEval (rewrite HMr2c_csp). iExact "Hp8". }
-        { iEval (rewrite HMr2c_csp). iExact "Hu7". }
-        { iEval (rewrite HMr2c_csp). iExact "Hfra". }
-        { iEval (rewrite HMr2c_csp). iExact "Hfs0". }
-        iIntros (mr) "Hsm Hgc Htlb Hpc Hfile %Hpinsr Hcpu3 Hnoff3 Hint3 Hjunk3".
+        { iEval (rewrite HMr2c_csp). iExact "Hstk". }
+        iIntros (mr) "Hsm Hgc Htlb Hpc Hfile %Hpinsr Hcpu3 Hnoff3 Hint3 Hstk".
+        iEval (rewrite HMr2c_csp) in "Hstk".
         (* pc = wakeup+0x30 (release's return target). *)
         assert (Hpc30 : update_vec_dec (add_vec (Mr2c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                         = mword_of_int (KernelSyms.wakeup + 0x30)).
@@ -1920,20 +1898,10 @@ Section ProcInv.
         iDestruct (gpr_file_dom with "Hfile") as "[%Hdommr Hfile]".
         (* reassemble [wk_res] for the next iteration: scratch (release junk),
            noff (restored to noffv via the round-trip), intena (0), lock words. *)
-        iDestruct "Hjunk3" as (w1 w2 w3 w4 w5 w6 w7 w8 w9) "(Hw1 & Hw2 & Hw3 & Hw4 & Hw5 & Hw6 & Hw7 & Hw8 & Hw9)".
-        iEval (rewrite HMr2c_csp) in "Hw1".
-        iEval (rewrite HMr2c_csp) in "Hw2".
-        iEval (rewrite HMr2c_csp) in "Hw3".
-        iEval (rewrite HMr2c_csp) in "Hw4".
-        iEval (rewrite HMr2c_csp) in "Hw5".
-        iEval (rewrite HMr2c_csp) in "Hw6".
-        iEval (rewrite HMr2c_csp) in "Hw7".
-        iEval (rewrite HMr2c_csp) in "Hw8".
-        iEval (rewrite HMr2c_csp) in "Hw9".
         iEval (rewrite HMr2c_a0) in "Hcpu3".
         iEval (rewrite HMr2c_tp) in "Hnoff3". iEval (rewrite Ha0f) in "Hnoff3".
         iEval (rewrite HMr2c_tp) in "Hint3". iEval (rewrite Ha0f) in "Hint3".
-        iApply ("Htail" $! mr with "[%] Hsm Hgc Htlb Hpc Hfile [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hnoff3 Hint3 Hcpu3 Hlockback] Hframe").
+        iApply ("Htail" $! mr with "[%] Hsm Hgc Htlb Hpc Hfile [Hstk Hnoff3 Hint3 Hcpu3 Hlockback] Hframe").
         - (* wk_loop_regs mr spF rtp chan k *)
           unfold wk_loop_regs.
           split.
@@ -1973,8 +1941,8 @@ Section ProcInv.
             rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr27. }
           exact Hdommr.
         - (* wk_res: scratch ∗ noff ∗ intena ∗ lockcells *)
-          rewrite /wk_res. iSplitL "Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9".
-          { rewrite /wk_scratch. iExists w1, w2, w3, w4, w5, w6, w7, w8, w9. iFrame. }
+          rewrite /wk_res. iSplitL "Hstk".
+          { rewrite /wk_scratch. iExact "Hstk". }
           iSplitL "Hnoff3".
           { (* rewrite ONLY the goal (via iEval): a bare Coq [rewrite] would also
                hit [noffv] inside Hnoff3 in the proof-mode context, desyncing them.

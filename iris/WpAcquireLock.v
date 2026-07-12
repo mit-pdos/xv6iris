@@ -26,6 +26,7 @@ Require Import WpGpr WpGprAddi WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpPushOffTop WpAmo WpAcquireMem WpHolding WpAcquireTop.
 Require Import CalleeSaved.
+Require Import StackOwn.
 Require Import WpLock WpLockLeaves WpHoldingInv.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for hiding mstatus0. *)
 Require WpGprCsrwC.
@@ -304,7 +305,8 @@ Section WpAcquireLock.
   Lemma wp_acquire_lock (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (R : iProp Σ)
       (m : gmap regidx (mword 64))
-      (vr24 vr16 vr8 pr24 pr16 pr8 fraold fs0old cpuold : bv 64)
+      (cpuold : bv 64)
+      (n : nat)
       (noff intena_old : mword 32) (a0f : mword 64)
       (γc : gname) (bsie : mword 1)
       :
@@ -354,6 +356,7 @@ Section WpAcquireLock.
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
     ↑lockN ⊆ E ->
+    (10 <= n)%nat ->
     (* S-mode configuration is now folded into [smode_config γc] below. *)
     (* ---- the amoswap.w PMA side-condition is DERIVED inside
        [wp_amoswap_lockinv] from [pma_allows_all] -- no premise. ---- *)
@@ -374,14 +377,7 @@ Section WpAcquireLock.
     ghost_var γc (1/2) bsie -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is AQw -∗ gpr_file m -∗
-    a_r24 ↦₈ vr24 -∗
-    a_r16 ↦₈ vr16 -∗
-    a_r8 ↦₈ vr8 -∗
-    a_p24 ↦₈ pr24 -∗
-    a_p16 ↦₈ pr16 -∗
-    a_p8 ↦₈ pr8 -∗
-    a_fra ↦₈ fraold -∗
-    a_fs0 ↦₈ fs0old -∗
+    stack_own sp0 n -∗
     a_noff ↦₄ noff -∗
     a_intena ↦₄ intena_old -∗
     is_lock γ lk R -∗
@@ -394,15 +390,7 @@ Section WpAcquireLock.
       locked γ -∗ R -∗
       gpr_file mfin -∗
       ⌜ callee_saved m mfin ⌝ -∗
-      a_r24 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-      a_r16 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-      a_r8 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-      (∃ (vp24 vp16 vp8 vfra vfs0 : bv 64),
-        a_p24 ↦₈ vp24 ∗
-        a_p16 ↦₈ vp16 ∗
-        a_p8 ↦₈ vp8 ∗
-        a_fra ↦₈ vfra ∗
-        a_fs0 ↦₈ vfs0) -∗
+      stack_own sp0 n -∗
       a_noff ↦₄ po_noff_store -∗
       a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then (zeros' 32) else intena_old) -∗
       a_cpu ↦₈ (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
@@ -411,9 +399,39 @@ Section WpAcquireLock.
   Proof.
     intros AQw lk sp0 spd a_r24 a_r16 a_r8 po_spd a_p24 a_p16 a_p8 po_spm10 a_fra a_fs0
       a_noff a_intena a_cpu A0 A1 A2 P0 PN0 PN1 po_noff_a5 po_noff_store ret_tgt
-      HN HNl Ha0 Hnotmine Hal0.
+      HN HNl Hn Ha0 Hnotmine Hal0.
     iIntros "Hcfg Htoken Htlbinv #Htext Hpc Hfile
-             Hr24 Hr16 Hr8 Hp24 Hp16 Hp8 Hfra Hfs0 Hnoff Hintena #Hlk Hcpu Hcont".
+             Hstk Hnoff Hintena #Hlk Hcpu Hcont".
+    (* peel the top 10 slots of the frame, frame the deeper region *)
+    iDestruct (stack_own_split_1 sp0 10 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iEval (rewrite stack_own_slots; cbn [seq]) in "Htop".
+    iDestruct "Htop" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
+    iDestruct "S1" as (vr24) "Hr24".   iDestruct "S2" as (vr16) "Hr16".
+    iDestruct "S3" as (vr8) "Hr8".     iDestruct "S4" as (vgap4) "Hgap4".
+    iDestruct "S5" as (pr24) "Hp24".   iDestruct "S6" as (pr16) "Hp16".
+    iDestruct "S7" as (pr8) "Hp8".     iDestruct "S8" as (vgap8) "Hgap8".
+    iDestruct "S9" as (fraold) "Hfra". iDestruct "S10" as (fs0old) "Hfs0".
+    (* bridges: clean [pa_stk sp0 k] = raw frame-slot spelling the body uses *)
+    assert (Hb1 : a_r24 = pa_stk sp0 1).
+    { rewrite /a_r24 /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : a_r16 = pa_stk sp0 2).
+    { rewrite /a_r16 /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb3 : a_r8 = pa_stk sp0 3).
+    { rewrite /a_r8 /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb5 : a_p24 = pa_stk sp0 5).
+    { rewrite /a_p24 /po_spd /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb6 : a_p16 = pa_stk sp0 6).
+    { rewrite /a_p16 /po_spd /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb7 : a_p8 = pa_stk sp0 7).
+    { rewrite /a_p8 /po_spd /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb9 : a_fra = pa_stk sp0 9).
+    { rewrite /a_fra /po_spm10 /po_spd /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb10 : a_fs0 = pa_stk sp0 10).
+    { rewrite /a_fs0 /po_spm10 /po_spd /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hb1) in "Hr24".  iEval (rewrite -Hb2) in "Hr16".
+    iEval (rewrite -Hb3) in "Hr8".   iEval (rewrite -Hb5) in "Hp24".
+    iEval (rewrite -Hb6) in "Hp16".  iEval (rewrite -Hb7) in "Hp8".
+    iEval (rewrite -Hb9) in "Hfra".  iEval (rewrite -Hb10) in "Hfs0".
     (* unbundle the ambient S-mode config: raw cells + folded facts + the
        config's half of the SIE ghost var (Hgc); the caller's token Htoken
        is held aside and returned at the end. *)
@@ -1019,8 +1037,27 @@ Section WpAcquireLock.
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
+    (* ---- rebundle the 10 frame slots back into [stack_own sp0 n].  The body
+       leaves each slot's [word_pointsto] address in a spelling convertible to
+       the clean [a_XX] let (as the old ∃-post consumed it), so we fold the
+       goal's [pa_stk sp0 k] to [a_XX] with the bridges and close by conversion;
+       the gap slots (4, 8) are already [pa_stk]-addressed from the peel. ---- *)
+    iAssert (stack_own sp0 10) with "[Hr24 Hr16 Hr8 Hgap4 Hp24 Hp16 Hp8 Hgap8 Hfra Hfs0]" as "Htop".
+    { rewrite stack_own_slots. cbn [seq].
+      iSplitL "Hr24"; [iExists _; iEval (rewrite -Hb1); iExact "Hr24"|].
+      iSplitL "Hr16"; [iExists _; iEval (rewrite -Hb2); iExact "Hr16"|].
+      iSplitL "Hr8";  [iExists _; iEval (rewrite -Hb3); iExact "Hr8"|].
+      iSplitL "Hgap4"; [by iExists _|].
+      iSplitL "Hp24"; [iExists _; iEval (rewrite -Hb5); iExact "Hp24"|].
+      iSplitL "Hp16"; [iExists _; iEval (rewrite -Hb6); iExact "Hp16"|].
+      iSplitL "Hp8";  [iExists _; iEval (rewrite -Hb7); iExact "Hp8"|].
+      iSplitL "Hgap8"; [by iExists _|].
+      iSplitL "Hfra"; [iExists _; iEval (rewrite -Hb9); iExact "Hfra"|].
+      iSplitL "Hfs0"; [iExists _; iEval (rewrite -Hb10); iExact "Hfs0"|].
+      done. }
+    iDestruct (stack_own_split_2 sp0 10 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
     (* ---- hand everything to the caller's continuation ---- *)
-    iApply ("Hcont" $! D4 with "Hcfg Htoken Htlbinv Hpc Htok HRes Hfile [%] Hr24 Hr16 Hr8 [Hfra Hfs0 Hp24 Hp16 Hp8] Hnoff [Hintena] Hcpu").
+    iApply ("Hcont" $! D4 with "Hcfg Htoken Htlbinv Hpc Htok HRes Hfile [%] Hstk Hnoff [Hintena] Hcpu").
     { unfold callee_saved. repeat split.
       - (* sp *)
         rewrite /D4. rewrite lookup_total_insert. rewrite HD3sp.
@@ -1103,8 +1140,6 @@ Section WpAcquireLock.
         rewrite /D1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite Hmc_s11. exact HB8s11.
     }
-    iExists _, _, _, _, _.
-    iFrame "Hp24 Hp16 Hp8 Hfra Hfs0".
     iExact "Hintena".
   Qed.
 

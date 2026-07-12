@@ -42,31 +42,32 @@ Section Kalloc.
   Notation PO := KernelSyms.push_off.
 
   (* ============================================================= *)
-  (* kalloc: whole-function S-mode WP.  WORK IN PROGRESS -- the     *)
-  (* statement's frame windows grow as each callee is reached; the  *)
-  (* tail past the prologue is [admit] for now.                     *)
+  (* kalloc: whole-function S-mode WP.  COMPLETE (Qed, no admits).  *)
+  (* Single full-[stack_own] lemma: pre and post are [stack_own     *)
+  (* sp0 n] (n >= 14).  kalloc peels its own 4-slot frame and lends  *)
+  (* the deep tail [stack_own spr (n-4)] to acquire / release /      *)
+  (* memset in turn, each returning it intact (no stack leak).       *)
   (* ============================================================= *)
-  Lemma wp_kalloc_words (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_kalloc (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname)
       (m : gmap regidx (mword 64))
-      (vr24 vr16 vr8 : bv 64)
-      (qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qpr0 qfraold qfs0old qcpuold : bv 64)
+      (qcpuold : bv 64)
       (qnoff qintena_old : mword 32) (a0f fl : mword 64)
       (γc : gname) (bsie : mword 1)
+      (n : nat)
       :
     let pcE : mword 64 := mword_of_int AK in
+    let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     let a_r24 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
     let a_r16 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
     let a_r8  := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (* ---- register-map chain through kalloc's prologue + the +0x12 jal ---- *)
     let R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m in
     let R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1 in
     let R3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x0a) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R2 in
     let R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fe : mword 12)))]> R3 in
     let mA := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)]> R4 in
-    (* ---- acquire's frame + per-cpu + lock addresses (its [let]s, m := mA) ---- *)
     let lkA := mA !!! Regidx (mword_of_int 10 : mword 5) in
     let sp0A := mA !!! Regidx csp_rs1 in
     let spdA := add_vec sp0A (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
@@ -84,35 +85,17 @@ Section Kalloc.
     let q_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
     let q_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
     let q_cpu := add_vec lkA (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    (* ---- acquire's internal register chain (A0..PN8), m := mA ---- *)
-    let A0 := <[Regidx csp_rs1 := regval_into_reg spdA]> mA in
-    let A1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
-        (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0 in
-    let A2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
-        (add_vec zero_reg (A1 !!! Regidx (mword_of_int 10 : mword 5)))]> A1 in
-    let P0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
-        (add_vec_int (mword_of_int (AQ + 0x0c) : mword 64) 4)]> A2 in
-    let PN0 := <[Regidx csp_rs1 := regval_into_reg
-        (add_vec (P0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> P0 in
-    let PN1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
-        (add_vec (PN0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> PN0 in
-    (* acquire's PN2..PN8 chain (over sstatus_read mstatus0) is now internal to
-       wp_acquire_lock; kalloc needs neither it nor mstatus0.  The saved intena
-       byte acquire stores is the concrete [zeros' 32] (SIE=0, folded). *)
     let q_storeval32 := (zeros' 32 : mword 32) in
     let q_noff_a5 := sign_extend' 64 (subrange_vec_dec
         (add_vec (sign_extend' 64 qnoff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let q_noff_store := (autocast (T := mword) (subrange_vec_dec q_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let q_ret_tgt := update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (14 <= n)%nat ->
     ↑minstretN ⊆ E ->
     ↑lockN ⊆ E ->
-    (* S-mode config facts (SIE/MPRV/SXL/MXR/PMM/PBMTE/LPE/FIOM/legalize) + the
-       pop_off sstatus fact are folded into [smode_config γc] below; acquire's
-       per-map mycpu pins reduce to the single tp-only fact [a0f = mycpu_ret ..]. *)
     eq_vec (qcpuold : mword 64) (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5))) = false ->
     eq_vec (access_vec_dec q_ret_tgt 0) ('b"0") = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (* the freelist head lives at &kmem.freelist = kmem+24 *)
     fl = mword_of_int (KernelSyms.kmem + 24) ->
     a0f = mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)) ->
     zopz0zKzJ_s zero_reg (sign_extend' 64 q_noff_store) = false ->
@@ -122,19 +105,7 @@ Section Kalloc.
     ghost_var γc (1/2) bsie -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    a_r24 ↦₈ vr24 -∗
-    a_r16 ↦₈ vr16 -∗
-    a_r8 ↦₈ vr8 -∗
-    (* ---- acquire's scratch-stack windows (below kalloc's own frame) ---- *)
-    q_r24 ↦₈ qvr24 -∗
-    q_r16 ↦₈ qvr16 -∗
-    q_r8  ↦₈ qvr8 -∗
-    q_p24 ↦₈ qpr24 -∗
-    q_p16 ↦₈ qpr16 -∗
-    q_p8  ↦₈ qpr8 -∗
-    q_p0  ↦₈ qpr0 -∗
-    q_fra ↦₈ qfraold -∗
-    q_fs0 ↦₈ qfs0old -∗
+    stack_own sp0 n -∗
     q_noff ↦₄ qnoff -∗
     q_intena ↦₄ qintena_old -∗
     is_lock γ lkA (kmem_res fl) -∗
@@ -146,19 +117,43 @@ Section Kalloc.
       pc_is ret_tgt -∗
       gpr_file mr -∗
       kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      (∃ u1 u2 u3 : bv 64, a_r24 ↦₈ u1 ∗ a_r16 ↦₈ u2 ∗ a_r8 ↦₈ u3) -∗
+      stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros pcE spr a_r24 a_r16 a_r8 ret_tgt
+    intros pcE sp0 spr a_r24 a_r16 a_r8 ret_tgt
       R1 R2 R3 R4 mA lkA sp0A spdA q_r24 q_r16 q_r8 pspdA q_p24 q_p16 q_p8 q_p0
       pspm10A q_fra q_fs0 q_noff q_intena q_cpu
-      A0 A1 A2 P0 PN0 PN1
       q_storeval32 q_noff_a5 q_noff_store q_ret_tgt
-      HN HNl Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0.
-    iIntros "Hcfg Htoken Htlbinv
-             #Htext Hpc Hfile Hr24 Hr16 Hr8
-             Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqp0 Hqfra Hqfs0 Hnoff Hint #Hlock Hcpu Hcont".
+      Hn HN HNl Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0.
+    iIntros "Hcfg Htoken Htlbinv #Htext Hpc Hfile Hstk Hnoff Hint #Hlock Hcpu Hcont".
+    assert (HmAsp : mA !!! Regidx csp_rs1 = spr).
+    { rewrite /mA lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R4 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R3 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R2 lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite /R1 lookup_total_insert. reflexivity. }
+    (* peel kalloc's own 4-slot frame [spr, sp0); slots 1..3 hold ra/s0/s1,
+       slot 4 is padding.  The deep tail [stack_own spr (n-4)] is lent to
+       acquire / release / memset in turn and returned intact (no leak). *)
+    iDestruct (stack_own_split_1 sp0 4 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iEval (rewrite stack_own_slots; cbn [seq]) in "Htop".
+    iDestruct "Htop" as "(S1 & S2 & S3 & S4 & _)".
+    iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
+    iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
+    assert (Hb1 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb3 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb4 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 4).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hsprstk : pa_stk sp0 4 = spr).
+    { rewrite /pa_stk /spr /sp0 /add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hb1) in "Hr24". iEval (rewrite -Hb2) in "Hr16".
+    iEval (rewrite -Hb3) in "Hr8".  iEval (rewrite -Hb4) in "Hg4".
+    iEval (rewrite Hsprstk) in "Hdeep".
     (* unbundle the ambient S-mode config: raw cells + folded facts + the SIE
        ghost half (Hgc); the caller's token Htoken is returned at the end. *)
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
@@ -260,13 +255,14 @@ Section Kalloc.
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
     iApply (wp_acquire_lock root_ppn E Φ γ (kmem_res fl) mA
-              qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qfraold qfs0old qcpuold
-              qnoff qintena_old a0f γc bsie
-              HN HNl (eq_sym Ha0fcpu) Hcpune Hret0
+              qcpuold (n - 4)%nat qnoff qintena_old a0f γc bsie
+              HN HNl ltac:(lia) (eq_sym Ha0fcpu) Hcpune Hret0
               with "Hcfg Htoken Htlbinv Htext Hpc Hfile
-                    Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqfra Hqfs0 Hnoff Hint Hlock Hcpu [-]").
+                    [Hdeep] Hnoff Hint Hlock Hcpu [-]").
+    { iEval (rewrite HmAsp). iExact "Hdeep". }
     iIntros (mfin) "Hcfg Htoken Htlbinv Hpc Htok HRres Hfile %Hpins
-             Hqr24 Hqr16 Hqr8 Hqjunk Hnoff Hint Hcpu".
+             Hdeep Hnoff Hint Hcpu".
+    iEval (rewrite HmAsp) in "Hdeep".
     (* re-open the config for kalloc's own post-acquire leaves (fresh existential,
        rebound to the same names after clearing the consumed pre-acquire ones) *)
     clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
@@ -397,40 +393,28 @@ Section Kalloc.
       { rewrite HE3tp /q_noff Ha0fcpu. reflexivity. }
       assert (Haint : add_vec (mycpu_ret (E3 !!! Regidx (mword_of_int 4 : mword 5))) (sign_extend' 64 (mword_of_int 124 : mword 12)) = q_intena).
       { rewrite HE3tp /q_intena Ha0fcpu. reflexivity. }
-      iDestruct "Hqjunk" as (vp24 vp16 vp8 vfra vfs0) "(Hqp24 & Hqp16 & Hqp8 & Hqfra & Hqfs0)".
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply (wp_release_words root_ppn E Φ γ γc bsie lkA (kmem_res fl) E3
+      iApply (wp_release root_ppn E Φ γ γc bsie lkA (kmem_res fl) E3
                 (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)))
                 q_noff_store
                 (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)
-                (mA !!! Regidx (mword_of_int 1 : mword 5))
-                (mA !!! Regidx (mword_of_int 8 : mword 5))
-                (mA !!! Regidx (mword_of_int 9 : mword 5))
-                vp24 vp16 vp8 qpr0 vfra vfs0
+                (n - 4)%nat
                 (dqi:=DfracOwn 1)
-                HN HNl
+                ltac:(lia) HN HNl
                 ltac:(rewrite HE3a0 HlkAkmem; apply bv_eq; vm_compute; reflexivity)
                 ltac:(rewrite HE3tp; apply eq_vec_true_iff; reflexivity)
                 Hnoffpos Hintena0
                 ltac:(rewrite HE3ra; vm_compute; reflexivity)
                 with "Hcfg Htoken Htlbinv Htext Hpc Hfile
-                      Hlock Htok HRres [Hcpu] [Hnoff] [Hint] [Hqr24] [Hqr16] [Hqr8]
-                      [Hqp24] [Hqp16] [Hqp8] [Hqp0] [Hqfra] [Hqfs0] [-]").
+                      Hlock Htok HRres [Hcpu] [Hnoff] [Hint] [Hdeep] [-]").
       { iEval (rewrite Hacpu). iExact "Hcpu". }
       { iEval (rewrite Hanoff). iExact "Hnoff". }
       { iEval (rewrite Haint). iExact "Hint". }
-      { iEval (rewrite HE3csp). iExact "Hqr24". }
-      { iEval (rewrite HE3csp). iExact "Hqr16". }
-      { iEval (rewrite HE3csp). iExact "Hqr8". }
-      { iEval (rewrite HE3csp). iExact "Hqp24". }
-      { iEval (rewrite HE3csp). iExact "Hqp16". }
-      { iEval (rewrite HE3csp). iExact "Hqp8". }
-      { iEval (rewrite HE3csp). iExact "Hqp0". }
-      { iEval (rewrite HE3csp). iExact "Hqfra". }
-      { iEval (rewrite HE3csp). iExact "Hqfs0". }
-      iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile %Hpins2 Hcpu2 Hnoff2 Hint2 Hjunk2".
+      { iEval (rewrite HE3csp HmAsp). iExact "Hdeep". }
+      iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile %Hpins2 Hcpu2 Hnoff2 Hint2 Hdeep".
+      iEval (rewrite HE3csp HmAsp) in "Hdeep".
       clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
       iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
         as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
@@ -447,12 +431,6 @@ Section Kalloc.
         rewrite /E2 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /E1 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite Hs1R7. exact Hhead. }
-      assert (HmAsp : mA !!! Regidx csp_rs1 = spr).
-      { rewrite /mA lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R4 lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R3 lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R2 lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R1 lookup_total_insert. reflexivity. }
       (* ---- shared epilogue (+0x40..+0x4a): a0:=s1, restore ra/s0/s1, ret ---- *)
       iPoseProof (kai_58 with "Htext") as "Hi58".
       iPoseProof (kai_40 with "Htext") as "Hi40".
@@ -565,10 +543,19 @@ Section Kalloc.
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply ("Hcont" $! P45 with "Hcfg Htoken Htlbinv Hpc Hfile [] [Hr24 Hr16 Hr8]").
+      (* rebundle kalloc's own 4-slot frame with the returned deep tail into
+         the FULL [stack_own sp0 n] handed back to the caller. *)
+      iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Htop".
+      { rewrite stack_own_slots. cbn [seq].
+        iSplitL "Hr24"; [iEval (rewrite -Hb1); iExists _; iExact "Hr24"|].
+        iSplitL "Hr16"; [iEval (rewrite -Hb2); iExists _; iExact "Hr16"|].
+        iSplitL "Hr8";  [iEval (rewrite -Hb3); iExists _; iExact "Hr8"|].
+        iSplitL "Hg4";  [iEval (rewrite -Hb4); iExists _; iExact "Hg4"|].
+        done. }
+      iEval (rewrite -Hsprstk) in "Hdeep".
+      iDestruct (stack_own_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
+      iApply ("Hcont" $! P45 with "Hcfg Htoken Htlbinv Hpc Hfile [] Hstk").
       { rewrite /kalloc_post. iLeft. iPureIntro. exact HP45a0. }
-      { iExists (R1 !!! Regidx (mword_of_int 1 : mword 5)), (R1 !!! Regidx (mword_of_int 8 : mword 5)), (R1 !!! Regidx (mword_of_int 9 : mword 5)).
-        iFrame "Hr24 Hr16 Hr8". }
     - (* ---- NONEMPTY: head = p, page_valid p, p <> nullp, fall through to +0x20 ---- *)
       iDestruct "Hchain" as "(-> & %Hpv & Hrun)".
       iDestruct "Hrun" as (nxt) "[Hrun Hchain]".
@@ -708,40 +695,28 @@ Section Kalloc.
       { rewrite HR12tp /q_noff Ha0fcpu. reflexivity. }
       assert (Haint : add_vec (mycpu_ret (R12 !!! Regidx (mword_of_int 4 : mword 5))) (sign_extend' 64 (mword_of_int 124 : mword 12)) = q_intena).
       { rewrite HR12tp /q_intena Ha0fcpu. reflexivity. }
-      iDestruct "Hqjunk" as (vp24 vp16 vp8 vfra vfs0) "(Hqp24 & Hqp16 & Hqp8 & Hqfra & Hqfs0)".
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply (wp_release_words root_ppn E Φ γ γc bsie lkA (kmem_res fl) R12
+      iApply (wp_release root_ppn E Φ γ γc bsie lkA (kmem_res fl) R12
                 (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)))
                 q_noff_store
                 (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)
-                (mA !!! Regidx (mword_of_int 1 : mword 5))
-                (mA !!! Regidx (mword_of_int 8 : mword 5))
-                (mA !!! Regidx (mword_of_int 9 : mword 5))
-                vp24 vp16 vp8 qpr0 vfra vfs0
+                (n - 4)%nat
                 (dqi:=DfracOwn 1)
-                HN HNl
+                ltac:(lia) HN HNl
                 ltac:(rewrite HR12a0 HlkAkmem; apply bv_eq; vm_compute; reflexivity)
                 ltac:(rewrite HR12tp; apply eq_vec_true_iff; reflexivity)
                 Hnoffpos Hintena0
                 ltac:(rewrite HR12ra; vm_compute; reflexivity)
                 with "Hcfg Htoken Htlbinv Htext Hpc Hfile
-                      Hlock Htok HRres [Hcpu] [Hnoff] [Hint] [Hqr24] [Hqr16] [Hqr8]
-                      [Hqp24] [Hqp16] [Hqp8] [Hqp0] [Hqfra] [Hqfs0] [-]").
+                      Hlock Htok HRres [Hcpu] [Hnoff] [Hint] [Hdeep] [-]").
       { iEval (rewrite Hacpu). iExact "Hcpu". }
       { iEval (rewrite Hanoff). iExact "Hnoff". }
       { iEval (rewrite Haint). iExact "Hint". }
-      { iEval (rewrite HR12csp). iExact "Hqr24". }
-      { iEval (rewrite HR12csp). iExact "Hqr16". }
-      { iEval (rewrite HR12csp). iExact "Hqr8". }
-      { iEval (rewrite HR12csp). iExact "Hqp24". }
-      { iEval (rewrite HR12csp). iExact "Hqp16". }
-      { iEval (rewrite HR12csp). iExact "Hqp8". }
-      { iEval (rewrite HR12csp). iExact "Hqp0". }
-      { iEval (rewrite HR12csp). iExact "Hqfra". }
-      { iEval (rewrite HR12csp). iExact "Hqfs0". }
-      iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile %Hpins2 Hcpu2 Hnoff2 Hint2 Hjunk2".
+      { iEval (rewrite HR12csp HmAsp). iExact "Hdeep". }
+      iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile %Hpins2 Hcpu2 Hnoff2 Hint2 Hdeep".
+      iEval (rewrite HR12csp HmAsp) in "Hdeep".
       clear mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0.
       iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
         as "(_ & _ & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
@@ -809,12 +784,6 @@ Section Kalloc.
         rewrite /R9 lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /R8 lookup_total_insert_ne; [| vm_compute; discriminate].
         exact Hs1R7. }
-      assert (HmAsp : mA !!! Regidx csp_rs1 = spr).
-      { rewrite /mA lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R4 lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R3 lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R2 lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /R1 lookup_total_insert. reflexivity. }
       iPoseProof (kai_3c with "Htext") as "Hi3c".
       (* +0x3c jal ra,memset : link ra := +0x40, jump to memset entry *)
       iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
@@ -863,34 +832,29 @@ Section Kalloc.
         rewrite /Mli lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /Mlui lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite Hmrcsp. exact HR12csp. }
-      (* ---- memset's frame slots pa_ra = q_r24, pa_s0 = q_r16 ---- *)
-      assert (Hpara : add_vec (add_vec (Mms !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
-                    = add_vec (add_vec (R12 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
-      { rewrite HMmssp HR12csp !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-      assert (Hps0 : add_vec (add_vec (Mms !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))
-                   = add_vec (add_vec (R12 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
-      { rewrite HMmssp HR12csp !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-      iDestruct "Hjunk2" as (u1 u2 u3 u4 u5 u6 u7 u8 u9) "(Hbra & Hbs0 & Hq8 & Hqp24 & Hqp16 & Hqp8 & Hqp0 & Hqfra & Hqfs0)".
-      (* +0x3c memset(p, 5, 4096) : fills the page, returns [page_own p] + gpr_file *)
+      (* +0x3c memset(p, 5, 4096) : fills the page, returns [page_own p] + gpr_file.
+         memset's stack frame is the deep tail [stack_own spr (n-4)] (spr = its
+         entry sp, via HMmssp/HmAsp), returned intact. *)
       iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv")
         as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-      iApply (wp_memset_page root_ppn E Φ Mms (mword_of_int 5 : mword 64) u1 u2
+      iApply (wp_memset_page root_ppn E Φ Mms (mword_of_int 5 : mword 64) (n - 4)%nat
                 γc (dq:=DfracOwn (1/2))
+                ltac:(lia)
                 ltac:(rewrite HMmsa0; exact Hpv)
                 HMmsa1 HMmsa2
                 HN
                 ltac:(rewrite HMmsra; vm_compute; reflexivity)
-                with "Hsm Htlbinv Htext Hpc Hfile [Hbra] [Hbs0] [Hpage] [-]").
-      { iEval (rewrite Hpara). iExact "Hbra". }
-      { iEval (rewrite Hps0). iExact "Hbs0". }
+                with "Hsm Htlbinv Htext Hpc Hfile [Hdeep] [Hpage] [-]").
+      { iEval (rewrite HMmssp HmAsp). iExact "Hdeep". }
       { iEval (rewrite HMmsa0). iExact "Hpage". }
-      iIntros (mfp) "Hsm Htlbinv Hpc Hbra Hbs0 Hpage Hfile %Hpinsf".
+      iIntros (mfp) "Hsm Htlbinv Hpc Hstk Hpage Hfile %Hpinsf".
       iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                    with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
         as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
       iEval (rewrite HMmsa0) in "Hpage".
+      iEval (rewrite HMmssp HmAsp) in "Hstk". iRename "Hstk" into "Hdeep".
       unfold callee_saved in Hpinsf.
     destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
       assert (Hpc40 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x40)).
@@ -996,172 +960,19 @@ Section Kalloc.
       iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                    HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                    with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-      iApply ("Hcont" $! Q45 with "Hcfg Htoken Htlbinv Hpc Hfile [Hpage] [Hr24 Hr16 Hr8]").
+      (* rebundle kalloc's own 4-slot frame with the returned deep tail into
+         the FULL [stack_own sp0 n] handed back to the caller. *)
+      iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Htop".
+      { rewrite stack_own_slots. cbn [seq].
+        iSplitL "Hr24"; [iEval (rewrite -Hb1); iExists _; iExact "Hr24"|].
+        iSplitL "Hr16"; [iEval (rewrite -Hb2); iExists _; iExact "Hr16"|].
+        iSplitL "Hr8";  [iEval (rewrite -Hb3); iExists _; iExact "Hr8"|].
+        iSplitL "Hg4";  [iEval (rewrite -Hb4); iExists _; iExact "Hg4"|].
+        done. }
+      iEval (rewrite -Hsprstk) in "Hdeep".
+      iDestruct (stack_own_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
+      iApply ("Hcont" $! Q45 with "Hcfg Htoken Htlbinv Hpc Hfile [Hpage] Hstk").
       { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage". iPureIntro. exact Hpv. }
-      { iExists (R1 !!! Regidx (mword_of_int 1 : mword 5)), (R1 !!! Regidx (mword_of_int 8 : mword 5)), (R1 !!! Regidx (mword_of_int 9 : mword 5)).
-        iFrame "Hr24 Hr16 Hr8". }
-  Qed.
-
-  (* [stack_own] wrapper over [wp_kalloc_words].  kalloc's transitive stack
-     footprint is the 14-slot region [sp0-112, sp0): its own 4-slot frame
-     [sp0-32, sp0) (saved ra/s0/s1 in slots 1..3, slot 4 padding) sitting over
-     the 10-slot acquire/release/memset scratch below (slots 5..14, with the
-     sp0-32/sp0-64 gaps at slots 4/8 that no callee touches).  The precondition
-     is a single [stack_own sp0 n] (n >= 14).  kalloc restores SP on return but
-     the whole-function proof only re-exposes its own frame, so the post returns
-     [stack_own sp0 4] (that frame) together with the untouched deeper tail
-     [stack_own (pa_stk sp0 14) (n-14)]; the scratch region between is consumed. *)
-  Lemma wp_kalloc (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (γ : gname)
-      (m : gmap regidx (mword 64))
-      (qcpuold : bv 64)
-      (qnoff qintena_old : mword 32) (a0f fl : mword 64)
-      (γc : gname) (bsie : mword 1)
-      (n : nat)
-      :
-    let pcE : mword 64 := mword_of_int AK in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let a_r24 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_r16 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_r8  := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m in
-    let R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1 in
-    let R3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x0a) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R2 in
-    let R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fe : mword 12)))]> R3 in
-    let mA := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)]> R4 in
-    let lkA := mA !!! Regidx (mword_of_int 10 : mword 5) in
-    let sp0A := mA !!! Regidx csp_rs1 in
-    let spdA := add_vec sp0A (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let q_r24 := add_vec spdA (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let q_r16 := add_vec spdA (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let q_r8  := add_vec spdA (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let pspdA := add_vec spdA (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let q_p24 := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let q_p16 := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let q_p8  := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let q_p0  := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let pspm10A := add_vec pspdA (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let q_fra := add_vec pspm10A (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let q_fs0 := add_vec pspm10A (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let q_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let q_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let q_cpu := add_vec lkA (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let q_storeval32 := (zeros' 32 : mword 32) in
-    let q_noff_a5 := sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 qnoff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
-    let q_noff_store := (autocast (T := mword) (subrange_vec_dec q_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let q_ret_tgt := update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (14 <= n)%nat ->
-    ↑minstretN ⊆ E ->
-    ↑lockN ⊆ E ->
-    eq_vec (qcpuold : mword 64) (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    eq_vec (access_vec_dec q_ret_tgt 0) ('b"0") = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    fl = mword_of_int (KernelSyms.kmem + 24) ->
-    a0f = mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)) ->
-    zopz0zKzJ_s zero_reg (sign_extend' 64 q_noff_store) = false ->
-    eq_vec (sign_extend' 64
-       (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)) zero_reg = true ->
-    smode_config γc (DfracOwn 1) -∗
-    ghost_var γc (1/2) bsie -∗
-    tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    stack_own sp0 n -∗
-    q_noff ↦₄ qnoff -∗
-    q_intena ↦₄ qintena_old -∗
-    is_lock γ lkA (kmem_res fl) -∗
-    q_cpu ↦₈ qcpuold -∗
-    ( ∀ (mr : gmap regidx (mword 64)),
-      smode_config γc (DfracOwn 1) -∗
-      ghost_var γc (1/2) bsie -∗
-      tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mr -∗
-      kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      (stack_own sp0 4 ∗ stack_own (pa_stk sp0 14) (n - 14)) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros pcE sp0 spr a_r24 a_r16 a_r8 ret_tgt
-      R1 R2 R3 R4 mA lkA sp0A spdA q_r24 q_r16 q_r8 pspdA q_p24 q_p16 q_p8 q_p0
-      pspm10A q_fra q_fs0 q_noff q_intena q_cpu
-      q_storeval32 q_noff_a5 q_noff_store q_ret_tgt
-      Hn HN HNl Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0.
-    iIntros "Hcfg Htoken Htlbinv #Htext Hpc Hfile Hstk Hnoff Hint #Hlock Hcpu Hcont".
-    assert (HmAsp : mA !!! Regidx csp_rs1 = spr).
-    { rewrite /mA lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R4 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R3 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R2 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R1 lookup_total_insert. reflexivity. }
-    (* peel the 14-slot footprint, frame the deeper tail *)
-    iDestruct (stack_own_split_1 sp0 14 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Htop".
-    iDestruct "Htop" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & S11 & S12 & S13 & S14 & _)".
-    iDestruct "S1" as (vr24) "Hr24".    iDestruct "S2" as (vr16) "Hr16".
-    iDestruct "S3" as (vr8) "Hr8".      iDestruct "S4" as (vg4) "Hg4".
-    iDestruct "S5" as (qvr24) "Hqr24".  iDestruct "S6" as (qvr16) "Hqr16".
-    iDestruct "S7" as (qvr8) "Hqr8".    iDestruct "S8" as (vg8) "Hg8".
-    iDestruct "S9" as (qpr24) "Hqp24".  iDestruct "S10" as (qpr16) "Hqp16".
-    iDestruct "S11" as (qpr8) "Hqp8".   iDestruct "S12" as (qpr0) "Hqp0".
-    iDestruct "S13" as (qfraold) "Hqfra". iDestruct "S14" as (qfs0old) "Hqfs0".
-    (* bridges: each clean [pa_stk sp0 k] equals the corresponding let address *)
-    assert (Hb1 : a_r24 = pa_stk sp0 1).
-    { rewrite /a_r24 /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb2 : a_r16 = pa_stk sp0 2).
-    { rewrite /a_r16 /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb3 : a_r8 = pa_stk sp0 3).
-    { rewrite /a_r8 /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    (* raw (spelled) forms of the three own-frame slots, for the return path
-       ([wp_kalloc_words] hands them back zeta-reduced, not via the [a_r*] let) *)
-    assert (Hbr1 : add_vec (add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
-    { rewrite /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hbr2 : add_vec (add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2).
-    { rewrite /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hbr3 : add_vec (add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
-    { rewrite /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb5 : q_r24 = pa_stk sp0 5).
-    { rewrite /q_r24 /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb6 : q_r16 = pa_stk sp0 6).
-    { rewrite /q_r16 /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb7 : q_r8 = pa_stk sp0 7).
-    { rewrite /q_r8 /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb9 : q_p24 = pa_stk sp0 9).
-    { rewrite /q_p24 /pspdA /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb10 : q_p16 = pa_stk sp0 10).
-    { rewrite /q_p16 /pspdA /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb11 : q_p8 = pa_stk sp0 11).
-    { rewrite /q_p8 /pspdA /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb12 : q_p0 = pa_stk sp0 12).
-    { rewrite /q_p0 /pspdA /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb13 : q_fra = pa_stk sp0 13).
-    { rewrite /q_fra /pspm10A /pspdA /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb14 : q_fs0 = pa_stk sp0 14).
-    { rewrite /q_fs0 /pspm10A /pspdA /spdA /sp0A HmAsp /spr /sp0. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite -Hb1) in "Hr24".   iEval (rewrite -Hb2) in "Hr16".
-    iEval (rewrite -Hb3) in "Hr8".    iEval (rewrite -Hb5) in "Hqr24".
-    iEval (rewrite -Hb6) in "Hqr16".  iEval (rewrite -Hb7) in "Hqr8".
-    iEval (rewrite -Hb9) in "Hqp24".  iEval (rewrite -Hb10) in "Hqp16".
-    iEval (rewrite -Hb11) in "Hqp8".  iEval (rewrite -Hb12) in "Hqp0".
-    iEval (rewrite -Hb13) in "Hqfra". iEval (rewrite -Hb14) in "Hqfs0".
-    iApply (wp_kalloc_words root_ppn E Φ γ m vr24 vr16 vr8
-              qvr24 qvr16 qvr8 qpr24 qpr16 qpr8 qpr0 qfraold qfs0old qcpuold
-              qnoff qintena_old a0f fl γc bsie
-              HN HNl Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0
-              with "Hcfg Htoken Htlbinv Htext Hpc Hfile
-                    Hr24 Hr16 Hr8 Hqr24 Hqr16 Hqr8 Hqp24 Hqp16 Hqp8 Hqp0 Hqfra Hqfs0
-                    Hnoff Hint Hlock Hcpu [-]").
-    iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hfile Hkp Hjunk".
-    iDestruct "Hjunk" as (u1 u2 u3) "(Hr24 & Hr16 & Hr8)".
-    iEval (rewrite Hbr1) in "Hr24". iEval (rewrite Hbr2) in "Hr16". iEval (rewrite Hbr3) in "Hr8".
-    (* rebundle kalloc's own 4-slot frame; the scratch below is consumed *)
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Htop".
-    { rewrite stack_own_slots. cbn [seq].
-      iSplitL "Hr24"; [by iExists _|]. iSplitL "Hr16"; [by iExists _|].
-      iSplitL "Hr8"; [by iExists _|]. iSplitL "Hg4"; [by iExists _|]. done. }
-    iApply ("Hcont" $! mr with "Hcfg Htoken Htlbinv Hpc Hfile Hkp [$Htop $Hdeep]").
   Qed.
 
 End Kalloc.

@@ -23,6 +23,7 @@ Require Import WpGpr WpGprRvc WpGprLoad.
 Require Import SmodeCore WpSmodeGpr WpEntryNew WpMemsetS.
 Require Import WpMemsetInstr.
 Require Import CalleeSaved.
+Require Import StackOwn.
 Require Import WpLock KallocInv.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -216,57 +217,45 @@ Section WpMemsetPage.
   (*  [page_valid p]; the ~15 standard S-mode config facts are kept.        *)
   (* =================================================================== *)
   Lemma wp_memset_page (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (cval : mword 64) (vra vs0 : bv 64)
+      (m0 : gmap regidx (mword 64)) (cval : mword 64) (n : nat)
       (γ : gname) {dq : dfrac} :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
     let a1_idx : mword 5 := mword_of_int 11 in
     let a2_idx : mword 5 := mword_of_int 12 in
     let pcE := mword_of_int KernelSyms.memset in
-    let imm_entry : mword 6 := mword_of_int 48 in
-    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
+    let sp0 := m0 !!! Regidx csp_rs1 in
+    let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
     let p := m0 !!! Regidx a0_idx in
-    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let pa_ra := ea_ra in
-    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let pa_s0 := ea_s0 in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (* memset's 2-slot save frame [sp0-16, sp0) is a single [stack_own sp0 n] (n >= 2) *)
+    (2 <= n)%nat ->
     (* the page being filled: RAM-resident, 4096-aligned, in [end, PHYSTOP) *)
     page_valid p ->
     (* argument setup by the caller before the [jal memset] *)
     m0 !!! Regidx a1_idx = cval ->
     m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
-    (* standard S-mode config side conditions (unchanged from the callee) *)
     ↑minstretN ⊆ E ->
-    (* the caller's return target's low bit is clear (a 2-aligned target is
-       fine: memset returns via [exec_jump_to_zca], Zca always enabled) *)
+    (* the caller's return target's low bit is clear (2-aligned target OK: Zca return) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    pa_ra ↦₈ vra -∗
-    pa_s0 ↦₈ vs0 -∗
+    stack_own sp0 n -∗
     page_own p -∗
     ( ∀ mfin,
       smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      pa_ra ↦₈ ra0 -∗
-      pa_s0 ↦₈ s00 -∗
+      stack_own sp0 n -∗
       page_own p -∗
       gpr_file mfin -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ra_idx s0_idx a0_idx a1_idx a2_idx pcE imm_entry sp' ra0 s00 p
-      ea_ra pa_ra ea_s0 pa_s0 ret_tgt
-      Hpv Hcval Ha2 HN Hret0.
+    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt Hn2 Hpv Hcval Ha2 HN Hret0.
     iIntros "Hsm Htlbinv
-             #Htext Hpc Hfile Hbra Hbs0 Hpage Hcont".
+             #Htext Hpc Hfile Hstk Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add p j) ↦ₘ b)%I) with "Hpage")
@@ -277,10 +266,10 @@ Section WpMemsetPage.
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- apply the whole-function memset WP, discharging all geometry --- *)
     pose proof (page_valid_ram p Hpv) as Hramp.
-    iApply (wp_memset_s_full root_ppn E Φ m0 4096
-              (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds vra vs0
+    iApply (wp_memset_s_full_kt root_ppn E Φ m0 4096
+              (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds n
               γ (dq:=dq)
-              HN ltac:(lia)
+              Hn2 HN ltac:(lia)
               add_vec_frame_cancel
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
@@ -334,10 +323,10 @@ Section WpMemsetPage.
               ltac:(intros j; exact (ms_incr_step p j))
               ltac:(intros j Hj; exact (ms_cmp_page p j Hpv Hj))
               with "Hsm Htlbinv
-                    Htext Hpc Hfile Hbra Hbs0 Hbuf [Hcont]").
+                    Htext Hpc Hfile Hstk Hbuf [Hcont]").
     (* --- continuation: rebuild [page_own p] and re-expose gpr_file --- *)
-    iIntros (mfin) "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hfile %Hcs".
-    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hbra Hbs0 [Hbuf] Hfile [%]").
+    iIntros (mfin) "Hsm Htlbinv Hpc Hstk Hbuf Hfile %Hcs".
+    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hstk [Hbuf] Hfile [%]").
     - (* page_own p from the returned all-cbyte buffer *)
       iEval (rewrite /page_own /byte_any).
       iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
