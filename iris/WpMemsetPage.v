@@ -277,7 +277,7 @@ Section WpMemsetPage.
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- apply the whole-function memset WP, discharging all geometry --- *)
     pose proof (page_valid_ram p Hpv) as Hramp.
-    iApply (wp_memset_s_full_kt_words root_ppn E Φ m0 4096
+    iApply (wp_memset_s_full root_ppn E Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds vra vs0
               γ (dq:=dq)
               HN ltac:(lia)
