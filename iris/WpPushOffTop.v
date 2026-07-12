@@ -441,6 +441,38 @@ Proof.
   repeat ((rewrite lookup_total_insert_ne; [| vm_compute; discriminate])). reflexivity.
 Qed.
 
+(* mycpu restores s0 (x8) from its frame before returning: preserved. *)
+Lemma po_mycpu_out_s0 (P : mword 64) (m : gmap regidx (mword 64)) :
+  po_mycpu_out P m !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5).
+Proof.
+  unfold po_mycpu_out. cbv zeta.
+  rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+  rewrite lookup_total_insert.
+  rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate].
+Qed.
+
+(* mycpu is a well-behaved callee: its output preserves every callee-saved
+   register (the ABI guarantee callers may rely on). *)
+Lemma po_mycpu_out_callee_saved (P : mword 64) (m : gmap regidx (mword 64)) :
+  callee_saved m (po_mycpu_out P m).
+Proof.
+  unfold callee_saved. repeat split.
+  - apply po_mycpu_out_csp.
+  - apply po_mycpu_out_tp.
+  - apply po_mycpu_out_s0.
+  - apply po_mycpu_out_s1.
+  - apply po_mycpu_out_s2.
+  - apply po_mycpu_out_s3.
+  - apply po_mycpu_out_s4.
+  - apply po_mycpu_out_s5.
+  - apply po_mycpu_out_s6.
+  - apply po_mycpu_out_s7.
+  - apply po_mycpu_out_s8.
+  - apply po_mycpu_out_s9.
+  - apply po_mycpu_out_s10.
+  - apply po_mycpu_out_s11.
+Qed.
+
 (* po_mycpu_out's a0 output depends on the input map only through tp (x4)
    (local copy; WpHolding.po_mycpu_out_a0 is downstream of this file). *)
 Lemma pt_mycpu_out_a0 (P : mword 64) (m : gmap regidx (mword 64)) :
@@ -1003,7 +1035,10 @@ Section WpPushOffTop.
       ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗ gpr_file (po_mycpu_out P m) -∗
+      pc_is ret_tgt -∗
+      (∃ mo, gpr_file mo ∗ ⌜ callee_saved m mo /\
+              mo !!! Regidx (mword_of_int 10 : mword 5)
+                = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝) -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -1035,7 +1070,9 @@ Section WpPushOffTop.
               Hal0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hsie Hcont]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hbra Hbs0").
+    iExists (po_mycpu_out P m). iFrame "Hfile". iPureIntro.
+    split; [ apply po_mycpu_out_callee_saved | apply pt_mycpu_out_a0 ].
   Qed.
 
   (* ============ reusable jal->mycpu->return block, [smode_config] view ===

@@ -1146,7 +1146,10 @@ Section WpPopOffTopSec.
       ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
       tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗ gpr_file (po_mycpu_out P m) -∗
+      pc_is ret_tgt -∗
+      (∃ mo, gpr_file mo ∗ ⌜ callee_saved m mo /\
+              mo !!! Regidx (mword_of_int 10 : mword 5)
+                = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝) -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
@@ -1173,7 +1176,9 @@ Section WpPopOffTopSec.
               HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hgc Hcont]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hbra Hbs0").
+    iExists (po_mycpu_out P m). iFrame "Hfile". iPureIntro.
+    split; [ apply po_mycpu_out_callee_saved | apply pt_mycpu_out_a0 ].
   Qed.
 
   (* [smode_config] view of the pure sstatus read (csrrs rd,sstatus,x0): mstatus
@@ -1595,7 +1600,7 @@ Section WpPopOffTopSec.
               with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
     { iEval (rewrite HspP2r). iExact "Hfra". }
     { iEval (rewrite HspP2r). iExact "Hfs0". }
-    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hfra Hfs0".
+    iIntros "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hmycpu Hfra Hfs0".
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
@@ -1604,17 +1609,20 @@ Section WpPopOffTopSec.
     assert (Hpc0c : update_vec_dec (add_vec (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (PP + 0x0c) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
-    set (C := po_mycpu_out (mword_of_int (PP + 0x08)) M1).
+    iDestruct "Hmycpu" as (C) "[Hfile %Hmc]".
+    destruct Hmc as (Hmc_cs & Hmc_a0).
+    unfold callee_saved in Hmc_cs.
+    destruct Hmc_cs as (Hmc_csp & Hmc_tp & Hmc_s0 & Hmc_s1 & Hmc_s2 & Hmc_s3 & Hmc_s4 & Hmc_s5 & Hmc_s6 & Hmc_s7 & Hmc_s8 & Hmc_s9 & Hmc_s10 & Hmc_s11).
     assert (Ha0C : C !!! Regidx (mword_of_int 10 : mword 5) = a0v).
-    { rewrite /C po_mycpu_out_a0 Htp1. reflexivity. }
+    { rewrite Hmc_a0 Htp1. reflexivity. }
     assert (HspC : C !!! Regidx csp_rs1 = spd).
-    { rewrite /C po_mycpu_out_csp. exact Hsp1. }
+    { rewrite Hmc_csp. exact Hsp1. }
     assert (Hs9C : C !!! Regidx (mword_of_int 9 : mword 5)
                    = m !!! Regidx (mword_of_int 9 : mword 5)).
-    { rewrite /C po_mycpu_out_s1. exact Hs91. }
+    { rewrite Hmc_s1. exact Hs91. }
     assert (HtpC : C !!! Regidx (mword_of_int 4 : mword 5)
                    = m !!! Regidx (mword_of_int 4 : mword 5)).
-    { rewrite /C po_mycpu_out_tp. exact Htp1. }
+    { rewrite Hmc_tp. exact Htp1. }
     (* +0x0c csrr a5,sstatus: read via the SIE ghost.  Yields [sstatus_read msr]
        for SOME [msr] with SIE = 0 (the concrete mstatus stays hidden in the
        bundle).  [msr] is contained to +0x0c..+0x12: a5 is overwritten at +0x14. *)
@@ -1879,61 +1887,61 @@ Section WpPopOffTopSec.
         rewrite (HaD1 (Regidx (mword_of_int 18 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s2.
+        rewrite Hmc_s2.
         exact (HaA1 (Regidx (mword_of_int 18 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 19 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 19 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s3.
+        rewrite Hmc_s3.
         exact (HaA1 (Regidx (mword_of_int 19 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 20 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 20 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s4.
+        rewrite Hmc_s4.
         exact (HaA1 (Regidx (mword_of_int 20 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 21 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 21 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s5.
+        rewrite Hmc_s5.
         exact (HaA1 (Regidx (mword_of_int 21 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s6.
+        rewrite Hmc_s6.
         exact (HaA1 (Regidx (mword_of_int 22 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s7.
+        rewrite Hmc_s7.
         exact (HaA1 (Regidx (mword_of_int 23 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s8.
+        rewrite Hmc_s8.
         exact (HaA1 (Regidx (mword_of_int 24 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s9.
+        rewrite Hmc_s9.
         exact (HaA1 (Regidx (mword_of_int 25 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s10.
+        rewrite Hmc_s10.
         exact (HaA1 (Regidx (mword_of_int 26 : mword 5)) ltac:(vm_compute; reflexivity)).
       - rewrite (HaE1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite (HaD1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P4. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /P3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /C po_mycpu_out_s11.
+        rewrite Hmc_s11.
         exact (HaA1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)). }
     destruct Hpres_M3 as (H18M3 & H19M3 & H20M3 & H21M3 & H22M3 & H23M3 & H24M3 & H25M3 & H26M3 & H27M3).
     (* +0x1e c.bnez a5: both outcomes (noff-1 <> 0 / = 0) *)
