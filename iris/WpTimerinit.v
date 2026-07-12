@@ -54,6 +54,7 @@ From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
+Require Import CalleeSaved.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -558,6 +559,33 @@ Local Ltac ti_unfold :=
   unfold ti_mout, ti_m27, ti_m26, ti_m24, ti_m23, ti_m22, ti_m21, ti_m19,
          ti_m18, ti_m16, ti_m15, ti_m14, ti_m13, ti_m12, ti_m1.
 
+(* timerinit obeys the callee-saved ABI: it spills+reloads ra/s0, restores sp,
+   and clobbers only the caller-saved temporaries a4/a5 -- every callee-saved
+   register (sp, tp, s0, s1, s2..s11) holds its entry value on return. *)
+Lemma ti_mout_callee_saved
+    (m : gmap regidx (mword 64)) (sp0 menv0 mtime0 ra0 s00 : mword 64)
+    (mcen0 : mword 32) :
+  m !!! Regidx csp_rs1 = sp0 ->
+  m !!! Regidx ti_s0 = s00 ->
+  callee_saved m (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00).
+Proof.
+  intros Hsp Hs0. unfold callee_saved. repeat split.
+  - rewrite Hsp. ti_unfold; ti_look.       (* x2  sp *)
+  - ti_unfold; ti_look.                     (* x4  tp *)
+  - rewrite Hs0. ti_unfold; ti_look.        (* x8  s0 *)
+  - ti_unfold; ti_look.                     (* x9  s1 *)
+  - ti_unfold; ti_look.                     (* x18 s2 *)
+  - ti_unfold; ti_look.                     (* x19 s3 *)
+  - ti_unfold; ti_look.                     (* x20 s4 *)
+  - ti_unfold; ti_look.                     (* x21 s5 *)
+  - ti_unfold; ti_look.                     (* x22 s6 *)
+  - ti_unfold; ti_look.                     (* x23 s7 *)
+  - ti_unfold; ti_look.                     (* x24 s8 *)
+  - ti_unfold; ti_look.                     (* x25 s9 *)
+  - ti_unfold; ti_look.                     (* x26 s10 *)
+  - ti_unfold; ti_look.                     (* x27 s11 *)
+Qed.
+
 (* ===================================================================== *)
 (* THE THEOREM: the whole timerinit() body, one Qed, at a generic         *)
 (* fraction [q] of the M-mode config.                                     *)
@@ -950,7 +978,7 @@ Section WpTimerinitThm.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg1 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (cret_target ra0) -∗
-      gpr_file (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00) -∗
+      (∃ mo, gpr_file mo ∗ ⌜ callee_saved m mo ⌝) -∗
       menvcfg ↦ᵣ menvcfg_legalized menv0 (ti_menv1 menv0) -∗
       mcounteren ↦ᵣ legalize_mcounteren mcen0 (ti_mcen1 mcen0) -∗
       mtime ↦ᵣ mtime0 -∗
@@ -977,7 +1005,9 @@ Section WpTimerinitThm.
     iEval (rewrite Hps0) in "Hstks0".
     iDestruct (stack_own_2_intro with "Hstkra Hstks0") as "Htop".
     iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hmtime Hstc Hstk").
+    iApply ("Hcont" with "Hmm Hpmpc Hpaddr Hpc [Hfile] Hmenv Hmcen Hmtime Hstc Hstk").
+    iExists (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00). iFrame "Hfile".
+    iPureIntro. apply ti_mout_callee_saved; assumption.
   Qed.
 
 End WpTimerinitThm.
