@@ -306,14 +306,16 @@ Section WpMemsetInstr.
            (mword_of_int (KernelSyms.memset + 0x24) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
 
   (* =================================================================== *)
-  (*  THE CAPSTONE: [wp_memset_s_full] with the sixteen instruction        *)
-  (*  decodings discharged from [kernel_text].  Every [instr] premise is    *)
-  (*  gone; the operand fields are the concrete decoded values.             *)
+  (*  THE CAPSTONE: [wp_memset_s_full_kt] — the whole-function memset WP,   *)
+  (*  with the sixteen instruction decodings discharged from [kernel_text]  *)
+  (*  and the 2-slot save frame carried as a single [stack_own sp0 n]       *)
+  (*  (n >= 2).  The Sv39 superpage-identity geometry (svpn := svpn_of a8)  *)
+  (*  is derived at the [wp_sb_s] leaf, so no svpn side conditions appear.   *)
   (* =================================================================== *)
 
-  Lemma wp_memset_s_full (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_memset_s_full_kt (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (N : nat) (wval_add : mword 64)
-      (svpn : mword 27) (olds : nat -> bv 8) (vra vs0 : bv 64)
+      (olds : nat -> bv 8) (n : nat)
       (γ : gname) {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
@@ -333,6 +335,7 @@ Section WpMemsetInstr.
     let imm8_beqz : mword 8 := mword_of_int 11 in
     let i_add : instruction := RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD) in
     let imm_bne : mword 13 := mword_of_int 0x1ffa in
+    let sp0 := m0 !!! Regidx csp_rs1 in
     let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
     let ra0 := m0 !!! Regidx ra_idx in
     let s00 := m0 !!! Regidx s0_idx in
@@ -353,12 +356,10 @@ Section WpMemsetInstr.
     let m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5 in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+    (2 <= n)%nat ->
     ↑minstretN ⊆ E ->
     (1 <= N)%nat ->
-    (* balanced frame: prologue alloc and epilogue dealloc cancel (48 = -16, +16) *)
-    (forall X : mword 64,
-       add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 imm_entry)))
-               (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = X) ->
+    (* the ADD computing the loop end pointer [a4 := a2 + a0 = wval_add] *)
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
        (if Z.eqb (uint a2_idx) 0 then zero_reg
@@ -367,38 +368,22 @@ Section WpMemsetInstr.
         else register_lookup (R_bitvector_64 (gpr_of_Z (uint a0_idx))) s_pc.(sregs)) = m5 !!! Regidx a0_idx ->
        exec (execute i_add) s_pc
        = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint a4_idx))) (regval_into_reg wval_add))) ->
+    (* the count [a2] is nonzero, so the entry [beqz] falls through *)
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
+    (* caller's return target's low bit is clear (2-aligned Zca return) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (* 2-aligned return target OK: memset returns via [exec_jump_to_zca] *)
-    add_vec (add_vec_int pc0L 6) (sign_extend' 64 imm_bne) = pc0L ->
-    eq_vec (access_vec_dec pc0L 0) ('b"0") = true ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    (forall j : nat, (j < N)%nat ->
-       neq_vec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j))))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0)) = false) ->
-    (forall j : nat, (j < N)%nat ->
-       autocast (T := mword) (subrange_vec_dec
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn) ->
-    (forall j : nat, (j < N)%nat ->
-       zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
-    (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
+    (* the end pointer couples to the buffer: [wval_add = ms_addr p N] *)
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    pa_ra ↦₈ vra -∗
-    pa_s0 ↦₈ vs0 -∗
+    stack_own sp0 n -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( ∀ mfin,
       smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      pa_ra ↦₈ ra0 -∗
-      pa_s0 ↦₈ s00 -∗
+      stack_own sp0 n -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
       gpr_file mfin -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
@@ -407,14 +392,20 @@ Section WpMemsetInstr.
   Proof.
     intros ra_idx s0_idx a0_idx a1_idx a2_idx a4_idx a5_idx pcE pc0L pcLS
       imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz i_add imm_bne
-      sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
+      sp0 sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      HN HNge1 Hframe
-      Hbexec_add
-      Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
-      Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp.
+      Hn HN HNge1 Hbexec_add Hn0 Hret0 Hcmp.
+    pose proof (add_vec_frame_cancel) as Hframe.
     iIntros "Hsm Htlbinv
-             #Htext Hpc Hfile Hbra Hbs0 Hbuf Hcont".
+             #Htext Hpc Hfile Hstk Hbuf Hcont".
+    (* peel the 2-slot save frame [sp0-16, sp0), lend the deeper region *)
+    iDestruct (stack_own_split_1 sp0 2 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iDestruct (stack_own_2_elim with "Htop") as (vra vs0) "[Hbra Hbs0]".
+    assert (Hb1 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hb1) in "Hbra". iEval (rewrite -Hb2) in "Hbs0".
     (* derive the thirteen prefix/suffix instr resources from the text image *)
     iPoseProof (minstr_cba with "Htext") as "Hi0".
     iPoseProof (minstr_cbc with "Htext") as "Hi2".
@@ -467,11 +458,11 @@ Section WpMemsetInstr.
     iIntros "Hsm Htlbinv Hpc Hfile Hbra Hbs0".
     iEval (rewrite Hpc1) in "Hpc".
     (* --- LOOP: 0xce0..0xce6 --- *)
-    iApply (wp_memset_loop root_ppn γ E Φ N p e cval a1_idx a4_idx a5_idx imm_bne svpn
+    iApply (wp_memset_loop root_ppn γ E Φ N p e cval a1_idx a4_idx a5_idx imm_bne
               olds (dq:=dq)
               HN ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
-              Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
+              ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(intros j; exact (ms_incr_step p j)) Hcmp
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               Hext0 Hext4 Hext6
               N 0%nat m6 ltac:(reflexivity) HNge1 Hcur Hm4 Hm1
@@ -491,7 +482,11 @@ Section WpMemsetInstr.
     iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hmfin".
     iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
     destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
-    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hfile [%]").
+    (* rebundle the restored 2-slot frame back to [stack_own sp0 n] *)
+    iEval (rewrite Hb1) in "Hbra". iEval (rewrite Hb2) in "Hbs0".
+    iDestruct (stack_own_2_intro with "Hbra Hbs0") as "Htop".
+    iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
+    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hstk Hbuf Hfile [%]").
     (* the caller-saved-register catch-all, relative to m0 *)
     assert (Hcatch : forall r : regidx,
               r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
@@ -523,136 +518,6 @@ Section WpMemsetInstr.
     - (* x25 s9 *) apply Hcatch; vm_compute; discriminate.
     - (* x26 s10 *) apply Hcatch; vm_compute; discriminate.
     - (* x27 s11 *) apply Hcatch; vm_compute; discriminate.
-  Qed.
-
-  (* [stack_own] wrapper over [wp_memset_s_full]: memset_s's 2-slot
-     frame [sp0-16, sp0) (saved ra + s0) is a single [stack_own sp0 n] (n >= 2).
-     The saved ra/s0 restored on the post are existential (scratch), so the
-     frame rebundles as [stack_own sp0 n]. *)
-  Lemma wp_memset_s_full_kt (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (N : nat) (wval_add : mword 64)
-      (svpn : mword 27) (olds : nat -> bv 8) (n : nat)
-      (γ : gname) {dq : dfrac} :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let s0_idx : mword 5 := mword_of_int 8 in
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let a1_idx : mword 5 := mword_of_int 11 in
-    let a2_idx : mword 5 := mword_of_int 12 in
-    let a4_idx : mword 5 := mword_of_int 14 in
-    let a5_idx : mword 5 := mword_of_int 15 in
-    let pcE := mword_of_int KernelSyms.memset in
-    let pc0L : mword 64 := mword_of_int (KernelSyms.memset + 0x14) in
-    let pcLS : mword 64 := mword_of_int (KernelSyms.memset + 0x1e) in
-    let imm_entry : mword 6 := mword_of_int 48 in
-    let shamt_l : mword 6 := mword_of_int 32 in
-    let shamt_r : mword 6 := mword_of_int 32 in
-    let imm_dealloc : mword 6 := mword_of_int 16 in
-    let nzimm_s0 : mword 8 := mword_of_int 4 in
-    let imm8_beqz : mword 8 := mword_of_int 11 in
-    let i_add : instruction := RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD) in
-    let imm_bne : mword 13 := mword_of_int 0x1ffa in
-    let sp0 := m0 !!! Regidx csp_rs1 in
-    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
-    let p := m0 !!! Regidx a0_idx in
-    let e := wval_add in
-    let cval := m0 !!! Regidx a1_idx in
-    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a8_ra := ea_ra in
-    let pa_ra := a8_ra in
-    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let a8_s0 := ea_s0 in
-    let pa_s0 := a8_s0 in
-    let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
-    let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
-    let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2 in
-    let m4 := <[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3 in
-    let m5 := <[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4 in
-    let m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5 in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
-    (2 <= n)%nat ->
-    ↑minstretN ⊆ E ->
-    (1 <= N)%nat ->
-    (* balanced frame: prologue alloc and epilogue dealloc cancel (48 = -16, +16) *)
-    (forall X : mword 64,
-       add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 imm_entry)))
-               (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = X) ->
-    (forall s_pc : mstate,
-       register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
-       (if Z.eqb (uint a2_idx) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a2_idx))) s_pc.(sregs)) = m5 !!! Regidx a2_idx ->
-       (if Z.eqb (uint a0_idx) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a0_idx))) s_pc.(sregs)) = m5 !!! Regidx a0_idx ->
-       exec (execute i_add) s_pc
-       = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint a4_idx))) (regval_into_reg wval_add))) ->
-    eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    add_vec (add_vec_int pc0L 6) (sign_extend' 64 imm_bne) = pc0L ->
-    eq_vec (access_vec_dec pc0L 0) ('b"0") = true ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    (forall j : nat, (j < N)%nat ->
-       neq_vec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j))))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0)) = false) ->
-    (forall j : nat, (j < N)%nat ->
-       autocast (T := mword) (subrange_vec_dec
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn) ->
-    (forall j : nat, (j < N)%nat ->
-       zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
-    (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
-    (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
-    smode_config γ dq -∗
-    tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    stack_own sp0 n -∗
-    ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
-    ( ∀ mfin,
-      smode_config γ dq -∗
-      tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗
-      stack_own sp0 n -∗
-      ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
-      gpr_file mfin -∗
-      ⌜ callee_saved m0 mfin ⌝ -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros ra_idx s0_idx a0_idx a1_idx a2_idx a4_idx a5_idx pcE pc0L pcLS
-      imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz i_add imm_bne
-      sp0 sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
-      m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      Hn HN HNge1 Hframe
-      Hbexec_add
-      Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
-      Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp.
-    iIntros "Hsm Htlbinv #Htext Hpc Hfile Hstk Hbuf Hcont".
-    (* peel the 2-slot frame, frame the deeper region *)
-    iDestruct (stack_own_split_1 sp0 2 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
-    iDestruct (stack_own_2_elim with "Htop") as (vra vs0) "[Hbra Hbs0]".
-    assert (Hb1 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb2 : add_vec (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite -Hb1) in "Hbra". iEval (rewrite -Hb2) in "Hbs0".
-    iApply (wp_memset_s_full root_ppn E Φ m0 N wval_add svpn olds vra vs0
-              γ (dq:=dq)
-              HN HNge1 Hframe Hbexec_add
-              Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
-              Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
-              with "Hsm Htlbinv Htext Hpc Hfile [Hbra] [Hbs0] Hbuf [-]").
-    { iExact "Hbra". }
-    { iExact "Hbs0". }
-    iIntros (mfin) "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hfile %Hcs".
-    iEval (rewrite Hb1) in "Hbra". iEval (rewrite Hb2) in "Hbs0".
-    iDestruct (stack_own_2_intro with "Hbra Hbs0") as "Htop".
-    iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hstk Hbuf Hfile [%]").
-    exact Hcs.
   Qed.
 
 End WpMemsetInstr.

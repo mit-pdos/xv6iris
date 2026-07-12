@@ -1145,27 +1145,17 @@ Qed.
   (*  page-walk + fill at tlb_hash svpn, preserving the invariant).       *)
   (* =================================================================== *)
   Lemma wp_sb_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12) (svpn : mword 27)
+      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64)) (vold : bv 8)
       {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
     let pa := zero_extend' 64 (add_vec_int a8 (0 * 1)) in
+    let svpn := svpn_of a8 in
     let storeval := (autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) in
     ↑minstretN ⊆ E ->
-    (* data address: superpage-identity geometry at tlb_hash svpn *)
-    neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn ->
-    zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    (* the walks' PTE read *)
-    (* store PMP: TOR entry 0 covers pa with W *)
+    (* the superpage-identity geometry facts below (svpn := svpn_of a8) are
+       derived internally at this leaf from [addr_is_ram a8]; no caller obligation. *)
     smode_config γ dq -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
@@ -1180,10 +1170,24 @@ Qed.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa storeval HN
-      Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn.
+    intros ea a8 pa svpn storeval HN.
     iIntros "Hsm Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbyte Hcont".
+    (* [push to leaf] derive the svpn geometry facts here from [addr_is_ram a8]. *)
+    iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa0.
+    { iDestruct (mem_ram with "Hbyte") as %Hr0. iPureIntro. exact Hr0. }
+    assert (Hpa_a8 : pa = a8)
+      by (unfold pa; rewrite Z.mul_0_l avi0; apply zero_extend'_id).
+    assert (Hrama8 : addr_is_ram a8) by (rewrite <- Hpa_a8; exact Hrampa0).
+    pose proof (RiscvExtras.ram_canonical a8 Hrama8) as Hcanon.
+    assert (Hvpn_def : autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn)
+      by reflexivity.
+    pose proof (WpSmodeGpr.ram_ident root_ppn a8 Hrama8) as Hident.
+    pose proof (RiscvExtras.ram_mask a8 Hrama8) as Hmask.
+    pose proof (RiscvExtras.ram_svpn2 a8 Hrama8) as Hvpn2.
+    pose proof (RiscvExtras.ram_mvpn a8 Hrama8) as Hmvpn.
+    pose proof (WpSmodeGpr.ram_mppn a8 Hrama8) as Hmppn.
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
@@ -2246,6 +2250,54 @@ Qed.
   (* c.addi a5,a5,1 increments a5 by exactly one. *)
   Definition ms_incr1 : mword 64 := sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)).
 
+  Lemma add_vec_unsigned (x y : mword 64) :
+    bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
+  Proof.
+    unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned. reflexivity.
+  Qed.
+
+  Lemma moi_unsigned (k : Z) : bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
+  Proof.
+    unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+    rewrite Z_to_bv_unsigned. reflexivity.
+  Qed.
+
+  Lemma ms_addr_pa_add (p : mword 64) (j : nat) : ms_addr p j = pa_add p j.
+  Proof. unfold ms_addr, pa_add, add_vec_int. reflexivity. Qed.
+
+  (* the c.addi increment [ms_incr1] is just [1]. *)
+  Lemma ms_incr1_one : ms_incr1 = (mword_of_int 1 : mword 64).
+  Proof. unfold ms_incr1. apply bv_eq; vm_compute; reflexivity. Qed.
+
+  (* pointer arithmetic: the c.addi advances the byte offset by one (any j). *)
+  Lemma ms_incr_step (p : mword 64) (j : nat) :
+    add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j).
+  Proof.
+    rewrite ms_incr1_one. rewrite !ms_addr_pa_add. unfold pa_add, add_vec_int.
+    apply bv_eq. rewrite !add_vec_unsigned. rewrite !moi_unsigned.
+    rewrite Nat2Z.inj_succ.
+    rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
+    f_equal. lia.
+  Qed.
+
+  (* memset's frame alloc (c.addi16sp sp,-16 ; encoded imm 48 = -16 in 6-bit)
+     and dealloc (c.addi16sp sp,+16 ; imm 16) cancel, so sp is net-preserved. *)
+  Lemma add_vec_frame_cancel (X : mword 64) :
+    add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
+            (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
+  Proof.
+    apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+    assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
+               = 18446744073709551600) by (vm_compute; reflexivity).
+    assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
+               = 16) by (vm_compute; reflexivity).
+    rewrite HA HB. rewrite <- Z.add_assoc.
+    replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
+    rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+  Qed.
+
   Lemma seq_cons (a b : nat) : seq a (S b) = a :: seq (S a) b.
   Proof. reflexivity. Qed.
 
@@ -2450,7 +2502,7 @@ Qed.
 
 
   Lemma wp_memset_loop (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13) (svpn : mword 27)
+      (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13)
       (olds : nat -> bv 8) {dq : dfrac} :
     let pc0 := mword_of_int (KernelSyms.memset + 0x14) in
     let pc4 := add_vec_int pc0 4 in
@@ -2464,21 +2516,7 @@ Qed.
        legalizes the bit1 = 1 target in the relocated image). *)
     add_vec pc6 (sign_extend' 64 imm_bne) = pc0 ->
     eq_vec (access_vec_dec pc0 0) ('b"0") = true ->
-    (* store page-level geometry *)
-    and_vec (sign_extend' (57 - 12) svpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    subrange_vec_dec svpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec svpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out svpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    (* per-byte store geometry, for each byte offset j < N (a5-value ms_addr p j) *)
-    (forall j : nat, (j < N)%nat ->
-       neq_vec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j))))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0)) = false) ->
-    (forall j : nat, (j < N)%nat ->
-       autocast (T := mword) (subrange_vec_dec
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = svpn) ->
-    (forall j : nat, (j < N)%nat ->
-       zero_extend' 64 (concat_vec (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) svpn)
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (ms_a8 (ms_addr p j)))) (Z.sub pagesize_bits 1) 0)) = ms_a8 (ms_addr p j)) ->
+    (* store geometry (svpn := svpn_of a8) is derived internally at [wp_sb_s]. *)
     (* pointer arithmetic: c.addi advances offset; bne compares a5+1 vs a4=e *)
     (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
@@ -2506,8 +2544,8 @@ Qed.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros pc0 pc4 pc6 cbyte HN Hra1 Hra4 Hra5 Hback Hal0 Hmask Hvpn2s Hmvpns Hmppns
-      Hcanon Hvpn Hident Hincr Hcmp Hra4ne Hra1ne Hext0 Hext4 Hext6.
+    intros pc0 pc4 pc6 cbyte HN Hra1 Hra4 Hra5 Hback Hal0
+      Hincr Hcmp Hra4ne Hra1ne Hext0 Hext4 Hext6.
     induction rem as [|rem' IH]; intros off m Hoff Hrem Hcur Hm4 Hm1;
       [ exfalso; lia | ].
     iIntros "Hsm Htlbinv
@@ -2522,12 +2560,8 @@ Qed.
     rewrite big_sepL_cons.
     iDestruct "Hbuf" as "[Hb0 Hbuf]".
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
-    iApply (wp_sb_s root_ppn γ E Φ pc0 ra1 ra5 (mword_of_int 0) svpn m (olds off) (dq:=dq)
+    iApply (wp_sb_s root_ppn γ E Φ pc0 ra1 ra5 (mword_of_int 0) m (olds off) (dq:=dq)
               HN
-              ltac:(rewrite Hcur; apply (Hcanon off HoffN))
-              ltac:(rewrite Hcur; apply (Hvpn off HoffN))
-              ltac:(rewrite Hcur; apply (Hident off HoffN))
-              Hmask Hvpn2s Hmvpns Hmppns
               with "Hsm Htlbinv Hpc Hfile Hi0 [Hb0]").
     { (* the byte points-to at ms_pa (m!!!ra5) = ms_pa (ms_addr p off) *)
       unfold ms_pa, ms_a8. rewrite Hcur. iExact "Hb0". }

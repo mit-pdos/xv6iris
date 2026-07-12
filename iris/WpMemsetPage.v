@@ -35,20 +35,6 @@ Import Defs.
 (*  the page-level geometry.                                               *)
 (* ===================================================================== *)
 
-Lemma add_vec_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
-
-Lemma moi_unsigned (k : Z) : bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-Proof.
-  unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. reflexivity.
-Qed.
-
 (* [ms_a8]/[ms_pa] are the store's translated (identity) byte address; on
    64-bit both are the identity, and [ms_addr p j] is definitionally [pa_add p
    j].  Hence memset's per-byte address [ms_pa (ms_addr p j)] is exactly the
@@ -69,45 +55,11 @@ Proof.
   rewrite avi0. rewrite zero_extend'_id. apply ms_a8_id.
 Qed.
 
-Lemma ms_addr_pa_add (p : mword 64) (j : nat) : ms_addr p j = pa_add p j.
-Proof. unfold ms_addr, pa_add, add_vec_int. reflexivity. Qed.
-
 Lemma ms_pa_ms_addr (p : mword 64) (j : nat) : ms_pa (ms_addr p j) = pa_add p j.
 Proof. rewrite ms_pa_id. apply ms_addr_pa_add. Qed.
 
 Lemma ms_a8_ms_addr (p : mword 64) (j : nat) : ms_a8 (ms_addr p j) = pa_add p j.
 Proof. rewrite ms_a8_id. apply ms_addr_pa_add. Qed.
-
-(* the c.addi increment [ms_incr1] is just [1]. *)
-Lemma ms_incr1_one : ms_incr1 = (mword_of_int 1 : mword 64).
-Proof. unfold ms_incr1. apply bv_eq; vm_compute; reflexivity. Qed.
-
-(* pointer arithmetic: the c.addi advances the byte offset by one (any j). *)
-Lemma ms_incr_step (p : mword 64) (j : nat) :
-  add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j).
-Proof.
-  rewrite ms_incr1_one. rewrite !ms_addr_pa_add. unfold pa_add, add_vec_int.
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite !moi_unsigned.
-  rewrite Nat2Z.inj_succ.
-  rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
-  f_equal. lia.
-Qed.
-
-(* memset's frame alloc (c.addi16sp sp,-16 ; encoded imm 48 = -16 in 6-bit)
-   and dealloc (c.addi16sp sp,+16 ; imm 16) cancel, so sp is net-preserved. *)
-Lemma add_vec_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-Proof.
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
-             = 18446744073709551600) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
-             = 16) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* ---- page validity gives RAM residency for the base and every byte ---- *)
 
@@ -264,13 +216,13 @@ Section WpMemsetPage.
       with "[Hpage]" as "Hbuf".
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }
-    (* --- apply the whole-function memset WP, discharging all geometry --- *)
-    pose proof (page_valid_ram p Hpv) as Hramp.
+    (* --- apply the whole-function memset WP.  The Sv39 geometry is now
+       derived inside the memset proof (at the [wp_sb_s] leaf); only the
+       argument-setup couplings [Hbexec_add / Hn0 / Hret0 / Hcmp] remain. --- *)
     iApply (wp_memset_s_full_kt root_ppn E Φ m0 4096
-              (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds n
+              (add_vec (mword_of_int 4096 : mword 64) p) olds n
               γ (dq:=dq)
               Hn2 HN ltac:(lia)
-              add_vec_frame_cancel
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
                     cbn [execute];
@@ -305,22 +257,7 @@ Section WpMemsetPage.
               (* Hn0 : a2 = 4096 <> 0 *)
               ltac:(rewrite Ha2; vm_compute; reflexivity)
               Hret0
-              (* Hbne / HpcL0 : constant target geometry *)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              (* svpn structural facts, over svpn_of p *)
-              (ram_mask p Hramp) (ram_svpn2 p Hramp) (ram_mvpn p Hramp)
-              (WpSmodeGpr.ram_mppn p Hramp)
-              (* the four per-byte geometry premises *)
-              ltac:(intros j Hj; rewrite ms_a8_ms_addr;
-                    exact (ram_canonical (pa_add p j) (page_valid_ram_j p j Hpv Hj)))
-              ltac:(intros j Hj; rewrite ms_a8_ms_addr;
-                    exact (svpn_pa_add_same p j Hpv Hj))
-              ltac:(intros j Hj; rewrite ms_a8_ms_addr;
-                    rewrite <- (svpn_pa_add_same p j Hpv Hj);
-                    exact (ram_ident root_ppn (pa_add p j) (page_valid_ram_j p j Hpv Hj)))
-              (* Hincr / Hcmp : pointer arithmetic *)
-              ltac:(intros j; exact (ms_incr_step p j))
+              (* Hcmp : the end pointer [p + 4096] couples to the buffer *)
               ltac:(intros j Hj; exact (ms_cmp_page p j Hpv Hj))
               with "Hsm Htlbinv
                     Htext Hpc Hfile Hstk Hbuf [Hcont]").
