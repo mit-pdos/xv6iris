@@ -21,7 +21,7 @@
      +0x1c  800018f2  0141      c.addi   sp,sp,16     frame free
      +0x1e  800018f4  8082      c.ret                                        *)
 From Stdlib Require Import ZArith.
-From stdpp Require Import gmap bitvector.definitions.
+From stdpp Require Import gmap bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
@@ -40,9 +40,32 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 Require Import VcGen VcGenS.
+Require Import CalleeSaved.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Import Defs.
+
+(* mycpu's balanced frame: entry [addi sp,sp,-16] (imm 48 = -16 in 6-bit) and
+   exit [addi sp,sp,+16] (imm 16) cancel, so sp returns to its entry value.
+   (A local clone of WpMemsetPage.add_vec_frame_cancel, which lives downstream.) *)
+Lemma mycpu_frame_cancel (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
+          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
+Proof.
+  assert (add_vec_unsigned : forall x y : mword 64,
+            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned. reflexivity. }
+  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
+             = 18446744073709551600) by (vm_compute; reflexivity).
+  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
+             = 16) by (vm_compute; reflexivity).
+  rewrite HA HB. rewrite <- Z.add_assoc.
+  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
+  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+Qed.
 
 (* ===================================================================== *)
 (* Decode templates.                                                      *)
@@ -744,11 +767,12 @@ Section WpMycpu.
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    ( ∀ mf,
+      hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗ gpr_file m11 -∗
+      pc_is ret_tgt -∗ gpr_file mf -∗ ⌜ callee_saved m0 mf ⌝ -∗
       stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -780,7 +804,40 @@ Section WpMycpu.
     iEval (rewrite Hps0) in "Hbs0".
     iDestruct (stack_own_2_intro with "Hbra Hbs0") as "Htop".
     iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hstk").
+    iApply ("Hcont" $! m11 with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
+    subst m11 m10 m9 m8 m7 m6 m5 m4 m3 m2 m1 sp' s00 ra0 s0_idx ra_idx tp_idx a0_idx a5_idx.
+    unfold callee_saved. repeat split.
+    - (* x2 sp: balanced frame *)
+      rewrite lookup_total_insert.
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+      rewrite lookup_total_insert. apply mycpu_frame_cancel.
+    - (* x4 tp *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x8 s0: spilled + reloaded *)
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite lookup_total_insert. reflexivity.
+    - (* x9 s1 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x18 s2 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x19 s3 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x20 s4 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x21 s5 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x22 s6 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x23 s7 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x24 s8 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x25 s9 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x26 s10 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    - (* x27 s11 *)
+      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
   Qed.
 
 End WpMycpu.

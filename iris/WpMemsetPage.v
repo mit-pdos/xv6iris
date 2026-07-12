@@ -281,6 +281,7 @@ Section WpMemsetPage.
               (add_vec (mword_of_int 4096 : mword 64) p) (svpn_of p) olds vra vs0
               γ (dq:=dq)
               HN ltac:(lia)
+              add_vec_frame_cancel
               (* Hbexec_add : the add computes a4 := 4096 + p *)
               ltac:(intros s_pc Hnpc Hva Hvb;
                     cbn [execute];
@@ -335,22 +336,14 @@ Section WpMemsetPage.
               with "Hsm Htlbinv
                     Htext Hpc Hfile Hbra Hbs0 Hbuf [Hcont]").
     (* --- continuation: rebuild [page_own p] and re-expose gpr_file --- *)
-    iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
-    iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
-    destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
+    iIntros (mfin) "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hfile %Hcs".
     iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hbra Hbs0 [Hbuf] Hfile [%]").
     - (* page_own p from the returned all-cbyte buffer *)
       iEval (rewrite /page_own /byte_any).
       iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
       iEval (rewrite ms_pa_ms_addr) in "H". iExists _. iExact "H".
-    - (* the final register file, with ra/s0/s1/s2/sp pinned to their caller values *)
-      unfold callee_saved.
-      split; [ (* sp *) rewrite Hpcsp; apply add_vec_frame_cancel |].
-      split; [ (* tp *) apply Hpres; vm_compute; discriminate |].
-      split; [ (* s0 *) exact Hps0 |].
-      split; [ (* s1 *) apply Hpres; vm_compute; discriminate |].
-      (* s2..s11 *)
-      repeat split; apply Hpres; vm_compute; discriminate.
+    - (* the final register file: callee_saved passes straight through *)
+      exact Hcs.
   Qed.
 
 End WpMemsetPage.

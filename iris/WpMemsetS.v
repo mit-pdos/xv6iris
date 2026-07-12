@@ -41,6 +41,7 @@ Require Import SmodeCore WpSmodeGpr.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import CalleeSaved.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -2984,6 +2985,11 @@ Qed.
     let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
     ↑minstretN ⊆ E ->
     (1 <= N)%nat ->
+    (* the prologue frame alloc [imm_entry] and epilogue dealloc [imm_dealloc]
+       cancel, so sp returns to its entry value (needed for [callee_saved]). *)
+    (forall X : mword 64,
+       add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 imm_entry)))
+               (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = X) ->
     (* fetch geometry + PMP: prefix (0..18), loop (ce0-relative), suffix (cea-relative) *)
     (* the add reduces to a4 := wval_add (end pointer) *)
     (forall s_pc : mstate,
@@ -3042,26 +3048,22 @@ Qed.
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
-    ( smode_config γ dq -∗
+    ( ∀ mfin,
+      smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
-      ( ∃ mfin, gpr_file mfin ∗
-          ⌜ mfin !!! Regidx ra_idx = ra0
-          /\ mfin !!! Regidx s0_idx = s00
-          /\ mfin !!! Regidx csp_rs1 = add_vec sp' (sign_extend' 64 (sign_extend' 12 imm_dealloc))
-          /\ (forall r, r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
-                 r <> Regidx a5_idx -> r <> Regidx a2_idx -> r <> Regidx a4_idx ->
-                 mfin !!! r = m0 !!! r) ⌝ ) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m0 mfin ⌝ -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ra_idx s0_idx a0_idx a1_idx a2_idx a4_idx a5_idx pcE pc0L pcLS
       sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      HN HNge1
+      HN HNge1 Hframe
       Hbexec_add
       Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
@@ -3129,20 +3131,38 @@ Qed.
     iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hmfin".
     iDestruct "Hmfin" as (mfin) "[Hfile %Hpins]".
     destruct Hpins as (Hpra & Hps0 & Hpcsp & Hpres).
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf [Hfile]").
-    iExists mfin. iFrame "Hfile". iPureIntro.
-    split; [exact Hpra | split; [exact Hps0 | split; [exact Hpcsp |]]].
-    intros r Hra Hs0 Hcsp Ha5 Ha2 Ha4.
-    rewrite (Hpres r Hra Hs0 Hcsp).
-    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
-    unfold m6, m5, m4, m3, m2, m1.
-    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha4)].
-    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2)].
-    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2)].
-    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
-    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hs0)].
-    rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hcsp)].
-    reflexivity.
+    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hfile [%]").
+    (* the caller-saved-register catch-all, relative to m0 *)
+    assert (Hcatch : forall r : regidx,
+              r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
+              r <> Regidx a5_idx -> r <> Regidx a2_idx -> r <> Regidx a4_idx ->
+              mfin !!! r = m0 !!! r).
+    { intros r Hra Hs0 Hcsp Ha5 Ha2 Ha4.
+      rewrite (Hpres r Hra Hs0 Hcsp).
+      rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
+      unfold m6, m5, m4, m3, m2, m1.
+      rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha4)].
+      rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2)].
+      rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2)].
+      rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
+      rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hs0)].
+      rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hcsp)].
+      reflexivity. }
+    unfold callee_saved. repeat split.
+    - (* x2 sp: balanced frame *) rewrite Hpcsp. unfold sp'. apply Hframe.
+    - (* x4 tp *) apply Hcatch; vm_compute; discriminate.
+    - (* x8 s0 *) exact Hps0.
+    - (* x9 s1 *) apply Hcatch; vm_compute; discriminate.
+    - (* x18 s2 *) apply Hcatch; vm_compute; discriminate.
+    - (* x19 s3 *) apply Hcatch; vm_compute; discriminate.
+    - (* x20 s4 *) apply Hcatch; vm_compute; discriminate.
+    - (* x21 s5 *) apply Hcatch; vm_compute; discriminate.
+    - (* x22 s6 *) apply Hcatch; vm_compute; discriminate.
+    - (* x23 s7 *) apply Hcatch; vm_compute; discriminate.
+    - (* x24 s8 *) apply Hcatch; vm_compute; discriminate.
+    - (* x25 s9 *) apply Hcatch; vm_compute; discriminate.
+    - (* x26 s10 *) apply Hcatch; vm_compute; discriminate.
+    - (* x27 s11 *) apply Hcatch; vm_compute; discriminate.
   Qed.
 
 End WpMemsetS.

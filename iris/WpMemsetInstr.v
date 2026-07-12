@@ -25,6 +25,7 @@ Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
+Require Import CalleeSaved.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -354,6 +355,10 @@ Section WpMemsetInstr.
     let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
     ↑minstretN ⊆ E ->
     (1 <= N)%nat ->
+    (* balanced frame: prologue alloc and epilogue dealloc cancel (48 = -16, +16) *)
+    (forall X : mword 64,
+       add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 imm_entry)))
+               (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = X) ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
        (if Z.eqb (uint a2_idx) 0 then zero_reg
@@ -388,19 +393,15 @@ Section WpMemsetInstr.
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
-    ( smode_config γ dq -∗
+    ( ∀ mfin,
+      smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈ ra0 -∗
       pa_s0 ↦₈ s00 -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
-      ( ∃ mfin, gpr_file mfin ∗
-          ⌜ mfin !!! Regidx ra_idx = ra0
-          /\ mfin !!! Regidx s0_idx = s00
-          /\ mfin !!! Regidx csp_rs1 = add_vec sp' (sign_extend' 64 (sign_extend' 12 imm_dealloc))
-          /\ (forall r, r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
-                 r <> Regidx a5_idx -> r <> Regidx a2_idx -> r <> Regidx a4_idx ->
-                 mfin !!! r = m0 !!! r) ⌝ ) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m0 mfin ⌝ -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -408,7 +409,7 @@ Section WpMemsetInstr.
       imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz i_add imm_bne
       sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      HN HNge1
+      HN HNge1 Hframe
       Hbexec_add
       Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp.
@@ -431,7 +432,7 @@ Section WpMemsetInstr.
     iApply (wp_memset_s_full root_ppn E Φ m0 N imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz
               i_add wval_add imm_bne svpn olds vra vs0
               γ (dq:=dq)
-              HN HNge1
+              HN HNge1 Hframe
               Hbexec_add
               Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
               Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
@@ -491,6 +492,10 @@ Section WpMemsetInstr.
     (2 <= n)%nat ->
     ↑minstretN ⊆ E ->
     (1 <= N)%nat ->
+    (* balanced frame: prologue alloc and epilogue dealloc cancel (48 = -16, +16) *)
+    (forall X : mword 64,
+       add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 imm_entry)))
+               (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = X) ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
        (if Z.eqb (uint a2_idx) 0 then zero_reg
@@ -523,18 +528,14 @@ Section WpMemsetInstr.
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
-    ( smode_config γ dq -∗
+    ( ∀ mfin,
+      smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       stack_own sp0 n -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
-      ( ∃ mfin, gpr_file mfin ∗
-          ⌜ mfin !!! Regidx ra_idx = ra0
-          /\ mfin !!! Regidx s0_idx = s00
-          /\ mfin !!! Regidx csp_rs1 = add_vec sp' (sign_extend' 64 (sign_extend' 12 imm_dealloc))
-          /\ (forall r, r <> Regidx ra_idx -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->
-                 r <> Regidx a5_idx -> r <> Regidx a2_idx -> r <> Regidx a4_idx ->
-                 mfin !!! r = m0 !!! r) ⌝ ) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m0 mfin ⌝ -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -542,7 +543,7 @@ Section WpMemsetInstr.
       imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz i_add imm_bne
       sp0 sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      Hn HN HNge1
+      Hn HN HNge1 Hframe
       Hbexec_add
       Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
       Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp.
@@ -557,17 +558,18 @@ Section WpMemsetInstr.
     iEval (rewrite -Hb1) in "Hbra". iEval (rewrite -Hb2) in "Hbs0".
     iApply (wp_memset_s_full_kt_words root_ppn E Φ m0 N wval_add svpn olds vra vs0
               γ (dq:=dq)
-              HN HNge1 Hbexec_add
+              HN HNge1 Hframe Hbexec_add
               Hn0 Hret0 Hbne HpcL0 Hmask_b Hvpn2b Hmvpnb Hmppnb
               Hpb_canon Hpb_vpn Hpb_ident Hincr Hcmp
               with "Hsm Htlbinv Htext Hpc Hfile [Hbra] [Hbs0] Hbuf [-]").
     { iExact "Hbra". }
     { iExact "Hbs0". }
-    iIntros "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hmfin".
+    iIntros (mfin) "Hsm Htlbinv Hpc Hbra Hbs0 Hbuf Hfile %Hcs".
     iEval (rewrite Hb1) in "Hbra". iEval (rewrite Hb2) in "Hbs0".
     iDestruct (stack_own_2_intro with "Hbra Hbs0") as "Htop".
     iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hstk Hbuf Hmfin").
+    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hstk Hbuf Hfile [%]").
+    exact Hcs.
   Qed.
 
 End WpMemsetInstr.

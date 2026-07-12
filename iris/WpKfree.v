@@ -112,6 +112,26 @@ Proof.
   rewrite <- Z.mul_assoc. apply Z.mod_mul. vm_compute; discriminate.
 Qed.
 
+(* kfree's epilogue [c.addi16sp +32] undoes its prologue [c.addi16sp -32],
+   restoring sp to its entry value.  (mword_of_int 32 : mword 6) is -32 in
+   6-bit two's complement; [caddi16sp_imm (mword_of_int 2)] is +32. *)
+Lemma kfree_sp_cancel (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
+Proof.
+  assert (add_vec_unsigned : forall x y : mword 64,
+            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned. reflexivity. }
+  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64) = 18446744073709551584) by (vm_compute; reflexivity).
+  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64) = 32) by (vm_compute; reflexivity).
+  rewrite HA HB. rewrite <- Z.add_assoc.
+  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
+  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+Qed.
+
 Section Kfree.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
@@ -213,11 +233,13 @@ Section Kfree.
     q_noff ↦₄ qnoff -∗
     q_intena ↦₄ qintena_old -∗
     q_cpu ↦₈ qcpuold -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mr,
+      smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) bsie -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ (mr : gmap regidx (mword 64)), gpr_file mr) -∗
+      gpr_file mr -∗
+      ⌜ callee_saved m mr ⌝ -∗
       (∃ u1 u2 u3 u4 u5 u6 : bv 64, a_r24 ↦₈ u1 ∗ a_r16 ↦₈ u2 ∗ a_r8 ↦₈ u3 ∗ a_r0 ↦₈ u4 ∗ ms_ra ↦₈ u5 ∗ ms_s0 ↦₈ u6) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -652,7 +674,7 @@ Section Kfree.
     iEval (rewrite Beq1) in "Hbra". iEval (rewrite Beq2) in "Hbs0".
     iRename "Hbra" into "Hqr24". iRename "Hbs0" into "Hqr16".
     unfold callee_saved in Hpinsf.
-    destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
+    destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & Hfs3 & Hfs4 & Hfs5 & Hfs6 & Hfs7 & Hfs8 & Hfs9 & Hfs10 & Hfs11).
     assert (Hpc36 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x36)).
     { rewrite HMmsra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc36) in "Hpc".
@@ -801,7 +823,7 @@ Section Kfree.
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
     unfold callee_saved in Hacqpins.
-    destruct Hacqpins as (Hqsp & Hqtp & Hqs0 & Hqs1 & Hqs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
+    destruct Hacqpins as (Hqsp & Hqtp & Hqs0 & Hqs1 & Hqs2 & Hqs3 & Hqs4 & Hqs5 & Hqs6 & Hqs7 & Hqs8 & Hqs9 & Hqs10 & Hqs11).
     assert (Hs1p : macq !!! Regidx (mword_of_int 9 : mword 5) = p) by (rewrite Hqs1; exact Hmacq_s1).
     assert (Hs2km : macq !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int KernelSyms.kmem) by (rewrite Hqs2; exact HKacqs2).
     iPoseProof (kfi_44 with "Htext") as "Hi44".
@@ -967,7 +989,7 @@ Section Kfree.
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".
     unfold callee_saved in Hrelpins.
-    destruct Hrelpins as (Hrsp & Hrtp & Hrs0 & Hrs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
+    destruct Hrelpins as (Hrsp & Hrtp & Hrs0 & Hrs1 & _ & Hrs3 & Hrs4 & Hrs5 & Hrs6 & Hrs7 & Hrs8 & Hrs9 & Hrs10 & Hrs11).
     assert (HspMrel : mrel !!! Regidx csp_rs1 = spr) by (rewrite Hrsp; exact HRrelcsp).
     iPoseProof (kfi_54 with "Htext") as "Hi54".
     iPoseProof (kfi_56 with "Htext") as "Hi56".
@@ -1059,8 +1081,69 @@ Section Kfree.
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-    iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc [Hfile] [Hr24 Hr16 Hr8 Hr0 Hbra Hbs0]").
-    { iExists Q5c. iFrame "Hfile". }
+    iApply ("Hcont" $! Q5c with "Hcfg Htoken Htlbinv Hpc Hfile [%] [Hr24 Hr16 Hr8 Hr0 Hbra Hbs0]").
+    { (* callee_saved m Q5c: the epilogue restores ra/s0/s1/s2 to their entry
+         (R1 = m) values and sp via the +32/-32 c.addi16sp cancel; tp and s3-s11
+         thread untouched through memset/acquire/release (each callee_saved) and
+         kfree's own body, which never writes them. *)
+      unfold callee_saved.
+      (* the register-preservation chain m -> ... -> mrel for a reg K that
+         kfree's own code never touches (tp, s3-s11): peel each own-code map
+         group, then hop across each callee via its callee_saved conjunct. *)
+      split.
+      { (* sp *)
+        rewrite /Q5c lookup_total_insert.
+        assert (HQ5acsp : Q5a !!! Regidx csp_rs1 = spr).
+        { rewrite /Q5a /Q58 /Q56 /Q54.
+          repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+          exact HspMrel. }
+        rewrite HQ5acsp. unfold regval_into_reg, spr. apply kfree_sp_cancel. }
+      split.
+      { (* tp *)
+        rewrite /Q5c /Q5a /Q58 /Q56 /Q54.
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+        first [rewrite Hrtp | rewrite Hrs3 | rewrite Hrs4 | rewrite Hrs5 | rewrite Hrs6 | rewrite Hrs7 | rewrite Hrs8 | rewrite Hrs9 | rewrite Hrs10 | rewrite Hrs11].
+        rewrite /Rrel /Rae /Rld.
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+        first [rewrite Hqtp | rewrite Hqs3 | rewrite Hqs4 | rewrite Hqs5 | rewrite Hqs6 | rewrite Hqs7 | rewrite Hqs8 | rewrite Hqs9 | rewrite Hqs10 | rewrite Hqs11].
+        rewrite /Kacq /S3 /S2 /S1.
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+        first [rewrite Hftp | rewrite Hfs3 | rewrite Hfs4 | rewrite Hfs5 | rewrite Hfs6 | rewrite Hfs7 | rewrite Hfs8 | rewrite Hfs9 | rewrite Hfs10 | rewrite Hfs11].
+        rewrite /Mms /R14 /R13 /R12 /R11 /R10 /R9 /R8 /R7 /R6 /R5 /R4 /R3 /R2 /R1.
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+        reflexivity. }
+      split.
+      { (* s0 *)
+        rewrite /Q5c lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q5a lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q58 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q56 lookup_total_insert.
+        rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+      split.
+      { (* s1 *)
+        rewrite /Q5c lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q5a lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q58 lookup_total_insert.
+        rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+      split.
+      { (* s2 *)
+        rewrite /Q5c lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q5a lookup_total_insert.
+        rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+      (* s3..s11: identical chain to tp *)
+      repeat split;
+        rewrite /Q5c /Q5a /Q58 /Q56 /Q54;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
+        first [rewrite Hrtp | rewrite Hrs3 | rewrite Hrs4 | rewrite Hrs5 | rewrite Hrs6 | rewrite Hrs7 | rewrite Hrs8 | rewrite Hrs9 | rewrite Hrs10 | rewrite Hrs11];
+        rewrite /Rrel /Rae /Rld;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
+        first [rewrite Hqtp | rewrite Hqs3 | rewrite Hqs4 | rewrite Hqs5 | rewrite Hqs6 | rewrite Hqs7 | rewrite Hqs8 | rewrite Hqs9 | rewrite Hqs10 | rewrite Hqs11];
+        rewrite /Kacq /S3 /S2 /S1;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
+        first [rewrite Hftp | rewrite Hfs3 | rewrite Hfs4 | rewrite Hfs5 | rewrite Hfs6 | rewrite Hfs7 | rewrite Hfs8 | rewrite Hfs9 | rewrite Hfs10 | rewrite Hfs11];
+        rewrite /Mms /R14 /R13 /R12 /R11 /R10 /R9 /R8 /R7 /R6 /R5 /R4 /R3 /R2 /R1;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
+        reflexivity. }
     { iExists (R1 !!! Regidx (mword_of_int 1 : mword 5)), (R1 !!! Regidx (mword_of_int 8 : mword 5)),
         (R1 !!! Regidx (mword_of_int 9 : mword 5)), (R1 !!! Regidx (mword_of_int 18 : mword 5)),
         w1, w2.
@@ -1115,11 +1198,13 @@ Section Kfree.
     q_noff ↦₄ qnoff -∗
     q_intena ↦₄ qintena_old -∗
     q_cpu ↦₈ qcpuold -∗
-    ( smode_config γc (DfracOwn 1) -∗
+    ( ∀ mr,
+      smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) bsie -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ (mr : gmap regidx (mword 64)), gpr_file mr) -∗
+      gpr_file mr -∗
+      ⌜ callee_saved m mr ⌝ -∗
       (stack_own sp0 6 ∗ stack_own (pa_stk sp0 14) (n - 14)) -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -1178,7 +1263,7 @@ Section Kfree.
               with "Hcfg Htoken Htlbinv Htext Hpc Hfile Hkmem Hpre
                     Hr24 Hr16 Hr8 Hr0 Hmra Hms0 Hqr8 Hqp24 Hqp16 Hqp8 Hqp0 Hqfra Hqfs0
                     Hnoff Hint Hcpu [-]").
-    iIntros "Hcfg Htoken Htlbinv Hpc Hgpr Hjunk".
+    iIntros (mr) "Hcfg Htoken Htlbinv Hpc Hgpr %Hcs Hjunk".
     iDestruct "Hjunk" as (u1 u2 u3 u4 u5 u6) "(Hr24 & Hr16 & Hr8 & Hr0 & Hmra & Hms0)".
     iEval (rewrite Hb1) in "Hr24". iEval (rewrite Hb2) in "Hr16".
     iEval (rewrite Hb3) in "Hr8".  iEval (rewrite Hb4) in "Hr0".
@@ -1188,7 +1273,8 @@ Section Kfree.
       iSplitL "Hr24"; [by iExists _|]. iSplitL "Hr16"; [by iExists _|].
       iSplitL "Hr8"; [by iExists _|].  iSplitL "Hr0"; [by iExists _|].
       iSplitL "Hmra"; [by iExists _|]. iSplitL "Hms0"; [by iExists _|]. done. }
-    iApply ("Hcont" with "Hcfg Htoken Htlbinv Hpc Hgpr [$Htop $Hdeep]").
+    iApply ("Hcont" $! mr with "Hcfg Htoken Htlbinv Hpc Hgpr [%] [$Htop $Hdeep]").
+    exact Hcs.
   Qed.
 
 End Kfree.
