@@ -11,14 +11,39 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
-Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved.
+Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved WpAuipc WpLoad WpSpinNew.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
 Require Import WpSmodeToBeDeleted.
 Require Import WpMmodeJalr.
 
+(* helper: exec_cE_zicfilp_false_S *)
+Local Lemma exec_cE_zicfilp_false_S s :
+    register_lookup cur_privilege (sregs s) = Supervisor ->
+    bool_bit_backwards (_get_MEnvcfg_LPE (register_lookup menvcfg s.(sregs))) = false ->
+    exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s).
+  Proof.
+    intros Hpriv Hlpe.
+    unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp) 0) with true by reflexivity.
+    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _
+              (exec_rec_cE_Zicsr_any (currentlyEnabled_measure Ext_Zicfilp - 1) _ s
+                 ltac:(vm_compute; reflexivity))).
+    cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zicfilp s)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+    match goal with |- context[_rec_get_xLPE Supervisor _ ?acc] => destruct acc end.
+    cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
+    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
+    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn match.
+    rewrite Hlpe. apply exec_returnM.
+  Qed.
+
 (* helper: exec_jump_to_zca *)
-  Lemma exec_jump_to_zca (target : mword 64) s :
+Local Lemma exec_jump_to_zca (target : mword 64) s :
     eq_vec (access_vec_dec target 0) ('b"0") = true ->
     exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
     exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
@@ -51,7 +76,7 @@ Require Import WpMmodeJalr.
   Qed.
 
 (* helper: exec_execute_JALR_ret_zca *)
-  Lemma exec_execute_JALR_ret_zca (imm : mword 12) (rs1 rdz : mword 5) s :
+Local Lemma exec_execute_JALR_ret_zca (imm : mword 12) (rs1 rdz : mword 5) s :
     uint rs1 <> 0 -> uint rdz = 0 ->
     exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s) ->
     exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
@@ -77,31 +102,6 @@ Require Import WpMmodeJalr.
               (exec_wX_bits_gpr rdz (register_lookup nextPC s.(sregs))
                   (set_reg s nextPC (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0"))))).
     rewrite Hrdz. cbn match. apply exec_returnm.
-  Qed.
-
-(* helper: exec_cE_zicfilp_false_S *)
-  Lemma exec_cE_zicfilp_false_S s :
-    register_lookup cur_privilege (sregs s) = Supervisor ->
-    bool_bit_backwards (_get_MEnvcfg_LPE (register_lookup menvcfg s.(sregs))) = false ->
-    exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s).
-  Proof.
-    intros Hpriv Hlpe.
-    unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp) 0) with true by reflexivity.
-    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-    rewrite (exec_and_boolM_Some _ _ _ _ _
-              (exec_rec_cE_Zicsr_any (currentlyEnabled_measure Ext_Zicfilp - 1) _ s
-                 ltac:(vm_compute; reflexivity))).
-    cbn match.
-    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zicfilp s)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    match goal with |- context[_rec_get_xLPE Supervisor _ ?acc] => destruct acc end.
-    cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
-    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
-    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn match.
-    rewrite Hlpe. apply exec_returnM.
   Qed.
 
 Section WpSmodeJalr.

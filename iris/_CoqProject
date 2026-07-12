@@ -66,6 +66,9 @@ WpSmodeShiftiop.v
 WpSmodeRtype.v
 WpSmodeItype.v
 WpSmodeUtype.v
+WpSmodeJal.v
+WpSmodeJalr.v
+WpSmodeCsr.v
 InstrBytes.v
 StackOwn.v
 CalleeSaved.v

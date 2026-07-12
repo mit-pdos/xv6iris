@@ -11,17 +11,17 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
-Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved.
+Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved WpAuipc WpLoad WpSpinNew.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
 From Stdlib Require Import FunctionalExtensionality.
 Require Import WpSmodeToBeDeleted.
 
 (* helper: csr_sstatus *)
-Definition csr_sstatus : mword 12 := Ox"100".
+Local Definition csr_sstatus : mword 12 := Ox"100".
 
 (* helper: exec_csr_id_read_callback_sstatus *)
-Lemma exec_csr_id_read_callback_sstatus (d : mword 64) s :
+Local Lemma exec_csr_id_read_callback_sstatus (d : mword 64) s :
   exec (csr_id_read_callback csr_sstatus d) s = Some (tt, s).
 Proof.
   assert (H : csr_id_read_callback csr_sstatus d = returnM tt) by (vm_compute; reflexivity).
@@ -29,7 +29,7 @@ Proof.
 Qed.
 
 (* helper: exec_csr_id_write_callback_sstatus *)
-Lemma exec_csr_id_write_callback_sstatus (d : mword 64) s :
+Local Lemma exec_csr_id_write_callback_sstatus (d : mword 64) s :
   exec (csr_id_write_callback csr_sstatus d) s = Some (tt, s).
 Proof.
   assert (H : csr_id_write_callback csr_sstatus d = returnM tt) by (vm_compute; reflexivity).
@@ -37,7 +37,7 @@ Proof.
 Qed.
 
 (* helper: exec_hartSupports_H *)
-Lemma exec_hartSupports_H s : exec (hartSupports Ext_H) s = Some (false, s).
+Local Lemma exec_hartSupports_H s : exec (hartSupports Ext_H) s = Some (false, s).
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).
   cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
@@ -48,7 +48,7 @@ Proof.
 Qed.
 
 (* helper: exec_hartSupports_Sv32 *)
-Lemma exec_hartSupports_Sv32 s : exec (hartSupports Ext_Sv32) s = Some (false, s).
+Local Lemma exec_hartSupports_Sv32 s : exec (hartSupports Ext_Sv32) s = Some (false, s).
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).
   cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
@@ -59,7 +59,7 @@ Proof.
 Qed.
 
 (* helper: exec_have_nominal_privLevel *)
-Lemma exec_have_nominal_privLevel (priv : mword 2) s :
+Local Lemma exec_have_nominal_privLevel (priv : mword 2) s :
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (have_nominal_privLevel priv) s = Some (have_nom_val priv, s).
@@ -73,7 +73,7 @@ Proof.
 Qed.
 
 (* helper: exec_lowest_supported_privLevel *)
-Lemma exec_lowest_supported_privLevel s :
+Local Lemma exec_lowest_supported_privLevel s :
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (lowest_supported_privLevel tt) s = Some (User, s).
 Proof.
@@ -83,7 +83,7 @@ Proof.
 Qed.
 
 (* helper: exec_read_CSR_sstatus *)
-Lemma exec_read_CSR_sstatus s :
+Local Lemma exec_read_CSR_sstatus s :
   exec (read_CSR csr_sstatus) s
     = Some (sstatus_read (register_lookup mstatus s.(sregs)), s).
 Proof.
@@ -94,7 +94,7 @@ Proof.
 Qed.
 
 (* helper: exec_virtual_memory_supported *)
-Lemma exec_virtual_memory_supported s :
+Local Lemma exec_virtual_memory_supported s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (virtual_memory_supported tt) s = Some (true, s).
 Proof.
@@ -140,7 +140,7 @@ Proof.
 Qed.
 
 (* helper: register_set_bv64_id *)
-Lemma register_set_bv64_id (r : register_bitvector_64) (rs : regstate) :
+Local Lemma register_set_bv64_id (r : register_bitvector_64) (rs : regstate) :
   register_set (R_bitvector_64 r) (register_lookup (R_bitvector_64 r) rs) rs = rs.
 Proof.
   destruct rs. unfold register_set, register_lookup. cbn.
@@ -151,7 +151,7 @@ Proof.
 Qed.
 
 (* helper: exec_currentlyEnabled_H_false *)
-Lemma exec_currentlyEnabled_H_false s : exec (currentlyEnabled Ext_H) s = Some (false, s).
+Local Lemma exec_currentlyEnabled_H_false s : exec (currentlyEnabled Ext_H) s = Some (false, s).
 Proof.
   unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
   cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
@@ -161,7 +161,7 @@ Proof.
 Qed.
 
 (* helper: exec_legalize_mstatus *)
-Lemma exec_legalize_mstatus (o v : mword 64) s :
+Local Lemma exec_legalize_mstatus (o v : mword 64) s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (legalize_mstatus o v) s = Some (mstatus_legalized o v, s).
@@ -193,7 +193,7 @@ Proof.
 Qed.
 
 (* helper: exec_legalize_sstatus *)
-Lemma exec_legalize_sstatus (m v : mword 64) s :
+Local Lemma exec_legalize_sstatus (m v : mword 64) s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (legalize_sstatus m v) s = Some (legalize_sstatus_val m v, s).
@@ -203,7 +203,7 @@ Proof.
 Qed.
 
 (* helper: exec_write_CSR_sstatus *)
-Lemma exec_write_CSR_sstatus (v : mword 64) s :
+Local Lemma exec_write_CSR_sstatus (v : mword 64) s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (write_CSR csr_sstatus v) s
@@ -224,7 +224,7 @@ Proof.
 Qed.
 
 (* helper: exec_check_CSR_priv_sstatus_S *)
-Lemma exec_check_CSR_priv_sstatus_S s :
+Local Lemma exec_check_CSR_priv_sstatus_S s :
   exec (check_CSR_priv csr_sstatus Supervisor) s = Some (true, s).
 Proof.
   unfold check_CSR_priv.
@@ -238,7 +238,7 @@ Proof.
 Qed.
 
 (* helper: exec_check_CSR_sstatus_S *)
-Lemma exec_check_CSR_sstatus_S s :
+Local Lemma exec_check_CSR_sstatus_S s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (check_CSR csr_sstatus Supervisor CSRReadWrite) s = Some (true, s).
 Proof.
@@ -260,7 +260,7 @@ Proof.
 Qed.
 
 (* helper: exec_check_CSR_result_sstatus_S *)
-Lemma exec_check_CSR_result_sstatus_S s :
+Local Lemma exec_check_CSR_result_sstatus_S s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (check_CSR_result csr_sstatus Supervisor CSRReadWrite) s = Some (CSR_Check_OK tt, s).
 Proof.
@@ -270,7 +270,7 @@ Proof.
 Qed.
 
 (* helper: exec_execute_csrr_sstatus *)
-Lemma exec_execute_csrr_sstatus (rd : mword 5) (m : mword 64) s :
+Local Lemma exec_execute_csrr_sstatus (rd : mword 5) (m : mword 64) s :
   register_lookup cur_privilege s.(sregs) = Supervisor ->
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -315,7 +315,7 @@ Proof.
 Qed.
 
 (* helper: exec_execute_csrrci_sstatus *)
-Lemma exec_execute_csrrci_sstatus (imm5 rd : mword 5) (m : mword 64) s :
+Local Lemma exec_execute_csrrci_sstatus (imm5 rd : mword 5) (m : mword 64) s :
   register_lookup cur_privilege s.(sregs) = Supervisor ->
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->

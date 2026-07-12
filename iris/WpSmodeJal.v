@@ -11,14 +11,14 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
-Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved.
+Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved WpAuipc WpLoad WpSpinNew.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
 Require Import WpSmodeToBeDeleted.
 Require Import WpMmodeJal.
 
 (* helper: exec_jump_to_zca *)
-  Lemma exec_jump_to_zca (target : mword 64) s :
+Local Lemma exec_jump_to_zca (target : mword 64) s :
     eq_vec (access_vec_dec target 0) ('b"0") = true ->
     exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
     exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
@@ -51,7 +51,7 @@ Require Import WpMmodeJal.
   Qed.
 
 (* helper: exec_execute_JAL_gpr_zca *)
-Lemma exec_execute_JAL_gpr_zca (imm : mword 21) (rd : mword 5) s :
+Local Lemma exec_execute_JAL_gpr_zca (imm : mword 21) (rd : mword 5) s :
   uint rd <> 0 ->
   eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
   exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
@@ -79,60 +79,6 @@ Proof.
   rewrite (exec_bind0_Some _ _ _ _ _ Hwx).
   apply exec_returnm.
 Qed.
-
-(* helper: sp_exec_jump_to_zca *)
-  Lemma sp_exec_jump_to_zca (target : mword 64) s :
-    eq_vec (access_vec_dec target 0) ('b"0") = true ->
-    exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-    exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
-  Proof.
-    intros Halign Hzca.
-    unfold jump_to. rewrite exec_catch_early_return.
-    change (ext_control_check_pc target) with (@None unit). cbv iota beta.
-    rewrite (execR_bind_Some _ _ _ false s).
-    2:{ unfold Defs.bind0.
-        erewrite execR_bind_Some.
-        2:{ erewrite execR_bind_Some.
-            2:{ apply execR_returnR_fwd. }
-            rewrite execR_liftR. unfold assert_exp. rewrite Halign. cbn match.
-            rewrite exec_returnm. reflexivity. }
-        unfold and_boolM.
-        rewrite (execR_bind_Some _ _ _ (bit_to_bool (access_vec_dec target 1)) s).
-        2:{ apply execR_returnR_fwd. }
-        destruct (bit_to_bool (access_vec_dec target 1)).
-        - cbv iota beta.
-          rewrite (execR_bind_Some _ _ _ true s).
-          2:{ rewrite execR_liftR. rewrite Hzca. reflexivity. }
-          cbv iota beta. apply execR_returnR_fwd.
-        - cbv iota beta. apply execR_returnR_fwd. }
-    cbv iota beta.
-    unfold Defs.bind0.
-    rewrite (execR_bind_Some _ _ _ tt (set_reg s nextPC target)).
-    2:{ rewrite execR_liftR. rewrite exec_set_next_pc. reflexivity. }
-    rewrite (execR_returnR_fwd RETIRE_SUCCESS (set_reg s nextPC target)).
-    reflexivity.
-  Qed.
-
-(* helper: exec_execute_JAL_zreg_zca *)
-  Lemma exec_execute_JAL_zreg_zca (imm : mword 21) s :
-    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-    exec (execute_JAL imm zreg) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
-  Proof.
-    intros Halign Hzca.
-    unfold execute_JAL, get_next_pc.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (sp_exec_jump_to_zca _ s Halign Hzca)).
-    cbn match.
-    unfold zreg.
-    rewrite (exec_bind0_Some _ _ _ _ _
-      (exec_wX_bits_gpr (zero_extend' 5 ('b"00")) (register_lookup nextPC s.(sregs))
-         (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))))).
-    apply exec_returnm.
-  Qed.
 
 Section WpSmodeJal.
   Context `{!riscvGS Σ, !sieG Σ}.
@@ -241,85 +187,6 @@ Section WpSmodeJal.
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
-
-  Lemma wp_jal_gpr_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 21)
-      (m : gmap regidx (mword 64))
-      (q : Qp) :
-    ↑minstretN ⊆ E ->
-    uint rd <> 0 ->
-    is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
-    smode_config γ (DfracOwn q) -∗
-    tlb_inv root_ppn -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc false (JAL (imm, Regidx rd)) -∗
-    ( smode_config γ (DfracOwn q) -∗
-      tlb_inv root_ppn -∗
-      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    iIntros (HN Hrd Halign)
-      "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iApply (wp_instr_s_tlbinv root_ppn γ E Φ pc false (JAL (imm, Regidx rd))
-             
-              HN
-              with "Hsm Htlbinv Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (Hpcv : register_lookup PC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { unfold set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    assert (Hlink : register_lookup nextPC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
-            with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec_int pc 4))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (add_vec_int pc 4))
-                 with "[Hrdc]") as "Hfmap".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                        nextPC (add_vec pc (sign_extend' 64 imm)))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec_int pc 4))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
-      rewrite (exec_execute_JAL_gpr imm rd (set_reg σ nextPC (add_vec_int pc 4))
-                 Hrd).
-      - rewrite Hpcv. rewrite Hlink. reflexivity.
-      - rewrite Hpcv. exact Hal0.
-      - rewrite Hpcv. exact Hal1. }
-    iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hsm' Htlbinv' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                         nextPC (add_vec pc (sign_extend' 64 imm)))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec_int pc 4))).(sregs)
-             = add_vec pc (sign_extend' 64 imm)).
-    { unfold set_reg; cbn [sregs].
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hsm' Htlbinv' [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
   Qed.
 
   Lemma wp_jal_gpr_s_zca (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
