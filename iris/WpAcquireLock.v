@@ -591,24 +591,43 @@ Section WpAcquireLock.
       by (rewrite /P0; apply lookup_total_insert).
     assert (E1a : add_vec_int (mword_of_int (PO + 0x18) : mword 64) 2 = mword_of_int (PO + 0x1a))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_push_off_words root_ppn γc E Φ P0 pr24 pr16 pr8 fraold fs0old noff intena_old a0f
-              HN ltac:(vm_compute; reflexivity)
+    (* bundle push_off's whole 6-slot frame (acquire slots 5..10) into
+       [stack_own spd 6] for [wp_push_off]. *)
+    assert (Hsd : pa_stk sp0 4 = spd).
+    { rewrite /spd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    iAssert (stack_own spd 6) with "[Hp24 Hp16 Hp8 Hgap8 Hfra Hfs0]" as "Hpstk".
+    { rewrite -Hsd stack_own_slots. cbn [seq].
+      iSplitL "Hp24"; [iExists _; iEval (rewrite (pa_stk_assoc sp0 4 1) -Hb5); iExact "Hp24"|].
+      iSplitL "Hp16"; [iExists _; iEval (rewrite (pa_stk_assoc sp0 4 2) -Hb6); iExact "Hp16"|].
+      iSplitL "Hp8";  [iExists _; iEval (rewrite (pa_stk_assoc sp0 4 3) -Hb7); iExact "Hp8"|].
+      iSplitL "Hgap8"; [iExists _; iEval (rewrite (pa_stk_assoc sp0 4 4)); iExact "Hgap8"|].
+      iSplitL "Hfra"; [iExists _; iEval (rewrite (pa_stk_assoc sp0 4 5) -Hb9); iExact "Hfra"|].
+      iSplitL "Hfs0"; [iExists _; iEval (rewrite (pa_stk_assoc sp0 4 6) -Hb10); iExact "Hfs0"|].
+      done. }
+    iApply (wp_push_off root_ppn γc E Φ P0 noff intena_old a0f 6
+              ltac:(lia) HN ltac:(vm_compute; reflexivity)
               ltac:(rewrite HP0ra; vm_compute; reflexivity)
               ltac:(rewrite /P0 lookup_total_insert_ne; [| vm_compute; discriminate];
                     rewrite /A2 lookup_total_insert_ne; [| vm_compute; discriminate];
                     rewrite /A1 lookup_total_insert_ne; [| vm_compute; discriminate];
                     rewrite /A0 lookup_total_insert_ne; [| vm_compute; discriminate]; exact Ha0)
-              with "Hcfg Htlbinv Htext Hpc Hfile [Hp24] [Hp16] [Hp8] [Hfra] [Hfs0] [Hnoff] [Hintena] [-]").
-    { iEval (rewrite HP0csp). iExact "Hp24". }
-    { iEval (rewrite HP0csp). iExact "Hp16". }
-    { iEval (rewrite HP0csp). iExact "Hp8". }
-    { iEval (rewrite HP0csp). iExact "Hfra". }
-    { iEval (rewrite HP0csp). iExact "Hfs0". }
+              with "Hcfg Htlbinv Htext Hpc Hfile [Hpstk] [Hnoff] [Hintena] [-]").
+    { iEval (rewrite HP0csp). iExact "Hpstk". }
     { iExact "Hnoff". }
     { iExact "Hintena". }
-    iIntros (mfin) "Hcfg Htlbinv Hpc Hfile %Hmf Hp24 Hp16 Hp8 Hjunk Hnoff Hintena".
-    iEval (rewrite HP0csp) in "Hp24". iEval (rewrite HP0csp) in "Hp16". iEval (rewrite HP0csp) in "Hp8".
-    iEval (rewrite HP0csp) in "Hjunk".
+    iIntros (mfin) "Hcfg Htlbinv Hpc Hfile %Hmf Hpstk Hnoff Hintena".
+    iEval (rewrite HP0csp) in "Hpstk".
+    (* unbundle back into the 6 individual frame cells acquire tracks *)
+    iEval (rewrite -Hsd stack_own_slots; cbn [seq]) in "Hpstk".
+    iDestruct "Hpstk" as "(R1 & R2 & R3 & R4 & R5 & R6 & _)".
+    iDestruct "R1" as (up24) "Hp24". iEval (rewrite (pa_stk_assoc sp0 4 1) -Hb5) in "Hp24".
+    iDestruct "R2" as (up16) "Hp16". iEval (rewrite (pa_stk_assoc sp0 4 2) -Hb6) in "Hp16".
+    iDestruct "R3" as (up8) "Hp8".   iEval (rewrite (pa_stk_assoc sp0 4 3) -Hb7) in "Hp8".
+    iDestruct "R4" as (ug8) "Hgap8". iEval (rewrite (pa_stk_assoc sp0 4 4)) in "Hgap8".
+    iDestruct "R5" as (ufra) "Hfra". iEval (rewrite (pa_stk_assoc sp0 4 5) -Hb9) in "Hfra".
+    iDestruct "R6" as (ufs0) "Hfs0". iEval (rewrite (pa_stk_assoc sp0 4 6) -Hb10) in "Hfs0".
+    iAssert (∃ wra0 ws00 : bv 64, a_fra ↦₈ wra0 ∗ a_fs0 ↦₈ ws00)%I with "[Hfra Hfs0]" as "Hjunk".
+    { iExists ufra, ufs0. iFrame. }
     assert (Hpc10 : update_vec_dec (add_vec (P0 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AQ + 0x10))
       by (rewrite HP0ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc10) in "Hpc".
@@ -776,8 +795,7 @@ Section WpAcquireLock.
       by (rewrite HB2sp; reflexivity).
     iDestruct "Hjunk" as (vfra0 vfs00) "[Hfra2 Hfs02]".
     iApply (wp_holding_lockinv root_ppn γc E Φ γ lk R B2 cpuold
-              (P0 !!! Regidx (mword_of_int 1 : mword 5)) (P0 !!! Regidx (mword_of_int 8 : mword 5))
-              (P0 !!! Regidx (mword_of_int 9 : mword 5)) vfra0 vfs00
+              up24 up16 up8 vfra0 vfs00
               (dqc:=DfracOwn 1)
               HN HNl HAlk
               ltac:(rewrite HB2tp; exact Hnotmine)
@@ -863,16 +881,23 @@ Section WpAcquireLock.
     assert (Hms0 : add_vec (add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
                      (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = a_p16).
     { rewrite /a_p16 /po_spd !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    (* mycpu's 2-slot frame as [pa_stk spd 1/2] = a_p24 / a_p16 *)
+    assert (Hbp1 : pa_stk spd 1 = a_p24).
+    { rewrite -Hmra. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hbp2 : pa_stk spd 2 = a_p16).
+    { rewrite -Hms0. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (AQ + 0x24)) (mword_of_int 0xcb8 : mword 21) B8
-              w24 w16
               HN ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-              with "Hcfg Htlbinv Htext Hpc Hfile Hi24 [Hp24] [Hp16] [-]").
-    { iEval (rewrite HB9sp Hmra). iExact "Hp24". }
-    { iEval (rewrite HB9sp Hms0). iExact "Hp16". }
-    iIntros (C1) "Hcfg Htlbinv Hpc Hfile %Hmc Hp24 Hp16".
-    iEval (rewrite HB9sp Hmra) in "Hp24". iEval (rewrite HB9sp Hms0) in "Hp16".
+              with "Hcfg Htlbinv Htext Hpc Hfile Hi24 [Hp24 Hp16] [-]").
+    { iEval (rewrite HB9sp). iApply (stack_own_2_intro with "[Hp24] [Hp16]").
+      - iEval (rewrite Hbp1). iExact "Hp24".
+      - iEval (rewrite Hbp2). iExact "Hp16". }
+    iIntros (C1) "Hcfg Htlbinv Hpc Hfile %Hmc Hstk".
+    iEval (rewrite HB9sp) in "Hstk".
+    iDestruct (stack_own_2_elim with "Hstk") as (wcra wcs0) "(Hp24 & Hp16)".
+    iEval (rewrite Hbp1) in "Hp24". iEval (rewrite Hbp2) in "Hp16".
     iEval (rewrite lookup_total_insert) in "Hpc".
     assert (Hpc28 : update_vec_dec (add_vec (add_vec_int (mword_of_int (AQ + 0x24) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (AQ + 0x28) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).

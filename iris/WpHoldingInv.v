@@ -28,7 +28,7 @@ Require Import WpEntryNew.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpPushOffTop WpAcquireMem.
-Require Import CalleeSaved.
+Require Import CalleeSaved StackOwn.
 Require Import WpHolding WpLock WpLockLeaves.
 Require Import WpPopOff.
 Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeLoad WpSmodeStore WpSmodeBtype.
@@ -496,16 +496,26 @@ Section WpHoldingInv.
         by (rewrite lookup_total_insert_ne; [ exact HspH5 | vm_compute; discriminate ]).
       assert (EQ18 : add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.holding + 0x18))
         by (apply bv_eq; vm_compute; reflexivity).
+      (* mycpu's 2-slot frame [a_fra / a_fs0] as [pa_stk spdh 1 / 2] *)
+      assert (Hbfra : pa_stk spdh 1 = a_fra).
+      { unfold pa_stk, add_vec_int, a_fra, mc_sp. rewrite !po_addv_assoc.
+        apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+      assert (Hbfs0 : pa_stk spdh 2 = a_fs0).
+      { unfold pa_stk, add_vec_int, a_fs0, mc_sp. rewrite !po_addv_assoc.
+        apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       (* mycpu callee, [smode_config] view -- no unbundle island needed *)
-      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5 vfra vfs0
+      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5
                 HN ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-                with "Hcfg Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
-      { iEval (rewrite HspH6). iExact "Hfra". }
-      { iEval (rewrite HspH6). iExact "Hfs0". }
-      iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
-      iEval (rewrite HspH6) in "Hfra". iEval (rewrite HspH6) in "Hfs0".
+                with "Hcfg Htlbinv Htext Hpc Hfile Hi16 [Hfra Hfs0] [-]").
+      { iEval (rewrite HspH6). iApply (stack_own_2_intro with "[Hfra] [Hfs0]").
+        - iEval (rewrite Hbfra). iExact "Hfra".
+        - iEval (rewrite Hbfs0). iExact "Hfs0". }
+      iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hstk".
+      iEval (rewrite HspH6) in "Hstk".
+      iDestruct (stack_own_2_elim with "Hstk") as (wra ws0) "(Hfra & Hfs0)".
+      iEval (rewrite Hbfra) in "Hfra". iEval (rewrite Hbfs0) in "Hfs0".
       iEval (rewrite lookup_total_insert) in "Hpc".
       assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                       = (mword_of_int (KernelSyms.holding + 0x1a) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1051,16 +1061,26 @@ Section WpHoldingInv.
         by (rewrite lookup_total_insert_ne; [ exact HspH5 | vm_compute; discriminate ]).
       assert (EQ18 : add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.holding + 0x18))
         by (apply bv_eq; vm_compute; reflexivity).
+      (* mycpu's 2-slot frame [a_fra / a_fs0] as [pa_stk spdh 1 / 2] *)
+      assert (Hbfra : pa_stk spdh 1 = a_fra).
+      { unfold pa_stk, add_vec_int, a_fra, mc_sp. rewrite !po_addv_assoc.
+        apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+      assert (Hbfs0 : pa_stk spdh 2 = a_fs0).
+      { unfold pa_stk, add_vec_int, a_fs0, mc_sp. rewrite !po_addv_assoc.
+        apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       (* mycpu callee, [smode_config] view -- no unbundle island needed *)
-      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5 vfra vfs0
+      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5
                 HN ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-                with "Hcfg Htlbinv Htext Hpc Hfile Hi16 [Hfra] [Hfs0] [-]").
-      { iEval (rewrite HspH6). iExact "Hfra". }
-      { iEval (rewrite HspH6). iExact "Hfs0". }
-      iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
-      iEval (rewrite HspH6) in "Hfra". iEval (rewrite HspH6) in "Hfs0".
+                with "Hcfg Htlbinv Htext Hpc Hfile Hi16 [Hfra Hfs0] [-]").
+      { iEval (rewrite HspH6). iApply (stack_own_2_intro with "[Hfra] [Hfs0]").
+        - iEval (rewrite Hbfra). iExact "Hfra".
+        - iEval (rewrite Hbfs0). iExact "Hfs0". }
+      iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hstk".
+      iEval (rewrite HspH6) in "Hstk".
+      iDestruct (stack_own_2_elim with "Hstk") as (wra ws0) "(Hfra & Hfs0)".
+      iEval (rewrite Hbfra) in "Hfra". iEval (rewrite Hbfs0) in "Hfs0".
       iEval (rewrite lookup_total_insert) in "Hpc".
       assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (KernelSyms.holding + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                       = (mword_of_int (KernelSyms.holding + 0x1a) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).

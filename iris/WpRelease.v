@@ -804,25 +804,40 @@ Section WpReleaseTop.
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
                      (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = a_h0).
     { rewrite /a_h0 /spdh !po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_pop_off_words root_ppn γc E Φ M1 noffv intenav
-              w24 w16 w8 vh0 (dqi:=dqi)
-              HN Hnoffpos Hint
+    (* pop_off's whole 4-slot frame (2 own + 2 mycpu) as [stack_own (M1!!!csp) 4];
+       the slots coincide with holding's dead frame cells a_h24/a_h16/a_h8/a_h0. *)
+    assert (Hc1 : pa_stk (M1 !!! Regidx csp_rs1) 1 = a_h24).
+    { rewrite HspM1 -EQp8. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hc2 : pa_stk (M1 !!! Regidx csp_rs1) 2 = a_h16).
+    { rewrite HspM1 -EQp0. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hc3 : pa_stk (M1 !!! Regidx csp_rs1) 3 = a_h8).
+    { rewrite HspM1 -EQpfra. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hc4 : pa_stk (M1 !!! Regidx csp_rs1) 4 = a_h0).
+    { rewrite HspM1 -EQpfs0. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    iAssert (stack_own (M1 !!! Regidx csp_rs1) 4) with "[Hh24 Hh16 Hh8 Hh0]" as "Hpstk".
+    { rewrite stack_own_slots. cbn [seq].
+      iSplitL "Hh24"; [iExists _; iEval (rewrite Hc1); iExact "Hh24"|].
+      iSplitL "Hh16"; [iExists _; iEval (rewrite Hc2); iExact "Hh16"|].
+      iSplitL "Hh8";  [iExists _; iEval (rewrite Hc3); iExact "Hh8"|].
+      iSplitL "Hh0";  [iExists _; iEval (rewrite Hc4); iExact "Hh0"|].
+      done. }
+    iApply (wp_pop_off root_ppn γc E Φ M1 noffv intenav 4 (dqi:=dqi)
+              ltac:(lia) HN Hnoffpos Hint
               ltac:(rewrite HraM1; vm_compute; reflexivity)
-              with "Hcfg Htlbinv Htext Hpc Hfile
-                    [Hh24] [Hh16] [Hh8] [Hh0] [Hnoff] [Hint] [-]").
-    { iEval (rewrite HspM1 EQp8). iExact "Hh24". }
-    { iEval (rewrite HspM1 EQp0). iExact "Hh16". }
-    { iEval (rewrite HspM1 EQpfra). iExact "Hh8". }
-    { iEval (rewrite HspM1 EQpfs0). iExact "Hh0". }
+              with "Hcfg Htlbinv Htext Hpc Hfile [Hpstk] [Hnoff] [Hint] [-]").
+    { iExact "Hpstk". }
     { iEval (rewrite HtpM1). iExact "Hnoff". }
     { iEval (rewrite HtpM1). iExact "Hint". }
-    iIntros (mf) "Hcfg Htlbinv Hpc Hfile %Hmff Hnoff Hint Hjunk".
+    iIntros (mf) "Hcfg Htlbinv Hpc Hfile %Hmff Hnoff Hint Hpstk".
     iEval (rewrite HtpM1) in "Hnoff". iEval (rewrite HtpM1) in "Hint".
     unfold callee_saved in Hmff.
     destruct Hmff as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & Hfs3 & Hfs4 & Hfs5 & Hfs6 & Hfs7 & Hfs8 & Hfs9 & Hfs10 & Hfs11).
-    iDestruct "Hjunk" as (u8 u0 ura us0) "(Hh24 & Hh16 & Hh8 & Hh0)".
-    iEval (rewrite HspM1 EQp8) in "Hh24". iEval (rewrite HspM1 EQp0) in "Hh16".
-    iEval (rewrite HspM1 EQpfra) in "Hh8". iEval (rewrite HspM1 EQpfs0) in "Hh0".
+    iEval (rewrite stack_own_slots; cbn [seq]) in "Hpstk".
+    iDestruct "Hpstk" as "(R1 & R2 & R3 & R4 & _)".
+    iDestruct "R1" as (uh24) "Hh24". iEval (rewrite Hc1) in "Hh24".
+    iDestruct "R2" as (uh16) "Hh16". iEval (rewrite Hc2) in "Hh16".
+    iDestruct "R3" as (uh8) "Hh8".   iEval (rewrite Hc3) in "Hh8".
+    iDestruct "R4" as (uh0) "Hh0".   iEval (rewrite Hc4) in "Hh0".
     assert (Hpc22 : update_vec_dec (add_vec (M1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (RL + 0x22)).
     { rewrite HraM1. apply bv_eq; vm_compute; reflexivity. }
