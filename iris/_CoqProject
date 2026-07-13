@@ -118,6 +118,7 @@ UmodeData4.v
 UmodeData2.v
 UmodeData1.v
 UmodeAmo4.v
+UmodeCsr.v
 UmodeLrsc.v
 WpUserLrsc.v
 WpUserLoop.v
@@ -176,6 +177,7 @@ WpUserMemC2.v
 WpUserMem1.v
 WpUserMemC1.v
 WpUserAmo.v
+WpUserCsr.v
 WpUserSteps.v
 WpUserExec.v
 WpUartPutcSyncFull.v
