@@ -45,6 +45,7 @@ Require Import WpUserCtrl.
 Require Import WpUserComputeC.
 Require Import WpUserTrap.
 Require Import WpUserMem.
+Require Import WpUserMemC.
 
 Section WpUserSteps.
   Context `{!riscvGS Σ}.
@@ -100,6 +101,7 @@ Section WpUserSteps.
   Local Notation ustep_c_compute1_direct := (WpUserComputeC.ustep_c_compute1_direct U).
   Local Notation ustep_c_ebreak := (WpUserTrap.ustep_c_ebreak U).
   Local Notation ustep_c_illegal := (WpUserTrap.ustep_c_illegal U).
+  Local Notation ustep_c_ld_code := (WpUserMemC.ustep_c_ld_code U).
   Local Notation ustep_c_itype := (WpUserComputeC.ustep_c_itype U).
   Local Notation ustep_c_jal := (WpUserCtrl.ustep_c_jal U).
   Local Notation ustep_c_jalr := (WpUserCtrl.ustep_c_jalr U).
@@ -1066,8 +1068,41 @@ Section WpUserSteps.
        is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
        isRVC (subrange_vec_dec w 15 0) = false /\
        (forall s0, agree_on D_u s0 dstateU ->
-          exec (ext_decode w) s0 = Some (ii, s0))).
-
+          exec (ext_decode w) s0 = Some (ii, s0)))
+    \/
+    (* 38: RVC fetch hit, compressed expanding to an 8-byte LOAD from a code page *)
+    (exists vpn i vpnD ieD (h : mword 16) (ii : instruction) (imm : mword 12) (rs1 rd : mword 5) (v : mword 64),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       c_fetch_mode va vpn i h /\
+       isRVC h = true /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode_compressed h) s0 = Some (ii, s0)) /\
+       (forall s : mstate, exec (execute ii) s
+          = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)), s)) /\
+       uint rd <> 0 /\
+       spec !! vpnD = Some ieD /\
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       uw_check_ok (Load Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 8 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 8 = true /\
+       (forall j : nat, (j < 8)%nat -> code !! pa_add paD j = Some (nth_byte v j))).
 
   (* the assembled Löb step obligation, v1 coverage *)
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :
@@ -1171,10 +1206,15 @@ Section WpUserSteps.
                                                                              Hpaal & HnotRVC & Hdec)
                                                                           | [ (vpn & i & h & ii & Hexec_op & Hvec & Hchk & Hupd &
                                                                                Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec)
-                                                                            | (vpn & i & w & ii & Hexec_op & Hlpad & Hvec & Hchk &
-                                                                               Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def &
-                                                                               Hpaal & HnotRVC & Hdec)
-                                                                            ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
+                                                                            | [ (vpn & i & w & ii & Hexec_op & Hlpad & Hvec & Hchk &
+                                                                                 Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def &
+                                                                                 Hpaal & HnotRVC & Hdec)
+                                                                              | (vpn & i & vpnD & ieD & h & ii & imm & rs1 & rd & v &
+                                                                                 Hvec & Hchk & Hupd & Hpbmt & HMPRV & HMXR & Hcanon &
+                                                                                 Hvpn_def & Hmode & HisRVC & Hdec & Hexp & Hrd &
+                                                                                 HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD &
+                                                                                 HcanonD & Hvpn_defD & HpaalD & Hcwd)
+                                                                              ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
       iDestruct "Hk" as "[_ HkT]".
@@ -1432,6 +1472,14 @@ Section WpUserSteps.
                 Hvpn_def Hpaal HnotRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
+    - (* compressed -> 8-byte LOAD from a code page *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_c_ld_code va vpn i h ii vpnD ieD imm rs1 rd v ms_v sc_v stval_v
+                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt HSXL HMPRV HMXR
+                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HvecD HchkD
+                HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hcwd
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
   Qed.
 
 

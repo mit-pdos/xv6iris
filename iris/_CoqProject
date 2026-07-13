@@ -146,5 +146,6 @@ WpUserCtrl.v
 WpUserComputeC.v
 WpUserTrap.v
 WpUserMem.v
+WpUserMemC.v
 WpUserSteps.v
 WpUserExec.v
