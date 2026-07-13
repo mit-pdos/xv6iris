@@ -26,6 +26,7 @@ WpRvcBridge.v
 WpLeafCommon.v
 WpEntry.v
 WpGpr.v
+MemData4.v
 WpGprLoad.v
 WpGprLui.v
 WpGprAddi.v
