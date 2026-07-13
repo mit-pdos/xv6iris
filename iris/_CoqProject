@@ -153,6 +153,7 @@ VcGenS.v
 WpSwtchVc.v
 WpWakeup.v
 WpSmodeUart.v
+WpSmodeGen.v
 WpUserBase.v
 WpUserFetch.v
 WpUserCompute.v
