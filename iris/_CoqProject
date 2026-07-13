@@ -58,6 +58,7 @@ WpMmodeStore.v
 WpMmodeUtype.v
 WpMmodeJalr.v
 WpMmodeMret.v
+WpMmodeCsr.v
 WpSmodeLeafBase.v
 WpSmodeFence.v
 WpSmodeToBeDeleted.v
