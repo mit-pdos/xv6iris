@@ -31,7 +31,7 @@ Require Import WpMycpu WpPushOffTop WpAcquireMem.
 Require Import CalleeSaved.
 Require Import WpHolding WpLock WpLockLeaves.
 Require Import WpPopOff.
-Require Export WpSmodeToBeDeleted WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeLoad WpSmodeStore WpSmodeBtype.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -524,20 +524,13 @@ Section WpHoldingInv.
         rewrite /H3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /H2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
-      unshelve iApply (wp_gpr_write_s_config_base_pc_scfg root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1a)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 10)
-                (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 9), Regidx (mword_of_int 10), SUB))
+      iApply (wp_sub_s root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1a)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 10)
                 (sub_vec (C !!! Regidx (mword_of_int 9 : mword 5)) (C !!! Regidx (mword_of_int 10 : mword 5)))
                 C (dq:=DfracOwn 1)
                 HN
                 ltac:(vm_compute; discriminate)
-                _
+                ltac:(reflexivity)
                 with "Hcfg Htlbinv Hpc Hfile Hi1a [-]").
-      { intros s_pc Hnpc Hpcv Hva Hvb.
-        change (execute (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 9), Regidx (mword_of_int 10), SUB)))
-          with (execute_RTYPE (Regidx (mword_of_int 10)) (Regidx (mword_of_int 9)) (Regidx (mword_of_int 10)) SUB).
-        rewrite (exec_execute_RTYPE_SUB_gpr (mword_of_int 10) (mword_of_int 9) (mword_of_int 10) s_pc).
-        replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false by (vm_compute; reflexivity).
-        unfold gpr_sub_val. rewrite Hva Hvb. reflexivity. }
       iIntros "Hcfg Htlbinv Hpc Hfile".
       set (H6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
           (sub_vec (C !!! Regidx (mword_of_int 9 : mword 5)) (C !!! Regidx (mword_of_int 10 : mword 5)))]> C).
@@ -547,18 +540,14 @@ Section WpHoldingInv.
       assert (Ha0H6 : H6 !!! Regidx (mword_of_int 10 : mword 5)
                       = sub_vec (C !!! Regidx (mword_of_int 9 : mword 5)) (C !!! Regidx (mword_of_int 10 : mword 5)))
         by (rewrite /H6; apply lookup_total_insert).
-      unshelve iApply (wp_gpr_write_s_config_base_pc_scfg root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1e)) (mword_of_int 10) (mword_of_int 10) (mword_of_int 10)
-                (ITYPE (mword_of_int 1, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLTIU))
+      iApply (wp_sltiu_s root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1e)) (mword_of_int 10) (mword_of_int 10)
+                (mword_of_int 1)
                 (zero_extend' 64 (bool_to_bit (zopz0zI_u (H6 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1 : mword 12)))))
                 H6 (dq:=DfracOwn 1)
                 HN
                 ltac:(vm_compute; discriminate)
-                _
+                ltac:(reflexivity)
                 with "Hcfg Htlbinv Hpc Hfile Hi1e [-]").
-      { intros s_pc Hnpc Hpcv Hva Hvb.
-        rewrite (exec_execute_ITYPE_SLTIU_gpr (mword_of_int 10) (mword_of_int 10) (mword_of_int 1) s_pc).
-        replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false by (vm_compute; reflexivity).
-        unfold gpr_sltiu_val. rewrite Hva. reflexivity. }
       iIntros "Hcfg Htlbinv Hpc Hfile".
       set (H7 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
           (zero_extend' 64 (bool_to_bit (zopz0zI_u (H6 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1 : mword 12)))))]> H6).
@@ -820,20 +809,13 @@ Section WpHoldingInv.
       iEval (rewrite Hpp04) in "Hpc".
       (* +0x04 c.li a0,0 *)
       iPoseProof (hi_04 with "Htext") as "Hi04".
-      unshelve iApply (wp_gpr_write_s_config_scfg root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x04)) (mword_of_int 10) (mword_of_int 10) (mword_of_int 10)
-                (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI))
+      iApply (wp_cli_s root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x04)) (mword_of_int 10)
+                (mword_of_int 0 : mword 6)
                 (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))
                 H1 (dq:=DfracOwn 1)
                 HN  ltac:(vm_compute; discriminate)
-                _
+                ltac:(reflexivity)
                 with "Hcfg Htlbinv Hpc Hfile Hi04 [-]").
-      { intros s_pc Hnpc _ _.
-        change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
-        rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) (mword_of_int 10) (sign_extend' 12 (mword_of_int 0 : mword 6)) s_pc).
-        replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false by (vm_compute; reflexivity).
-        unfold gpr_addi_val.
-        replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true by (vm_compute; reflexivity).
-        reflexivity. }
       iIntros "Hcfg Htlbinv Hpc Hfile".
       set (H2f := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
           (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))]> H1).
@@ -1097,20 +1079,13 @@ Section WpHoldingInv.
         rewrite /H3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /H2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /H1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
-      unshelve iApply (wp_gpr_write_s_config_base_pc_scfg root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1a)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 10)
-                (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 9), Regidx (mword_of_int 10), SUB))
+      iApply (wp_sub_s root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1a)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 10)
                 (sub_vec (C !!! Regidx (mword_of_int 9 : mword 5)) (C !!! Regidx (mword_of_int 10 : mword 5)))
                 C (dq:=DfracOwn 1)
                 HN
                 ltac:(vm_compute; discriminate)
-                _
+                ltac:(reflexivity)
                 with "Hcfg Htlbinv Hpc Hfile Hi1a [-]").
-      { intros s_pc Hnpc Hpcv Hva Hvb.
-        change (execute (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 9), Regidx (mword_of_int 10), SUB)))
-          with (execute_RTYPE (Regidx (mword_of_int 10)) (Regidx (mword_of_int 9)) (Regidx (mword_of_int 10)) SUB).
-        rewrite (exec_execute_RTYPE_SUB_gpr (mword_of_int 10) (mword_of_int 9) (mword_of_int 10) s_pc).
-        replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false by (vm_compute; reflexivity).
-        unfold gpr_sub_val. rewrite Hva Hvb. reflexivity. }
       iIntros "Hcfg Htlbinv Hpc Hfile".
       set (H6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
           (sub_vec (C !!! Regidx (mword_of_int 9 : mword 5)) (C !!! Regidx (mword_of_int 10 : mword 5)))]> C).
@@ -1120,18 +1095,14 @@ Section WpHoldingInv.
       assert (Ha0H6 : H6 !!! Regidx (mword_of_int 10 : mword 5)
                       = sub_vec (C !!! Regidx (mword_of_int 9 : mword 5)) (C !!! Regidx (mword_of_int 10 : mword 5)))
         by (rewrite /H6; apply lookup_total_insert).
-      unshelve iApply (wp_gpr_write_s_config_base_pc_scfg root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1e)) (mword_of_int 10) (mword_of_int 10) (mword_of_int 10)
-                (ITYPE (mword_of_int 1, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLTIU))
+      iApply (wp_sltiu_s root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x1e)) (mword_of_int 10) (mword_of_int 10)
+                (mword_of_int 1)
                 (zero_extend' 64 (bool_to_bit (zopz0zI_u (H6 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1 : mword 12)))))
                 H6 (dq:=DfracOwn 1)
                 HN
                 ltac:(vm_compute; discriminate)
-                _
+                ltac:(reflexivity)
                 with "Hcfg Htlbinv Hpc Hfile Hi1e [-]").
-      { intros s_pc Hnpc Hpcv Hva Hvb.
-        rewrite (exec_execute_ITYPE_SLTIU_gpr (mword_of_int 10) (mword_of_int 10) (mword_of_int 1) s_pc).
-        replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false by (vm_compute; reflexivity).
-        unfold gpr_sltiu_val. rewrite Hva. reflexivity. }
       iIntros "Hcfg Htlbinv Hpc Hfile".
       set (H7 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
           (zero_extend' 64 (bool_to_bit (zopz0zI_u (H6 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1 : mword 12)))))]> H6).

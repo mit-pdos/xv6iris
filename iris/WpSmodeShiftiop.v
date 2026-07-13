@@ -14,7 +14,6 @@ Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommo
 Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
-Require Import WpSmodeToBeDeleted.
 Require Import WpMmodeShiftiop.
 
 Section WpSmodeShiftiop.
@@ -243,6 +242,31 @@ Section WpSmodeShiftiop.
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
+  Qed.
+
+  Lemma wp_slli_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    shift_bits_left (m !!! Regidx rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) = wval ->
+    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
+    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs1
+              (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) wval m (dq:=dq)
+              HN Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_slli_val, gpr_src. rewrite Hva Hwval. reflexivity.
   Qed.
 
 End WpSmodeShiftiop.

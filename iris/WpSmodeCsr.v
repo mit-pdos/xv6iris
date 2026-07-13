@@ -15,7 +15,6 @@ Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved WpAuipc WpLo
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
 From Stdlib Require Import FunctionalExtensionality.
-Require Import WpSmodeToBeDeleted.
 
 (* helper: csr_sstatus *)
 Local Definition csr_sstatus : mword 12 := Ox"100".

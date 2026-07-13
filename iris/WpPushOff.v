@@ -54,7 +54,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpAuipc.
 Require Import WpGpr WpGprAddi WpMmodeShiftiop WpGprLogic WpGprAuipc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew.
-Require Export WpSmodeToBeDeleted WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeUtype WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeUtype WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

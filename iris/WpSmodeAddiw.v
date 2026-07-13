@@ -14,7 +14,6 @@ Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommo
 Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
-Require Import WpSmodeToBeDeleted.
 
 Section WpSmodeAddiw.
   Context `{!riscvGS Σ, !sieG Σ}.

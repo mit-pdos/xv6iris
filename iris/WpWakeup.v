@@ -43,7 +43,7 @@ Require Import WpSwtchVc.
 Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge WpKallocDecode WpAuipc.
 From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
-Require Export WpSmodeToBeDeleted WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeLoad WpSmodeStore WpSmodeBtype.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1456,18 +1456,11 @@ Section ProcInv.
       iPoseProof (wki_30 with "Htext") as "Hi30".
       iPoseProof (wki_34 with "Htext") as "Hi34".
       (* 0x30 addi s1,s1,360 : s1 := &proc[k+1] *)
-      iApply (wp_gpr_write_s_config_base_scfg root_ppn γc E Phi (mword_of_int (KernelSyms.wakeup + 0x30))
-                (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5)
-                (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI))
+      iApply (wp_addi_s root_ppn γc E Phi (mword_of_int (KernelSyms.wakeup + 0x30))
+                (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 360 : mword 12)
                 (proc_addr (S k)) Mt (dq:=DfracOwn 1)
                 HN ltac:(vm_compute; discriminate)
-                ltac:(intros s_pc Hnpc Hva Hvb;
-                      assert (Hval : gpr_addi_val (mword_of_int 9 : mword 5) (mword_of_int 360 : mword 12) s_pc = proc_addr (S k));
-                      [ unfold gpr_addi_val; rewrite Hva; rewrite Ht1; apply (proc_addr_succ k) | ];
-                      rewrite (exec_execute_ITYPE_ADDI_gpr (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 360 : mword 12) s_pc);
-                      rewrite Hval;
-                      replace (Z.eqb (uint (mword_of_int 9 : mword 5)) 0) with false by (vm_compute; reflexivity);
-                      reflexivity)
+                ltac:(rewrite Ht1; apply (proc_addr_succ k))
                 with "Hsm Htlb Hpc Hfile Hi30 [-]").
       iIntros "Hsm Htlb Hpc Hfile".
       set (Mt30 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (proc_addr (S k))]> Mt).

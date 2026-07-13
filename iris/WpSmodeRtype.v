@@ -14,7 +14,6 @@ Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommo
 Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
-Require Import WpSmodeToBeDeleted.
 Require Import WpMmodeRtype.
 
 Section WpSmodeRtype.
@@ -172,6 +171,111 @@ Section WpSmodeRtype.
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
+  Qed.
+
+  (* Specific per-instruction leaf lemmas (instr precondition fixes the RTYPE op;
+     a pure map-form value hypothesis replaces the generic [exec (execute i)]). *)
+
+  Lemma wp_sltu_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    zero_extend' 64 (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2))) = wval ->
+    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) -∗
+    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs2
+              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) wval m (dq:=dq)
+              HN Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva Hvb.
+    rewrite (exec_execute_RTYPE_SLTU_gpr rs2 rs1 rd s_pc Hrd).
+    unfold gpr_sltu_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  Lemma wp_cor_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    or_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
+    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
+    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_scfg root_ppn γ E Φ pc rd rs1 rs2
+              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) wval m (dq:=dq)
+              HN Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva Hvb.
+    rewrite (exec_execute_RTYPE_OR_gpr rs2 rs1 rd s_pc Hrd).
+    unfold gpr_or_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  Lemma wp_sub_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
+    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) -∗
+    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs2
+              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m (dq:=dq)
+              HN Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva Hvb.
+    change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)))
+      with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SUB).
+    rewrite (exec_execute_RTYPE_SUB_gpr rs2 rs1 rd s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_sub_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  Lemma wp_add_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    add_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
+    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
+    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs2
+              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) wval m (dq:=dq)
+              HN Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva Hvb.
+    change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))
+      with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) ADD).
+    rewrite (exec_execute_RTYPE_ADD_gpr rs2 rs1 rd s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_rd_val. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
 End WpSmodeRtype.

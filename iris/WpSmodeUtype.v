@@ -14,7 +14,6 @@ Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommo
 Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved WpAuipc WpLoad.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Import Defs.
-Require Import WpSmodeToBeDeleted.
 Require Import WpMmodeUtype.
 
 Section WpSmodeUtype.
@@ -91,6 +90,31 @@ Section WpSmodeUtype.
                  HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
+  Qed.
+
+  Lemma wp_clui_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 20) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    luival imm = wval ->
+    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc true (UTYPE (imm, Regidx rd, LUI)) -∗
+    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_scfg root_ppn γ E Φ pc rd rd rd
+              (UTYPE (imm, Regidx rd, LUI)) wval m (dq:=dq)
+              HN Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc _ _.
+    rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    rewrite Hwval. reflexivity.
   Qed.
 
 End WpSmodeUtype.

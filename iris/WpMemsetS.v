@@ -42,7 +42,7 @@ Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import CalleeSaved.
-Require Export WpSmodeToBeDeleted WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1372,7 +1372,7 @@ Qed.
   Lemma wp_memset_prefix (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64))
       (imm_entry shamt_l shamt_r : mword 6) (nzimm_s0 imm8_beqz : mword 8)
-      (i_add : instruction) (wval_add : mword 64) (vra vs0 : bv 64)
+      (wval_add : mword 64) (vra vs0 : bv 64)
       (γ : gname) {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
@@ -1399,15 +1399,8 @@ Qed.
     (* fetch geometry + PMP for all nine C-instr addresses (and add's second half) *)
     (* n <> 0 (fall through the c.beqz) *)
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
-    (* the add reduces to a4 := wval_add *)
-    (forall s_pc : mstate,
-       register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
-       (if Z.eqb (uint a2_idx) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a2_idx))) s_pc.(sregs)) = m5 !!! Regidx a2_idx ->
-       (if Z.eqb (uint a0_idx) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a0_idx))) s_pc.(sregs)) = m5 !!! Regidx a0_idx ->
-       exec (execute i_add) s_pc
-       = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint a4_idx))) (regval_into_reg wval_add))) ->
+    (* the add reduces to a4 := wval_add (a4 := a2 + a0) *)
+    add_vec (m5 !!! Regidx a2_idx) (m5 !!! Regidx a0_idx) = wval_add ->
     (* store geometry for the two frame slots (ra at 8(sp'), s0 at 0(sp')): just the
        one "PMP TOR entry 0 covers all of RAM" fact -- the _ram wrappers derive the
        rest (canonicality, identity translation, the gigapage masks, PMP match) from
@@ -1423,7 +1416,7 @@ Qed.
     instr (add_vec_int pcE 10) true (RTYPE (Regidx a0_idx, zreg, Regidx a5_idx, ADD)) -∗
     instr (add_vec_int pcE 12) true (SHIFTIOP (shamt_l, Regidx a2_idx, Regidx a2_idx, SLLI)) -∗
     instr (add_vec_int pcE 14) true (SHIFTIOP (shamt_r, Regidx a2_idx, Regidx a2_idx, SRLI)) -∗
-    instr (add_vec_int pcE 16) false i_add -∗
+    instr (add_vec_int pcE 16) false (RTYPE (Regidx a0_idx, Regidx a2_idx, Regidx a4_idx, ADD)) -∗
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
     ( smode_config γ dq -∗
@@ -1436,7 +1429,7 @@ Qed.
   Proof.
     intros ra_idx s0_idx a0_idx a2_idx a4_idx a5_idx pcE sp'
       ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0 m1 m2 m3 m4 m5 m6
-      HN Hn0 Hbexec_add.
+      HN Hn0 Hvalue_add.
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp') by (unfold m1; rewrite lookup_total_insert; reflexivity).
     iIntros "Hsm Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 Hcont".
@@ -1504,9 +1497,9 @@ Qed.
     change (<[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4)
       with m5.
     (* cdc: add a4,a2,a0 : a4 := a2 + a0 (end pointer) *)
-    iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ (add_vec_int pcE 16) a4_idx a2_idx a0_idx i_add wval_add m5
+    iApply (wp_add_s root_ppn γ E Φ (add_vec_int pcE 16) a4_idx a2_idx a0_idx wval_add m5
               (dq:=dq)
-              HN ltac:(vm_compute; discriminate) Hbexec_add
+              HN ltac:(vm_compute; discriminate) Hvalue_add
               with "Hsm Htlbinv Hpc Hfile Hi16 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.

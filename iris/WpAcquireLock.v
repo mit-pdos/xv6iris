@@ -803,20 +803,13 @@ Section WpAcquireLock.
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: c.li a4,1 ---- *)
-    unshelve iApply (wp_gpr_write_s_config_scfg root_ppn γc E Φ (mword_of_int (AQ + 0x16)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5)
-              (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI))
+    iApply (wp_cli_s root_ppn γc E Φ (mword_of_int (AQ + 0x16)) (mword_of_int 14 : mword 5)
+              (mword_of_int 1 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
               mh (dq:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate)
-              _
+              ltac:(reflexivity)
               with "Hcfg Htlbinv Hpc Hfile Hi16 [-]").
-    { intros s_pc Hnpc _ _.
-      change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
-      rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) (mword_of_int 14) (sign_extend' 12 (mword_of_int 1 : mword 6)) s_pc).
-      replace (Z.eqb (uint (mword_of_int 14 : mword 5)) 0) with false by (vm_compute; reflexivity).
-      unfold gpr_addi_val.
-      replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true by (vm_compute; reflexivity).
-      reflexivity. }
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (B5 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> mh).

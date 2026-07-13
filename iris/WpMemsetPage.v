@@ -223,14 +223,8 @@ Section WpMemsetPage.
               (add_vec (mword_of_int 4096 : mword 64) p) olds n
               γ (dq:=dq)
               Hn2 HN
-              (* Hbexec_add : the add computes a4 := 4096 + p *)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    cbn [execute];
-                    rewrite (exec_execute_RTYPE_ADD_gpr (mword_of_int 10) (mword_of_int 12) (mword_of_int 14) s_pc);
-                    replace (Z.eqb (uint (mword_of_int 14 : mword 5)) 0) with false by (vm_compute; reflexivity);
-                    unfold gpr_rd_val;
-                    rewrite Hva Hvb;
-                    match goal with
+              (* Hvalue_add : the add computes a4 := 4096 + p (a4 := a2 + a0) *)
+              ltac:(match goal with
                     | |- context [ ?mm !!! Regidx (mword_of_int 12) ] =>
                         let HA := fresh "HA" in
                         assert (HA : mm !!! Regidx (mword_of_int 12) = (mword_of_int 4096));

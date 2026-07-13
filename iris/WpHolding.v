@@ -157,55 +157,7 @@ Lemma hdec_seqz s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 1, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLTIU), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; h_dbase s Hpriv ]. Qed.
 
-(* register-generic RTYPE SUB execute (mirror of WpGpr.exec_execute_RTYPE_ADD_gpr) *)
-Definition gpr_sub_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
-  sub_vec (if Z.eqb (uint rs1) 0 then zero_reg
-           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-          (if Z.eqb (uint rs2) 0 then zero_reg
-           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)).
-
-Lemma exec_execute_RTYPE_SUB_gpr (rs2 rs1 rd : mword 5) s :
-  exec (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SUB) s
-  = Some (RETIRE_SUCCESS,
-          if Z.eqb (uint rd) 0 then s
-          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (gpr_sub_val rs2 rs1 s))).
-Proof.
-  unfold gpr_sub_val.
-  unfold execute_RTYPE. cbn match.
-  rewrite (exec_bind_Some _ _ _ (gpr_sub_val rs2 rs1 s) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-      apply exec_returnm. }
-  unfold gpr_sub_val.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
-  destruct (Z.eqb (uint rd) 0); apply exec_returnm.
-Qed.
-
-(* register-generic ITYPE SLTIU execute *)
-Definition gpr_sltiu_val (rs1 : mword 5) (imm : mword 12) (s : mstate) : mword 64 :=
-  zero_extend' 64 (bool_to_bit (zopz0zI_u
-    (if Z.eqb (uint rs1) 0 then zero_reg
-     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-    (sign_extend' 64 imm))).
-
-Lemma exec_execute_ITYPE_SLTIU_gpr (rs1 rd : mword 5) (imm : mword 12) s :
-  exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU))) s
-  = Some (RETIRE_SUCCESS,
-          if Z.eqb (uint rd) 0 then s
-          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (gpr_sltiu_val rs1 imm s))).
-Proof.
-  change (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU)))
-    with (execute_ITYPE imm (Regidx rs1) (Regidx rd) SLTIU).
-  unfold execute_ITYPE. cbn zeta match.
-  rewrite (exec_bind_Some _ _ _ (gpr_sltiu_val rs1 imm s) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-      apply exec_returnm. }
-  unfold gpr_sltiu_val.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
-  destruct (Z.eqb (uint rd) 0); apply exec_returnm.
-Qed.
+(* gpr_sub_val/gpr_sltiu_val + exec_execute_RTYPE_SUB_gpr/ITYPE_SLTIU_gpr relocated to WpMmodeLeafBase.v *)
 
 (* seqz on (a - b) is 0 when a <> b *)
 Lemma seqz_sub_neq (a b : mword 64) :

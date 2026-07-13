@@ -986,6 +986,92 @@ Proof.
   apply exec_returnm.
 Qed.
 
+(* --- relocated from WpKfree.v / WpHolding.v: pure register-generic execute
+   facts for SLTU / SUB / SLTIU, needed by the S-mode per-instruction leaf
+   lemmas (kept here in the shared exec base to avoid import cycles). --- *)
+Definition gpr_sltu_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
+  zero_extend' 64 (bool_to_bit (zopz0zI_u
+    (if Z.eqb (uint rs1) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    (if Z.eqb (uint rs2) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)))).
+
+Lemma exec_execute_RTYPE_SLTU (rs2 rs1 rd : regidx) (a b : mword 64) s s' :
+  exec (rX_bits rs1) s = Some (a, s) -> exec (rX_bits rs2) s = Some (b, s) ->
+  exec (wX_bits rd (zero_extend' 64 (bool_to_bit (zopz0zI_u a b)))) s = Some (tt, s') ->
+  exec (execute_RTYPE rs2 rs1 rd SLTU) s = Some (RETIRE_SUCCESS, s').
+Proof. intros Ha Hb Hw. unfold execute_RTYPE. cbn match.
+  rewrite (exec_bind_Some _ _ _ (zero_extend' 64 (bool_to_bit (zopz0zI_u a b))) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha). rewrite (exec_bind_Some _ _ _ _ _ Hb). apply exec_returnm. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
+
+Lemma exec_execute_RTYPE_SLTU_gpr (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg (gpr_sltu_val rs2 rs1 s))).
+Proof.
+  intro Hrd. unfold gpr_sltu_val.
+  change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)))
+    with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SLTU).
+  eapply exec_execute_RTYPE_SLTU.
+  - apply (exec_rX_bits_gpr rs1 s).
+  - apply (exec_rX_bits_gpr rs2 s).
+  - rewrite exec_wX_bits_gpr.
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    reflexivity.
+Qed.
+
+Definition gpr_sub_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
+  sub_vec (if Z.eqb (uint rs1) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+          (if Z.eqb (uint rs2) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)).
+
+Lemma exec_execute_RTYPE_SUB_gpr (rs2 rs1 rd : mword 5) s :
+  exec (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SUB) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_sub_val rs2 rs1 s))).
+Proof.
+  unfold gpr_sub_val.
+  unfold execute_RTYPE. cbn match.
+  rewrite (exec_bind_Some _ _ _ (gpr_sub_val rs2 rs1 s) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+      apply exec_returnm. }
+  unfold gpr_sub_val.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  destruct (Z.eqb (uint rd) 0); apply exec_returnm.
+Qed.
+
+Definition gpr_sltiu_val (rs1 : mword 5) (imm : mword 12) (s : mstate) : mword 64 :=
+  zero_extend' 64 (bool_to_bit (zopz0zI_u
+    (if Z.eqb (uint rs1) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    (sign_extend' 64 imm))).
+
+Lemma exec_execute_ITYPE_SLTIU_gpr (rs1 rd : mword 5) (imm : mword 12) s :
+  exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_sltiu_val rs1 imm s))).
+Proof.
+  change (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU)))
+    with (execute_ITYPE imm (Regidx rs1) (Regidx rd) SLTIU).
+  unfold execute_ITYPE. cbn zeta match.
+  rewrite (exec_bind_Some _ _ _ (gpr_sltiu_val rs1 imm s) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+      apply exec_returnm. }
+  unfold gpr_sltiu_val.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  destruct (Z.eqb (uint rd) 0); apply exec_returnm.
+Qed.
+
+
 (* WpGprJalr.v : exec_cE_zicfilp_false *)
 Lemma exec_cE_zicfilp_false s :
   register_lookup cur_privilege (sregs s) = Machine ->

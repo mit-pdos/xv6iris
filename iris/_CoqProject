@@ -61,7 +61,6 @@ WpMmodeMret.v
 WpMmodeCsr.v
 WpSmodeLeafBase.v
 WpSmodeFence.v
-WpSmodeToBeDeleted.v
 WpSmodeAddiw.v
 WpSmodeShiftiop.v
 WpSmodeRtype.v
