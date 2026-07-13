@@ -557,6 +557,41 @@ Proof.
   - right; apply tlb4k_nomatch_ram; exact Hram.
 Qed.
 
+(* the RAM superpage entry never matches the UART vpn (0x80000 tag vs the   *)
+(* 0x10000 vpn, whose bit is masked out by the gigapage levelMask 0x3FFFF): *)
+(* so a superpage resident at the UART's hash slot triggers a re-walk.      *)
+Lemma pw_super_nomatch_uart (root : mword 44) :
+  match_TLB_Entry (pw_tlb_entry root (mword_of_int 0)) (mword_of_int 0 : mword 16)
+    (sign_extend' (57 - 12) uart_vpn) = false.
+Proof.
+  unfold match_TLB_Entry, pw_tlb_entry, uart_vpn.
+  cbn [TLB_Entry_asid TLB_Entry_global TLB_Entry_vpn TLB_Entry_levelMask].
+  vm_compute. reflexivity.
+Qed.
+
+(* convert the invariant's [tlb_consistent (P_uart4k ...)] at the UART hash  *)
+(* slot into exactly the trichotomy [exec_translateAddr_tramp] consumes:     *)
+(* empty | resident-but-nonmatching (superpage collision → re-walk) |        *)
+(* resident UART leaf (hit).  [pte]/[ptea] of the UART leaf are pinned to     *)
+(* what TrampTlb's walk installs ([mk_pte lppn lflags] at [a0]).             *)
+Lemma uart_slot_disj (root lppn : mword 44) (lflags : Z) (a0 : mword 64)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  tlb_consistent (P_uart4k root lppn (mk_pte lppn lflags) a0) tlbvec ->
+  (vec_access_dec tlbvec (tlb_hash (__id 39) uart_vpn) = None \/
+   (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) uart_vpn) = Some ent /\
+                match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) uart_vpn) = false) \/
+   (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) uart_vpn)
+                 = Some (tlb4k_entry (mword_of_int 0) uart_vpn lppn (mk_pte lppn lflags) ptea))).
+Proof.
+  intros Hcons.
+  destruct (Hcons (tlb_hash (__id 39) uart_vpn) (tlb_hash_range uart_vpn)) as [Hn | (e & He & HPe)].
+  - left; exact Hn.
+  - destruct HPe as [-> | ->].
+    + right; left. exists (pw_tlb_entry root (mword_of_int 0)).
+      split; [ exact He | apply pw_super_nomatch_uart ].
+    + right; right. exists a0. unfold uart_tlb_ent in He. exact He.
+Qed.
+
 (* ===================================================================== *)
 (* §4  S-mode, width-1 device STORE towers (translation WALKS, filling     *)
 (*     the TLB, then the device write ADVANCES the device).  Clones of      *)
