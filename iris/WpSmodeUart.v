@@ -621,9 +621,8 @@ Qed.
   Variable data : bv 8.
   Variable d' : dev_state.
   Variable region : PMA_Region.
-  Variable tlbf : vec (option TLB_Entry) (2 ^ 6).
-  Variable s : mstate.
-  Let s' := set_reg s tlb tlbf.
+  Variable s s' : mstate.
+  Hypothesis Hmem_eq : s'.(mem) = s.(mem).
   Let pa := zero_extend' 64 (add_vec_int a (0 * 1)).
   Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 1 = true.
   Hypothesis Hcp : register_lookup cur_privilege s'.(sregs) = Supervisor.
@@ -704,7 +703,7 @@ Qed.
                apply bv_eq. rewrite bv_extract_unsigned.
                change (Z.of_N (MachineWord.Z_idx 0)) with 0. rewrite Z.shiftr_0_r.
                apply bv_wrap_bv_unsigned. }
-          assert (Hmem' : s'.(mem) = s.(mem)) by reflexivity.
+          assert (Hmem' : s'.(mem) = s.(mem)) by exact Hmem_eq.
           rewrite (execR_liftR_seq _ _ _ _ _
             (exec_mem_write_value_dev_1_S PBMT_PMA (zero_extend' 64 (add_vec_int a (0*1))) region data d'
                (register_lookup mstatus s'.(sregs)) s' HA Hord Hrange HW Hmatch Hwrite Hc Hsig Hh Hdev Hwr eq_refl Hmprv Hcp)).
@@ -727,9 +726,8 @@ Qed.
   Variable d' : dev_state.
   Variable region : PMA_Region.
   Variable satp0 : mword 64.
-  Variable tlbf : vec (option TLB_Entry) (2 ^ 6).
-  Variable s : mstate.
-  Let s' := set_reg s tlb tlbf.
+  Variable s s' : mstate.
+  Hypothesis Hmem_eq : s'.(mem) = s.(mem).
   Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
   Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
@@ -777,7 +775,7 @@ Qed.
     cbn match.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
     rewrite execR_liftR.
-    rewrite (exec_vmem_write_addr_1_S_walk_dev a8 data d' region tlbf s Halign Hcp' Hmprv' Htr HA Hord Hrange HW Hmatch Hwrite Hc Hsig Hh Hdev Hwr).
+    rewrite (exec_vmem_write_addr_1_S_walk_dev a8 data d' region s s' Hmem_eq Halign Hcp' Hmprv' Htr HA Hord Hrange HW Hmatch Hwrite Hc Hsig Hh Hdev Hwr).
     reflexivity.
   Qed.
   End VWgS1walkDev.
@@ -787,10 +785,9 @@ Qed.
   Variable imm : mword 12.
   Variable region : PMA_Region.
   Variable satp0 : mword 64.
-  Variable tlbf : vec (option TLB_Entry) (2 ^ 6).
-  Variable s : mstate.
+  Variable s s' : mstate.
   Variable d' : dev_state.
-  Let s' := set_reg s tlb tlbf.
+  Hypothesis Hmem_eq : s'.(mem) = s.(mem).
   Let offset := sign_extend' 64 imm.
   Let vrs2 := if Z.eqb (uint rs2) 0 then zero_reg
               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs).
@@ -841,7 +838,7 @@ Qed.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
     cbn match.
     rewrite (exec_bind_Some _ _ _ _ _
-      (exec_vmem_write_1_gpr_S_walk_dev rs1 offset data_byte d' region satp0 tlbf s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HW Hmatch Hwrite Hc Hsig Hh Hdev Hwr)).
+      (exec_vmem_write_1_gpr_S_walk_dev rs1 offset data_byte d' region satp0 s s' Hmem_eq Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HW Hmatch Hwrite Hc Hsig Hh Hdev Hwr)).
     cbn match.
     apply exec_returnM.
   Qed.
@@ -860,9 +857,7 @@ Variable a : mword 64.
 Variable v : bv 8.
 Variable d' : dev_state.
 Variable region : PMA_Region.
-Variable tlbf : vec (option TLB_Entry) (2 ^ 6).
-Variable s : mstate.
-Let s' := set_reg s tlb tlbf.
+Variable s s' : mstate.
 Let pa := zero_extend' 64 (add_vec_int a (0 * 1)).
 Let data2 : mword (1*1*8) :=
   update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) v.
@@ -935,9 +930,7 @@ Variable v : bv 8.
 Variable d' : dev_state.
 Variable region : PMA_Region.
 Variable satp0 : mword 64.
-Variable tlbf : vec (option TLB_Entry) (2 ^ 6).
-Variable s : mstate.
-Let s' := set_reg s tlb tlbf.
+Variable s s' : mstate.
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
 Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
@@ -986,7 +979,7 @@ Proof.
   cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
   rewrite execR_liftR.
-  rewrite (exec_vmem_read_addr_1_S_walk_dev a8 v d' region tlbf s Halign Hcp' Hmprv' Htr HA Hord Hrange HR Hmatch Hread Hc Hsig Hh Hdev Hdrd).
+  rewrite (exec_vmem_read_addr_1_S_walk_dev a8 v d' region s s' Halign Hcp' Hmprv' Htr HA Hord Hrange HR Hmatch Hread Hc Hsig Hh Hdev Hdrd).
   reflexivity.
 Qed.
 End RWgS1walkDev.
@@ -998,9 +991,7 @@ Variable v : bv 8.
 Variable d' : dev_state.
 Variable region : PMA_Region.
 Variable satp0 : mword 64.
-Variable tlbf : vec (option TLB_Entry) (2 ^ 6).
-Variable s : mstate.
-Let s' := set_reg s tlb tlbf.
+Variable s s' : mstate.
 Let offset := sign_extend' 64 imm.
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
@@ -1048,7 +1039,7 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (exec_bind_Some _ _ _ _ _ Hass).
   rewrite (exec_bind_Some _ _ _ _ _
-    (exec_vmem_read_1_gpr_S_walk_dev rs1 offset v d' region satp0 tlbf s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hread Hc Hsig Hh Hdev Hdrd)).
+    (exec_vmem_read_1_gpr_S_walk_dev rs1 offset v d' region satp0 s s' Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hread Hc Hsig Hh Hdev Hdrd)).
   cbn match.
   assert (Hw : exec (wX_bits (Regidx rd) (extend_value false data2)) (MState s'.(sregs) s'.(mem) d')
                = Some (tt, set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd)))
