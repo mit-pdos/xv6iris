@@ -186,6 +186,7 @@ WpUserZicond.v
 WpUserZbb.v
 WpUserClmul.v
 WpUserZbbRtype.v
+WpUserPriv.v
 WpUserSteps.v
 WpUserExec.v
 WpUartPutcSyncFull.v
