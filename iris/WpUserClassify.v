@@ -555,4 +555,55 @@ Section WpUserClassify.
     exact (classify_covered va ms_v g tlbvec vpn i w ii Hf Hdec (Hcov ii Hdu Hdec)).
   Qed.
 
+  (* Everything classified so far, as one predicate + one dispatcher: the four
+     base-integer compute families plus the [covered_u] trap/no-op set. *)
+  Definition classifiable_u (ii : instruction) : bool :=
+    match ii with
+    | ITYPE _ => true | RTYPE _ => true | UTYPE _ => true | SHIFTIOP _ => true
+    | _ => covered_u ii
+    end.
+
+  Lemma classify_word (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (ii : instruction) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    classifiable_u ii = true ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hcl.
+    destruct ii; try discriminate Hcl;
+      try (exact (classify_covered va ms_v g tlbvec vpn i w _ Hf Hdec eq_refl)).
+    all: lazymatch goal with
+    | Hdec : forall _, _ -> exec _ _ = Some (ITYPE ?p, _) |- _ =>
+        destruct p as [[[imm r1] r2] op]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_itype va ms_v g tlbvec vpn i w imm rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (RTYPE ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_rtype va ms_v g tlbvec vpn i w rs2 rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (UTYPE ?p, _) |- _ =>
+        destruct p as [[imm r1] op]; destruct r1 as [rd];
+        exact (classify_utype va ms_v g tlbvec vpn i w imm rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SHIFTIOP ?p, _) |- _ =>
+        destruct p as [[[shamt r1] r2] op]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_shiftiop va ms_v g tlbvec vpn i w shamt rs1 rd op Hf Hdec)
+    end.
+  Qed.
+
+  (* The full pipeline over the wider [classifiable_u] set. *)
+  Lemma classify_word_of_decode (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall ii, decodable_u ii = true ->
+       (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+       classifiable_u ii = true) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hcl.
+    destruct (decode_total_u_set w) as (ii & Hdu & Hdec).
+    exact (classify_word va ms_v g tlbvec vpn i w ii Hf Hdec (Hcl ii Hdu Hdec)).
+  Qed.
+
 End WpUserClassify.
