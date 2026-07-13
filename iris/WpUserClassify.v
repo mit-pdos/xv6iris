@@ -58,6 +58,34 @@ Proof.
   unfold execute_NTL. apply exec_returnM.
 Qed.
 
+(* A memory barrier is state-preserving under exec (local copy to keep this
+   U-mode file off the S-mode fence file). *)
+Lemma exec_sail_barrier (b : Arch.barrier) s :
+  exec (sail_barrier b) s = Some (tt, s).
+Proof. reflexivity. Qed.
+
+(* FENCE.TSO and FENCE.I: a single [sail_barrier] (state-preserving) then
+   [returnM RETIRE_SUCCESS].  Unconditional -- no pred/succ dispatch. *)
+Lemma exec_execute_FENCE_TSO_any (u : unit) s :
+  exec (execute (FENCE_TSO u)) s = Some (RETIRE_SUCCESS, s).
+Proof.
+  destruct u.
+  change (execute (FENCE_TSO tt)) with (execute_FENCE_TSO tt).
+  unfold execute_FENCE_TSO.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_FENCEI_any (p : mword 12 * regidx * regidx) s :
+  exec (execute (FENCEI p)) s = Some (RETIRE_SUCCESS, s).
+Proof.
+  destruct p as [[imm rs] rd].
+  change (execute (FENCEI (imm, rs, rd))) with (execute_FENCEI imm rs rd).
+  unfold execute_FENCEI.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier _ s)).
+  apply exec_returnM.
+Qed.
+
 Section WpUserClassify.
   Context `{CID : CpuId}.
   Context (U : WpUserBase.uctx).
@@ -127,6 +155,8 @@ Section WpUserClassify.
     | ILLEGAL _ => true
     | PAUSE _ => true
     | NTL _ => true
+    | FENCE_TSO _ => true
+    | FENCEI _ => true
     | _ => false
     end.
 
@@ -145,6 +175,8 @@ Section WpUserClassify.
       (split; [ reflexivity | ]);
       first [ left; apply exec_execute_PAUSE_any
             | left; apply exec_execute_NTL_any
+            | left; apply exec_execute_FENCE_TSO_any
+            | left; apply exec_execute_FENCEI_any
             | right; apply exec_execute_ILLEGAL_any ].
   Qed.
 
