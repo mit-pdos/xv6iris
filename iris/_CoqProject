@@ -29,6 +29,7 @@ WpGpr.v
 MemData4.v
 MemData2.v
 MemData1.v
+MemAmo4.v
 WpGprLoad.v
 WpGprLui.v
 WpGprAddi.v
@@ -112,6 +113,7 @@ UmodeData.v
 UmodeData4.v
 UmodeData2.v
 UmodeData1.v
+UmodeAmo4.v
 WpUserLoop.v
 WpIntrStep.v
 WpIntrInv.v
@@ -163,5 +165,6 @@ WpUserMem2.v
 WpUserMemC2.v
 WpUserMem1.v
 WpUserMemC1.v
+WpUserAmo.v
 WpUserSteps.v
 WpUserExec.v
