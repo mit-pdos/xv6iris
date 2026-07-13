@@ -115,6 +115,7 @@ UmodeData2.v
 UmodeData1.v
 UmodeAmo4.v
 UmodeLrsc.v
+WpUserLrsc.v
 WpUserLoop.v
 WpIntrStep.v
 WpIntrInv.v
