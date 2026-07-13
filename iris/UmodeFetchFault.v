@@ -32,6 +32,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import MinstretInv InstrBytes.
 Require Import WpIntrCore.
 Require Import UmodeTrap UmodeFetch UmodeStep.
+Require Import CommonWalk.
 Local Open Scope
 Z_scope.
 Import Defs.
@@ -56,42 +57,6 @@ Definition utrap_ms (ms_v : mword 64) (elp_v : mword 1) : mword 64 :=
 (* §1 The exec chain of the fetch page fault (TLB hit, A-bit clear).      *)
 (* ===================================================================== *)
 
-Lemma exec_currentlyEnabled_Svadu s :
-  exec (currentlyEnabled Ext_Svadu) s = Some (true, s).
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  vm_compute. reflexivity.
-Qed.
-
-(* ADUE = 0 (Svade behaviour): an A/D update is required but forbidden. *)
-Lemma exec_update_and_write_pte_needs_update
-    (pteAddr : physaddr) (pte pte' : mword 64) (acc : MemoryAccessType mem_payload) s :
-  update_PTE_Bits pte acc = Some pte' ->
-  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
-  exec (update_and_write_pte pteAddr 8 pte acc) s
-    = Some (Err (PTW_PTE_Needs_Update tt), s).
-Proof.
-  intros Hupd Hmenv.
-  unfold update_and_write_pte.
-  rewrite Hupd. cbn match.
-  erewrite exec_bind_Some.
-  2:{ (* the ADUE gate evaluates to false *)
-      unfold or_boolM.
-      erewrite exec_bind_Some.
-      2:{ rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Svadu s)).
-          rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)).
-          rewrite Hmenv.
-          replace (eq_vec (_get_MEnvcfg_ADUE MENVCFG_S) ('b"1" : mword 1)) with false
-            by (vm_compute; reflexivity).
-          apply exec_returnm. }
-      cbn beta iota.
-      erewrite exec_and_boolM_Some.
-      2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Svadu s)).
-          apply (exec_returnM (not true) s). }
-      cbn [not negb]. apply (exec_returnM false s). }
-  cbn beta iota.
-  apply exec_returnm.
-Qed.
 
 Section UTranslateHitFault.
   Context (ent : TLB_Entry) (vpn : mword 27).

@@ -93,6 +93,7 @@ WpIntrBits.v
 WpIntrCore.v
 WpUart.v
 UmodeTrap.v
+CommonWalk.v
 UmodeFetch.v
 UmodeFetchC.v
 UmodeStep.v
@@ -141,6 +142,7 @@ VcGen.v
 VcGenS.v
 WpSwtchVc.v
 WpWakeup.v
+WpSmodeUart.v
 WpUserBase.v
 WpUserFetch.v
 WpUserCompute.v
