@@ -18,7 +18,7 @@ From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
@@ -564,4 +564,48 @@ Proof.
   unfold execute_ZIMOP_MOP_RR. cbv beta.
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
   apply exec_returnM.
+Qed.
+
+(* ===================================================================== *)
+(* §7 The register-generic RTYPEW execute fact: execute_RTYPEW is         *)
+(*    op-generic (one uniform rX/rX/wX chain with a pure match), so ONE   *)
+(*    lemma covers ADDW/SUBW/SLLW/SRLW/SRAW -- for the base RTYPEW arm    *)
+(*    and the C_ADDW/C_SUBW expansions.                                   *)
+(* ===================================================================== *)
+
+Definition gpr_rtypew_val (op : ropw) (v1 v2 : mword 64) : mword 64 :=
+  sign_extend' 64
+    (match op with
+     | ADDW => add_vec (subrange_vec_dec v1 31 0) (subrange_vec_dec v2 31 0)
+     | SUBW => sub_vec (subrange_vec_dec v1 31 0) (subrange_vec_dec v2 31 0)
+     | SLLW => shift_bits_left (subrange_vec_dec v1 31 0)
+                 (subrange_vec_dec (subrange_vec_dec v2 31 0) 4 0)
+     | SRLW => shift_bits_right (subrange_vec_dec v1 31 0)
+                 (subrange_vec_dec (subrange_vec_dec v2 31 0) 4 0)
+     | SRAW => shift_bits_right_arith (subrange_vec_dec v1 31 0)
+                 (subrange_vec_dec (subrange_vec_dec v2 31 0) 4 0)
+     end).
+
+Lemma exec_execute_RTYPEW_gpr (op : ropw) (rs2 rs1 rd : mword 5) s :
+  exec (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    (gpr_rtypew_val op
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                       (if Z.eqb (uint rs2) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))))).
+Proof.
+  change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op)))
+    with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) op).
+  unfold execute_RTYPEW. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  unfold gpr_rtypew_val.
+  destruct op; apply exec_returnM.
 Qed.
