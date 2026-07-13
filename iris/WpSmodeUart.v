@@ -987,6 +987,7 @@ End RWgS1walkDev.
 Section ExecLoadGS1walkDev.
 Variable rs1 rd : mword 5.
 Variable imm : mword 12.
+Variable is_unsigned : bool.
 Variable v : bv 8.
 Variable d' : dev_state.
 Variable region : PMA_Region.
@@ -1028,12 +1029,12 @@ Hypothesis Hdev : dev_addr pa = true.
 Hypothesis Hdrd : dev_read s'.(mdev) pa 1 = Some (v, d').
 
 Lemma exec_execute_LOAD_1_gpr_S_walk_dev :
-  exec (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 1))) s
+  exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))) s
     = Some (RETIRE_SUCCESS,
-            set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value false data2))).
+            set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value is_unsigned data2))).
 Proof.
-  change (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 1)))
-    with (execute_LOAD imm (Regidx rs1) (Regidx rd) false 1).
+  change (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)))
+    with (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned 1).
   unfold execute_LOAD.
   replace (1 <=? xlen_bytes) with true by (vm_compute; reflexivity).
   assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
@@ -1041,10 +1042,10 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _
     (exec_vmem_read_1_gpr_S_walk_dev rs1 offset v d' region satp0 s s' Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hread Hc Hsig Hh Hdev Hdrd)).
   cbn match.
-  assert (Hw : exec (wX_bits (Regidx rd) (extend_value false data2)) (MState s'.(sregs) s'.(mem) d')
+  assert (Hw : exec (wX_bits (Regidx rd) (extend_value is_unsigned data2)) (MState s'.(sregs) s'.(mem) d')
                = Some (tt, set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd)))
-                              (regval_into_reg (extend_value false data2)))).
-  { rewrite (exec_wX_bits_gpr rd (extend_value false data2) (MState s'.(sregs) s'.(mem) d')).
+                              (regval_into_reg (extend_value is_unsigned data2)))).
+  { rewrite (exec_wX_bits_gpr rd (extend_value is_unsigned data2) (MState s'.(sregs) s'.(mem) d')).
     rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
   rewrite (exec_bind0_Some _ _ _ _ _ Hw).
   apply exec_returnM.
@@ -1486,18 +1487,19 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §8  The S-mode instruction-level UART LOAD (LB) WP.                      *)
+(* §8  The S-mode instruction-level UART LOAD (LB / LBU) WP.                *)
 (*     Mirror of the store WP: the device READ advances the UART (RHR pops  *)
-(*     the rx FIFO), and the sign-extended byte is written into rd.         *)
+(*     the rx FIFO), and the byte is written into rd, sign- (LB) or         *)
+(*     zero-extended (LBU) per [is_unsigned].                               *)
 (* ===================================================================== *)
 
 Lemma wp_lb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mval -> iProp Σ)
-    (pc : mword 64) (is_rvc : bool) (rd rs1 : mword 5) (imm : mword 12) (b : bv 8)
+    (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (b : bv 8)
     (m : gmap regidx (mword 64)) (u u' : uart_state)
     (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let ldval : mword 64 := extend_value false (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b) in
+  let ldval : mword 64 := extend_value is_unsigned (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b) in
   let a0addr := pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) in
   ↑minstretN ⊆ E ->
   eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1526,7 +1528,7 @@ Lemma wp_lb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mva
   hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
   mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
   tlb_inv_gen (P_uart4k root_ppn lppn (mk_pte lppn lflags) a0addr) root_ppn -∗
-  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 1)) -∗
+  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
   uart_map root_ppn p1 p0 lppn lflags dq -∗ uart_frag u -∗
   ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
     mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
@@ -1541,7 +1543,7 @@ Proof.
     Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hpter Hcanon Hvpn_def Hident Hpa Hread_u.
   iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huartmap Huf Hcont".
   iApply (wp_instr_s_config_tlbinv_gen (P_uart4k root_ppn lppn (mk_pte lppn lflags) a0addr) root_ppn E Φ pc is_rvc
-            (LOAD (imm, Regidx rs1, Regidx rd, false, 1)) mstatus0 mie_v mdv0 menvcfg0
+            (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) mstatus0 mie_v mdv0 menvcfg0
             HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
             (P_uart4k_super root_ppn lppn (mk_pte lppn lflags) a0addr)
             (P_uart4k_disc root_ppn lppn (mk_pte lppn lflags) a0addr)
@@ -1634,9 +1636,9 @@ Proof.
   { rewrite Hmdev_s'. apply (dev_read_uart σ.(mdev) off b u' Hoff). rewrite <- Hduart. exact Hread_u. }
   pose (d' := set_duart σ.(mdev) u').
   pose (s_x := set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg ldval)).
-  assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 1))) s_pc = Some (RETIRE_SUCCESS, s_x)).
+  assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))) s_pc = Some (RETIRE_SUCCESS, s_x)).
   { subst s_x ldval.
-    apply (exec_execute_LOAD_1_gpr_S_walk_dev rs1 rd imm b d' region_ld satp0 s_pc s'
+    apply (exec_execute_LOAD_1_gpr_S_walk_dev rs1 rd imm is_unsigned b d' region_ld satp0 s_pc s'
              Hrd Lpriv_pc HSXL_pc Lsatp_pc Hmode
              ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
              ltac:(rewrite Lmenv_pc; exact Hpmm)
