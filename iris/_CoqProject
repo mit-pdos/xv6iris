@@ -139,4 +139,12 @@ VcGen.v
 VcGenS.v
 WpSwtchVc.v
 WpWakeup.v
+WpUserBase.v
+WpUserFetch.v
+WpUserCompute.v
+WpUserCtrl.v
+WpUserComputeC.v
+WpUserTrap.v
+WpUserMem.v
+WpUserSteps.v
 WpUserExec.v
