@@ -280,7 +280,7 @@ Section InstrBytes.
     instr_bytes pc r -∗
     ⌜ exec (fetch tt) σ = Some (r, σ) ⌝.
   Proof.
-    iIntros (Hpmp0 Hpma0 HmisaC) "[Hreg Hmem] Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes".
+    iIntros (Hpmp0 Hpma0 HmisaC) "[Hreg [Hmem Hdev]] Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes".
     iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
@@ -317,7 +317,7 @@ Section InstrBytes.
                  (within_clint_false (fetch_pa pc) 4 σ Hnc ltac:(lia))
                  (within_sig_false  (fetch_pa pc) 4 σ Hns ltac:(lia))
                  (within_htif_false (fetch_pa pc) 4 σ Lhtif)
-                 Hbf Hal HnotRVC).
+                 (addr_is_ram_not_dev _ Hram) Hbf Hal HnotRVC).
       + (* 2-aligned (not 4): two 2-byte reads at pc and pc+2, via
            [exec_fetch_F_Base_2] (RiscvFetchExec).  [instr_bytes] no longer
            carries any of the geometry: it is all derived here from [H2al],
@@ -371,6 +371,7 @@ Section InstrBytes.
                  (within_clint_false (fetch_pa (add_vec_int pc 2)) 2 σ Hnch ltac:(lia))
                  (within_sig_false  (fetch_pa (add_vec_int pc 2)) 2 σ Hnsh ltac:(lia))
                  (within_htif_false (fetch_pa (add_vec_int pc 2)) 2 σ Lhtif)
+                 (addr_is_ram_not_dev _ Hraml) (addr_is_ram_not_dev _ Hramh)
                  Hbl Hbh Hbit0 Hbit1 Hal HmisaC' HnotRVC (concat_subranges_id w)).
     - (* F_RVC h *)
       iDestruct "Hbytes" as "[%HisRVC Hbytes]".
@@ -398,7 +399,7 @@ Section InstrBytes.
                  (within_clint_false (fetch_pa pc) 4 σ Hnc ltac:(lia))
                  (within_sig_false  (fetch_pa pc) 4 σ Hns ltac:(lia))
                  (within_htif_false (fetch_pa pc) 4 σ Lhtif)
-                 Hbf Hal HisRVC').
+                 (addr_is_ram_not_dev _ Hram) Hbf Hal HisRVC').
       + (* not 4-aligned : 2 bytes = [h]; derive the bit/paddr facts from the
            top-level 2-alignment fact *)
         destruct (align2_not4_facts pc H2al Hal) as (Halign & Hbit0 & Hbit1).
@@ -423,7 +424,7 @@ Section InstrBytes.
                  (within_clint_false (fetch_pa pc) 2 σ Hnc ltac:(lia))
                  (within_sig_false  (fetch_pa pc) 2 σ Hns ltac:(lia))
                  (within_htif_false (fetch_pa pc) 2 σ Lhtif)
-                 Hbf Hbit0 Hbit1 Hal HmisaC' HisRVC).
+                 (addr_is_ram_not_dev _ Hram) Hbf Hbit0 Hbit1 Hal HmisaC' HisRVC).
     - (* F_Error: [instr_bytes] is [False] *) done.
   Qed.
 

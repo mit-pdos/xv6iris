@@ -351,7 +351,7 @@ Section UptInv.
     (a ↦₈{dq} w) -∗
     ⌜exec (read_pte (Physaddr a) 8) σ = Some (Ok w, σ)⌝.
   Proof.
-    iIntros (HA Hord HR Hcov Hpter) "Hhw [Hreg Hmem] Hw".
+    iIntros (HA Hord HR Hcov Hpter) "Hhw [Hreg [Hmem Hdev]] Hw".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
@@ -394,6 +394,7 @@ Section UptInv.
              (within_clint_false a 8 σ Hnc ltac:(lia))
              (within_sig_false a 8 σ Hns ltac:(lia))
              (within_htif_false a 8 σ Lhtif)
+             (addr_is_ram_not_dev _ Hram)
              Hbf).
   Qed.
 

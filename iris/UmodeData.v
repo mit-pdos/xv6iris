@@ -138,11 +138,12 @@ Lemma exec_checked_mem_read_ram_8_U (pbmt : page_based_mem_type) (addr : mword 6
   exec (within_clint (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   exec (checked_mem_read (Load Data) pbmt User (Physaddr addr) 8 false false false false)
        s = Some (Ok (w, default_meta), s).
 Proof.
-  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hbytes.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes.
   unfold checked_mem_read.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
@@ -176,7 +177,7 @@ Proof.
       rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
   rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hbytes)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hdev Hbytes)).
   apply exec_returnM.
 Qed.
 
@@ -551,6 +552,7 @@ Lemma exec_mem_read_load_U (pbmt : page_based_mem_type) (addr : mword 64)
   exec (within_clint (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 8)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
@@ -558,7 +560,7 @@ Lemma exec_mem_read_load_U (pbmt : page_based_mem_type) (addr : mword 64)
   exec (mem_read (Load Data) pbmt (Physaddr addr) 8 false false false)
        s = Some (Ok w, s).
 Proof.
-  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hbytes Hmprv Hpriv.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes Hmprv Hpriv.
   unfold mem_read.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
@@ -625,6 +627,7 @@ Section VRU.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 8) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
+  Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N ->
     s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
@@ -669,7 +672,7 @@ Section VRU.
         end.
         { rewrite (execR_liftR_seq _ _ _ _ _
             (exec_mem_read_load_U PBMT_PMA pa region v s
-               HpmpA Hpmp_ord Hrange HpmpR Hpmam Hpalign Hread Hc Hsig Hh Hbytes
+               HpmpA Hpmp_ord Hrange HpmpR Hpmam Hpalign Hread Hc Hsig Hh Hdev Hbytes
                Hmprv Hcp)).
           cbn match.
           rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
@@ -743,6 +746,7 @@ Section VRUg.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 8) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
+  Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N ->
     s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
@@ -767,7 +771,7 @@ Section VRUg.
     rewrite (exec_vmem_read_addr_8_U ent vpn ea v region s
                Hchk Hupd Hpbmt Hmatch Hcp HSXL Hmprv Hsatpmode Hasid Hvec
                Halign Hcanon Hvpn_def
-               HpmpA Hpmp_ord Hrange HpmpR Hpmam Hpalign Hread Hc Hsig Hh Hbytes).
+               HpmpA Hpmp_ord Hrange HpmpR Hpmam Hpalign Hread Hc Hsig Hh Hdev Hbytes).
     reflexivity.
   Qed.
 
@@ -890,10 +894,11 @@ Lemma exec_checked_mem_write_ram_8_U (pbmt : page_based_mem_type) (addr : mword 
   exec (within_clint (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_htif_writable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
   exec (checked_mem_write (Physaddr addr) 8 data (Store Data) pbmt User tt false false false) s
-    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 8 data)).
+    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 8 data) s.(mdev)).
 Proof.
-  intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh.
+  intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev.
   unfold checked_mem_write.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
@@ -914,7 +919,7 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (write_kind_of_flags false false false) s = Some (rv64d_types.Write_plain, s))).
   2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_plain_8 addr data s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_plain_8 addr data s Hdev)).
   apply exec_returnM.
 Qed.
 
@@ -933,19 +938,20 @@ Lemma exec_mem_write_value_8_U (pbmt : page_based_mem_type) (addr : mword 64)
   exec (within_clint (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 8) s = Some (false, s) ->
   exec (within_htif_writable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = User ->
   exec (mem_write_value (Physaddr addr) 8 data (Store Data) pbmt false false false) s
-    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 8 data)).
+    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 8 data) s.(mdev)).
 Proof.
-  intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hmprv Hpriv.
+  intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev Hmprv Hpriv.
   unfold mem_write_value, mem_write_value_meta.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
   rewrite Hpriv.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_store_nm _ _ s Hmprv)).
   unfold mem_write_value_priv_meta. cbn [orb andb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_8_U pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_8_U pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev)).
   cbn match. unfold mem_write_callback. apply exec_returnm.
 Qed.
 
@@ -1004,10 +1010,11 @@ Section VWUg.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 8) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 8) s = Some (false, s).
+  Hypothesis Hdev : dev_addr pa = false.
 
   Lemma exec_vmem_write_addr_8_U (data : bv 64) :
     exec (vmem_write_addr (Virtaddr ea) 8 data (Store Data) false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 8 data)).
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 8 data) s.(mdev)).
   Proof.
     unfold vmem_write_addr.
     rewrite exec_catch_early_return.
@@ -1021,7 +1028,7 @@ Section VWUg.
     match goal with
     | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
       assert (Hu : execR (Defs.untilMT vs m c b) s
-                   = Some (inr (true, 0%Z, true), MState s.(sregs) (write_bytes s.(mem) pa 8 data)))
+                   = Some (inr (true, 0%Z, true), MState s.(sregs) (write_bytes s.(mem) pa 8 data) s.(mdev)))
     end.
     { eapply execR_untilMT_1.
       - reflexivity.
@@ -1049,7 +1056,7 @@ Section VWUg.
         match goal with
         | |- context [ Defs.bind (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) ?post ] =>
             assert (Hwrloop : execR (Defs.bind0 (Defs.liftR asrt) Nbody) s
-                             = Some (inr true, MState s.(sregs) (write_bytes s.(mem) pa 8 data)))
+                             = Some (inr true, MState s.(sregs) (write_bytes s.(mem) pa 8 data) s.(mdev)))
         end.
         { match goal with
           | |- execR (Defs.bind0 _ ?Nbody) s = _ => set (NN := Nbody)
@@ -1077,7 +1084,7 @@ Section VWUg.
                apply bv_wrap_bv_unsigned. }
           rewrite (execR_liftR_seq _ _ _ _ _
             (exec_mem_write_value_8_U PBMT_PMA pa region data s
-               HpmpA Hpmp_ord Hrange HpmpW Hpmam Hpalign Hwrite Hc Hsig Hh
+               HpmpA Hpmp_ord Hrange HpmpW Hpmam Hpalign Hwrite Hc Hsig Hh Hdev
                Hmprv Hcp)).
           cbn match.
           apply execR_returnR_fwd. }
@@ -1091,7 +1098,7 @@ Section VWUg.
 
   Lemma exec_vmem_write_8_U (data : bv 64) :
     exec (vmem_write (Regidx rs1) offset 8 data (Store Data) false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 8 data)).
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 8 data) s.(mdev)).
   Proof.
     unfold vmem_write. rewrite exec_catch_early_return.
     assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Store Data) 8) s
@@ -1113,7 +1120,7 @@ Section VWUg.
 
   Lemma exec_execute_STORE_8_U :
     exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s
-      = Some (RETIRE_SUCCESS, MState s.(sregs) (write_bytes s.(mem) pa 8 vrs2)).
+      = Some (RETIRE_SUCCESS, MState s.(sregs) (write_bytes s.(mem) pa 8 vrs2) s.(mdev)).
   Proof.
     change (execute (STORE (imm, Regidx rs2, Regidx rs1, 8)))
       with (execute_STORE imm (Regidx rs2) (Regidx rs1) 8).

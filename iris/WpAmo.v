@@ -248,6 +248,7 @@ Section AmoTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -256,7 +257,7 @@ Section AmoTranslate.
       = Some (Ok (Build_PTW_Output 39 (sdata_ppn_out vpn) (autocast (T := mword) pte_super)
                     (Physaddr (pte_paddr root_ppn)) 2 PBMT_PMA false, tt), s).
   Proof.
-    intros Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    intros Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold pt_walk, Zwf_guarded.
     cbn [_rec_pt_walk].
     rewrite exec_catch_early_return.
@@ -272,7 +273,7 @@ Section AmoTranslate.
       replace wd with 8 by (vm_compute; reflexivity) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_read_pte_S (pte_paddr root_ppn) region pte_super s
-                  HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes)).
+                  HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes)).
     assert (Hinv : exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte_super 7 0))
                            (ext_bits_of_PTE pte_super)) s = Some (false, s))
       by (vm_compute; reflexivity).
@@ -325,6 +326,7 @@ Section AmoTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -334,11 +336,11 @@ Section AmoTranslate.
               set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
                                (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn asid)))).
   Proof.
-    intros Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    intros Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold translate_TLB_miss. cbn zeta.
     rewrite (exec_bind_Some _ _ _ _ _
                (exec_pt_walk_amo_super vpn mxr do_sum region menvcfg0 s
-                  Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE)).
+                  Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE)).
     cbn match.
     match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
       assert (Hupd : exec (update_and_write_pte a wd p ac) s = Some (Ok None, s)) end.
@@ -371,6 +373,7 @@ Section AmoTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -379,13 +382,13 @@ Section AmoTranslate.
       = Some (Ok (sdata_ppn_out vpn, PBMT_PMA, tt),
               set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn asid)))).
   Proof.
-    intros Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    intros Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold translate.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_miss_data vpn asid tlbvec s Htlb Hvec)).
     cbn match.
     rewrite <- Htlb.
     apply (exec_translate_TLB_miss_amo vpn mxr do_sum asid region menvcfg0 s
-             Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE).
+             Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE).
   Qed.
 
   Lemma exec_translateAddr_amo_walk (a : mword 64) (vpn : mword 27)
@@ -422,6 +425,7 @@ Section AmoTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -430,7 +434,7 @@ Section AmoTranslate.
               set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn (mword_of_int 0))))).
   Proof.
     intros Hcp HSXL Hmprv Hsatp Hmode Hppn Hasid Hcanon Hvpn_def Hident
-           Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+           Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold translateAddr.
     rewrite exec_catch_early_return.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
@@ -471,7 +475,7 @@ Section AmoTranslate.
       replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_translate_amo_walk vpn _ _ (mword_of_int 0) region menvcfg0 tlbvec s
-                  Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE)).
+                  Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE)).
     cbn match.
     rewrite execR_returnR. cbn match.
     rewrite Hident.
@@ -590,36 +594,39 @@ End AmoTranslate.
 (* ===================================================================== *)
 
 Lemma run_read_ram_resacq_4_pin (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   run (read_ram rv64d_types.Read_RISCV_reserved_acquire (Physaddr addr) 4 false) s (w, default_meta) s.
 Proof.
-  intro Hbytes.
+  intros Hdev Hbytes.
   unfold read_ram. cbn match.
   apply (proj2 (run_bind _ _ _ _ _)).
   eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
   apply (proj2 (run_bind _ _ _ _ _)).
   unfold Defs.sail_mem_read. cbn beta zeta.
   eexists _, s. split.
-  - cbn match beta. exists w. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
     + intros j Hj. exact (Hbytes j Hj).
     + apply run_returnM_fwd.
   - cbn match beta. apply run_returnM_fwd.
 Qed.
 
 Lemma exec_read_ram_resacq_4 (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   exec (read_ram rv64d_types.Read_RISCV_reserved_acquire (Physaddr addr) 4 false) s
   = Some ((w, default_meta), s).
 Proof.
-  intro Hbytes.
-  apply (run_to_exec _ _ _ _ (run_read_ram_resacq_4_pin addr w s Hbytes)).
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_resacq_4_pin addr w s Hdev Hbytes)).
   unfold read_ram. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
   unfold Defs.sail_mem_read. cbn beta zeta.
   unfold Defs.bind. cbn [Interface.iMon_bind].
-  rewrite exec_MemRead.
+  rewrite exec_MemRead; last exact Hdev.
   cbn [Interface.ReadReq.pa].
   case_match eqn:Hrb.
   - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
@@ -650,12 +657,13 @@ Lemma exec_checked_mem_read_ram_amo_4_S (pbmt : page_based_mem_type) (addr : mwo
   exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   exec (checked_mem_read (Atomic (AMOSWAP, Data, Data)) pbmt Supervisor (Physaddr addr) 4 true false true false)
        s = Some (Ok (w, default_meta), s).
 Proof.
-  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hbytes.
+  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes.
   unfold checked_mem_read.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
@@ -673,7 +681,7 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_RISCV_reserved_acquire, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resacq_4 addr w s Hbytes)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resacq_4 addr w s Hdev Hbytes)).
   apply exec_returnM.
 Qed.
 
@@ -696,6 +704,7 @@ Lemma exec_mem_read_amo_4_S (pbmt : page_based_mem_type) (addr : mword 64)
   exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   register_lookup mstatus s.(sregs) = m ->
@@ -704,7 +713,7 @@ Lemma exec_mem_read_amo_4_S (pbmt : page_based_mem_type) (addr : mword 64)
   exec (mem_read (Atomic (AMOSWAP, Data, Data)) pbmt (Physaddr addr) 4 true false true)
        s = Some (Ok w, s).
 Proof.
-  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hbytes Hms Hmprv Hpriv.
+  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes Hms Hmprv Hpriv.
   unfold mem_read.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
@@ -724,13 +733,18 @@ Proof.
 Qed.
 
 Lemma exec_write_ram_cond_4 (addr : mword 64) (data : bv 32) s :
+  dev_addr addr = false ->
   exec (write_ram rv64d_types.Write_RISCV_conditional (Physaddr addr) 4 data tt) s
-  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 4 data)).
+  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
 Proof.
+  intros Hdev.
   unfold write_ram. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
   unfold Defs.sail_mem_write. cbn beta zeta iota match.
-  unfold Defs.bind. cbn [Interface.iMon_bind]. cbn match. reflexivity.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  cbn match.
+  rewrite exec_MemWrite; last exact Hdev.
+  reflexivity.
 Qed.
 
 Lemma exec_mem_write_ea_amo_4 (addr : mword 64) s :
@@ -765,10 +779,11 @@ Lemma exec_checked_mem_write_ram_amo_4_S (pbmt : page_based_mem_type) (addr : mw
   exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_writable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
   exec (checked_mem_write (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt Supervisor tt false false true) s
-    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data)).
+    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
 Proof.
-  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh.
+  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev.
   unfold checked_mem_write.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
@@ -789,7 +804,7 @@ Proof.
             (_ : exec (write_kind_of_flags false false true) s
                  = Some (rv64d_types.Write_RISCV_conditional, s))).
   2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_4 addr data s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_4 addr data s Hdev)).
   apply exec_returnM.
 Qed.
 
@@ -812,13 +827,14 @@ Lemma exec_mem_write_value_amo_4_S (pbmt : page_based_mem_type) (addr : mword 64
   exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_writable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = Supervisor ->
   exec (mem_write_value (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt false false true) s
-    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data)).
+    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
 Proof.
-  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hms Hmprv Hpriv.
+  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hms Hmprv Hpriv.
   unfold mem_write_value, mem_write_value_meta.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
@@ -826,7 +842,7 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_amo_S m s Hmprv)).
   unfold mem_write_value_priv_meta.
   rewrite Halign. cbn [orb andb negb Riscv.rv64d.not].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_amo_4_S pbmt addr region data s HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_amo_4_S pbmt addr region data s HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev)).
   cbn match. unfold mem_write_callback. apply exec_returnm.
 Qed.
 
@@ -878,12 +894,13 @@ Section ExecAmoGS4.
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 4) s = Some (false, s).
   Hypothesis Hhr : exec (within_htif_readable (Physaddr pa) 4) s = Some (false, s).
   Hypothesis Hhw : exec (within_htif_writable (Physaddr pa) 4) s = Some (false, s).
+  Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte w j).
 
   Lemma exec_execute_AMOSWAP_4_gpr_S :
     exec (execute (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))) s
     = Some (RETIRE_SUCCESS,
-            set_reg (MState s.(sregs) (write_bytes s.(mem) pa 4 storeval))
+            set_reg (MState s.(sregs) (write_bytes s.(mem) pa 4 storeval) s.(mdev))
                     (R_bitvector_64 (gpr_of_Z (uint rd)))
                     (regval_into_reg (sign_extend' 64 (autocast (T := mword) (w : mword (8 * 4)) : mword (4 * 8))))).
   Proof.
@@ -922,7 +939,7 @@ Section ExecAmoGS4.
     rewrite execR_bind.
     rewrite (execR_liftR_seq _ _ _ _ _
               (exec_mem_read_amo_4_S PBMT_PMA pa region w (register_lookup mstatus s.(sregs)) s
-                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhr Hbytes eq_refl Hmprv Hcp)).
+                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhr Hdev Hbytes eq_refl Hmprv Hcp)).
     cbn match. rewrite execR_returnR. cbn match.
     cbn zeta. cbn match.
     (* AMOCAS test is false: and_boolM short-circuits *)
@@ -934,7 +951,7 @@ Section ExecAmoGS4.
     (* the conditional write of rs2's low 32 bits *)
     rewrite (execR_liftR_seq _ _ _ _ _
               (exec_mem_write_value_amo_4_S PBMT_PMA pa region _ (register_lookup mstatus s.(sregs)) s
-                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhw eq_refl Hmprv Hcp)).
+                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhw Hdev eq_refl Hmprv Hcp)).
     cbn match.
     (* rd := sext64(loaded) on the post-write state *)
     match goal with |- context[execR _ ?st] =>
@@ -1006,12 +1023,13 @@ Section ExecAmoGS4walk.
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 4) s' = Some (false, s').
   Hypothesis Hhr : exec (within_htif_readable (Physaddr pa) 4) s' = Some (false, s').
   Hypothesis Hhw : exec (within_htif_writable (Physaddr pa) 4) s' = Some (false, s').
+  Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte w j).
 
   Lemma exec_execute_AMOSWAP_4_gpr_S_walk :
     exec (execute (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))) s
     = Some (RETIRE_SUCCESS,
-            set_reg (MState s'.(sregs) (write_bytes s.(mem) pa 4 storeval))
+            set_reg (MState s'.(sregs) (write_bytes s.(mem) pa 4 storeval) s'.(mdev))
                     (R_bitvector_64 (gpr_of_Z (uint rd)))
                     (regval_into_reg (sign_extend' 64 (autocast (T := mword) (w : mword (8 * 4)) : mword (4 * 8))))).
   Proof.
@@ -1047,7 +1065,7 @@ Section ExecAmoGS4walk.
     rewrite execR_bind.
     rewrite (execR_liftR_seq _ _ _ _ _
               (exec_mem_read_amo_4_S PBMT_PMA pa region w (register_lookup mstatus s'.(sregs)) s'
-                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhr
+                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhr Hdev
                  (fun j Hj => Hbytes j Hj) eq_refl Hmprv' Hcp')).
     cbn match. rewrite execR_returnR. cbn match.
     cbn zeta. cbn match.
@@ -1058,7 +1076,7 @@ Section ExecAmoGS4walk.
     rewrite execR_returnR. cbn match.
     rewrite (execR_liftR_seq _ _ _ _ _
               (exec_mem_write_value_amo_4_S PBMT_PMA pa region _ (register_lookup mstatus s'.(sregs)) s'
-                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhw eq_refl Hmprv' Hcp')).
+                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhw Hdev eq_refl Hmprv' Hcp')).
     cbn match.
     match goal with |- context[execR _ ?st] =>
       set (s_m := st)

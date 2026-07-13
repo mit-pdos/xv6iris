@@ -64,6 +64,7 @@ Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_r
 Hypothesis Hc : exec (within_clint (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
+Hypothesis Hdev : dev_addr pa = false.
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
 Lemma exec_vmem_read_8_gpr :
@@ -81,7 +82,7 @@ Proof.
   cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
   rewrite execR_liftR.
-  rewrite (exec_vmem_read_addr_8 a8 v region s Halign Hcp Hmprv Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hbytes).
+  rewrite (exec_vmem_read_addr_8 a8 v region s Halign Hcp Hmprv Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes).
   reflexivity.
 Qed.
 End VRg.
@@ -113,6 +114,7 @@ Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_r
 Hypothesis Hc : exec (within_clint (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hsig : exec (within_sig (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
+Hypothesis Hdev : dev_addr pa = false.
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
 Lemma exec_execute_LOAD_8_gpr :
@@ -127,7 +129,7 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (exec_bind_Some _ _ _ _ _ Hass).
   rewrite (exec_bind_Some _ _ _ _ _
-    (exec_vmem_read_8_gpr rs1 offset v region s Hcp Hmprv Hpmm Halign Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hbytes)).
+    (exec_vmem_read_8_gpr rs1 offset v region s Hcp Hmprv Hpmm Halign Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes)).
   cbn match.
   assert (Hw : exec (wX_bits (Regidx rd) (extend_value false data2)) s
                = Some (tt, set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -227,7 +229,7 @@ Section WpLdGpr.
     iApply (wp_instr E Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hpmpc_k")   as %Lpmpc.
@@ -309,6 +311,7 @@ Section WpLdGpr.
       - rewrite Hpa. apply Hwc.
       - rewrite Hpa. apply Hws.
       - rewrite Hpa. apply Hwh.
+      - rewrite Hpa. exact (addr_is_ram_not_dev _ Hrampa).
       - intros j Hj. rewrite Hpa. exact (Hbytesf j Hj). }
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
@@ -323,8 +326,8 @@ Section WpLdGpr.
                (regval_into_reg v)).
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact Hexec_spc. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))

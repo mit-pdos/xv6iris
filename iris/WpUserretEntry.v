@@ -209,7 +209,7 @@ Section UserretEntry.
     iDestruct (pte8_facts σ _ _ _ with "Hsi HpbA") as %[HbA HramA].
     iDestruct (pte8_facts σ _ _ _ with "Hsi HpbB") as %[HbB HramB].
     iDestruct (pte8_facts σ _ _ _ with "Hsi HpbC") as %[HbC HramC].
-    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     destruct HpA as (HAx & Hordx & HrgAx & HRx).
     pose proof (addr_is_ram_not_in_clint _ HramA) as HncA.
     pose proof (addr_is_ram_not_in_sig _ HramA) as HnsA.
@@ -239,6 +239,7 @@ Section UserretEntry.
                 (within_clint_false _ 8 σ HncA ltac:(lia))
                 (within_sig_false _ 8 σ HnsA ltac:(lia))
                 (within_htif_false _ 8 σ Lhtif)
+                (addr_is_ram_not_dev _ HramA)
                 HbA
                 ltac:(rewrite Lpmpa; destruct HpB as (_&_&HH&_); exact HH)
                 ltac:(rewrite Lpma; exact HmB)
@@ -246,6 +247,7 @@ Section UserretEntry.
                 (within_clint_false _ 8 σ HncB ltac:(lia))
                 (within_sig_false _ 8 σ HnsB ltac:(lia))
                 (within_htif_false _ 8 σ Lhtif)
+                (addr_is_ram_not_dev _ HramB)
                 HbB
                 ltac:(rewrite Lpmpa; destruct HpC as (_&_&HH&_); exact HH)
                 ltac:(rewrite Lpma; exact HmC)
@@ -253,6 +255,7 @@ Section UserretEntry.
                 (within_clint_false _ 8 σ HncC ltac:(lia))
                 (within_sig_false _ 8 σ HnsC ltac:(lia))
                 (within_htif_false _ 8 σ Lhtif)
+                (addr_is_ram_not_dev _ HramC)
                 HbC
                 ltac:(unfold PTE_TRAMP; vm_compute; reflexivity)
                 satp0 pa va
@@ -312,6 +315,7 @@ Section UserretEntry.
     - exact (within_sig_false pa 4 (set_reg σ tlb tv2) Hns ltac:(lia)).
     - apply within_htif_false.
       rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+    - exact (addr_is_ram_not_dev _ Hram0).
     - intros j Hj. unfold set_reg; cbn [mem]. exact (Hbf j Hj).
     - rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
     - exact HnotRVC.
@@ -456,7 +460,7 @@ Section WpStepTramp.
       iMod (reg_update _ tlb _ tv2 with "Hreg Htlb") as "[Hreg Htlb]".
       set (σf := set_reg σ tlb tv2 : mstate).
       iAssert (mstate_interp σf) with "[Hreg Hmem]" as "Hsi".
-      { unfold σf, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold σf, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
       iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
       iDestruct "Hsi" as "[Hreg Hmem]".
       iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σf.
@@ -648,7 +652,7 @@ Section WpUserretEntryTop.
     { iPureIntro. rewrite Hpceq1. rewrite Hva01. fold s_pc1.
       change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex1. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs) = uva 0xa0).
     { unfold s_pc1; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
@@ -711,7 +715,7 @@ Section WpUserretEntryTop.
       change ai_csrw with (CSRReg (csr_satp, Regidx (mword_of_int 10 : mword 5), zreg, CSRRW)).
       exact Hex2. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc2, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc2, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp usatp).(sregs) = uva 0xa4).
     { unfold s_pc2; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
@@ -765,7 +769,7 @@ Section WpUserretEntryTop.
     { iPureIntro. rewrite Hpceq3. rewrite Hva03. fold s_pc3.
       change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex3. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc3, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc3, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs) = uva 0xa8).
     { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }

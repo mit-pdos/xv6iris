@@ -45,15 +45,29 @@ Fixpoint exec {X} (m : M X) (s : mstate) {struct m} : option (X * mstate) :=
        | Interface.RegRead r _ => fun k => exec (k (register_lookup r s.(sregs))) s
        | Interface.RegWrite r _ v => fun k => exec (k tt) (set_reg s r v)
        | Interface.MemRead n req => fun k =>
-           match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-           | Some w => exec (k (inl (w, None))) s
-           | None => None
-           end
+           if dev_addr (Interface.ReadReq.pa req) then
+             match dev_read s.(mdev) (Interface.ReadReq.pa req) n with
+             | Some (w, d') =>
+                 exec (k (inl (w, None))) (MState s.(sregs) s.(mem) d')
+             | None => None
+             end
+           else
+             match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+             | Some w => exec (k (inl (w, None))) s
+             | None => None
+             end
        | Interface.MemWrite n req => fun k =>
-           exec (k (inl None))
-                (MState s.(sregs)
-                   (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                                (Interface.WriteReq.value req)))
+           if dev_addr (Interface.WriteReq.pa req) then
+             match dev_write s.(mdev) (Interface.WriteReq.pa req) n
+                             (Interface.WriteReq.value req) with
+             | Some d' => exec (k (inl None)) (MState s.(sregs) s.(mem) d')
+             | None => None
+             end
+           else
+             exec (k (inl None))
+                  (MState s.(sregs)
+                     (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                  (Interface.WriteReq.value req)) s.(mdev))
        | Interface.InstrAnnounce _   => fun k => exec (k tt) s
        | Interface.BranchAnnounce _ _=> fun k => exec (k tt) s
        | Interface.Barrier _         => fun k => exec (k tt) s
@@ -88,19 +102,41 @@ Proof.
            [ apply (proj1 (IH _ _ _ _ Hexec))
            | intros y2 s2 Hr; simpl in Hr; exact (proj2 (IH _ _ _ _ Hexec) _ _ Hr) ]).
     + (* MemRead *)
-      destruct (read_bytes s.(mem) _ _) as [w0|] eqn:Hrb;
-        [|discriminate].
-      destruct (IH (inl (w0, None)) s x s' Hexec) as [Hrun0 Huniq0].
-      split.
-      * simpl. exists w0. split; [|exact Hrun0].
-        intros j Hj. apply (read_bytes_spec _ _ _ _ Hrb j Hj).
-      * intros y2 s2 Hr. simpl in Hr. destruct Hr as (w & Hbytes & Hrun).
-        assert (Hweq : w = w0).
-        { apply bv_eq_of_bytes. intros j Hj.
-          pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
-          pose proof (Hbytes j Hj) as Hw.
-          rewrite Hw in H0. apply Some_inj in H0. exact H0. }
-        subst w. exact (Huniq0 _ _ Hrun).
+      destruct (dev_addr _) eqn:Hd.
+      * (* device fabric *)
+        destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|discriminate].
+        split.
+        { simpl. rewrite Hd Hdr. exact (proj1 (IH _ _ _ _ Hexec)). }
+        { intros y2 s2 Hr. simpl in Hr. rewrite Hd Hdr in Hr.
+          exact (proj2 (IH _ _ _ _ Hexec) _ _ Hr). }
+      * (* RAM *)
+        destruct (read_bytes s.(mem) _ _) as [w0|] eqn:Hrb;
+          [|discriminate].
+        destruct (IH (inl (w0, None)) s x s' Hexec) as [Hrun0 Huniq0].
+        split.
+        { simpl. rewrite Hd. exists w0. split; [|exact Hrun0].
+          intros j Hj. apply (read_bytes_spec _ _ _ _ Hrb j Hj). }
+        { intros y2 s2 Hr. simpl in Hr. rewrite Hd in Hr.
+          destruct Hr as (w & Hbytes & Hrun).
+          assert (Hweq : w = w0).
+          { apply bv_eq_of_bytes. intros j Hj.
+            pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as H0.
+            pose proof (Hbytes j Hj) as Hw.
+            rewrite Hw in H0. apply Some_inj in H0. exact H0. }
+          subst w. exact (Huniq0 _ _ Hrun). }
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * (* device fabric *)
+        destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|discriminate].
+        split.
+        { simpl. rewrite Hd Hdw. exact (proj1 (IH _ _ _ _ Hexec)). }
+        { intros y2 s2 Hr. simpl in Hr. rewrite Hd Hdw in Hr.
+          exact (proj2 (IH _ _ _ _ Hexec) _ _ Hr). }
+      * (* RAM *)
+        split.
+        { simpl. rewrite Hd. exact (proj1 (IH _ _ _ _ Hexec)). }
+        { intros y2 s2 Hr. simpl in Hr. rewrite Hd in Hr.
+          exact (proj2 (IH _ _ _ _ Hexec) _ _ Hr). }
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -125,27 +161,69 @@ Section WPExec.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr Hmem]".
+    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
-    iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem)) with "[Hri Hmem]") as (σ') "[%Hexec Hk]".
-    { rewrite /mstate_interp /=. iFrame "Hri Hmem". }
+    iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev)) with "[Hri Hmem Hdev]")
+      as (σ') "[%Hexec Hk]".
+    { rewrite /mstate_interp /=. iFrame "Hri Hmem Hdev". }
     pose proof (exec_run_det _ _ _ _ Hexec) as [Hrun Huniq].
     iModIntro. iSplitR.
     { iPureIntro.
       exists [], (LoopE cpu_id),
-             (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem)), []. red.
+             (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem) σ'.(mdev)), [].
+      left.
       exists cpu_id. split; [done|]. split; [done|]. split; [done|]. split; [done|].
       exists tt, σ'. split; [exact Hrun|done]. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as (cpu2 & Hcpu2 & -> & _ & -> & u2 & σ2' & Hrun2 & ->).
+    destruct Hstep as [(cpu2 & Hcpu2 & -> & _ & -> & u2 & σ2' & Hrun2 & ->)
+                      |(Hcontra & _)]; last discriminate Hcontra.
     injection Hcpu2 as <-.
     destruct (Huniq _ _ Hrun2) as [_ ->].
-    iMod "Hk" as "[[Hri' Hmem'] HWP]".
+    iMod "Hk" as "[(Hri' & Hmem' & Hdev') HWP]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' HWP".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
   Qed.
 
 End WPExec.
+
+Section WPDev.
+  Context `{!riscvGS Σ}.
+
+  (* The device-thread analogue of [wp_exec_step]: one step of the [DevLoop]
+     execution context.  The device is ALWAYS reducible (the wire step exists
+     for any hart), so the user only proves PRESERVATION: for EVERY possible
+     device transition -- a byte leaving the tx FIFO, a byte arriving from
+     the outside world, the PLIC gateway latching the UART's interrupt level,
+     or the PLIC driving a hart's [sig_seip] wire -- re-establish the
+     register bridges (the wire step writes a hart's [sig_seip] register,
+     which needs its ghost-map fragment unless the written value is
+     unchanged) and the device interpretation.  [gen_heap_interp] is framed:
+     no device step touches the byte memory. *)
+  Lemma wp_dev_step E Φ :
+    (∀ gr d, gregs_interp gr ∗ dev_interp d ={E,∅}=∗
+       ▷ (∀ d' gr', ⌜dev_step d gr d' gr'⌝ ={∅,E}=∗
+            gregs_interp gr' ∗ dev_interp d' ∗
+            WP (DevLoop : expr riscv_lang) @ E {{ Φ }}))
+    ⊢ WP (DevLoop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros "H".
+    iApply wp_lift_step; first done.
+    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
+    iMod ("H" $! g.(gregs) g.(gdev) with "[$Hgr $Hdev]") as "Hk".
+    iModIntro. iSplitR.
+    { iPureIntro. do 4 eexists. right.
+      split; [reflexivity|]. split; [reflexivity|].
+      split; [reflexivity|]. split; [reflexivity|].
+      do 2 eexists. split; [apply (DevStepWire _ _ 0%fin) | reflexivity]. }
+    iIntros (e2 g2 efs Hstep) "!>".
+    destruct Hstep as [(cpu2 & Hcontra & _)
+                      |(_ & -> & _ & -> & d' & gr' & Hdstep & ->)];
+      first discriminate Hcontra.
+    iMod ("Hk" $! d' gr' with "[//]") as "(Hgr' & Hdev' & HWP)".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem Hdev' HWP".
+  Qed.
+
+End WPDev.
 
 (* Now that the Lang/Iris/Exec sections (which must share stdpp's bv_countable   *)
 (* with RiscvModelBytes for [mstate.mem]) are defined, bring in the model's      *)
@@ -209,9 +287,13 @@ Proof.
   induction m as [y | T oc k IH]; intros s.
   - rewrite bind_Ret. reflexivity.
   - rewrite bind_Next. destruct oc; cbn [exec];
-      try (apply IH); try reflexivity;
-      (* only MemRead remains *)
-      destruct (read_bytes _ _ _) as [w|]; [apply IH | reflexivity].
+      try (apply IH); try reflexivity.
+    + (* MemRead *) destruct (dev_addr _).
+      * destruct (dev_read _ _ _) as [[w d']|]; [apply IH | reflexivity].
+      * destruct (read_bytes _ _ _) as [w|]; [apply IH | reflexivity].
+    + (* MemWrite *) destruct (dev_addr _).
+      * destruct (dev_write _ _ _ _) as [d'|]; [apply IH | reflexivity].
+      * apply IH.
 Qed.
 
 Lemma exec_bind0 {Y} (m : M unit) (n : M Y) :

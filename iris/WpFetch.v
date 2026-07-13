@@ -93,7 +93,7 @@ Section WpFetch.
              (within_clint_false (fetch_pa pc) 4 s Hnc ltac:(lia))
              (within_sig_false  (fetch_pa pc) 4 s Hns ltac:(lia))
              (within_htif_false (fetch_pa pc) 4 s Lhtif)
-             Hbytesf Hvalign HnotRVC).
+             (addr_is_ram_not_dev _ Hram) Hbytesf Hvalign HnotRVC).
   Qed.
 
   (* ====================================================================== *)
@@ -169,7 +169,7 @@ Section WpFetch.
              (within_clint_false (fetch_pa pc) 4 t Hnc ltac:(lia))
              (within_sig_false  (fetch_pa pc) 4 t Hns ltac:(lia))
              (within_htif_false (fetch_pa pc) 4 t Lthtif)
-             Ltmem Hvalign HnotRVC).
+             (addr_is_ram_not_dev _ Hram) Ltmem Hvalign HnotRVC).
   Qed.
 
 End WpFetch.

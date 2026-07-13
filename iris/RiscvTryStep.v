@@ -44,14 +44,28 @@ Proof.
       first
         [ (* simple state-threading outcomes: goal convertible to IH *)
           exact (IH _ _)
-        | (* MemRead: exists w, byte-match /\ run (k (inl (w,None))) *)
-          (split;
-           [ intro H; destruct H as (w & HP & H); apply IH in H;
-             destruct H as (yy & s1 & Hk & Hf);
-             exists yy, s1; split; [ exists w; split; assumption | assumption ]
-           | intros (yy & s1 & H & Hf); destruct H as (w & HP & Hk);
-             exists w; split;
-             [ assumption | apply IH; exists yy, s1; split; assumption ] ])
+        | (* MemRead / MemWrite: bus-routed -- expose the single outcome
+             branch (cbn; [k] stays symbolic so nothing blows up), then case
+             on the address decode.  Device side: the dev_read/dev_write
+             match either threads state (IH) or is stuck (False both sides).
+             RAM side: MemWrite threads state (IH); MemRead is the
+             byte-match existential. *)
+          (cbn [Interface.iMon_bind run];
+           destruct (dev_addr _);
+           [ first [ destruct (dev_read _ _ _) as [[w d']|]
+                   | destruct (dev_write _ _ _ _) as [d'|] ];
+             first [ exact (IH _ _)
+                   | split; [ intro H; destruct H
+                            | intros (yy & s1 & H & _); destruct H ] ]
+           | first
+               [ exact (IH _ _)
+               | (split;
+                  [ intro H; destruct H as (w & HP & H); apply IH in H;
+                    destruct H as (yy & s1 & Hk & Hf);
+                    exists yy, s1; split; [ exists w; split; assumption | assumption ]
+                  | intros (yy & s1 & H & Hf); destruct H as (w & HP & Hk);
+                    exists w; split;
+                    [ assumption | apply IH; exists yy, s1; split; assumption ] ]) ] ])
         | (* Choose: exists c, run (k c) *)
           (split;
            [ intro H; destruct H as (c & H); apply IH in H;
@@ -79,6 +93,74 @@ Qed.
 Lemma run_returnM {X} (x0 : X) s y s' :
   run (returnM x0) s y s' <-> (y = x0 /\ s' = s).
 Proof. unfold returnM. apply run_ret. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* Bus-decode reductions for the raw MemRead/MemWrite outcomes: given which *)
+(* way the address routes ([dev_addr]), [run] of the outcome unfolds to the *)
+(* RAM byte-match / the device transaction.  ([cbn [run]] only expands the  *)
+(* single concrete outcome branch; the continuation [k] stays symbolic.)    *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma run_MemRead_ram {X} (n : N) (req : Interface.ReadReq.t n)
+    (k : bv (8 * n) * option bool + Arch.abort -> M X) s x s' :
+  dev_addr (Interface.ReadReq.pa req) = false ->
+  run (Interface.Next (Interface.MemRead n req) k) s x s' <->
+  (exists w : bv (8 * n),
+     (forall j : nat, (N.of_nat j < n)%N ->
+        s.(mem) !! (pa_add (Interface.ReadReq.pa req) j) = Some (nth_byte w j))
+     /\ run (k (inl (w, None))) s x s').
+Proof. intros Hd. cbn [run]. rewrite Hd. apply iff_refl. Qed.
+
+Lemma run_MemRead_dev {X} (n : N) (req : Interface.ReadReq.t n)
+    (k : bv (8 * n) * option bool + Arch.abort -> M X) s x s' w d' :
+  dev_addr (Interface.ReadReq.pa req) = true ->
+  dev_read s.(mdev) (Interface.ReadReq.pa req) n = Some (w, d') ->
+  run (Interface.Next (Interface.MemRead n req) k) s x s' <->
+  run (k (inl (w, None))) (MState s.(sregs) s.(mem) d') x s'.
+Proof. intros Hd Hr. cbn [run]. rewrite Hd Hr. apply iff_refl. Qed.
+
+Lemma run_MemWrite_ram {X} (n : N) (req : Interface.WriteReq.t n)
+    (k : option bool + Arch.abort -> M X) s x s' :
+  dev_addr (Interface.WriteReq.pa req) = false ->
+  run (Interface.Next (Interface.MemWrite n req) k) s x s' <->
+  run (k (inl None))
+      (MState s.(sregs)
+         (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                      (Interface.WriteReq.value req)) s.(mdev)) x s'.
+Proof. intros Hd. cbn [run]. rewrite Hd. apply iff_refl. Qed.
+
+Lemma run_MemWrite_dev {X} (n : N) (req : Interface.WriteReq.t n)
+    (k : option bool + Arch.abort -> M X) s x s' d' :
+  dev_addr (Interface.WriteReq.pa req) = true ->
+  dev_write s.(mdev) (Interface.WriteReq.pa req) n (Interface.WriteReq.value req)
+    = Some d' ->
+  run (Interface.Next (Interface.MemWrite n req) k) s x s' <->
+  run (k (inl None)) (MState s.(sregs) s.(mem) d') x s'.
+Proof. intros Hd Hw. cbn [run]. rewrite Hd Hw. apply iff_refl. Qed.
+
+(* intro (RHS-to-LHS) forms, [eapply]-friendly: the conclusion is unified
+   with the goal FIRST (resolving the request), so the [dev_addr] premise
+   can then be discharged against a hypothesis about the plain address. *)
+Lemma run_MemRead_ram_intro {X} (n : N) (req : Interface.ReadReq.t n)
+    (k : bv (8 * n) * option bool + Arch.abort -> M X) s x s' (w : bv (8 * n)) :
+  dev_addr (Interface.ReadReq.pa req) = false ->
+  (forall j : nat, (N.of_nat j < n)%N ->
+     s.(mem) !! (pa_add (Interface.ReadReq.pa req) j) = Some (nth_byte w j)) ->
+  run (k (inl (w, None))) s x s' ->
+  run (Interface.Next (Interface.MemRead n req) k) s x s'.
+Proof.
+  intros Hd Hb Hk. apply (proj2 (run_MemRead_ram n req k s x s' Hd)). eauto.
+Qed.
+
+Lemma run_MemWrite_ram_intro {X} (n : N) (req : Interface.WriteReq.t n)
+    (k : option bool + Arch.abort -> M X) s x s' :
+  dev_addr (Interface.WriteReq.pa req) = false ->
+  run (k (inl None))
+      (MState s.(sregs)
+         (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                      (Interface.WriteReq.value req)) s.(mdev)) x s' ->
+  run (Interface.Next (Interface.MemWrite n req) k) s x s'.
+Proof. intros Hd Hk. apply (proj2 (run_MemWrite_ram n req k s x s' Hd)). exact Hk. Qed.
 
 (* ===== RiscvModelMR ===== *)
 (* ====================================================================== *)
@@ -369,16 +451,30 @@ Fixpoint execR {R X} (m : Defs.monadR R exception X)
            fun k => execR (k tt) (set_reg s r v)
        | Interface.MemRead n req =>
            fun k =>
-             match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-             | Some w => execR (k (inl (w, None))) s
-             | None => None
-             end
+             if dev_addr (Interface.ReadReq.pa req) then
+               match dev_read s.(mdev) (Interface.ReadReq.pa req) n with
+               | Some (w, d') =>
+                   execR (k (inl (w, None))) (MState s.(sregs) s.(mem) d')
+               | None => None
+               end
+             else
+               match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
+               | Some w => execR (k (inl (w, None))) s
+               | None => None
+               end
        | Interface.MemWrite n req =>
            fun k =>
-             execR (k (inl None))
-                   (MState s.(sregs)
-                      (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                                   (Interface.WriteReq.value req)))
+             if dev_addr (Interface.WriteReq.pa req) then
+               match dev_write s.(mdev) (Interface.WriteReq.pa req) n
+                               (Interface.WriteReq.value req) with
+               | Some d' => execR (k (inl None)) (MState s.(sregs) s.(mem) d')
+               | None => None
+               end
+             else
+               execR (k (inl None))
+                     (MState s.(sregs)
+                        (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                     (Interface.WriteReq.value req)) s.(mdev))
        | Interface.InstrAnnounce _    => fun k => execR (k tt) s
        | Interface.BranchAnnounce _ _ => fun k => execR (k tt) s
        | Interface.Barrier _          => fun k => execR (k tt) s
@@ -429,10 +525,15 @@ Proof.
   - rewrite bindR_Next. destruct oc; cbn [execR];
       try (apply IH); try reflexivity;
       first
-        [ match goal with
-          | |- context[read_bytes ?mm ?pa ?n] =>
-              destruct (read_bytes mm pa n) as [w|]; [apply IH | reflexivity]
-          end
+        [ (* MemRead / MemWrite: case on the bus decode, then the device
+             transaction / RAM bytes *)
+          (destruct (dev_addr _);
+           [ first [ destruct (dev_read _ _ _) as [[w d']|]
+                   | destruct (dev_write _ _ _ _) as [d'|] ];
+             [ apply IH | reflexivity ]
+           | first
+               [ (destruct (read_bytes _ _ _) as [w|]; [apply IH | reflexivity])
+               | apply IH ] ])
         | match goal with
           | He : (_ + exception)%type |- _ => destruct He; reflexivity
           end ].
@@ -453,10 +554,13 @@ Proof.
   - reflexivity.
   - destruct oc; cbn [Defs.try_catch execR exec Defs.throw];
       try (apply IH); try reflexivity;
-      match goal with
-      | |- context[read_bytes ?mm ?pa ?n] =>
-          destruct (read_bytes mm pa n) as [w|]; [apply IH | reflexivity]
-      end.
+      (destruct (dev_addr _);
+       [ first [ destruct (dev_read _ _ _) as [[w d']|]
+               | destruct (dev_write _ _ _ _) as [d'|] ];
+         [ apply IH | reflexivity ]
+       | first
+           [ (destruct (read_bytes _ _ _) as [w|]; [apply IH | reflexivity])
+           | apply IH ] ]).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -476,10 +580,13 @@ Proof.
   - destruct oc; cbn [Defs.try_catch exec execR Defs.throw Defs.returnm];
       try (apply IH); try reflexivity;
       first
-        [ match goal with
-          | |- context[read_bytes ?mm ?pa ?n] =>
-              destruct (read_bytes mm pa n) as [w|]; [apply IH | reflexivity]
-          end
+        [ (destruct (dev_addr _);
+           [ first [ destruct (dev_read _ _ _) as [[w d']|]
+                   | destruct (dev_write _ _ _ _) as [d'|] ];
+             [ apply IH | reflexivity ]
+           | first
+               [ (destruct (read_bytes _ _ _) as [w|]; [apply IH | reflexivity])
+               | apply IH ] ])
         | match goal with
           | He : (_ + exception)%type |- _ => destruct He; reflexivity
           end ].
@@ -1306,18 +1413,20 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Lemma run_read_ram_plain_4_pin (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   run (read_ram Read_plain (Physaddr addr) 4 false) s (w, default_meta) s.
 Proof.
-  intro Hbytes.
+  intros Hdev Hbytes.
   unfold read_ram. cbn match.
   apply (proj2 (run_bind _ _ _ _ _)).
   eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
   apply (proj2 (run_bind _ _ _ _ _)).
   unfold Defs.sail_mem_read. cbn beta zeta.
   eexists _, s. split.
-  - cbn match beta. exists w. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
     + intros j Hj. exact (Hbytes j Hj).
     + apply run_returnM_fwd.
   - cbn match beta. apply run_returnM_fwd.

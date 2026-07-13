@@ -362,7 +362,7 @@ Section WpUserExec.
     rewrite LpcT.
     iSplitL "Hpcr"; [iExact "Hpcr" |].
     iSplitL "Hreg Hmem".
-    { unfold s_trap, set_reg; cbn [sregs mem].
+    { unfold s_trap, set_reg; cbn [sregs mem mdev].
       unfold utrap_ms, utrap_scause.
       iFrame "Hreg Hmem". }
     iNext.
@@ -544,7 +544,7 @@ Section WpUserExec.
     rewrite LpcT.
     iSplitL "Hpcr"; [iExact "Hpcr" |].
     iSplitL "Hreg Hmem".
-    { unfold s_trap, set_reg; cbn [sregs mem].
+    { unfold s_trap, set_reg; cbn [sregs mem mdev].
       unfold utrap_ms, utrap_scause.
       iFrame "Hreg Hmem". }
     iNext.
@@ -661,7 +661,7 @@ Section WpUserExec.
                                   = Some (PBMT_PMA, s0)).
     { intros s0. exact (upt_entry_pbmt vpn ie s0 Hpbmt0). }
     iApply (wp_exec_step_hart_active_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ) "[Hreg Hmem]".
+    iIntros (σ) "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid with "Hreg Hpc") as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hms") as %Lms.
@@ -736,6 +736,7 @@ Section WpUserExec.
                   (within_clint_false pa 4 σ Hnc ltac:(lia))
                   (within_sig_false pa 4 σ Hns ltac:(lia))
                   (within_htif_false pa 4 σ Lhtif)
+                  (addr_is_ram_not_dev _ Hram)
                   Hbf Lpriv HnotRVC) as Hfetch.
     assert (Lmenv' : register_lookup menvcfg σ.(sregs) = MENVCFG_S)
       by (rewrite Lmenv; reflexivity).
@@ -749,7 +750,7 @@ Section WpUserExec.
     (* ---- the caller's execute fact ---- *)
     iMod ("H" $! σ Lpc (agree_u σ Lpriv Lmenv' Lsenv Lmst0 Lsst0 Lmisa')
             (conj Lpriv (conj Lms (conj Lsatp (conj Ltlb (conj Lpmpc Lpmpa)))))
-            with "[$Hreg $Hmem]")
+            with "[$Hreg $Hmem $Hdev]")
       as (s_exec) "(%Hexec & [Hreg' Hmem'] & Hcont)".
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     (* ---- the whole retiring step ---- *)
@@ -905,7 +906,7 @@ Section WpUserExec.
     rewrite LpcT.
     iSplitL "Hpcr"; [iExact "Hpcr" |].
     iSplitL "Hreg Hmem".
-    { unfold s_trap, set_reg; cbn [sregs mem].
+    { unfold s_trap, set_reg; cbn [sregs mem mdev].
       unfold utrap_ms, utrap_scause.
       iFrame "Hreg Hmem". }
     iNext.
@@ -1127,7 +1128,7 @@ Section WpUserExec.
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       rewrite Hav. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     (* continuation: rebuild the user frame at pc+4 with rd updated *)
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
@@ -1257,7 +1258,7 @@ Section WpUserExec.
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact HE. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int va 4))
@@ -1405,7 +1406,7 @@ Section WpUserExec.
       rewrite Hrv1 in HE. rewrite Hrv2 in HE.
       exact HE. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int va 4))
@@ -1556,7 +1557,7 @@ Section WpUserExec.
       rewrite Hv in HE.
       exact HE. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int va 4))
@@ -1691,7 +1692,7 @@ Section WpUserExec.
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact HE. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int va 4))
@@ -1820,7 +1821,7 @@ Section WpUserExec.
       change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
       exact HE. }
     iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg s1 nextPC (add_vec va (sign_extend' 64 imm)))
@@ -1976,7 +1977,7 @@ Section WpUserExec.
         with (execute_JALR imm (Regidx rs1) (Regidx rd)).
       exact HE. }
     iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg s1 nextPC (jalr_target (g !!! Regidx rs1) imm))
@@ -2084,7 +2085,7 @@ Section WpUserExec.
       apply (Hexec_f imm rs2 rs1 s1).
       unfold rvv. rewrite Hrv1 Hrv2. exact Hcmp. }
     iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC s1.(sregs) = add_vec_int va 4).
     { unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
@@ -2195,7 +2196,7 @@ Section WpUserExec.
       apply HE; [ | exact Hal0 | exact Hal1 ].
       unfold rvv. rewrite Hrv1 Hrv2. exact Hcmp. }
     iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s1 nextPC (add_vec va (sign_extend' 64 imm))).(sregs)
@@ -2297,7 +2298,7 @@ Section WpUserExec.
     iExists s1.
     iSplitR; [iPureIntro; exact (Hexec_nop s1) |].
     iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC s1.(sregs) = add_vec_int va 4).
     { unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
@@ -2452,7 +2453,7 @@ Section WpUserExec.
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact HE. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int va 4))
@@ -2573,7 +2574,7 @@ Section WpUserExec.
     destruct (Hspec vpn ie Hsome) as (Hsl2 & Hsl1 & Hsl0 & Hwf).
     destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0).
     iApply (wp_exec_step_hart_active_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ) "[Hreg Hmem]".
+    iIntros (σ) "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid with "Hreg Hpc") as %Lpc.
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hms") as %Lms.
@@ -2605,7 +2606,7 @@ Section WpUserExec.
     assert (Hcov' : (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Lpmpa; exact Hpmp_cov).
     iDestruct (upt_walk_read_ptes root slots spec vpn ie σ Hsome
-                 HA' Hord' HR' Hcov' Hpter with "Hhw [$Hreg $Hmem] Hupt")
+                 HA' Hord' HR' Hcov' Hpter with "Hhw [$Hreg $Hmem $Hdev] Hupt")
       as %(Hrd2 & Hrd1 & Hrd0 & _).
     (* ---- pure facts: the walk-filling translate + fetch at σ ---- *)
     assert (HES : exec (currentlyEnabled Ext_S) σ = Some (true, σ)).
@@ -2692,6 +2693,7 @@ Section WpUserExec.
                   (within_clint_false pa 4 σ' Hnc ltac:(lia))
                   (within_sig_false pa 4 σ' Hns ltac:(lia))
                   (within_htif_false pa 4 σ' LhtifX)
+                  (addr_is_ram_not_dev _ Hram)
                   Hbf LprivX HnotRVC) as Hfetch.
     (* decode at σ' (agreement survives the tlb fill) *)
     pose proof (agree_u_set_tlb σ tlbvec'
@@ -2704,8 +2706,8 @@ Section WpUserExec.
       by (unfold σ'; lk; exact Lpc).
     (* ---- ghost tlb fill, then the caller's execute fact at σ' ---- *)
     iMod (reg_update _ tlb _ tlbvec' with "Hreg Htlbc") as "[Hreg Htlbc]".
-    iMod ("H" $! σ' LpcX HagX with "[Hreg Hmem]") as (s_exec) "(%Hexec & [Hreg' Hmem'] & Hcont)".
-    { unfold σ', set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iMod ("H" $! σ' LpcX HagX with "[Hreg Hmem Hdev]") as (s_exec) "(%Hexec & [Hreg' Hmem'] & Hcont)".
+    { unfold σ', set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     (* ---- the whole retiring step ---- *)
     assert (Hha : exec (run_hart_active 0) σ
@@ -2806,7 +2808,7 @@ Section WpUserExec.
                                   = Some (PBMT_PMA, s0)).
     { intros s0. exact (upt_entry_pbmt vpn ie s0 Hpbmt0). }
     iApply (wp_exec_step_trapish_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ) "[Hreg Hmem]".
+    iIntros (σ) "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
     iDestruct (reg_valid with "Hreg Hnpc") as %Lnpc.
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
@@ -2884,6 +2886,7 @@ Section WpUserExec.
                   (within_clint_false pa 4 σ Hnc ltac:(lia))
                   (within_sig_false pa 4 σ Hns ltac:(lia))
                   (within_htif_false pa 4 σ Lhtif)
+                  (addr_is_ram_not_dev _ Hram)
                   Hbf Lpriv HnotRVC) as Hfetch.
     assert (Lmenv' : register_lookup menvcfg σ.(sregs) = MENVCFG_S)
       by (rewrite Lmenv; reflexivity).
@@ -2973,10 +2976,10 @@ Section WpUserExec.
     { unfold s_trap, s_x. lk. exact Lpc. }
     rewrite LpcT.
     iSplitL "Hpcr"; [iExact "Hpcr" |].
-    iSplitL "Hreg Hmem".
-    { unfold s_trap, s_x, set_reg; cbn [sregs mem].
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s_trap, s_x, set_reg; cbn [sregs mem mdev].
       unfold utrap_ms, utrap_scause.
-      iFrame "Hreg Hmem". }
+      iFrame "Hreg Hmem Hdev". }
     iNext.
     iIntros "Hhs Hpcr".
     assert (LnT : register_lookup nextPC s_trap.(sregs) = stvec_base stvec_v).
@@ -3083,7 +3086,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq Hag Hpins) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag Hpins) "[Hreg [Hmem Hdev]]".
     destruct Hpins as (Lpriv0 & Lms0 & Lsatp0 & Ltlb0 & Lpmpc0 & Lpmpa0).
     assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -3205,6 +3208,8 @@ Section WpUserExec.
                      exact (within_sig_false paD 8 s1 HnsD ltac:(lia)))
                ltac:(fold eaS paS; rewrite Hpa;
                      exact (within_htif_false paD 8 s1 Lhtif1))
+               ltac:(fold eaS paS; rewrite Hpa;
+                     exact (addr_is_ram_not_dev _ HramD))
                ltac:(fold eaS paS; rewrite Hpa; exact HbfD)
                rd imm Hrd eq_refl). }
     rewrite data2_id in HE.
@@ -3221,8 +3226,8 @@ Section WpUserExec.
     iExists (set_reg s1 (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg (extend_value false v))).
     iSplitR; [iPureIntro; exact HE |].
-    iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s1 (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -3332,7 +3337,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq Hag Hpins) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag Hpins) "[Hreg [Hmem Hdev]]".
     destruct Hpins as (Lpriv0 & Lms0 & Lsatp0 & Ltlb0 & Lpmpc0 & Lpmpa0).
     assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -3454,6 +3459,8 @@ Section WpUserExec.
                      exact (within_sig_false paD 8 s1 HnsD ltac:(lia)))
                ltac:(fold eaS paS; rewrite Hpa;
                      exact (within_htif_false paD 8 s1 Lhtif1))
+               ltac:(fold eaS paS; rewrite Hpa;
+                     exact (addr_is_ram_not_dev _ HramD))
                ltac:(fold eaS paS; rewrite Hpa; exact HbfD)
                rd imm Hrd eq_refl). }
     rewrite data2_id in HE.
@@ -3470,8 +3477,8 @@ Section WpUserExec.
     iExists (set_reg s1 (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg (extend_value false v))).
     iSplitR; [iPureIntro; exact HE |].
-    iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s1 (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -3584,7 +3591,7 @@ Section WpUserExec.
               ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
-    iIntros (σ Hpceq Hag Hpins) "[Hreg Hmem]".
+    iIntros (σ Hpceq Hag Hpins) "[Hreg [Hmem Hdev]]".
     destruct Hpins as (Lpriv0 & Lms0 & Lsatp0 & Ltlb0 & Lpmpc0 & Lpmpa0).
     assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
       by (apply lookup_lookup_total_dom; apply Hdom).
@@ -3668,7 +3675,7 @@ Section WpUserExec.
     (* ---- the STORE execute fact at s1 ---- *)
     assert (HE : exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s1
              = Some (RETIRE_SUCCESS,
-                     MState s1.(sregs) (write_bytes s1.(mem) paD 8 vNew))).
+                     MState s1.(sregs) (write_bytes s1.(mem) paD 8 vNew) s1.(mdev))).
     { pose proof (exec_execute_STORE_8_U (upt_entry vpnD ieD) vpnD rs2 rs1 imm
                regionD s1
                HchkD' HupdD' HpbmtD' (upt_entry_match vpnD ieD)
@@ -3695,20 +3702,22 @@ Section WpUserExec.
                ltac:(fold eaS paS; rewrite Hpa;
                      exact (within_sig_false paD 8 s1 HnsD ltac:(lia)))
                ltac:(fold eaS paS; rewrite Hpa;
-                     exact (within_htif_writable_false paD 8 s1 Lhtif0))) as HE0.
+                     exact (within_htif_writable_false paD 8 s1 Lhtif0))
+               ltac:(fold eaS paS; rewrite Hpa;
+                     exact (addr_is_ram_not_dev _ HramD))) as HE0.
       fold eaS paS in HE0. rewrite Hpa in HE0. rewrite Hrv2 in HE0.
       exact HE0. }
     (* ---- ghost window update in lock-step with write_bytes ---- *)
     iMod (upd_window_8 σ.(mem) paD vNew vold with "Hmem Hwin") as "[Hmem Hwin]".
     iModIntro.
-    iExists (MState s1.(sregs) (write_bytes s1.(mem) paD 8 vNew)).
+    iExists (MState s1.(sregs) (write_bytes s1.(mem) paD 8 vNew) s1.(mdev)).
     iSplitR; [iPureIntro; exact HE |].
-    iSplitL "Hreg Hmem".
-    { rewrite /mstate_interp. cbn [sregs mem].
-      unfold s1, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { rewrite /mstate_interp. cbn [sregs mem mdev].
+      unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
     assert (Lnpc : register_lookup nextPC
-             (MState s1.(sregs) (write_bytes s1.(mem) paD 8 vNew)).(sregs)
+             (MState s1.(sregs) (write_bytes s1.(mem) paD 8 vNew) s1.(mdev)).(sregs)
              = add_vec_int va 4).
     { cbn [sregs]. unfold s1, set_reg; cbn [sregs].
       rewrite register_lookup_set. reflexivity. }

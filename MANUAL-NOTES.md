@@ -23,7 +23,10 @@ Big things that still need to be done/explored:
   - flat model does instruction re-ordering, which means no sequential stepping through instructions
   - promising model requires future-write reasoning
   - DRF-SC is probably not sufficient to cover all kernel code
-- devices
+- devices (STARTED: iris/DevModel.v + iris/WpUart.v -- UART + PLIC as a
+  concurrent device execution context, MMIO routed at the interpreter's
+  MemRead/MemWrite outcomes, interrupts wired through per-hart sig_seip;
+  see iris/README.md "Devices")
 - liveness, or at least deadlock avoidance
 - file system
 - virtual memory / page tables

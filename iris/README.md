@@ -82,6 +82,61 @@ left Rocq for Lean). Here it is reduced **symbolically and axiom-free** through
 the relational `run` interpreter — Iris reasons about the step, it never computes
 it.
 
+## Devices (UART + PLIC)
+
+The machine now includes memory-mapped devices: a 16550-style **UART** and a
+(S-context) **PLIC**, modelled in **`DevModel.v`** and wired into the language
+in `RiscvLang.v`.  Design notes:
+
+- **MMIO is routed at the interpreter, not in the Sail model.**  The Sail
+  semantics externalises every non-CLINT/SIG/HTIF memory access as a
+  `MemRead`/`MemWrite` *outcome* carrying the physical address; the
+  interpreters (`run`/`exec`/`execR`) are the machine's memory system.  The
+  bus decode is one `if dev_addr pa` (= `uint pa < 0x8000_0000`, the DRAM
+  base): RAM addresses hit the byte `gmap` exactly as before, device
+  addresses become **individual, immediate transactions** against the device
+  state (`dev_read`/`dev_write`) — a read is serviced *by the device* (and
+  may change it: reading RHR pops the rx FIFO), a write is *delivered* to the
+  device (nothing accumulates in a cache).  Unmodelled offsets/widths are
+  stuck, so a WP certifies the kernel never touches them.
+
+- **Devices run concurrently.**  `gstate` carries the shared `dev_state`
+  alongside the shared byte memory, and the language has a second expression
+  form: `DevLoop`, the *device execution context*, whose `prim_step` is
+  `dev_step` — the UART transmits/receives a byte, the PLIC gateway latches
+  the UART's level output, or the PLIC drives a hart's external-interrupt
+  wire.  Because each CPU `prim_step` is one whole instruction (the model is
+  sequentially consistent at instruction granularity), servicing MMIO
+  *synchronously inside* the CPU's step is observationally the same as an
+  asynchronous device transaction ordered at the instruction boundary — so
+  the "synchronous MMIO" and "concurrent device" views coincide.
+
+- **Interrupts ride the model's own wires.**  The Sail model reads
+  `mip` as `mip | MEI(sig_meip) | SEI(sig_seip)` — `sig_seip` *is* the
+  per-hart external S-interrupt pin.  The PLIC's wire step writes
+  `bool_to_bit (plic_eip …)` into a hart's `sig_seip`, and the existing
+  `dispatchInterrupt` machinery (WpIntrCore.v) sees it at the next
+  instruction boundary.  Wire propagation is a separate device step (the
+  line has delay), which is the weaker — hence safer — modelling choice.
+
+- **Iris layer.**  `state_interp` gained `dev_interp` (ghost-var halves
+  `uart_frag`/`plic_frag` for the two devices); `mstate_interp` hands every
+  leaf WP the device conjunct, so an MMIO-touching step updates the halves
+  like any other footprint.  **`WpUart.v`** provides: per-hart register
+  ownership (`reg_pointsto_at`, for the wire), the fabric transaction
+  leaves and the 1-byte `exec`-level device towers (twins of the RAM
+  load/store towers), **`wp_dev_loop`** — the device thread runs forever
+  under an invariant owning the device halves and every hart's `sig_seip`
+  (the shape of future driver-vs-device proofs), and the pure
+  interrupt chain `uart_irq → plic_latch → plic_eip → s_dispatch fires`.
+
+- **Known model gap.**  The Sail test-signature (SIG) window
+  `[0xC000000, 0xC000020)` shadows the PLIC priority registers of sources
+  0–7 (xv6's `plicinit` write for VIRTIO0_IRQ = 1 would hit it).  The UART
+  (source 10, priority register at `0xC000028`) is unaffected.  Removing the
+  SIG device needs the Sail model regenerated with the signature region
+  disabled.
+
 ## Building
 
 From the **repository root** (`/shared/xv6rocq`):

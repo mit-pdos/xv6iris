@@ -388,11 +388,12 @@ Lemma exec_checked_mem_read_ram_2_S (pbmt : page_based_mem_type) (addr : mword 6
   exec (within_clint (Physaddr addr) 2) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 2) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 2) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   exec (checked_mem_read (InstructionFetch tt) pbmt Supervisor (Physaddr addr) 2 false false false false)
        s = Some (Ok (w, default_meta), s).
 Proof.
-  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes.
+  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes.
   unfold checked_mem_read.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
@@ -410,7 +411,7 @@ Proof.
       rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
   rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_2 addr w s Hbytes)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_2 addr w s Hdev Hbytes)).
   apply exec_returnM.
 Qed.
 
@@ -429,12 +430,13 @@ Lemma exec_mem_read_fetch_2_S (pbmt : page_based_mem_type) (addr : mword 64)
   exec (within_clint (Physaddr addr) 2) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 2) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 2) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   register_lookup cur_privilege s.(sregs) = Supervisor ->
   exec (mem_read (InstructionFetch tt) pbmt (Physaddr addr) 2 false false false)
        s = Some (Ok w, s).
 Proof.
-  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes Hpriv.
+  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes Hpriv.
   unfold mem_read.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
@@ -466,11 +468,12 @@ Lemma exec_checked_mem_read_ram_4_S (pbmt : page_based_mem_type) (addr : mword 6
   exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   exec (checked_mem_read (InstructionFetch tt) pbmt Supervisor (Physaddr addr) 4 false false false false)
        s = Some (Ok (w, default_meta), s).
 Proof.
-  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes.
+  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes.
   unfold checked_mem_read.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
@@ -488,7 +491,7 @@ Proof.
       rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
   rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hbytes)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hdev Hbytes)).
   apply exec_returnM.
 Qed.
 
@@ -507,12 +510,13 @@ Lemma exec_mem_read_fetch_4_S (pbmt : page_based_mem_type) (addr : mword 64)
   exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   register_lookup cur_privilege s.(sregs) = Supervisor ->
   exec (mem_read (InstructionFetch tt) pbmt (Physaddr addr) 4 false false false)
        s = Some (Ok w, s).
 Proof.
-  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes Hpriv.
+  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes Hpriv.
   unfold mem_read.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
@@ -1184,10 +1188,11 @@ Section KVTranslate.
     exec (within_clint (Physaddr addr) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr addr) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr addr) 8) s = Some (false, s) ->
+    dev_addr addr = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
     exec (read_pte (Physaddr addr) 8) s = Some (Ok w, s).
   Proof.
-    intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hbytes.
+    intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes.
     assert (Hchk : exec (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor (Physaddr addr) 8 false false false false)
                      s = Some (Ok (w, default_meta), s)).
     { unfold checked_mem_read.
@@ -1223,7 +1228,7 @@ Section KVTranslate.
           rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
       rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s))).
       2:{ unfold read_kind_of_flags. apply exec_returnM. }
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hbytes)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hdev Hbytes)).
       apply exec_returnM. }
     unfold read_pte, mem_read_priv.
     rewrite (exec_bind_Some _ _ _ _ _
@@ -1251,6 +1256,7 @@ Section KVTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -1259,7 +1265,7 @@ Section KVTranslate.
       = Some (Ok (Build_PTW_Output 39 (sfetch_ppn_out vpn) (autocast (T := mword) pte_super)
                     (Physaddr (pte_paddr root_ppn)) 2 PBMT_PMA false, tt), s).
   Proof.
-    intros Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    intros Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold pt_walk, Zwf_guarded.
     cbn [_rec_pt_walk].
     rewrite exec_catch_early_return.
@@ -1274,7 +1280,7 @@ Section KVTranslate.
       replace wd with 8 by (vm_compute; reflexivity) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_read_pte_S (pte_paddr root_ppn) region pte_super s
-                  HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes)).
+                  HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes)).
     assert (Hinv : exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte_super 7 0))
                            (ext_bits_of_PTE pte_super)) s = Some (false, s))
       by (vm_compute; reflexivity).
@@ -1345,6 +1351,7 @@ Section KVTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -1354,11 +1361,11 @@ Section KVTranslate.
               set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
                                (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn asid)))).
   Proof.
-    intros Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    intros Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold translate_TLB_miss. cbn zeta.
     rewrite (exec_bind_Some _ _ _ _ _
                (exec_pt_walk_super vpn mxr do_sum region menvcfg0 s
-                  Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE)).
+                  Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE)).
     cbn match.
     match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
       assert (Hupd : exec (update_and_write_pte a wd p ac) s = Some (Ok None, s)) end.
@@ -1402,6 +1409,7 @@ Section KVTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -1410,13 +1418,13 @@ Section KVTranslate.
       = Some (Ok (sfetch_ppn_out vpn, PBMT_PMA, tt),
               set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn asid)))).
   Proof.
-    intros Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+    intros Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold translate.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_miss vpn asid tlbvec s Htlb Hvec)).
     cbn match.
     rewrite <- Htlb.
     apply (exec_translate_TLB_miss_super vpn mxr do_sum asid region menvcfg0 s
-             Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE).
+             Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE).
   Qed.
 
   (* The state after the fetch's page walk: TLB filled at hash index [tlb_hash 39 svpn]. *)
@@ -1458,6 +1466,7 @@ Section KVTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -1465,7 +1474,7 @@ Section KVTranslate.
       = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), pw_filled svpn tlbvec s).
   Proof.
     intros Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hvec Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
-           HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+           HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     unfold translateAddr.
     rewrite exec_catch_early_return.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
@@ -1506,7 +1515,7 @@ Section KVTranslate.
       replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_translate_walk svpn _ _ (mword_of_int 0) region menvcfg0 tlbvec s
-                  Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE)).
+                  Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE)).
     cbn match.
     rewrite execR_returnR. cbn match.
     rewrite <- (sfetch_tlb_get_ppn root_ppn svpn).
@@ -1558,6 +1567,7 @@ Section KVTranslate.
     exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
     exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+    dev_addr (pte_paddr root_ppn) = false ->
     (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -1566,12 +1576,12 @@ Section KVTranslate.
                /\ (s' = s \/ s' = pw_filled svpn tlbvec s).
   Proof.
     intros Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hcons Hcanon Hvpn_def Hident Hmask
-           Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+           Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
     destruct Hcons as [Hvec | Hvec].
     - eexists. split.
       + exact (exec_translateAddr_fetch_walk va svpn region menvcfg0 satp0 tlbvec s
                  Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hvec Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
-                 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE).
+                 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE).
       + right. reflexivity.
     - eexists. split.
       + exact (exec_translateAddr_fetch_hit_g va svpn satp0 tlbvec s
@@ -1618,6 +1628,7 @@ Section SFetchHit.
     Hypothesis Hc : exec (within_clint (Physaddr va) 2) s = Some (false, s).
     Hypothesis Hsig : exec (within_sig (Physaddr va) 2) s = Some (false, s).
     Hypothesis Hh : exec (within_htif_readable (Physaddr va) 2) s = Some (false, s).
+    Hypothesis Hdev : dev_addr va = false.
     Hypothesis Hbytes : forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte h j).
 
   End W2.
@@ -1638,10 +1649,11 @@ Section SFetchHit.
     Hypothesis Hc : exec (within_clint (Physaddr va) 4) s = Some (false, s).
     Hypothesis Hsig : exec (within_sig (Physaddr va) 4) s = Some (false, s).
     Hypothesis Hh : exec (within_htif_readable (Physaddr va) 4) s = Some (false, s).
+    Hypothesis Hdev : dev_addr va = false.
     Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte w j).
 
     Lemma exec_fetch_bytes_4_S_hit : exec (fetch_bytes va va 4) s = Some (@FetchBytes_Success 4 w, s).
-    Proof using Hcp HSXL Hsatp Hmode Hasid Htlb Hvec Hcanon Hvpn_def Hident Hmask HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes.
+    Proof using Hcp HSXL Hsatp Hmode Hasid Htlb Hvec Hcanon Hvpn_def Hident Hmask HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes.
       unfold fetch_bytes.
       rewrite exec_catch_early_return.
       change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
@@ -1661,7 +1673,7 @@ Section SFetchHit.
              = Some (inr (Ok w), s))).
       2:{ rewrite execR_liftR.
           rewrite (exec_mem_read_fetch_4_S PBMT_PMA va region w s
-                     HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes Hcp).
+                     HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes Hcp).
           cbn match. reflexivity. }
       cbv iota beta. rewrite autocast_mword_id.
       rewrite execR_returnR_fwd. cbn match. reflexivity.
@@ -1707,6 +1719,7 @@ Lemma translate_chunk_ram (root_ppn : mword 44)
   exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
   exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
   exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
+  dev_addr (pte_paddr root_ppn) = false ->
   (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
   register_lookup menvcfg s.(sregs) = menvcfg0 ->
   eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
@@ -1720,13 +1733,13 @@ Lemma translate_chunk_ram (root_ppn : mword 44)
           register_lookup rr s'.(sregs) = register_lookup rr s.(sregs)).
 Proof.
   intros Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hcons Hram
-         HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE.
+         HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
   destruct (exec_translateAddr_fetch_S root_ppn a (svpn_of a) region_pte menvcfg0 satp0 tlbvec s
               Hcp HSXL Hsatp Hmode Hppn Hasid Htlb
               (Hcons (tlb_hash (__id 39) (svpn_of a)) (tlb_hash_range (svpn_of a)))
               (ram_canonical a Hram) eq_refl (ram_ident root_ppn a Hram) (ram_mask a Hram)
               (ram_svpn2 a Hram) (ram_mvpn a Hram) (ram_mppn a Hram)
-              HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hbytes Hmenv HPBMTE)
+              HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE)
     as (s' & Htr & Hs').
   exists s'. split; [exact Htr|].
   destruct Hs' as [Hs' | Hs'].
@@ -1791,13 +1804,14 @@ Section SFetchHitOuter.
     Hypothesis Hc : exec (within_clint (Physaddr va) 4) s = Some (false, s).
     Hypothesis Hsig : exec (within_sig (Physaddr va) 4) s = Some (false, s).
     Hypothesis Hh : exec (within_htif_readable (Physaddr va) 4) s = Some (false, s).
+    Hypothesis Hdev : dev_addr va = false.
     Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte w j).
 
     Let Halign4p : is_aligned_paddr (Physaddr va) 4 = true := Hvalign.
     Let Hfb4 : exec (fetch_bytes va va 4) s = Some (@FetchBytes_Success 4 w, s) :=
       exec_fetch_bytes_4_S_hit root_ppn va svpn satp0 tlbvec s
         Hcp HSXL Hsatp Hmode Hasid Htlb Hvec Hcanon Hvpn_def Hident Hmask region w
-        HA Hord Hrange4 HX Hmatch Halign4p Hexec Hc Hsig Hh Hbytes.
+        HA Hord Hrange4 HX Hmatch Halign4p Hexec Hc Hsig Hh Hdev Hbytes.
 
     (* F_Base at a 4-aligned va (single 4-byte read). *)
     Hypothesis HnotRVC : isRVC (subrange_vec_dec w 15 0) = false.
@@ -1814,6 +1828,7 @@ Section SFetchHitOuter.
     Hypothesis Hc : exec (within_clint (Physaddr va) 4) s = Some (false, s).
     Hypothesis Hsig : exec (within_sig (Physaddr va) 4) s = Some (false, s).
     Hypothesis Hh : exec (within_htif_readable (Physaddr va) 4) s = Some (false, s).
+    Hypothesis Hdev : dev_addr va = false.
     Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte w j).
     Hypothesis HisRVC : isRVC (subrange_vec_dec w 15 0) = true.
 
@@ -1837,6 +1852,7 @@ Section SFetchHitOuter.
       Hypothesis Hc : exec (within_clint (Physaddr va) 2) s = Some (false, s).
       Hypothesis Hsig : exec (within_sig (Physaddr va) 2) s = Some (false, s).
       Hypothesis Hh : exec (within_htif_readable (Physaddr va) 2) s = Some (false, s).
+      Hypothesis Hdev : dev_addr va = false.
       Hypothesis Hbytes : forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte h j).
       Hypothesis HisRVC : isRVC h = true.
 
@@ -1867,6 +1883,8 @@ Section SFetchHitOuter.
       Hypothesis Hch : exec (within_clint (Physaddr vah) 2) s = Some (false, s).
       Hypothesis Hsigh : exec (within_sig (Physaddr vah) 2) s = Some (false, s).
       Hypothesis Hhh : exec (within_htif_readable (Physaddr vah) 2) s = Some (false, s).
+      Hypothesis Hdevl : dev_addr va = false.
+      Hypothesis Hdevh : dev_addr vah = false.
       Hypothesis Hbytesl : forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add va j) = Some (nth_byte ilo j).
       Hypothesis Hbytesh : forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add vah j) = Some (nth_byte ihi j).
       Hypothesis HnotRVC : isRVC ilo = false.
@@ -1913,6 +1931,7 @@ Lemma exec_fetch_F_Base_2_S_gen
   exec (within_clint (Physaddr va) 2) s1 = Some (false, s1) ->
   exec (within_sig (Physaddr va) 2) s1 = Some (false, s1) ->
   exec (within_htif_readable (Physaddr va) 2) s1 = Some (false, s1) ->
+  dev_addr va = false ->
   (forall j : nat, (N.of_nat j < 2)%N -> s1.(mem) !! (pa_add va j) = Some (nth_byte ilo j)) ->
   register_lookup cur_privilege s1.(sregs) = Supervisor ->
   (* high halfword mem-read facts, at s2 *)
@@ -1929,6 +1948,7 @@ Lemma exec_fetch_F_Base_2_S_gen
   exec (within_clint (Physaddr vah) 2) s2 = Some (false, s2) ->
   exec (within_sig (Physaddr vah) 2) s2 = Some (false, s2) ->
   exec (within_htif_readable (Physaddr vah) 2) s2 = Some (false, s2) ->
+  dev_addr vah = false ->
   (forall j : nat, (N.of_nat j < 2)%N -> s2.(mem) !! (pa_add vah j) = Some (nth_byte ihi j)) ->
   register_lookup cur_privilege s2.(sregs) = Supervisor ->
   isRVC ilo = false ->
@@ -1936,8 +1956,8 @@ Lemma exec_fetch_F_Base_2_S_gen
   exec (fetch tt) s = Some (F_Base w, s2).
 Proof.
   intros ilo ihi vah HpcPC HpcPC1 HmisaC Hbit0 Hbit1 Hvalign4 Htrl Htrh
-         iHAL iHordL iHrangeL iHXL iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHbytesL iHprivL
-         iHAH iHordH iHrangeH iHXH iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHbytesH iHprivH
+         iHAL iHordL iHrangeL iHXL iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHdevL iHbytesL iHprivL
+         iHAH iHordH iHrangeH iHXH iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHdevH iHbytesH iHprivH
          HnotRVC Hconcat.
   assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
   { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
@@ -1962,7 +1982,7 @@ Proof.
            = Some (inr (Ok ilo), s1))).
     2:{ rewrite execR_liftR.
         rewrite (exec_mem_read_fetch_2_S PBMT_PMA va regl ilo s1
-                   iHAL iHordL iHrangeL iHXL iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHbytesL iHprivL).
+                   iHAL iHordL iHrangeL iHXL iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHdevL iHbytesL iHprivL).
         cbn match. reflexivity. }
     cbv iota beta. rewrite autocast_mword_id_16.
     rewrite execR_returnR_fwd. cbn match. reflexivity. }
@@ -1985,7 +2005,7 @@ Proof.
            = Some (inr (Ok ihi), s2))).
     2:{ rewrite execR_liftR.
         rewrite (exec_mem_read_fetch_2_S PBMT_PMA vah regh ihi s2
-                   iHAH iHordH iHrangeH iHXH iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHbytesH iHprivH).
+                   iHAH iHordH iHrangeH iHXH iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHdevH iHbytesH iHprivH).
         cbn match. reflexivity. }
     cbv iota beta. rewrite autocast_mword_id_16.
     rewrite execR_returnR_fwd. cbn match. reflexivity. }
@@ -2056,12 +2076,13 @@ Lemma exec_fetch_F_Base_4_S_gen
   exec (within_clint (Physaddr va) 4) s1 = Some (false, s1) ->
   exec (within_sig (Physaddr va) 4) s1 = Some (false, s1) ->
   exec (within_htif_readable (Physaddr va) 4) s1 = Some (false, s1) ->
+  dev_addr va = false ->
   (forall j : nat, (N.of_nat j < 4)%N -> s1.(mem) !! (pa_add va j) = Some (nth_byte w j)) ->
   register_lookup cur_privilege s1.(sregs) = Supervisor ->
   isRVC (subrange_vec_dec w 15 0) = false ->
   exec (fetch tt) s = Some (F_Base w, s1).
 Proof.
-  intros HpcPC Hvalign Htr iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv HnotRVC.
+  intros HpcPC Hvalign Htr iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv HnotRVC.
   destruct (align4_low_bits va Hvalign) as [Hbit0 Hbit1].
   assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
   { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
@@ -2083,7 +2104,7 @@ Proof.
            = Some (inr (Ok w), s1))).
     2:{ rewrite execR_liftR.
         rewrite (exec_mem_read_fetch_4_S PBMT_PMA va region w s1
-                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv).
+                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv).
         cbn match. reflexivity. }
     cbv iota beta. rewrite autocast_mword_id.
     rewrite execR_returnR_fwd. cbn match. reflexivity. }
@@ -2137,12 +2158,13 @@ Lemma exec_fetch_RVC_4_S_gen
   exec (within_clint (Physaddr va) 4) s1 = Some (false, s1) ->
   exec (within_sig (Physaddr va) 4) s1 = Some (false, s1) ->
   exec (within_htif_readable (Physaddr va) 4) s1 = Some (false, s1) ->
+  dev_addr va = false ->
   (forall j : nat, (N.of_nat j < 4)%N -> s1.(mem) !! (pa_add va j) = Some (nth_byte w j)) ->
   register_lookup cur_privilege s1.(sregs) = Supervisor ->
   isRVC (subrange_vec_dec w 15 0) = true ->
   exec (fetch tt) s = Some (F_RVC (subrange_vec_dec w 15 0), s1).
 Proof.
-  intros HpcPC Hvalign Htr iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv HisRVC.
+  intros HpcPC Hvalign Htr iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv HisRVC.
   destruct (align4_low_bits va Hvalign) as [Hbit0 Hbit1].
   assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
   { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
@@ -2164,7 +2186,7 @@ Proof.
            = Some (inr (Ok w), s1))).
     2:{ rewrite execR_liftR.
         rewrite (exec_mem_read_fetch_4_S PBMT_PMA va region w s1
-                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv).
+                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv).
         cbn match. reflexivity. }
     cbv iota beta. rewrite autocast_mword_id.
     rewrite execR_returnR_fwd. cbn match. reflexivity. }
@@ -2221,12 +2243,13 @@ Lemma exec_fetch_RVC_2_S_gen
   exec (within_clint (Physaddr va) 2) s1 = Some (false, s1) ->
   exec (within_sig (Physaddr va) 2) s1 = Some (false, s1) ->
   exec (within_htif_readable (Physaddr va) 2) s1 = Some (false, s1) ->
+  dev_addr va = false ->
   (forall j : nat, (N.of_nat j < 2)%N -> s1.(mem) !! (pa_add va j) = Some (nth_byte h j)) ->
   register_lookup cur_privilege s1.(sregs) = Supervisor ->
   isRVC h = true ->
   exec (fetch tt) s = Some (F_RVC h, s1).
 Proof.
-  intros HpcPC HmisaC Hbit0 Hbit1 Hvalign4 Htr iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv HisRVC.
+  intros HpcPC HmisaC Hbit0 Hbit1 Hvalign4 Htr iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv HisRVC.
   assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
   { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
   assert (Hfb2 : exec (fetch_bytes va va 2) s = Some (@FetchBytes_Success 2 h, s1)).
@@ -2247,7 +2270,7 @@ Proof.
            = Some (inr (Ok h), s1))).
     2:{ rewrite execR_liftR.
         rewrite (exec_mem_read_fetch_2_S PBMT_PMA va region h s1
-                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv).
+                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv).
         cbn match. reflexivity. }
     cbv iota beta. rewrite autocast_mword_id_16.
     rewrite execR_returnR_fwd. cbn match. reflexivity. }
@@ -2334,6 +2357,7 @@ Section SFetchWalk.
   Hypothesis pHc : exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s).
   Hypothesis pHsig : exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s).
   Hypothesis pHh : exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s).
+  Hypothesis pHdev : dev_addr (pte_paddr root_ppn) = false.
   Hypothesis pHbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j).
   (* ---- instruction-read pmp facts, at the FILLED state sf ---- *)
   Hypothesis iHA : pmpAddrMatchType_encdec_backwards
@@ -2346,7 +2370,7 @@ Section SFetchWalk.
       = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), sf) :=
     exec_translateAddr_fetch_walk root_ppn va svpn region_pte menvcfg0 satp0 tlbvec s
       Hcp HSXL Hsatp Hmode Hppn Hasid Htlb Hvec Hcanon Hvpn_def Hident Hvpn2 Hmvpn Hmppn
-      pHA pHord pHrange pHR pHmatch pHalign pHpte pHc pHsig pHh pHbytes Hmenv HPBMTE.
+      pHA pHord pHrange pHR pHmatch pHalign pHpte pHc pHsig pHh pHdev pHbytes Hmenv HPBMTE.
 
   (* -- width 4 read at va, at sf -- *)
   Section WalkW4.
@@ -2360,6 +2384,7 @@ Section SFetchWalk.
     Hypothesis iHc : exec (within_clint (Physaddr va) 4) sf = Some (false, sf).
     Hypothesis iHsig : exec (within_sig (Physaddr va) 4) sf = Some (false, sf).
     Hypothesis iHh : exec (within_htif_readable (Physaddr va) 4) sf = Some (false, sf).
+    Hypothesis iHdev : dev_addr va = false.
     Hypothesis iHbytes : forall j : nat, (N.of_nat j < 4)%N -> sf.(mem) !! (pa_add va j) = Some (nth_byte w j).
 
 
@@ -2391,6 +2416,7 @@ Section SFetchWalk.
     Hypothesis iHc : exec (within_clint (Physaddr va) 2) sf = Some (false, sf).
     Hypothesis iHsig : exec (within_sig (Physaddr va) 2) sf = Some (false, sf).
     Hypothesis iHh : exec (within_htif_readable (Physaddr va) 2) sf = Some (false, sf).
+    Hypothesis iHdev : dev_addr va = false.
     Hypothesis iHbytes : forall j : nat, (N.of_nat j < 2)%N -> sf.(mem) !! (pa_add va j) = Some (nth_byte h j).
     Hypothesis HisRVC : isRVC h = true.
 
@@ -2426,6 +2452,7 @@ Section SFetchWalk.
     Hypothesis iHcL : exec (within_clint (Physaddr va) 2) sf = Some (false, sf).
     Hypothesis iHsigL : exec (within_sig (Physaddr va) 2) sf = Some (false, sf).
     Hypothesis iHhL : exec (within_htif_readable (Physaddr va) 2) sf = Some (false, sf).
+    Hypothesis iHdevL : dev_addr va = false.
     Hypothesis iHbytesL : forall j : nat, (N.of_nat j < 2)%N -> sf.(mem) !! (pa_add va j) = Some (nth_byte ilo j).
     (* high half (2 bytes at va+2), read at sf (HITS the just-filled slot 5) *)
     Hypothesis iHrangeH : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -2437,6 +2464,7 @@ Section SFetchWalk.
     Hypothesis iHcH : exec (within_clint (Physaddr vah) 2) sf = Some (false, sf).
     Hypothesis iHsigH : exec (within_sig (Physaddr vah) 2) sf = Some (false, sf).
     Hypothesis iHhH : exec (within_htif_readable (Physaddr vah) 2) sf = Some (false, sf).
+    Hypothesis iHdevH : dev_addr vah = false.
     Hypothesis iHbytesH : forall j : nat, (N.of_nat j < 2)%N -> sf.(mem) !! (pa_add vah j) = Some (nth_byte ihi j).
     Hypothesis HnotRVC : isRVC ilo = false.
     Hypothesis Hconcat : concat_vec ihi ilo = w.
@@ -2855,7 +2883,7 @@ Section SmodeCoreIris.
                  ∧ tlb_pt_consistent root_ppn tlbvec2 ⌝.
   Proof.
     iIntros (Hpma0 HmisaC0 HSXL0 Hmode Hppn Hasid Hcons HPBMTE HX Hcov Hpmpp Hmatchp0 Hptep)
-      "[Hreg Hmem] Hpc Hpriv Hms Hsatp Htlb Hmenv Hpmpc Hpmpa Hpma Hhtif Hmisa Hpbytes Hbytes".
+      "[Hreg [Hmem Hdev]] Hpc Hpriv Hms Hsatp Htlb Hmenv Hpmpc Hpmpa Hpma Hhtif Hmisa Hpbytes Hbytes".
     (* the PTE-root 8-byte alignment now rides inside [pte_super_bytes] (folded
        into [tlb_inv]); peel it back off together with the raw byte points. *)
     iDestruct "Hpbytes" as "[%Halignp Hpbytes]".
@@ -2937,7 +2965,7 @@ Section SmodeCoreIris.
                     (within_clint_false (pte_paddr root_ppn) 8 σ Hncp ltac:(lia))
                     (within_sig_false  (pte_paddr root_ppn) 8 σ Hnsp ltac:(lia))
                     (within_htif_false (pte_paddr root_ppn) 8 σ Lhtif)
-                    Hpbytesf Lmenv HPBMTE)
+                    (addr_is_ram_not_dev _ Hramp) Hpbytesf Lmenv HPBMTE)
           as (s1 & Htr1 & Hs1eq & Hs1mem & Hs1cons & Hs1reg).
         assert (L1priv : register_lookup cur_privilege s1.(sregs) = Supervisor)
           by (rewrite (Hs1reg cur_privilege ltac:(vm_compute; reflexivity)); exact Lpriv).
@@ -2971,7 +2999,7 @@ Section SmodeCoreIris.
                       (within_clint_false pc 4 s1 Hnc ltac:(lia))
                       (within_sig_false  pc 4 s1 Hns ltac:(lia))
                       (within_htif_false pc 4 s1 L1htif)
-                      i1bytes L1priv HnotRVC) as Hfetch.
+                      (addr_is_ram_not_dev _ Hram) i1bytes L1priv HnotRVC) as Hfetch.
         exists (register_lookup tlb s1.(sregs)).
         split; [ rewrite <- Hs1eq; exact Hfetch | exact Hs1cons ].
       + (* 2-aligned (not 4): 2+2 read, TWO chunks (low at pc, high at pc+2,
@@ -3029,7 +3057,7 @@ Section SmodeCoreIris.
                     (within_clint_false (pte_paddr root_ppn) 8 σ Hncp ltac:(lia))
                     (within_sig_false  (pte_paddr root_ppn) 8 σ Hnsp ltac:(lia))
                     (within_htif_false (pte_paddr root_ppn) 8 σ Lhtif)
-                    Hpbytesf Lmenv HPBMTE)
+                    (addr_is_ram_not_dev _ Hramp) Hpbytesf Lmenv HPBMTE)
           as (s1 & Htr1 & Hs1eq & Hs1mem & Hs1cons & Hs1reg).
         (* transfer the config facts to s1 (only tlb changed) *)
         assert (L1priv : register_lookup cur_privilege s1.(sregs) = Supervisor)
@@ -3081,7 +3109,7 @@ Section SmodeCoreIris.
                     (within_clint_false (pte_paddr root_ppn) 8 s1 Hncp ltac:(lia))
                     (within_sig_false  (pte_paddr root_ppn) 8 s1 Hnsp ltac:(lia))
                     (within_htif_false (pte_paddr root_ppn) 8 s1 L1htif)
-                    H1pbytes L1menv HPBMTE)
+                    (addr_is_ram_not_dev _ Hramp) H1pbytes L1menv HPBMTE)
           as (s2 & Htr2 & Hs2eq & Hs2mem & Hs2cons & Hs2reg).
         (* transfer config facts to s2 (via s1) *)
         assert (L2priv : register_lookup cur_privilege s2.(sregs) = Supervisor)
@@ -3140,12 +3168,12 @@ Section SmodeCoreIris.
                       (within_clint_false pc 2 s1 Hncl ltac:(lia))
                       (within_sig_false  pc 2 s1 Hnsl ltac:(lia))
                       (within_htif_false pc 2 s1 L1htif)
-                      i1bytesL L1priv
+                      (addr_is_ram_not_dev _ Hraml) i1bytesL L1priv
                       i2HA i2Hord i2rangeH i2HX i2matchH Halignh0 Hxh
                       (within_clint_false (add_vec_int pc 2) 2 s2 Hnch ltac:(lia))
                       (within_sig_false  (add_vec_int pc 2) 2 s2 Hnsh ltac:(lia))
                       (within_htif_false (add_vec_int pc 2) 2 s2 L2htif)
-                      i2bytesH L2priv HnotRVC (concat_subranges_id w)) as Hfetch.
+                      (addr_is_ram_not_dev _ Hramh) i2bytesH L2priv HnotRVC (concat_subranges_id w)) as Hfetch.
         assert (Hs2flat : s2 = set_reg σ tlb (register_lookup tlb s2.(sregs))).
         { rewrite Hs1eq in Hs2eq. rewrite set_reg_tlb_overwrite in Hs2eq. exact Hs2eq. }
         exists (register_lookup tlb s2.(sregs)).
@@ -3179,7 +3207,7 @@ Section SmodeCoreIris.
                     (within_clint_false (pte_paddr root_ppn) 8 σ Hncp ltac:(lia))
                     (within_sig_false  (pte_paddr root_ppn) 8 σ Hnsp ltac:(lia))
                     (within_htif_false (pte_paddr root_ppn) 8 σ Lhtif)
-                    Hpbytesf Lmenv HPBMTE)
+                    (addr_is_ram_not_dev _ Hramp) Hpbytesf Lmenv HPBMTE)
           as (s1 & Htr1 & Hs1eq & Hs1mem & Hs1cons & Hs1reg).
         assert (L1priv : register_lookup cur_privilege s1.(sregs) = Supervisor)
           by (rewrite (Hs1reg cur_privilege ltac:(vm_compute; reflexivity)); exact Lpriv).
@@ -3213,7 +3241,7 @@ Section SmodeCoreIris.
                       (within_clint_false pc 4 s1 Hnc ltac:(lia))
                       (within_sig_false  pc 4 s1 Hns ltac:(lia))
                       (within_htif_false pc 4 s1 L1htif)
-                      i1bytes L1priv HisRVC') as Hfetch.
+                      (addr_is_ram_not_dev _ Hram) i1bytes L1priv HisRVC') as Hfetch.
         rewrite Hsub in Hfetch.
         exists (register_lookup tlb s1.(sregs)).
         split; [ rewrite <- Hs1eq; exact Hfetch | exact Hs1cons ].
@@ -3243,7 +3271,7 @@ Section SmodeCoreIris.
                     (within_clint_false (pte_paddr root_ppn) 8 σ Hncp ltac:(lia))
                     (within_sig_false  (pte_paddr root_ppn) 8 σ Hnsp ltac:(lia))
                     (within_htif_false (pte_paddr root_ppn) 8 σ Lhtif)
-                    Hpbytesf Lmenv HPBMTE)
+                    (addr_is_ram_not_dev _ Hramp) Hpbytesf Lmenv HPBMTE)
           as (s1 & Htr1 & Hs1eq & Hs1mem & Hs1cons & Hs1reg).
         assert (L1priv : register_lookup cur_privilege s1.(sregs) = Supervisor)
           by (rewrite (Hs1reg cur_privilege ltac:(vm_compute; reflexivity)); exact Lpriv).
@@ -3277,7 +3305,7 @@ Section SmodeCoreIris.
                       (within_clint_false pc 2 s1 Hnc ltac:(lia))
                       (within_sig_false  pc 2 s1 Hns ltac:(lia))
                       (within_htif_false pc 2 s1 L1htif)
-                      i1bytes L1priv HisRVC) as Hfetch.
+                      (addr_is_ram_not_dev _ Hram) i1bytes L1priv HisRVC) as Hfetch.
         exists (register_lookup tlb s1.(sregs)).
         split; [ rewrite <- Hs1eq; exact Hfetch | exact Hs1cons ].
     - (* F_Error *) done.
@@ -3363,7 +3391,7 @@ Section SmodeCoreIris.
     iMod (reg_update _ tlb _ tlbvec2 with "Hreg Htlb") as "[Hreg Htlb]".
     set (σf := set_reg σ tlb tlbvec2 : mstate).
     iAssert (mstate_interp σf) with "[Hreg Hmem]" as "Hsi".
-    { unfold σf, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold σf, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σf.

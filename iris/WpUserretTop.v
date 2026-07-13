@@ -253,10 +253,13 @@ Section WpUld.
     (* --- the data translation at s_pc: hit slot 62 or walk + fill --- *)
     pose proof (addr_is_ram_not_in_clint _ HramP2) as HncP2.
     pose proof (addr_is_ram_not_in_sig _ HramP2) as HnsP2.
+    pose proof (addr_is_ram_not_dev _ HramP2) as HdevP2.
     pose proof (addr_is_ram_not_in_clint _ HramP1) as HncP1.
     pose proof (addr_is_ram_not_in_sig _ HramP1) as HnsP1.
+    pose proof (addr_is_ram_not_dev _ HramP1) as HdevP1.
     pose proof (addr_is_ram_not_in_clint _ HramP0f) as HncP0f.
     pose proof (addr_is_ram_not_in_sig _ HramP0f) as HnsP0f.
+    pose proof (addr_is_ram_not_dev _ HramP0f) as HdevP0f.
     destruct Hp2 as (HAx & Hordx & Hrg2x & HRx).
     destruct Hp1 as (HA1 & Hord1 & Hrg1x & HR1).
     destruct Hp0 as (HA0t & Hord0t & Hrg0tx & HR0t).
@@ -273,11 +276,13 @@ Section WpUld.
     pose proof Hb2 as Hb2f; rewrite <- Hidx2 in Hb2f.
     pose proof HncP2 as HncP2f; rewrite <- Hidx2 in HncP2f.
     pose proof HnsP2 as HnsP2f; rewrite <- Hidx2 in HnsP2f.
+    pose proof HdevP2 as HdevP2f; rewrite <- Hidx2 in HdevP2f.
     pose proof Hrg1x as Hrg1f; rewrite <- Hidx1 in Hrg1f.
     pose proof Hr1 as Hr1f; rewrite <- Hidx1 in Hr1f.
     pose proof Hb1 as Hb1f; rewrite <- Hidx1 in Hb1f.
     pose proof HncP1 as HncP1f; rewrite <- Hidx1 in HncP1f.
     pose proof HnsP1 as HnsP1f; rewrite <- Hidx1 in HnsP1f.
+    pose proof HdevP1 as HdevP1f; rewrite <- Hidx1 in HdevP1f.
     destruct (exec_translateAddr_tramp
                 (Load Data) tf_vpn uroot ul1 ul0 tfp PTE_TF
                 rg2 rg1 rg0f menvcfg0 s_pc
@@ -298,6 +303,7 @@ Section WpUld.
                 (within_clint_false _ 8 s_pc HncP2f ltac:(lia))
                 (within_sig_false _ 8 s_pc HnsP2f ltac:(lia))
                 (within_htif_false _ 8 s_pc Lhtif_pc)
+                HdevP2f
                 Hb2f
                 ltac:(rewrite Lpmpaddr_pc; exact Hrg1f)
                 ltac:(rewrite Lpma_pc; exact (proj1 Hr1f))
@@ -305,6 +311,7 @@ Section WpUld.
                 (within_clint_false _ 8 s_pc HncP1f ltac:(lia))
                 (within_sig_false _ 8 s_pc HnsP1f ltac:(lia))
                 (within_htif_false _ 8 s_pc Lhtif_pc)
+                HdevP1f
                 Hb1f
                 ltac:(rewrite Lpmpaddr_pc; exact Hrgfx)
                 ltac:(rewrite Lpma_pc; exact (proj1 Hr0f))
@@ -312,6 +319,7 @@ Section WpUld.
                 (within_clint_false _ 8 s_pc HncP0f ltac:(lia))
                 (within_sig_false _ 8 s_pc HnsP0f ltac:(lia))
                 (within_htif_false _ 8 s_pc Lhtif_pc)
+                HdevP0f
                 Hb0f
                 ltac:(unfold update_PTE_Bits;
                       rewrite (mk_pte_flags tfp PTE_TF ltac:(unfold PTE_TF; lia));
@@ -368,6 +376,7 @@ Section WpUld.
                  (within_sig_false tfpa 8 _ Hnsd ltac:(lia))
                  ltac:(apply within_htif_false;
                        rewrite (HregT tlbvec_f htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc)
+                 (addr_is_ram_not_dev _ Hrampa)
                  Hbytesf_pc). }
       iMod (reg_update _ tlb _ tlbvec_f with "Hreg Htlb") as "[Hreg Htlb]".
       iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
@@ -382,7 +391,7 @@ Section WpUld.
       iSplitR.
       { iPureIntro. exact Hload. }
       iSplitL "Hreg Hmem".
-      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
       iIntros "Hhs' Hpc'".
       assert (Lnpc : register_lookup nextPC
                (set_reg (set_reg s_pc tlb tlbvec_f) (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -443,6 +452,7 @@ Section WpUld.
                  (within_sig_false tfpa 8 _ Hnsd ltac:(lia))
                  ltac:(apply within_htif_false;
                        rewrite (HregT tlbf2 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc)
+                 (addr_is_ram_not_dev _ Hrampa)
                  Hbytesf_pc). }
       iMod (reg_update _ tlb _ tlbf2 with "Hreg Htlb") as "[Hreg Htlb]".
       iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
@@ -457,7 +467,7 @@ Section WpUld.
       iSplitR.
       { iPureIntro. exact Hload. }
       iSplitL "Hreg Hmem".
-      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
       iIntros "Hhs' Hpc'".
       assert (Lnpc : register_lookup nextPC
                (set_reg (set_reg s_pc tlb tlbf2) (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -619,7 +629,7 @@ Section WpUalu.
     iSplitR.
     { iPureIntro. exact Hload. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5))))
@@ -1007,7 +1017,7 @@ Section WpUsret.
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact HexecC. }
     iSplitL "Hreg Hmem".
-    { unfold sX, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold sX, s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
     assert (Lnpc : register_lookup nextPC sX.(sregs) = sret_tgt sepc0)
       by (unfold sX, set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).

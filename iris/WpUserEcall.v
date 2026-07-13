@@ -168,7 +168,7 @@ Section WpUserEcall.
     pose proof (elp_no_lp elp0 Help_np) as Help0.
     iDestruct "Hpc" as "[Hpcr Hnpc]".
     iApply (wp_exec_step_trapish_inv E Φ HN with "Hinv Hhs").
-    iIntros (σ) "[Hreg Hmem]".
+    iIntros (σ) "[Hreg [Hmem Hdev]]".
     (* ---- register facts at σ ---- *)
     iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
     iDestruct (reg_valid with "Hreg Hnpc") as %Lnpc.
@@ -249,6 +249,7 @@ Section WpUserEcall.
                   (within_clint_false pa 4 σ Hnc ltac:(lia))
                   (within_sig_false pa 4 σ Hns ltac:(lia))
                   (within_htif_false pa 4 σ Lhtif)
+                  (addr_is_ram_not_dev _ Hram)
                   Hbf Lpriv HnotRVC) as Hfetch.
     assert (Lmenv' : register_lookup menvcfg σ.(sregs) = MENVCFG_S)
       by (rewrite Lmenv; exact Hmenvval).
@@ -330,10 +331,10 @@ Section WpUserEcall.
     { unfold s9, s_x. lk. exact Lpc. }
     rewrite LpcT.
     iSplitL "Hpcr"; [iExact "Hpcr" |].
-    iSplitL "Hreg Hmem".
-    { unfold s9, s_x, set_reg; cbn [sregs mem].
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s9, s_x, set_reg; cbn [sregs mem mdev].
       unfold u_trap_ms, u_ms_b, u_ms_a, u_ms_e, u_trap_cause, u_c1.
-      iFrame "Hreg Hmem". }
+      iFrame "Hreg Hmem Hdev". }
     iNext.
     iIntros "Hhs Hpcr".
     assert (LnT : register_lookup nextPC (set_reg s9 nextPC (stvec_base stvec_v)).(sregs)

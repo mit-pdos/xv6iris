@@ -110,7 +110,8 @@ Definition dregs (mv : mword 64) (p : Privilege) : regstate :=
          fun r => if register_bitvector_64_beq r misa then MISA_C
                   else if register_bitvector_64_beq r menvcfg then mv
                   else mword_of_int 0 ]}.
-Definition dstate (mv : mword 64) (p : Privilege) : mstate := MState (dregs mv p) ∅.
+Definition dstate (mv : mword 64) (p : Privilege) : mstate :=
+  MState (dregs mv p) ∅ dev0_state.
 
 (* The two reference states the kernel decodes against: Machine (menvcfg
    irrelevant -> 0) and Supervisor (menvcfg = the post-boot [MENVCFG_S]). *)

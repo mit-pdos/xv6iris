@@ -18,6 +18,7 @@ From iris.program_logic Require Import language.
 (* clash with read_bytes.  See the import line just above RiscvModelExecClose.    *)
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
+Require Export DevModel.
 (* NB: deliberately NO `Set Default Proof Using "Type"` — some merged sections   *)
 (* use bare `Proof.` and rely on Coq's default (generalize over the section      *)
 (* Hypotheses actually used), as in their original (Set-free) files.             *)
@@ -45,18 +46,26 @@ Local Open Scope Z_scope.
 
 
 (* ---------------------------------------------------------------------- *)
-(* 1. Operational state: the model's register record + byte memory.        *)
+(* 1. Operational state: the model's register record + byte memory +       *)
+(*    the memory-mapped device fabric (UART + PLIC, see DevModel.v).       *)
 (*    Memory is keyed by the model's physical-address type [Arch.pa]       *)
-(*    (= mword 64), values are individual bytes.                           *)
+(*    (= mword 64), values are individual bytes.  [mdev] is one hart's     *)
+(*    view of the SHARED device state, exactly like [mem] is its view of   *)
+(*    the shared byte memory.                                              *)
 (* ---------------------------------------------------------------------- *)
 
 Record mstate := MState {
   sregs : regstate;
   mem   : gmap Arch.pa (bv 8);
+  mdev  : dev_state;
 }.
 
 Definition set_reg (s : mstate) (r : register) (v : type_of_register r) : mstate :=
-  MState (register_set r v s.(sregs)) s.(mem).
+  MState (register_set r v s.(sregs)) s.(mem) s.(mdev).
+Definition set_mem (s : mstate) (mm : gmap Arch.pa (bv 8)) : mstate :=
+  MState s.(sregs) mm s.(mdev).
+Definition set_dev (s : mstate) (d : dev_state) : mstate :=
+  MState s.(sregs) s.(mem) d.
 
 
 (* Byte address [a + j] (model's own mword arithmetic) and byte [j] of a value. *)
@@ -82,20 +91,41 @@ Fixpoint run {X} (m : M X) (s : mstate) (x : X) (s' : mstate) {struct m} : Prop 
            fun k => run (k (register_lookup r s.(sregs))) s x s'
        | Interface.RegWrite r _ v =>
            fun k => run (k tt) (set_reg s r v) x s'
-       (* memory: an n-byte read returns the value [w] whose every byte [j] is
-          the memory byte at [pa + j] (little-endian, faithful), so the full
-          word is pinned by [(mem, pa, n)] -- not just the low byte. *)
+       (* memory: the bus routes each access by physical address.  Addresses
+          below the DRAM bank ([dev_addr]) are memory-mapped I/O: the READ is
+          serviced directly by the device (whose state may change, e.g. RHR
+          pops the receive FIFO), and the WRITE is delivered to the device as
+          an individual transaction.  A RAM read returns the value [w] whose
+          every byte [j] is the memory byte at [pa + j] (little-endian,
+          faithful), so the full word is pinned by [(mem, pa, n)] -- not just
+          the low byte. *)
        | Interface.MemRead n req =>
-           fun k => exists w : bv (8 * n),
-             (forall j : nat, (N.of_nat j < n)%N ->
-                s.(mem) !! (pa_add (Interface.ReadReq.pa req) j) = Some (nth_byte w j))
-             /\ run (k (inl (w, None))) s x s'
+           fun k =>
+             if dev_addr (Interface.ReadReq.pa req) then
+               match dev_read s.(mdev) (Interface.ReadReq.pa req) n with
+               | Some (w, d') =>
+                   run (k (inl (w, None))) (MState s.(sregs) s.(mem) d') x s'
+               | None => False
+               end
+             else
+               exists w : bv (8 * n),
+                 (forall j : nat, (N.of_nat j < n)%N ->
+                    s.(mem) !! (pa_add (Interface.ReadReq.pa req) j) = Some (nth_byte w j))
+                 /\ run (k (inl (w, None))) s x s'
        | Interface.MemWrite n req =>
            fun k =>
-             run (k (inl None))
-                 (MState s.(sregs)
-                    (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                                 (Interface.WriteReq.value req))) x s'
+             if dev_addr (Interface.WriteReq.pa req) then
+               match dev_write s.(mdev) (Interface.WriteReq.pa req) n
+                               (Interface.WriteReq.value req) with
+               | Some d' =>
+                   run (k (inl None)) (MState s.(sregs) s.(mem) d') x s'
+               | None => False
+               end
+             else
+               run (k (inl None))
+                   (MState s.(sregs)
+                      (write_bytes s.(mem) (Interface.WriteReq.pa req) n
+                                   (Interface.WriteReq.value req)) s.(mdev)) x s'
        (* trace / announce outcomes: state no-ops *)
        | Interface.InstrAnnounce _   => fun k => run (k tt) s x s'
        | Interface.BranchAnnounce _ _=> fun k => run (k tt) s x s'
@@ -140,6 +170,7 @@ Definition CPU : Type := fin NCPU.
 Record gstate := GState {
   gregs : CPU -> regstate;
   gmem  : gmap Arch.pa (bv 8);
+  gdev  : dev_state;
 }.
 
 (* pointwise update of a single hart's register file *)
@@ -147,39 +178,81 @@ Global Instance greg_insert : Insert CPU regstate (CPU -> regstate) :=
   fun cpu rs gr c => if decide (c = cpu) then rs else gr c.
 
 (* ---------------------------------------------------------------------- *)
+(* 3c. The device execution context.                                        *)
+(*                                                                          *)
+(*   The devices run CONCURRENTLY with the harts: between any two CPU        *)
+(*   instructions the UART may transmit or receive a byte, the PLIC gateway  *)
+(*   may latch the UART's (level) interrupt output, and the PLIC may         *)
+(*   propagate its per-hart EIP level onto a hart's external S-interrupt     *)
+(*   pin -- the [sig_seip] register, which is exactly the model's external   *)
+(*   interrupt WIRE: [read_mip IncludePlatformInterrupts] ORs it into mip,   *)
+(*   so [dispatchInterrupt] sees it on the next instruction boundary.        *)
+(*                                                                          *)
+(*   Note the wire is updated by its OWN step (DevStepWire), not             *)
+(*   synchronously with the MMIO write that caused the level change: the     *)
+(*   interrupt line has propagation delay, which is both realistic and the   *)
+(*   weaker (hence safer) modelling choice.                                  *)
+(* ---------------------------------------------------------------------- *)
+
+Inductive dev_step (d : dev_state) (gr : CPU -> regstate)
+    : dev_state -> (CPU -> regstate) -> Prop :=
+  | DevStepTx b u' :
+      uart_tx_pop d.(duart) = Some (b, u') ->
+      dev_step d gr (set_duart d u') gr
+  | DevStepRx b u' :
+      uart_rx_push d.(duart) b = Some u' ->
+      dev_step d gr (set_duart d u') gr
+  | DevStepLatch p' :
+      uart_irq d.(duart) = true ->
+      plic_latch d.(dplic) = Some p' ->
+      dev_step d gr (set_dplic d p') gr
+  | DevStepWire (c : CPU) :
+      dev_step d gr d
+        (<[c := register_set sig_seip
+                  (bool_to_bit (dev_seip d (fin_to_nat c))) (gr c)]> gr).
+
+(* ---------------------------------------------------------------------- *)
 (* 4. The language.  The program [Loop] steps ONE hart forever; which hart   *)
 (*    is selected AMBIENTLY: the constructor [LoopE] carries the hart id and  *)
 (*    the [Loop] notation fills it in from the surrounding [CpuId] instance.  *)
 (*    Every WP therefore keeps the argument-free spelling [WP Loop {{...}}],  *)
 (*    while [prim_step] over [gstate] reads the selected hart's registers,    *)
-(*    pairs them with [gmem] to reconstruct that hart's [mstate], runs one    *)
-(*    [riscv_step], and writes the resulting registers and memory back.       *)
+(*    pairs them with [gmem]/[gdev] to reconstruct that hart's [mstate], runs *)
+(*    one [riscv_step], and writes the resulting registers, memory and        *)
+(*    device state back.  [DevLoopE] is the device execution context: it      *)
+(*    steps [dev_step] forever, interleaved with the harts.                   *)
 (* ---------------------------------------------------------------------- *)
 
 Class CpuId := cpu_id : CPU.
 
-Inductive mexpr := LoopE (cpu : CPU).
+Inductive mexpr := LoopE (cpu : CPU) | DevLoopE.
 Definition mval := Empty_set.
 Definition mobs := Empty_set.
 Definition of_val (v : mval) : mexpr := match v with end.
 Definition to_val (_ : mexpr) : option mval := None.
 
 Notation Loop := (LoopE cpu_id).
+Notation DevLoop := DevLoopE.
 
 Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
     (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
-  exists cpu, e = LoopE cpu /\ e' = LoopE cpu /\ κ = [] /\ efs = [] /\
+  (exists cpu, e = LoopE cpu /\ e' = LoopE cpu /\ κ = [] /\ efs = [] /\
     exists (u : unit) (s' : mstate),
-      run riscv_step (MState (g.(gregs) cpu) g.(gmem)) u s' /\
-      g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem).
+      run riscv_step (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
+      g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev))
+  \/
+  (e = DevLoopE /\ e' = DevLoopE /\ κ = [] /\ efs = [] /\
+    exists d' gr',
+      dev_step g.(gdev) g.(gregs) d' gr' /\
+      g' = GState gr' g.(gmem) d').
 
 Lemma riscv_lang_mixin : LanguageMixin of_val to_val prim_step.
 Proof.
   split.
   - intros [].
   - intros e v Hv. discriminate Hv.
-  - intros e s κ e' s' efs (cpu & -> & _). reflexivity.
+  - intros e s κ e' s' efs [(cpu & -> & _) | (-> & _)]; reflexivity.
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.

@@ -356,6 +356,7 @@ Section TrampWalk.
   Hypothesis Hc2 : exec (within_clint (Physaddr a2) 8) s = Some (false, s).
   Hypothesis Hsig2 : exec (within_sig (Physaddr a2) 8) s = Some (false, s).
   Hypothesis Hh2 : exec (within_htif_readable (Physaddr a2) 8) s = Some (false, s).
+  Hypothesis Hdev2 : dev_addr a2 = false.
   Hypothesis Hbytes2 : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a2 j) = Some (nth_byte pte2 j).
 
   Hypothesis Hrange1 : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -366,6 +367,7 @@ Section TrampWalk.
   Hypothesis Hc1 : exec (within_clint (Physaddr a1) 8) s = Some (false, s).
   Hypothesis Hsig1 : exec (within_sig (Physaddr a1) 8) s = Some (false, s).
   Hypothesis Hh1 : exec (within_htif_readable (Physaddr a1) 8) s = Some (false, s).
+  Hypothesis Hdev1 : dev_addr a1 = false.
   Hypothesis Hbytes1 : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a1 j) = Some (nth_byte pte1 j).
 
   Hypothesis Hrange0 : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -376,6 +378,7 @@ Section TrampWalk.
   Hypothesis Hc0 : exec (within_clint (Physaddr a0) 8) s = Some (false, s).
   Hypothesis Hsig0 : exec (within_sig (Physaddr a0) 8) s = Some (false, s).
   Hypothesis Hh0 : exec (within_htif_readable (Physaddr a0) 8) s = Some (false, s).
+  Hypothesis Hdev0 : dev_addr a0 = false.
   Hypothesis Hbytes0 : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a0 j) = Some (nth_byte pte0 j).
 
   (* the walk's leaf output *)
@@ -400,7 +403,7 @@ Section TrampWalk.
       replace wd with 8 by (vm_compute; reflexivity) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_read_pte_S a0 region0 pte0 s
-                  HA Hord Hrange0 HR Hmatch0 (pte_addr_at_aligned8 p0 idx0) Hpte0 Hc0 Hsig0 Hh0 Hbytes0)).
+                  HA Hord Hrange0 HR Hmatch0 (pte_addr_at_aligned8 p0 idx0) Hpte0 Hc0 Hsig0 Hh0 Hdev0 Hbytes0)).
     match goal with |- context[Mk_PTE_Flags (@subrange_vec_dec ?w _ 7 0)] =>
       change w with 64 end.
     rewrite (mk_pte_flags lppn lflags Hlf).
@@ -457,7 +460,7 @@ Section TrampWalk.
       replace wd with 8 by (vm_compute; reflexivity) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_read_pte_S a1 region1 pte1 s
-                  HA Hord Hrange1 HR Hmatch1 (pte_addr_at_aligned8 p1 idx1) Hpte1 Hc1 Hsig1 Hh1 Hbytes1)).
+                  HA Hord Hrange1 HR Hmatch1 (pte_addr_at_aligned8 p1 idx1) Hpte1 Hc1 Hsig1 Hh1 Hdev1 Hbytes1)).
     match goal with |- context[Mk_PTE_Flags (@subrange_vec_dec ?w _ 7 0)] =>
       change w with 64 end.
     rewrite (mk_pte_flags p0 PTE_PTR ltac:(unfold PTE_PTR; lia)).
@@ -500,7 +503,7 @@ Section TrampWalk.
       replace wd with 8 by (vm_compute; reflexivity) end.
     rewrite (execR_liftR_seq _ _ _ _ _
                (exec_read_pte_S a2 region2 pte2 s
-                  HA Hord Hrange2 HR Hmatch2 (pte_addr_at_aligned8 p2 idx2) Hpte2 Hc2 Hsig2 Hh2 Hbytes2)).
+                  HA Hord Hrange2 HR Hmatch2 (pte_addr_at_aligned8 p2 idx2) Hpte2 Hc2 Hsig2 Hh2 Hdev2 Hbytes2)).
     match goal with |- context[Mk_PTE_Flags (@subrange_vec_dec ?w _ 7 0)] =>
       change w with 64 end.
     rewrite (mk_pte_flags p1 PTE_PTR ltac:(unfold PTE_PTR; lia)).

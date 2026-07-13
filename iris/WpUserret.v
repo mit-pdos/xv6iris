@@ -271,7 +271,7 @@ Section UserretFetch.
     ⌜ (forall j : nat, (N.of_nat j < 8)%N -> σ.(mem) !! (pa_add a j) = Some (nth_byte v j))
       /\ addr_is_ram a ⌝.
   Proof.
-    iIntros "[Hreg Hmem] Hp".
+    iIntros "[Hreg [Hmem Hdev]] Hp".
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
                σ.(mem) !! (pa_add a j) = Some (nth_byte v j)⌝)%I as %Hb.
     { iIntros (j Hj).
@@ -407,6 +407,7 @@ Section UserretFetch.
                 (within_clint_false _ 8 σ Hnc2 ltac:(lia))
                 (within_sig_false _ 8 σ Hns2 ltac:(lia))
                 (within_htif_false _ 8 σ Lhtif)
+                (addr_is_ram_not_dev _ Hram2)
                 Hb2
                 ltac:(rewrite Lpmpa; exact Hrg1)
                 ltac:(rewrite Lpma; exact Hm1)
@@ -414,6 +415,7 @@ Section UserretFetch.
                 (within_clint_false _ 8 σ Hnc1 ltac:(lia))
                 (within_sig_false _ 8 σ Hns1 ltac:(lia))
                 (within_htif_false _ 8 σ Lhtif)
+                (addr_is_ram_not_dev _ Hram1)
                 Hb1
                 ltac:(rewrite Lpmpa; exact Hrg0)
                 ltac:(rewrite Lpma; exact Hm0)
@@ -421,6 +423,7 @@ Section UserretFetch.
                 (within_clint_false _ 8 σ Hnc0 ltac:(lia))
                 (within_sig_false _ 8 σ Hns0 ltac:(lia))
                 (within_htif_false _ 8 σ Lhtif)
+                (addr_is_ram_not_dev _ Hram0)
                 Hb0
                 ltac:(unfold PTE_TRAMP; vm_compute; reflexivity)
                 usatp pa va
@@ -544,7 +547,7 @@ Section UserretFetch2.
     iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb2") as %[Hb2 HramP2].
     iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb1") as %[Hb1 HramP1].
     iDestruct (pte8_facts σ _ _ _ with "Hsi Hpb0t") as %[Hb0 HramP0].
-    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     (* the PURE per-chunk translation, applicable at ANY state agreeing with σ
        on everything but the tlb (whose value/consistency is a parameter). *)
     destruct Hp2 as (HAx & Hordx & Hrg2 & HRx).
@@ -602,6 +605,7 @@ Section UserretFetch2.
                   (within_clint_false _ 8 s0 HncP2 ltac:(lia))
                   (within_sig_false _ 8 s0 HnsP2 ltac:(lia))
                   (within_htif_false _ 8 s0 L0htif)
+                  (addr_is_ram_not_dev _ HramP2)
                   ltac:(rewrite Hsm; exact Hb2)
                   ltac:(rewrite L0pmpa; destruct Hp1 as (_&_&HH&_); exact HH)
                   ltac:(rewrite L0pma; exact Hm1)
@@ -609,6 +613,7 @@ Section UserretFetch2.
                   (within_clint_false _ 8 s0 HncP1 ltac:(lia))
                   (within_sig_false _ 8 s0 HnsP1 ltac:(lia))
                   (within_htif_false _ 8 s0 L0htif)
+                  (addr_is_ram_not_dev _ HramP1)
                   ltac:(rewrite Hsm; exact Hb1)
                   ltac:(rewrite L0pmpa; destruct Hp0 as (_&_&HH&_); exact HH)
                   ltac:(rewrite L0pma; exact Hm0)
@@ -616,6 +621,7 @@ Section UserretFetch2.
                   (within_clint_false _ 8 s0 HncP0 ltac:(lia))
                   (within_sig_false _ 8 s0 HnsP0 ltac:(lia))
                   (within_htif_false _ 8 s0 L0htif)
+                  (addr_is_ram_not_dev _ HramP0)
                   ltac:(rewrite Hsm; exact Hb0)
                   ltac:(unfold PTE_TRAMP; vm_compute; reflexivity)
                   usatp pa0 va0
@@ -682,6 +688,7 @@ Section UserretFetch2.
         * exact (within_sig_false pa 4 s1 Hns ltac:(lia)).
         * apply within_htif_false.
           rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * exact (addr_is_ram_not_dev _ Hram0).
         * intros j Hj. unfold s1, set_reg; cbn [mem]. exact (Hbf j Hj).
         * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
         * exact HnotRVC.
@@ -729,6 +736,7 @@ Section UserretFetch2.
         * exact (within_sig_false pa 2 s1 Hns ltac:(lia)).
         * apply within_htif_false.
           rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * exact (addr_is_ram_not_dev _ Hram0).
         * intros j Hj. unfold s1, set_reg; cbn [mem].
           rewrite nth_byte_subrange_lo; [| exact Hj]. apply Hbf. lia.
         * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
@@ -752,6 +760,8 @@ Section UserretFetch2.
                    (addr_is_ram_not_in_sig _ ltac:(unfold pa_add in Hram2b; change (Z.of_nat 2) with 2 in Hram2b; exact Hram2b)) ltac:(lia)).
         * apply within_htif_false.
           rewrite (Hreg1 tv3 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * exact (addr_is_ram_not_dev _
+                   ltac:(unfold pa_add in Hram2b; change (Z.of_nat 2) with 2 in Hram2b; exact Hram2b)).
         * intros j Hj. cbn [mem set_reg].
           rewrite nth_byte_subrange_hi; [| exact Hj].
           rewrite (Haddr j Hj). apply Hbf. lia.
@@ -792,6 +802,7 @@ Section UserretFetch2.
         * exact (within_sig_false pa 4 s1 Hns ltac:(lia)).
         * apply within_htif_false.
           rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * exact (addr_is_ram_not_dev _ Hram0).
         * intros j Hj. unfold s1, set_reg; cbn [mem]. exact (Hbf j Hj).
         * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
         * rewrite Hsub. exact HisRVC.
@@ -825,6 +836,7 @@ Section UserretFetch2.
         * exact (within_sig_false pa 2 s1 Hns ltac:(lia)).
         * apply within_htif_false.
           rewrite (Hreg1 tv2 htif_tohost_base ltac:(vm_compute; reflexivity)). exact Lhtif.
+        * exact (addr_is_ram_not_dev _ Hram0).
         * intros j Hj. unfold s1, set_reg; cbn [mem]. exact (Hbf j Hj).
         * rewrite (Hreg1 tv2 cur_privilege ltac:(vm_compute; reflexivity)). exact Lpriv.
         * exact HisRVC.
@@ -947,7 +959,7 @@ Section WpInstrU.
     iMod (reg_update _ tlb _ tlbvec2 with "Hreg Htlb") as "[Hreg Htlb]".
     set (σf := set_reg σ tlb tlbvec2 : mstate).
     iAssert (mstate_interp σf) with "[Hreg Hmem]" as "Hsi".
-    { unfold σf, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold σf, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Hpriv_σf.

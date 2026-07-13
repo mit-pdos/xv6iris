@@ -2,7 +2,7 @@
 From Stdlib Require Import Eqdep_dec ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
+From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -71,6 +71,14 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      [gregs_interp] below. *)
   cpu_reg_name : CPU -> gname;
   riscv_memGS :: gen_heapGS Arch.pa (bv 8) Σ;
+  (* the device fabric (DevModel.v): one [ghost_var] per device, in the
+     standard halves pattern -- [state_interp] holds one half (the "auth"),
+     the other half (the "frag") floats freely and is typically stored in an
+     invariant shared between the driver's hart and the device thread. *)
+  riscv_uartGS :: ghost_varG Σ uart_state;
+  riscv_plicGS :: ghost_varG Σ plic_state;
+  uart_name : gname;
+  plic_name : gname;
 }.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
@@ -138,6 +146,14 @@ Proof.
   intros [Hlo _]. right.
   assert (uint plat_sig_base + uint plat_sig_size = 201326624)%Z as -> by (vm_compute; reflexivity).
   unfold ram_base in Hlo. lia.
+Qed.
+
+(* Being RAM also implies being off the device fabric: the bus routes only
+   sub-DRAM addresses ([dev_bound] = [ram_base]) to the UART/PLIC. *)
+Lemma addr_is_ram_not_dev a : addr_is_ram a -> dev_addr a = false.
+Proof.
+  intros [Hlo _]. apply dev_addr_false.
+  unfold dev_bound; unfold ram_base in Hlo. lia.
 Qed.
 
 (* memory points-to: owns byte [a |-> v] at fraction [dq] AND records that [a]
@@ -249,10 +265,54 @@ Definition reg_interp_at `{!riscvGS Σ} (γ : gname) (rs : regstate) : iProp Σ 
 Definition reg_interp `{!riscvGS Σ} `{CpuId} (rs : regstate) : iProp Σ :=
   reg_interp_at reg_name rs.
 
-(* one hart's view (its registers + the shared memory); the single-CPU
-   [state_interp σ ns κs nt] of the leaf lemmas is replaced by [mstate_interp σ]. *)
+(* ---------------------------------------------------------------------- *)
+(* device-fabric ownership: the halves pattern over two [ghost_var]s.       *)
+(* [uart_auth]/[plic_auth] live inside [state_interp]; [uart_frag]/         *)
+(* [plic_frag] are the user-facing halves.  Agreement + joint update are    *)
+(* the two bridge lemmas, mirroring [reg_valid]/[reg_update].               *)
+(* ---------------------------------------------------------------------- *)
+
+Definition uart_auth `{!riscvGS Σ} (u : uart_state) : iProp Σ :=
+  ghost_var uart_name (1/2) u.
+Definition uart_frag `{!riscvGS Σ} (u : uart_state) : iProp Σ :=
+  ghost_var uart_name (1/2) u.
+Definition plic_auth `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
+  ghost_var plic_name (1/2) p.
+Definition plic_frag `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
+  ghost_var plic_name (1/2) p.
+
+(* the state_interp conjunct for the shared device state *)
+Definition dev_interp `{!riscvGS Σ} (d : dev_state) : iProp Σ :=
+  (uart_auth d.(duart) ∗ plic_auth d.(dplic))%I.
+
+Section DevBridge.
+  Context `{!riscvGS Σ}.
+
+  Lemma uart_agree u u' : uart_auth u -∗ uart_frag u' -∗ ⌜u' = u⌝.
+  Proof.
+    iIntros "Ha Hf". by iDestruct (ghost_var_agree with "Ha Hf") as %->.
+  Qed.
+  Lemma uart_update u u' u'' :
+    uart_auth u -∗ uart_frag u' ==∗ uart_auth u'' ∗ uart_frag u''.
+  Proof. iApply ghost_var_update_halves. Qed.
+
+  Lemma plic_agree p p' : plic_auth p -∗ plic_frag p' -∗ ⌜p' = p⌝.
+  Proof.
+    iIntros "Ha Hf". by iDestruct (ghost_var_agree with "Ha Hf") as %->.
+  Qed.
+  Lemma plic_update p p' p'' :
+    plic_auth p -∗ plic_frag p' ==∗ plic_auth p'' ∗ plic_frag p''.
+  Proof. iApply ghost_var_update_halves. Qed.
+End DevBridge.
+
+(* one hart's view (its registers + the shared memory + the shared device
+   fabric); the single-CPU [state_interp σ ns κs nt] of the leaf lemmas is
+   replaced by [mstate_interp σ].  The device conjunct rides in LAST
+   position: a leaf that only touches registers/memory frames it through
+   untouched (an exec over set_reg/write_bytes preserves [mdev]
+   definitionally). *)
 Definition mstate_interp `{!riscvGS Σ} `{CpuId} (σ : mstate) : iProp Σ :=
-  (reg_interp σ.(sregs) ∗ gen_heap_interp σ.(mem))%I.
+  (reg_interp σ.(sregs) ∗ gen_heap_interp σ.(mem) ∗ dev_interp σ.(mdev))%I.
 
 (* the GLOBAL register bridge: one authoritative map per hart, over the whole
    finite [CPU] set.  [gregs] is a total function, so there is no membership
@@ -266,7 +326,8 @@ Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
 
 Global Program Instance riscv_irisGS `{!riscvGS Σ} : irisGS riscv_lang Σ := {
   iris_invGS := riscv_invGS;
-  state_interp g _ _ _ := (gregs_interp g.(gregs) ∗ gen_heap_interp g.(gmem))%I;
+  state_interp g _ _ _ :=
+    (gregs_interp g.(gregs) ∗ gen_heap_interp g.(gmem) ∗ dev_interp g.(gdev))%I;
   fork_post _ := True%I;
   num_laters_per_step _ := 0%nat;
 }.
