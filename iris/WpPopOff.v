@@ -601,7 +601,6 @@ Section WpPopOffTopSec.
   Lemma wp_call_mycpu_vc (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
       (m : gmap regidx (mword 64))
-      (raold s0old : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       :
     let ra_idx : mword 5 := mword_of_int 1 in
@@ -643,8 +642,7 @@ Section WpPopOffTopSec.
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    pa_ra ↦₈ raold -∗
-    pa_s0 ↦₈ s0old -∗
+    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
     ( ∀ mo,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
@@ -656,8 +654,7 @@ Section WpPopOffTopSec.
       ⌜ callee_saved m mo /\
         mo !!! Regidx (mword_of_int 10 : mword 5)
           = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      pa_ra ↦₈ ra0 -∗
-      pa_s0 ↦₈ s00 -∗
+      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -665,7 +662,7 @@ Section WpPopOffTopSec.
       ea_ra pa_ra ea_s0 pa_s0 ret_tgt
       HN Htarget Halign_tgt
       HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe HFIOM Hlegal Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hstk Hcont".
     iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
@@ -678,12 +675,12 @@ Section WpPopOffTopSec.
     iDestruct (kv_cfg_recombine γc mstatus0 mie_v mdv0 menvcfg0
                  with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
       as "(Hhs & Hpriv & Hms & Hgc & Hmie & Hmdl & Hmenv)".
-    iApply (wp_mycpu_words root_ppn E Φ m0 raold s0old mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [Hgc Hcont]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
+    iApply (wp_mycpu root_ppn E Φ m0 2 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
+              ltac:(lia) HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hstk [Hgc Hcont]").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hstk".
     iApply ("Hcont" $! (po_mycpu_out P m)
-              with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hbra Hbs0").
+              with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
     split; [ apply po_mycpu_out_callee_saved | apply pt_mycpu_out_a0 ].
   Qed.
 
@@ -711,7 +708,6 @@ Section WpPopOffTopSec.
   Lemma wp_call_mycpu_vc_scfg (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
       (m : gmap regidx (mword 64))
-      (raold s0old : bv 64)
       :
     let ra_idx : mword 5 := mword_of_int 1 in
     let tp_idx : mword 5 := mword_of_int 4 in
@@ -737,8 +733,7 @@ Section WpPopOffTopSec.
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    pa_ra ↦₈ raold -∗
-    pa_s0 ↦₈ s0old -∗
+    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
     ( ∀ mo,
       smode_config γc (DfracOwn 1) -∗
       tlb_inv root_ppn -∗
@@ -747,38 +742,37 @@ Section WpPopOffTopSec.
       ⌜ callee_saved m mo /\
         mo !!! Regidx (mword_of_int 10 : mword 5)
           = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      pa_ra ↦₈ ra0 -∗
-      pa_s0 ↦₈ s00 -∗
+      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ra_idx tp_idx s0_idx a0_idx a5_idx m0 pcE imm_entry sp' ra0 s00
       ea_ra pa_ra ea_s0 pa_s0 ret_tgt
       HN Htarget Halign_tgt Hal0.
-    iIntros "Hcfg Htlbinv Htext Hpc Hfile Hjal Hbra Hbs0 Hcont".
+    iIntros "Hcfg Htlbinv Htext Hpc Hfile Hjal Hstk Hcont".
     iDestruct (smode_config_unbundle γc (DfracOwn 1) with "Hcfg")
       as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
     iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
     iDestruct "Hmsb" as (mstatus0) "(Hms & Hgc & %HSIE & %HMPRV & %HSXL & %HMXR & %Hlegal)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
-    iApply (wp_call_mycpu_vc root_ppn γc E Φ P jimm m raold s0old
+    iApply (wp_call_mycpu_vc root_ppn γc E Φ P jimm m
               mstatus0 mie_v mdv0 menvcfg0
               HN Htarget Halign_tgt
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe HFIOM Hlegal Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hjal Hbra Hbs0 [-]").
-    iIntros (mo) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hbra Hbs0".
+              with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hjal Hstk [-]").
+    iIntros (mo) "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmc Hstk".
     iDestruct (smode_config_rebuild γc (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
                  HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv") as "Hcfg".
-    iApply ("Hcont" $! mo with "Hcfg Htlbinv Hpc Hfile [%] Hbra Hbs0").
+    iApply ("Hcont" $! mo with "Hcfg Htlbinv Hpc Hfile [%] Hstk").
     exact Hmc.
   Qed.
 
-  Lemma wp_pop_off_words (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_pop_off (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (noffv intenav : mword 32)
-      (vp8 vp0 vfra vfs0 : bv 64)
+      (n : nat)
       {dqi : dfrac} :
     let pcE : mword 64 := mword_of_int PP in
     let spd := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
@@ -793,6 +787,7 @@ Section WpPopOffTopSec.
     let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
     let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (4 ≤ n)%nat ->
     ↑minstretN ⊆ E ->
     (* S-mode config facts + the interrupt-off sstatus fact are folded into
        [smode_config γc] below. *)
@@ -804,10 +799,9 @@ Section WpPopOffTopSec.
     smode_config γc (DfracOwn 1) -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    a_p8 ↦₈ vp8 -∗
-    a_p0 ↦₈ vp0 -∗
-    a_fra ↦₈ vfra -∗
-    a_fs0 ↦₈ vfs0 -∗
+    (* pop_off's whole 4-slot frame (2 own p8/p0 + 2 mycpu) as
+       [stack_own (m!!!csp) n] (n>=4). *)
+    stack_own (m !!! Regidx csp_rs1) n -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
     ( ∀ mf,
@@ -818,18 +812,27 @@ Section WpPopOffTopSec.
       ⌜ callee_saved m mf ⌝ -∗
       a_noff ↦₄ storeval -∗
       a_int ↦₄{ dqi } intenav -∗
-      (∃ (w8 w0 wra ws0 : bv 64),
-        a_p8 ↦₈ w8 ∗
-        a_p0 ↦₈ w0 ∗
-        a_fra ↦₈ wra ∗
-        a_fs0 ↦₈ ws0) -∗
+      stack_own (m !!! Regidx csp_rs1) n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
-      HN Hnoffpos Hint Hal0.
+      Hn4 HN Hnoffpos Hint Hal0.
     iIntros "Hcfg Htlbinv
-             #Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Hint Hcont".
+             #Htext Hpc Hfile Hframe Hnoff Hint Hcont".
+    (* peel the 2 own slots as cells; keep mycpu's 2-slot frame as a
+       [stack_own] slice the body threads directly. *)
+    iDestruct (stack_own_split_1 (m !!! Regidx csp_rs1) 4 n ltac:(lia) with "Hframe") as "[Htop Hdeep]".
+    iDestruct (stack_own_split_1 (m !!! Regidx csp_rs1) 2 4 ltac:(lia) with "Htop") as "[Ht12 Hstk]".
+    iDestruct (stack_own_2_elim with "Ht12") as (vp8 vp0) "[Hp8 Hp0]".
+    assert (Hb1 : a_p8 = pa_stk (m !!! Regidx csp_rs1) 1).
+    { rewrite /a_p8 /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : a_p0 = pa_stk (m !!! Regidx csp_rs1) 2).
+    { rewrite /a_p0 /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hspd2 : pa_stk (m !!! Regidx csp_rs1) 2 = spd).
+    { rewrite /spd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    iEval (rewrite -Hb1) in "Hp8". iEval (rewrite -Hb2) in "Hp0".
+    iEval (rewrite Hspd2) in "Hstk".
     iPoseProof (ppi_08 with "Htext") as "Hi08".
     iPoseProof (ppi_0c with "Htext") as "Hi0c".
     iPoseProof (ppi_10 with "Htext") as "Hi10".
@@ -920,15 +923,14 @@ Section WpPopOffTopSec.
     (* +0x08 jal ra,mycpu; the callee needs raw config cells + the SIE ghost, so
        unbundle here and rebundle when it returns (pop_off's post is existential,
        so re-pinning a value is fine). *)
-    iApply (wp_call_mycpu_vc_scfg root_ppn γc E Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) M1 vfra vfs0
+    iApply (wp_call_mycpu_vc_scfg root_ppn γc E Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) M1
               HN ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-              with "Hcfg Htlbinv Htext Hpc Hfile Hi08 [Hfra] [Hfs0] [-]").
-    { iEval (rewrite HspP2r). iExact "Hfra". }
-    { iEval (rewrite HspP2r). iExact "Hfs0". }
-    iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hfra Hfs0".
-    iEval (rewrite HspP2r) in "Hfra". iEval (rewrite HspP2r) in "Hfs0".
+              with "Hcfg Htlbinv Htext Hpc Hfile Hi08 [Hstk] [-]").
+    { iEval (rewrite HspP2r). iExact "Hstk". }
+    iIntros (C) "Hcfg Htlbinv Hpc Hfile %Hmc Hstk".
+    iEval (rewrite HspP2r) in "Hstk".
     iEval (rewrite lookup_total_insert) in "Hpc".
     assert (Hpc0c : update_vec_dec (add_vec (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (PP + 0x0c) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1398,9 +1400,13 @@ Section WpPopOffTopSec.
                 with "Hcfg Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" $! Mf with "Hcfg Htlbinv Hpc Hfile [%] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iEval (rewrite Hb1) in "Hp8". iEval (rewrite Hb2) in "Hp0".
+      iDestruct (stack_own_2_intro with "Hp8 Hp0") as "Ht12".
+      iEval (rewrite -Hspd2) in "Hstk".
+      iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 2 4 ltac:(lia) with "[$Ht12 $Hstk]") as "Htopf".
+      iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 4 n ltac:(lia) with "[$Htopf $Hdeep]") as "Hpstkf".
+      iApply ("Hcont" $! Mf with "Hcfg Htlbinv Hpc Hfile [%] Hnoff Hint Hpstkf").
       { unfold callee_saved. repeat split; assumption. }
-      iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
     - (* fall: noff-1 = 0, read intena (= 0), c.beqz taken to +0x28 *)
       iApply (wp_cbnez_fall_s_scfg root_ppn γc E Φ (mword_of_int (PP + 0x1e)) (mword_of_int 5) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 M3 (dq:=DfracOwn 1)
@@ -1578,98 +1584,15 @@ Section WpPopOffTopSec.
                 with "Hcfg Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       iEval (rewrite HraF) in "Hpc".
-      iApply ("Hcont" $! Mf with "Hcfg Htlbinv Hpc Hfile [%] Hnoff Hint [Hp8 Hp0 Hfra Hfs0]").
+      iEval (rewrite Hb1) in "Hp8". iEval (rewrite Hb2) in "Hp0".
+      iDestruct (stack_own_2_intro with "Hp8 Hp0") as "Ht12".
+      iEval (rewrite -Hspd2) in "Hstk".
+      iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 2 4 ltac:(lia) with "[$Ht12 $Hstk]") as "Htopf".
+      iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 4 n ltac:(lia) with "[$Htopf $Hdeep]") as "Hpstkf".
+      iApply ("Hcont" $! Mf with "Hcfg Htlbinv Hpc Hfile [%] Hnoff Hint Hpstkf").
       { unfold callee_saved. repeat split; assumption. }
-      iExists _, _, _, _. iFrame "Hp8 Hp0 Hfra Hfs0".
   Qed.
 
 
-  (* Public interface: pop_off's 4-slot stack region (own 2 slots + the
-     child mycpu's 2 slots) as [stack_own sp0 n] (n >= 4), a peel /
-     re-bundle wrapper over [wp_pop_off_words].  pop_off already returns
-     its stack slots existentially, so the [stack_own] post is exact. *)
-  Lemma wp_pop_off (root_ppn : mword 44) (γc : gname) E (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64))
-      (noffv intenav : mword 32)
-      (n : nat)
-      {dqi : dfrac} :
-    let pcE : mword 64 := mword_of_int PP in
-    let spd := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a_p8 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_p0 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let mc_sp := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a_fra := add_vec mc_sp (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_fs0 := add_vec mc_sp (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let a0v := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec a0v (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec a0v (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
-    let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (4 ≤ n)%nat ->
-    ↑minstretN ⊆ E ->
-    (* S-mode config facts + the interrupt-off sstatus fact are folded into
-       [smode_config γc] below. *)
-    (* noff >= 1 (signed) *)
-    zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
-    (* saved intena is 0 *)
-    eq_vec (sign_extend' 64 intenav) zero_reg = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    stack_own (m !!! Regidx csp_rs1) n -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄{ dqi } intenav -∗
-    ( ∀ mf,
-      smode_config γc (DfracOwn 1) -∗
-      tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mf -∗
-      ⌜ callee_saved m mf ⌝ -∗
-      a_noff ↦₄ storeval -∗
-      a_int ↦₄{ dqi } intenav -∗
-      stack_own (m !!! Regidx csp_rs1) n -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros pcE spd a_p8 a_p0 mc_sp a_fra a_fs0 a0v a_noff a_int nv1 storeval ret_tgt
-      Hn4 HN Hnoffpos Hint Hal0.
-    iIntros "Hcfg Htlbinv #Htext Hpc Hfile Hstk Hnoff Haint Hcont".
-    iDestruct (stack_own_split_1 (m !!! Regidx csp_rs1) 4 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
-    iDestruct (stack_own_split_1 (m !!! Regidx csp_rs1) 2 4 ltac:(lia) with "Htop") as "[Ht12 Ht34]".
-    iDestruct (stack_own_2_elim with "Ht12") as (vp8 vp0) "[Hp8 Hp0]".
-    iDestruct (stack_own_2_elim with "Ht34") as (vfra vfs0) "[Hfra Hfs0]".
-    iEval (rewrite (pa_stk_assoc (m !!! Regidx csp_rs1) 2 1)) in "Hfra".
-    iEval (rewrite (pa_stk_assoc (m !!! Regidx csp_rs1) 2 2)) in "Hfs0".
-    (* bridges stated over the RAW slot spellings [wp_pop_off_words] produces
-       (its [a_p8]/... lets zeta-reduce to these), so a single rewrite serves
-       both the peel and the return. *)
-    assert (Hb1 : add_vec (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 1).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb2 : add_vec (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 2).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb3 : add_vec (add_vec (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 3).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb4 : add_vec (add_vec (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 4).
-    { unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite -Hb1) in "Hp8". iEval (rewrite -Hb2) in "Hp0".
-    iEval (rewrite -Hb3) in "Hfra". iEval (rewrite -Hb4) in "Hfs0".
-    iApply (wp_pop_off_words root_ppn γc E Φ m noffv intenav vp8 vp0 vfra vfs0 (dqi:=dqi)
-              HN Hnoffpos Hint Hal0
-              with "Hcfg Htlbinv Htext Hpc Hfile Hp8 Hp0 Hfra Hfs0 Hnoff Haint [-]").
-    iIntros (mf) "Hcfg Htlbinv Hpc Hmf %Hcs Hnoff Haint Hblk".
-    iDestruct "Hblk" as (w8 w0 wra ws0) "(Hp8 & Hp0 & Hfra & Hfs0)".
-    iEval (rewrite Hb1) in "Hp8". iEval (rewrite Hb2) in "Hp0".
-    iEval (rewrite Hb3) in "Hfra". iEval (rewrite Hb4) in "Hfs0".
-    iEval (rewrite -(pa_stk_assoc (m !!! Regidx csp_rs1) 2 1)) in "Hfra".
-    iEval (rewrite -(pa_stk_assoc (m !!! Regidx csp_rs1) 2 2)) in "Hfs0".
-    iDestruct (stack_own_2_intro with "Hp8 Hp0") as "Ht12".
-    iDestruct (stack_own_2_intro with "Hfra Hfs0") as "Ht34".
-    iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 2 4 ltac:(lia) with "[$Ht12 $Ht34]") as "Htop".
-    iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! mf with "Hcfg Htlbinv Hpc Hmf [%] Hnoff Haint Hstk").
-    exact Hcs.
-  Qed.
 
 End WpPopOffTopSec.

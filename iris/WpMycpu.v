@@ -406,14 +406,9 @@ Section WpMycpu.
   Qed.
 
   (* ------------------------------------------------------------------- *)
-  (* [wp_mycpu_words]: the legacy word-level interface (two explicit
-     SP-relative slot points-to), retained for callers not yet migrated
-     to [stack_own].  [wp_mycpu] below is the same theorem stated over the
-     [stack_own] abstraction. *)
-  (* ------------------------------------------------------------------- *)
-  Lemma wp_mycpu_words (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_mycpu (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64))
-      (raold s0old : bv 64)
+      (n : nat)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
@@ -429,6 +424,7 @@ Section WpMycpu.
     let imm_addi : mword 12 := mword_of_int 0xa94 in
     let shamt_slli : mword 6 := mword_of_int 7 in
     let imm_addiw : mword 6 := mword_of_int 0 in
+    let sp0 := m0 !!! Regidx csp_rs1 in
     let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
     let ra0 := m0 !!! Regidx ra_idx in
     let s00 := m0 !!! Regidx s0_idx in
@@ -450,6 +446,7 @@ Section WpMycpu.
     let m10 := <[Regidx s0_idx := regval_into_reg s00]> m9 in
     let m11 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10 in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (2 ≤ n)%nat ->
     ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -468,25 +465,35 @@ Section WpMycpu.
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    pa_ra ↦₈ raold -∗
-    pa_s0 ↦₈ s0old -∗
+    stack_own sp0 n -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗ gpr_file m11 -∗
-      pa_ra ↦₈ ra0 -∗
-      pa_s0 ↦₈ s00 -∗
+      stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ra_idx tp_idx s0_idx a0_idx a5_idx pcE imm_entry imm_dealloc nzimm_s0
-      imm_auipc imm_addi shamt_slli imm_addiw sp' ra0 s00
+      imm_auipc imm_addi shamt_slli imm_addiw sp0 sp' ra0 s00
       ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
-      HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
+      Hn2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             #Htext Hpc Hfile Hbra Hbs0 Hcont".
+             #Htext Hpc Hfile Hstk Hcont".
+    (* peel mycpu's two-slot frame off the abstract stack ownership and thread
+       the concrete slots through the instruction chain; the caller's extra
+       depth [n-2] rides along untouched in [Hdeep]. *)
+    iDestruct (stack_own_split_1 sp0 2 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iDestruct (stack_own_2_elim with "Htop") as (raold s0old) "[Hbra Hbs0]".
+    (* the two slots sit at the raw SP-relative addresses mycpu's stores use. *)
+    assert (Hpra : add_vec (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { unfold sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hps0 : add_vec (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { unfold sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hpra) in "Hbra".
+    iEval (rewrite -Hps0) in "Hbs0".
     (* register-index / offset spelling bridges (pure, concrete) *)
     assert (Hcsp2 : Regidx (mword_of_int 2 : mword 5) = Regidx csp_rs1)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
@@ -736,142 +743,15 @@ Section WpMycpu.
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi1e [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile [Hbra] [Hbs0]").
-    - iExact "Hbra".
-    - iExact "Hbs0".
-  Qed.
-
-  Lemma wp_mycpu (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64))
-      (n : nat)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let tp_idx : mword 5 := mword_of_int 4 in
-    let s0_idx : mword 5 := mword_of_int 8 in
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let a5_idx : mword 5 := mword_of_int 15 in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let imm_entry : mword 6 := mword_of_int 48 in
-    let imm_dealloc : mword 6 := mword_of_int 16 in
-    let nzimm_s0 : mword 8 := mword_of_int 4 in
-    let imm_auipc : mword 20 := mword_of_int 0x11 in
-    let imm_addi : mword 12 := mword_of_int 0xa94 in
-    let shamt_slli : mword 6 := mword_of_int 7 in
-    let imm_addiw : mword 6 := mword_of_int 0 in
-    let sp0 := m0 !!! Regidx csp_rs1 in
-    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
-    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a8_ra := ea_ra in
-    let pa_ra := a8_ra in
-    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let a8_s0 := ea_s0 in
-    let pa_s0 := a8_s0 in
-    let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
-    let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
-    let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2 in
-    let m4 := <[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3 in
-    let m5 := <[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4 in
-    let m6 := <[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5 in
-    let m7 := <[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6 in
-    let m8 := <[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7 in
-    let m9 := <[Regidx ra_idx := regval_into_reg ra0]> m8 in
-    let m10 := <[Regidx s0_idx := regval_into_reg s00]> m9 in
-    let m11 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10 in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (2 ≤ n)%nat ->
-    ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (* the single "PMP TOR entry 0 covers all of RAM" config fact *)
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    stack_own sp0 n -∗
-    ( ∀ mf,
-      hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗ gpr_file mf -∗ ⌜ callee_saved m0 mf ⌝ -∗
-      stack_own sp0 n -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros ra_idx tp_idx s0_idx a0_idx a5_idx pcE imm_entry imm_dealloc nzimm_s0
-      imm_auipc imm_addi shamt_slli imm_addiw sp0 sp' ra0 s00
-      ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
-      m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
-      Hn2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             #Htext Hpc Hfile Hstk Hcont".
-    (* peel mycpu's two-slot frame off the abstract stack ownership and hand
-       the concrete slots to the legacy [wp_mycpu_words]; the caller's extra
-       depth [n-2] rides along untouched in [Hdeep]. *)
-    iDestruct (stack_own_split_1 sp0 2 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
-    iDestruct (stack_own_2_elim with "Htop") as (raold s0old) "[Hbra Hbs0]".
-    (* the two slots sit at the raw SP-relative addresses [wp_mycpu_words] wants. *)
-    assert (Hpra : add_vec (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
-    { unfold sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hps0 : add_vec (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
-    { unfold sp0, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite -Hpra) in "Hbra".
-    iEval (rewrite -Hps0) in "Hbs0".
-    iApply (wp_mycpu_words root_ppn E Φ m0 raold s0old mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hbra Hbs0 [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbra Hbs0".
-    iEval (rewrite Hpra) in "Hbra".
-    iEval (rewrite Hps0) in "Hbs0".
+    (* the inlined body leaves the two cells at the let-folded [pa_ra]/[pa_s0]
+       spellings; restate the [pa_stk] bridges in that form (convertible). *)
+    assert (Hpra' : pa_ra = pa_stk sp0 1) by exact Hpra.
+    assert (Hps0' : pa_s0 = pa_stk sp0 2) by exact Hps0.
+    iEval (rewrite Hpra') in "Hbra".
+    iEval (rewrite Hps0') in "Hbs0".
     iDestruct (stack_own_2_intro with "Hbra Hbs0") as "Htop".
     iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! m11 with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
-    subst m11 m10 m9 m8 m7 m6 m5 m4 m3 m2 m1 sp' s00 ra0 s0_idx ra_idx tp_idx a0_idx a5_idx.
-    unfold callee_saved. repeat split.
-    - (* x2 sp: balanced frame *)
-      rewrite lookup_total_insert.
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      rewrite lookup_total_insert. apply mycpu_frame_cancel.
-    - (* x4 tp *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x8 s0: spilled + reloaded *)
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert. reflexivity.
-    - (* x9 s1 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x18 s2 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x19 s3 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x20 s4 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x21 s5 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x22 s6 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x23 s7 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x24 s8 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x25 s9 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x26 s10 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
-    - (* x27 s11 *)
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hstk").
   Qed.
 
 End WpMycpu.

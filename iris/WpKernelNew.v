@@ -23,7 +23,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec WpEntry WpGpr.
 Require Import WpGprRvc.
 Require Import WpGprCsrwA WpGprCsrwB.
 Require Import WpGprMretWp.
-Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit WpStartNew.
+Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit WpStartNew StackOwn.
 Require Import KernelText.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
@@ -38,10 +38,11 @@ Section WpKernelNew.
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (vsra vss0 vtra vts0 : bv 64) {dq : dfrac} :
+      (n : nat) {dq : dfrac} :
     (* the stack pointer start() runs on: _entry's computed sp
        (= v_stack0 + 4096 * (mhartid + 1)). *)
     let sp0 : mword 64 := m_jal m v_stack0 mhartid_in !!! Regidx csp_rs1 in
+    (4 <= n)%nat ->
     ↑minstretN ⊆ E ->
     (* boot pmp config: all entries OFF. *)
     pmp_all_off pmpcfg0 ->
@@ -69,12 +70,9 @@ Section WpKernelNew.
     stimecmp ↦ᵣ stimecmp0 -∗
     (* the per-CPU stack0 pointer word _entry loads *)
     entry_ld_ea ↦₈{ dq } v_stack0 -∗
-    (* start()'s frame slots *)
-    (ti_ea_ra sp0) ↦₈ vsra -∗
-    (ti_ea_s0 sp0) ↦₈ vss0 -∗
-    (* timerinit's frame slots *)
-    (ti_ea_ra (ti_sp1 sp0)) ↦₈ vtra -∗
-    (ti_ea_s0 (ti_sp1 sp0)) ↦₈ vts0 -∗
+    (* start()'s 4-slot frame (own ra/s0 + child timerinit's ra/s0) as the
+       bottom four slots of [stack_own sp0 n] (any depth n >= 4). *)
+    stack_own sp0 n -∗
     kernel_text -∗
     ( ∀ (ms0 : mword 64)
         (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
@@ -99,16 +97,13 @@ Section WpKernelNew.
       mtime ↦ᵣ mtime0 -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
       entry_ld_ea ↦₈{ dq } v_stack0 -∗
-      (ti_ea_ra sp0) ↦₈ (add_vec_int pc_e7 4) -∗
-      (ti_ea_s0 sp0) ↦₈ (m !!! Regidx ti_s0) -∗
-      (ti_ea_ra (ti_sp1 sp0)) ↦₈ st_ra_link -∗
-      (ti_ea_s0 (ti_sp1 sp0)) ↦₈ sp0 -∗
+      stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros sp0 HN Hpmp HlpeE Hbnd_ra Hbnd_s0.
+    intros sp0 Hn4 HN Hpmp HlpeE Hbnd_ra Hbnd_s0.
     iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
-             Hmtime Hstc Hstk Hsra Hss0 Htra Hts0 #Htext Hcont".
+             Hmtime Hstc Hstk Hstko #Htext Hcont".
     (* ---- _entry: reset -> jal start (PC = 0x80000058) ---- *)
     iApply (wp_entry E Φ m v_stack0 mhartid_in pmpcfg0 (dq := dq) HN Hpmp
               with "Hmm Hpcf Hpc Hfile Hmh Hstk Htext").
@@ -126,20 +121,20 @@ Section WpKernelNew.
                   vm_compute in H; discriminate H ]).
       reflexivity. }
     (* ---- start(): jal-entry -> MRET (Supervisor mode at <main>) ---- *)
-    iApply (wp_start_words E Φ (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
+    iApply (wp_start E Φ (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
               (m !!! Regidx ti_s0)
               mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in
-              mcounteren0 pmpcfg0 pmpaddr00 vsra vss0 vtra vts0
-              HN Hpmp HlpeE eq_refl HEra HEs0
+              mcounteren0 pmpcfg0 pmpaddr00 n
+              Hn4 HN Hpmp HlpeE eq_refl HEra HEs0
               Hbnd_ra Hbnd_s0
               with "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
-                    Hmcen Hmtime Hstc Hsra Hss0 Htra Hts0 Htext [Hcont Hstk]").
+                    Hmcen Hmtime Hstc Hstko Htext [Hcont Hstk]").
     iIntros (ms0 HoIE HoPRV HoSXL)
       "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
-       Hmenv Hmcen Hmtime Hstc Hsra Hss0 Htra Hts0".
+       Hmenv Hmcen Hmtime Hstc Hstko".
     iApply ("Hcont" $! ms0 HoIE HoPRV HoSXL
               with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl
-                    Hmie Hmenv Hmcen Hmtime Hstc Hstk Hsra Hss0 Htra Hts0").
+                    Hmie Hmenv Hmcen Hmtime Hstc Hstk Hstko").
   Qed.
 
 End WpKernelNew.

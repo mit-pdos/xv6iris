@@ -1103,16 +1103,15 @@ Section WpStartThm.
     rewrite dfrac_op_own Qp.half_half. iExact "H".
   Qed.
 
-  (* [wp_start_words]: legacy word-level interface (four explicit stack slots),
-     retained for callers not yet migrated to [stack_own].  [wp_start] below is
-     the same theorem over [stack_own sp0 n] (n >= 4 = start's own 2-slot frame
-     plus timerinit's 2-slot child frame). *)
-  Lemma wp_start_words E (Φ : mval -> iProp Σ)
+  (* [wp_start]: the whole-function spec over [stack_own sp0 n] (n >= 4 =
+     start's own 2-slot frame plus timerinit's 2-slot child frame). *)
+  Lemma wp_start E (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (vsra vss0 vtra vts0 : bv 64) :
+      (n : nat) :
+    (4 <= n)%nat ->
     ↑minstretN ⊆ E ->
     (* the boot pmpcfg is all-OFF (fetches + the two prologue stores). *)
     pmp_all_off pmpcfg0 ->
@@ -1142,10 +1141,9 @@ Section WpStartThm.
     mcounteren ↦ᵣ mcounteren0 -∗
     mtime ↦ᵣ mtime0 -∗
     stimecmp ↦ᵣ stimecmp0 -∗
-    (ti_ea_ra sp0) ↦₈ vsra -∗
-    (ti_ea_s0 sp0) ↦₈ vss0 -∗
-    (ti_ea_ra (ti_sp1 sp0)) ↦₈ vtra -∗
-    (ti_ea_s0 (ti_sp1 sp0)) ↦₈ vts0 -∗
+    (* start's 4-slot stack region (own ra/s0 + child timerinit's ra/s0)
+       as the bottom four slots of [stack_own sp0 n] (any depth n >= 4). *)
+    stack_own sp0 n -∗
     kernel_text -∗
     (* the continuation is universally quantified over the (hidden) entry
        mstatus value [ms0] with its mmode_config invariant facts. *)
@@ -1170,16 +1168,28 @@ Section WpStartThm.
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
       mtime ↦ᵣ mtime0 -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
-      (ti_ea_ra sp0) ↦₈ ra0 -∗
-      (ti_ea_s0 sp0) ↦₈ s00 -∗
-      (ti_ea_ra (ti_sp1 sp0)) ↦₈ st_ra_link -∗
-      (ti_ea_s0 (ti_sp1 sp0)) ↦₈ sp0 -∗
+      stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hpmp HlpeE Hsp Hra Hs0 Hbnd_ra Hbnd_s0.
-    iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
-             Hmtime Hstc Hsra Hss0 Htra Hts0 #Htext Hcont".
+    intros Hn4 HN Hpmp HlpeE Hsp Hra Hs0 Hbnd_ra Hbnd_s0.
+    iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hmtime Hstc Hstk #Htext Hcont".
+    iDestruct (stack_own_split_1 sp0 4 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
+    iDestruct (stack_own_split_1 sp0 2 4 ltac:(lia) with "Htop") as "[Ht12 Ht34]".
+    iDestruct (stack_own_2_elim with "Ht12") as (vsra vss0) "[Hsra Hss0]".
+    iDestruct (stack_own_2_elim with "Ht34") as (vtra vts0) "[Htra Hts0]".
+    iEval (rewrite (pa_stk_assoc sp0 2 1)) in "Htra".
+    iEval (rewrite (pa_stk_assoc sp0 2 2)) in "Hts0".
+    assert (Hb1 : ti_ea_ra sp0 = pa_stk sp0 1).
+    { unfold ti_ea_ra, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : ti_ea_s0 sp0 = pa_stk sp0 2).
+    { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb3 : ti_ea_ra (ti_sp1 sp0) = pa_stk sp0 3).
+    { unfold ti_ea_ra, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb4 : ti_ea_s0 (ti_sp1 sp0) = pa_stk sp0 4).
+    { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hb1) in "Hsra". iEval (rewrite -Hb2) in "Hss0".
+    iEval (rewrite -Hb3) in "Htra". iEval (rewrite -Hb4) in "Hts0".
     (* the 34 [instr] facts, off the persistent text image *)
     iPoseProof (st_instr30 with "Htext") as "Hi30".
     iPoseProof (st_instr31 with "Htext") as "Hi31".
@@ -1624,13 +1634,22 @@ Section WpStartThm.
     assert (L59s0 : st_m59 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_s0 = sp0)
       by (st_unfold; st_look).
     iDestruct "Hpaddr" as "[HpaA HpaK]".
-    iApply (wp_timerinit_words E Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
+    (* bundle timerinit's 2-slot frame into [stack_own (ti_sp1 sp0) 2] *)
+    assert (Htb1 : ti_ea_ra (ti_sp1 sp0) = pa_stk (ti_sp1 sp0) 1).
+    { unfold ti_ea_ra, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Htb2 : ti_ea_s0 (ti_sp1 sp0) = pa_stk (ti_sp1 sp0) 2).
+    { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite Htb1) in "Htra". iEval (rewrite Htb2) in "Hts0".
+    iDestruct (stack_own_2_intro with "Htra Hts0") as "Htistk".
+    iApply (wp_timerinit E Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
               st_ra_link sp0 menvcfg0 mtime0 stimecmp0 mcounteren0
-              (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) vtra vts0
-              HN Hpmp1 Htor_ra Htor_s0 Hcret_al L59sp L59ra L59s0
-              with "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htra Hts0 Htext").
+              (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) 2
+              ltac:(lia) HN Hpmp1 Htor_ra Htor_s0 Hcret_al L59sp L59ra L59s0
+              with "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htistk Htext").
     iEval (rewrite Hcretv).
-    iIntros "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htra Hts0".
+    iIntros "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hmtime Hstc Htistk".
+    iDestruct (stack_own_2_elim with "Htistk") as (v_tra v_ts0) "[Htra Hts0]".
+    iEval (rewrite -Htb1) in "Htra". iEval (rewrite -Htb2) in "Hts0".
     iEval (change (ti_mout (st_m59 m sp0 ms0 mie0 mideleg0) (ti_sp1 sp0)
                      menvcfg0 mcounteren0 mtime0 st_ra_link sp0)
              with (st_mti m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0)) in "Hfile".
@@ -1698,104 +1717,8 @@ Section WpStartThm.
     iEval (rewrite Hctgtv).
     iIntros "Hhs Hpriv Hms Hpcf Hmenv Hpc Hfile Hmepc".
 
-    (* hand everything to the caller's continuation *)
-    iApply ("Hcont" $! ms0 HoIE HoPRV HoSXL
-              with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
-                    Hmenv Hmcen Hmtime Hstc Hsra Hss0 Htra Hts0").
-  Qed.
-
-
-  (* Public interface: start's 4-slot stack region (own ra/s0 + the child
-     timerinit's ra/s0) as [stack_own sp0 n] (n >= 4), a thin peel /
-     re-bundle wrapper over [wp_start_words]. *)
-  Lemma wp_start E (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)
-      (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in : mword 64)
-      (mcounteren0 : mword 32)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (n : nat) :
-    (4 <= n)%nat ->
-    ↑minstretN ⊆ E ->
-    (* the boot pmpcfg is all-OFF (fetches + the two prologue stores). *)
-    pmp_all_off pmpcfg0 ->
-    (* Zicfilp landing-pad enable of the initial menvcfg is off (the boot
-       flow never sets it), so the MRET target check is a no-op. *)
-    _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
-    (* entry register file: sp / ra / s0. *)
-    m !!! Regidx csp_rs1 = sp0 ->
-    m !!! Regidx ti_ra = ra0 ->
-    m !!! Regidx ti_s0 = s00 ->
-    (* timerinit's frame slots: inside the written TOR region
-       [0, 0xfffffffffffffc). *)
-    uint (ti_ea_ra (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
-    uint (ti_ea_s0 (ti_sp1 sp0)) + 8 <= 0xfffffffffffffc ->
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ pmpaddr00 -∗
-    pc_is st_pc30 -∗
-    gpr_file m -∗
-    mhartid ↦ᵣ mhartid_in -∗
-    mepc ↦ᵣ mepc0 -∗
-    satp ↦ᵣ satp0 -∗
-    medeleg ↦ᵣ medeleg0 -∗
-    mideleg ↦ᵣ mideleg0 -∗
-    mie ↦ᵣ mie0 -∗
-    menvcfg ↦ᵣ menvcfg0 -∗
-    mcounteren ↦ᵣ mcounteren0 -∗
-    mtime ↦ᵣ mtime0 -∗
-    stimecmp ↦ᵣ stimecmp0 -∗
-    stack_own sp0 n -∗
-    kernel_text -∗
-    (* the continuation is universally quantified over the (hidden) entry
-       mstatus value [ms0] with its mmode_config invariant facts. *)
-    ( ∀ (ms0 : mword 64)
-        (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
-        (HoPRV : eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false)
-        (HoSXL : _get_Mstatus_SXL ms0 = ('b"10")),
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗
-      mstatus ↦ᵣ cms5 (st_ms1 ms0) -∗
-      pmpcfg_n ↦ᵣ st_pmpcfg1 pmpcfg0 -∗
-      pmpaddr_n ↦ᵣ st_pmpaddr1 pmpcfg0 pmpaddr00 -∗
-      pc_is st_main -∗
-      gpr_file (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 mtime0 mhartid_in) -∗
-      mhartid ↦ᵣ mhartid_in -∗
-      mepc ↦ᵣ st_main -∗
-      satp ↦ᵣ satp_legalized satp0 (mword_of_int 0) -∗
-      medeleg ↦ᵣ legalize_medeleg medeleg0 st_ffff -∗
-      mideleg ↦ᵣ st_mdl1 mideleg0 -∗
-      mie ↦ᵣ st_mie1 mie0 mideleg0 -∗
-      menvcfg ↦ᵣ menvcfg_legalized menvcfg0 (ti_menv1 menvcfg0) -∗
-      mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
-      mtime ↦ᵣ mtime0 -∗
-      stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
-      stack_own sp0 n -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros Hn4 HN Hpmp HlpeE Hsp Hra Hs0 Hbnd_ra Hbnd_s0.
-    iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hmtime Hstc Hstk #Htext Hcont".
-    iDestruct (stack_own_split_1 sp0 4 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
-    iDestruct (stack_own_split_1 sp0 2 4 ltac:(lia) with "Htop") as "[Ht12 Ht34]".
-    iDestruct (stack_own_2_elim with "Ht12") as (vsra vss0) "[Hsra Hss0]".
-    iDestruct (stack_own_2_elim with "Ht34") as (vtra vts0) "[Htra Hts0]".
-    iEval (rewrite (pa_stk_assoc sp0 2 1)) in "Htra".
-    iEval (rewrite (pa_stk_assoc sp0 2 2)) in "Hts0".
-    assert (Hb1 : ti_ea_ra sp0 = pa_stk sp0 1).
-    { unfold ti_ea_ra, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb2 : ti_ea_s0 sp0 = pa_stk sp0 2).
-    { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb3 : ti_ea_ra (ti_sp1 sp0) = pa_stk sp0 3).
-    { unfold ti_ea_ra, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hb4 : ti_ea_s0 (ti_sp1 sp0) = pa_stk sp0 4).
-    { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iEval (rewrite -Hb1) in "Hsra". iEval (rewrite -Hb2) in "Hss0".
-    iEval (rewrite -Hb3) in "Htra". iEval (rewrite -Hb4) in "Hts0".
-    iApply (wp_start_words E Φ m sp0 ra0 s00 mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in
-              mcounteren0 pmpcfg0 pmpaddr00 vsra vss0 vtra vts0
-              HN Hpmp HlpeE Hsp Hra Hs0 Hbnd_ra Hbnd_s0
-              with "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hmtime Hstc Hsra Hss0 Htra Hts0 Htext [-]").
-    iIntros (ms0 HoIE HoPRV HoSXL) "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hmtime Hstc Hsra Hss0 Htra Hts0".
+    (* re-bundle start's 4 frame slots back into [stack_own sp0 n] and hand
+       everything to the caller's continuation. *)
     iEval (rewrite Hb1) in "Hsra". iEval (rewrite Hb2) in "Hss0".
     iEval (rewrite Hb3) in "Htra". iEval (rewrite Hb4) in "Hts0".
     iEval (rewrite -(pa_stk_assoc sp0 2 1)) in "Htra".
@@ -1806,5 +1729,6 @@ Section WpStartThm.
     iDestruct (stack_own_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
     iApply ("Hcont" $! ms0 HoIE HoPRV HoSXL with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hmtime Hstc Hstk").
   Qed.
+
 
 End WpStartThm.
