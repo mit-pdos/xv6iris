@@ -91,6 +91,7 @@ SmodePte.v
 Pt4kWalk.v
 KptPt.v
 SmodeCore.v
+HartActiveExecuteAs.v
 WpSmodeGpr.v
 WpMemsetS.v
 WpSmodeSret.v
