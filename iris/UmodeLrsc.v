@@ -315,3 +315,261 @@ Section GenExecLoadresFail4.
     cbn match. apply exec_returnM.
   Qed.
 End GenExecLoadresFail4.
+
+(* ===================================================================== *)
+(* SC.W fault-execute tower (StoreConditional prohibited).                *)
+(*                                                                         *)
+(* With LR/SC prohibited, no reservation is ever established, so           *)
+(* match_reservation is always false.  Then SC.W takes the no-matching-    *)
+(* reservation branch of vmem_write_addr, which runs phys_access_check      *)
+(* directly; the store-conditional PMA check (writable and reservability    *)
+(* not RsrvNone) fails on RsrvNone, giving E_SAMO_Access_Fault, then trap.  *)
+(* ===================================================================== *)
+
+(* pmaCheck for an aligned RAM StoreConditional with reservability RsrvNone. *)
+Lemma exec_pmaCheck_ram_storecon_fail (addr : mword 64) (pbmt : page_based_mem_type)
+      (region : PMA_Region) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) = RsrvNone ->
+  exec (pmaCheck (Physaddr addr) 4 (StoreConditional Data) pbmt true) s
+    = Some (Some (E_SAMO_Access_Fault tt), s).
+Proof.
+  intros Hmatch Halign Hresv.
+  unfold pmaCheck.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
+  rewrite Hmatch.
+  destruct region as [rbase rsize rattr rdtree].
+  cbn [PMA_Region_attributes] in Hresv |- *.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
+  cbn match beta.
+  change (assert_exp' true "sys/mem.sail:112.56-112.57" >>=
+          (fun _ : true = true =>
+             returnM (andb (PMA_writable (override_PMA rattr pbmt))
+                        (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone))))
+    with (returnM (andb (PMA_writable (override_PMA rattr pbmt))
+                    (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone)) : M bool).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
+  rewrite Hresv.
+  replace (generic_neq RsrvNone RsrvNone) with false by (vm_compute; reflexivity).
+  rewrite andb_false_r.
+  replace (get_config_print_pma tt) with false by (vm_compute; reflexivity).
+  cbn match.
+  apply exec_returnM.
+Qed.
+
+(* pmpCheck user grant for a StoreConditional: pmpCheckRWX checks W, exactly
+   like Store Data -- clone of exec_pmpCheck_user_grant_store. *)
+Lemma exec_pmpCheck_user_grant_storecon (a : mword 64) (width : Z) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  exec (pmpCheck (Physaddr a) width (StoreConditional Data) User) s = Some (None, s).
+Proof.
+  intros HA Hord Hrange HW.
+  unfold pmpCheck. rewrite exec_catch_early_return.
+  replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity). cbn zeta.
+  rewrite execR_bind0.
+  match goal with |- context[foreach_ZM_up ?F ?T ?S ?V ?B] =>
+    assert (Hfe : execR (foreach_ZM_up F T S V B) s = Some (inl None, s)) end.
+  { unfold foreach_ZM_up. cbn [foreach_ZM_up'].
+    rewrite execR_bind.
+    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpReadAddrReg_val 0 s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (exec_pmpMatchAddr_TOR_match a (to_bits 64 width)
+                  (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                  (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)
+                  (zeros' 64) s HA Hord Hrange)). cbn beta.
+    cbn match.
+    unfold or_boolM.
+    rewrite execR_bind.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (_ : exec (pmpCheckRWX (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                            (StoreConditional Data)) s = Some (true, s))).
+    2:{ unfold pmpCheckRWX. cbn match. rewrite HW. apply exec_returnm. }
+    cbn match. rewrite execR_returnR. cbn beta.
+    cbn match. rewrite execR_bind. rewrite execR_returnR. cbn match.
+    unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+  rewrite Hfe. cbn match. reflexivity.
+Qed.
+
+(* effectivePrivilege for StoreConditional below Machine (MPRV clear): identity. *)
+Lemma exec_effectivePrivilege_storecon_nm (m : mword 64) (pr : Privilege) s :
+  eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
+  exec (effectivePrivilege (StoreConditional Data) m pr) s = Some (pr, s).
+Proof.
+  intro H. unfold effectivePrivilege. cbn [generic_neq generic_eq].
+  rewrite H. cbn [andb]. apply exec_returnm.
+Qed.
+
+(* phys_access_check for a prohibited StoreConditional: pmp grants, PMA
+   fails on reservability -> Some (E_SAMO_Access_Fault). *)
+Lemma exec_phys_access_check_storecon_fail (p : Privilege) (pbmt : page_based_mem_type)
+    (addr : mword 64) (region : PMA_Region) s :
+  exec (pmpCheck (Physaddr addr) 4 (StoreConditional Data) p) s = Some (None, s) ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) = RsrvNone ->
+  exec (phys_access_check (StoreConditional Data) pbmt p (Physaddr addr) 4 true) s
+    = Some (Some (E_SAMO_Access_Fault tt), s).
+Proof.
+  intros Hpmp Hmatch Halign Hresv.
+  unfold phys_access_check.
+  rewrite (exec_bind_Some _ _ _ _ _ Hpmp).
+  rewrite (exec_bind_Some _ _ _ _ _
+             (exec_pmaCheck_ram_storecon_fail addr pbmt region s Hmatch Halign Hresv)).
+  cbn match. apply exec_returnM.
+Qed.
+
+Section GenVMemWriteStoreconFail4.
+  Variable p : Privilege.
+  Variable a : mword 64.
+  Variable dw : mword (8 * 4).
+  Variable region : PMA_Region.
+  Variable s : mstate.
+  Variable pa : mword 64.
+  Variable aq rl : bool.
+  Let W' : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_SAMO_Access_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 4 = true.
+  Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = p.
+  Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
+  Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * 4))) (StoreConditional Data)) s
+                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s).
+  Hypothesis Hpmp : exec (pmpCheck (Physaddr pa) 4 (StoreConditional Data) p) s = Some (None, s).
+  Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 4 = Some region.
+  Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
+  Hypothesis Hresv : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) = RsrvNone.
+  Hypothesis Hmatchrsv : match_reservation (bits_of_physaddr (Physaddr pa)) = false.
+
+  Lemma exec_vmem_write_addr_storecon_fail :
+    exec (vmem_write_addr (Virtaddr a) 4 dw (StoreConditional Data) (andb aq rl) rl true) s
+      = Some (Err W', s).
+  Proof.
+    unfold vmem_write_addr.
+    rewrite exec_catch_early_return.
+    rewrite Halign. cbn [Riscv.rv64d.not negb].
+    assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
+                            liftR (split_misaligned (Virtaddr a) 4)) s = Some (inr (1, 4), s)).
+    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_4 (Virtaddr a) s Halign). reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+    rewrite misaligned_order_1.
+    match goal with
+    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inl (Err W'), s))
+    end.
+    { eapply execR_untilMT_1_early.
+      - reflexivity.
+      - cbn match.
+        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
+        cbn [bits_of_virtaddr] in *. cbn match.
+        (* the SC assert (Bool.eqb res is_store_conditional) *)
+        assert (Hsc : exec (assert_exp (Bool.eqb true (is_store_conditional (StoreConditional Data))) "sys/vmem_utils.sail:197.50-197.51") s
+                      = Some (tt, s)) by reflexivity.
+        assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb true (is_store_conditional (StoreConditional Data))) "sys/vmem_utils.sail:197.50-197.51")
+                              : Defs.monadR (result bool ExecutionResult) exception unit) s = Some (inr tt, s))
+          by (rewrite execR_liftR; rewrite Hsc; reflexivity).
+        match goal with
+        | |- execR (Defs.bind ?inner ?post) s = _ =>
+          assert (Hbody : execR inner s = Some (inl (Err W'), s))
+        end.
+        { match goal with
+          | |- execR (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) s = _ => set (NN := Nbody)
+          end.
+          rewrite (execR_bind0_Some _ _ _ _ Hscm).
+          unfold NN; clear NN.
+          rewrite Hmatchrsv. cbn [negb andb].
+          rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+          rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+          rewrite Hcp.
+          rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_storecon_nm (register_lookup mstatus s.(sregs)) p s Hmprv)). cbn beta.
+          rewrite (execR_liftR_seq _ _ _ _ _
+            (exec_phys_access_check_storecon_fail p PBMT_PMA pa region s Hpmp Hmatch Hpalign Hresv)). cbn match.
+          rewrite (execR_liftR_seq _ _ _ _ _
+            (exec_memory_exception (Virtaddr (add_vec_int a (0 * 4))) (E_SAMO_Access_Fault tt) s)).
+          cbn match. cbn [bits_of_virtaddr]. rewrite avi0_mul4.
+          unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+        rewrite execR_bind. rewrite Hbody. reflexivity. }
+    rewrite execR_bind. rewrite Hu. cbn match. reflexivity.
+  Qed.
+End GenVMemWriteStoreconFail4.
+
+Section GenExecStoreconFail4.
+  Variable p : Privilege.
+  Variable rs1 rs2 rd : mword 5.
+  Variable a : mword 64.
+  Variable dw : mword (8 * 4).
+  Variable region : PMA_Region.
+  Variable s : mstate.
+  Variable pa : mword 64.
+  Variable aq rl : bool.
+  (* The rs2 source value is irrelevant to the fault; abstract it. *)
+  Variable dw_src : mword 64.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (zeros' 64).
+  Let W' : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_SAMO_Access_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (StoreConditional Data)) s = Some (Virtaddr a, s).
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 4 = true.
+  Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = p.
+  Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
+  Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * 4))) (StoreConditional Data)) s
+                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s).
+  Hypothesis Hpmp : exec (pmpCheck (Physaddr pa) 4 (StoreConditional Data) p) s = Some (None, s).
+  Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 4 = Some region.
+  Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
+  Hypothesis Hresv : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) = RsrvNone.
+  Hypothesis Hmatchrsv : match_reservation (bits_of_physaddr (Physaddr pa)) = false.
+  Hypothesis Hrs2 : exec (rX_bits (Regidx rs2)) s = Some (dw_src, s).
+
+  Lemma exec_vmem_write_storecon_fail :
+    exec (vmem_write (Regidx rs1) (zeros' 64) 4
+            (autocast (T := mword) (subrange_vec_dec dw_src (Z.sub (Z.mul 4 8) 1) 0))
+            (StoreConditional Data) (andb aq rl) rl true) s
+      = Some (Err W', s).
+  Proof.
+    unfold vmem_write. rewrite exec_catch_early_return.
+    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (StoreConditional Data) 4) s
+                   = Some (Ext_DataAddr_OK (Virtaddr a), s)).
+    { unfold get_transformed_data_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 (zeros' 64) (StoreConditional Data) 4 s)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ Htea).
+      apply exec_returnM. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
+    cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a) s)).
+    rewrite execR_liftR.
+    rewrite (exec_vmem_write_addr_storecon_fail p a
+               (autocast (T := mword) (subrange_vec_dec dw_src (Z.sub (Z.mul 4 8) 1) 0))
+               region s pa aq rl Halign Hcp Hmprv Htr Hpmp Hmatch Hpalign Hresv Hmatchrsv).
+    reflexivity.
+  Qed.
+
+  Lemma exec_execute_STORECON_fault :
+    exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd))) s = Some (W', s).
+  Proof.
+    change (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd)))
+      with (execute_STORECON aq rl (Regidx rs2) (Regidx rs1) 4 (Regidx rd)).
+    unfold execute_STORECON.
+    assert (Hass : exec (assert_exp' (Z.leb 4 xlen_bytes) "extensions/A/zalrsc_insts.sail:68.28-68.29" : M (_ = _)) s = Some (@eq_refl bool true, s)) by reflexivity.
+    rewrite (exec_bind_Some _ _ _ _ _ Hass).
+    rewrite (exec_bind_Some _ _ _ _ _ Hrs2).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_vmem_write_storecon_fail)).
+    cbn match. apply exec_returnM.
+  Qed.
+End GenExecStoreconFail4.
