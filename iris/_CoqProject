@@ -190,5 +190,6 @@ WpUserZbbRtype.v
 CboIllegal.v
 WpUserPriv.v
 WpUserSteps.v
+WpUserClassify.v
 WpUserExec.v
 WpUartPutcSyncFull.v
