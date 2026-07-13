@@ -23,7 +23,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import WpGpr.
 Require Import WpDecodeBridge.
+Require Import WpAuipc.
+Require Import WpMmodeLeafBase WpMmodeShiftiop.
 Require Import UmodeFetch UmodeEcall.
 Require Import UptInv WpUserBase.
 Require Import WpUserSteps.
@@ -84,6 +87,185 @@ Proof.
   unfold execute_FENCEI.
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier _ s)).
   apply exec_returnM.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* The one missing ITYPE per-op fact: SLTI (signed set-less-than-imm).  It
+   is the SLTIU proof with the signed comparison [zopz0zI_s]. *)
+Definition gpr_slti_val (rs1 : mword 5) (imm : mword 12) (s : mstate) : mword 64 :=
+  zero_extend' 64 (bool_to_bit (zopz0zI_s
+    (if Z.eqb (uint rs1) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    (sign_extend' 64 imm))).
+
+Lemma exec_execute_ITYPE_SLTI_gpr (rs1 rd : mword 5) (imm : mword 12) s :
+  exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTI))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_slti_val rs1 imm s))).
+Proof.
+  change (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTI)))
+    with (execute_ITYPE imm (Regidx rs1) (Regidx rd) SLTI).
+  unfold execute_ITYPE. cbn zeta match.
+  rewrite (exec_bind_Some _ _ _ (gpr_slti_val rs1 imm s) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+      apply exec_returnm. }
+  unfold gpr_slti_val.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  destruct (Z.eqb (uint rd) 0); apply exec_returnm.
+Qed.
+
+(* ITYPE with rd = x0: the write is discarded, so it retires state-preserving
+   for every op -- the [rd = 0] leg of the ITYPE classification (-> no-op
+   disjunct).  Built from the per-op [_gpr] facts. *)
+Lemma exec_execute_ITYPE_rd0 (op : iop) (imm : mword 12) (rs1 rd : mword 5) s :
+  uint rd = 0 ->
+  exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, op))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hrd0.
+  assert (Hz : Z.eqb (uint rd) 0 = true) by (apply Z.eqb_eq; exact Hrd0).
+  destruct op;
+    [ rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s)
+    | rewrite (exec_execute_ITYPE_SLTI_gpr rs1 rd imm s)
+    | rewrite (exec_execute_ITYPE_SLTIU_gpr rs1 rd imm s)
+    | rewrite (exec_execute_ITYPE_XORI_gpr rs1 rd imm s)
+    | rewrite (exec_execute_ITYPE_ORI_gpr rs1 rd imm s)
+    | rewrite (exec_execute_ITYPE_ANDI_gpr rs1 rd imm s) ];
+    rewrite Hz; reflexivity.
+Qed.
+
+(* The missing SHIFTIOP per-op fact: SRAI (arithmetic shift-right-imm), the
+   SLLI/SRLI proof with [shift_bits_right_arith]. *)
+Definition gpr_srai_val (rs1 : mword 5) (shamt : mword 6) (s : mstate) : mword 64 :=
+  shift_bits_right_arith (gpr_src rs1 s) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0).
+
+Lemma exec_execute_SHIFTIOP_SRAI_gpr (rs1 rd : mword 5) (shamt : mword 6) s :
+  exec (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRAI))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_srai_val rs1 shamt s))).
+Proof.
+  change (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRAI)))
+    with (execute_SHIFTIOP shamt (Regidx rs1) (Regidx rd) SRAI).
+  unfold execute_SHIFTIOP. cbn zeta match.
+  rewrite (exec_bind_Some _ _ _ (gpr_srai_val rs1 shamt s) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+      apply exec_returnm. }
+  unfold gpr_srai_val, gpr_src.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  destruct (Z.eqb (uint rd) 0); apply exec_returnm.
+Qed.
+
+Lemma exec_execute_SHIFTIOP_rd0 (op : sop) (shamt : mword 6) (rs1 rd : mword 5) s :
+  uint rd = 0 ->
+  exec (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hrd0.
+  assert (Hz : Z.eqb (uint rd) 0 = true) by (apply Z.eqb_eq; exact Hrd0).
+  destruct op;
+    [ rewrite (exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt s)
+    | rewrite (exec_execute_SHIFTIOP_SRLI_gpr rs1 rd shamt s)
+    | rewrite (exec_execute_SHIFTIOP_SRAI_gpr rs1 rd shamt s) ];
+    rewrite Hz; reflexivity.
+Qed.
+
+Definition shiftiop_f (op : sop) : mword 64 -> mword 6 -> mword 64 :=
+  match op with
+  | SLLI => fun v sh => shift_bits_left v (subrange_vec_dec sh (Z.sub log2_xlen 1) 0)
+  | SRLI => fun v sh => shift_bits_right v (subrange_vec_dec sh (Z.sub log2_xlen 1) 0)
+  | SRAI => fun v sh => shift_bits_right_arith v (subrange_vec_dec sh (Z.sub log2_xlen 1) 0)
+  end.
+
+Lemma exec_execute_SHIFTIOP_op_gpr (op : sop) (rs1 rd : mword 5) (shamt : mword 6) s :
+  exec (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    (shiftiop_f op
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                       shamt))).
+Proof.
+  destruct op;
+    [ exact (exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt s)
+    | exact (exec_execute_SHIFTIOP_SRLI_gpr rs1 rd shamt s)
+    | exact (exec_execute_SHIFTIOP_SRAI_gpr rs1 rd shamt s) ].
+Qed.
+
+(* The per-op value functions, packaged so the ITYPE disjunct's [f] is a
+   single [itype_f op].  Each matches its [gpr_<op>_val] definitionally. *)
+Definition itype_f (op : iop) : mword 64 -> mword 12 -> mword 64 :=
+  match op with
+  | ADDI  => fun v i => add_vec v (sign_extend' 64 i)
+  | SLTI  => fun v i => zero_extend' 64 (bool_to_bit (zopz0zI_s v (sign_extend' 64 i)))
+  | SLTIU => fun v i => zero_extend' 64 (bool_to_bit (zopz0zI_u v (sign_extend' 64 i)))
+  | XORI  => fun v i => xor_vec v (sign_extend' 64 i)
+  | ORI   => fun v i => or_vec v (sign_extend' 64 i)
+  | ANDI  => fun v i => and_vec v (sign_extend' 64 i)
+  end.
+
+Lemma exec_execute_ITYPE_op_gpr (op : iop) (rs1 rd : mword 5) (imm : mword 12) s :
+  exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    (itype_f op
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                       imm))).
+Proof.
+  destruct op;
+    [ exact (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s)
+    | exact (exec_execute_ITYPE_SLTI_gpr rs1 rd imm s)
+    | exact (exec_execute_ITYPE_SLTIU_gpr rs1 rd imm s)
+    | exact (exec_execute_ITYPE_XORI_gpr rs1 rd imm s)
+    | exact (exec_execute_ITYPE_ORI_gpr rs1 rd imm s)
+    | exact (exec_execute_ITYPE_ANDI_gpr rs1 rd imm s) ].
+Qed.
+
+(* UTYPE (LUI/AUIPC).  Disjunct 7 splits the written value into a
+   state-dependent [V imm s] (AUIPC reads PC) and a pc-pinned witness [v];
+   the extra premise ties them at PC = va. *)
+Definition utype_V (op : uop) : mword 20 -> mstate -> mword 64 :=
+  match op with
+  | LUI => fun imm s => luival imm
+  | AUIPC => fun imm s => add_vec (register_lookup PC s.(sregs)) (auipc_off imm)
+  end.
+
+Definition utype_v (op : uop) (imm : mword 20) (va : mword 64) : mword 64 :=
+  match op with
+  | LUI => luival imm
+  | AUIPC => add_vec va (auipc_off imm)
+  end.
+
+Lemma exec_execute_UTYPE_rd0 (op : uop) (imm : mword 20) (rd : mword 5) s :
+  uint rd = 0 ->
+  exec (execute (UTYPE (imm, Regidx rd, op))) s = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hrd0.
+  assert (Hz : Z.eqb (uint rd) 0 = true) by (apply Z.eqb_eq; exact Hrd0).
+  destruct op;
+    [ rewrite (exec_execute_UTYPE_LUI_gpr rd imm s)
+    | rewrite (exec_execute_UTYPE_AUIPC_gpr rd imm s) ];
+    rewrite Hz; reflexivity.
+Qed.
+
+Lemma exec_execute_UTYPE_op_gpr (op : uop) (rd : mword 5) (imm : mword 20) s :
+  exec (execute (UTYPE (imm, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (utype_V op imm s))).
+Proof.
+  destruct op;
+    [ exact (exec_execute_UTYPE_LUI_gpr rd imm s)
+    | exact (exec_execute_UTYPE_AUIPC_gpr rd imm s) ].
 Qed.
 
 Section WpUserClassify.
@@ -147,6 +329,90 @@ Section WpUserClassify.
     unfold ustep_case, WpUserSteps.ustep_case.
     right; right; right; right; right; right; right; right; right; right; right; left.
     exists vpn, i, w, ii. repeat split; assumption.
+  Qed.
+
+  (* A word decoding to any ITYPE op is classified: rd = x0 -> the no-op
+     disjunct (11); rd <> 0 -> the ITYPE compute disjunct (5), with
+     [f := itype_f op].  Unlike the nullary trap/no-op constructors this
+     carries the instruction fields, so it is its own classify lemma. *)
+  Lemma classify_itype (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 12) (rs1 rd : mword 5) (op : iop) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ITYPE (imm, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - (* rd = x0: no-op disjunct 11 *)
+      apply (classify_nop va ms_v g tlbvec vpn i w (ITYPE (imm, Regidx rs1, Regidx rd, op))).
+      + intro s. exact (exec_execute_ITYPE_rd0 op imm rs1 rd s Hrd0).
+      + reflexivity.
+      + exact Hf.
+      + exact Hdec.
+    - (* rd <> 0: ITYPE compute disjunct 5 *)
+      destruct Hf as (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC).
+      unfold ustep_case, WpUserSteps.ustep_case.
+      right; right; right; right; left.
+      exists vpn, i, w, op, (itype_f op), imm, rs1, rd.
+      repeat split; try assumption.
+      exact (fun rs1' rd' imm' s => exec_execute_ITYPE_op_gpr op rs1' rd' imm' s).
+  Qed.
+
+  (* SHIFTIOP (SLLI/SRLI/SRAI): rd = x0 -> no-op (11); rd <> 0 -> shift
+     disjunct (8), [f := shiftiop_f op]. *)
+  Lemma classify_shiftiop (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (shamt : mword 6) (rs1 rd : mword 5) (op : sop) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_nop va ms_v g tlbvec vpn i w (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op))).
+      + intro s. exact (exec_execute_SHIFTIOP_rd0 op shamt rs1 rd s Hrd0).
+      + reflexivity.
+      + exact Hf.
+      + exact Hdec.
+    - destruct Hf as (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC).
+      unfold ustep_case, WpUserSteps.ustep_case.
+      right; right; right; right; right; right; right; left.
+      exists vpn, i, w, op, (shiftiop_f op), shamt, rs1, rd.
+      repeat split; try assumption.
+      exact (fun rs1' rd' shamt' s => exec_execute_SHIFTIOP_op_gpr op rs1' rd' shamt' s).
+  Qed.
+
+  (* UTYPE (LUI/AUIPC): rd = x0 -> no-op (11); rd <> 0 -> the UTYPE disjunct
+     (7), with [V := utype_V op] and the pc-pinned witness [utype_v op imm va]. *)
+  Lemma classify_utype (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 20) (rd : mword 5) (op : uop) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (UTYPE (imm, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_nop va ms_v g tlbvec vpn i w (UTYPE (imm, Regidx rd, op))).
+      + intro s. exact (exec_execute_UTYPE_rd0 op imm rd s Hrd0).
+      + reflexivity.
+      + exact Hf.
+      + exact Hdec.
+    - destruct Hf as (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC).
+      unfold ustep_case, WpUserSteps.ustep_case.
+      right; right; right; right; right; right; left.
+      exists vpn, i, w, op, (utype_V op), (utype_v op imm va), imm, rd.
+      repeat split; try assumption.
+      + intros s' Hpc. destruct op; cbn [utype_V utype_v];
+          [ reflexivity | rewrite Hpc; reflexivity ].
+      + intros rd' imm' s. exact (exec_execute_UTYPE_op_gpr op rd' imm' s).
   Qed.
 
   (* The constructors this file classifies so far. *)
