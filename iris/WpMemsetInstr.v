@@ -359,14 +359,7 @@ Section WpMemsetInstr.
     (2 <= n)%nat ->
     ↑minstretN ⊆ E ->
     (* the ADD computing the loop end pointer [a4 := a2 + a0 = wval_add] *)
-    (forall s_pc : mstate,
-       register_lookup nextPC s_pc.(sregs) = add_vec_int (add_vec_int pcE 16) 4 ->
-       (if Z.eqb (uint a2_idx) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a2_idx))) s_pc.(sregs)) = m5 !!! Regidx a2_idx ->
-       (if Z.eqb (uint a0_idx) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint a0_idx))) s_pc.(sregs)) = m5 !!! Regidx a0_idx ->
-       exec (execute i_add) s_pc
-       = Some (RETIRE_SUCCESS, set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint a4_idx))) (regval_into_reg wval_add))) ->
+    add_vec (m5 !!! Regidx a2_idx) (m5 !!! Regidx a0_idx) = wval_add ->
     (* the entry [beqz a2] is taken exactly when the byte count [N] is zero:
        count register is zero iff N = 0 (a 0-byte memset skips the loop) *)
     eq_vec (m0 !!! Regidx a2_idx) zero_reg = Nat.eqb N 0 ->
@@ -394,7 +387,7 @@ Section WpMemsetInstr.
       imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz i_add imm_bne
       sp0 sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
       m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      Hn HN Hbexec_add Hcount0 Hret0 Hcmp.
+      Hn HN Hvalue_add Hcount0 Hret0 Hcmp.
     pose proof (add_vec_frame_cancel) as Hframe.
     iIntros "Hsm Htlbinv
              #Htext Hpc Hfile Hstk Hbuf Hcont".
@@ -522,8 +515,8 @@ Section WpMemsetInstr.
     assert (Hpc2 : add_vec_int (add_vec_int pc0L 6) 4 = pcLS) by (vm_compute; reflexivity).
     (* --- PREFIX: 0xccc..0xcdc --- *)
     iApply (wp_memset_prefix root_ppn E Φ m0 imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
-              i_add wval_add vra vs0 γ (dq:=dq)
-              HN Hn0 Hbexec_add
+              wval_add vra vs0 γ (dq:=dq)
+              HN Hn0 Hvalue_add
               with "Hsm Htlbinv Hpc Hfile
                     Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile Hbra Hbs0".

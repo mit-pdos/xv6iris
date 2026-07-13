@@ -28,6 +28,7 @@ Require Import WpMycpu WpPushOffTop WpAmo WpAcquireMem WpHolding WpAcquireTop.
 Require Import CalleeSaved.
 Require Import StackOwn.
 Require Import WpLock WpLockLeaves WpHoldingInv WpPopOff.
+Require Export WpSmodeLoad WpSmodeStore WpSmodeBtype.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for hiding mstatus0. *)
 Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
@@ -345,35 +346,6 @@ Section WpAcquireLock.
   Qed.
 
   (* [smode_config] leaf wrapper for the generic 8-byte RAM store. *)
-  Lemma wp_csd_s_ram_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    ↑minstretN ⊆ E ->
-    smode_config γ dq -∗ tlb_inv root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ea ↦₈ vold -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗ gpr_file m -∗ ea ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros ea HN.
-    iIntros "Hsm Htlbinv Hpc Hfile Hinstr Hbw Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_csd_s_ram root_ppn E Φ pc rs2 rs1 imm m vold mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hbw").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hbw").
-  Qed.
 
   Lemma wp_acquire_lock (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (γ : gname) (R : iProp Σ)
@@ -831,20 +803,13 @@ Section WpAcquireLock.
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: c.li a4,1 ---- *)
-    unshelve iApply (wp_gpr_write_s_config_scfg root_ppn γc E Φ (mword_of_int (AQ + 0x16)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5)
-              (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI))
+    iApply (wp_cli_s root_ppn γc E Φ (mword_of_int (AQ + 0x16)) (mword_of_int 14 : mword 5)
+              (mword_of_int 1 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
               mh (dq:=DfracOwn 1)
               HN ltac:(vm_compute; discriminate)
-              _
+              ltac:(reflexivity)
               with "Hcfg Htlbinv Hpc Hfile Hi16 [-]").
-    { intros s_pc Hnpc _ _.
-      change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
-      rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) (mword_of_int 14) (sign_extend' 12 (mword_of_int 1 : mword 6)) s_pc).
-      replace (Z.eqb (uint (mword_of_int 14 : mword 5)) 0) with false by (vm_compute; reflexivity).
-      unfold gpr_addi_val.
-      replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true by (vm_compute; reflexivity).
-      reflexivity. }
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (B5 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> mh).

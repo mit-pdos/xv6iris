@@ -1,4 +1,4 @@
-(* WpGprJal.v -- the JAL family, stated on the new [instr] / [mmode_config]
+(* WpMmodeJal.v -- the JAL family, stated on the new [instr] / [mmode_config]
    / [gpr_file] layer (cf. wp_auipc_gpr).  JAL has no source register: it
    writes rd := pc+4 (the return address) AND jumps, setting nextPC := the
    target [pc + sign_extend(imm)].  Unlike the straight-line templates

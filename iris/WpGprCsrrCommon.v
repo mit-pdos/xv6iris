@@ -11,7 +11,7 @@ From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.
 
 (* [subrange_vec_dec a (xlen-1) 0] extracts all 64 bits of a 64-bit word -- a
-   noop (cf. WpGprLoad.subrange_id, but stated with the [Z.sub xlen 1] form the
+   noop (cf. subrange_id, but stated with the [Z.sub xlen 1] form the
    CSR reads use).  Lets the CSR-read WPs state the read value without the
    subrange. *)
 Lemma subrange64_id (a : mword 64) : subrange_vec_dec a (Z.sub xlen 1) 0 = a.

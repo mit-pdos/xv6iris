@@ -24,7 +24,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpEntryNew WpAuipc.
-Require Import WpGpr WpGprAddi WpGprRvc WpGprShift WpGprLogic WpGprLui.
+Require Import WpGpr WpGprAddi WpGprRvc WpMmodeShiftiop WpGprLogic WpGprLui.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpHolding WpAcquireMem.
 Require Import WpLock.
@@ -42,39 +42,7 @@ Local Open Scope Z_scope.
 (* mirroring [exec_execute_RTYPE_OR{,_gpr}] in WpGprLogic.  The model's    *)
 (* SLTU writes [zero_extend' 64 (bool_to_bit (a <u b))].                   *)
 (* ===================================================================== *)
-Definition gpr_sltu_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
-  zero_extend' 64 (bool_to_bit (zopz0zI_u
-    (if Z.eqb (uint rs1) 0 then zero_reg
-     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-    (if Z.eqb (uint rs2) 0 then zero_reg
-     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)))).
-
-Lemma exec_execute_RTYPE_SLTU (rs2 rs1 rd : regidx) (a b : mword 64) s s' :
-  exec (rX_bits rs1) s = Some (a, s) -> exec (rX_bits rs2) s = Some (b, s) ->
-  exec (wX_bits rd (zero_extend' 64 (bool_to_bit (zopz0zI_u a b)))) s = Some (tt, s') ->
-  exec (execute_RTYPE rs2 rs1 rd SLTU) s = Some (RETIRE_SUCCESS, s').
-Proof. intros Ha Hb Hw. unfold execute_RTYPE. cbn match.
-  rewrite (exec_bind_Some _ _ _ (zero_extend' 64 (bool_to_bit (zopz0zI_u a b))) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha). rewrite (exec_bind_Some _ _ _ _ _ Hb). apply exec_returnm. }
-  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
-
-Lemma exec_execute_RTYPE_SLTU_gpr (rs2 rs1 rd : mword 5) s :
-  uint rd <> 0 ->
-  exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU))) s
-  = Some (RETIRE_SUCCESS,
-          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-            (regval_into_reg (gpr_sltu_val rs2 rs1 s))).
-Proof.
-  intro Hrd. unfold gpr_sltu_val.
-  change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)))
-    with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SLTU).
-  eapply exec_execute_RTYPE_SLTU.
-  - apply (exec_rX_bits_gpr rs1 s).
-  - apply (exec_rX_bits_gpr rs2 s).
-  - rewrite exec_wX_bits_gpr.
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    reflexivity.
-Qed.
+(* gpr_sltu_val / exec_execute_RTYPE_SLTU{,_gpr} relocated to WpMmodeLeafBase.v *)
 
 (* [zopz0zI_u x y = Z.ltb (uint x) (uint y)]; a false compare packs to 0. *)
 Lemma sltu_false_zero (a b : mword 64) :
@@ -275,44 +243,8 @@ Section Kfree.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hbw").
   Qed.
 
-  Lemma wp_gpr_write_s_config_base_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rsa rsb : mword 5) (i : instruction) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
-    uint rd <> 0 ->
-    (forall s_pc : mstate,
-       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
-       (if Z.eqb (uint rsa) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = m !!! Regidx rsa ->
-       (if Z.eqb (uint rsb) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = m !!! Regidx rsb ->
-       exec (execute i) s_pc
-       = Some (RETIRE_SUCCESS,
-               set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    smode_config γ dq -∗ tlb_inv root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false i -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    iIntros (HN Hrd Hbexec) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_gpr_write_s_config_base root_ppn E Φ pc rd rsa rsb i wval m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd Hbexec
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
-
+  (* local wp_gpr_write_s_config_base_scfg engine copy removed: sites now use
+     specific per-instruction lemmas (wp_sltu_s / wp_slli_s / ...). *)
   Lemma wp_cslli_gpr_s_config_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rsd : regidx) (rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
@@ -541,34 +473,26 @@ Section Kfree.
     { rewrite /R4 lookup_total_insert. rewrite /R3 lookup_total_insert.
       apply bv_eq; vm_compute; reflexivity. }
     (* +0x14 sltu a4,a0,a5  (a4 := p <u end = 0, since end <= p) *)
-    iApply (wp_gpr_write_s_config_base_scfg root_ppn γc E Φ (mword_of_int (KF + 0x14))
+    iApply (wp_sltu_s root_ppn γc E Φ (mword_of_int (KF + 0x14))
               (mword_of_int 14 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 15 : mword 5)
-              (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 10), Regidx (mword_of_int 14), SLTU))
               (mword_of_int 0 : mword 64)
               R4 (dq:=DfracOwn 1)
               HN
               ltac:(vm_compute; discriminate)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    rewrite (exec_execute_RTYPE_SLTU_gpr (mword_of_int 15) (mword_of_int 10) (mword_of_int 14) s_pc ltac:(vm_compute; discriminate));
-                    unfold gpr_sltu_val; rewrite Hva Hvb Hp10 Hend;
-                    rewrite (sltu_false_zero p (mword_of_int 0x80023558) Hsltu14); reflexivity)
+              ltac:(rewrite Hp10 Hend; exact (sltu_false_zero p (mword_of_int 0x80023558) Hsltu14))
               with "Hcfg Htlbinv Hpc Hfile Hi14 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (R5 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> R4).
     assert (Hpp18 : add_vec_int (mword_of_int (KF + 0x14) : mword 64) 4 = mword_of_int (KF + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     (* +0x18 c.li a5,17 *)
-    iApply (wp_gpr_write_s_config_scfg root_ppn γc E Φ (mword_of_int (KF + 0x18))
-              (mword_of_int 15 : mword 5) (zero_extend' 5 ('b"00") : mword 5) (zero_extend' 5 ('b"00") : mword 5)
-              (ITYPE (sign_extend' 12 (mword_of_int 17 : mword 6), zreg, Regidx (mword_of_int 15), ADDI))
+    iApply (wp_cli_s root_ppn γc E Φ (mword_of_int (KF + 0x18))
+              (mword_of_int 15 : mword 5) (mword_of_int 17 : mword 6)
               (mword_of_int 17 : mword 64)
               R5 (dq:=DfracOwn 1)
               HN
               ltac:(vm_compute; discriminate)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) (mword_of_int 15) (sign_extend' 12 (mword_of_int 17 : mword 6)) s_pc);
-                    replace (Z.eqb (uint (mword_of_int 15 : mword 5)) 0) with false by (vm_compute; reflexivity);
-                    do 2 f_equal; unfold gpr_addi_val; apply bv_eq; vm_compute; reflexivity)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcfg Htlbinv Hpc Hfile Hi18 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (R6 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 17 : mword 64)]> R5).
@@ -606,17 +530,13 @@ Section Kfree.
     assert (Hpp1e : add_vec_int (mword_of_int (KF + 0x1c) : mword 64) 2 = mword_of_int (KF + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1e) in "Hpc".
     (* +0x1e sltu a5,a5,a0  (a5 := (PHYSTOP-1) <u p = 0, since p <= PHYSTOP-1) *)
-    iApply (wp_gpr_write_s_config_base_scfg root_ppn γc E Φ (mword_of_int (KF + 0x1e))
+    iApply (wp_sltu_s root_ppn γc E Φ (mword_of_int (KF + 0x1e))
               (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
-              (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLTU))
               (mword_of_int 0 : mword 64)
               R8 (dq:=DfracOwn 1)
               HN
               ltac:(vm_compute; discriminate)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    rewrite (exec_execute_RTYPE_SLTU_gpr (mword_of_int 10) (mword_of_int 15) (mword_of_int 15) s_pc ltac:(vm_compute; discriminate));
-                    unfold gpr_sltu_val; rewrite Hva Hvb Hphysm1 Hp10_8;
-                    rewrite (sltu_false_zero (mword_of_int 0x87FFFFFF) p Hsltu1e); reflexivity)
+              ltac:(rewrite Hphysm1 Hp10_8; exact (sltu_false_zero (mword_of_int 0x87FFFFFF) p Hsltu1e))
               with "Hcfg Htlbinv Hpc Hfile Hi1e [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (R9 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> R8).
@@ -631,20 +551,13 @@ Section Kfree.
     assert (Hpp22 : add_vec_int (mword_of_int (KF + 0x1e) : mword 64) 4 = mword_of_int (KF + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
     (* +0x22 c.or a5,a4  (a5 := a5 | a4 = 0) *)
-    iApply (wp_gpr_write_s_config_scfg root_ppn γc E Φ (mword_of_int (KF + 0x22))
+    iApply (wp_cor_s root_ppn γc E Φ (mword_of_int (KF + 0x22))
               (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
-              (RTYPE (creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), OR))
               (mword_of_int 0 : mword 64)
               R9 (dq:=DfracOwn 1)
               HN
               ltac:(vm_compute; discriminate)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    change (creg2reg_idx (Cregidx (mword_of_int 6))) with (Regidx (mword_of_int 14 : mword 5));
-                    change (creg2reg_idx (Cregidx (mword_of_int 7))) with (Regidx (mword_of_int 15 : mword 5));
-                    rewrite (exec_execute_RTYPE_OR_gpr (mword_of_int 14) (mword_of_int 15) (mword_of_int 15) s_pc ltac:(vm_compute; discriminate));
-                    unfold gpr_or_val; rewrite Hva Hvb Hor15 Hor14;
-                    replace (or_vec (mword_of_int 0 : mword 64) (mword_of_int 0)) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity);
-                    reflexivity)
+              ltac:(rewrite Hor15 Hor14; apply bv_eq; vm_compute; reflexivity)
               with "Hcfg Htlbinv Hpc Hfile Hi22 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (R10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> R9).
@@ -678,18 +591,13 @@ Section Kfree.
     assert (Hpp28 : add_vec_int (mword_of_int (KF + 0x26) : mword 64) 2 = mword_of_int (KF + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp28) in "Hpc".
     (* +0x28 slli a5,a0,0x34  (a5 := p << 52 = 0, since p is 4096-aligned) *)
-    iApply (wp_gpr_write_s_config_base_scfg root_ppn γc E Φ (mword_of_int (KF + 0x28))
-              (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
-              (SHIFTIOP (mword_of_int 52 : mword 6, Regidx (mword_of_int 10), Regidx (mword_of_int 15), SLLI))
+    iApply (wp_slli_s root_ppn γc E Φ (mword_of_int (KF + 0x28))
+              (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 52 : mword 6)
               (mword_of_int 0 : mword 64)
               R11 (dq:=DfracOwn 1)
               HN
               ltac:(vm_compute; discriminate)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    rewrite (exec_execute_SHIFTIOP_SLLI_gpr (mword_of_int 10) (mword_of_int 15) (mword_of_int 52 : mword 6) s_pc);
-                    replace (Z.eqb (uint (mword_of_int 15 : mword 5)) 0) with false by (vm_compute; reflexivity);
-                    unfold gpr_slli_val, gpr_src;
-                    rewrite Hva Hp10_11 (shift_bits_left52_zero p Hpal); reflexivity)
+              ltac:(rewrite Hp10_11; exact (shift_bits_left52_zero p Hpal))
               with "Hcfg Htlbinv Hpc Hfile Hi28 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (R12 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> R11).
@@ -708,36 +616,26 @@ Section Kfree.
     assert (Hpp2e : add_vec_int (mword_of_int (KF + 0x2c) : mword 64) 2 = mword_of_int (KF + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2e) in "Hpc".
     (* +0x2e c.lui a2,0x1  (a2 := 4096, the memset length) *)
-    iApply (wp_gpr_write_s_config_scfg root_ppn γc E Φ (mword_of_int (KF + 0x2e))
-              (mword_of_int 12 : mword 5) (zero_extend' 5 ('b"00") : mword 5) (zero_extend' 5 ('b"00") : mword 5)
-              (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 12), LUI))
+    iApply (wp_clui_s root_ppn γc E Φ (mword_of_int (KF + 0x2e))
+              (mword_of_int 12 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6))
               (mword_of_int 4096 : mword 64)
               R12 (dq:=DfracOwn 1)
               HN
               ltac:(vm_compute; discriminate)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    rewrite (exec_execute_UTYPE_LUI_gpr (mword_of_int 12) (sign_extend' 20 (mword_of_int 1 : mword 6)) s_pc);
-                    replace (Z.eqb (uint (mword_of_int 12 : mword 5)) 0) with false by (vm_compute; reflexivity);
-                    replace (luival (sign_extend' 20 (mword_of_int 1 : mword 6))) with (mword_of_int 4096 : mword 64) by (unfold luival; apply bv_eq; vm_compute; reflexivity);
-                    reflexivity)
+              ltac:(unfold luival; apply bv_eq; vm_compute; reflexivity)
               with "Hcfg Htlbinv Hpc Hfile Hi2e [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (R13 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (mword_of_int 4096 : mword 64)]> R12).
     assert (Hpp30 : add_vec_int (mword_of_int (KF + 0x2e) : mword 64) 2 = mword_of_int (KF + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp30) in "Hpc".
     (* +0x30 c.li a1,1  (a1 := 1, the memset fill byte) *)
-    iApply (wp_gpr_write_s_config_scfg root_ppn γc E Φ (mword_of_int (KF + 0x30))
-              (mword_of_int 11 : mword 5) (zero_extend' 5 ('b"00") : mword 5) (zero_extend' 5 ('b"00") : mword 5)
-              (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI))
+    iApply (wp_cli_s root_ppn γc E Φ (mword_of_int (KF + 0x30))
+              (mword_of_int 11 : mword 5) (mword_of_int 1 : mword 6)
               (mword_of_int 1 : mword 64)
               R13 (dq:=DfracOwn 1)
               HN
               ltac:(vm_compute; discriminate)
-              ltac:(intros s_pc Hnpc Hva Hvb;
-                    rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) (mword_of_int 11) (sign_extend' 12 (mword_of_int 1 : mword 6)) s_pc);
-                    replace (Z.eqb (uint (mword_of_int 11 : mword 5)) 0) with false by (vm_compute; reflexivity);
-                    replace (gpr_addi_val (zero_extend' 5 ('b"00")) (sign_extend' 12 (mword_of_int 1 : mword 6)) s_pc) with (mword_of_int 1 : mword 64) by (unfold gpr_addi_val; apply bv_eq; vm_compute; reflexivity);
-                    reflexivity)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcfg Htlbinv Hpc Hfile Hi30 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
     set (R14 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 1 : mword 64)]> R13).

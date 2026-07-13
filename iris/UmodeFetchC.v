@@ -1,0 +1,567 @@
+(* UmodeFetchC.v -- User-mode COMPRESSED (RVC) instruction fetch through
+   the Sv39 TLB-hit path.
+
+   The two F_RVC flavours of the fetch, mirroring UmodeFetch's 4-byte
+   F_Base tower:
+     - [exec_fetch_F_RVC_4_U_gen]: pc 4-aligned.  The Ziccif branch
+       fetches a full 4-byte window and F_RVC is the LOW HALFWORD --
+       the code map must still cover pa..pa+3.
+     - [exec_fetch_F_RVC_2_U_gen]: pc == 2 (mod 4).  The alignment-fault
+       check reads Zca (enabled: misa.C = 1), the Ziccif branch is
+       skipped, and a single 2-byte fetch_bytes runs through the same
+       translate-hit chain.
+   Plus the width-2 U-mode read stack they need
+   ([exec_checked_mem_read_ram_2_U], [exec_mem_read_fetch_2_U]) -- clones
+   of UmodeFetch's width-4 stack over RiscvFetchExec's width-2 PMA/RAM
+   primitives.                                                            *)
+From Stdlib Require Import ZArith Bool.
+From stdpp Require Import gmap bitvector.definitions.
+From iris.proofmode Require Import proofmode.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import SmodeCore.
+Require Import WpIntrCore.
+Require Import UmodeFetch.
+Require Import WpGpr.
+Local Open Scope Z_scope.
+Import Defs.
+
+(* ===================================================================== *)
+(* §1 The width-2 U-mode read stack.                                      *)
+(* ===================================================================== *)
+
+Lemma exec_checked_mem_read_ram_2_U (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : bv 16) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 2)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 2 = Some region ->
+  is_aligned_paddr (Physaddr addr) 2 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  exec (within_clint (Physaddr addr) 2) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 2) s = Some (false, s) ->
+  exec (within_htif_readable (Physaddr addr) 2) s = Some (false, s) ->
+  (forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (checked_mem_read (InstructionFetch tt) pbmt User (Physaddr addr) 2 false false false false)
+       s = Some (Ok (w, default_meta), s).
+Proof.
+  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes.
+  unfold checked_mem_read.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
+  2:{ unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmpCheck_user_grant addr 2 s HA Hord Hrange HX)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_2 addr pbmt region s Hmatch Halign Hexec)).
+      cbn match. apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (within_mmio_readable (Physaddr addr) 2) s = Some (false, s))).
+  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s))).
+  2:{ unfold read_kind_of_flags. apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_2 addr w s Hbytes)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_mem_read_fetch_2_U (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : bv 16) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 2)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 2 = Some region ->
+  is_aligned_paddr (Physaddr addr) 2 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
+  exec (within_clint (Physaddr addr) 2) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 2) s = Some (false, s) ->
+  exec (within_htif_readable (Physaddr addr) 2) s = Some (false, s) ->
+  (forall j : nat, (N.of_nat j < 2)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (mem_read (InstructionFetch tt) pbmt (Physaddr addr) 2 false false false)
+       s = Some (Ok w, s).
+Proof.
+  intros HA Hord Hrange HX Hmatch Halign Hexec Hc Hsig Hh Hbytes Hpriv.
+  unfold mem_read.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_fetch _ _ s)).
+  rewrite Hpriv.
+  unfold mem_read_priv.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (mem_read_priv_meta _ _ _ _ 2 _ _ _ _) s = Some (Ok (w, default_meta), s))).
+  2:{ unfold mem_read_priv_meta. cbn [orb andb].
+      rewrite (exec_bind_Some _ _ _ _ _
+                (_ : exec (checked_mem_read _ _ _ _ 2 _ _ _ _) s = Some (Ok (w, default_meta), s))).
+      2:{ cbn match. apply exec_checked_mem_read_ram_2_U with (region := region); assumption. }
+      cbn match. unfold mem_read_callback. apply exec_returnM. }
+  cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
+Qed.
+
+(* ===================================================================== *)
+(* §2 The 4-aligned RVC fetch: identical window to the F_Base fetch --     *)
+(*    only the isRVC discriminant flips, and F_RVC carries the LOW half.   *)
+(* ===================================================================== *)
+
+Lemma exec_fetch_F_RVC_4_U_gen
+      (va pa : mword 64) (w : mword 32) (s s1 : mstate) (region : PMA_Region) :
+  register_lookup PC s.(sregs) = va ->
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s1) ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s1.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s1.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s1.(sregs)) (Physaddr pa) 4 = Some region ->
+  is_aligned_paddr (Physaddr pa) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
+  exec (within_clint (Physaddr pa) 4) s1 = Some (false, s1) ->
+  exec (within_sig (Physaddr pa) 4) s1 = Some (false, s1) ->
+  exec (within_htif_readable (Physaddr pa) 4) s1 = Some (false, s1) ->
+  (forall j : nat, (N.of_nat j < 4)%N -> s1.(mem) !! (pa_add pa j) = Some (nth_byte w j)) ->
+  register_lookup cur_privilege s1.(sregs) = User ->
+  isRVC (subrange_vec_dec w 15 0) = true ->
+  exec (fetch tt) s = Some (F_RVC (subrange_vec_dec w 15 0), s1).
+Proof.
+  intros HpcPC Hvalign Htr iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv HisRVC.
+  destruct (align4_low_bits va Hvalign) as [Hbit0 Hbit1].
+  assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
+  { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
+  assert (Hfb4 : exec (fetch_bytes va va 4) s = Some (@FetchBytes_Success 4 w, s1)).
+  { unfold fetch_bytes.
+    rewrite exec_catch_early_return.
+    change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+              (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
+           = Some (inr (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), s1))).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+        rewrite execR_liftR. rewrite Htr. cbn match. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s1)).
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4 false false false)) s1
+           = Some (inr (Ok w), s1))).
+    2:{ rewrite execR_liftR.
+        rewrite (exec_mem_read_fetch_4_U PBMT_PMA pa region w s1
+                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv).
+        cbn match. reflexivity. }
+    cbv iota beta. rewrite autocast_mword_id.
+    rewrite execR_returnR_fwd. cbn match. reflexivity. }
+  unfold fetch.
+  rewrite exec_catch_early_return.
+  change (get_config_rvfi tt) with false. cbv iota beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ false s).
+  2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      unfold or_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit0. apply execR_returnR_fwd. }
+      cbv iota beta.
+      unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit1. apply execR_returnR_fwd. }
+      cbv iota beta. reflexivity. }
+  cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ true s).
+  2:{ unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ true s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hvalign. apply execR_returnR_fwd. }
+      cbv iota beta.
+      rewrite execR_liftR. rewrite exec_currentlyEnabled_Ziccif. cbn match. reflexivity. }
+  cbv iota beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hfb4).
+  cbv iota beta. rewrite HisRVC. cbv iota beta.
+  rewrite execR_returnR_fwd. cbn match. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §3 The 2-mod-4 RVC fetch: the alignment-fault check now READS Zca       *)
+(*    (misa.C = 1 keeps bit 1 legal), the Ziccif branch short-circuits on   *)
+(*    the failed 4-alignment, and one 2-byte fetch_bytes runs through the   *)
+(*    translate-hit chain.                                                  *)
+(* ===================================================================== *)
+
+Lemma exec_fetch_F_RVC_2_U_gen
+      (va pa : mword 64) (h : mword 16) (s s1 : mstate) (region : PMA_Region) :
+  register_lookup PC s.(sregs) = va ->
+  neq_vec (access_vec_dec va 0) ('b"0") = false ->
+  neq_vec (access_vec_dec va 1) ('b"0") = true ->
+  is_aligned_vaddr (Virtaddr va) 4 = false ->
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s1) ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s1.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 2)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n s1.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s1.(sregs)) (Physaddr pa) 2 = Some region ->
+  is_aligned_paddr (Physaddr pa) 2 = true ->
+  (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true ->
+  exec (within_clint (Physaddr pa) 2) s1 = Some (false, s1) ->
+  exec (within_sig (Physaddr pa) 2) s1 = Some (false, s1) ->
+  exec (within_htif_readable (Physaddr pa) 2) s1 = Some (false, s1) ->
+  (forall j : nat, (N.of_nat j < 2)%N -> s1.(mem) !! (pa_add pa j) = Some (nth_byte h j)) ->
+  register_lookup cur_privilege s1.(sregs) = User ->
+  isRVC h = true ->
+  exec (fetch tt) s = Some (F_RVC h, s1).
+Proof.
+  intros HpcPC Hbit0 Hbit1 Hvalign HmisaC Htr iHA iHord iHrange iHX iHmatch
+         iHalign iHexec iHc iHsig iHh iHbytes iHpriv HisRVC.
+  assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
+  { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
+  assert (Hfb2 : exec (fetch_bytes va va 2) s = Some (@FetchBytes_Success 2 h, s1)).
+  { unfold fetch_bytes.
+    rewrite exec_catch_early_return.
+    change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+              (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
+           = Some (inr (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), s1))).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+        rewrite execR_liftR. rewrite Htr. cbn match. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s1)).
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ _ _
+      (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2 false false false)) s1
+           = Some (inr (Ok h), s1))).
+    2:{ rewrite execR_liftR.
+        rewrite (exec_mem_read_fetch_2_U PBMT_PMA pa region h s1
+                   iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHbytes iHpriv).
+        cbn match. reflexivity. }
+    cbv iota beta. rewrite autocast_mword_id_16.
+    rewrite execR_returnR_fwd. cbn match. reflexivity. }
+  unfold fetch.
+  rewrite exec_catch_early_return.
+  change (get_config_rvfi tt) with false. cbv iota beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ false s).
+  2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      unfold or_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit0. apply execR_returnR_fwd. }
+      cbv iota beta.
+      unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ true s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit1. apply execR_returnR_fwd. }
+      cbv iota beta.
+      rewrite (execR_bind_Some _ _ _ true s).
+      2:{ rewrite execR_liftR. rewrite (exec_currentlyEnabled_Zca s HmisaC). cbn match.
+          apply execR_returnR_fwd. }
+      cbv iota beta. reflexivity. }
+  cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ false s).
+  2:{ unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ false s).
+      2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hvalign. apply execR_returnR_fwd. }
+      cbv iota beta. reflexivity. }
+  cbv iota beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hfb2).
+  cbv iota beta. rewrite HisRVC. cbv iota beta.
+  rewrite execR_returnR_fwd. cbn match. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §4 The RVC step dispatch for a DIRECT result (no ExecuteAs hop):        *)
+(*    C_NOP/C_NTL/ZCMOP retire directly, C_ILLEGAL is directly illegal,    *)
+(*    C_NOT/C_ZEXT_B compute directly.  Twin of SmodeCore's               *)
+(*    [exec_hart_active_progress_RVC_gen], with the base-gen's            *)
+(*    non-ExecuteAs side condition.                                       *)
+(* ===================================================================== *)
+
+Lemma exec_hart_active_progress_RVC_direct_gen
+    (priv : Privilege) (s s_f s_x : mstate) (h : mword 16) (instr : instruction)
+    (pc : mword 64) (resf : ExecutionResult) :
+  register_lookup cur_privilege s.(sregs) = priv ->
+  exec (dispatchInterrupt priv) s = Some (None, s) ->
+  exec (fetch tt) s = Some (F_RVC h, s_f) ->
+  exec (ext_decode_compressed h) s_f = Some (instr, s_f) ->
+  eq_vec (register_lookup elp s_f.(sregs))
+         (landing_pad_bits_backwards LP_EXPECTED) = false ->
+  register_lookup PC s_f.(sregs) = pc ->
+  exec (currentlyEnabled Ext_Zca) s_f = Some (true, s_f) ->
+  exec (execute instr) (set_reg s_f nextPC (add_vec_int pc 2)) = Some (resf, s_x) ->
+  (match resf with ExecuteAs _ => False | _ => True end) ->
+  exec (run_hart_active 0) s = Some (Step_Execute (resf, zero_extend' 32 h), s_x).
+Proof.
+  intros Hpriv Hdisp Hfetch Hdec Hlpad HpcF Hzca Hexec Hnotexec.
+  unfold run_hart_active.
+  rewrite exec_catch_early_return.
+  rewrite execR_bind execR_liftR exec_read_reg Hpriv. cbn match.
+  rewrite execR_bind execR_liftR Hdisp. cbn match.
+  rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
+  rewrite execR_liftR Hfetch. cbn match. cbn match.
+  unfold ext_fetch_hook. cbn match. cbn beta iota.
+  rewrite execR_bind execR_liftR Hdec. cbn match.
+  unfold get_config_print_instr. cbn match.
+  rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
+  rewrite execR_liftR exec_is_landing_pad Hlpad. cbn match.
+  rewrite execR_bind execR_liftR Hzca. cbn match.
+  rewrite execR_bind execR_liftR (exec_read_reg PC) HpcF. cbn match.
+  rewrite execR_bind. rewrite execR_bind0 execR_liftR (exec_write_reg nextPC). cbn match.
+  rewrite execR_liftR Hexec. cbn match.
+  destruct resf; try contradiction; cbn match;
+    rewrite execR_bind execR_returnR; cbn match;
+    rewrite execR_returnR; cbn match; reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §5 The expansion layer: every retiring compressed instruction executes  *)
+(*    as [ExecuteAs] of its base expansion (pure -- state untouched), and   *)
+(*    the hint/illegal families produce their result directly.             *)
+(* ===================================================================== *)
+
+Ltac cexp := intros; reflexivity.
+
+Lemma exec_execute_C_ADDI (imm : mword 6) (rsd : regidx) s :
+  exec (execute (C_ADDI (imm, rsd))) s
+    = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, rsd, rsd, ADDI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_LI (imm : mword 6) (rd : regidx) s :
+  exec (execute (C_LI (imm, rd))) s
+    = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, zreg, rd, ADDI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_ADDI16SP (imm : mword 6) s :
+  exec (execute (C_ADDI16SP imm)) s
+    = Some (ExecuteAs (ITYPE (sign_extend' 12 (concat_vec imm (Ox"0" : mword 4)), sp, sp, ADDI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_ADDI4SPN (rdc : cregidx) (nzimm : mword 8) s :
+  exec (execute (C_ADDI4SPN (rdc, nzimm))) s
+    = Some (ExecuteAs (ITYPE (concat_vec ('b"00" : mword 2) (concat_vec nzimm ('b"00" : mword 2)),
+                              sp, creg2reg_idx rdc, ADDI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_ANDI (imm : mword 6) (rsd : cregidx) s :
+  exec (execute (C_ANDI (imm, rsd))) s
+    = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, creg2reg_idx rsd, creg2reg_idx rsd, ANDI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_LUI (imm : mword 6) (rd : regidx) s :
+  exec (execute (C_LUI (imm, rd))) s
+    = Some (ExecuteAs (UTYPE (sign_extend' 20 imm, rd, LUI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_MV (rd rs2 : regidx) s :
+  exec (execute (C_MV (rd, rs2))) s
+    = Some (ExecuteAs (RTYPE (rs2, zreg, rd, ADD)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_ADD (rsd rs2 : regidx) s :
+  exec (execute (C_ADD (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPE (rs2, rsd, rsd, ADD)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_AND (rsd rs2 : cregidx) s :
+  exec (execute (C_AND (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPE (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, AND)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_OR (rsd rs2 : cregidx) s :
+  exec (execute (C_OR (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPE (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, OR)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_XOR (rsd rs2 : cregidx) s :
+  exec (execute (C_XOR (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPE (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, XOR)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_SUB (rsd rs2 : cregidx) s :
+  exec (execute (C_SUB (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPE (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, SUB)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_ADDW (rsd rs2 : cregidx) s :
+  exec (execute (C_ADDW (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPEW (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, ADDW)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_SUBW (rsd rs2 : cregidx) s :
+  exec (execute (C_SUBW (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPEW (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, SUBW)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_SLLI (shamt : mword 6) (rsd : regidx) s :
+  exec (execute (C_SLLI (shamt, rsd))) s
+    = Some (ExecuteAs (SHIFTIOP (shamt, rsd, rsd, SLLI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_SRLI (shamt : mword 6) (rsd : cregidx) s :
+  exec (execute (C_SRLI (shamt, rsd))) s
+    = Some (ExecuteAs (SHIFTIOP (shamt, creg2reg_idx rsd, creg2reg_idx rsd, SRLI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_SRAI (shamt : mword 6) (rsd : cregidx) s :
+  exec (execute (C_SRAI (shamt, rsd))) s
+    = Some (ExecuteAs (SHIFTIOP (shamt, creg2reg_idx rsd, creg2reg_idx rsd, SRAI)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_ADDIW (imm : mword 6) (rsd : regidx) s :
+  exec (execute (C_ADDIW (imm, rsd))) s
+    = Some (ExecuteAs (ADDIW (sign_extend' 12 imm, rsd, rsd)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_J (imm : mword 11) s :
+  exec (execute (C_J imm)) s
+    = Some (ExecuteAs (JAL (sign_extend' 21 (concat_vec imm ('b"0" : mword 1)), zreg)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_JR (rs1 : regidx) s :
+  exec (execute (C_JR rs1)) s
+    = Some (ExecuteAs (JALR (zeros' 12, rs1, zreg)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_JALR (rs1 : regidx) s :
+  exec (execute (C_JALR rs1)) s
+    = Some (ExecuteAs (JALR (zeros' 12, rs1, ra)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_BEQZ (imm : mword 8) (rs : cregidx) s :
+  exec (execute (C_BEQZ (imm, rs))) s
+    = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0" : mword 1)), zreg, creg2reg_idx rs, BEQ)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_BNEZ (imm : mword 8) (rs : cregidx) s :
+  exec (execute (C_BNEZ (imm, rs))) s
+    = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0" : mword 1)), zreg, creg2reg_idx rs, BNE)), s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_EBREAK s :
+  exec (execute (C_EBREAK tt)) s = Some (ExecuteAs (EBREAK tt), s).
+Proof. cexp. Qed.
+
+(* direct results: hints retire, C_ILLEGAL is illegal *)
+Lemma exec_execute_C_NOP (imm : mword 6) s :
+  exec (execute (C_NOP imm)) s = Some (RETIRE_SUCCESS, s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_NTL (n : ntl_type) s :
+  exec (execute (C_NTL n)) s = Some (RETIRE_SUCCESS, s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_ZCMOP (mop : mword 3) s :
+  exec (execute (ZCMOP mop)) s = Some (RETIRE_SUCCESS, s).
+Proof. cexp. Qed.
+
+Lemma exec_execute_C_ILLEGAL (hw : mword 16) s :
+  exec (execute (C_ILLEGAL hw)) s = Some (Illegal_Instruction tt, s).
+Proof. cexp. Qed.
+
+(* ===================================================================== *)
+(* §6 Register-file execute facts for the DIRECT compressed computes      *)
+(*    (C_NOT / C_ZEXT_B run rX/wX inline, no ExecuteAs) and the ZIMOP     *)
+(*    may-be-operations (write rd := 0 and retire; register-generic, so   *)
+(*    the 32-bit forms ride the base single-source compute arm).          *)
+(* ===================================================================== *)
+
+(* the 5-bit register index a compressed register field denotes (x8..x15) *)
+Definition creg_bits (c : mword 3) : mword 5 :=
+  zero_extend' 5 (concat_vec ('b"1" : mword 1) c).
+
+Lemma exec_execute_C_NOT_gpr (c : mword 3) s :
+  exec (execute (C_NOT (Cregidx c))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint (creg_bits c)) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                 (regval_into_reg
+                    (not_vec (if Z.eqb (uint (creg_bits c)) 0 then zero_reg
+                              else register_lookup
+                                     (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                                     s.(sregs))))).
+Proof.
+  change (execute (C_NOT (Cregidx c))) with (execute_C_NOT (Cregidx c)).
+  unfold execute_C_NOT. cbv beta zeta iota.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr (creg_bits c) s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (creg_bits c) _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_C_ZEXT_B_gpr (c : mword 3) s :
+  exec (execute (C_ZEXT_B (Cregidx c))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint (creg_bits c)) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                 (regval_into_reg
+                    (zero_extend' 64 (subrange_vec_dec
+                       (if Z.eqb (uint (creg_bits c)) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                               s.(sregs)) 7 0)))).
+Proof.
+  change (execute (C_ZEXT_B (Cregidx c))) with (execute_C_ZEXT_B (Cregidx c)).
+  unfold execute_C_ZEXT_B. cbv beta zeta iota.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr (creg_bits c) s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (creg_bits c) _ s)).
+  apply exec_returnM.
+Qed.
+
+(* the ZIMOP mop.r family in the base compute1 shape: rd := 0, retire.
+   Register-generic (forall rs1'/rd'), F := const zero.                  *)
+Lemma exec_execute_ZIMOP_MOP_R_gpr (mop : mword 5) (rs1 rd : mword 5) s :
+  exec (execute (ZIMOP_MOP_R (mop, Regidx rs1, Regidx rd))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    ((fun _ : mword 64 => zeros' 64)
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+Proof.
+  change (execute (ZIMOP_MOP_R (mop, Regidx rs1, Regidx rd)))
+    with (execute_ZIMOP_MOP_R mop (Regidx rs1) (Regidx rd)).
+  unfold execute_ZIMOP_MOP_R. cbv beta.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_ZIMOP_MOP_RR_gpr (mop : mword 3) (rs2 rs1 rd : mword 5) s :
+  exec (execute (ZIMOP_MOP_RR (mop, Regidx rs2, Regidx rs1, Regidx rd))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    ((fun _ : mword 64 => zeros' 64)
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+Proof.
+  change (execute (ZIMOP_MOP_RR (mop, Regidx rs2, Regidx rs1, Regidx rd)))
+    with (execute_ZIMOP_MOP_RR mop (Regidx rs2) (Regidx rs1) (Regidx rd)).
+  unfold execute_ZIMOP_MOP_RR. cbv beta.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.

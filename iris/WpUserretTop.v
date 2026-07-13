@@ -11,7 +11,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpDecodeBridge WpRvcBridge WpLeafCommon.
-Require Import WpGpr WpGprLui WpGprAddi WpGprShift WpGprRvc WpGprRvcTor WpGprLoad WpLoad.
+Require Import WpGpr WpGprLui WpGprAddi WpMmodeShiftiop WpGprRvc WpGprRvcTor WpGprLoad WpLoad.
 Require Import WpGprCsrwCommon WpGprCsrwB WpGprMret WpGprMretNew WpRelease.
 Require Import WpEntryNew SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
 Require Import TrampPt TrampTlb WpUserret.
