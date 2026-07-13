@@ -795,3 +795,28 @@ Proof.
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
   destruct op; apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §9 EBREAK in User mode: the software-breakpoint Trap execution result  *)
+(*    (twin of UmodeEcall's exec_execute_ECALL_U; tval = the pc).         *)
+(* ===================================================================== *)
+
+Lemma exec_execute_EBREAK_U (pc0 : mword 64) (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  register_lookup PC s.(sregs) = pc0 ->
+  exec (execute (EBREAK tt)) s
+    = Some (rv64d_types.Trap
+              (User, make_sync_exception (E_Breakpoint Brk_Software) pc0, pc0), s).
+Proof.
+  intros Hpriv Hpc.
+  change (execute (EBREAK tt)) with (execute_EBREAK tt).
+  unfold execute_EBREAK.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  rewrite Hpc. cbn beta.
+  unfold trap.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv. cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  rewrite Hpc. cbn beta.
+  apply exec_returnm.
+Qed.
