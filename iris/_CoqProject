@@ -152,5 +152,6 @@ WpUserTrap.v
 WpUserMem.v
 WpUserMemC.v
 WpUserMem4.v
+WpUserMemC4.v
 WpUserSteps.v
 WpUserExec.v
