@@ -30,6 +30,7 @@ Require Import WpMmodeLeafBase WpMmodeShiftiop WpMmodeMul.
 Require Import UmodeFetch UmodeFetchC UmodeEcall.
 Require Import ZbbGpr ClmulGpr ZbbRtypeGpr ZicondGpr.
 Require Import UptInv WpUserBase.
+Require Import WpMemsetS.
 Require Import WpUserSteps.
 Require Import DecodeSetU.
 Local Open Scope Z_scope.
@@ -1171,6 +1172,98 @@ Section WpUserClassify.
     do 9 right; left.
     exists vpn, i, w, imm, rs1, rd.
     repeat split; assumption.
+  Qed.
+
+  (* BTYPE branches (BNE/BEQ armed in U-mode).  Also conditional: the taken/
+     not-taken split is decided by the runtime comparison [c (g rs1) (g rs2)],
+     and the taken leg needs the target 4-aligned.  Fall-through -> disjunct
+     13; taken (aligned) -> disjunct 14.  The execute-fact conjunct is
+     supplied by WpMemsetS.exec_execute_BTYPE_<OP>_{fall,taken}. *)
+
+  (* BNE, not taken. *)
+  Lemma classify_btype_bne_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BNE), s0)) ->
+    neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 12 right; left.
+    exists vpn, i, w, BNE, (fun v1 v2 => neq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BNE_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  (* BEQ, not taken. *)
+  Lemma classify_btype_beq_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ), s0)) ->
+    eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 12 right; left.
+    exists vpn, i, w, BEQ, (fun v1 v2 => eq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BEQ_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  (* BNE, taken (aligned target). *)
+  Lemma classify_btype_bne_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BNE), s0)) ->
+    neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 13 right; left.
+    exists vpn, i, w, BNE, (fun v1 v2 => neq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 =>
+             exec_execute_BTYPE_BNE_taken imm' rs2' rs1' s Ht Ha0 Ha1).
+  Qed.
+
+  (* BEQ, taken (aligned target). *)
+  Lemma classify_btype_beq_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ), s0)) ->
+    eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 13 right; left.
+    exists vpn, i, w, BEQ, (fun v1 v2 => eq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 =>
+             exec_execute_BTYPE_BEQ_taken imm' rs2' rs1' s Ht Ha0 Ha1).
   Qed.
 
   (* The constructors this file classifies so far. *)
