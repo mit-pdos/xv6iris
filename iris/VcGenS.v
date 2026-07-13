@@ -314,14 +314,9 @@ Section VcGenSIris.
     tlb_inv root_ppn -∗
     ⌜ is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ⌝ ∗ tlb_inv root_ppn.
   Proof.
-    iIntros "H".
-    iDestruct (tlb_inv_open with "H") as (satp0 tlbvec)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hbytes & Hpmp)".
-    iDestruct "Hbytes" as "(%Hal & Hbytes)".
-    iSplitR; [iPureIntro; exact Hal|].
-    iApply (tlb_inv_intro root_ppn satp0 tlbvec Hmode Hasid Hppn Hcons
-              with "Hsatp Htlb [Hbytes] Hpmp").
-    rewrite /pte_super_bytes. iSplitR; [iPureIntro; exact Hal|]. iExact "Hbytes".
+    iIntros "H". iSplitR; [| iExact "H"].
+    iPureIntro.
+    exact (pte_addr_at_aligned8 root_ppn (subrange_vec_dec kv_vpn 26 18)).
   Qed.
 
   (* ================================================================== *)

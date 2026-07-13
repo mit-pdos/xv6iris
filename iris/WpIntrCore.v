@@ -704,21 +704,21 @@ Section WpInstrIntr.
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
-    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00 region_pte)
-      "(Hpmpc & Hpmpa & %Hpmpp & %Hpteregion & %HX & %HW & %HR & %Hcov)".
+    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
+      "(Hpmpc & Hpmpa & %HA0 & %Hord0 & %Hpma_imp & %HX & %HW & %HR & %Hcov)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    destruct (Hpteregion pmar0 Hpma_all) as (Hmatchp0 & Hptep).
+    pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent root_ppn σ pc r
-                 satp0 mstatus0 misa0 menvcfg0 region_pte pmpcfg0 pmpaddr00 pmar0 tlbvec
-                 Hpma_all HmisaC HSXL Hmode Hppn Hasid Hcons HPBMTE HX Hcov Hpmpp
-                 Hmatchp0 Hptep
+                 satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
+                 Hpma_all HmisaC HmisaS HSXL Hmode Hppn Hasid Hcons HPBMTE HX Hcov
+                 HA0 Hord0 HR Hpma_pte
                  with "Hsi Hpc Hpriv Hmstatus Hsatp Htlb Hmenvc Hpmpc Hpmpa Hpma Hhtif Hmisa Hpbytes Hbytes")
       as %Hfetch.
     destruct Hfetch as (tlbvec2 & Hfetcheq & Hcons2).
@@ -750,8 +750,8 @@ Section WpInstrIntr.
     assert (Lpc_σf : register_lookup PC σf.(sregs) = pc).
     { unfold σf, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [exact Lpc | vm_compute; reflexivity]. }
-    iDestruct (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 region_pte
-                 Hpmpp Hpteregion HX HW HR Hcov with "Hpmpc Hpmpa") as "Hpmp".
+    iDestruct (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
+                 HA0 Hord0 Hpma_imp HX HW HR Hcov with "Hpmpc Hpmpa") as "Hpmp".
     iMod ("H" $! σf Lpc_σf satp0 tlbvec2 Hmode Hasid Hppn Hcons2
             with "Hpriv Hsatp Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Hpmp Htlb Hpbytes [$Hreg $Hmem]")
       as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".

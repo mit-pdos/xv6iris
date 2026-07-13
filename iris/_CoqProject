@@ -83,6 +83,9 @@ StackOwn.v
 CalleeSaved.v
 WpEntryNew.v
 WpSpinNew.v
+SmodePte.v
+Pt4kWalk.v
+KptPt.v
 SmodeCore.v
 WpSmodeGpr.v
 WpMemsetS.v

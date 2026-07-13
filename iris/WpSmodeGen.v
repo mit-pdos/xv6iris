@@ -81,9 +81,9 @@ Section WpSmodeGen.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
-    P (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (forall a, addr_is_ram a -> P (kpt_tlb_ent root_ppn (svpn_of a))) ->
     (forall a e, addr_is_ram a -> P e ->
-       e = pw_tlb_entry root_ppn (mword_of_int 0) \/
+       e = kpt_tlb_ent root_ppn (svpn_of a) \/
        match_TLB_Entry e (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) (svpn_of a)) = false) ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
@@ -186,9 +186,9 @@ Section WpSmodeGen.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
-    P (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (forall a, addr_is_ram a -> P (kpt_tlb_ent root_ppn (svpn_of a))) ->
     (forall a e, addr_is_ram a -> P e ->
-       e = pw_tlb_entry root_ppn (mword_of_int 0) \/
+       e = kpt_tlb_ent root_ppn (svpn_of a) \/
        match_TLB_Entry e (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) (svpn_of a)) = false) ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
@@ -284,9 +284,9 @@ Section WpSmodeGen.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
-    P (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (forall a, addr_is_ram a -> P (kpt_tlb_ent root_ppn (svpn_of a))) ->
     (forall a e, addr_is_ram a -> P e ->
-       e = pw_tlb_entry root_ppn (mword_of_int 0) \/
+       e = kpt_tlb_ent root_ppn (svpn_of a) \/
        match_TLB_Entry e (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) (svpn_of a)) = false) ->
     uint rd <> 0 ->
     luival imm = wval ->
@@ -331,9 +331,9 @@ Section WpSmodeGen.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
-    P (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (forall a, addr_is_ram a -> P (kpt_tlb_ent root_ppn (svpn_of a))) ->
     (forall a e, addr_is_ram a -> P e ->
-       e = pw_tlb_entry root_ppn (mword_of_int 0) \/
+       e = kpt_tlb_ent root_ppn (svpn_of a) \/
        match_TLB_Entry e (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) (svpn_of a)) = false) ->
     uint rd <> 0 ->
     hw_config -∗ minstret_inv -∗
@@ -382,9 +382,9 @@ Section WpSmodeGen.
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
-    P (pw_tlb_entry root_ppn (mword_of_int 0)) ->
+    (forall a, addr_is_ram a -> P (kpt_tlb_ent root_ppn (svpn_of a))) ->
     (forall a e, addr_is_ram a -> P e ->
-       e = pw_tlb_entry root_ppn (mword_of_int 0) \/
+       e = kpt_tlb_ent root_ppn (svpn_of a) \/
        match_TLB_Entry e (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) (svpn_of a)) = false) ->
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->

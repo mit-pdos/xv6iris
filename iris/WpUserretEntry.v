@@ -34,14 +34,16 @@ Local Notation idx0f := (subrange_vec_dec tf_vpn 8 0).
 (* ===================================================================== *)
 
 Lemma pmp_pte_read_of_bounds (cfg : type_of_register pmpcfg_n)
-    (addrs : type_of_register pmpaddr_n) (aref a : mword 64) :
-  pmp_tor0_pte_read cfg addrs aref ->
+    (addrs : type_of_register pmpaddr_n) (a : mword 64) :
+  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec addrs 0) = false ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec cfg 0)) ('b"1") = true ->
   ram_base <= uint a ->
   uint a + 8 <= ram_base + ram_size ->
   ram_base + ram_size <= uint (vec_access_dec addrs 0) * 4 ->
   pmp_tor0_pte_read cfg addrs a.
 Proof.
-  intros (HA & Hord & _ & HR) Hlo Hfit Hcov.
+  intros HA Hord HR Hlo Hfit Hcov.
   exact (conj HA (conj Hord (conj (ram_pmp_match a _ Hlo Hfit Hcov) HR))).
 Qed.
 
@@ -57,6 +59,21 @@ Proof.
   vm_compute; reflexivity.
 Qed.
 
+(* under the all-4KB kernel PT: every legal kernel entry is some MAPPED vpn's
+   own 4KB leaf; mapped vpns (DRAM < 0x90000, devices < 0x10002) never equal
+   [tramp_vpn] (0x3FFFFFF), so no kernel entry matches the trampoline tag. *)
+Lemma kpt_tlb_ent_tramp_nonmatch (kroot : mword 44) (e : TLB_Entry) :
+  P_kpt kroot e ->
+  match_TLB_Entry e (mword_of_int 0) (sign_extend' (57 - 12) tramp_vpn) = false.
+Proof.
+  intros (vpn & Hm & ->).
+  unfold kpt_tlb_ent. apply match_tlb4k_other.
+  intro He. subst vpn.
+  destruct Hm as [[Hlo Hhi] | [Hlo Hhi]];
+    (replace (bv_unsigned tramp_vpn) with 67108863 in Hhi
+       by (vm_compute; reflexivity); lia).
+Qed.
+
 Lemma ktramp_slot63 (kroot : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
   tlb_pt_consistent kroot tlbvec ->
   vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn) = None \/
@@ -68,10 +85,10 @@ Lemma ktramp_slot63 (kroot : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
 Proof.
   intros Hc.
   rewrite tramp_hash.
-  destruct (Hc 63 ltac:(vm_compute; split; congruence)) as [Hn | He].
+  destruct (Hc 63 ltac:(vm_compute; split; congruence)) as [Hn | (e & He & HPe)].
   - left. exact Hn.
-  - right; left. exists (pw_tlb_entry kroot (mword_of_int 0)).
-    split; [exact He | apply pw_tlb_entry_tramp_nonmatch].
+  - right; left. exists e.
+    split; [exact He | exact (kpt_tlb_ent_tramp_nonmatch kroot e HPe)].
 Qed.
 
 (* an all-None vector satisfies the slot disjunction trivially. *)
@@ -589,8 +606,8 @@ Section WpUserretEntryTop.
        the super PTE, and the PMP cells + ambient facts *)
     iDestruct (tlb_inv_open with "Hktlb") as (ksatp0 tlbvec0)
       "(Hsatp & %HkMode & %Hkasid & %Hkppn & Htlb & %Hconsk & Hsuper & Hkpmp)".
-    iDestruct "Hkpmp" as (pmpcfg0 pmpaddr00 region_pte)
-      "(Hpmpc & Hpmpa & %Hpk & %Hpkreg & %HX & %HW & %HR & %Hcov)".
+    iDestruct "Hkpmp" as (pmpcfg0 pmpaddr00)
+      "(Hpmpc & Hpmpa & %HA0 & %Hord0 & %Hpma_imp & %HX & %HW & %HR & %Hcov)".
     iDestruct "Hktramp" as "(HkbA & HkbB & HkbC)".
     iDestruct "Hupte" as "(HubA & HubB & HubC & HubD)".
     (* PMP read permission for all seven walk PTE addresses, from RAM
@@ -602,13 +619,13 @@ Section WpUserretEntryTop.
     iDestruct (pte8_ram_bounds with "HubB") as %[HloUB HfitUB].
     iDestruct (pte8_ram_bounds with "HubC") as %[HloUC HfitUC].
     iDestruct (pte8_ram_bounds with "HubD") as %[HloUD HfitUD].
-    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloKA HfitKA Hcov) as HpKA.
-    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloKB HfitKB Hcov) as HpKB.
-    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloKC HfitKC Hcov) as HpKC.
-    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUA HfitUA Hcov) as HpUA.
-    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUB HfitUB Hcov) as HpUB.
-    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUC HfitUC Hcov) as HpUC.
-    pose proof (pmp_pte_read_of_bounds _ _ _ _ Hpk HloUD HfitUD Hcov) as HpUD.
+    pose proof (pmp_pte_read_of_bounds _ _ _ HA0 Hord0 HR HloKA HfitKA Hcov) as HpKA.
+    pose proof (pmp_pte_read_of_bounds _ _ _ HA0 Hord0 HR HloKB HfitKB Hcov) as HpKB.
+    pose proof (pmp_pte_read_of_bounds _ _ _ HA0 Hord0 HR HloKC HfitKC Hcov) as HpKC.
+    pose proof (pmp_pte_read_of_bounds _ _ _ HA0 Hord0 HR HloUA HfitUA Hcov) as HpUA.
+    pose proof (pmp_pte_read_of_bounds _ _ _ HA0 Hord0 HR HloUB HfitUB Hcov) as HpUB.
+    pose proof (pmp_pte_read_of_bounds _ _ _ HA0 Hord0 HR HloUC HfitUC Hcov) as HpUC.
+    pose proof (pmp_pte_read_of_bounds _ _ _ HA0 Hord0 HR HloUD HfitUD Hcov) as HpUD.
     (* the concrete next-pc equalities *)
     assert (Hva01 : add_vec_int (uva 0x9c) 4 = uva 0xa0)
       by (apply bv_eq; vm_compute; reflexivity).
