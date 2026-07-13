@@ -609,3 +609,185 @@ Proof.
   unfold gpr_rtypew_val.
   destruct op; apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §8 Register-generic execute facts for the remaining M-extension and    *)
+(*    W-compute families.  All are pure rX/rX/wX (or rX/wX) chains; the   *)
+(*    division-by-zero and signed-overflow cases are PURE ifs folded into *)
+(*    the value functions.  Two-source facts are in the RTYPE nonzero-rd  *)
+(*    shape (for the generic two-source arm); SHIFTIWOP is in the         *)
+(*    single-source compute1 if-shape.                                    *)
+(* ===================================================================== *)
+
+Definition gpr_mulw_val (v1 v2 : mword 64) : mword 64 :=
+  sign_extend' 64 (to_bits_truncate 32
+    (Z.mul (sint (subrange_vec_dec v1 31 0)) (sint (subrange_vec_dec v2 31 0)))).
+
+Definition gpr_div_val (is_unsigned : bool) (v1 v2 : mword 64) : mword 64 :=
+  let rs1_int := if is_unsigned then uint v1 else sint v1 in
+  let rs2_int := if is_unsigned then uint v2 else sint v2 in
+  let quotient := if Z.eqb rs2_int 0 then Z.opp 1 else Z.quot rs1_int rs2_int in
+  let quotient :=
+    if andb (not is_unsigned) (Z.geb quotient (pow2 (Z.sub xlen 1)))
+    then Z.opp (pow2 (Z.sub xlen 1)) else quotient in
+  to_bits_truncate 64 quotient.
+
+Definition gpr_divw_val (is_unsigned : bool) (v1 v2 : mword 64) : mword 64 :=
+  let rs1_int := if is_unsigned then uint (subrange_vec_dec v1 31 0)
+                 else sint (subrange_vec_dec v1 31 0) in
+  let rs2_int := if is_unsigned then uint (subrange_vec_dec v2 31 0)
+                 else sint (subrange_vec_dec v2 31 0) in
+  let quotient := if Z.eqb rs2_int 0 then Z.opp 1 else Z.quot rs1_int rs2_int in
+  let quotient :=
+    if andb (not is_unsigned) (Z.geb quotient (pow2 31))
+    then Z.opp (pow2 31) else quotient in
+  sign_extend' 64 (to_bits_truncate 32 quotient).
+
+Definition gpr_rem_val (is_unsigned : bool) (v1 v2 : mword 64) : mword 64 :=
+  let rs1_int := if is_unsigned then uint v1 else sint v1 in
+  let rs2_int := if is_unsigned then uint v2 else sint v2 in
+  let remainder := if Z.eqb rs2_int 0 then rs1_int else Z.rem rs1_int rs2_int in
+  to_bits_truncate 64 remainder.
+
+Definition gpr_remw_val (is_unsigned : bool) (v1 v2 : mword 64) : mword 64 :=
+  let rs1_int := if is_unsigned then uint (subrange_vec_dec v1 31 0)
+                 else sint (subrange_vec_dec v1 31 0) in
+  let rs2_int := if is_unsigned then uint (subrange_vec_dec v2 31 0)
+                 else sint (subrange_vec_dec v2 31 0) in
+  let remainder := if Z.eqb rs2_int 0 then rs1_int else Z.rem rs1_int rs2_int in
+  sign_extend' 64 (to_bits_truncate 32 remainder).
+
+Definition gpr_shiftiwop_val (op : sopw) (shamt : mword 5) (v1 : mword 64) : mword 64 :=
+  sign_extend' 64
+    (match op with
+     | SLLIW => shift_bits_left (subrange_vec_dec v1 31 0) shamt
+     | SRLIW => shift_bits_right (subrange_vec_dec v1 31 0) shamt
+     | SRAIW => shift_bits_right_arith (subrange_vec_dec v1 31 0) shamt
+     end).
+
+Ltac gpr2_chain rs1 rs2 rd s :=
+  cbv beta zeta;
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s));
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s));
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+
+Lemma exec_execute_MULW_gpr (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (MULW (Regidx rs2, Regidx rs1, Regidx rd))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg
+               (gpr_mulw_val
+                  (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                  (if Z.eqb (uint rs2) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))))).
+Proof.
+  intro Hrd.
+  change (execute (MULW (Regidx rs2, Regidx rs1, Regidx rd)))
+    with (execute_MULW (Regidx rs2) (Regidx rs1) (Regidx rd)).
+  unfold execute_MULW, gpr_mulw_val. gpr2_chain rs1 rs2 rd s.
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_DIV_gpr (u : bool) (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg
+               (gpr_div_val u
+                  (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                  (if Z.eqb (uint rs2) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))))).
+Proof.
+  intro Hrd.
+  change (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_DIV (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_DIV, gpr_div_val. gpr2_chain rs1 rs2 rd s.
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_DIVW_gpr (u : bool) (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (DIVW (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg
+               (gpr_divw_val u
+                  (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                  (if Z.eqb (uint rs2) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))))).
+Proof.
+  intro Hrd.
+  change (execute (DIVW (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_DIVW (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_DIVW, gpr_divw_val. gpr2_chain rs1 rs2 rd s.
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_REM_gpr (u : bool) (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg
+               (gpr_rem_val u
+                  (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                  (if Z.eqb (uint rs2) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))))).
+Proof.
+  intro Hrd.
+  change (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_REM (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_REM, gpr_rem_val. gpr2_chain rs1 rs2 rd s.
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_REMW_gpr (u : bool) (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (REMW (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg
+               (gpr_remw_val u
+                  (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                  (if Z.eqb (uint rs2) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))))).
+Proof.
+  intro Hrd.
+  change (execute (REMW (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_REMW (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_REMW, gpr_remw_val. gpr2_chain rs1 rs2 rd s.
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  apply exec_returnM.
+Qed.
+
+(* single-source, in the compute1 if-shape: SLLIW/SRLIW/SRAIW instances
+   ride ustep_compute1 with mk := fun rs1 rd => SHIFTIWOP (shamt, .., op) *)
+Lemma exec_execute_SHIFTIWOP_gpr (op : sopw) (shamt : mword 5) (rs1 rd : mword 5) s :
+  exec (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    (gpr_shiftiwop_val op shamt
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+Proof.
+  change (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, op)))
+    with (execute_SHIFTIWOP shamt (Regidx rs1) (Regidx rd) op).
+  unfold execute_SHIFTIWOP, gpr_shiftiwop_val. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  destruct op; apply exec_returnM.
+Qed.
