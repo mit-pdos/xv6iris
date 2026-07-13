@@ -1,6 +1,5 @@
 (* S-mode Store leaf lemmas (smode_config/Supervisor, decode family Store).
    Relocated from function proof files (per-(mode,family) leaf reorg). *)
-Require Import WpSmodeLeafBase.
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -10,11 +9,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
-Require Import SmodeCore WpSmodeGpr WpEntryNew StackOwn CalleeSaved WpAuipc WpLoad WpSpinNew.
-Require Import WpMmodeLeafBase WpSmodeLeafBase.
+Require Import MinstretInv InstrBytes WpGpr.
+Require Import SmodeCore WpSmodeGpr WpLoad.
+Require Import WpMmodeLeafBase.
 Import Defs.
-Require Import WpMmodeStore.
 
 (* helper: avi0_mul4 *)
 Local Lemma avi0_mul4 (a : mword 64) : add_vec_int a (0 * 4) = a.
