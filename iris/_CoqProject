@@ -92,6 +92,7 @@ WpIntrBits.v
 WpIntrCore.v
 UmodeTrap.v
 UmodeFetch.v
+UmodeFetchC.v
 UmodeStep.v
 UmodeEcall.v
 DecodeTotal.v
