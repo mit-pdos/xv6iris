@@ -268,6 +268,46 @@ Proof.
     | exact (exec_execute_UTYPE_AUIPC_gpr rd imm s) ].
 Qed.
 
+(* RTYPE (register-register, two sources).  One op-generic if-form fact,
+   proved by a uniform reduction over all ten ops (including the four with no
+   prior [_gpr] fact: SLL/SLT/SRL/SRA), keyed by [rtype_f].  [gpr_src rs s]
+   is the x0-aware read (reused from WpMmodeShiftiop). *)
+Definition rtype_f (op : rop) : mword 64 -> mword 64 -> mword 64 :=
+  match op with
+  | ADD  => fun a b => add_vec a b
+  | SUB  => fun a b => sub_vec a b
+  | SLL  => fun a b => shift_bits_left a (subrange_vec_dec b (Z.sub log2_xlen 1) 0)
+  | SLT  => fun a b => zero_extend' 64 (bool_to_bit (zopz0zI_s a b))
+  | SLTU => fun a b => zero_extend' 64 (bool_to_bit (zopz0zI_u a b))
+  | XOR  => fun a b => xor_vec a b
+  | SRL  => fun a b => shift_bits_right a (subrange_vec_dec b (Z.sub log2_xlen 1) 0)
+  | SRA  => fun a b => shift_bits_right_arith a (subrange_vec_dec b (Z.sub log2_xlen 1) 0)
+  | OR   => fun a b => or_vec a b
+  | AND  => fun a b => and_vec a b
+  end.
+
+Lemma exec_execute_RTYPE_op_gpr (op : rop) (rs2 rs1 rd : mword 5) s :
+  exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (rtype_f op (gpr_src rs1 s) (gpr_src rs2 s)))).
+Proof.
+  change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op)))
+    with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) op).
+  unfold execute_RTYPE.
+  destruct op; cbn match;
+    match goal with
+    | |- context [regval_into_reg ?V] =>
+      rewrite (exec_bind_Some _ _ _ V s);
+        [ rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s));
+          destruct (Z.eqb (uint rd) 0); apply exec_returnm
+        | rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s));
+          rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s));
+          apply exec_returnm ]
+    end.
+Qed.
+
 Section WpUserClassify.
   Context `{CID : CpuId}.
   Context (U : WpUserBase.uctx).
@@ -413,6 +453,38 @@ Section WpUserClassify.
       + intros s' Hpc. destruct op; cbn [utype_V utype_v];
           [ reflexivity | rewrite Hpc; reflexivity ].
       + intros rd' imm' s. exact (exec_execute_UTYPE_op_gpr op rd' imm' s).
+  Qed.
+
+  (* RTYPE (ADD/SUB/SLL/SLT/SLTU/XOR/SRL/SRA/OR/AND): rd = x0 -> no-op (11);
+     rd <> 0 -> the register-register disjunct (6), [f := rtype_f op].  Both
+     legs come from the single op-generic if-form fact. *)
+  Lemma classify_rtype (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (rs2 rs1 rd : mword 5) (op : rop) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_nop va ms_v g tlbvec vpn i w (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))).
+      + intro s. rewrite (exec_execute_RTYPE_op_gpr op rs2 rs1 rd s).
+        replace (Z.eqb (uint rd) 0) with true by (symmetry; apply Z.eqb_eq; exact Hrd0).
+        reflexivity.
+      + reflexivity.
+      + exact Hf.
+      + exact Hdec.
+    - destruct Hf as (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC).
+      unfold ustep_case, WpUserSteps.ustep_case.
+      right; right; right; right; right; left.
+      exists vpn, i, w, op, (rtype_f op), rs2, rs1, rd.
+      repeat split; try assumption.
+      intros rs2' rs1' rd' s Hrd'.
+      rewrite (exec_execute_RTYPE_op_gpr op rs2' rs1' rd' s).
+      replace (Z.eqb (uint rd') 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd').
+      reflexivity.
   Qed.
 
   (* The constructors this file classifies so far. *)
