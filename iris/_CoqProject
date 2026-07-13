@@ -27,6 +27,8 @@ WpLeafCommon.v
 WpEntry.v
 WpGpr.v
 MemData4.v
+MemData2.v
+MemData1.v
 WpGprLoad.v
 WpGprLui.v
 WpGprAddi.v
@@ -108,6 +110,8 @@ UmodeWalk.v
 UptInv.v
 UmodeData.v
 UmodeData4.v
+UmodeData2.v
+UmodeData1.v
 WpUserLoop.v
 WpIntrStep.v
 WpIntrInv.v
@@ -155,5 +159,9 @@ WpUserMem.v
 WpUserMemC.v
 WpUserMem4.v
 WpUserMemC4.v
+WpUserMem2.v
+WpUserMemC2.v
+WpUserMem1.v
+WpUserMemC1.v
 WpUserSteps.v
 WpUserExec.v
