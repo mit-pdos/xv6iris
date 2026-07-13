@@ -736,3 +736,140 @@ Section UTranslateLrscWrappers.
     reflexivity.
   Qed.
 End UTranslateLrscWrappers.
+
+(* ===================================================================== *)
+(* transform_effective_address (identity) for LoadReserved/StoreConditional. *)
+(* Clones of UmodeData's load/store EA-transform leaf stack.                *)
+(* ===================================================================== *)
+
+Lemma exec_is_pmm_applicable_loadres_u s :
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  exec (is_pmm_applicable (LoadReserved Data) User) s = Some (true, s).
+Proof.
+  intro Hmxr.
+  unfold is_pmm_applicable.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (LoadReserved Data) (InstructionFetch tt)) with true by (vm_compute; reflexivity). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (LoadReserved Data) (Load PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (LoadReserved Data) (Store PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  match goal with
+  | |- context [ and_boolM ?orb _ ] => assert (Hor : exec orb s = Some (true, s))
+  end.
+  { rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+    replace (generic_eq User Machine) with false by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (exec_returnM _ s). rewrite Hmxr. reflexivity. }
+  rewrite (exec_and_boolM_Some _ _ _ _ _ Hor).
+  cbn match.
+  rewrite (exec_returnM _ s).
+  replace (xlen =? 64) with true by (vm_compute; reflexivity). reflexivity.
+Qed.
+
+Lemma exec_is_pmm_applicable_storecon_u s :
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  exec (is_pmm_applicable (StoreConditional Data) User) s = Some (true, s).
+Proof.
+  intro Hmxr.
+  unfold is_pmm_applicable.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (StoreConditional Data) (InstructionFetch tt)) with true by (vm_compute; reflexivity). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (StoreConditional Data) (Load PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+  replace (generic_neq (StoreConditional Data) (Store PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  match goal with
+  | |- context [ and_boolM ?orb _ ] => assert (Hor : exec orb s = Some (true, s))
+  end.
+  { rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
+    replace (generic_eq User Machine) with false by (vm_compute; reflexivity). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (exec_returnM _ s). rewrite Hmxr. reflexivity. }
+  rewrite (exec_and_boolM_Some _ _ _ _ _ Hor).
+  cbn match.
+  rewrite (exec_returnM _ s).
+  replace (xlen =? 64) with true by (vm_compute; reflexivity). reflexivity.
+Qed.
+
+Lemma exec_get_pmlen_loadres_u s :
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup senvcfg s.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (get_pmlen (LoadReserved Data) User) s = Some (0, s).
+Proof.
+  intros Hmxr HES Hsenv Hmenv. unfold get_pmlen.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_is_pmm_applicable_loadres_u s Hmxr)).
+  cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_get_pmm_user s HES Hsenv Hmenv)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_get_pmlen_storecon_u s :
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup senvcfg s.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (get_pmlen (StoreConditional Data) User) s = Some (0, s).
+Proof.
+  intros Hmxr HES Hsenv Hmenv. unfold get_pmlen.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_is_pmm_applicable_storecon_u s Hmxr)).
+  cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_get_pmm_user s HES Hsenv Hmenv)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_transform_effective_address_loadres_u (ea : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = User ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup senvcfg s.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s.(sregs))) = ('b"1000" : mword 4) ->
+  exec (transform_effective_address (Virtaddr ea) (LoadReserved Data)) s
+    = Some (Virtaddr ea, s).
+Proof.
+  intros Hcp Hmprv Hmxr HSXL HES Hsenv Hmenv Hmode.
+  unfold transform_effective_address.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_loadres_nm _ _ s Hmprv)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_get_pmlen_loadres_u s Hmxr HES Hsenv Hmenv)).
+  rewrite (exec_bind_Some _ _ _ _ _
+             (exec_translationMode_U_sv39 (register_lookup satp s.(sregs)) s
+                HSXL eq_refl Hmode)).
+  replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity). cbn match.
+  rewrite <- (pm_transform_VA_0 ea) at 2.
+  apply exec_returnM.
+Qed.
+
+Lemma exec_transform_effective_address_storecon_u (ea : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = User ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup senvcfg s.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s.(sregs))) = ('b"1000" : mword 4) ->
+  exec (transform_effective_address (Virtaddr ea) (StoreConditional Data)) s
+    = Some (Virtaddr ea, s).
+Proof.
+  intros Hcp Hmprv Hmxr HSXL HES Hsenv Hmenv Hmode.
+  unfold transform_effective_address.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_storecon_nm _ _ s Hmprv)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_get_pmlen_storecon_u s Hmxr HES Hsenv Hmenv)).
+  rewrite (exec_bind_Some _ _ _ _ _
+             (exec_translationMode_U_sv39 (register_lookup satp s.(sregs)) s
+                HSXL eq_refl Hmode)).
+  replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity). cbn match.
+  rewrite <- (pm_transform_VA_0 ea) at 2.
+  apply exec_returnM.
+Qed.
