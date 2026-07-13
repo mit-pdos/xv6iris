@@ -26,8 +26,9 @@ Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WpGpr.
 Require Import WpDecodeBridge.
 Require Import WpAuipc.
-Require Import WpMmodeLeafBase WpMmodeShiftiop.
-Require Import UmodeFetch UmodeEcall.
+Require Import WpMmodeLeafBase WpMmodeShiftiop WpMmodeMul.
+Require Import UmodeFetch UmodeFetchC UmodeEcall.
+Require Import ZbbGpr ClmulGpr ZbbRtypeGpr ZicondGpr.
 Require Import UptInv WpUserBase.
 Require Import WpUserSteps.
 Require Import DecodeSetU.
@@ -308,6 +309,126 @@ Proof.
     end.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* If-form (compute-shape, rd=x0-guarded) execute facts for the two-source
+   families whose armed [_gpr] facts are stated only in the nonzero-rd form
+   (MULW / DIV{,W} / REM{,W} and the two-source Zbb ops).  Each is the same
+   pure rX/rX/wX chain as the nonzero-rd proof; keeping the [if uint rd = 0]
+   guard (rather than [replace]-ing it away) makes the fact usable for BOTH
+   legs of [classify_two] (rd=x0 -> no-op, rd<>0 -> the two-source arm). *)
+
+Lemma exec_execute_MULW_if (rs2 rs1 rd : mword 5) s :
+  exec (execute (MULW (Regidx rs2, Regidx rs1, Regidx rd))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_mulw_val (gpr_val rs1 s) (gpr_val rs2 s)))).
+Proof.
+  change (execute (MULW (Regidx rs2, Regidx rs1, Regidx rd)))
+    with (execute_MULW (Regidx rs2) (Regidx rs1) (Regidx rd)).
+  unfold execute_MULW, gpr_mulw_val. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_DIV_if (u : bool) (rs2 rs1 rd : mword 5) s :
+  exec (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_div_val u (gpr_val rs1 s) (gpr_val rs2 s)))).
+Proof.
+  change (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_DIV (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_DIV, gpr_div_val. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_DIVW_if (u : bool) (rs2 rs1 rd : mword 5) s :
+  exec (execute (DIVW (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_divw_val u (gpr_val rs1 s) (gpr_val rs2 s)))).
+Proof.
+  change (execute (DIVW (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_DIVW (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_DIVW, gpr_divw_val. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_REM_if (u : bool) (rs2 rs1 rd : mword 5) s :
+  exec (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_rem_val u (gpr_val rs1 s) (gpr_val rs2 s)))).
+Proof.
+  change (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_REM (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_REM, gpr_rem_val. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_REMW_if (u : bool) (rs2 rs1 rd : mword 5) s :
+  exec (execute (REMW (Regidx rs2, Regidx rs1, Regidx rd, u))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_remw_val u (gpr_val rs1 s) (gpr_val rs2 s)))).
+Proof.
+  change (execute (REMW (Regidx rs2, Regidx rs1, Regidx rd, u)))
+    with (execute_REMW (Regidx rs2) (Regidx rs1) (Regidx rd) u).
+  unfold execute_REMW, gpr_remw_val. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_ZBB_RTYPE_if (op : brop_zbb) (rs2 rs1 rd : mword 5) s :
+  exec (execute (ZBB_RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (zbb_rtype_val op (gpr_val rs1 s) (gpr_val rs2 s)))).
+Proof.
+  change (execute (ZBB_RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op)))
+    with (execute_ZBB_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) op).
+  unfold execute_ZBB_RTYPE, zbb_rtype_val. cbn match. cbv zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_ZBB_RTYPEW_if (op : bropw_zbb) (rs2 rs1 rd : mword 5) s :
+  exec (execute (ZBB_RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (zbb_rtypew_val op (gpr_val rs1 s) (gpr_val rs2 s)))).
+Proof.
+  change (execute (ZBB_RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op)))
+    with (execute_ZBB_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) op).
+  unfold execute_ZBB_RTYPEW, zbb_rtypew_val. cbn match. cbv zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnm.
+Qed.
+
 Section WpUserClassify.
   Context `{CID : CpuId}.
   Context (U : WpUserBase.uctx).
@@ -487,6 +608,434 @@ Section WpUserClassify.
       reflexivity.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* Generic single-source compute classifier (-> disjunct 15).  Any
+     constructor built by [mk : rs1 -> rd -> instruction] whose execute is
+     the compute1 if-shape (write [F (rs1 value)] to rd, guarded by rd=x0)
+     and which is not a landing pad: rd = x0 -> the no-op disjunct (11);
+     rd <> 0 -> the single-source compute disjunct (15).  ADDIW, the W-shifts
+     (SHIFTIWOP), and the single-source Zbb ops (REV8/RORI/RORIW) all ride
+     this helper. *)
+  Lemma classify_single (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (mk : mword 5 -> mword 5 -> instruction) (F : mword 64 -> mword 64)
+      (rs1 rd : mword 5) :
+    (forall (rs1' rd' : mword 5) s,
+       exec (execute (mk rs1' rd')) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd')))
+                      (regval_into_reg (F (gpr_val rs1' s))))) ->
+    is_lpad_instruction (mk rs1 rd) = false ->
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (mk rs1 rd, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec Hlpad Hf Hdec.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_nop va ms_v g tlbvec vpn i w (mk rs1 rd)).
+      + intro s. rewrite (Hexec rs1 rd s).
+        replace (Z.eqb (uint rd) 0) with true by (symmetry; apply Z.eqb_eq; exact Hrd0).
+        reflexivity.
+      + exact Hlpad.
+      + exact Hf.
+      + exact Hdec.
+    - destruct Hf as (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC).
+      unfold ustep_case, WpUserSteps.ustep_case.
+      do 14 right; left.
+      exists vpn, i, w, mk, F, rs1, rd.
+      repeat split; try assumption; try exact Hexec.
+  Qed.
+
+  (* Generic two-source compute classifier (-> disjunct 33).  Any constructor
+     built by [mk2 : rs2 -> rs1 -> rd -> instruction] whose execute is the
+     RTYPE if-shape (write [f (rs1 value) (rs2 value)] to rd, guarded by
+     rd=x0) and which is not a landing pad: rd = x0 -> no-op (11); rd <> 0 ->
+     the generic two-source compute disjunct (33).  RTYPEW, MUL(W)/DIV(W)/
+     REM(W), CLMUL{,H,R}, the two-source Zbb ops and ZICOND ride this. *)
+  Lemma classify_two (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (mk2 : mword 5 -> mword 5 -> mword 5 -> instruction)
+      (f : mword 64 -> mword 64 -> mword 64)
+      (rs2 rs1 rd : mword 5) :
+    (forall (rs2' rs1' rd' : mword 5) s,
+       exec (execute (mk2 rs2' rs1' rd')) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd')))
+                      (regval_into_reg (f (gpr_val rs1' s) (gpr_val rs2' s))))) ->
+    is_lpad_instruction (mk2 rs2 rs1 rd) = false ->
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (mk2 rs2 rs1 rd, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec Hlpad Hf Hdec.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_nop va ms_v g tlbvec vpn i w (mk2 rs2 rs1 rd)).
+      + intro s. rewrite (Hexec rs2 rs1 rd s).
+        replace (Z.eqb (uint rd) 0) with true by (symmetry; apply Z.eqb_eq; exact Hrd0).
+        reflexivity.
+      + exact Hlpad.
+      + exact Hf.
+      + exact Hdec.
+    - destruct Hf as (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC).
+      unfold ustep_case, WpUserSteps.ustep_case.
+      do 32 right; left.
+      exists vpn, i, w, mk2, f, rs2, rs1, rd.
+      repeat split; try assumption.
+      intros rs2' rs1' rd' s Hrd'.
+      rewrite (Hexec rs2' rs1' rd' s).
+      replace (Z.eqb (uint rd') 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd').
+      reflexivity.
+  Qed.
+
+  (* --- single-source families (disjunct 15) --- *)
+
+  (* ADDIW rd, rs1, imm : rd := sext32(rs1 + sext(imm)). *)
+  Lemma classify_addiw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 12) (rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ADDIW (imm, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_single va ms_v g tlbvec vpn i w
+             (fun a b => ADDIW (imm, Regidx a, Regidx b))
+             (fun v => sign_extend' 64 (subrange_vec_dec
+                         (add_vec v (sign_extend' 64 imm)) 31 0))
+             rs1 rd).
+    - intros rs1' rd' s. exact (exec_execute_ADDIW_gpr rs1' rd' imm s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* SHIFTIWOP rd, rs1, shamt (SLLIW/SRLIW/SRAIW). *)
+  Lemma classify_shiftiwop (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (shamt : mword 5) (rs1 rd : mword 5) (op : sopw) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_single va ms_v g tlbvec vpn i w
+             (fun a b => SHIFTIWOP (shamt, Regidx a, Regidx b, op))
+             (fun v => gpr_shiftiwop_val op shamt v) rs1 rd).
+    - intros rs1' rd' s. exact (exec_execute_SHIFTIWOP_gpr op shamt rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* REV8 rd, rs1. *)
+  Lemma classify_rev8 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (REV8 (Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_single va ms_v g tlbvec vpn i w
+             (fun a b => REV8 (Regidx a, Regidx b)) (fun v => rev8 v) rs1 rd).
+    - intros rs1' rd' s. exact (exec_execute_REV8_gpr rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* RORI rd, rs1, shamt. *)
+  Lemma classify_rori (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (shamt : mword 6) (rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (RORI (shamt, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_single va ms_v g tlbvec vpn i w
+             (fun a b => RORI (shamt, Regidx a, Regidx b))
+             (fun v => rotate_bits_right v (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
+             rs1 rd).
+    - intros rs1' rd' s. exact (exec_execute_RORI_gpr shamt rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* RORIW rd, rs1, shamt. *)
+  Lemma classify_roriw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (shamt : mword 5) (rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (RORIW (shamt, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_single va ms_v g tlbvec vpn i w
+             (fun a b => RORIW (shamt, Regidx a, Regidx b))
+             (fun v => sign_extend' 64 (rotate_bits_right (subrange_vec_dec v 31 0) shamt))
+             rs1 rd).
+    - intros rs1' rd' s. exact (exec_execute_RORIW_gpr shamt rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* --- two-source families with an if-form execute fact (disjunct 33) --- *)
+
+  (* RTYPEW rd, rs1, rs2 (ADDW/SUBW/SLLW/SRLW/SRAW). *)
+  Lemma classify_rtypew (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (rs2 rs1 rd : mword 5) (op : ropw) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => RTYPEW (Regidx a, Regidx b, Regidx c, op))
+             (gpr_rtypew_val op) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_RTYPEW_gpr op rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* CLMUL rd, rs1, rs2. *)
+  Lemma classify_clmul (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (CLMUL (Regidx rs2, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => CLMUL (Regidx a, Regidx b, Regidx c))
+             (fun v1 v2 => subrange_vec_dec (carryless_mul v1 v2) (Z.sub xlen 1) 0)
+             rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_CLMUL_gpr rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* CLMULH rd, rs1, rs2. *)
+  Lemma classify_clmulh (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (CLMULH (Regidx rs2, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => CLMULH (Regidx a, Regidx b, Regidx c))
+             (fun v1 v2 => subrange_vec_dec (carryless_mul v1 v2) (Z.sub (Z.mul 2 xlen) 1) xlen)
+             rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_CLMULH_gpr rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* CLMULR rd, rs1, rs2. *)
+  Lemma classify_clmulr (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (CLMULR (Regidx rs2, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => CLMULR (Regidx a, Regidx b, Regidx c))
+             (fun v1 v2 => carryless_mulr v1 v2) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_CLMULR_gpr rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* --- two-source families via the local if-form facts (disjunct 33) --- *)
+
+  (* MULW rd, rs1, rs2. *)
+  Lemma classify_mulw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (MULW (Regidx rs2, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => MULW (Regidx a, Regidx b, Regidx c))
+             gpr_mulw_val rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_MULW_if rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* DIV rd, rs1, rs2 (u selects signed/unsigned). *)
+  Lemma classify_div (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) (u : bool) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (DIV (Regidx rs2, Regidx rs1, Regidx rd, u), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => DIV (Regidx a, Regidx b, Regidx c, u))
+             (gpr_div_val u) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_DIV_if u rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* DIVW rd, rs1, rs2. *)
+  Lemma classify_divw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) (u : bool) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (DIVW (Regidx rs2, Regidx rs1, Regidx rd, u), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => DIVW (Regidx a, Regidx b, Regidx c, u))
+             (gpr_divw_val u) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_DIVW_if u rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* REM rd, rs1, rs2. *)
+  Lemma classify_rem (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) (u : bool) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (REM (Regidx rs2, Regidx rs1, Regidx rd, u), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => REM (Regidx a, Regidx b, Regidx c, u))
+             (gpr_rem_val u) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_REM_if u rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* REMW rd, rs1, rs2. *)
+  Lemma classify_remw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) (u : bool) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (REMW (Regidx rs2, Regidx rs1, Regidx rd, u), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => REMW (Regidx a, Regidx b, Regidx c, u))
+             (gpr_remw_val u) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_REMW_if u rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* ZBB_RTYPE rd, rs1, rs2 (ANDN/ORN/XNOR/MAX{,U}/MIN{,U}/ROL/ROR). *)
+  Lemma classify_zbb_rtype (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) (op : brop_zbb) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ZBB_RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => ZBB_RTYPE (Regidx a, Regidx b, Regidx c, op))
+             (zbb_rtype_val op) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_ZBB_RTYPE_if op rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* ZBB_RTYPEW rd, rs1, rs2 (ROLW/RORW). *)
+  Lemma classify_zbb_rtypew (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) (op : bropw_zbb) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ZBB_RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => ZBB_RTYPEW (Regidx a, Regidx b, Regidx c, op))
+             (zbb_rtypew_val op) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_ZBB_RTYPEW_if op rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* ZICOND_RTYPE rd, rs1, rs2 (CZERO.EQZ/CZERO.NEZ). *)
+  Lemma classify_zicond (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 rd : mword 5) (op : zicondop) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ZICOND_RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => ZICOND_RTYPE (Regidx a, Regidx b, Regidx c, op))
+             (fun v1 v2 =>
+                if (match op with
+                    | CZERO_EQZ => eq_vec v2 (zeros' 64)
+                    | CZERO_NEZ => neq_vec v2 (zeros' 64)
+                    end)
+                then zeros' 64 else v1) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s.
+      exact (exec_execute_ZICOND_RTYPE_gpr rs2' rs1' rd' op s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
   (* The constructors this file classifies so far. *)
   Definition covered_u (ii : instruction) : bool :=
     match ii with
@@ -560,6 +1109,12 @@ Section WpUserClassify.
   Definition classifiable_u (ii : instruction) : bool :=
     match ii with
     | ITYPE _ => true | RTYPE _ => true | UTYPE _ => true | SHIFTIOP _ => true
+    | ADDIW _ => true | SHIFTIWOP _ => true
+    | REV8 _ => true | RORI _ => true | RORIW _ => true
+    | RTYPEW _ => true | MULW _ => true
+    | DIV _ => true | DIVW _ => true | REM _ => true | REMW _ => true
+    | CLMUL _ => true | CLMULH _ => true | CLMULR _ => true
+    | ZBB_RTYPE _ => true | ZBB_RTYPEW _ => true | ZICOND_RTYPE _ => true
     | _ => covered_u ii
     end.
 
@@ -588,6 +1143,69 @@ Section WpUserClassify.
     | Hdec : forall _, _ -> exec _ _ = Some (SHIFTIOP ?p, _) |- _ =>
         destruct p as [[[shamt r1] r2] op]; destruct r1 as [rs1]; destruct r2 as [rd];
         exact (classify_shiftiop va ms_v g tlbvec vpn i w shamt rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (ADDIW ?p, _) |- _ =>
+        destruct p as [[imm r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_addiw va ms_v g tlbvec vpn i w imm rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SHIFTIWOP ?p, _) |- _ =>
+        destruct p as [[[shamt r1] r2] op]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_shiftiwop va ms_v g tlbvec vpn i w shamt rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (REV8 ?p, _) |- _ =>
+        destruct p as [r1 r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_rev8 va ms_v g tlbvec vpn i w rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (RORI ?p, _) |- _ =>
+        destruct p as [[shamt r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_rori va ms_v g tlbvec vpn i w shamt rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (RORIW ?p, _) |- _ =>
+        destruct p as [[shamt r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_roriw va ms_v g tlbvec vpn i w shamt rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (RTYPEW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_rtypew va ms_v g tlbvec vpn i w rs2 rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (MULW ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_mulw va ms_v g tlbvec vpn i w rs2 rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (DIV ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_div va ms_v g tlbvec vpn i w rs2 rs1 rd u Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (DIVW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_divw va ms_v g tlbvec vpn i w rs2 rs1 rd u Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (REM ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_rem va ms_v g tlbvec vpn i w rs2 rs1 rd u Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (REMW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_remw va ms_v g tlbvec vpn i w rs2 rs1 rd u Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (CLMUL ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_clmul va ms_v g tlbvec vpn i w rs2 rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (CLMULH ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_clmulh va ms_v g tlbvec vpn i w rs2 rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (CLMULR ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_clmulr va ms_v g tlbvec vpn i w rs2 rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (ZBB_RTYPE ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_zbb_rtype va ms_v g tlbvec vpn i w rs2 rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (ZBB_RTYPEW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_zbb_rtypew va ms_v g tlbvec vpn i w rs2 rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (ZICOND_RTYPE ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_zicond va ms_v g tlbvec vpn i w rs2 rs1 rd op Hf Hdec)
     end.
   Qed.
 
