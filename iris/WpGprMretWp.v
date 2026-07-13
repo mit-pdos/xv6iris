@@ -2,14 +2,11 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpFetch WpDecode.
-Require Import MinstretInv.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDecode.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
-Require Import WpGprMret.
 
 (* ====================================================================== *)
 (* decode_mret : ext_decode of 0x30200073 = MRET tt.                       *)

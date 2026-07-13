@@ -25,10 +25,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
+Require Import InstrBytes.
 Require Import WpDecode WpLeafCommon WpEntryNew.
 Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpSmodeGpr WpMemsetS.
 Require Import WpMycpu WpPushOffTop.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.

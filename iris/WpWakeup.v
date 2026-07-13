@@ -34,7 +34,7 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import InstrBytes MinstretInv RiscvFetchExec WpGpr WpEntryNew.
 Require Import WpLock.
-Require Import WpGprAddi WpGprRvc.
+Require Import WpGprRvc.
 Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGen VcGenS.
 Require Import WpAcquireTop WpAcquireLock WpAcquireMem WpRelease WpMycpu WpPushOffTop.
 Require Import CalleeSaved.

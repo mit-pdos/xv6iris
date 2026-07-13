@@ -37,11 +37,10 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpDecodeBridge WpRvcBridge WpLeafCommon.
-Require Import WpGpr WpGprLui WpGprAddi WpMmodeShiftiop WpGprRvc WpGprRvcTor WpGprLoad WpLoad.
-Require Import WpGprCsrwCommon WpGprCsrwB WpGprMretNew WpRelease.
+Require Import WpDecodeBridge WpRvcBridge.
+Require Import WpGprCsrwB WpGprMretNew WpRelease.
 Require Import WpEntryNew SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
 Require Import TrampPt TrampTlb.
 From Kernel Require Import KernelInstrs.

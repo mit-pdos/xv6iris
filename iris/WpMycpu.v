@@ -32,7 +32,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpLeafCommon WpEntryNew WpAuipc.
 Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpMemsetS WpPushOff.
+Require Import SmodeCore WpPushOff.
 Require Import WpMemsetInstr.
 Require Import WpRvcBridge.
 Require Import StackOwn.

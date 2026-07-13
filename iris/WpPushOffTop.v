@@ -20,7 +20,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpLeafCommon WpEntryNew WpAuipc.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew.
-Require Import WpPushOff WpPushOffMem WpPushOffCsr WpMycpu.
+Require Import WpPushOffCsr WpMycpu.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpRvcBridge.

@@ -21,7 +21,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import MinstretInv InstrBytes.
 Require Import WpEntryNew WpAuipc.
-Require Import WpGpr WpGprAddi WpGprRvc WpGprLui.
+Require Import WpGpr WpGprLui.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpPushOffTop WpAcquireMem.
 Require Import WpLock WpPopOff.

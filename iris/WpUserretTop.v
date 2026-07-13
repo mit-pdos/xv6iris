@@ -10,9 +10,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpDecodeBridge WpRvcBridge WpLeafCommon.
-Require Import WpGpr WpGprLui WpGprAddi WpMmodeShiftiop WpGprRvc WpGprRvcTor WpGprLoad WpLoad.
-Require Import WpGprCsrwCommon WpGprCsrwB WpGprMret WpGprMretNew WpRelease.
+Require Import WpLeafCommon.
+Require Import WpGpr WpLoad.
+Require Import WpGprCsrwCommon WpGprMret WpGprMretNew WpRelease.
 Require Import WpEntryNew SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
 Require Import TrampPt TrampTlb WpUserret.
 From Kernel Require Import KernelInstrs.

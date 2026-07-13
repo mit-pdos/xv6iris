@@ -32,7 +32,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.TypeCasts SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpGpr WpGprStore WpGprLoad.
+Require Import WpGpr WpGprLoad.
 Require Import SmodeCore WpSmodeGpr WpPushOffMem WpAmo WpLock.
 Local Open Scope Z_scope.
 Import Defs.

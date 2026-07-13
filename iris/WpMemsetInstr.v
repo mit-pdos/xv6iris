@@ -19,7 +19,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpLeafCommon.
 Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpSmodeGpr WpEntryNew WpMemsetS WpTimerinit.
+Require Import SmodeCore WpEntryNew WpMemsetS WpTimerinit.
 Require Import StackOwn.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.

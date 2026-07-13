@@ -38,7 +38,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpEntryNew.
 Require Import WpGpr WpGprRvc.
 Require Import WpRvcBridge.
-Require Import SmodeCore WpMemsetS WpPushOffTop WpKallocDecode.
+Require Import SmodeCore WpPushOffTop WpKallocDecode.
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
