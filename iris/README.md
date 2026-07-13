@@ -130,13 +130,6 @@ in `RiscvLang.v`.  Design notes:
   (the shape of future driver-vs-device proofs), and the pure
   interrupt chain `uart_irq → plic_latch → plic_eip → s_dispatch fires`.
 
-- **Known model gap.**  The Sail test-signature (SIG) window
-  `[0xC000000, 0xC000020)` shadows the PLIC priority registers of sources
-  0–7 (xv6's `plicinit` write for VIRTIO0_IRQ = 1 would hit it).  The UART
-  (source 10, priority register at `0xC000028`) is unaffected.  Removing the
-  SIG device needs the Sail model regenerated with the signature region
-  disabled.
-
 ## Building
 
 From the **repository root** (`/shared/xv6rocq`):

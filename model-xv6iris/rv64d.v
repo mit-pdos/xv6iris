@@ -12731,7 +12731,7 @@ unwrap_value ((to_bits_checked (64) ((33554432  : Z)))  : M (mword ((if 64 =? 32
 Definition plat_clint_size : physaddrbits :=
 unwrap_value ((to_bits_checked (64) ((786432  : Z)))  : M (mword ((if 64 =? 32 then 34 else 64)))).
 #[export] Hint Unfold plat_clint_size : sail.
-Definition plat_have_sig : bool := true.
+Definition plat_have_sig : bool := false.
 #[export] Hint Unfold plat_have_sig : sail.
 Definition plat_sig_base : physaddrbits :=
 unwrap_value
@@ -42529,7 +42529,7 @@ Definition check_mem_layout '(tt : unit) : M (bool) :=
           (to_bits_checked (64) ((786432  : Z))) >>= fun (w__3 : mword 64) =>
           (within_configured_pma_memory ("CLINT (platform.clint)") ((Some (IOMemory))) (w__2) (w__3))
            : M (bool))) >>= fun clint_ok =>
-      let sig_supported : bool := true in
+      let sig_supported : bool := false in
       (or_boolM (returnM ((not (sig_supported))))
          ((to_bits_checked (64) ((201326592  : Z))) >>= fun (w__5 : mword 64) =>
           (within_configured_pma_memory

@@ -23,6 +23,7 @@ SWITCH  ?= /shared/xv6rocq
 RUN     := opam exec --switch=$(SWITCH) --
 PYTHON  ?= python3
 OBJDUMP ?= riscv64-linux-gnu-objdump
+SAIL_RISCV_DIR ?=
 
 # Parallel compilation: each Coq sub-make (coq_makefile) is run with -j$(JOBS).
 # coq_makefile computes the dependency order, so independent files (e.g. the
@@ -88,6 +89,13 @@ distclean: clean
 
 # ---- regenerating the Sail model (manual; needs the Sail toolchain) ----
 model-gen:
-	@echo "Regenerating $(MODEL)/*.v requires the 'sail' compiler and the"
-	@echo "sail-riscv sources.  See README.md > Build > 'Regenerating the Sail model'."
-	@false
+	@if command -v sail >/dev/null 2>&1; then \
+		tools/regen_sail_model.sh $(if $(SAIL_RISCV_DIR),"$(SAIL_RISCV_DIR)",); \
+	else \
+		echo "Regenerating $(MODEL)/*.v requires the 'sail' compiler (0.20.1,"; \
+		echo "sail_coq_backend) on PATH -- eval \$$(opam env) into whichever switch"; \
+		echo "has it installed, then run tools/regen_sail_model.sh directly, or"; \
+		echo "'make model-gen SAIL_RISCV_DIR=path/to/sail-riscv'."; \
+		echo "See README.md > Build > 'Regenerating the Sail model'."; \
+		false; \
+	fi

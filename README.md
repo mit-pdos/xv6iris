@@ -81,20 +81,35 @@ the kernel + dumper), and `python3`. Override the disassembler with
 ### Regenerating the Sail model
 
 The model `.v` in `model-xv6iris/` are checked in. Regenerating them requires
-the **Sail compiler** (`sail` 0.20.1 + `sail_coq_backend`), which is **not**
-installed in this environment (`make model-gen` just prints this reminder). The
-procedure (from the cloned `sail-riscv/`) is:
+the **Sail compiler** (`sail` 0.20.1 + `sail_coq_backend`, via opam) and a
+clone of [`sail-riscv`](https://github.com/riscv/sail-riscv) at a sibling path
+(`../sail-riscv`, or pass a path explicitly). If `sail` isn't on `PATH`,
+`make model-gen` just prints this reminder.
 
 ```sh
-cd sail-riscv && eval $(opam env)
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DDOWNLOAD_GMP=FALSE
-cmake --build build --target generated_rocq_rv64d    # Sail -> rocq/*.v  (slow, ~25 min)
-cmake --build build --target build_rocq_rv64d        # coqc -> rocq/*.vo
+eval $(opam env)   # into whichever switch has `sail` installed
+tools/regen_sail_model.sh [path/to/sail-riscv]     # ~10 min, dominated by the Sail->Rocq step
+make model
 ```
 
-then copy the generated `rv64d_types.v` / `riscv_extras.v` / `rv64d.v` into
-`model-xv6iris/`. (The model is built with the `--dcoq-undef-axioms` flag, which
-is why `Print Assumptions` reports the five `rv64d.*` platform axioms.)
+The script configures sail-riscv's own cmake project (for its module list and
+build deps), then invokes `sail --coq` directly with **this repo's config**
+(`model-xv6iris/sail-config-rv64d.json`) instead of sail-riscv's own default
+config, compile-checks the output with `coqc`, and installs
+`rv64d.v`/`rv64d_types.v`/`riscv_extras.v` into `model-xv6iris/`. (The model is
+built with the `--dcoq-undef-axioms` flag, which is why `Print Assumptions`
+reports the five `rv64d.*` platform axioms.)
+
+Our config differs from sail-riscv's upstream default in exactly one place:
+`platform.simple_interrupt_generator.supported` is `false`. Sail's built-in
+SIG test device otherwise claims the MMIO window `[0xC000000, 0xC000020)`,
+which collides with xv6's real PLIC base address (`0xC000000`, see
+`iris/DevModel.v`'s `plic_base`) — with SIG enabled, the Sail model intercepts
+PLIC priority-register accesses for interrupt sources 0–7 internally instead
+of routing them to xv6iris's own PLIC model. See the comment at the top of
+`model-xv6iris/sail-config-rv64d.json` for why disabling SIG is safe (it only
+removes the address-window claim, not the interrupt-pin registers the PLIC
+model wires into).
 
 ## Toolchain (installed via opam, matching sail-riscv CI)
 
@@ -130,18 +145,10 @@ Key entry points (all in `Riscv.rv64d`):
 
 `M` is the Sail free monad; `mword n` is an n-bit vector (`SailStdpp`).
 
-### Regenerating the model
-
-```sh
-cd sail-riscv
-eval $(opam env)
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DDOWNLOAD_GMP=FALSE
-cmake --build build --target generated_rocq_rv64d    # Sail -> rocq/*.v  (slow, ~25 min)
-cmake --build build --target build_rocq_rv64d        # coqc -> rocq/*.vo
-# install into user-contrib/Riscv:
-install -d "$(coqc -where)/user-contrib/Riscv"
-install build/rocq/* "$(coqc -where)/user-contrib/Riscv"
-```
+See "Regenerating the Sail model" above for how to rebuild these from
+`sail-riscv` — the model is compiled locally in `model-xv6iris/` (via `-R .
+Riscv`, see `model-xv6iris/_CoqProject`), not installed into a global
+`user-contrib`.
 
 ## Dumping the kernel instructions
 

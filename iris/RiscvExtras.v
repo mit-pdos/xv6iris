@@ -87,11 +87,14 @@ Qed.
 Lemma within_sig_false (a : Arch.pa) (w : Z) s :
   not_in_sig a -> (0 < w)%Z -> exec (within_sig (Physaddr a) w) s = Some (false, s).
 Proof.
-  intros Hns Hw. unfold within_sig, plat_have_sig, __id. cbn [Riscv.rv64d.not negb].
-  assert (Hf : (uint plat_sig_base <=? uint a) &&
-               (uint a + w <=? uint plat_sig_base + uint plat_sig_size) = false).
-  { destruct Hns as [H|H]; [apply andb_false_intro1|apply andb_false_intro2]; apply Z.leb_gt; lia. }
-  rewrite Hf. apply exec_returnm.
+  (* plat_have_sig is compiled in as a constant `false` (the SIG test device
+     is disabled in model-xv6iris/sail-config-rv64d.json, since it would
+     otherwise collide with the real PLIC's address window) -- `within_sig`
+     already short-circuits to `false` without consulting the address range,
+     so `not_in_sig`/`w` aren't needed to close this goal. Kept as hypotheses
+     to avoid rippling the ~200 call sites across iris/ that supply them. *)
+  intros _ _. unfold within_sig, plat_have_sig, __id. cbn [Riscv.rv64d.not negb].
+  apply exec_returnm.
 Qed.
 
 Lemma within_htif_false (a : Arch.pa) (w : Z) s :
