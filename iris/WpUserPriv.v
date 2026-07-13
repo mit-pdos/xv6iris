@@ -13,16 +13,28 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras RiscvTryStep.
 Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
 Require Import SmodeCore WpIntrCore WpDecodeBridge.
 Require Import UmodeTrap UmodeFetch UmodeFetchC UmodeStep UmodeEcall UmodeFetchFault.
-Require Import UptInv.
+Require Import UptInv HartActiveExecuteAs.
 Require Import WpUserEcall WpUserTrap.
 Local Open Scope Z_scope.
 Import Defs.
 
 Require Import WpUserBase.
+
+(* SINVAL.VMA executes AS SFENCE.VMA: its execute yields ExecuteAs, not a
+   direct ExecutionResult.  (The dispatch is [returnM (execute_SINVAL_VMA …)]
+   and execute_SINVAL_VMA = ExecuteAs (SFENCE_VMA …).) *)
+Lemma exec_execute_SINVAL_VMA_ExecuteAs (rs1 rs2 : regidx) s :
+  exec (execute (SINVAL_VMA (rs1, rs2))) s
+  = Some (ExecuteAs (SFENCE_VMA (rs1, rs2)), s).
+Proof.
+  change (execute (SINVAL_VMA (rs1, rs2)))
+    with (returnM (execute_SINVAL_VMA rs1 rs2) : M ExecutionResult).
+  unfold execute_SINVAL_VMA. apply exec_returnM.
+Qed.
 
 Section WpUserPriv.
   Context `{!riscvGS Σ}.
@@ -39,6 +51,7 @@ Section WpUserPriv.
   Local Notation user_data := (WpUserBase.user_data U).
   Local Notation user_trap_frame := (WpUserBase.user_trap_frame U).
   Local Notation ustep_illegal_st := (WpUserTrap.ustep_illegal_st U).
+  Local Notation ustep_illegal_run_st := (WpUserTrap.ustep_illegal_run_st U).
 
   (* The shared fetch/decode premises of ustep_illegal_st, abstracted over
      the (nullary) instruction [ii] and its decode target. *)
@@ -210,6 +223,50 @@ Section WpUserPriv.
     iApply (upriv_illegal_run (SFENCE_VMA (Regidx rs1, Regidx rs2))
               va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ
               Harm eq_refl (fun s Hs => exec_execute_SFENCE_VMA_illegal_U rs1 rs2 s Hs)).
+  Qed.
+
+  (* SINVAL.VMA: unlike the direct ops, its execute yields ExecuteAs(SFENCE_VMA)
+     rather than Illegal, so it rides ustep_illegal_run_st with the
+     F_Base+ExecuteAs run producer (re-dispatch to SFENCE_VMA -> Illegal)
+     instead of the direct base progress. *)
+  Lemma ustep_sinval_vma_illegal (rs1 rs2 : mword 5)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64)) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    upriv_illegal_arm (SINVAL_VMA (Regidx rs1, Regidx rs2)) va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ ->
+    hw_config -∗ minstret_inv -∗ hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗ stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗ tlb ↦ᵣ tlbvec -∗ pc_is va -∗ gpr_file g -∗
+    upt_inv root slots spec -∗ user_code -∗ user_data -∗ user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros (HN & Hok & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HSXL & Hval &
+            Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec).
+    assert (Hrun : forall σ0 : mstate,
+       register_lookup cur_privilege σ0.(sregs) = User ->
+       exec (dispatchInterrupt User) σ0 = Some (None, σ0) ->
+       exec (fetch tt) σ0 = Some (F_Base w, σ0) ->
+       exec (ext_decode w) σ0 = Some (SINVAL_VMA (Regidx rs1, Regidx rs2), σ0) ->
+       eq_vec (register_lookup elp σ0.(sregs))
+              (landing_pad_bits_backwards LP_EXPECTED) = false ->
+       register_lookup PC σ0.(sregs) = va ->
+       exec (run_hart_active 0) σ0
+         = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w),
+                 set_reg σ0 nextPC (add_vec_int va 4))).
+    { intros σ0 Hcp Hdsp Hft Hdc Hlp Hpc.
+      apply (exec_hart_active_progress_base_ExecuteAs_gen User σ0 σ0
+               (set_reg σ0 nextPC (add_vec_int va 4)) w
+               (SINVAL_VMA (Regidx rs1, Regidx rs2)) (SFENCE_VMA (Regidx rs1, Regidx rs2))
+               va (Illegal_Instruction tt) Hcp Hdsp Hft Hdc Hlp eq_refl Hpc).
+      - exact (exec_execute_SINVAL_VMA_ExecuteAs (Regidx rs1) (Regidx rs2)
+                 (set_reg σ0 nextPC (add_vec_int va 4))).
+      - apply exec_execute_SFENCE_VMA_illegal_U. lk. exact Hcp. }
+    iApply (ustep_illegal_run_st (SINVAL_VMA (Regidx rs1, Regidx rs2))
+              va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hrun Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec).
   Qed.
 
 End WpUserPriv.

@@ -464,18 +464,32 @@ Section WpUserTrap.
   Qed.
 
 
-  Lemma ustep_illegal_st (ii : instruction)
+  (* Generalised over HOW the step reaches an Illegal execution result: the
+     caller supplies a producer [Hrun] deriving [run_hart_active -> Illegal] at
+     any User state meeting the fetch/decode setup.  The direct case
+     (execute ii = Illegal, via [exec_hart_active_progress_base_gen]) is the
+     wrapper [ustep_illegal_st] below; the ExecuteAs case (SINVAL_VMA executes
+     as SFENCE_VMA, via [exec_hart_active_progress_base_ExecuteAs_gen]) and the
+     config-gated ops reuse this driver with their own producer. *)
+  Lemma ustep_illegal_run_st (ii : instruction)
       (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
       (ms_v sc_v stval_v sepc_v : mword 64)
       (g : gmap regidx (mword 64))
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       E (Φ : mval -> iProp Σ) :
     ↑minstretN ⊆ E ->
-    (* the op is illegal whenever executing in User mode (SRET/MRET/WFI/
-       SFENCE*: the model reads cur_privilege and yields Illegal) *)
-    (forall s, register_lookup cur_privilege s.(sregs) = User ->
-       exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
-    is_lpad_instruction ii = false ->
+    (* run_hart_active reaches Illegal at any User state meeting the setup *)
+    (forall σ0 : mstate,
+       register_lookup cur_privilege σ0.(sregs) = User ->
+       exec (dispatchInterrupt User) σ0 = Some (None, σ0) ->
+       exec (fetch tt) σ0 = Some (F_Base w, σ0) ->
+       exec (ext_decode w) σ0 = Some (ii, σ0) ->
+       eq_vec (register_lookup elp σ0.(sregs))
+              (landing_pad_bits_backwards LP_EXPECTED) = false ->
+       register_lookup PC σ0.(sregs) = va ->
+       exec (run_hart_active 0) σ0
+         = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w),
+                 set_reg σ0 nextPC (add_vec_int va 4))) ->
     upt_tlb_ok spec tlbvec ->
     vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) ->
     uw_check_ok (InstructionFetch tt) ie ->
@@ -510,7 +524,7 @@ Section WpUserTrap.
     ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hexec_ill Hnlpad Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+    intros HN Hrun Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
            Hvpn_def Hpaal HnotRVC Hdec.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
              #Hcode Hdata Hcfg Hcont".
@@ -627,14 +641,9 @@ Section WpUserTrap.
       by (rewrite Lelp; exact Help_np).
     (* ---- the whole non-retiring step: execute -> Illegal ---- *)
     set (s_x := set_reg σ nextPC (add_vec_int va 4)).
-    assert (LprivXe : register_lookup cur_privilege s_x.(sregs) = User)
-      by (unfold s_x; lk; exact Lpriv).
     assert (Hha : exec (run_hart_active 0) σ
                     = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w), s_x)).
-    { apply (exec_hart_active_progress_base_gen User σ σ s_x w ii va
-               (Illegal_Instruction tt) Lpriv Hdisp Hfetch Hdec' Hlpad Hnlpad Lpc).
-      - exact (Hexec_ill s_x LprivXe).
-      - exact I. }
+    { unfold s_x. exact (Hrun σ Lpriv Hdisp Hfetch Hdec' Hlpad Lpc). }
     (* ---- the dispatch arm: handle_exception at s_x ---- *)
     assert (LprivX : register_lookup cur_privilege s_x.(sregs) = User)
       by (unfold s_x; lk; exact Lpriv).
@@ -731,6 +740,78 @@ Section WpUserTrap.
     iFrame "Hstvec Hmie Hmidl Hmedl Hmip Hmeip Hseip Hsatp Hmenv Hsenv
             Hmst0 Hsst0 Hpmpc Hpmpa".
     iFrame "Hpcr Hnpc".
+  Qed.
+
+  (* The direct privilege-conditioned illegal arm: [execute ii = Illegal]
+     whenever in User mode (SRET/MRET/WFI/SFENCE*/privileged CSR).  A thin
+     wrapper over ustep_illegal_run_st whose run producer is
+     exec_hart_active_progress_base_gen fed the execute fact. *)
+  Lemma ustep_illegal_st (ii : instruction)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    (forall s, register_lookup cur_privilege s.(sregs) = User ->
+       exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
+    is_lpad_instruction ii = false ->
+    upt_tlb_ok spec tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hexec_ill Hnlpad Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec.
+    assert (Hrun : forall σ0 : mstate,
+       register_lookup cur_privilege σ0.(sregs) = User ->
+       exec (dispatchInterrupt User) σ0 = Some (None, σ0) ->
+       exec (fetch tt) σ0 = Some (F_Base w, σ0) ->
+       exec (ext_decode w) σ0 = Some (ii, σ0) ->
+       eq_vec (register_lookup elp σ0.(sregs))
+              (landing_pad_bits_backwards LP_EXPECTED) = false ->
+       register_lookup PC σ0.(sregs) = va ->
+       exec (run_hart_active 0) σ0
+         = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w),
+                 set_reg σ0 nextPC (add_vec_int va 4))).
+    { intros σ0 Hcp Hdsp Hft Hdc Hlp Hpc.
+      apply (exec_hart_active_progress_base_gen User σ0 σ0
+               (set_reg σ0 nextPC (add_vec_int va 4)) w ii va (Illegal_Instruction tt)
+               Hcp Hdsp Hft Hdc Hlp Hnlpad Hpc).
+      - apply Hexec_ill. lk. exact Hcp.
+      - exact I. }
+    iApply (ustep_illegal_run_st ii va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hrun Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec).
   Qed.
 
 
