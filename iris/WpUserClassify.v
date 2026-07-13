@@ -429,6 +429,28 @@ Proof.
   apply exec_returnm.
 Qed.
 
+(* MUL (all four M-extension products): execute_MUL is uniform over the
+   [mul_op] record (rX/rX/wX with a pure [mult_to_bits_half]), so one
+   op-generic if-form fact covers MUL/MULH/MULHSU/MULHU. *)
+Lemma exec_execute_MUL_if (mop : mul_op) (rs2 rs1 rd : mword 5) s :
+  exec (execute (MUL (Regidx rs2, Regidx rs1, Regidx rd, mop))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    (mult_to_bits_half xlen (mop.(mul_op_signed_rs1))
+                       (mop.(mul_op_signed_rs2)) (gpr_val rs1 s) (gpr_val rs2 s)
+                       (mop.(mul_op_result_part))))).
+Proof.
+  change (execute (MUL (Regidx rs2, Regidx rs1, Regidx rd, mop)))
+    with (execute_MUL (Regidx rs2) (Regidx rs1) (Regidx rd) mop).
+  unfold execute_MUL.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
 Section WpUserClassify.
   Context `{CID : CpuId}.
   Context (U : WpUserBase.uctx).
@@ -1036,6 +1058,70 @@ Section WpUserClassify.
     - exact Hdec.
   Qed.
 
+  (* MUL rd, rs1, rs2 (any of MUL/MULH/MULHSU/MULHU). *)
+  Lemma classify_mul (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (rs2 rs1 rd : mword 5) (mop : mul_op) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (MUL (Regidx rs2, Regidx rs1, Regidx rd, mop), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => MUL (Regidx a, Regidx b, Regidx c, mop))
+             (fun v1 v2 => mult_to_bits_half xlen (mop.(mul_op_signed_rs1))
+                             (mop.(mul_op_signed_rs2)) v1 v2 (mop.(mul_op_result_part)))
+             rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_MUL_if mop rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* --- the ZIMOP may-be-operations (write 0 to rd, retire) --- *)
+
+  (* ZIMOP_MOP_R rd, rs1: rd := 0 (single-source, const-zero value). *)
+  Lemma classify_zimop_r (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (mop : mword 5) (rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ZIMOP_MOP_R (mop, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_single va ms_v g tlbvec vpn i w
+             (fun a b => ZIMOP_MOP_R (mop, Regidx a, Regidx b))
+             (fun _ => zeros' 64) rs1 rd).
+    - intros rs1' rd' s. exact (exec_execute_ZIMOP_MOP_R_gpr mop rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  (* ZIMOP_MOP_RR rd, rs1, rs2: rd := 0 (two-source, const-zero value). *)
+  Lemma classify_zimop_rr (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (mop : mword 3) (rs2 rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ZIMOP_MOP_RR (mop, Regidx rs2, Regidx rs1, Regidx rd), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_two va ms_v g tlbvec vpn i w
+             (fun a b c => ZIMOP_MOP_RR (mop, Regidx a, Regidx b, Regidx c))
+             (fun _ _ => zeros' 64) rs2 rs1 rd).
+    - intros rs2' rs1' rd' s. exact (exec_execute_ZIMOP_MOP_RR_gpr mop rs2' rs1' rd' s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
   (* The constructors this file classifies so far. *)
   Definition covered_u (ii : instruction) : bool :=
     match ii with
@@ -1111,10 +1197,11 @@ Section WpUserClassify.
     | ITYPE _ => true | RTYPE _ => true | UTYPE _ => true | SHIFTIOP _ => true
     | ADDIW _ => true | SHIFTIWOP _ => true
     | REV8 _ => true | RORI _ => true | RORIW _ => true
-    | RTYPEW _ => true | MULW _ => true
+    | RTYPEW _ => true | MUL _ => true | MULW _ => true
     | DIV _ => true | DIVW _ => true | REM _ => true | REMW _ => true
     | CLMUL _ => true | CLMULH _ => true | CLMULR _ => true
     | ZBB_RTYPE _ => true | ZBB_RTYPEW _ => true | ZICOND_RTYPE _ => true
+    | ZIMOP_MOP_R _ => true | ZIMOP_MOP_RR _ => true
     | _ => covered_u ii
     end.
 
@@ -1162,6 +1249,10 @@ Section WpUserClassify.
         destruct p as [[[rs2r r1] r2] op];
         destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
         exact (classify_rtypew va ms_v g tlbvec vpn i w rs2 rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (MUL ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] mop];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_mul va ms_v g tlbvec vpn i w rs2 rs1 rd mop Hf Hdec)
     | Hdec : forall _, _ -> exec _ _ = Some (MULW ?p, _) |- _ =>
         destruct p as [[rs2r r1] r2];
         destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
@@ -1206,6 +1297,13 @@ Section WpUserClassify.
         destruct p as [[[rs2r r1] r2] op];
         destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
         exact (classify_zicond va ms_v g tlbvec vpn i w rs2 rs1 rd op Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (ZIMOP_MOP_R ?p, _) |- _ =>
+        destruct p as [[mop r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_zimop_r va ms_v g tlbvec vpn i w mop rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (ZIMOP_MOP_RR ?p, _) |- _ =>
+        destruct p as [[[mop rs2r] r1] r2];
+        destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_zimop_rr va ms_v g tlbvec vpn i w mop rs2 rs1 rd Hf Hdec)
     end.
   Qed.
 
