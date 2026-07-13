@@ -96,10 +96,10 @@ The end-to-end theorem `wp_user_exec_v1`: from a `user_frame` (config cells + up
 - **Genuine branches: `destruct (eq_vec ..) eqn:` + taken/fall leaves, NOT the split leaf** — the split leaf forces both continuations from disjoint resources; destruct duplicates the full Iris context.
 - **Callee-saved pins:** call specs (acquire/release/push_off/pop_off/holding/mycpu) pin s2–s5 (x18–x21) across calls; when a new loop keeps another callee-saved live, extend the pins bottom-up (the `lookup_total_insert_ne` peel pattern; `po_mycpu_out_s*` clones).
 
-## U-mode worklist (state as of the 32-disjunct assembly)
+## U-mode worklist (state as of the 34-disjunct assembly)
 
-Covered: all integer compute incl. RTYPEW/MUL/ZIMOP, control flow, ECALL, illegal-trap, fetch faults, NOP-likes, width-8 loads/stores, and the compressed layer (every non-memory `decodable_c` constructor except C_EBREAK). Open, roughly in order:
-1. MULW/DIV/DIVW/REM/REMW + SHIFTIWOP: one `_gpr` lemma each (fold div-by-zero into the value fn), then the scripted 4-swap (base arm, c-instances where applicable, disjunct, dispatch).
+Covered: all integer compute incl. RTYPEW/MUL/MULW/DIV/DIVW/REM/REMW/SHIFTIWOP/ZIMOP (the generic two-source arm `ustep_rtype2`/disjunct 33 + the compute1 single-source arm take any family as a classification-time instance given its `_gpr` fact), control flow, ECALL, illegal-trap, fetch faults, NOP-likes, width-8 loads/stores, and the compressed layer (every non-memory `decodable_c` constructor except C_EBREAK). Open, roughly in order:
+1. Remaining compute `_gpr` facts only (no assembly work needed): CLMUL/CLMULH/CLMULR, ZICOND, ZBB_RTYPE(W) pack/rotate ops, REV8/RORI/RORIW/ORCB (some have foreach loops in execute — harder).
 2. C_EBREAK / base EBREAK: trap template = ustep_c_illegal recipe with E_Breakpoint cause (`Hdel_break` hypothesis already in the section).
 3. Illegal-in-U instances: SRET/MRET/WFI/SFENCE*/SINVAL*/CSR*/SSAMOSWAP/ZICBOM/ZICBOZ (CSRs need mcounteren/scounteren pinned; cbo needs the MENVCFG_S CBIE/CBCFE/CBZE bits).
 4. Width-1/2/4 loads/stores (unlocks the 13 compressed memory ops), then LR/SC/AMO (reservations).
