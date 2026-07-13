@@ -1059,3 +1059,39 @@ Proof.
   apply exec_returnM.
 Qed.
 End ExecLoadGS1walkDev.
+
+Section UartWpBytes.
+Context `{!riscvGS Σ}.
+Existing Instance riscv_memGS.
+
+Definition uart_map (root p1 p0 lppn : mword 44) (lflags : Z) (dq : dfrac) : iProp Σ :=
+  (pte_addr_at root (subrange_vec_dec uart_vpn 26 18) ↦₈{ dq } mk_pte p1 PTE_PTR ∗
+   pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9) ↦₈{ dq } mk_pte p0 PTE_PTR ∗
+   pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) ↦₈{ dq } mk_pte lppn lflags)%I.
+
+Lemma uart_map_bytes (root p1 p0 lppn : mword 44) (lflags : Z) dq (σ : mstate) :
+  gen_heap_interp σ.(mem) -∗ uart_map root p1 p0 lppn lflags dq -∗
+  ⌜ (forall j:nat, (N.of_nat j < 8)%N ->
+       σ.(mem) !! (pa_add (pte_addr_at root (subrange_vec_dec uart_vpn 26 18)) j) = Some (nth_byte (mk_pte p1 PTE_PTR) j))
+  /\ (forall j:nat, (N.of_nat j < 8)%N ->
+       σ.(mem) !! (pa_add (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9)) j) = Some (nth_byte (mk_pte p0 PTE_PTR) j))
+  /\ (forall j:nat, (N.of_nat j < 8)%N ->
+       σ.(mem) !! (pa_add (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0)) j) = Some (nth_byte (mk_pte lppn lflags) j)) ⌝.
+Proof.
+  iIntros "Hm (H2 & H1 & H0)".
+  iDestruct (word_pointsto_bytes with "H2") as "H2".
+  iDestruct (word_pointsto_bytes with "H1") as "H1".
+  iDestruct (word_pointsto_bytes with "H0") as "H0".
+  iSplit; [| iSplit].
+  - iIntros (j Hj). iDestruct (big_sepL_lookup _ _ j j with "H2") as "Hbj".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iApply (mem_valid with "Hm Hbj").
+  - iIntros (j Hj). iDestruct (big_sepL_lookup _ _ j j with "H1") as "Hbj".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iApply (mem_valid with "Hm Hbj").
+  - iIntros (j Hj). iDestruct (big_sepL_lookup _ _ j j with "H0") as "Hbj".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iApply (mem_valid with "Hm Hbj").
+Qed.
+
+End UartWpBytes.
