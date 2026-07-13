@@ -187,6 +187,7 @@ WpUserZicond.v
 WpUserZbb.v
 WpUserClmul.v
 WpUserZbbRtype.v
+CboIllegal.v
 WpUserPriv.v
 WpUserSteps.v
 WpUserExec.v

@@ -478,7 +478,10 @@ Section WpUserTrap.
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       E (Φ : mval -> iProp Σ) :
     ↑minstretN ⊆ E ->
-    (* run_hart_active reaches Illegal at any User state meeting the setup *)
+    (* run_hart_active reaches Illegal at any User state meeting the setup.
+       The last three hypotheses expose the (frame-pinned) config a
+       config-gated illegal op needs: menvcfg=MENVCFG_S, senvcfg=0, and Ext_S
+       enabled.  Direct ops ignore them. *)
     (forall σ0 : mstate,
        register_lookup cur_privilege σ0.(sregs) = User ->
        exec (dispatchInterrupt User) σ0 = Some (None, σ0) ->
@@ -487,6 +490,9 @@ Section WpUserTrap.
        eq_vec (register_lookup elp σ0.(sregs))
               (landing_pad_bits_backwards LP_EXPECTED) = false ->
        register_lookup PC σ0.(sregs) = va ->
+       register_lookup menvcfg σ0.(sregs) = MENVCFG_S ->
+       register_lookup senvcfg σ0.(sregs) = (mword_of_int 0 : mword 64) ->
+       exec (currentlyEnabled Ext_S) σ0 = Some (true, σ0) ->
        exec (run_hart_active 0) σ0
          = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w),
                  set_reg σ0 nextPC (add_vec_int va 4))) ->
@@ -643,7 +649,7 @@ Section WpUserTrap.
     set (s_x := set_reg σ nextPC (add_vec_int va 4)).
     assert (Hha : exec (run_hart_active 0) σ
                     = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w), s_x)).
-    { unfold s_x. exact (Hrun σ Lpriv Hdisp Hfetch Hdec' Hlpad Lpc). }
+    { unfold s_x. exact (Hrun σ Lpriv Hdisp Hfetch Hdec' Hlpad Lpc Lmenv' Lsenv HES). }
     (* ---- the dispatch arm: handle_exception at s_x ---- *)
     assert (LprivX : register_lookup cur_privilege s_x.(sregs) = User)
       by (unfold s_x; lk; exact Lpriv).
@@ -800,10 +806,13 @@ Section WpUserTrap.
        eq_vec (register_lookup elp σ0.(sregs))
               (landing_pad_bits_backwards LP_EXPECTED) = false ->
        register_lookup PC σ0.(sregs) = va ->
+       register_lookup menvcfg σ0.(sregs) = MENVCFG_S ->
+       register_lookup senvcfg σ0.(sregs) = (mword_of_int 0 : mword 64) ->
+       exec (currentlyEnabled Ext_S) σ0 = Some (true, σ0) ->
        exec (run_hart_active 0) σ0
          = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w),
                  set_reg σ0 nextPC (add_vec_int va 4))).
-    { intros σ0 Hcp Hdsp Hft Hdc Hlp Hpc.
+    { intros σ0 Hcp Hdsp Hft Hdc Hlp Hpc _ _ _.
       apply (exec_hart_active_progress_base_gen User σ0 σ0
                (set_reg σ0 nextPC (add_vec_int va 4)) w ii va (Illegal_Instruction tt)
                Hcp Hdsp Hft Hdc Hlp Hnlpad Hpc).
