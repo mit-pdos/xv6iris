@@ -343,13 +343,18 @@ Qed.
   (* =================================================================== *)
 
   Lemma exec_write_ram_plain_1 (addr : mword 64) (data : bv 8) s :
+    dev_addr addr = false ->
     exec (write_ram rv64d_types.Write_plain (Physaddr addr) 1 data tt) s
-    = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 1 data)).
+    = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 1 data) s.(mdev)).
   Proof.
+    intros Hdev.
     unfold write_ram. cbn match.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
     unfold Defs.sail_mem_write. cbn beta zeta iota match.
-    unfold Defs.bind. cbn [Interface.iMon_bind]. cbn match. reflexivity.
+    unfold Defs.bind. cbn [Interface.iMon_bind].
+    cbn match.
+    rewrite exec_MemWrite; last exact Hdev.
+    reflexivity.
   Qed.
 
   Lemma exec_pmaCheck_ram_store_1 (addr : mword 64) (pbmt : page_based_mem_type)
@@ -391,10 +396,11 @@ Qed.
     exec (within_clint (Physaddr addr) 1) s = Some (false, s) ->
     exec (within_sig (Physaddr addr) 1) s = Some (false, s) ->
     exec (within_htif_writable (Physaddr addr) 1) s = Some (false, s) ->
+    dev_addr addr = false ->
     exec (checked_mem_write (Physaddr addr) 1 data (Store Data) pbmt Supervisor tt false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 1 data)).
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 1 data) s.(mdev)).
   Proof.
-    intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh.
+    intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev.
     unfold checked_mem_write.
     rewrite (exec_bind_Some _ _ _ _ _
               (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
@@ -414,7 +420,7 @@ Qed.
     rewrite (exec_bind_Some _ _ _ _ _
               (_ : exec (write_kind_of_flags false false false) s = Some (rv64d_types.Write_plain, s))).
     2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_plain_1 addr data s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_plain_1 addr data s Hdev)).
     apply exec_returnM.
   Qed.
 
@@ -433,20 +439,21 @@ Qed.
     exec (within_clint (Physaddr addr) 1) s = Some (false, s) ->
     exec (within_sig (Physaddr addr) 1) s = Some (false, s) ->
     exec (within_htif_writable (Physaddr addr) 1) s = Some (false, s) ->
+    dev_addr addr = false ->
     register_lookup mstatus s.(sregs) = m ->
     eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
     register_lookup cur_privilege s.(sregs) = Supervisor ->
     exec (mem_write_value (Physaddr addr) 1 data (Store Data) pbmt false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 1 data)).
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 1 data) s.(mdev)).
   Proof.
-    intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hms Hmprv Hpriv.
+    intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev Hms Hmprv Hpriv.
     unfold mem_write_value, mem_write_value_meta.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
     rewrite Hpriv. rewrite Hms.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_store_S m s Hmprv)).
     unfold mem_write_value_priv_meta. cbn [orb andb].
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_store_S_1 pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_store_S_1 pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev)).
     cbn match. unfold mem_write_callback. apply exec_returnm.
   Qed.
 
@@ -499,10 +506,11 @@ Qed.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 1) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 1) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 1) s = Some (false, s).
+  Hypothesis Hdev : dev_addr pa = false.
 
   Lemma exec_vmem_write_addr_1_S :
     exec (vmem_write_addr (Virtaddr a) 1 data (Store Data) false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 1 data)).
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 1 data) s.(mdev)).
   Proof.
     unfold vmem_write_addr.
     rewrite exec_catch_early_return.
@@ -516,7 +524,7 @@ Qed.
     match goal with
     | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
       assert (Hu : execR (Defs.untilMT vs m c b) s
-                   = Some (inr (true, 0%Z, true), MState s.(sregs) (write_bytes s.(mem) pa 1 data)))
+                   = Some (inr (true, 0%Z, true), MState s.(sregs) (write_bytes s.(mem) pa 1 data) s.(mdev)))
     end.
     { eapply execR_untilMT_1.
       - reflexivity.
@@ -533,7 +541,7 @@ Qed.
         match goal with
         | |- context [ Defs.bind (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) ?post ] =>
             assert (Hwrloop : execR (Defs.bind0 (Defs.liftR asrt) Nbody) s
-                             = Some (inr true, MState s.(sregs) (write_bytes s.(mem) pa 1 data)))
+                             = Some (inr true, MState s.(sregs) (write_bytes s.(mem) pa 1 data) s.(mdev)))
         end.
         { match goal with
           | |- execR (Defs.bind0 _ ?Nbody) s = _ => set (NN := Nbody)
@@ -561,7 +569,7 @@ Qed.
                apply bv_wrap_bv_unsigned. }
           rewrite (execR_liftR_seq _ _ _ _ _
             (exec_mem_write_value_1_S PBMT_PMA (zero_extend' 64 (add_vec_int a (0*1))) region data
-               (register_lookup mstatus s.(sregs)) s HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh eq_refl Hmprv Hcp)).
+               (register_lookup mstatus s.(sregs)) s HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev eq_refl Hmprv Hcp)).
           cbn match.
           apply execR_returnR_fwd. }
         rewrite (execR_bind_Some _ _ _ _ _ Hwrloop).
@@ -608,10 +616,11 @@ Qed.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 1) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 1) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 1) s = Some (false, s).
+  Hypothesis Hdev : dev_addr pa = false.
 
   Lemma exec_vmem_write_1_gpr_S :
     exec (vmem_write (Regidx rs1) offset 1 data (Store Data) false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 1 data)).
+      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 1 data) s.(mdev)).
   Proof.
     unfold vmem_write. rewrite exec_catch_early_return.
     assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Store Data) 1) s
@@ -625,7 +634,7 @@ Qed.
     cbn match.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
     rewrite execR_liftR.
-    rewrite (exec_vmem_write_addr_1_S a8 data region s Halign Hcp Hmprv Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh).
+    rewrite (exec_vmem_write_addr_1_S a8 data region s Halign Hcp Hmprv Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev).
     reflexivity.
   Qed.
   End VWgS1.
@@ -667,12 +676,13 @@ Qed.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 1) s = Some (false, s).
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 1) s = Some (false, s).
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 1) s = Some (false, s).
+  Hypothesis Hdev : dev_addr pa = false.
 
   Lemma exec_execute_STORE_1_gpr_S :
     exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 1))) s
       = Some (RETIRE_SUCCESS,
               MState s.(sregs) (write_bytes s.(mem) pa 1
-                (autocast (T := mword) (subrange_vec_dec vrs2 (Z.sub (Z.mul 1 8) 1) 0) : mword 8))).
+                (autocast (T := mword) (subrange_vec_dec vrs2 (Z.sub (Z.mul 1 8) 1) 0) : mword 8)) s.(mdev)).
   Proof.
     change (execute (STORE (imm, Regidx rs2, Regidx rs1, 1)))
       with (execute_STORE imm (Regidx rs2) (Regidx rs1) 1).
@@ -684,7 +694,7 @@ Qed.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
     cbn match.
     rewrite (exec_bind_Some _ _ _ _ _
-      (exec_vmem_write_1_gpr_S rs1 offset _ region satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh)).
+      (exec_vmem_write_1_gpr_S rs1 offset _ region satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
     cbn match.
     apply exec_returnM.
   Qed.
@@ -719,10 +729,11 @@ Qed.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 1) s' = Some (false, s').
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 1) s' = Some (false, s').
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 1) s' = Some (false, s').
+  Hypothesis Hdev : dev_addr pa = false.
 
   Lemma exec_vmem_write_addr_1_S_walk :
     exec (vmem_write_addr (Virtaddr a) 1 data (Store Data) false false false) s
-      = Some (Ok true, MState s'.(sregs) (write_bytes s.(mem) pa 1 data)).
+      = Some (Ok true, MState s'.(sregs) (write_bytes s.(mem) pa 1 data) s'.(mdev)).
   Proof.
     unfold vmem_write_addr.
     rewrite exec_catch_early_return.
@@ -736,7 +747,7 @@ Qed.
     match goal with
     | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
       assert (Hu : execR (Defs.untilMT vs m c b) s
-                   = Some (inr (true, 0%Z, true), MState s'.(sregs) (write_bytes s.(mem) pa 1 data)))
+                   = Some (inr (true, 0%Z, true), MState s'.(sregs) (write_bytes s.(mem) pa 1 data) s'.(mdev)))
     end.
     { eapply execR_untilMT_1.
       - reflexivity.
@@ -753,7 +764,7 @@ Qed.
         match goal with
         | |- context [ Defs.bind (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) ?post ] =>
             assert (Hwrloop : execR (Defs.bind0 (Defs.liftR asrt) Nbody) s'
-                             = Some (inr true, MState s'.(sregs) (write_bytes s.(mem) pa 1 data)))
+                             = Some (inr true, MState s'.(sregs) (write_bytes s.(mem) pa 1 data) s'.(mdev)))
         end.
         { match goal with
           | |- execR (Defs.bind0 _ ?Nbody) s' = _ => set (NN := Nbody)
@@ -782,7 +793,7 @@ Qed.
           assert (Hmem' : s'.(mem) = s.(mem)) by reflexivity.
           rewrite (execR_liftR_seq _ _ _ _ _
             (exec_mem_write_value_1_S PBMT_PMA (zero_extend' 64 (add_vec_int a (0*1))) region data
-               (register_lookup mstatus s'.(sregs)) s' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh eq_refl Hmprv Hcp)).
+               (register_lookup mstatus s'.(sregs)) s' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev eq_refl Hmprv Hcp)).
           cbn match.
           rewrite Hmem'.
           apply execR_returnR_fwd. }
@@ -833,10 +844,11 @@ Qed.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 1) s' = Some (false, s').
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 1) s' = Some (false, s').
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 1) s' = Some (false, s').
+  Hypothesis Hdev : dev_addr pa = false.
 
   Lemma exec_vmem_write_1_gpr_S_walk :
     exec (vmem_write (Regidx rs1) offset 1 data (Store Data) false false false) s
-      = Some (Ok true, MState s'.(sregs) (write_bytes s.(mem) pa 1 data)).
+      = Some (Ok true, MState s'.(sregs) (write_bytes s.(mem) pa 1 data) s'.(mdev)).
   Proof.
     unfold vmem_write. rewrite exec_catch_early_return.
     assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Store Data) 1) s
@@ -850,7 +862,7 @@ Qed.
     cbn match.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
     rewrite execR_liftR.
-    rewrite (exec_vmem_write_addr_1_S_walk a8 data region tlbf s Halign Hcp' Hmprv' Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh).
+    rewrite (exec_vmem_write_addr_1_S_walk a8 data region tlbf s Halign Hcp' Hmprv' Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev).
     reflexivity.
   Qed.
   End VWgS1walk.
@@ -895,12 +907,13 @@ Qed.
   Hypothesis Hc : exec (within_clint (Physaddr pa) 1) s' = Some (false, s').
   Hypothesis Hsig : exec (within_sig (Physaddr pa) 1) s' = Some (false, s').
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 1) s' = Some (false, s').
+  Hypothesis Hdev : dev_addr pa = false.
 
   Lemma exec_execute_STORE_1_gpr_S_walk :
     exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 1))) s
       = Some (RETIRE_SUCCESS,
               MState s'.(sregs) (write_bytes s.(mem) pa 1
-                (autocast (T := mword) (subrange_vec_dec vrs2 (Z.sub (Z.mul 1 8) 1) 0) : mword 8))).
+                (autocast (T := mword) (subrange_vec_dec vrs2 (Z.sub (Z.mul 1 8) 1) 0) : mword 8)) s'.(mdev)).
   Proof.
     change (execute (STORE (imm, Regidx rs2, Regidx rs1, 1)))
       with (execute_STORE imm (Regidx rs2) (Regidx rs1) 1).
@@ -912,7 +925,7 @@ Qed.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
     cbn match.
     rewrite (exec_bind_Some _ _ _ _ _
-      (exec_vmem_write_1_gpr_S_walk rs1 offset _ region satp0 tlbf s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh)).
+      (exec_vmem_write_1_gpr_S_walk rs1 offset _ region satp0 tlbf s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
     cbn match.
     apply exec_returnM.
   Qed.

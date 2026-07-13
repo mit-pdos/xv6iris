@@ -67,7 +67,7 @@ Section WpStoreGpr.
     iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
               HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hpmpc_k")   as %Lpmpc.
@@ -131,7 +131,7 @@ Section WpStoreGpr.
                        offset) (xlen - 0 - 1) 0)) (0 * 8)) = ea).
     { rewrite Hbase. rewrite !zero_extend'_id. rewrite subrange_id.
       change (0 * 8) with 0. rewrite avi0. reflexivity. }
-    pose (s_x := MState s_pc.(sregs) (write_bytes s_pc.(mem) ea 8 (m !!! Regidx rs2))).
+    pose (s_x := MState s_pc.(sregs) (write_bytes s_pc.(mem) ea 8 (m !!! Regidx rs2)) s_pc.(mdev)).
     assert (Hexec_spc :
       exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s_pc
       = Some (RETIRE_SUCCESS, s_x)).
@@ -141,7 +141,8 @@ Section WpStoreGpr.
                 ltac:(intro j; rewrite Lpmpcp; exact (proj1 (Hpmp j)))
                 ltac:(rewrite Lpmap Hpa; exact Hmatch) ltac:(rewrite Hpa; exact Halign)
                 Hwrite ltac:(rewrite Hpa; apply Hwc) ltac:(rewrite Hpa; apply Hws)
-                ltac:(rewrite Hpa; apply Hwh)).
+                ltac:(rewrite Hpa; apply Hwh)
+                ltac:(rewrite Hpa; exact (addr_is_ram_not_dev _ Hrampa))).
       subst s_x. rewrite Hpa Hdata. reflexivity. }
     (* write the 8 target bytes: from [vold] to rs2's value, updating the heap. *)
     iMod (upd_window_8 σ.(mem) ea (m !!! Regidx rs2) vold
@@ -150,8 +151,8 @@ Section WpStoreGpr.
     iExists s_x.
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact Hexec_spc. }
-    iSplitL "Hreg Hmem".
-    { unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s_x, s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
@@ -215,7 +216,7 @@ Section MmodeStoreTor.
     iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hpmpc_k")   as %Lpmpc.
@@ -282,7 +283,7 @@ Section MmodeStoreTor.
                        offset) (xlen - 0 - 1) 0)) (0 * 8)) = ea).
     { rewrite Hbase. rewrite !zero_extend'_id. rewrite subrange_id.
       change (0 * 8) with 0. rewrite avi0. reflexivity. }
-    pose (s_x := MState s_pc.(sregs) (write_bytes s_pc.(mem) ea 8 (m !!! Regidx rs2))).
+    pose (s_x := MState s_pc.(sregs) (write_bytes s_pc.(mem) ea 8 (m !!! Regidx rs2)) s_pc.(mdev)).
     assert (Hexec_spc :
       exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s_pc
       = Some (RETIRE_SUCCESS, s_x)).
@@ -292,7 +293,8 @@ Section MmodeStoreTor.
                 ltac:(rewrite Hpa; exact Hpmpchk_ea)
                 ltac:(rewrite Lpmap Hpa; exact Hmatch) ltac:(rewrite Hpa; exact Halign)
                 Hwrite ltac:(rewrite Hpa; apply Hwc) ltac:(rewrite Hpa; apply Hws)
-                ltac:(rewrite Hpa; apply Hwh)).
+                ltac:(rewrite Hpa; apply Hwh)
+                ltac:(rewrite Hpa; exact (addr_is_ram_not_dev _ Hrampa))).
       subst s_x. rewrite Hpa Hdata. reflexivity. }
     iMod (upd_window_8 σ.(mem) ea (m !!! Regidx rs2) vold
             with "Hmem Hbytes") as "[Hmem Hbytes]".
@@ -300,8 +302,8 @@ Section MmodeStoreTor.
     iExists s_x.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
-    iSplitL "Hreg Hmem".
-    { unfold s_x, s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s_x, s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }

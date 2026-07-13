@@ -65,7 +65,7 @@ Section WpLdGpr.
     iApply (wp_instr E Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hpmpc_k")   as %Lpmpc.
@@ -147,6 +147,7 @@ Section WpLdGpr.
       - rewrite Hpa. apply Hwc.
       - rewrite Hpa. apply Hws.
       - rewrite Hpa. apply Hwh.
+      - rewrite Hpa. exact (addr_is_ram_not_dev _ Hrampa).
       - intros j Hj. rewrite Hpa. exact (Hbytesf j Hj). }
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
@@ -161,8 +162,8 @@ Section WpLdGpr.
                (regval_into_reg v)).
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact Hexec_spc. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -231,7 +232,7 @@ Section MmodeLoadTor.
     iApply (wp_instr E Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms_k")     as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hpmpc_k")   as %Lpmpc.
@@ -319,6 +320,7 @@ Section MmodeLoadTor.
       - rewrite Hpa. apply Hwc.
       - rewrite Hpa. apply Hws.
       - rewrite Hpa. apply Hwh.
+      - rewrite Hpa. exact (addr_is_ram_not_dev _ Hrampa).
       - intros j Hj. rewrite Hpa. exact (Hbytesf j Hj). }
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
@@ -333,8 +335,8 @@ Section MmodeLoadTor.
                (regval_into_reg v)).
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem Hdev".
+    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
