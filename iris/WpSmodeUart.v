@@ -1051,6 +1051,131 @@ Proof.
 Qed.
 End ExecLoadGS1walkDev.
 
+(* ===================================================================== *)
+(* §6  The UART data translate: instantiate TrampTlb's three-way 4KB       *)
+(*     translateAddr at the UART leaf (access-generic: Store/Load Data).    *)
+(*     The three PTE-page reads land in RAM, so their PMP/within/dev facts  *)
+(*     are derived from [addr_is_ram] on each PTE address.                   *)
+(* ===================================================================== *)
+
+(* the 8-byte PTE read at a RAM address matches the kernel's TOR entry 0 *)
+Lemma ram_pte_pmp8 (a pmpaddr0 : mword 64) :
+  addr_is_ram a -> addr_is_ram (pa_add a 7) ->
+  ram_base + ram_size <= uint pmpaddr0 * 4 ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint pmpaddr0) 4)
+    (uint a) (uint (to_bits 64 8)) = PMP_Match.
+Proof.
+  intros Hram Hram7 Hcov.
+  assert (Hlo : (ram_base <= uint a)%Z) by (destruct Hram as [Hl _]; exact Hl).
+  assert (Hfit : (uint a + 8 <= ram_base + ram_size)%Z).
+  { assert (Hnw : (uint a + Z.of_nat 7 < 18446744073709551616)%Z).
+    { destruct Hram as [_ Hh]. unfold ram_base, ram_size in Hh. change (Z.of_nat 7) with 7. lia. }
+    pose proof (uint_pa_add a 7 Hnw) as Heq.
+    destruct Hram7 as [_ Hhi7]. rewrite Heq in Hhi7. change (Z.of_nat 7) with 7 in Hhi7.
+    unfold ram_base, ram_size in *. lia. }
+  exact (ram_pmp_match_w a pmpaddr0 8 ltac:(lia) ltac:(vm_compute; reflexivity) Hlo Hfit Hcov).
+Qed.
+
+Section UartTranslate.
+Context (access : MemoryAccessType mem_payload).
+Context (root p1 p0 lppn : mword 44) (lflags : Z).
+Context (region2 region1 region0 : PMA_Region).
+Context (menvcfg0 satp0 va pa : mword 64).
+Context (s : mstate).
+
+Local Notation a2 := (pte_addr_at root (subrange_vec_dec uart_vpn 26 18)).
+Local Notation a1 := (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9)).
+Local Notation a0 := (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0)).
+Local Notation pmpaddr0 := (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0).
+
+(* leaf-PTE facts *)
+Hypothesis Hlf : 0 <= lflags < 256.
+Hypothesis Hinv0 : forall s', exec (pte_is_invalid (Mk_PTE_Flags (mword_of_int lflags)) (Mk_PTE_Ext (mword_of_int 0))) s' = Some (false, s').
+Hypothesis Hnl0 : pte_is_non_leaf (Mk_PTE_Flags (mword_of_int lflags : mword 8)) = false.
+Hypothesis Hchk0 : forall (mxr do_sum : bool) s', exec (check_PTE_permission access Supervisor mxr do_sum (Mk_PTE_Flags (mword_of_int lflags)) (Mk_PTE_Ext (mword_of_int 0)) tt) s' = Some (PTE_Check_Success tt, s').
+Hypothesis HG0 : eq_vec (_get_PTE_Flags_G (Mk_PTE_Flags (mword_of_int lflags : mword 8))) ('b"1") = false.
+Hypothesis Hupd0 : update_PTE_Bits (mk_pte lppn lflags) access = None.
+(* config at s *)
+Hypothesis Heff : exec (effectivePrivilege access (register_lookup mstatus s.(sregs)) Supervisor) s = Some (Supervisor, s).
+Hypothesis Hss : exec (is_shadow_stack_access access) s = Some (false, s).
+Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Supervisor.
+Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
+Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
+Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
+Hypothesis Hppn : autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root.
+Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16).
+Hypothesis HmisaS : eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true.
+Hypothesis Hmenv : register_lookup menvcfg s.(sregs) = menvcfg0.
+Hypothesis HPBMTE : eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true.
+(* PMP TOR entry 0 (RAM grant, covers the whole low physical space) *)
+Hypothesis HA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
+Hypothesis Hord : zopz0zKzJ_u (zeros' 64) pmpaddr0 = false.
+Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
+Hypothesis Hcov : ram_base + ram_size <= uint pmpaddr0 * 4.
+(* PTE pages sit in RAM *)
+Hypothesis Hram2 : addr_is_ram a2.  Hypothesis Hram2' : addr_is_ram (pa_add a2 7).
+Hypothesis Hram1 : addr_is_ram a1.  Hypothesis Hram1' : addr_is_ram (pa_add a1 7).
+Hypothesis Hram0 : addr_is_ram a0.  Hypothesis Hram0' : addr_is_ram (pa_add a0 7).
+Hypothesis Hmatch2 : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr a2) 8 = Some region2.
+Hypothesis Hpte2 : (override_PMA (PMA_Region_attributes region2) PBMT_PMA).(PMA_supports_pte_read) = true.
+Hypothesis Hmatch1 : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr a1) 8 = Some region1.
+Hypothesis Hpte1 : (override_PMA (PMA_Region_attributes region1) PBMT_PMA).(PMA_supports_pte_read) = true.
+Hypothesis Hmatch0 : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr a0) 8 = Some region0.
+Hypothesis Hpte0 : (override_PMA (PMA_Region_attributes region0) PBMT_PMA).(PMA_supports_pte_read) = true.
+Hypothesis Hbytes2 : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a2 j) = Some (nth_byte (mk_pte p1 PTE_PTR) j).
+Hypothesis Hbytes1 : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a1 j) = Some (nth_byte (mk_pte p0 PTE_PTR) j).
+Hypothesis Hbytes0 : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a0 j) = Some (nth_byte (mk_pte lppn lflags) j).
+Hypothesis Hhtif : register_lookup htif_tohost_base s.(sregs) = None.
+(* va geometry: canonical, vpn = uart_vpn, output page = pa *)
+Hypothesis Hcanon : neq_vec (bits_of_virtaddr (Virtaddr va))
+   (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false.
+Hypothesis Hvpn_def : autocast (T := mword) (subrange_vec_dec
+   (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn.
+Hypothesis Hident : zero_extend' 64 (concat_vec lppn
+   (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa.
+
+Lemma exec_translateAddr_uart (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  register_lookup tlb s.(sregs) = tlbvec ->
+  tlb_consistent (P_uart4k root lppn (mk_pte lppn lflags) a0) tlbvec ->
+  exists s',
+    exec (translateAddr (Virtaddr va) access) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s')
+    /\ (s' = s \/
+        s' = set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) uart_vpn)
+                              (Some (uart_tlb_ent lppn (mk_pte lppn lflags) a0)))).
+Proof.
+  intros Htlb Hcons.
+  assert (HextN0 : eq_vec (_get_PTE_Ext_N (Mk_PTE_Ext (mword_of_int 0 : mword 10))) ('b"1") = false)
+    by (vm_compute; reflexivity).
+  pose proof (ram_pte_pmp8 (pte_addr_at root (subrange_vec_dec uart_vpn 26 18)) pmpaddr0 Hram2 Hram2' Hcov) as Hrange2.
+  pose proof (ram_pte_pmp8 (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9)) pmpaddr0 Hram1 Hram1' Hcov) as Hrange1.
+  pose proof (ram_pte_pmp8 (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0)) pmpaddr0 Hram0 Hram0' Hcov) as Hrange0.
+  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram2) ltac:(lia)) as Hc2.
+  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram1) ltac:(lia)) as Hc1.
+  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)) as Hc0.
+  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram2) ltac:(lia)) as Hsig2.
+  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram1) ltac:(lia)) as Hsig1.
+  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)) as Hsig0.
+  pose proof (within_htif_false (pte_addr_at root (subrange_vec_dec uart_vpn 26 18)) 8 s Hhtif) as Hh2.
+  pose proof (within_htif_false (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9)) 8 s Hhtif) as Hh1.
+  pose proof (within_htif_false (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0)) 8 s Hhtif) as Hh0.
+  pose proof (addr_is_ram_not_dev _ Hram2) as Hdev2.
+  pose proof (addr_is_ram_not_dev _ Hram1) as Hdev1.
+  pose proof (addr_is_ram_not_dev _ Hram0) as Hdev0.
+  exact (exec_translateAddr_tramp access uart_vpn root p1 p0 lppn lflags
+           region2 region1 region0 menvcfg0 s
+           Hlf Hinv0 Hnl0 Hchk0 HextN0 HG0 HmisaS HA Hord HR Hmenv HPBMTE
+           Hrange2 Hmatch2 Hpte2 Hc2 Hsig2 Hh2 Hdev2 Hbytes2
+           Hrange1 Hmatch1 Hpte1 Hc1 Hsig1 Hh1 Hdev1 Hbytes1
+           Hrange0 Hmatch0 Hpte0 Hc0 Hsig0 Hh0 Hdev0 Hbytes0 Hupd0
+           satp0 pa va
+           Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid Hcanon Hvpn_def Hident
+           tlbvec Htlb (uart_slot_disj root lppn lflags a0 tlbvec Hcons)).
+Qed.
+
+End UartTranslate.
+
 Section UartWpBytes.
 Context `{!riscvGS Σ}.
 Existing Instance riscv_memGS.
