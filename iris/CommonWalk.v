@@ -100,6 +100,21 @@ Proof.
   apply exec_returnm.
 Qed.
 
+(* Sv39 TLB tags are 45-bit sign-extensions of the 27-bit vpn; since the
+   top 12 bits of a 27-bit word never overflow the sign extension, the tag
+   determines the vpn.  Used to discriminate device (UART/PLIC) TLB entries
+   from RAM svpn tags. *)
+Lemma u_sext45_inj (x y : mword 27) :
+  sign_extend' (57 - 12) x = sign_extend' (57 - 12) y -> x = y.
+Proof.
+  intros H.
+  apply (f_equal bv_signed) in H.
+  cbv [sign_extend' Operators_mwords.sign_extend exts_vec to_word get_word
+       MachineWord.MachineWord.sign_extend] in H.
+  rewrite !bv_sign_extend_signed in H; [| apply N.leb_le; vm_compute; reflexivity ..].
+  apply bv_eq_signed. exact H.
+Qed.
+
 Section UserWalk.
   Context (vpn : mword 27) (root : mword 44).
   Context (pte2 pte1 pte0 : mword 64).
