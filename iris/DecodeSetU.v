@@ -195,6 +195,15 @@ Proof.
   intros Hb. apply (goodbP_bind_val D P m f s v (bval_exec m s v Hb)).
 Qed.
 
+(* and_boolM whose LEFT side is concretely false: short-circuits without
+   ever running the right side.                                           *)
+Lemma exec_and_lfalse (l r : M bool) (s : mstate) :
+  exec l s = Some (false, s) ->
+  exec (and_boolM l r) s = Some (false, s).
+Proof.
+  intros Hl. unfold and_boolM. rewrite exec_bind, Hl. apply exec_returnm.
+Qed.
+
 (* and_boolM whose RIGHT side is concretely false (its left side may
    depend on symbolic instruction bits): the conjunction is false however
    the left side evaluates.                                               *)
@@ -295,7 +304,9 @@ Ltac dtp_pin :=
       | and_boolM (currentlyEnabled ?e) ?r =>
           (* decide by the (closed) gate alone; when the gate is ON the
              conjunction is only pinnable if the right side is itself a
-             closed probe chain (the SSRDP shape) *)
+             closed probe (chain): plain gate (C_SEXT_B), gate-disjunction
+             (C_MUL), privilege-read chain (SSRDP), or a nested gated
+             chain (C_SSPUSH) -- never a word-dependent returnM.          *)
           let ev := eval vm_compute in (bval (currentlyEnabled e) s) in
           lazymatch ev with
           | Some false => dtp_pin_here D P h f s false
@@ -303,6 +314,34 @@ Ltac dtp_pin :=
               lazymatch r with
               | Defs.bind (Defs.read_reg _) _ => dtp_pin_closed D P h f s
               | zicfiss_xSSE _ => dtp_pin_closed D P h f s
+              | currentlyEnabled _ => dtp_pin_closed D P h f s
+              | or_boolM (currentlyEnabled _) (currentlyEnabled _) =>
+                  dtp_pin_closed D P h f s
+              | and_boolM (currentlyEnabled ?e2) ?r2 =>
+                  let ev2 := eval vm_compute in (bval (currentlyEnabled e2) s) in
+                  lazymatch ev2 with
+                  | Some false => dtp_pin_here D P h f s false
+                  | Some true =>
+                      lazymatch r2 with
+                      | Defs.bind (Defs.read_reg _) _ => dtp_pin_closed D P h f s
+                      | currentlyEnabled _ => dtp_pin_closed D P h f s
+                      end
+                  end
+              end
+          end
+      | and_boolM (and_boolM (currentlyEnabled ?e0) ?l2) ?r =>
+          (* closed gated chain on the LEFT, word test on the right (the
+             compressed shadow-stack shape): pin when the chain is false *)
+          lazymatch l2 with
+          | returnM _ => fail
+          | _ =>
+              let lv := eval vm_compute in (bval (and_boolM (currentlyEnabled e0) l2) s) in
+              lazymatch lv with
+              | Some false =>
+                  apply (goodbP_bind_val D P h f s false);
+                  [ apply exec_and_lfalse; apply bval_exec; vm_compute; reflexivity
+                  | vm_compute; reflexivity
+                  | cbv beta ]
               end
           end
       | and_boolM (returnM ?x) (currentlyEnabled ?e) =>
@@ -440,6 +479,68 @@ Proof.
   exists i. split; [exact HP|]. intros s Hag.
   destruct (goodbP_exec D_u decodable_u (ext_decode w) dstateU s
               (fun r HD => eq_sym (Hag r HD)) (goodbP_encdec_u w)) as (x & Hx & Hs & _).
+  assert (i = x) as -> by congruence.
+  exact Hs.
+Qed.
+
+(* ===================================================================== *)
+(* §6 The compressed (16-bit) decoder: same machinery, second image.      *)
+(*    MISA_C has C enabled, so user code CAN execute compressed           *)
+(*    instructions; this is the decode-side completion for that path.     *)
+(*    The discovered image is the Zca base set + the Zcb subset that      *)
+(*    needs no Zba/Zbb (C_LBU/C_LH/C_LHU/C_SB/C_SH/C_ZEXT_B/C_NOT/C_MUL)  *)
+(*    + hints (C_NTL, ZCMOP, C_NOP) + the C_ILLEGAL fallback.  Excluded:  *)
+(*    C_JAL (RV32-only), C_SEXT_B/C_SEXT_H/C_ZEXT_H (need Zbb, off),      *)
+(*    C_ZEXT_W (needs Zba, off), C_SSPUSH/C_SSPOPCHK (senvcfg.SSE = 0;    *)
+(*    their gate is the left-nested closed chain handled by the           *)
+(*    exec_and_lfalse pin).  No FP: this model build generates no         *)
+(*    FLD/FSD clauses in either decoder.                                  *)
+(* ===================================================================== *)
+
+Definition decodable_c (i : instruction) : bool :=
+  match i with
+  | C_ADD _ => true | C_ADDI _ => true | C_ADDI16SP _ => true
+  | C_ADDI4SPN _ => true | C_ADDIW _ => true | C_ADDW _ => true
+  | C_AND _ => true | C_ANDI _ => true
+  | C_BEQZ _ => true | C_BNEZ _ => true
+  | C_EBREAK _ => true | C_ILLEGAL _ => true
+  | C_J _ => true | C_JALR _ => true | C_JR _ => true
+  | C_LBU _ => true | C_LD _ => true | C_LDSP _ => true
+  | C_LH _ => true | C_LHU _ => true
+  | C_LI _ => true | C_LUI _ => true
+  | C_LW _ => true | C_LWSP _ => true
+  | C_MUL _ => true | C_MV _ => true
+  | C_NOP _ => true | C_NOT _ => true | C_NTL _ => true
+  | C_OR _ => true
+  | C_SB _ => true | C_SD _ => true | C_SDSP _ => true
+  | C_SH _ => true
+  | C_SLLI _ => true | C_SRAI _ => true | C_SRLI _ => true
+  | C_SUB _ => true | C_SUBW _ => true
+  | C_SW _ => true | C_SWSP _ => true
+  | C_XOR _ => true | C_ZEXT_B _ => true
+  | ZCMOP _ => true
+  | _ => false
+  end.
+
+Lemma goodbP_encdec_c (w : mword 16) :
+  goodbP D_u decodable_c (ext_decode_compressed w) dstateU = true.
+Proof.
+  unfold ext_decode_compressed, encdec_compressed_backwards. cbv beta zeta.
+  repeat dtp_core.
+Qed.
+
+(* Every 16-bit halfword decodes -- to a SINGLE instruction in the
+   explicit compressed set, shared by every D_u-agreeing state.           *)
+Theorem decode_total_c_set (w : mword 16) :
+  exists i, decodable_c i = true /\
+    forall s, agree_on D_u s dstateU ->
+      exec (ext_decode_compressed w) s = Some (i, s).
+Proof.
+  destruct (goodbP_exec D_u decodable_c (ext_decode_compressed w) dstateU dstateU
+              (fun r _ => eq_refl) (goodbP_encdec_c w)) as (i & Hi & _ & HP).
+  exists i. split; [exact HP|]. intros s Hag.
+  destruct (goodbP_exec D_u decodable_c (ext_decode_compressed w) dstateU s
+              (fun r HD => eq_sym (Hag r HD)) (goodbP_encdec_c w)) as (x & Hx & Hs & _).
   assert (i = x) as -> by congruence.
   exact Hs.
 Qed.
