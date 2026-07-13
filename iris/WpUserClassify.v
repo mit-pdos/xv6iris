@@ -1122,6 +1122,57 @@ Section WpUserClassify.
     - exact Hdec.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* Control-flow classifiers.  Unlike the compute families these carry
+     RUNTIME guards (rd<>x0, target alignment, branch condition) that are
+     decided from the frame's register map [g] / pc [va] -- NOT from the
+     decoded word alone -- so they are CONDITIONAL classifiers (extra
+     hypotheses) and do NOT join the unconditional [classify_word]
+     dispatcher.  They route to the pre-existing jump/branch disjuncts
+     (9/10/13/14); the caller discharges the guards for its program. *)
+
+  (* JAL rd, imm: aligned pc-relative jump, rd<>x0 -> disjunct 9. *)
+  Lemma classify_jal (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 21) (rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JAL (imm, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hrd H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 8 right; left.
+    exists vpn, i, w, imm, rd.
+    repeat split; assumption.
+  Qed.
+
+  (* JALR rd, rs1, imm: aligned register-indirect jump, rd<>x0 -> disjunct 10. *)
+  Lemma classify_jalr (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 12) (rs1 rd : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JALR (imm, Regidx rs1, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    eq_vec (access_vec_dec (jalr_target (g !!! Regidx rs1) imm) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (jalr_target (g !!! Regidx rs1) imm) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hrd H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 9 right; left.
+    exists vpn, i, w, imm, rs1, rd.
+    repeat split; assumption.
+  Qed.
+
   (* The constructors this file classifies so far. *)
   Definition covered_u (ii : instruction) : bool :=
     match ii with
