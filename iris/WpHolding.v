@@ -189,18 +189,6 @@ Proof.
   - apply bv_eq. vm_compute. reflexivity.
 Qed.
 
-(* the a0 slot of a mycpu call's output register file, in closed form *)
-Lemma po_mycpu_out_a0 (P : mword 64) (m : gmap regidx (mword 64)) :
-  po_mycpu_out P m !!! Regidx (mword_of_int 10 : mword 5)
-  = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)).
-Proof.
-  unfold po_mycpu_out. cbv zeta.
-  repeat first [ rewrite lookup_total_insert
-               | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ].
-  unfold mycpu_ret, mycpu_a5.
-  reflexivity.
-Qed.
-
 Section WpHolding.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.

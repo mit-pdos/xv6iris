@@ -678,10 +678,15 @@ Section WpPopOffTopSec.
     iApply (wp_mycpu root_ppn E Φ m0 2 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               ltac:(lia) HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hstk [Hgc Hcont]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hstk".
-    iApply ("Hcont" $! (po_mycpu_out P m)
-              with "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
-    split; [ apply po_mycpu_out_callee_saved | apply pt_mycpu_out_a0 ].
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmcs Hstk".
+    iApply ("Hcont" with
+              "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
+    destruct Hmcs as [Hcs Ha0]. split.
+    - exact (callee_saved_insert_ra _ _ _ Hcs).
+    - assert (Htp : m0 !!! Regidx (mword_of_int 4 : mword 5)
+                    = m !!! Regidx (mword_of_int 4 : mword 5))
+        by (rewrite /m0 lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
+      rewrite -Htp. exact Ha0.
   Qed.
 
   (* [smode_config] view of the pure sstatus read (csrrs rd,sstatus,x0): mstatus

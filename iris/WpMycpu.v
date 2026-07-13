@@ -67,6 +67,22 @@ Proof.
   rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
 Qed.
 
+(* [callee_saved] ignores ra (x1), so a preceding jal link-write on the input
+   map is irrelevant: this lets a mycpu caller state its callee_saved post
+   against the pre-jal map [m] while [wp_mycpu] proves it against the post-jal
+   [<[ra:=..]> m]. *)
+Lemma callee_saved_insert_ra (v : mword 64) (m mo : gmap regidx (mword 64)) :
+  callee_saved (<[Regidx (mword_of_int 1 : mword 5) := v]> m) mo -> callee_saved m mo.
+Proof.
+  unfold callee_saved. intros H.
+  repeat match goal with He : _ /\ _ |- _ => destruct He end.
+  repeat split;
+    match goal with
+    | Hh : mo !!! ?r = _ |- mo !!! ?r = _ =>
+        rewrite lookup_total_insert_ne in Hh; [ exact Hh | vm_compute; discriminate ]
+    end.
+Qed.
+
 (* ===================================================================== *)
 (* Decode templates.                                                      *)
 (* ===================================================================== *)
@@ -201,39 +217,6 @@ Lemma mycpu_epilogue_run :
   vc_block_s (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap []) mycpu_epilogue
   = Some (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap []).
 Proof. vm_compute. reflexivity. Qed.
-
-(* named form of wp_mycpu's output register file (= call_mycpu's m11 chain),
-   so downstream geometry (holding/acquire/push_off) can reference its a0/sp
-   lookups.  Lives here because it is the mycpu() call's result, not push_off's. *)
-Definition po_mycpu_out (P : mword 64) (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
-  let ra_idx : mword 5 := mword_of_int 1 in
-  let tp_idx : mword 5 := mword_of_int 4 in
-  let s0_idx : mword 5 := mword_of_int 8 in
-  let a0_idx : mword 5 := mword_of_int 10 in
-  let a5_idx : mword 5 := mword_of_int 15 in
-  let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-  let pcE := mword_of_int KernelSyms.mycpu in
-  let imm_entry : mword 6 := mword_of_int 48 in
-  let imm_dealloc : mword 6 := mword_of_int 16 in
-  let nzimm_s0 : mword 8 := mword_of_int 4 in
-  let imm_auipc : mword 20 := mword_of_int 0x11 in
-  let imm_addi : mword 12 := mword_of_int 0xa94 in
-  let shamt_slli : mword 6 := mword_of_int 7 in
-  let imm_addiw : mword 6 := mword_of_int 0 in
-  let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
-  let ra0 := m0 !!! Regidx ra_idx in
-  let s00 := m0 !!! Regidx s0_idx in
-  let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
-  let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
-  let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2 in
-  let m4 := <[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3 in
-  let m5 := <[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4 in
-  let m6 := <[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5 in
-  let m7 := <[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6 in
-  let m8 := <[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7 in
-  let m9 := <[Regidx ra_idx := regval_into_reg ra0]> m8 in
-  let m10 := <[Regidx s0_idx := regval_into_reg s00]> m9 in
-  <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10.
 
 Section WpMycpu.
   Context `{!riscvGS Σ}.
@@ -471,6 +454,8 @@ Section WpMycpu.
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗ gpr_file m11 -∗
+      ⌜ callee_saved m0 m11 /\
+        m11 !!! Regidx a0_idx = mycpu_ret (m0 !!! Regidx tp_idx) ⌝ -∗
       stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
@@ -751,7 +736,19 @@ Section WpMycpu.
     iEval (rewrite Hps0') in "Hbs0".
     iDestruct (stack_own_2_intro with "Hbra Hbs0") as "Htop".
     iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hstk").
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
+    (* mycpu's output register file [m11] is callee-saved w.r.t. [m0] and returns
+       a0 = &cpus[cpuid] = mycpu_ret (m0's tp).  Proven once here, over the
+       concrete let-chain, so callers never name the register file. *)
+    rewrite /m11 /m10 /m9 /m8 /m7 /m6 /m5 /m4 /m3 /m2 /m1 /s00 /ra0.
+    split.
+    - unfold callee_saved. repeat split;
+        repeat first [ rewrite lookup_total_insert
+                     | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ];
+        first [ reflexivity | apply mycpu_frame_cancel ].
+    - repeat first [ rewrite lookup_total_insert
+                   | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ].
+      unfold mycpu_ret, mycpu_a5. reflexivity.
   Qed.
 
 End WpMycpu.
