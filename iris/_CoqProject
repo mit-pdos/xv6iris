@@ -54,6 +54,7 @@ WpGprMretWp.v
 WpGprMretNew.v
 WpGprRvc.v
 WpGprRvcTor.v
+ZicondGpr.v
 WpMmodeLeafBase.v
 WpMmodeItype.v
 WpMmodeAddiw.v
@@ -178,6 +179,7 @@ WpUserMem1.v
 WpUserMemC1.v
 WpUserAmo.v
 WpUserCsr.v
+WpUserZicond.v
 WpUserSteps.v
 WpUserExec.v
 WpUartPutcSyncFull.v
