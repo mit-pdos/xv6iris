@@ -45,3 +45,54 @@ holds durable, forward-looking guidance distilled from past work.
 ## Recurring technique: recover a concrete register map from a VCgen block
 
 `wp_vc_block_s`'s continuation gives an abstract `mf` + `gpr_matches` facts. To hand back a concrete `gpr_file`: use `agree_off st'.(vregs) mf m0` (2nd conjunct — pins every reg the block didn't write to its pre-block value) together with `gpr_file_ext` (two *total* maps that agree on every `!!!` are equal gmaps, so `gpr_file m1 -∗ gpr_file m2`). Store-only blocks give `mf = m` generically; K-write blocks: prove `mf = <the K-insert chain>` by ~K `decide`-cases (`regval_into_reg` is the identity, so raw block values line up by conversion). Extract `∀ r, r ∈ dom m` at the TOP before the block consumes `gpr_file m`.
+
+## Multi-CPU model (ambient hart)
+
+- Multi-hart execution uses an AMBIENT hart: `CPU := fin NCPU`, `Class CpuId := cpu_id : CPU` (RiscvLang.v). `Notation Loop := (LoopE cpu_id)` keeps WP statements spelled exactly as single-CPU.
+- Per-file contract: add `Context `{CID : CpuId}.` after every `Context `{!riscvGS Σ}.`, and use the single-hart view `mstate_interp σ` (= `reg_interp σ.(sregs) ∗ gen_heap_interp σ.(mem)`) in leaf lemmas — never the global `state_interp`. The one per-hart framing point is `gregs_interp_acc` inside `wp_exec_step`.
+- The older explicit-`cpu` design lives on branch `backup-explicit-cpu`; do not resurrect it.
+
+## U-mode execution theorem (WpUserExec.v)
+
+The end-to-end theorem `wp_user_exec_v1`: from a `user_frame` (config cells + upt_inv + arbitrary GPRs/pc), the machine runs arbitrary user code with continuations only at stvec. Built as: per-shape **arms** (`ustep_*`) → a pure classification `ustep_case` (one disjunct per arm = exactly that arm's pure premise bundle) → `user_step_holds` destructs + dispatches → Löb loop in `wp_user_exec`.
+
+- **Later convention:** the Löb obligation provides continuations under `▷`; every arm's final continuation premise is `▷ (...)` (proof-free for arms whose engine has an internal `iNext`; `ustep_ecall` needed one explicit `iNext`).
+- **Adding an arm family is scripted, not hand-written.** Extract the closest proven arm's text from the file and constructor-swap it (e.g. RTYPE→RTYPEW + `rop`→`ropw`; RTYPE→MUL + `mul_op` param). Same for its `ustep_case` disjunct and dispatch case. Scripted swaps of proven text compile first try; hand-built premise bundles don't.
+- **Disjunct paren discipline:** a base disjunct's trailing execute-fact text ends with the disjunct's own closing paren — copying it verbatim and appending `)` gives +1 imbalance. Before compiling, split the `ustep_case` body on `\n    \/\n` and balance-check each disjunct's parens; check the destruct intropattern has N−1 `[` and `]` for N disjuncts.
+- **Arm placement:** compressed/late arms must sit AFTER the base arms — some (jalr) use helpers (`exec_cE_zicfilp_false_u`) defined mid-file.
+- **Pure-classification boundary:** `ustep_case` is a `Prop`; mutable-memory loads/stores (`ustep_ld_data`, `ustep_sd`) take spatial premises and stay standalone theorems by design. `ustep_ld_code` folds in because the code image is immutable.
+- Register-generic execute facts follow the `exec_execute_*_gpr` pattern (`exec_rX_bits_gpr`/`exec_wX_bits_gpr` chains; values packaged as `gpr_*_val` in the two-value shape). `execute_RTYPEW` is op-generic — one lemma covers all five W-ops; prefer that shape where the model allows.
+
+## Decode totality and the user-mode instruction set (DecodeTotalU.v / DecodeSetU.v)
+
+- `decode_total_u`: every 32-bit word decodes at the U-mode reference state; `decode_total_u_set` / `decode_total_c_set`: the decode images are the EXPLICIT sets `decodable_u` (54 constructors) / `decodable_c` (44). Machine-discovered, not guessed.
+- **Technique** (reuse for any exec-totality/classification goal): reduce to a boolean `goodb`/`goodbP` traversal at the concrete `dstateU`. `goodb D m s = true` alone implies exec success with state unchanged; `exec_goodb_congr` transports to agreeing states. The bind rule with a ∀-quantified continuation makes the traversal LINEAR in decoder size (the abandoned exec-threading peel was per-clause × per-guard: 35min/28GB vs ~10s).
+- `goodbP` adds a leaf predicate; classification flows through the clause spine via `goodbP_bind_Q` (head's leaf predicate becomes the continuation's hypothesis). The decoder's LAST clause uses a pure-match tail — needs `goodbP_spine_pure`.
+- **vm_compute trap:** never `eval vm_compute in` a term whose value can be stuck (readback of a stuck normal form costs minutes). Decide value-pins by vm-ing only the closed gate (`currentlyEnabled e`); goal-level `vm_compute; reflexivity` is safe even with symbolic bits in dead branches (discarded during evaluation, never read back). `bval` (value-only exec mirror) exists because an exec equation's readback contains the whole normalized register file.
+- **Discovery recipe:** run the traversal with an opaque predicate variable; the unsolved leaves are exactly the reachable constructors.
+- Config at dstateU: only Zba/Zbb/Zbs/Zicfilp gates are OFF; Zicfiss is ON but `senvcfg.SSE=0` kills SSPUSH/SSPOPCHK/SSRDP at decode (SSAMOSWAP's xSSE check is execute-time, so it IS in the image). Neither decoder emits any FP instruction in this model build.
+
+## Compressed (RVC) layer (UmodeFetchC.v + WpUserExec.v)
+
+- Every retiring compressed instruction executes as `ExecuteAs` of its base expansion (pure `reflexivity` lemmas, UmodeFetchC §5) — so compressed arms reuse the base execute-lemma layer unchanged. Exceptions: C_NOP/C_NTL/ZCMOP retire directly, C_ILLEGAL is directly illegal, C_NOT/C_ZEXT_B compute inline (own `_gpr` facts, §6).
+- The RVC dispatch writes `nextPC := pc+2` BEFORE execute, so JAL/JALR link values come out right with no new jump lemmas.
+- Two fetch modes, packaged as ONE disjunctive premise (`c_fetch_mode`): 4-aligned pc → Ziccif reads a full 4-BYTE window (code map must cover pa..pa+3; F_RVC is the low half); pc ≡ 2 (mod 4) → single 2-byte fetch (the align check reads Zca). Engines: `wp_instr_c_hit` (ExecuteAs) / `wp_instr_c_hit_direct`; step dispatch via `exec_hart_active_progress_RVC_gen` (SmodeCore, privilege-generic) / `_RVC_direct_gen` (UmodeFetchC).
+- For a dual-mode arm with a long tail (the trapish ones): hoist width-independent facts before `destruct Hmode`, copy the two fetch-construction blocks from `wp_instr_c_hit` verbatim, duplicate the tail per branch.
+
+## Kernel-side proof architecture notes
+
+- **swtch / contexts:** `valid_context sc E Φ P c` (WpSwtchVc.v) = c's 14 saved-register cells + wand to WP; config abstracted as one resource `sc` (instantiated at the `smode_config γc dq ∗ SIE-ghost ∗ tlb_inv` bundle). The resumer is EXISTENTIAL with a caller-chosen ▷-guarded predicate `P` (fixpoint) — multi-CPU: never pin a partner.
+- **proc locks / wakeup:** `proc_lock_res` owns state@24 + chan@32 (+ `proc_ctx` when parked); `contains_lock` hands the spinlock token through the sleep/wakeup swtch handoff; `procs_inv` = 64 `is_lock`s. Wakeup's content is `proc_lock_res_wakeup` (SLEEPING→RUNNABLE carries the context untouched).
+- **Bounded loops: fuel induction, NOT iLöb.** Packaged S-mode leaves strip the step's `▷` internally and never expose a `▷` goal, so an iLöb IH under `▷` can never be applied. `iAssert` a fuel-indexed loop lemma and `iInduction fuel`.
+- **Genuine branches: `destruct (eq_vec ..) eqn:` + taken/fall leaves, NOT the split leaf** — the split leaf forces both continuations from disjoint resources; destruct duplicates the full Iris context.
+- **Callee-saved pins:** call specs (acquire/release/push_off/pop_off/holding/mycpu) pin s2–s5 (x18–x21) across calls; when a new loop keeps another callee-saved live, extend the pins bottom-up (the `lookup_total_insert_ne` peel pattern; `po_mycpu_out_s*` clones).
+
+## U-mode worklist (state as of the 32-disjunct assembly)
+
+Covered: all integer compute incl. RTYPEW/MUL/ZIMOP, control flow, ECALL, illegal-trap, fetch faults, NOP-likes, width-8 loads/stores, and the compressed layer (every non-memory `decodable_c` constructor except C_EBREAK). Open, roughly in order:
+1. MULW/DIV/DIVW/REM/REMW + SHIFTIWOP: one `_gpr` lemma each (fold div-by-zero into the value fn), then the scripted 4-swap (base arm, c-instances where applicable, disjunct, dispatch).
+2. C_EBREAK / base EBREAK: trap template = ustep_c_illegal recipe with E_Breakpoint cause (`Hdel_break` hypothesis already in the section).
+3. Illegal-in-U instances: SRET/MRET/WFI/SFENCE*/SINVAL*/CSR*/SSAMOSWAP/ZICBOM/ZICBOZ (CSRs need mcounteren/scounteren pinned; cbo needs the MENVCFG_S CBIE/CBCFE/CBZE bits).
+4. Width-1/2/4 loads/stores (unlocks the 13 compressed memory ops), then LR/SC/AMO (reservations).
+5. F_Base fetch at pc ≡ 2 (mod 4) (32-bit instr at odd halfword: two 2-byte fetches; M-mode template `FetchFBase2` exists); C-enabled JAL/JALR/BTYPE target-alignment lemmas (current ones demand bit-1-clear targets).
+6. Hclass discharge: connect `decode_total_u_set`/`decode_total_c_set` to `ustep_case` (per-decoded-instruction execute classification).
