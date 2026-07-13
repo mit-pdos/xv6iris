@@ -322,4 +322,100 @@ Section WpUserPriv.
               Hvpn_def Hpaal HnotRVC Hdec).
   Qed.
 
+  (* ZICBOZ (CBO.ZERO): illegal in U on menvcfg.CBZE = 0 (short-circuits before
+     any memory access).  Only the menvcfg config hyp is needed. *)
+  Lemma ustep_zicboz_illegal (rs1 : regidx)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64)) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    upriv_illegal_arm (ZICBOZ rs1) va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ ->
+    hw_config -∗ minstret_inv -∗ hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗ stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗ tlb ↦ᵣ tlbvec -∗ pc_is va -∗ gpr_file g -∗
+    upt_inv root slots spec -∗ user_code -∗ user_data -∗ user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros (HN & Hok & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HSXL & Hval &
+            Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec).
+    assert (Hrun : forall σ0 : mstate,
+       register_lookup cur_privilege σ0.(sregs) = User ->
+       exec (dispatchInterrupt User) σ0 = Some (None, σ0) ->
+       exec (fetch tt) σ0 = Some (F_Base w, σ0) ->
+       exec (ext_decode w) σ0 = Some (ZICBOZ rs1, σ0) ->
+       eq_vec (register_lookup elp σ0.(sregs))
+              (landing_pad_bits_backwards LP_EXPECTED) = false ->
+       register_lookup PC σ0.(sregs) = va ->
+       register_lookup menvcfg σ0.(sregs) = MENVCFG_S ->
+       register_lookup senvcfg σ0.(sregs) = (mword_of_int 0 : mword 64) ->
+       exec (currentlyEnabled Ext_S) σ0 = Some (true, σ0) ->
+       exec (run_hart_active 0) σ0
+         = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w),
+                 set_reg σ0 nextPC (add_vec_int va 4))).
+    { intros σ0 Hcp Hdsp Hft Hdc Hlp Hpc Hmenv0 _ _.
+      apply (exec_hart_active_progress_base_gen User σ0 σ0
+               (set_reg σ0 nextPC (add_vec_int va 4)) w
+               (ZICBOZ rs1) va (Illegal_Instruction tt)
+               Hcp Hdsp Hft Hdc Hlp eq_refl Hpc).
+      - apply exec_execute_ZICBOZ_illegal.
+        + lk. exact Hcp.
+        + lk. exact Hmenv0.
+      - exact I. }
+    iApply (ustep_illegal_run_st (ZICBOZ rs1)
+              va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hrun Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec).
+  Qed.
+
+  (* SSAMOSWAP (Zicfiss shadow-stack AMO): illegal in U on senvcfg.SSE = 0
+     with Ext_S on.  Needs all three config hyps. *)
+  Lemma ustep_ssamoswap_illegal (aq rl : bool) (rs2 rs1 : regidx)
+      (width : Z) (rd : regidx)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64)) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    upriv_illegal_arm (SSAMOSWAP (aq, rl, rs2, rs1, width, rd))
+      va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ ->
+    hw_config -∗ minstret_inv -∗ hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗ stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗ tlb ↦ᵣ tlbvec -∗ pc_is va -∗ gpr_file g -∗
+    upt_inv root slots spec -∗ user_code -∗ user_data -∗ user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros (HN & Hok & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HSXL & Hval &
+            Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec).
+    assert (Hrun : forall σ0 : mstate,
+       register_lookup cur_privilege σ0.(sregs) = User ->
+       exec (dispatchInterrupt User) σ0 = Some (None, σ0) ->
+       exec (fetch tt) σ0 = Some (F_Base w, σ0) ->
+       exec (ext_decode w) σ0 = Some (SSAMOSWAP (aq, rl, rs2, rs1, width, rd), σ0) ->
+       eq_vec (register_lookup elp σ0.(sregs))
+              (landing_pad_bits_backwards LP_EXPECTED) = false ->
+       register_lookup PC σ0.(sregs) = va ->
+       register_lookup menvcfg σ0.(sregs) = MENVCFG_S ->
+       register_lookup senvcfg σ0.(sregs) = (mword_of_int 0 : mword 64) ->
+       exec (currentlyEnabled Ext_S) σ0 = Some (true, σ0) ->
+       exec (run_hart_active 0) σ0
+         = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w),
+                 set_reg σ0 nextPC (add_vec_int va 4))).
+    { intros σ0 Hcp Hdsp Hft Hdc Hlp Hpc Hmenv0 Hsenv0 HES0.
+      apply (exec_hart_active_progress_base_gen User σ0 σ0
+               (set_reg σ0 nextPC (add_vec_int va 4)) w
+               (SSAMOSWAP (aq, rl, rs2, rs1, width, rd)) va (Illegal_Instruction tt)
+               Hcp Hdsp Hft Hdc Hlp eq_refl Hpc).
+      - apply exec_execute_SSAMOSWAP_illegal.
+        + lk. exact Hcp.
+        + lk. exact Hmenv0.
+        + lk. exact Hsenv0.
+        + apply exec_currentlyEnabled_S_set_nextPC. exact HES0.
+      - exact I. }
+    iApply (ustep_illegal_run_st (SSAMOSWAP (aq, rl, rs2, rs1, width, rd))
+              va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hrun Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec).
+  Qed.
+
 End WpUserPriv.
