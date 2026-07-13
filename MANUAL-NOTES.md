@@ -16,6 +16,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)
 - user-mode exec: TBD what's the best way to reason about all instructions
+- shared CLAUDE.md memory in repo
+- device model: DevLoop opcode, concurrent WP, shared access to CPU SEIP
 
 Big things that still need to be done/explored:
 
@@ -23,13 +25,10 @@ Big things that still need to be done/explored:
   - flat model does instruction re-ordering, which means no sequential stepping through instructions
   - promising model requires future-write reasoning
   - DRF-SC is probably not sufficient to cover all kernel code
-- devices (STARTED: iris/DevModel.v + iris/WpUart.v -- UART + PLIC as a
-  concurrent device execution context, MMIO routed at the interpreter's
-  MemRead/MemWrite outcomes, interrupts wired through per-hart sig_seip;
-  see iris/README.md "Devices")
 - liveness, or at least deadlock avoidance
 - file system
 - virtual memory / page tables
+- adequacy theorem
 
 Don't know where else to put this:
 
