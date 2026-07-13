@@ -32,7 +32,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpSmodeSret WpEntryNew.
+Require Import SmodeCore WpSmodeSret KernelText.
 Require Import WpKernelvecNew.
 Require Import WpIntrBits WpIntrCore.
 (* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the

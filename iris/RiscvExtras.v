@@ -61,6 +61,25 @@ Lemma add_vec_slot0_zero (x : mword 64) :
   add_vec x (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = x.
 Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
+(* A 1-bit word that is not 1 is 0 -- the two-element case analysis on a
+   [mword 1] (e.g. an [Mstatus.SIE]/[Mstatus.MIE] bit known to be not-set).
+   Pure bitvector fact; shared by the pop_off/push_off/acquire/release
+   interrupt-disable proofs (do NOT re-copy it into a Wp*.v file). *)
+Lemma mword1_zero_of_ne_one (x : mword 1) :
+  eq_vec x ('b"1") = false -> x = ('b"0" : mword 1).
+Proof.
+  intro H. apply eq_vec_false_iff in H. apply bv_eq.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  assert (Hmod : bv_modulus 1 = 2) by (vm_compute; reflexivity).
+  rewrite Hmod in Hr.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  assert (H0 : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
+  rewrite H0.
+  assert (Hne : bv_unsigned x <> 1).
+  { intro Hc. apply H. apply bv_eq. rewrite H1. exact Hc. }
+  lia.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* should_inc_minstret is state-pure: its result is fully determined by    *)
 (* the mcountinhibit and minstretcfg cells.  Owning those two CSRs thus     *)

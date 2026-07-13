@@ -63,7 +63,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import WpAuipc WpGprLui WpGprAddi WpMmodeShiftiop WpGprLogic WpMmodeJal WpGprStore WpGprRvc WpGprRvcTor.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB WpGprCsrwC.
 Require Import WpGprMretWp WpGprMretNew.
-Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit.
+Require Import MinstretInv InstrBytes KernelText WpTimerinit.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

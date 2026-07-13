@@ -24,6 +24,7 @@ Require Import WpGprRvc.
 Require Import WpGprCsrwA WpGprCsrwB.
 Require Import WpGprMretWp.
 Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit WpStartNew.
+Require Import KernelText.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 Local Open Scope Z_scope.

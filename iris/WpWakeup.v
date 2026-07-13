@@ -32,7 +32,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import SmodeCore.
-Require Import InstrBytes MinstretInv RiscvFetchExec WpGpr WpEntryNew.
+Require Import InstrBytes MinstretInv RiscvFetchExec WpGpr KernelText.
 Require Import WpLock.
 Require Import WpGprRvc.
 Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGen VcGenS.

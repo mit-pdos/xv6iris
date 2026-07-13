@@ -75,6 +75,7 @@ WpSmodeLoad.v
 WpSmodeStore.v
 WpSmodeBtype.v
 InstrBytes.v
+KernelText.v
 StackOwn.v
 CalleeSaved.v
 WpEntryNew.v
@@ -114,6 +115,7 @@ WpPushOff.v
 WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
+KernelRvcDecode.v
 WpPushOffTop.v
 WpAmo.v
 WpAcquireMem.v

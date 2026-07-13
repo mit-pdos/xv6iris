@@ -19,15 +19,15 @@ From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpEntryNew.
+Require Import KernelText.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpPushOffTop WpAmo WpAcquireMem WpHolding WpAcquireTop.
 Require Import CalleeSaved.
 Require Import StackOwn.
-Require Import WpLock WpLockLeaves WpHoldingInv WpPopOff.
+Require Import WpLock WpLockLeaves WpHoldingInv WpSmodeJalr.
 Require Export WpSmodeLoad WpSmodeStore WpSmodeBtype.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for hiding mstatus0. *)
 Require WpGprCsrwC.
@@ -58,27 +58,12 @@ Definition acq_intena_store (mstatus0 : mword 64) : mword 32 :=
 (* store to 0, so wp_acquire_lock's intena postcondition needs no          *)
 (* mstatus0.  Bridges mirror WpRelease's sstatus_sie_clear_neq.            *)
 (* ===================================================================== *)
-Lemma acq_mword1_zero_of_ne_one (x : mword 1) :
-  eq_vec x ('b"1") = false -> x = ('b"0" : mword 1).
-Proof.
-  intro H. apply eq_vec_false_iff in H. apply bv_eq.
-  pose proof (bv_unsigned_in_range _ x) as Hr.
-  assert (Hmod : bv_modulus 1 = 2) by (vm_compute; reflexivity).
-  rewrite Hmod in Hr.
-  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
-  assert (H0 : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
-  rewrite H0.
-  assert (Hne : bv_unsigned x <> 1).
-  { intro Hc. apply H. apply bv_eq. rewrite H1. exact Hc. }
-  lia.
-Qed.
-
 Lemma acq_sstatus_bit1_sie (m : mword 64) :
   eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
   Z.testbit (bv_unsigned (sstatus_read m)) 1 = false.
 Proof.
   intro HSIE.
-  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1)) by (apply acq_mword1_zero_of_ne_one; exact HSIE).
+  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1)) by (apply mword1_zero_of_ne_one; exact HSIE).
   unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
   apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz.
 Qed.

@@ -37,13 +37,13 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpEntryNew.
+Require Import WpDecode KernelText.
 Require Import WpGpr WpGprLoad.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
-Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr WpHolding.
+Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import WpRvcBridge.
+Require Import WpRvcBridge KernelRvcDecode.
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -368,7 +368,7 @@ Section WpPopOffInstr.
 
   Lemma ppi_12 : kernel_text -∗ instr (mword_of_int (PP + 0x12) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc4 (PP + 0x12)%Z (mword_of_int 0xef99 : mword 16) (mword_of_int 0x5d3cef99 : mword 32)
-    (mword_of_int (PP + 0x12) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) ppdec_bnez1e hexec_bnez. Qed.
+    (mword_of_int (PP + 0x12) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) ppdec_bnez1e exec_execute_C_BNEZ. Qed.
 
   Lemma ppi_14 : kernel_text -∗ instr (mword_of_int (PP + 0x14) : mword 64) true (LOAD (mword_of_int 120, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc2 (PP + 0x14)%Z (mword_of_int 0x5d3c : mword 16)
@@ -388,7 +388,7 @@ Section WpPopOffInstr.
 
   Lemma ppi_1e : kernel_text -∗ instr (mword_of_int (PP + 0x1e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc4 (PP + 0x1e)%Z (mword_of_int 0xe789 : mword 16) (mword_of_int 0x5d7ce789 : mword 32)
-    (mword_of_int (PP + 0x1e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) ppdec_bnez0a hexec_bnez. Qed.
+    (mword_of_int (PP + 0x1e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) ppdec_bnez0a exec_execute_C_BNEZ. Qed.
 
   Lemma ppi_20 : kernel_text -∗ instr (mword_of_int (PP + 0x20) : mword 64) true (LOAD (mword_of_int 124, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc2 (PP + 0x20)%Z (mword_of_int 0x5d7c : mword 16)
@@ -452,22 +452,8 @@ End WpPopOffTakenZca.
 (* csrsi that would re-enable interrupts is provably skipped).            *)
 (* ===================================================================== *)
 (* SIE=0 (folded into smode_config) gives pop_off's interrupt-off fact
-   [sstatus & 2 = 0] with mstatus0 hidden.  Mirrors WpRelease's bridge. *)
-Lemma pop_mword1_zero_of_ne_one (x : mword 1) :
-  eq_vec x ('b"1") = false -> x = ('b"0" : mword 1).
-Proof.
-  intro H. apply eq_vec_false_iff in H. apply bv_eq.
-  pose proof (bv_unsigned_in_range _ x) as Hr.
-  assert (Hmod : bv_modulus 1 = 2) by (vm_compute; reflexivity).
-  rewrite Hmod in Hr.
-  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
-  assert (H0 : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
-  rewrite H0.
-  assert (Hne : bv_unsigned x <> 1).
-  { intro Hc. apply H. apply bv_eq. rewrite H1. exact Hc. }
-  lia.
-Qed.
-
+   [sstatus & 2 = 0] with mstatus0 hidden.  [mword1_zero_of_ne_one] is the
+   shared pure bitvector fact (RiscvExtras). *)
 Lemma pop_sstatus_clear_neq (m : mword 64) :
   eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
   neq_vec (and_vec (sstatus_read m)
@@ -476,7 +462,7 @@ Proof.
   intro HSIE.
   unfold neq_vec. apply negb_false_iff. apply eq_vec_true_iff.
   assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1))
-    by (apply pop_mword1_zero_of_ne_one; exact HSIE).
+    by (apply mword1_zero_of_ne_one; exact HSIE).
   assert (Hb1 : Z.testbit (bv_unsigned (sstatus_read m)) 1 = false).
   { unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
     apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz. }
@@ -716,36 +702,8 @@ Section WpPopOffTopSec.
 
 
 
-  Lemma wp_cret_s_zca_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    ↑minstretN ⊆ E ->
-    uint ra <> 0 ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    smode_config γ dq -∗ tlb_inv root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
-      pc_is tgt -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros tgt HN Hra Hal0.
-    iIntros "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_cret_s_zca root_ppn E Φ pc ra m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
+  (* [wp_cret_s_zca_scfg] (the c.ret S-mode leaf) lives in WpSmodeJalr; used
+     here via that import.  (Formerly duplicated in this file.) *)
 
   (* [smode_config] view of the mycpu() VCgen callee: the raw callee needs full
      config cells + the SIE ghost half, so unbundle here and rebundle on return

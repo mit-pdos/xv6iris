@@ -48,6 +48,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras WpDecod
 Require Import WpGprLui WpMmodeShiftiop WpGprLogic WpGprRvc WpGprRvcTor.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB.
 Require Import MinstretInv InstrBytes WpEntryNew.
+Require Import KernelText.
 Require Import WpRvcBridge.
 Require Import StackOwn.
 From iris.base_logic.lib Require Import invariants.

@@ -15,15 +15,15 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpLeafCommon WpEntryNew WpAuipc.
+Require Import WpDecode WpLeafCommon KernelText WpAuipc.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew.
 Require Import WpPushOffCsr WpMycpu.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import WpRvcBridge.
+Require Import WpRvcBridge KernelRvcDecode.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for the saved-intena = 0 fact. *)
 Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
@@ -65,54 +65,6 @@ Local Ltac po_close0 s HmisaC :=
 
 (* ---- RVC decodes ---- *)
 
-(* +0x00  0x1101  c.addi sp,-32 *)
-Lemma podec_00 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x1101 : mword 16)) s
-  = Some (C_ADDI (mword_of_int 32, Regidx csp_rs1), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x02  0xec06  c.sdsp ra,24(sp) *)
-Lemma podec_02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xec06 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 3, Regidx (mword_of_int 1)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x04  0xe822  c.sdsp s0,16(sp) *)
-Lemma podec_04 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe822 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 8)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x06  0xe426  c.sdsp s1,8(sp) *)
-Lemma podec_06 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe426 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 1, Regidx (mword_of_int 9)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x08  0x1000  c.addi4spn s0,sp,32 *)
-Lemma podec_08 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x1000 : mword 16)) s
-  = Some (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 8), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x0e  0x84be  c.mv s1,a5 *)
-Lemma podec_0e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84be : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 15)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
 (* +0x14/+0x1c  0x5d3c  c.lw a5,120(a0) *)
 Lemma podec_lw s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x5d3c : mword 16)) s
@@ -149,46 +101,6 @@ Qed.
 Lemma podec_sw124 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xdd7c : mword 16)) s
   = Some (C_SW (mword_of_int 31, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x22  0x60e2  c.ldsp ra,24(sp) *)
-Lemma podec_22 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x60e2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 3, Regidx (mword_of_int 1)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x24  0x6442  c.ldsp s0,16(sp) *)
-Lemma podec_24 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6442 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 8)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x26  0x64a2  c.ldsp s1,8(sp) *)
-Lemma podec_26 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x64a2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 1, Regidx (mword_of_int 9)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x28  0x6105  c.addi16sp sp,32 *)
-Lemma podec_28 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6105 : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 2 : mword 6), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x2a  0x8082  c.ret *)
-Lemma podec_2a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8082 : mword 16)) s
-  = Some (C_JR (Regidx (mword_of_int 1)), s).
 Proof.
   intro H. rvc_oneshot s H.
 Qed.
@@ -251,14 +163,6 @@ Lemma podec_30 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* ===================================================================== *)
-(* creg / immediate reconciliations + bespoke ExecuteAs expansions.       *)
-(* ===================================================================== *)
-Lemma po_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10).
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma po_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-
 Lemma po_imm120 : zero_extend' 12 (concat_vec (mword_of_int 30 : mword 5) ('b"00")) = (mword_of_int 120 : mword 12).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -300,36 +204,6 @@ Qed.
 
 (* named form of wp_mycpu's output register file (= call_mycpu's m11 chain),
    so downstream geometry can reference its a0/sp lookups. *)
-Definition po_mycpu_out (P : mword 64) (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
-  let ra_idx : mword 5 := mword_of_int 1 in
-  let tp_idx : mword 5 := mword_of_int 4 in
-  let s0_idx : mword 5 := mword_of_int 8 in
-  let a0_idx : mword 5 := mword_of_int 10 in
-  let a5_idx : mword 5 := mword_of_int 15 in
-  let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-  let pcE := mword_of_int KernelSyms.mycpu in
-  let imm_entry : mword 6 := mword_of_int 48 in
-  let imm_dealloc : mword 6 := mword_of_int 16 in
-  let nzimm_s0 : mword 8 := mword_of_int 4 in
-  let imm_auipc : mword 20 := mword_of_int 0x11 in
-  let imm_addi : mword 12 := mword_of_int 0xa94 in
-  let shamt_slli : mword 6 := mword_of_int 7 in
-  let imm_addiw : mword 6 := mword_of_int 0 in
-  let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
-  let ra0 := m0 !!! Regidx ra_idx in
-  let s00 := m0 !!! Regidx s0_idx in
-  let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
-  let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
-  let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2 in
-  let m4 := <[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3 in
-  let m5 := <[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4 in
-  let m6 := <[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5 in
-  let m7 := <[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6 in
-  let m8 := <[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7 in
-  let m9 := <[Regidx ra_idx := regval_into_reg ra0]> m8 in
-  let m10 := <[Regidx s0_idx := regval_into_reg s00]> m9 in
-  <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10.
-
 Lemma po_addv_assoc (a b c : mword 64) :
   add_vec (add_vec a b) c = add_vec a (add_vec b c).
 Proof.
@@ -502,27 +376,12 @@ Proof.
   rewrite Z.add_0_l. apply bv_wrap_bv_unsigned.
 Qed.
 
-Lemma po_mword1_zero_of_ne_one (x : mword 1) :
-  eq_vec x ('b"1") = false -> x = ('b"0" : mword 1).
-Proof.
-  intro H. apply eq_vec_false_iff in H. apply bv_eq.
-  pose proof (bv_unsigned_in_range _ x) as Hr.
-  assert (Hmod : bv_modulus 1 = 2) by (vm_compute; reflexivity).
-  rewrite Hmod in Hr.
-  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
-  assert (H0 : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
-  rewrite H0.
-  assert (Hne : bv_unsigned x <> 1).
-  { intro Hc. apply H. apply bv_eq. rewrite H1. exact Hc. }
-  lia.
-Qed.
-
 Lemma po_sstatus_bit1_sie (m : mword 64) :
   eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
   Z.testbit (bv_unsigned (sstatus_read m)) 1 = false.
 Proof.
   intro HSIE.
-  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1)) by (apply po_mword1_zero_of_ne_one; exact HSIE).
+  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1)) by (apply mword1_zero_of_ne_one; exact HSIE).
   unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
   apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz.
 Qed.

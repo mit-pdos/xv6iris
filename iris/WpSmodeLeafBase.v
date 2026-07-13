@@ -10,7 +10,7 @@ From iris.program_logic Require Import language.
 From stdpp Require Import bitvector.definitions gmap.
 
 Require Import SmodeCore WpSmodeGpr.
-Require Import WpEntryNew.
+Require Import KernelText.
 From Kernel Require Import KernelInstrs KernelSyms.
 From Stdlib Require Import Lia List.
 From iris.program_logic Require Import lifting.

@@ -28,12 +28,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpEntryNew.
+Require Import WpDecode KernelText.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew.
-Require Import WpMycpu WpPushOffTop WpAcquireTop.
+Require Import WpMycpu WpPushOffTop WpAcquireTop KernelRvcDecode.
 Require Import WpLock WpLockLeaves WpHoldingInv WpPopOff.
 Require Import StackOwn.
 Require Import CalleeSaved.
@@ -281,20 +281,7 @@ End WpJalZca.
 (* mstatus0) 2) zero_reg = false] pop_off premise from the SIE=0 fact that  *)
 (* now lives folded inside smode_config (so mstatus0 stays hidden).        *)
 (* ===================================================================== *)
-Lemma mword1_zero_of_ne_one (x : mword 1) :
-  eq_vec x ('b"1") = false -> x = ('b"0" : mword 1).
-Proof.
-  intro H. apply eq_vec_false_iff in H. apply bv_eq.
-  pose proof (bv_unsigned_in_range _ x) as Hr.
-  assert (Hmod : bv_modulus 1 = 2) by (vm_compute; reflexivity).
-  rewrite Hmod in Hr.
-  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
-  assert (H0 : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
-  rewrite H0.
-  assert (Hne : bv_unsigned x <> 1).
-  { intro Hc. apply H. apply bv_eq. rewrite H1. exact Hc. }
-  lia.
-Qed.
+(* [mword1_zero_of_ne_one] is a pure bitvector fact -- now in RiscvExtras. *)
 
 Lemma sstatus_sie_clear_neq (m : mword 64) :
   eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->

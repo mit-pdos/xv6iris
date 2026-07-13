@@ -23,13 +23,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpEntryNew WpAuipc.
+Require Import KernelText WpAuipc.
 Require Import WpGpr WpMmodeShiftiop WpGprLui.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpHolding WpAcquireMem.
 Require Import WpLock.
 Require Import WpAcquireLock WpRelease WpMemsetPage WpFreelistMem.
-Require Import WpHoldingInv WpPopOff.
+Require Import WpHoldingInv.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.

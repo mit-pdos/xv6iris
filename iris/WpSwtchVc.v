@@ -35,10 +35,10 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpEntryNew.
+Require Import WpDecode KernelText.
 Require Import WpGpr WpGprRvc.
 Require Import WpRvcBridge.
-Require Import SmodeCore WpPushOffTop WpKallocDecode.
+Require Import SmodeCore WpKallocDecode KernelRvcDecode WpSmodeJalr.
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

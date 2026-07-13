@@ -26,9 +26,9 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
-Require Import WpDecode WpLeafCommon WpEntryNew.
+Require Import WpDecode WpLeafCommon KernelText.
 Require Import WpGpr WpGprRvc.
-Require Import WpMycpu WpPushOffTop.
+Require Import WpMycpu KernelRvcDecode.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -96,11 +96,8 @@ Proof.
   rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite h_imm0. reflexivity.
 Qed.
 
-Lemma hexec_bnez (imm : mword 8) (rs : cregidx) s :
-  exec (execute (C_BNEZ (imm, rs))) s
-    = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BNE)), s).
-Proof. unfold execute. cbn match. unfold execute_C_BNEZ. apply exec_returnM. Qed.
-
+(* [hexec_bnez] moved to WpMmodeLeafBase as [exec_execute_C_BNEZ] (shared
+   compressed-BNEZ exec fact; also used by pop_off/acquire retry loops). *)
 
 (* ===================================================================== *)
 (* holding()'s SLOW path (lock word nonzero): frame alloc, a5 := lk->cpu, *)
@@ -295,7 +292,7 @@ Section WpHolding.
       (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc2 (KernelSyms.holding + 0x2)%Z (mword_of_int 0xe399 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x2) : mword 64)
-    (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) hdec_bnez hexec_bnez. Qed.
+    (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) hdec_bnez exec_execute_C_BNEZ. Qed.
 
   Lemma hi_04 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x4) : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).

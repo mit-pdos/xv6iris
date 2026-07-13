@@ -31,7 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import MinstretInv InstrBytes.
 Require Import WpLeafCommon.
 Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpSmodeGpr WpSmodeSret WpEntryNew WpKvInstr.
+Require Import SmodeCore WpSmodeGpr WpSmodeSret KernelText WpKvInstr.
 Require Import VcGen VcGenS.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

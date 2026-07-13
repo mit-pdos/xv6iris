@@ -18,7 +18,7 @@ Require Import InstrBytes.
 Require Import WpDecode.
 Require Import WpGprRvc.
 Require Import WpRvcBridge.
-Require Import WpEntryNew.
+Require Import KernelText.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.

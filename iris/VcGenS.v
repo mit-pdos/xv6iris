@@ -33,7 +33,8 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpGprRvc.
-Require Import SmodeCore WpSmodeGpr WpPushOff WpPushOffMem WpFreelistMem WpAcquireMem.
+Require Import SmodeCore WpSmodeGpr.
+Require Import WpSmodeItype WpSmodeAddiw.
 Require Import VcGen.
 Require Export WpSmodeLoad WpSmodeStore WpSmodeBtype.
 From iris.base_logic.lib Require Import invariants.

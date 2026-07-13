@@ -24,7 +24,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes WpDecodeBridge.
-Require Import WpGprRvc WpEntryNew.
+Require Import WpGprRvc KernelText.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -33,21 +33,10 @@ Import Defs.
 
 (* ===================================================================== *)
 (* Extra ExecuteAs-expansion facts not already in WpGprRvc: the           *)
-(* compressed opcodes (c.ld / c.sd / c.bnez / c.beqz / c.j) that kalloc /  *)
+(* compressed branch/jump opcodes (c.bnez / c.beqz / c.j) that kalloc /    *)
 (* kfree use.  Representation-independent, mirrors of the WpGprRvc ones.    *)
+(* (c.ld / c.sd now live in the shared WpMmodeLeafBase, via WpGprRvc.)      *)
 (* ===================================================================== *)
-Lemma exec_execute_C_LD (uimm : mword 5) (rsc rdc : cregidx) s :
-  exec (execute (C_LD (uimm, rsc, rdc))) s
-  = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")),
-                           creg2reg_idx rsc, creg2reg_idx rdc, false, 8)), s).
-Proof. unfold execute. cbn match. unfold execute_C_LD. cbn zeta. apply exec_returnM. Qed.
-
-Lemma exec_execute_C_SD (uimm : mword 5) (rsc1 rsc2 : cregidx) s :
-  exec (execute (C_SD (uimm, rsc1, rsc2))) s
-  = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
-                            creg2reg_idx rsc2, creg2reg_idx rsc1, 8)), s).
-Proof. unfold execute. cbn match. unfold execute_C_SD. cbn zeta. apply exec_returnM. Qed.
-
 Lemma exec_execute_C_BNEZ (imm : mword 8) (rs : cregidx) s :
   exec (execute (C_BNEZ (imm, rs))) s
   = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BNE)), s).

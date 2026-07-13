@@ -30,7 +30,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpLeafCommon WpEntryNew WpAuipc.
+Require Import WpDecode WpLeafCommon KernelText WpAuipc.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpPushOff.
 Require Import WpMemsetInstr.
@@ -201,6 +201,40 @@ Lemma mycpu_epilogue_run :
   vc_block_s (VSt (KernelSyms.mycpu + 24) vregs_init mycpu_epi_heap []) mycpu_epilogue
   = Some (VSt (KernelSyms.mycpu + 30) mycpu_epi_regs1 mycpu_epi_heap []).
 Proof. vm_compute. reflexivity. Qed.
+
+(* named form of wp_mycpu's output register file (= call_mycpu's m11 chain),
+   so downstream geometry (holding/acquire/push_off) can reference its a0/sp
+   lookups.  Lives here because it is the mycpu() call's result, not push_off's. *)
+Definition po_mycpu_out (P : mword 64) (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
+  let ra_idx : mword 5 := mword_of_int 1 in
+  let tp_idx : mword 5 := mword_of_int 4 in
+  let s0_idx : mword 5 := mword_of_int 8 in
+  let a0_idx : mword 5 := mword_of_int 10 in
+  let a5_idx : mword 5 := mword_of_int 15 in
+  let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
+  let pcE := mword_of_int KernelSyms.mycpu in
+  let imm_entry : mword 6 := mword_of_int 48 in
+  let imm_dealloc : mword 6 := mword_of_int 16 in
+  let nzimm_s0 : mword 8 := mword_of_int 4 in
+  let imm_auipc : mword 20 := mword_of_int 0x11 in
+  let imm_addi : mword 12 := mword_of_int 0xa94 in
+  let shamt_slli : mword 6 := mword_of_int 7 in
+  let imm_addiw : mword 6 := mword_of_int 0 in
+  let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
+  let ra0 := m0 !!! Regidx ra_idx in
+  let s00 := m0 !!! Regidx s0_idx in
+  let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
+  let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
+  let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2 in
+  let m4 := <[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3 in
+  let m5 := <[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4 in
+  let m6 := <[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5 in
+  let m7 := <[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6 in
+  let m8 := <[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7 in
+  let m9 := <[Regidx ra_idx := regval_into_reg ra0]> m8 in
+  let m10 := <[Regidx s0_idx := regval_into_reg s00]> m9 in
+  <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10.
+
 Section WpMycpu.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.

@@ -39,10 +39,10 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
-Require Import WpDecode WpLeafCommon WpEntryNew.
+Require Import WpDecode WpLeafCommon KernelText.
 Require Import WpGprRvc.
 Require Import WpKernelvecNew.
-Require Import WpMycpu WpPushOffTop.
+Require Import WpMycpu WpPushOffTop KernelRvcDecode.
 Require Import WpAmo WpHolding.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
@@ -340,7 +340,7 @@ Section WpAcquireTop.
 
   Lemma aqi_18 : kernel_text -∗ instr (mword_of_int (AQ + 0x18) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)).
   Proof. mk_rvc2 (AQ + 0x18)%Z (mword_of_int 0xed11 : mword 16)
-    (mword_of_int (AQ + 0x18) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)) aqdec_bnez_a0 hexec_bnez. Qed.
+    (mword_of_int (AQ + 0x18) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)) aqdec_bnez_a0 exec_execute_C_BNEZ. Qed.
 
   Lemma aqi_1a : kernel_text -∗ instr (mword_of_int (AQ + 0x1a) : mword 64) true (RTYPE (Regidx (mword_of_int 14), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc4 (AQ + 0x1a)%Z (mword_of_int 0x87ba : mword 16) (mword_of_int 0xa7af87ba : mword 32)
@@ -356,7 +356,7 @@ Section WpAcquireTop.
 
   Lemma aqi_22 : kernel_text -∗ instr (mword_of_int (AQ + 0x22) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc4 (AQ + 0x22)%Z (mword_of_int 0xffe5 : mword 16) (mword_of_int 0x00efffe5 : mword 32)
-    (mword_of_int (AQ + 0x22) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) aqdec_bnez_a5 hexec_bnez. Qed.
+    (mword_of_int (AQ + 0x22) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) aqdec_bnez_a5 exec_execute_C_BNEZ. Qed.
 
   Lemma aqi_24 : kernel_text -∗ instr (mword_of_int (AQ + 0x24) : mword 64) false (JAL (mword_of_int 0xcb8 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (AQ + 0x24)%Z (mword_of_int 0x4b9000ef : mword 32)

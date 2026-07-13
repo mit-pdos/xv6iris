@@ -7,7 +7,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpGpr WpLeafCommon.
-Require Import MinstretInv InstrBytes WpEntryNew.
+Require Import MinstretInv InstrBytes KernelText.
 Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.

@@ -1299,6 +1299,29 @@ Lemma exec_execute_C_JR (rs1 : regidx) s :
   exec (execute (C_JR rs1)) s = Some (ExecuteAs (JALR (zeros' 12, rs1, zreg)), s).
 Proof. unfold execute. cbn match. unfold execute_C_JR. apply exec_returnM. Qed.
 
+(* c.ld / c.sd : the register-relative width-8 compressed memory ops (the
+   creg-indexed counterparts of C_LDSP/C_SDSP above). Shared exec facts --
+   used by kalloc/kfree decode, swtch, wakeup, and the userret trampoline. *)
+Lemma exec_execute_C_LD (uimm : mword 5) (rsc rdc : cregidx) s :
+  exec (execute (C_LD (uimm, rsc, rdc))) s
+  = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")),
+                           creg2reg_idx rsc, creg2reg_idx rdc, false, 8)), s).
+Proof. unfold execute. cbn match. unfold execute_C_LD. cbn zeta. apply exec_returnM. Qed.
+
+Lemma exec_execute_C_SD (uimm : mword 5) (rsc1 rsc2 : cregidx) s :
+  exec (execute (C_SD (uimm, rsc1, rsc2))) s
+  = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
+                            creg2reg_idx rsc2, creg2reg_idx rsc1, 8)), s).
+Proof. unfold execute. cbn match. unfold execute_C_SD. cbn zeta. apply exec_returnM. Qed.
+
+(* c.bnez : the compressed branch-if-nonzero expands to a base BTYPE/BNE
+   against x0.  Shared exec fact -- used by holding(), pop_off()'s and
+   acquire()'s compressed retry loops. *)
+Lemma exec_execute_C_BNEZ (imm : mword 8) (rs : cregidx) s :
+  exec (execute (C_BNEZ (imm, rs))) s
+    = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BNE)), s).
+Proof. unfold execute. cbn match. unfold execute_C_BNEZ. apply exec_returnM. Qed.
+
 (* ===================================================================== *)
 (* Helper facts shared by chains that step compressed instructions via     *)
 (* the (is_rvc-generalized) BASE-instruction WPs.                           *)

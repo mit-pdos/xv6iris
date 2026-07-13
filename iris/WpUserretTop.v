@@ -12,8 +12,8 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvT
 Require Import MinstretInv InstrBytes.
 Require Import WpLeafCommon.
 Require Import WpGpr WpLoad.
-Require Import WpGprCsrwCommon WpGprMret WpGprMretNew WpRelease.
-Require Import WpEntryNew SmodeCore WpSmodeGpr WpSmodeSret WpKallocDecode.
+Require Import WpGprCsrwCommon WpGprMret WpGprMretNew.
+Require Import SmodeCore WpSmodeGpr WpSmodeSret.
 Require Import TrampPt TrampTlb WpUserret.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.

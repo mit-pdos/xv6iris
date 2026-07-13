@@ -20,7 +20,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr WpGprLoad.
-Require Import SmodeCore WpSmodeGpr WpEntryNew WpMemsetS.
+Require Import SmodeCore WpSmodeGpr KernelText WpMemsetS.
 Require Import WpMemsetInstr.
 Require Import CalleeSaved.
 Require Import StackOwn.
