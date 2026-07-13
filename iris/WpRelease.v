@@ -399,18 +399,6 @@ Section WpReleaseTop.
     let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
     let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
     let sp0 := m !!! Regidx csp_rs1 in
-    let spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let a_r24 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_r16 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_r8  := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let spdh := add_vec spr (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let a_h24 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_h16 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_h8  := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_h0  := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let mch := add_vec spdh (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a_hfra := add_vec mch (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_hfs0 := add_vec mch (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
     let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
     let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
     let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
@@ -456,11 +444,13 @@ Section WpReleaseTop.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros pcE lk0 a_cpu sp0 spr a_r24 a_r16 a_r8 spdh a_h24 a_h16 a_h8 a_h0 mch a_hfra a_hfs0
-      cpuv a_noff a_int nv1 storeval_noff ret_tgt
-      Hn HN HNl
-      Hlkeq
-      Hmine Hnoffpos Hint Hal0.
+    intros pcE lk0 a_cpu sp0 cpuv a_noff a_int nv1 storeval_noff ret_tgt Hn HN HNl Hlkeq Hmine Hnoffpos Hint Hal0.
+    set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
+    set (spdh := add_vec spr (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
+    set (a_h24 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
+    set (a_h16 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
+    set (a_h8 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
+    set (a_h0 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))).
     iIntros "Hcfg Htoken Htlbinv
              #Htext Hpc Hfile #Hlock Htok HRes Hcpu Hnoff Hint
              Hstk Hcont".

@@ -1380,7 +1380,6 @@ Section WpLockLeaves.
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
-    let storeval := (mword_of_int 0 : mword 32) in
     ↑minstretN ⊆ E ->
     ↑lockN ⊆ E ->
     pa = lk ->
@@ -1426,7 +1425,8 @@ Section WpLockLeaves.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa storeval HN HNl Hpalk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros ea a8 pa HN HNl Hpalk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    set (storeval := (mword_of_int 0 : mword 32)).
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Htok HRes Hcont".
     iPoseProof "Hhw" as "#Hhwc".

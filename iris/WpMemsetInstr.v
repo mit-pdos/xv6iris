@@ -322,38 +322,23 @@ Section WpMemsetInstr.
     let a0_idx : mword 5 := mword_of_int 10 in
     let a1_idx : mword 5 := mword_of_int 11 in
     let a2_idx : mword 5 := mword_of_int 12 in
-    let a4_idx : mword 5 := mword_of_int 14 in
     let a5_idx : mword 5 := mword_of_int 15 in
     let pcE := mword_of_int KernelSyms.memset in
-    let pc0L : mword 64 := mword_of_int (KernelSyms.memset + 0x14) in
-    let pcLS : mword 64 := mword_of_int (KernelSyms.memset + 0x1e) in
     let imm_entry : mword 6 := mword_of_int 48 in
     let shamt_l : mword 6 := mword_of_int 32 in
     let shamt_r : mword 6 := mword_of_int 32 in
-    let imm_dealloc : mword 6 := mword_of_int 16 in
     let nzimm_s0 : mword 8 := mword_of_int 4 in
-    let imm8_beqz : mword 8 := mword_of_int 11 in
-    let i_add : instruction := RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD) in
-    let imm_bne : mword 13 := mword_of_int 0x1ffa in
     let sp0 := m0 !!! Regidx csp_rs1 in
     let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
     let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
     let p := m0 !!! Regidx a0_idx in
     let e := wval_add in
     let cval := m0 !!! Regidx a1_idx in
-    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a8_ra := ea_ra in
-    let pa_ra := a8_ra in
-    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let a8_s0 := ea_s0 in
-    let pa_s0 := a8_s0 in
     let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
     let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
     let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2 in
     let m4 := <[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3 in
     let m5 := <[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4 in
-    let m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5 in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
     (2 <= n)%nat ->
@@ -383,11 +368,15 @@ Section WpMemsetInstr.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ra_idx s0_idx a0_idx a1_idx a2_idx a4_idx a5_idx pcE pc0L pcLS
-      imm_entry shamt_l shamt_r imm_dealloc nzimm_s0 imm8_beqz i_add imm_bne
-      sp0 sp' ra0 s00 p e cval ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
-      m1 m2 m3 m4 m5 m6 ret_tgt cbyte
-      Hn HN Hvalue_add Hcount0 Hret0 Hcmp.
+    intros ra_idx s0_idx a0_idx a1_idx a2_idx a5_idx pcE imm_entry shamt_l shamt_r nzimm_s0 sp0 sp' ra0 p e cval m1 m2 m3 m4 m5 ret_tgt cbyte Hn HN Hvalue_add Hcount0 Hret0 Hcmp.
+    set (a4_idx := (mword_of_int 14 : mword 5)).
+    set (pc0L := (mword_of_int (KernelSyms.memset + 0x14) : mword 64)).
+    set (pcLS := (mword_of_int (KernelSyms.memset + 0x1e) : mword 64)).
+    set (imm_dealloc := (mword_of_int 16 : mword 6)).
+    set (imm8_beqz := (mword_of_int 11 : mword 8)).
+    set (imm_bne := (mword_of_int 0x1ffa : mword 13)).
+    set (s00 := m0 !!! Regidx s0_idx).
+    set (m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5).
     pose proof (add_vec_frame_cancel) as Hframe.
     iIntros "Hsm Htlbinv
              #Htext Hpc Hfile Hstk Hbuf Hcont".

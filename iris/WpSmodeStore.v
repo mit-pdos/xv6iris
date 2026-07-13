@@ -2072,7 +2072,6 @@ Section WpSmodeStore.
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
     let pa := zero_extend' 64 (add_vec_int a8 (0 * 1)) in
-    let svpn := svpn_of a8 in
     let storeval := (autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) in
     ↑minstretN ⊆ E ->
     (* the superpage-identity geometry facts below (svpn := svpn_of a8) are
@@ -2091,7 +2090,8 @@ Section WpSmodeStore.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ea a8 pa svpn storeval HN.
+    intros ea a8 pa storeval HN.
+    set (svpn := svpn_of a8).
     iIntros "Hsm Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbyte Hcont".
     (* [push to leaf] derive the svpn geometry facts here from [addr_is_ram a8]. *)

@@ -287,7 +287,6 @@ Section Kfree.
     let pcE : mword 64 := mword_of_int KF in
     let p := m !!! Regidx (mword_of_int 10 : mword 5) in
     let sp0 := m !!! Regidx csp_rs1 in
-    let spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     let q_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
     let q_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
@@ -331,8 +330,8 @@ Section Kfree.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros pcE p sp0 spr ret_tgt q_noff q_intena q_cpu q_noff_a5 q_noff_store
-      Hn HN HNl Hcpune Hretm Hlk Hfl Ha0fcpu Hnoffpos Hintena0.
+    intros pcE p sp0 ret_tgt q_noff q_intena q_cpu q_noff_a5 q_noff_store Hn HN HNl Hcpune Hretm Hlk Hfl Ha0fcpu Hnoffpos Hintena0.
+    set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcfg Htoken Htlbinv
              #Htext Hpc Hfile #Hkmem Hpre Hstk Hqnoff Hqint Hqcpu Hcont".
     (* peel kfree's own 4-slot frame [spr, spr+32); the deep tail

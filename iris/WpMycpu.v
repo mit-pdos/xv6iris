@@ -411,12 +411,6 @@ Section WpMycpu.
     let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
     let ra0 := m0 !!! Regidx ra_idx in
     let s00 := m0 !!! Regidx s0_idx in
-    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a8_ra := ea_ra in
-    let pa_ra := a8_ra in
-    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let a8_s0 := ea_s0 in
-    let pa_s0 := a8_s0 in
     let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
     let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
     let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2 in
@@ -460,11 +454,13 @@ Section WpMycpu.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ra_idx tp_idx s0_idx a0_idx a5_idx pcE imm_entry imm_dealloc nzimm_s0
-      imm_auipc imm_addi shamt_slli imm_addiw sp0 sp' ra0 s00
-      ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
-      m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
-      Hn2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
+    intros ra_idx tp_idx s0_idx a0_idx a5_idx pcE imm_entry imm_dealloc nzimm_s0 imm_auipc imm_addi shamt_slli imm_addiw sp0 sp' ra0 s00 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt Hn2 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
+    set (ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
+    set (a8_ra := ea_ra).
+    set (pa_ra := a8_ra).
+    set (ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))).
+    set (a8_s0 := ea_s0).
+    set (pa_s0 := a8_s0).
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              #Htext Hpc Hfile Hstk Hcont".
     (* peel mycpu's two-slot frame off the abstract stack ownership and thread

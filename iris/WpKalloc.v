@@ -97,10 +97,6 @@ Section Kalloc.
       :
     let pcE : mword 64 := mword_of_int AK in
     let sp0 := m !!! Regidx csp_rs1 in
-    let spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let a_r24 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_r16 := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_r8  := add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     let R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m in
     let R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1 in
@@ -108,19 +104,6 @@ Section Kalloc.
     let R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fe : mword 12)))]> R3 in
     let mA := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)]> R4 in
     let lkA := mA !!! Regidx (mword_of_int 10 : mword 5) in
-    let sp0A := mA !!! Regidx csp_rs1 in
-    let spdA := add_vec sp0A (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let q_r24 := add_vec spdA (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let q_r16 := add_vec spdA (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let q_r8  := add_vec spdA (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let pspdA := add_vec spdA (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let q_p24 := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let q_p16 := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let q_p8  := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let q_p0  := add_vec pspdA (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let pspm10A := add_vec pspdA (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let q_fra := add_vec pspm10A (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let q_fs0 := add_vec pspm10A (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
     let q_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
     let q_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
     let q_cpu := add_vec lkA (sign_extend' 64 (mword_of_int 16 : mword 12)) in
@@ -160,11 +143,8 @@ Section Kalloc.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros pcE sp0 spr a_r24 a_r16 a_r8 ret_tgt
-      R1 R2 R3 R4 mA lkA sp0A spdA q_r24 q_r16 q_r8 pspdA q_p24 q_p16 q_p8 q_p0
-      pspm10A q_fra q_fs0 q_noff q_intena q_cpu
-      q_storeval32 q_noff_a5 q_noff_store q_ret_tgt
-      Hn HN HNl Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0.
+    intros pcE sp0 ret_tgt R1 R2 R3 R4 mA lkA q_noff q_intena q_cpu q_storeval32 q_noff_a5 q_noff_store q_ret_tgt Hn HN HNl Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0.
+    set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcfg Htoken Htlbinv #Htext Hpc Hfile Hstk Hnoff Hint #Hlock Hcpu Hcont".
     assert (HmAsp : mA !!! Regidx csp_rs1 = spr).
     { rewrite /mA lookup_total_insert_ne; [| vm_compute; discriminate].

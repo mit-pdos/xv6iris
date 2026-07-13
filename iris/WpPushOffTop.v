@@ -533,39 +533,9 @@ Section WpPushOffTop.
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       :
     let ra_idx : mword 5 := mword_of_int 1 in
-    let tp_idx : mword 5 := mword_of_int 4 in
-    let s0_idx : mword 5 := mword_of_int 8 in
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let a5_idx : mword 5 := mword_of_int 15 in
     let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
     let pcE := mword_of_int KernelSyms.mycpu in
-    let imm_entry : mword 6 := mword_of_int 48 in
-    let imm_dealloc : mword 6 := mword_of_int 16 in
-    let nzimm_s0 : mword 8 := mword_of_int 4 in
-    let imm_auipc : mword 20 := mword_of_int 0x11 in
-    let imm_addi : mword 12 := mword_of_int 0xa94 in
-    let shamt_slli : mword 6 := mword_of_int 7 in
-    let imm_addiw : mword 6 := mword_of_int 0 in
-    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
     let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
-    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a8_ra := ea_ra in
-    let pa_ra := a8_ra in
-    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let a8_s0 := ea_s0 in
-    let pa_s0 := a8_s0 in
-    let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
-    let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
-    let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2 in
-    let m4 := <[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3 in
-    let m5 := <[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4 in
-    let m6 := <[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5 in
-    let m7 := <[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6 in
-    let m8 := <[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7 in
-    let m9 := <[Regidx ra_idx := regval_into_reg ra0]> m8 in
-    let m10 := <[Regidx s0_idx := regval_into_reg s00]> m9 in
-    let m11 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10 in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
     add_vec P (sign_extend' 64 jimm) = pcE ->
@@ -606,13 +576,7 @@ Section WpPushOffTop.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ra_idx tp_idx s0_idx a0_idx a5_idx m0 pcE imm_entry imm_dealloc nzimm_s0
-      imm_auipc imm_addi shamt_slli imm_addiw sp' ra0 s00
-      ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0
-      m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt
-      HN Htarget Halign_tgt
-      HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hfiom Hleg
-      Hal0.
+    intros ra_idx m0 pcE ra0 ret_tgt HN Htarget Halign_tgt HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hfiom Hleg Hal0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hstk Hcont".
     iDestruct (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
@@ -650,28 +614,9 @@ Section WpPushOffTop.
       (m : gmap regidx (mword 64))
       :
     let ra_idx : mword 5 := mword_of_int 1 in
-    let tp_idx : mword 5 := mword_of_int 4 in
-    let s0_idx : mword 5 := mword_of_int 8 in
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let a5_idx : mword 5 := mword_of_int 15 in
     let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
     let pcE := mword_of_int KernelSyms.mycpu in
-    let imm_entry : mword 6 := mword_of_int 48 in
-    let imm_dealloc : mword 6 := mword_of_int 16 in
-    let nzimm_s0 : mword 8 := mword_of_int 4 in
-    let imm_auipc : mword 20 := mword_of_int 0x11 in
-    let imm_addi : mword 12 := mword_of_int 0xa94 in
-    let shamt_slli : mword 6 := mword_of_int 7 in
-    let imm_addiw : mword 6 := mword_of_int 0 in
-    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
     let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
-    let ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a8_ra := ea_ra in
-    let pa_ra := a8_ra in
-    let ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let a8_s0 := ea_s0 in
-    let pa_s0 := a8_s0 in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     ↑minstretN ⊆ E ->
     add_vec P (sign_extend' 64 jimm) = pcE ->
@@ -694,10 +639,7 @@ Section WpPushOffTop.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros ra_idx tp_idx s0_idx a0_idx a5_idx m0 pcE imm_entry imm_dealloc nzimm_s0
-      imm_auipc imm_addi shamt_slli imm_addiw sp' ra0 s00
-      ea_ra a8_ra pa_ra ea_s0 a8_s0 pa_s0 ret_tgt
-      HN Htarget Halign_tgt Hal0.
+    intros ra_idx m0 pcE ra0 ret_tgt HN Htarget Halign_tgt Hal0.
     iIntros "Hsm Htlbinv #Htext Hpc Hfile Hjal Hstk Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
@@ -725,12 +667,7 @@ Section WpPushOffTop.
       :
     let P : mword 64 := mword_of_int (PO + 0x18) in
     let spm := ms !!! Regidx csp_rs1 in
-    let ra0 := add_vec_int P 4 in
-    let s00 := ms !!! Regidx (mword_of_int 8 : mword 5) in
     let a0v := mycpu_ret (ms !!! Regidx (mword_of_int 4 : mword 5)) in
-    let sp' := add_vec spm (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a8_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a8_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
     let a8_noff := add_vec a0v (sign_extend' 64 (mword_of_int 120 : mword 12)) in
     let a8_p24 := add_vec spm (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
     let a8_p16 := add_vec spm (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
@@ -776,9 +713,8 @@ Section WpPushOffTop.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros P spm ra0 s00 a0v sp' a8_ra a8_s0 a8_noff a8_p24 a8_p16 a8_p8
-      noff_a5 storeval cret_tgt
-      HN Hret0.
+    intros P spm a0v a8_noff a8_p24 a8_p16 a8_p8 noff_a5 storeval cret_tgt HN Hret0.
+    set (s00 := ms !!! Regidx (mword_of_int 8 : mword 5)).
     assert (Hm0sp : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> ms) !!! Regidx csp_rs1 = spm)
       by (rewrite lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
     iIntros "Hsm Htlbinv #Htext Hpc Hfile Hstk Hnoff Hpp24 Hpp16 Hpp8 Hcont".
@@ -1030,22 +966,12 @@ Section WpPushOffTop.
       (noff intena_old : mword 32) (a0f : mword 64) (n : nat)
       :
     let sp0 := m !!! Regidx csp_rs1 in
-    let spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let N0 := <[Regidx csp_rs1 := regval_into_reg spd]> m in
-    let N1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
-        (add_vec (N0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> N0 in
     (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
        read [sstatus_read mstatus0]) are reconstructed inside the proof over the
        unbundled mstatus0; the statement stays mstatus0-free. *)
     let noff_a5 := sign_extend' 64 (subrange_vec_dec
         (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let noff_store := (autocast (T := mword) (subrange_vec_dec noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let spm10 := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a_r24 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_r16 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_r8  := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_fra := add_vec spm10 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_fs0 := add_vec spm10 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
     let a_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
     let a_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
     let caller_ret := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -1077,9 +1003,11 @@ Section WpPushOffTop.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros sp0 spd N0 N1 noff_a5 noff_store spm10
-      a_r24 a_r16 a_r8 a_fra a_fs0 a_noff a_intena caller_ret
-      Hn HN Himm5 Hcret0 Ha0.
+    intros sp0 noff_a5 noff_store a_noff a_intena caller_ret Hn HN Himm5 Hcret0 Ha0.
+    set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
+    set (N0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
+    set (N1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
+        (add_vec (N0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> N0).
     iIntros "Hsm Htlbinv #Htext Hpc Hfile Hframe Hnoff Hintena Hcont".
     (* peel the top 4 own slots as cells; keep mycpu's 2-slot frame as a
        [stack_own] slice the body threads directly. *)

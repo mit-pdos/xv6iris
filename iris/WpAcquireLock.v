@@ -343,39 +343,17 @@ Section WpAcquireLock.
     let AQw : mword 64 := mword_of_int AQ in
     let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
     let sp0 := m !!! Regidx csp_rs1 in
-    let spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     (* acquire's own frame slots (ra/s0/s1 saves at spd+24/+16/+8) *)
-    let a_r24 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_r16 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_r8  := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
     (* push_off's frame below (its sp is spd): slots at spd-8/-16/-24 *)
-    let po_spd := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let a_p24 := add_vec po_spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_p16 := add_vec po_spd (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_p8  := add_vec po_spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
     (* mycpu's frame under push_off: slots at spd-40/-48 *)
-    let po_spm10 := add_vec po_spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a_fra := add_vec po_spm10 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_fs0 := add_vec po_spm10 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
     (* the per-cpu noff/intena words *)
     let a_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
     let a_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
     (* the spinlock's fields *)
     let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
     (* prologue register chain *)
-    let A0 := <[Regidx csp_rs1 := regval_into_reg spd]> m in
-    let A1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
-        (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0 in
-    let A2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
-        (add_vec zero_reg (A1 !!! Regidx (mword_of_int 10 : mword 5)))]> A1 in
     (* push_off's entry map (after the jal's link write) *)
-    let P0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
-        (add_vec_int (mword_of_int (AQ + 0x0c) : mword 64) 4)]> A2 in
     (* push_off's internal register chain (mirrors wp_push_off's lets) *)
-    let PN0 := <[Regidx csp_rs1 := regval_into_reg
-        (add_vec (P0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> P0 in
-    let PN1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
-        (add_vec (PN0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> PN0 in
     (* push_off's internal register chain PN2..PN8 + po_storeval32 (which
        read [sstatus_read mstatus0]) are reconstructed inside the proof over
        the unbundled mstatus0; they are not needed in the statement. *)
@@ -427,9 +405,25 @@ Section WpAcquireLock.
       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros AQw lk sp0 spd a_r24 a_r16 a_r8 po_spd a_p24 a_p16 a_p8 po_spm10 a_fra a_fs0
-      a_noff a_intena a_cpu A0 A1 A2 P0 PN0 PN1 po_noff_a5 po_noff_store ret_tgt
-      HN HNl Hn Ha0 Hnotmine Hal0.
+    intros AQw lk sp0 a_noff a_intena a_cpu po_noff_a5 po_noff_store ret_tgt HN HNl Hn Ha0 Hnotmine Hal0.
+    set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
+    set (a_r24 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
+    set (a_r16 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
+    set (a_r8 := add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
+    set (po_spd := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
+    set (a_p24 := add_vec po_spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
+    set (a_p16 := add_vec po_spd (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
+    set (a_p8 := add_vec po_spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
+    set (po_spm10 := add_vec po_spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
+    set (a_fra := add_vec po_spm10 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
+    set (a_fs0 := add_vec po_spm10 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))).
+    set (A0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
+    set (A1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
+        (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0).
+    set (A2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
+        (add_vec zero_reg (A1 !!! Regidx (mword_of_int 10 : mword 5)))]> A1).
+    set (P0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
+        (add_vec_int (mword_of_int (AQ + 0x0c) : mword 64) 4)]> A2).
     iIntros "Hcfg Htoken Htlbinv #Htext Hpc Hfile
              Hstk Hnoff Hintena #Hlk Hcpu Hcont".
     (* peel the top 10 slots of the frame, frame the deeper region *)
