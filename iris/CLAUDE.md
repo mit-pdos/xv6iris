@@ -3,6 +3,15 @@
 Weakest-precondition proofs for a RISC-V (rv64) xv6 kernel, in Iris. This file
 holds durable, forward-looking guidance distilled from past work.
 
+## Maintaining this file
+
+Any project memory worth keeping goes HERE, committed in the repo — not in local
+per-session memory files. Record only what is useful for **future** development:
+architecture, conventions, gotchas, and techniques that will recur. Do NOT record
+narratives of refactorings or code changes that are already finished and no longer
+bear on future work — once a change has landed and its lessons are captured as a
+forward-looking convention, drop the play-by-play.
+
 ## Build
 
 - Working dir: `/shared/xv6rocq/iris`.
