@@ -203,23 +203,10 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §3  UART TLB tagging: the vpn tag and its injectivity.                   *)
-(*     [uart_vpn] is the UART page's Sv39 vpn; [u_sext45_inj] (a local copy *)
-(*     of UptInv's, generic -- should eventually move to CommonWalk) lets   *)
-(*     the discrimination below reduce a 45-bit sign-extended tag equality  *)
-(*     back to the 27-bit vpn.                                              *)
+(* §3  UART TLB tagging: the UART page's Sv39 vpn.  The tag injectivity    *)
+(*     lemma [u_sext45_inj] used by the discrimination below now lives in  *)
+(*     CommonWalk.v.                                                        *)
 (* ===================================================================== *)
-
-Lemma u_sext45_inj (x y : mword 27) :
-  sign_extend' (57 - 12) x = sign_extend' (57 - 12) y -> x = y.
-Proof.
-  intros H.
-  apply (f_equal bv_signed) in H.
-  cbv [sign_extend' Operators_mwords.sign_extend exts_vec to_word get_word
-       MachineWord.MachineWord.sign_extend] in H.
-  rewrite !bv_sign_extend_signed in H; [| apply N.leb_le; vm_compute; reflexivity ..].
-  apply bv_eq_signed. exact H.
-Qed.
 
 Definition uart_vpn : mword 27 := mword_of_int 0x10000.
 
