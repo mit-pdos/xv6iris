@@ -402,6 +402,113 @@ Qed.
 
 
 (* ===================================================================== *)
+(* §3b  P_uart and the fetch/data DISCRIMINATION.  The generalized fetch    *)
+(*     engine ([wp_instr_s_config_tlbinv_gen]) admits the UART leaf in the   *)
+(*     TLB via [P_uart] and, for every RAM address, needs the UART entry to  *)
+(*     FAIL [match_TLB_Entry] (so a RAM fetch/data access at a colliding     *)
+(*     hash re-walks rather than mis-hitting the UART leaf).  This holds     *)
+(*     because the UART entry's vpn tag is [sign_extend' 45 0x10000] whereas *)
+(*     every RAM svpn sits in the 0x80000 gigapage.  This is the concrete    *)
+(*     proof the [tlb_consistent] generalization admits the UART entry.      *)
+(*     (The four bitvector/TLB helpers are local copies of UptInv's; they    *)
+(*     are generic and should eventually move to CommonWalk.)                *)
+(* ===================================================================== *)
+
+Lemma u_eq_vec_refl {n} (x : mword n) : eq_vec x x = true.
+Proof. apply bool_decide_eq_true_2. reflexivity. Qed.
+
+Lemma u_and_ones45 (x : mword 45) :
+  and_vec x (not_vec (zero_extend' (57 - 12) (ones 0 : mword 0))) = x.
+Proof.
+  apply bv_eq.
+  unfold and_vec, word_binop, with_word', with_word, MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  change (Z.sub 57 12) with 45.
+  match goal with |- context[Z.land _ (bv_unsigned ?m)] =>
+    change (bv_unsigned m) with (Z.ones 45) end.
+  rewrite Z.land_ones; [|lia].
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr. exact Hr.
+Qed.
+
+Lemma u_and_ones27 (x : mword 27) :
+  and_vec x (not_vec (zero_extend' 27 (ones 0 : mword 0))) = x.
+Proof.
+  apply bv_eq.
+  unfold and_vec, word_binop, with_word', with_word, MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context[Z.land _ (bv_unsigned ?m)] =>
+    change (bv_unsigned m) with (Z.ones 27) end.
+  rewrite Z.land_ones; [|lia].
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr. exact Hr.
+Qed.
+
+Lemma u_sext45_inj (x y : mword 27) :
+  sign_extend' (57 - 12) x = sign_extend' (57 - 12) y -> x = y.
+Proof.
+  intros H.
+  apply (f_equal bv_signed) in H.
+  cbv [sign_extend' Operators_mwords.sign_extend exts_vec to_word get_word
+       MachineWord.MachineWord.sign_extend] in H.
+  rewrite !bv_sign_extend_signed in H; [| apply N.leb_le; vm_compute; reflexivity ..].
+  apply bv_eq_signed. exact H.
+Qed.
+
+(* the level-0 walk entry matches exactly its own vpn (asid 0, empty mask) *)
+Lemma u_walk_entry_match (vpn vpn' : mword 27) (pte2 pte1 pte0 : mword 64) :
+  match_TLB_Entry (u_walk_entry vpn pte2 pte1 pte0 (mword_of_int 0)) (mword_of_int 0)
+    (sign_extend' (57 - 12) vpn')
+  = eq_vec (sign_extend' (57 - 12) vpn) (sign_extend' (57 - 12) vpn').
+Proof.
+  unfold match_TLB_Entry, u_walk_entry.
+  cbn [TLB_Entry_global TLB_Entry_asid TLB_Entry_vpn TLB_Entry_levelMask].
+  rewrite u_and_ones45. rewrite u_and_ones27. rewrite u_eq_vec_refl.
+  rewrite orb_true_r. reflexivity.
+Qed.
+
+Definition uart_vpn : mword 27 := mword_of_int 0x10000.
+
+Definition P_uart (root : mword 44) (pte2 pte1 pte0 : mword 64) : TLB_Entry -> Prop :=
+  fun e => e = pw_tlb_entry root (mword_of_int 0) \/
+           e = u_walk_entry uart_vpn pte2 pte1 pte0 (mword_of_int 0).
+
+(* the UART entry never matches a RAM address's svpn *)
+Lemma uart_entry_nomatch_ram (pte2 pte1 pte0 : mword 64) (a : mword 64) :
+  addr_is_ram a ->
+  match_TLB_Entry (u_walk_entry uart_vpn pte2 pte1 pte0 (mword_of_int 0)) (mword_of_int 0)
+    (sign_extend' (57 - 12) (svpn_of a)) = false.
+Proof.
+  intros Hram.
+  rewrite u_walk_entry_match.
+  destruct (eq_vec _ _) eqn:He; [exfalso | reflexivity].
+  apply eq_vec_true_iff in He. apply u_sext45_inj in He.
+  pose proof (ram_mask a Hram) as Hm.
+  rewrite <- He in Hm.
+  apply (f_equal bv_unsigned) in Hm.
+  vm_compute in Hm. discriminate.
+Qed.
+
+(* the two obligations the generic engine takes: superpage is legal, and    *)
+(* every legal entry is either the superpage (a hit) or fails to match a     *)
+(* RAM fetch/data vpn (a re-walk).                                           *)
+Lemma P_uart_super (root : mword 44) (pte2 pte1 pte0 : mword 64) :
+  P_uart root pte2 pte1 pte0 (pw_tlb_entry root (mword_of_int 0)).
+Proof. left; reflexivity. Qed.
+
+Lemma P_uart_disc (root : mword 44) (pte2 pte1 pte0 : mword 64) :
+  forall a e, addr_is_ram a -> P_uart root pte2 pte1 pte0 e ->
+    e = pw_tlb_entry root (mword_of_int 0) \/
+    match_TLB_Entry e (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) (svpn_of a)) = false.
+Proof.
+  intros a e Hram [-> | ->].
+  - left; reflexivity.
+  - right; apply uart_entry_nomatch_ram; exact Hram.
+Qed.
+
+(* ===================================================================== *)
 (* §4  S-mode, width-1 device STORE towers (translation WALKS, filling     *)
 (*     the TLB, then the device write ADVANCES the device).  Clones of      *)
 (*     WpMemsetS's width-1 RAM store walk towers with the RAM leaf swapped  *)
