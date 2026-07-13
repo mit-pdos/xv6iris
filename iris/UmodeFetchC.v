@@ -820,3 +820,109 @@ Proof.
   rewrite Hpc. cbn beta.
   apply exec_returnm.
 Qed.
+
+(* ===================================================================== *)
+(* §10 Illegal-in-User execute facts for the privileged families: SRET /  *)
+(*     MRET / WFI (wfi-in-U disabled by config) / SFENCE_VMA /            *)
+(*     SFENCE_W_INVAL / SFENCE_INVAL_IR, all conditioned only on          *)
+(*     cur_privilege = User (state untouched).  These feed the            *)
+(*     privilege-conditioned illegal arm.                                 *)
+(* ===================================================================== *)
+
+Lemma exec_execute_SRET_illegal_U (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (SRET tt)) s = Some (Illegal_Instruction tt, s).
+Proof.
+  intro Hpriv.
+  change (execute (SRET tt)) with (execute_SRET tt).
+  unfold execute_SRET.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM true s)).
+  cbn beta iota. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_MRET_illegal_U (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (MRET tt)) s = Some (Illegal_Instruction tt, s).
+Proof.
+  intro Hpriv.
+  change (execute (MRET tt)) with (execute_MRET tt).
+  unfold execute_MRET.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv.
+  replace (generic_neq User Machine) with true by (vm_compute; reflexivity).
+  cbn match. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_WFI_illegal_U (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (WFI tt)) s = Some (Illegal_Instruction tt, s).
+Proof.
+  intro Hpriv.
+  change (execute (WFI tt)) with (execute_WFI tt).
+  unfold execute_WFI.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv. cbn match.
+  change plat_wfi_available_to_usermode with false. cbn match.
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_SFENCE_W_INVAL_illegal_U (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (SFENCE_W_INVAL tt)) s = Some (Illegal_Instruction tt, s).
+Proof.
+  intro Hpriv.
+  change (execute (SFENCE_W_INVAL tt)) with (execute_SFENCE_W_INVAL tt).
+  unfold execute_SFENCE_W_INVAL.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv.
+  replace (generic_eq User User) with true by (vm_compute; reflexivity).
+  cbn match. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_SFENCE_INVAL_IR_illegal_U (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (SFENCE_INVAL_IR tt)) s = Some (Illegal_Instruction tt, s).
+Proof.
+  intro Hpriv.
+  change (execute (SFENCE_INVAL_IR tt)) with (execute_SFENCE_INVAL_IR tt).
+  unfold execute_SFENCE_INVAL_IR.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv.
+  replace (generic_eq User User) with true by (vm_compute; reflexivity).
+  cbn match. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_SFENCE_VMA_illegal_U (rs1 rs2 : mword 5) (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (SFENCE_VMA (Regidx rs1, Regidx rs2))) s
+    = Some (Illegal_Instruction tt, s).
+Proof.
+  intro Hpriv.
+  change (execute (SFENCE_VMA (Regidx rs1, Regidx rs2)))
+    with (execute_SFENCE_VMA (Regidx rs1) (Regidx rs2)).
+  unfold execute_SFENCE_VMA.
+  match goal with
+  |- exec (Defs.bind ?m1 _) _ = _ =>
+    assert (H1 : exists o1, exec m1 s = Some (o1, s))
+  end.
+  { destruct (generic_neq (Regidx rs1) zreg).
+    - eexists. rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+      apply exec_returnM.
+    - eexists. apply exec_returnM. }
+  destruct H1 as [o1 H1].
+  rewrite (exec_bind_Some _ _ _ _ _ H1). cbn beta.
+  match goal with
+  |- exec (Defs.bind ?m2 _) _ = _ =>
+    assert (H2 : exists o2, exec m2 s = Some (o2, s))
+  end.
+  { destruct (generic_neq (Regidx rs2) zreg).
+    - eexists. rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+      apply exec_returnM.
+    - eexists. apply exec_returnM. }
+  destruct H2 as [o2 H2].
+  rewrite (exec_bind_Some _ _ _ _ _ H2). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv. cbn match. apply exec_returnM.
+Qed.
