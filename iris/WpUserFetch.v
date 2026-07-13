@@ -28,13 +28,12 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
-Require Import SmodeCore WpIntrCore WpDecodeBridge.
-Require Import UmodeTrap UmodeFetch UmodeFetchC UmodeStep UmodeEcall UmodeFetchFault UmodeWalk.
-Require Import UptInv WpUserLoop WpUserEcall WpGprAddi WpGprLogic WpGprLui WpAuipc WpGprAuipc WpMmodeShiftiop WpMmodeJal WpGprJalr WpMemsetS WpHolding UmodeData WpGprLoad WpGprStore.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import MinstretInv InstrBytes WpGpr.
+Require Import WpIntrCore.
+Require Import UmodeTrap UmodeFetch UmodeStep UmodeFetchFault UmodeWalk.
+Require Import UptInv.
 Local Open Scope Z_scope.
 Import Defs.
 
