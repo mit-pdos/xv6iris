@@ -31,6 +31,7 @@ Require Import WpGpr.
 Require Import WpLoad WpMmodeLeafBase.
 Require Import WpSmodeGpr.
 Require Import WpUart.
+Require Import TrampPt TrampTlb.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -506,6 +507,54 @@ Proof.
   intros a e Hram [-> | ->].
   - left; reflexivity.
   - right; apply uart_entry_nomatch_ram; exact Hram.
+Qed.
+
+(* ===================================================================== *)
+(* §3c  tlb4k-entry variant of P_uart.  The UART data translate is built   *)
+(*     by INSTANTIATING TrampTlb's generic 4KB three-way translate         *)
+(*     ([exec_translateAddr_tramp], hit/nonmatch/walk, generic in the      *)
+(*     access), which installs a [tlb4k_entry] rather than CommonWalk's    *)
+(*     [u_walk_entry].  So the invariant's legal-entry set [P_uart4k] is    *)
+(*     phrased on [tlb4k_entry], and its discrimination re-uses TrampTlb's  *)
+(*     match facts.  (The §3b u_walk_entry copy is retained but superseded  *)
+(*     by this path for the actual WP.)                                     *)
+(* ===================================================================== *)
+
+Definition uart_tlb_ent (lppn : mword 44) (pte ptea : mword 64) : TLB_Entry :=
+  tlb4k_entry (mword_of_int 0) uart_vpn lppn pte ptea.
+
+Definition P_uart4k (root lppn : mword 44) (pte ptea : mword 64) : TLB_Entry -> Prop :=
+  fun e => e = pw_tlb_entry root (mword_of_int 0) \/ e = uart_tlb_ent lppn pte ptea.
+
+Lemma tlb4k_nomatch_ram (lppn : mword 44) (pte ptea : mword 64) (a : mword 64) :
+  addr_is_ram a ->
+  match_TLB_Entry (uart_tlb_ent lppn pte ptea) (mword_of_int 0)
+    (sign_extend' (57 - 12) (svpn_of a)) = false.
+Proof.
+  intros Hram.
+  unfold uart_tlb_ent, match_TLB_Entry, tlb4k_entry.
+  cbn [TLB_Entry_asid TLB_Entry_global TLB_Entry_vpn TLB_Entry_levelMask].
+  apply andb_false_intro2.
+  match goal with |- context[and_vec ?x ?m] =>
+    rewrite (and45_ones x m ltac:(vm_compute; reflexivity)) end.
+  destruct (eq_vec _ _) eqn:He; [exfalso | reflexivity].
+  apply eq_vec_true_iff in He. apply u_sext45_inj in He.
+  pose proof (ram_mask a Hram) as Hm. rewrite <- He in Hm.
+  apply (f_equal bv_unsigned) in Hm. vm_compute in Hm. discriminate.
+Qed.
+
+Lemma P_uart4k_super (root lppn : mword 44) (pte ptea : mword 64) :
+  P_uart4k root lppn pte ptea (pw_tlb_entry root (mword_of_int 0)).
+Proof. left; reflexivity. Qed.
+
+Lemma P_uart4k_disc (root lppn : mword 44) (pte ptea : mword 64) :
+  forall a e, addr_is_ram a -> P_uart4k root lppn pte ptea e ->
+    e = pw_tlb_entry root (mword_of_int 0) \/
+    match_TLB_Entry e (mword_of_int 0 : mword 16) (sign_extend' (57 - 12) (svpn_of a)) = false.
+Proof.
+  intros a e Hram [-> | ->].
+  - left; reflexivity.
+  - right; apply tlb4k_nomatch_ram; exact Hram.
 Qed.
 
 (* ===================================================================== *)
