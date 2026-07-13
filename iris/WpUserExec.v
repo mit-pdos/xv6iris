@@ -5492,6 +5492,135 @@ Section WpUserExec.
   (* play, now composed with the per-page classification.                 *)
   (* ------------------------------------------------------------------ *)
   (* ------------------------------------------------------------------ *)
+  (* The DIRECT compressed single-source compute: the compressed          *)
+  (* instruction runs its rX/wX chain itself (C_NOT, C_ZEXT_B) -- no      *)
+  (* ExecuteAs hop, so the execute fact is about ii at the FIXED rs1/rd.  *)
+  (* ------------------------------------------------------------------ *)
+  Lemma ustep_c_compute1_direct
+      (F : mword 64 -> mword 64)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (h : mword 16) (ii : instruction)
+      (rs1 rd : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    (forall s,
+       exec (execute ii) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd) 0 then s
+               else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                      (regval_into_reg
+                         (F (if Z.eqb (uint rs1) 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))))) ->
+    upt_tlb_ok spec tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    ((exists w4 : mword 32,
+        is_aligned_vaddr (Virtaddr va) 4 = true /\
+        is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true /\
+        (forall j : nat, (j < 4)%nat ->
+           code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w4 j)) /\
+        h = subrange_vec_dec w4 15 0)
+     \/ (neq_vec (access_vec_dec va 0) ('b"0") = false /\
+         neq_vec (access_vec_dec va 1) ('b"0") = true /\
+         is_aligned_vaddr (Virtaddr va) 4 = false /\
+         is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+         (forall j : nat, (j < 2)%nat ->
+            code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte h j)))) ->
+    isRVC h = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    uint rd <> 0 ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hexec_op Hok Hvec Hchk0 HupdN Hpbmt0 HSXL Hcanon
+           Hvpn_def Hmode HisRVC Hdec Hrd.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
+             [%Hdom Hfmap] Hupt #Hcode Hdata Hcfg Hcont".
+    iApply (wp_instr_c_hit_direct va vpn ie h ii
+              ms_v tlbvec E Φ HN Hvec Hchk0 HupdN Hpbmt0 HSXL Hcanon
+              Hvpn_def Hmode HisRVC Hdec
+              with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hcfg").
+    iIntros (σ Hpceq Hag Hpins) "[Hreg Hmem]".
+    assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmd : g !! Regidx rd = Some (g !!! Regidx rd))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int va 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (g !!! Regidx rs1)
+                 (set_reg σ nextPC (add_vec_int va 2)) with "Hreg Hr1c") as %Hrv.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+            (regval_into_reg (F (g !!! Regidx rs1)))
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg (F (g !!! Regidx rs1)))
+                 with "[Hrdc]") as "Hfmap".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg (set_reg σ nextPC (add_vec_int va 2))
+               (R_bitvector_64 (gpr_of_Z (uint rd)))
+               (regval_into_reg (F (g !!! Regidx rs1)))).
+    iSplitR.
+    { iPureIntro.
+      pose proof (Hexec_op (set_reg σ nextPC (add_vec_int va 2))) as HE.
+      rewrite Hrv in HE.
+      replace (Z.eqb (uint rd) 0) with false in HE
+        by (symmetry; apply Z.eqb_neq; exact Hrd).
+      exact HE. }
+    iSplitL "Hreg Hmem".
+    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg (set_reg σ nextPC (add_vec_int va 2))
+                (R_bitvector_64 (gpr_of_Z (uint rd)))
+                (regval_into_reg (F (g !!! Regidx rs1)))).(sregs)
+             = add_vec_int va 2).
+    { unfold set_reg; cbn [sregs].
+      tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iNext.
+    iApply "Hcont".
+    rewrite /user_frame.
+    iExists ms_v, sc_v, stval_v, sepc_v, (add_vec_int va 2),
+            (<[Regidx rd := regval_into_reg (F (g !!! Regidx rs1))]> g), tlbvec.
+    iFrame "Hhs' Hpriv' Hms' Hsc Hstv Hsepc Htlbc' Hupt Hcode Hdata Hcfg'".
+    iSplitR; [iPureIntro; exact HSXL |].
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitL "Hpc' Hnpc"; [iFrame "Hpc' Hnpc" |].
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (* The COMPRESSED illegal case: the decoded compressed instruction's    *)
   (* execute yields Illegal_Instruction directly (C_ILLEGAL, and any      *)
   (* future config-illegal compressed op) -> full trap to stvec.  The     *)
@@ -6599,7 +6728,33 @@ Section WpUserExec.
        c_fetch_mode va vpn i h /\
        isRVC h = true /\
        (forall s0, agree_on D_u s0 dstateU ->
-          exec (ext_decode_compressed h) s0 = Some (ii, s0))).
+          exec (ext_decode_compressed h) s0 = Some (ii, s0)))
+    \/
+    (* 28: RVC fetch hit, DIRECT compressed single-source compute (C_NOT etc.) *)
+    (exists vpn i (h : mword 16) (ii : instruction)
+            (F : mword 64 -> mword 64) (rs1 rd : mword 5),
+       (forall s,
+          exec (execute ii) s
+          = Some (RETIRE_SUCCESS,
+                  if Z.eqb (uint rd) 0 then s
+                  else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                         (regval_into_reg
+                            (F (if Z.eqb (uint rs1) 0 then zero_reg
+                                else register_lookup
+                                       (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))))) /\
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       uw_check_ok (InstructionFetch tt) i /\
+       update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       c_fetch_mode va vpn i h /\
+       isRVC h = true /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode_compressed h) s0 = Some (ii, s0)) /\
+       uint rd <> 0).
 
   (* the assembled Löb step obligation, v1 coverage *)
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :
@@ -6675,9 +6830,12 @@ Section WpUserExec.
                                                          Hexp & Hctrue & Halign0 & Halign1)
                                                       | [ (vpn & i & h & ii & Hexec_op & Hvec & Hchk & Hupd & Hpbmt &
                                                            Hcanon & Hvpn_def & Hmode & HisRVC & Hdec)
-                                                        | (vpn & i & h & ii & Hexec_op & Hvec & Hchk & Hupd & Hpbmt &
-                                                           Hcanon & Hvpn_def & Hmode & HisRVC & Hdec)
-                                                        ] ] ] ] ] ] ] ] ] ] ]
+                                                        | [ (vpn & i & h & ii & Hexec_op & Hvec & Hchk & Hupd & Hpbmt &
+                                                             Hcanon & Hvpn_def & Hmode & HisRVC & Hdec)
+                                                          | (vpn & i & h & ii & F & rs1 & rd & Hexec_op & Hvec & Hchk &
+                                                             Hupd & Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec &
+                                                             Hrd)
+                                                          ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
       iDestruct "Hk" as "[_ HkT]".
@@ -6865,6 +7023,13 @@ Section WpUserExec.
                 Hmode HisRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
+    - (* compressed DIRECT single-source compute *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_c_compute1_direct F va vpn i h ii rs1 rd ms_v sc_v stval_v sepc_v
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon
+                Hvpn_def Hmode HisRVC Hdec Hrd
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
   Qed.
 
   (* the END-TO-END theorem at v1 coverage: the machine runs user code

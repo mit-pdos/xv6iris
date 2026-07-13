@@ -25,6 +25,7 @@ Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodeCore.
 Require Import WpIntrCore.
 Require Import UmodeFetch.
+Require Import WpGpr.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -478,3 +479,89 @@ Proof. cexp. Qed.
 Lemma exec_execute_C_ILLEGAL (hw : mword 16) s :
   exec (execute (C_ILLEGAL hw)) s = Some (Illegal_Instruction tt, s).
 Proof. cexp. Qed.
+
+(* ===================================================================== *)
+(* §6 Register-file execute facts for the DIRECT compressed computes      *)
+(*    (C_NOT / C_ZEXT_B run rX/wX inline, no ExecuteAs) and the ZIMOP     *)
+(*    may-be-operations (write rd := 0 and retire; register-generic, so   *)
+(*    the 32-bit forms ride the base single-source compute arm).          *)
+(* ===================================================================== *)
+
+(* the 5-bit register index a compressed register field denotes (x8..x15) *)
+Definition creg_bits (c : mword 3) : mword 5 :=
+  zero_extend' 5 (concat_vec ('b"1" : mword 1) c).
+
+Lemma exec_execute_C_NOT_gpr (c : mword 3) s :
+  exec (execute (C_NOT (Cregidx c))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint (creg_bits c)) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                 (regval_into_reg
+                    (not_vec (if Z.eqb (uint (creg_bits c)) 0 then zero_reg
+                              else register_lookup
+                                     (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                                     s.(sregs))))).
+Proof.
+  change (execute (C_NOT (Cregidx c))) with (execute_C_NOT (Cregidx c)).
+  unfold execute_C_NOT. cbv beta zeta iota.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr (creg_bits c) s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (creg_bits c) _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_C_ZEXT_B_gpr (c : mword 3) s :
+  exec (execute (C_ZEXT_B (Cregidx c))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint (creg_bits c)) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                 (regval_into_reg
+                    (zero_extend' 64 (subrange_vec_dec
+                       (if Z.eqb (uint (creg_bits c)) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint (creg_bits c))))
+                               s.(sregs)) 7 0)))).
+Proof.
+  change (execute (C_ZEXT_B (Cregidx c))) with (execute_C_ZEXT_B (Cregidx c)).
+  unfold execute_C_ZEXT_B. cbv beta zeta iota.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr (creg_bits c) s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr (creg_bits c) _ s)).
+  apply exec_returnM.
+Qed.
+
+(* the ZIMOP mop.r family in the base compute1 shape: rd := 0, retire.
+   Register-generic (forall rs1'/rd'), F := const zero.                  *)
+Lemma exec_execute_ZIMOP_MOP_R_gpr (mop : mword 5) (rs1 rd : mword 5) s :
+  exec (execute (ZIMOP_MOP_R (mop, Regidx rs1, Regidx rd))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    ((fun _ : mword 64 => zeros' 64)
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+Proof.
+  change (execute (ZIMOP_MOP_R (mop, Regidx rs1, Regidx rd)))
+    with (execute_ZIMOP_MOP_R mop (Regidx rs1) (Regidx rd)).
+  unfold execute_ZIMOP_MOP_R. cbv beta.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_ZIMOP_MOP_RR_gpr (mop : mword 3) (rs2 rs1 rd : mword 5) s :
+  exec (execute (ZIMOP_MOP_RR (mop, Regidx rs2, Regidx rs1, Regidx rd))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg
+                    ((fun _ : mword 64 => zeros' 64)
+                       (if Z.eqb (uint rs1) 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
+Proof.
+  change (execute (ZIMOP_MOP_RR (mop, Regidx rs2, Regidx rs1, Regidx rd)))
+    with (execute_ZIMOP_MOP_RR mop (Regidx rs2) (Regidx rs1) (Regidx rd)).
+  unfold execute_ZIMOP_MOP_RR. cbv beta.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnM.
+Qed.
