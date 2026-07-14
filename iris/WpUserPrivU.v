@@ -92,6 +92,45 @@ Section WpUserPrivU.
               Hvpn_def Hpaal HnotRVC Hdec).
   Qed.
 
+  (* ---- generic catch-all: any word whose execute is Illegal in EVERY
+     state (undecodable / always-illegal), rides the combined engine ---- *)
+  Lemma ustep_illegal_u (ii : instruction)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64)) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    (forall s, exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
+    is_lpad_instruction ii = false ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    hw_config -∗ minstret_inv -∗ hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗ stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗ tlb ↦ᵣ tlbvec -∗ pc_is va -∗ gpr_file g -∗
+    upt_inv root slots spec -∗ user_code -∗ user_data -∗ user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hexec_ill Hnlpad Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec.
+    iApply (ustep_illegal_st_u ii va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ HN
+              (fun s _ => Hexec_ill s) Hnlpad Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec).
+  Qed.
+
   (* ---- direct privileged ops: execute is Illegal in User ---- *)
   Lemma ustep_sret_illegal_u
       (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
