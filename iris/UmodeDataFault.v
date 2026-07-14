@@ -12,13 +12,15 @@
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import SmodeCore.
 Require Import WpDecodeBridge.
 Require Import UmodeFetch UmodeFetchFault UmodeWalk.
+Require Import UptInv.
 Require Import UmodeData.
 Local Open Scope Z_scope.
 Import Defs.
@@ -182,3 +184,112 @@ Proof.
   rewrite execR_returnR. cbn match.
   reflexivity.
 Qed.
+
+Section DataFaultFrame.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  (* frame-level: an UNMAPPED (or kernel-denied) data address page-faults,
+     no state change -- the data analog of [upt_translateAddr_fetch_unmapped]. *)
+  Lemma upt_translateAddr_load_unmapped (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (va satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) :
+    spec !! vpn = None ->
+    upt_fault_wf root slots spec ->
+    upt_tlb_ok spec tlbvec ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1" : mword 1) = false ->
+    register_lookup satp σ.(sregs) = satp0 ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (translateAddr (Virtaddr va) (Load Data)) σ
+       = Some (Err (E_Load_Page_Fault tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf Hok Lpriv LSXL HMPRV Lsatp Ltlb Hmode Hasid Hroot Hcanon Hvpn_def
+             HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_unmapped_walk_fault root slots spec vpn (Load Data)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 σ Hvpn Hfwf HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(f & Hwalk & Hf).
+    iPureIntro.
+    assert (Hte : exec (translationException (Load Data) f) σ
+                    = Some (E_Load_Page_Fault tt, σ)).
+    { destruct Hf as [-> | ->];
+        unfold translationException; cbn match; apply exec_returnm. }
+    exact (exec_translateAddr_load_walk_u_pagefault vpn root f va satp0 σ
+             Lpriv LSXL HMPRV Lsatp Hmode Hasid Hroot
+             (upt_lookup_TLB_unmapped spec vpn tlbvec σ Hvpn Hok Ltlb)
+             Hwalk Hte Hcanon Hvpn_def).
+  Qed.
+
+  (* frame-level: an UNMAPPED (or kernel-denied) data address page-faults,
+     no state change -- the data analog of [upt_translateAddr_fetch_unmapped]. *)
+  Lemma upt_translateAddr_store_unmapped (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (va satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) :
+    spec !! vpn = None ->
+    upt_fault_wf root slots spec ->
+    upt_tlb_ok spec tlbvec ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1" : mword 1) = false ->
+    register_lookup satp σ.(sregs) = satp0 ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (translateAddr (Virtaddr va) (Store Data)) σ
+       = Some (Err (E_SAMO_Page_Fault tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf Hok Lpriv LSXL HMPRV Lsatp Ltlb Hmode Hasid Hroot Hcanon Hvpn_def
+             HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_unmapped_walk_fault root slots spec vpn (Store Data)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 σ Hvpn Hfwf HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(f & Hwalk & Hf).
+    iPureIntro.
+    assert (Hte : exec (translationException (Store Data) f) σ
+                    = Some (E_SAMO_Page_Fault tt, σ)).
+    { destruct Hf as [-> | ->];
+        unfold translationException; cbn match; apply exec_returnm. }
+    exact (exec_translateAddr_store_walk_u_pagefault vpn root f va satp0 σ
+             Lpriv LSXL HMPRV Lsatp Hmode Hasid Hroot
+             (upt_lookup_TLB_unmapped spec vpn tlbvec σ Hvpn Hok Ltlb)
+             Hwalk Hte Hcanon Hvpn_def).
+  Qed.
+End DataFaultFrame.
