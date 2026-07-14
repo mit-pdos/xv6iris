@@ -244,3 +244,55 @@ Section VWU4.
              Htea Halign Hcp Hmprv Htr Hpmp Hpmam Hpalign Hwrite Hc Hsig Hh Hdev).
   Qed.
 End VWU4.
+
+(* ===================================================================== *)
+(* U-mode width-4 STORE, DATA-TLB-MISS form.  The store translate walks    *)
+(* and fills (s -> s'); the write body runs at s'.  Thin glue over the      *)
+(* generic exec_execute_STORE_4_gpr_walk + the U pmpCheck grant; the        *)
+(* caller supplies the identity EA-transform [Htea] and the walk-fill       *)
+(* translate [Htr] (via exec_translateAddr_store_walk_u).                    *)
+(* ===================================================================== *)
+Section VWU4Miss.
+  Variable rs2 rs1 : mword 5.
+  Variable imm : mword 12.
+  Variable region : PMA_Region.
+  Variable s s' : mstate.
+  Variable pa : mword 64.
+  Let offset := sign_extend' 64 imm.
+  Let vrs2 := if Z.eqb (uint rs2) 0 then zero_reg
+              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs).
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Store Data)) s = Some (Virtaddr ea, s).
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr ea) 4 = true.
+  Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr ea)) (0 * 4))) (Store Data)) s
+                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
+  Hypothesis Hcp : register_lookup cur_privilege s'.(sregs) = User.
+  Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1" : mword 1) = false.
+  Hypothesis HpmpA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) = TOR.
+  Hypothesis Hpmp_ord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0) = false.
+  Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match.
+  Hypothesis HpmpW : eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) ('b"1") = true.
+  Hypothesis Hpmam : matching_pma_region (register_lookup pma_regions s'.(sregs)) (Physaddr pa) 4 = Some region.
+  Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
+  Hypothesis Hwrite : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_writable) = true.
+  Hypothesis Hc : exec (within_clint (Physaddr pa) 4) s' = Some (false, s').
+  Hypothesis Hsig : exec (within_sig (Physaddr pa) 4) s' = Some (false, s').
+  Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 4) s' = Some (false, s').
+  Hypothesis Hdev : dev_addr pa = false.
+
+  Lemma exec_execute_STORE_4_U_miss :
+    exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 4))) s
+      = Some (RETIRE_SUCCESS,
+              MState s'.(sregs) (write_bytes s'.(mem) pa 4
+                (autocast (T := mword) (subrange_vec_dec vrs2 (Z.sub (Z.mul 4 8) 1) 0) : mword 32)) s'.(mdev)).
+  Proof.
+    assert (Hpmp : exec (pmpCheck (Physaddr pa) 4 (Store Data) User) s' = Some (None, s')).
+    { exact (exec_pmpCheck_user_grant_store pa 4 s' HpmpA Hpmp_ord Hrange HpmpW). }
+    exact (exec_execute_STORE_4_gpr_walk User rs2 rs1 imm ea region s s' pa
+             Htea Halign Htr Hcp Hmprv Hpmp Hpmam Hpalign Hwrite Hc Hsig Hh Hdev).
+  Qed.
+End VWU4Miss.
