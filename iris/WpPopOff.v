@@ -40,7 +40,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpGpr WpGprLoad.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew WpPushOff.
-Require Import WpPushOffMem WpPushOffCsr WpMycpu WpPushOffTop WpMemsetInstr.
+Require Import WpPushOffMem WpPushOffCsr WpMycpu WpMemsetInstr.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpRvcBridge KernelRvcDecode.

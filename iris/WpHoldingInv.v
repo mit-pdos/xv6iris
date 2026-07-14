@@ -28,6 +28,7 @@ Require Import KernelText.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
 Require Import WpMycpu WpPushOffTop WpAcquireMem.
+Require Import KernelRvcDecode.
 Require Import CalleeSaved StackOwn.
 Require Import WpHolding WpLock WpLockLeaves.
 Require Import WpSmodeJalr.

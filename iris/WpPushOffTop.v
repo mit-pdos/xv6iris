@@ -19,7 +19,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpLeafCommon KernelText WpAuipc.
 Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew WpKernelvecNew.
+Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew.
 Require Import WpPushOffCsr WpMycpu.
 Require Import StackOwn.
 Require Import CalleeSaved.
@@ -65,13 +65,7 @@ Local Ltac po_close0 s HmisaC :=
 
 (* ---- RVC decodes ---- *)
 
-(* +0x14/+0x1c  0x5d3c  c.lw a5,120(a0) *)
-Lemma podec_lw s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x5d3c : mword 16)) s
-  = Some (C_LW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
+(* podec_lw (c.lw a5,120(a0)) is shared with pop_off — now in KernelRvcDecode. *)
 
 (* +0x16  0xcb99  c.beqz a5,80000bec *)
 Lemma podec_16 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -89,13 +83,7 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* +0x20  0xdd3c  c.sw a5,120(a0) *)
-Lemma podec_sw120 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xdd3c : mword 16)) s
-  = Some (C_SW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
+(* podec_sw120 (c.sw a5,120(a0)) is shared with pop_off — now in KernelRvcDecode. *)
 
 (* +0x36  0xdd7c  c.sw a5,124(a0) *)
 Lemma podec_sw124 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -163,27 +151,10 @@ Lemma podec_30 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* ===================================================================== *)
-Lemma po_imm120 : zero_extend' 12 (concat_vec (mword_of_int 30 : mword 5) ('b"00")) = (mword_of_int 120 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
+(* po_imm120, poexec_lw, poexec_sw120 are shared with pop_off — now in
+   KernelRvcDecode.  po_imm124/poexec_sw124 below are push_off-specific. *)
 Lemma po_imm124 : zero_extend' 12 (concat_vec (mword_of_int 31 : mword 5) ('b"00")) = (mword_of_int 124 : mword 12).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
-Lemma poexec_lw s :
-  exec (execute (C_LW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (LOAD (mword_of_int 120, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_LW. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite po_imm120. reflexivity.
-Qed.
-
-Lemma poexec_sw120 s :
-  exec (execute (C_SW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (STORE (mword_of_int 120, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite po_imm120. reflexivity.
-Qed.
 
 Lemma poexec_sw124 s :
   exec (execute (C_SW (mword_of_int 31, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
@@ -204,14 +175,7 @@ Qed.
 
 (* named form of wp_mycpu's output register file (= call_mycpu's m11 chain),
    so downstream geometry can reference its a0/sp lookups. *)
-Lemma po_addv_assoc (a b c : mword 64) :
-  add_vec (add_vec a b) c = add_vec a (add_vec b c).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite !bv_add_unsigned.
-  unfold bv_wrap. rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r Z.add_assoc. reflexivity.
-Qed.
+(* po_addv_assoc (add_vec associativity) is shared with pop_off — now in KernelRvcDecode. *)
 
 
 (* ===================================================================== *)
@@ -581,7 +545,7 @@ Section WpPushOffTop.
     iDestruct (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_jal_gpr_s2 root_ppn γ E Φ P (mword_of_int 1) jimm m (1/2)%Qp
+    iApply (wp_jal_gpr_s_zca root_ppn γ E Φ P (mword_of_int 1) jimm m (1/2)%Qp
               HN  ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
               with "Hsm Htlbinv Hpc Hfile Hjal [-]").
@@ -1289,7 +1253,7 @@ Section WpPushOffTop.
           assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                                 (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
             by (apply bv_eq; vm_compute; reflexivity).
-          rewrite HAB. apply kv_addv_zero.
+          rewrite HAB. apply avi0.
         - (* tp *)
           rewrite Htp.
           rewrite /N8 lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -1455,7 +1419,7 @@ Section WpPushOffTop.
           assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                                 (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
             by (apply bv_eq; vm_compute; reflexivity).
-          rewrite HAB. apply kv_addv_zero.
+          rewrite HAB. apply avi0.
         - (* tp *)
           rewrite Htp.
           rewrite /N5 lookup_total_insert_ne; [| vm_compute; discriminate].

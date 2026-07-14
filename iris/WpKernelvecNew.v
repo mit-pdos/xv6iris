@@ -505,87 +505,9 @@ Section WpKernelvecNew.
     done.
   Qed.
 
-  (* =================================================================== *)
-  (* Fraction choreography (the wp_start recipe): full raw cells <->     *)
-  (* smode_config(1/2) + retained halves with the values pinned outside. *)
-  (* =================================================================== *)
-  Lemma kv_cfg_split (γ : gname) (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    menvcfg0 = MENVCFG_S ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗
-    mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
-    mie ↦ᵣ mie_v -∗
-    mideleg ↦ᵣ mdv0 -∗
-    menvcfg ↦ᵣ menvcfg0 -∗
-    smode_config γ (DfracOwn (1/2)) ∗
-    hart_state ↦ᵣ{DfracOwn (1/2)} HART_ACTIVE tt ∗
-    cur_privilege ↦ᵣ{DfracOwn (1/2)} Supervisor ∗
-    mstatus ↦ᵣ{DfracOwn (1/2)} mstatus0 ∗
-    mie ↦ᵣ{DfracOwn (1/2)} mie_v ∗
-    mideleg ↦ᵣ{DfracOwn (1/2)} mdv0 ∗
-    menvcfg ↦ᵣ{DfracOwn (1/2)} menvcfg0.
-  Proof.
-    iIntros (HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0)
-      "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv".
-    iDestruct "Hhs" as "[Hhs1 Hhs2]".
-    iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
-    iDestruct "Hms" as "[Hms1 Hms2]".
-    iDestruct "Hmie" as "[Hmie1 Hmie2]".
-    iDestruct "Hmdl" as "[Hmdl1 Hmdl2]".
-    iDestruct "Hmenv" as "[Hmenv1 Hmenv2]".
-    iSplitL "Hhs1 Hpriv1 Hms1 Hsie Hmie1 Hmdl1 Hmenv1".
-    { iApply (smode_config_rebuild γ (DfracOwn (1/2)) mstatus0 mie_v mdv0 menvcfg0
-                HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                with "Hhw Hinv Hhs1 Hpriv1 Hms1 Hsie Hmie1 Hmdl1 Hmenv1"). }
-    iFrame.
-  Qed.
-
-  Lemma kv_cfg_recombine (γ : gname) (mstatus0 mie_v mdv0 menvcfg0 : mword 64) :
-    smode_config γ (DfracOwn (1/2)) -∗
-    hart_state ↦ᵣ{DfracOwn (1/2)} HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{DfracOwn (1/2)} Supervisor -∗
-    mstatus ↦ᵣ{DfracOwn (1/2)} mstatus0 -∗
-    mie ↦ᵣ{DfracOwn (1/2)} mie_v -∗
-    mideleg ↦ᵣ{DfracOwn (1/2)} mdv0 -∗
-    menvcfg ↦ᵣ{DfracOwn (1/2)} menvcfg0 -∗
-    (hart_state ↦ᵣ HART_ACTIVE tt ∗
-     cur_privilege ↦ᵣ Supervisor ∗
-     mstatus ↦ᵣ mstatus0 ∗
-     ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
-     mie ↦ᵣ mie_v ∗
-     mideleg ↦ᵣ mdv0 ∗
-     menvcfg ↦ᵣ menvcfg0).
-  Proof.
-    iIntros "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2".
-    iDestruct (smode_config_unbundle with "Hsm")
-      as "(_ & _ & Hhs1 & Hpriv1 & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (ms') "(Hms1 & Hsie & _ & _ & _ & _ & _)".
-    iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %->.
-    iDestruct "Hmieb" as (mie' mdv') "(Hmi1 & Hmd1 & _)".
-    iDestruct (reg_pointsto_agree with "Hmi1 Hmie2") as %->.
-    iDestruct (reg_pointsto_agree with "Hmd1 Hmdl2") as %->.
-    iDestruct "Hmenvb" as (menv') "(Hme1 & _ & _ & _ & _)".
-    iDestruct (reg_pointsto_agree with "Hme1 Hmenv2") as %->.
-    iCombine "Hhs1 Hhs2" as "Hhs".
-    iCombine "Hpriv1 Hpriv2" as "Hpriv".
-    iCombine "Hms1 Hms2" as "Hms".
-    iCombine "Hmi1 Hmie2" as "Hmie".
-    iCombine "Hmd1 Hmdl2" as "Hmdl".
-    iCombine "Hme1 Hmenv2" as "Hmenv".
-    iFrame.
-  Qed.
+  (* kv_cfg_split / kv_cfg_recombine (the smode_config fraction choreography)
+     are shared with push_off/pop_off — now in SmodeCore beside
+     smode_config_split/rebuild. *)
 
   (* hw_config is persistent and bundled inside [smode_config]: peel a copy
      without disturbing the bundle. *)

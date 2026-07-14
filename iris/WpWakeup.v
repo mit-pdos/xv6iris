@@ -37,6 +37,7 @@ Require Import WpLock.
 Require Import WpGprRvc.
 Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGen VcGenS.
 Require Import WpAcquireTop WpAcquireLock WpAcquireMem WpRelease WpMycpu WpPushOffTop.
+Require Import KernelRvcDecode.
 Require Import CalleeSaved.
 Require Import StackOwn.
 Require Import WpSwtchVc.
