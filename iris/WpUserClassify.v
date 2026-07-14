@@ -2119,6 +2119,113 @@ Section WpUserClassify.
     - exact Hrd.
   Qed.
 
+  (* Compressed op expanding to a retiring UTYPE op (C_LUI), rd<>x0 -> RVC
+     UTYPE disjunct 19 (V/pc-pinned witness + base UTYPE fact). *)
+  Lemma classify_c_utype (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (op : uop) (imm : mword 20) (rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (UTYPE (imm, Regidx rd, op)), s)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hrd.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 18 right; left.
+    exists vpn, i, h, ii, op, (utype_V op), (utype_v op imm va), imm, rd.
+    repeat split; try assumption; try exact Hexp.
+    - intros s' Hpc. destruct op; cbn [utype_V utype_v]; [ reflexivity | rewrite Hpc; reflexivity ].
+    - intros rd' imm' s. exact (exec_execute_UTYPE_op_gpr op rd' imm' s).
+  Qed.
+
+  (* C_LUI rd, imm : rd := sext20(imm) << 12 (LUI); rd<>x0,x2. *)
+  Lemma classify_c_lui (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 6) (rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_LUI (imm, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    apply (classify_c_utype va ms_v g tlbvec vpn i h (C_LUI (imm, Regidx rd))
+             LUI (sign_extend' 20 imm) rd Hf Hdec);
+      [ intro s; exact (exec_execute_C_LUI imm (Regidx rd) s) | exact Hrd ].
+  Qed.
+
+  (* Compressed op expanding to a retiring single-source compute op, rd<>x0
+     -> RVC single-source disjunct 21 (mk/F if-form base fact). *)
+  Lemma classify_c_single (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (mk : mword 5 -> mword 5 -> instruction) (F : mword 64 -> mword 64)
+      (rs1 rd : mword 5) :
+    (forall (rs1' rd' : mword 5) s,
+       exec (execute (mk rs1' rd')) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd')))
+                      (regval_into_reg (F (gpr_val rs1' s))))) ->
+    is_lpad_instruction (mk rs1 rd) = false ->
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (mk rs1 rd), s)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hbase Hlpad (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hrd.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 20 right; left.
+    exists vpn, i, h, ii, mk, F, rs1, rd.
+    repeat split; try assumption; try exact Hexp; try exact Hbase.
+  Qed.
+
+  (* C_ADDIW rd, imm : rd := sext32(rd + sext(imm)); rd<>x0. *)
+  Lemma classify_c_addiw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 6) (rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ADDIW (imm, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    apply (classify_c_single va ms_v g tlbvec vpn i h (C_ADDIW (imm, Regidx rd))
+             (fun a b => ADDIW (sign_extend' 12 imm, Regidx a, Regidx b))
+             (fun v => sign_extend' 64 (subrange_vec_dec
+                         (add_vec v (sign_extend' 64 (sign_extend' 12 imm))) 31 0))
+             rd rd).
+    - intros rs1' rd' s. exact (exec_execute_ADDIW_gpr rs1' rd' (sign_extend' 12 imm) s).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+    - intro s. exact (exec_execute_C_ADDIW imm (Regidx rd) s).
+    - exact Hrd.
+  Qed.
+
+  (* C_JALR rs1 : jalr ra, rs1, 0 (rd = ra = x1, always <>x0), aligned
+     target -> RVC JALR disjunct 23.  (C_JR / C_J have rd = x0 and no home.) *)
+  Lemma classify_c_jalr (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (imm : mword 12) (rs1 rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (JALR (imm, Regidx rs1, Regidx rd)), s)) ->
+    uint rd <> 0 ->
+    eq_vec (access_vec_dec (jalr_target (g !!! Regidx rs1) imm) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (jalr_target (g !!! Regidx rs1) imm) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hrd H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 22 right; left.
+    exists vpn, i, h, ii, imm, rs1, rd.
+    repeat split; try assumption; try exact Hexp.
+  Qed.
+
   (* The constructors this file classifies so far. *)
   Definition covered_u (ii : instruction) : bool :=
     match ii with
