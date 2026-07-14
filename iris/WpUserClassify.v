@@ -1869,6 +1869,77 @@ Section WpUserClassify.
     apply (classify_c_illegal va ms_v g tlbvec vpn i h (C_ILLEGAL hw)); [ intro s; exact (exec_execute_C_ILLEGAL hw s) | exact Hf | exact Hdec ].
   Qed.
 
+  (* Compressed op expanding (ExecuteAs) to a retiring ITYPE compute op,
+     rd<>x0 -> RVC ITYPE disjunct 17.  Carries BOTH the expansion fact and
+     the base ITYPE op-generic compute fact (same as disjunct 5).  Like the
+     base compute this needs rd<>x0 (the ExecuteAs form has no RVC no-op
+     home for rd=x0), so it is a conditional classifier. *)
+  Lemma classify_c_itype (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (op : iop) (imm : mword 12) (rs1 rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (ITYPE (imm, Regidx rs1, Regidx rd, op)), s)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hrd.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 16 right; left.
+    exists vpn, i, h, ii, op, (itype_f op), imm, rs1, rd.
+    repeat split; try assumption;
+      try exact Hexp;
+      try exact (fun rs1' rd' imm' s => exec_execute_ITYPE_op_gpr op rs1' rd' imm' s).
+  Qed.
+
+  (* C_ADDI rd, imm : rd := rd + sext(imm) (rd<>x0; rd=x0 is C_NOP). *)
+  Lemma classify_c_addi (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 6) (rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ADDI (imm, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    apply (classify_c_itype va ms_v g tlbvec vpn i h (C_ADDI (imm, Regidx rd))
+             ADDI (sign_extend' 12 imm) rd rd Hf Hdec);
+      [ intro s; exact (exec_execute_C_ADDI imm (Regidx rd) s) | exact Hrd ].
+  Qed.
+
+  (* C_LI rd, imm : rd := sext(imm) (via ADDI from x0). *)
+  Lemma classify_c_li (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 6) (rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_LI (imm, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    apply (classify_c_itype va ms_v g tlbvec vpn i h (C_LI (imm, Regidx rd))
+             ADDI (sign_extend' 12 imm) (zero_extend' 5 ('b"00")) rd Hf Hdec);
+      [ intro s; exact (exec_execute_C_LI imm (Regidx rd) s) | exact Hrd ].
+  Qed.
+
+  (* C_ANDI rd', imm : rd' := rd' & sext(imm) (rd' a compressed reg, x8-x15). *)
+  Lemma classify_c_andi (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 6) (rdc : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ANDI (imm, rdc), s0)) ->
+    uint (match creg2reg_idx rdc with Regidx r => r end) <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    destruct (creg2reg_idx rdc) as [rd] eqn:Hc.
+    apply (classify_c_itype va ms_v g tlbvec vpn i h (C_ANDI (imm, rdc))
+             ANDI (sign_extend' 12 imm) rd rd Hf Hdec).
+    - intro s. rewrite <- Hc. exact (exec_execute_C_ANDI imm rdc s).
+    - exact Hrd.
+  Qed.
+
   (* The constructors this file classifies so far. *)
   Definition covered_u (ii : instruction) : bool :=
     match ii with
