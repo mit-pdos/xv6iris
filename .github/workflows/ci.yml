@@ -42,13 +42,21 @@ jobs:
       # minutes to compile).  Keyed on the OS, compiler, and the pinned package
       # list — editing .github/coq-deps.txt busts the cache; the restore-keys
       # let an older switch be reused and reconciled by `opam install` on a miss.
+      #
+      # The key is also scoped to runner.name: a project-local opam switch bakes
+      # its absolute workspace path into the switch, so it is NOT relocatable.
+      # Different runners have different workspace paths (e.g. hosted
+      # /home/runner/work/... vs. self-hosted /home/ubuntu/actions-runner/_work/...),
+      # so a switch cached on one runner is invalid on another — restoring it
+      # clobbers setup-ocaml's fresh switch and yields "No switch is currently
+      # set".  Scoping by runner.name keeps each runner's cache to itself.
       - name: Cache opam switch
         uses: actions/cache@v4
         with:
           path: _opam
-          key: ${{ runner.os }}-opam-5.3-${{ hashFiles('.github/coq-deps.txt') }}
+          key: ${{ runner.os }}-${{ runner.name }}-opam-5.3-${{ hashFiles('.github/coq-deps.txt') }}
           restore-keys: |
-            ${{ runner.os }}-opam-5.3-
+            ${{ runner.os }}-${{ runner.name }}-opam-5.3-
 
       # Pinned to match the development switch (Rocq 9.0.1, Iris 4.4.0, Sail
       # support 0.20.1).  The leaf packages pull in coq-stdpp transitively, but
