@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: [self-hosted, coqdev]
+    runs-on: coqdev
 
     steps:
       - uses: actions/checkout@v4
