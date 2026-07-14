@@ -175,6 +175,7 @@ WpUserFetch.v
 WpUserCompute.v
 WpUserComputeMiss.v
 WpUserCtrlU.v
+WpUserZicondU.v
 WpUserCtrl.v
 WpUserComputeC.v
 WpUserTrap.v
