@@ -133,6 +133,7 @@ WpPushOff.v
 WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
+WpCallMycpu.v
 KernelRvcDecode.v
 WpPushOffTop.v
 WpAmo.v

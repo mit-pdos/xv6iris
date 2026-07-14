@@ -24,7 +24,7 @@ Require Import MinstretInv InstrBytes.
 Require Import KernelText.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
-Require Import WpMycpu WpPushOffTop WpAmo WpAcquireMem WpHolding WpAcquireTop.
+Require Import WpMycpu WpCallMycpu WpPushOffTop WpAmo WpAcquireMem WpHolding WpAcquireTop.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved.
 Require Import StackOwn.
@@ -866,7 +866,7 @@ Section WpAcquireLock.
     { rewrite -Hmra. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hbp2 : pa_stk spd 2 = a_p16).
     { rewrite -Hms0. unfold pa_stk, add_vec_int. rewrite !po_addv_assoc. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (AQ + 0x24)) (mword_of_int 0xcb8 : mword 21) B8
+    iApply (wp_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (AQ + 0x24)) (mword_of_int 0xcb8 : mword 21) B8
               HN ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)

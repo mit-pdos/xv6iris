@@ -27,7 +27,7 @@ Require Import MinstretInv InstrBytes.
 Require Import KernelText.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
-Require Import WpMycpu WpPushOffTop WpAcquireMem.
+Require Import WpMycpu WpCallMycpu WpAcquireMem.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved StackOwn.
 Require Import WpHolding WpLock WpLockLeaves.
@@ -505,7 +505,7 @@ Section WpHoldingInv.
       { unfold pa_stk, add_vec_int, a_fs0, mc_sp. rewrite !po_addv_assoc.
         apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       (* mycpu callee, [smode_config] view -- no unbundle island needed *)
-      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5
+      iApply (wp_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5
                 HN ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
@@ -1070,7 +1070,7 @@ Section WpHoldingInv.
       { unfold pa_stk, add_vec_int, a_fs0, mc_sp. rewrite !po_addv_assoc.
         apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       (* mycpu callee, [smode_config] view -- no unbundle island needed *)
-      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5
+      iApply (wp_call_mycpu_scfg_cs root_ppn γc E Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) H5
                 HN ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)

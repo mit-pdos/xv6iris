@@ -20,7 +20,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpLeafCommon KernelText WpAuipc.
 Require Import WpGpr WpGprRvc.
 Require Import SmodeCore WpSmodeGpr WpMemsetS WpSpinNew.
-Require Import WpPushOffCsr WpMycpu.
+Require Import WpPushOffCsr WpMycpu WpCallMycpu.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpRvcBridge KernelRvcDecode.
@@ -486,142 +486,9 @@ Section WpPushOffTop.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-
-
-
-  (* ============ reusable jal->mycpu->return block (raw cells; used by
-     WpHoldingInv / WpAcquireLock, whose posts pin the concrete mstatus0) === *)
-  Lemma wp_pushoff_call_mycpu (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (P : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    ↑minstretN ⊆ E ->
-    add_vec P (sign_extend' 64 jimm) = pcE ->
-    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
-    mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is P -∗ gpr_file m -∗
-    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-    ( ∀ mo,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-      ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
-      mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mo -∗
-      ⌜ callee_saved m mo /\
-        mo !!! Regidx (mword_of_int 10 : mword 5)
-          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros ra_idx m0 pcE ra0 ret_tgt HN Htarget Halign_tgt HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hfiom Hleg Hal0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv #Htext Hpc Hfile Hjal Hstk Hcont".
-    iDestruct (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
-      as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_jal_gpr_s_zca root_ppn γ E Φ P (mword_of_int 1) jimm m (1/2)%Qp
-              HN  ltac:(vm_compute; discriminate)
-              ltac:(rewrite Htarget; exact Halign_tgt)
-              with "Hsm Htlbinv Hpc Hfile Hjal [-]").
-    iIntros "Hsm Htlbinv Hpc Hfile".
-    iEval (rewrite Htarget) in "Hpc".
-    iDestruct (kv_cfg_recombine γ mstatus0 mie_v mdv0 menvcfg0
-                 with "Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2")
-      as "(Hhs & Hpriv & Hms & Hsie & Hmie & Hmdl & Hmenv)".
-    iApply (wp_mycpu root_ppn E Φ m0 2 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
-              ltac:(lia) HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hstk [Hsie Hcont]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmcs Hstk".
-    iApply ("Hcont" with
-              "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
-    destruct Hmcs as [Hcs Ha0]. split.
-    - exact (callee_saved_insert_ra _ _ _ Hcs).
-    - assert (Htp : m0 !!! Regidx (mword_of_int 4 : mword 5)
-                    = m !!! Regidx (mword_of_int 4 : mword 5))
-        by (rewrite /m0 lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
-      rewrite -Htp. exact Ha0.
-  Qed.
-
-  (* ============ jal->mycpu->return block, [smode_config] view with the ====
-     ABSTRACT callee_saved post (mirrors the raw [wp_pushoff_call_mycpu]).
-     For the concrete-mstatus0 callers WpHoldingInv/WpAcquireLock, which want
-     the returned register file abstractly (mo + callee_saved + a0) rather
-     than pinned to [po_mycpu_out]; lets them drop their unbundle island. *)
-  Lemma wp_pushoff_call_mycpu_scfg_cs (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
-      (P : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
-      :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    ↑minstretN ⊆ E ->
-    add_vec P (sign_extend' 64 jimm) = pcE ->
-    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γ (DfracOwn 1) -∗
-    tlb_inv root_ppn -∗
-    kernel_text -∗ pc_is P -∗ gpr_file m -∗
-    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-    ( ∀ mo,
-      smode_config γ (DfracOwn 1) -∗
-      tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mo -∗
-      ⌜ callee_saved m mo /\
-        mo !!! Regidx (mword_of_int 10 : mword 5)
-          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros ra_idx m0 pcE ra0 ret_tgt HN Htarget Halign_tgt Hal0.
-    iIntros "Hsm Htlbinv #Htext Hpc Hfile Hjal Hstk Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_pushoff_call_mycpu root_ppn γ E Φ P jimm m
-              mstatus0 mie_v mdv0 menvcfg0
-              HN Htarget Halign_tgt
-              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hfiom Hleg Hal0
-              with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hjal Hstk [-]").
-    iIntros (mo) "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hcs Hstk".
-    iDestruct (smode_config_rebuild γ (DfracOwn 1) mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" $! mo with "Hsm Htlbinv Hpc Hfile [] Hstk").
-    iPureIntro. exact Hcs.
-  Qed.
+  (* The reusable jal->mycpu->return composites wp_call_mycpu /
+     wp_call_mycpu_scfg_cs now live in WpMycpu (beside wp_mycpu), so
+     holding/acquire reuse them without depending on push_off. *)
 
   (* ============ the suffix from 0x80000bd8 (PO+0x18) to c.ret ============ *)
 
@@ -683,7 +550,7 @@ Section WpPushOffTop.
       by (rewrite lookup_total_insert_ne; [ reflexivity | vm_compute; discriminate ]).
     iIntros "Hsm Htlbinv #Htext Hpc Hfile Hstk Hnoff Hpp24 Hpp16 Hpp8 Hcont".
     iPoseProof (poi_18 with "Htext") as "Hi18".
-    iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γ E Φ P (mword_of_int 0xcfe : mword 21) ms
+    iApply (wp_call_mycpu_scfg_cs root_ppn γ E Φ P (mword_of_int 0xcfe : mword 21) ms
               HN ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               with "Hsm Htlbinv Htext Hpc Hfile Hi18 [Hstk] [-]").
@@ -1075,7 +942,7 @@ Section WpPushOffTop.
     assert (Hm0csp10 : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (PO + 0x10) : mword 64) 4)]> N3) !!! Regidx csp_rs1 = spd)
       by (rewrite lookup_total_insert_ne; [ exact Hcsp3n | vm_compute; discriminate ]).
     iPoseProof (poi_10 with "Htext") as "Hi10".
-    iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γ E Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3
+    iApply (wp_call_mycpu_scfg_cs root_ppn γ E Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3
               HN ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               with "Hsm Htlbinv Htext Hpc Hfile Hi10 [Hstk] [-]").
@@ -1140,7 +1007,7 @@ Section WpPushOffTop.
       assert (Hm0csp2c : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (PO + 0x2c) : mword 64) 4)]> N5) !!! Regidx csp_rs1 = spd)
         by (rewrite lookup_total_insert_ne; [ exact HcspN5 | vm_compute; discriminate ]).
       iPoseProof (poi_2c with "Htext") as "Hi2c".
-      iApply (wp_pushoff_call_mycpu_scfg_cs root_ppn γ E Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5
+      iApply (wp_call_mycpu_scfg_cs root_ppn γ E Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5
                 HN ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
                 with "Hsm Htlbinv Htext Hpc Hfile Hi2c [Hstk] [-]").
