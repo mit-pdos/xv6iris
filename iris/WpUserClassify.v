@@ -30,6 +30,7 @@ Require Import WpMmodeLeafBase WpMmodeShiftiop WpMmodeMul.
 Require Import UmodeFetch UmodeFetchC UmodeEcall.
 Require Import ZbbGpr ClmulGpr ZbbRtypeGpr ZicondGpr.
 Require Import UptInv WpUserBase.
+Require Import WpLeafCommon.
 Require Import WpMemsetS.
 Require Import WpUserSteps.
 Require Import DecodeSetU.
@@ -450,6 +451,170 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
   apply exec_returnM.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* BTYPE execute-reductions for the four comparison ops not armed in
+   WpMemsetS (BLT/BGE/BLTU/BGEU).  execute_BTYPE is uniform: read rs1/rs2,
+   compute the op's boolean [taken], then fall through (RETIRE, state
+   unchanged) or jump to PC + sext(imm).  These mirror WpMemsetS's BNE/BEQ
+   facts with the op's comparison (signed/unsigned </>=).  [rvv] is
+   WpMemsetS's x0-aware register read (matches ustep_case disjuncts 13/14). *)
+
+Local Lemma exec_BTYPE_cmp_BLT (rs2 rs1 : mword 5) s :
+  exec (Defs.bind (rX_bits (Regidx rs1))
+          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
+             (fun w3 => returnM (zopz0zI_s w2 w3)))) s
+    = Some (zopz0zI_s (rvv rs1 s) (rvv rs2 s), s).
+Proof.
+  unfold rvv.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  apply exec_returnM.
+Qed.
+
+Local Lemma exec_BTYPE_cmp_BGE (rs2 rs1 : mword 5) s :
+  exec (Defs.bind (rX_bits (Regidx rs1))
+          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
+             (fun w3 => returnM (zopz0zKzJ_s w2 w3)))) s
+    = Some (zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s), s).
+Proof.
+  unfold rvv.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  apply exec_returnM.
+Qed.
+
+Local Lemma exec_BTYPE_cmp_BLTU (rs2 rs1 : mword 5) s :
+  exec (Defs.bind (rX_bits (Regidx rs1))
+          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
+             (fun w3 => returnM (zopz0zI_u w2 w3)))) s
+    = Some (zopz0zI_u (rvv rs1 s) (rvv rs2 s), s).
+Proof.
+  unfold rvv.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  apply exec_returnM.
+Qed.
+
+Local Lemma exec_BTYPE_cmp_BGEU (rs2 rs1 : mword 5) s :
+  exec (Defs.bind (rX_bits (Regidx rs1))
+          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
+             (fun w3 => returnM (zopz0zKzJ_u w2 w3)))) s
+    = Some (zopz0zKzJ_u (rvv rs1 s) (rvv rs2 s), s).
+Proof.
+  unfold rvv.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_execute_BTYPE_BLT_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zI_s (rvv rs1 s) (rvv rs2 s) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hfall.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BLT rs2 rs1 s)).
+  rewrite Hfall. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_BTYPE_BGE_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hfall.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BGE rs2 rs1 s)).
+  rewrite Hfall. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_BTYPE_BLTU_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zI_u (rvv rs1 s) (rvv rs2 s) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hfall.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BLTU rs2 rs1 s)).
+  rewrite Hfall. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_BTYPE_BGEU_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zKzJ_u (rvv rs1 s) (rvv rs2 s) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hfall.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BGEU rs2 rs1 s)).
+  rewrite Hfall. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_BTYPE_BLT_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zI_s (rvv rs1 s) (rvv rs2 s) = true ->
+  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+  bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+Proof.
+  intros Htaken Halign Hbit1.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BLT rs2 rs1 s)).
+  rewrite Htaken.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  exact (exec_jump_to _ s Halign Hbit1).
+Qed.
+
+Lemma exec_execute_BTYPE_BGE_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s) = true ->
+  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+  bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+Proof.
+  intros Htaken Halign Hbit1.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BGE rs2 rs1 s)).
+  rewrite Htaken.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  exact (exec_jump_to _ s Halign Hbit1).
+Qed.
+
+Lemma exec_execute_BTYPE_BLTU_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zI_u (rvv rs1 s) (rvv rs2 s) = true ->
+  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+  bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+Proof.
+  intros Htaken Halign Hbit1.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BLTU rs2 rs1 s)).
+  rewrite Htaken.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  exact (exec_jump_to _ s Halign Hbit1).
+Qed.
+
+Lemma exec_execute_BTYPE_BGEU_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zKzJ_u (rvv rs1 s) (rvv rs2 s) = true ->
+  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+  bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+Proof.
+  intros Htaken Halign Hbit1.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BGEU rs2 rs1 s)).
+  rewrite Htaken.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  exact (exec_jump_to _ s Halign Hbit1).
 Qed.
 
 Section WpUserClassify.
@@ -1264,6 +1429,178 @@ Section WpUserClassify.
     repeat split; try assumption.
     exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 =>
              exec_execute_BTYPE_BEQ_taken imm' rs2' rs1' s Ht Ha0 Ha1).
+  Qed.
+
+  (* BLT, not taken. *)
+  Lemma classify_btype_blt_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BLT), s0)) ->
+    zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 12 right; left.
+    exists vpn, i, w, BLT, (fun v1 v2 => zopz0zI_s v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BLT_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  (* BGE, not taken. *)
+  Lemma classify_btype_bge_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BGE), s0)) ->
+    zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 12 right; left.
+    exists vpn, i, w, BGE, (fun v1 v2 => zopz0zKzJ_s v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BGE_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  (* BLTU, not taken. *)
+  Lemma classify_btype_bltu_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU), s0)) ->
+    zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 12 right; left.
+    exists vpn, i, w, BLTU, (fun v1 v2 => zopz0zI_u v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BLTU_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  (* BGEU, not taken. *)
+  Lemma classify_btype_bgeu_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU), s0)) ->
+    zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 12 right; left.
+    exists vpn, i, w, BGEU, (fun v1 v2 => zopz0zKzJ_u v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BGEU_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  (* BLT, taken (aligned target). *)
+  Lemma classify_btype_blt_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BLT), s0)) ->
+    zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 13 right; left.
+    exists vpn, i, w, BLT, (fun v1 v2 => zopz0zI_s v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 =>
+             exec_execute_BTYPE_BLT_taken imm' rs2' rs1' s Ht Ha0 Ha1).
+  Qed.
+
+  (* BGE, taken (aligned target). *)
+  Lemma classify_btype_bge_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BGE), s0)) ->
+    zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 13 right; left.
+    exists vpn, i, w, BGE, (fun v1 v2 => zopz0zKzJ_s v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 =>
+             exec_execute_BTYPE_BGE_taken imm' rs2' rs1' s Ht Ha0 Ha1).
+  Qed.
+
+  (* BLTU, taken (aligned target). *)
+  Lemma classify_btype_bltu_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU), s0)) ->
+    zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 13 right; left.
+    exists vpn, i, w, BLTU, (fun v1 v2 => zopz0zI_u v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 =>
+             exec_execute_BTYPE_BLTU_taken imm' rs2' rs1' s Ht Ha0 Ha1).
+  Qed.
+
+  (* BGEU, taken (aligned target). *)
+  Lemma classify_btype_bgeu_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU), s0)) ->
+    zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 13 right; left.
+    exists vpn, i, w, BGEU, (fun v1 v2 => zopz0zKzJ_u v1 v2), imm, rs2, rs1.
+    repeat split; try assumption.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 =>
+             exec_execute_BTYPE_BGEU_taken imm' rs2' rs1' s Ht Ha0 Ha1).
   Qed.
 
   (* The constructors this file classifies so far. *)
