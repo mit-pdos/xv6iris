@@ -182,6 +182,7 @@ WpUserCtrl.v
 WpUserComputeC.v
 WpUserTrap.v
 WpUserTrapMiss.v
+WpUserPrivU.v
 WpUserMem.v
 WpUserMemC.v
 WpUserMem4.v
