@@ -107,6 +107,63 @@ Section VRU4.
 End VRU4.
 
 (* ===================================================================== *)
+(* U-mode width-4 LOAD, DATA-TLB-MISS form.  The data translate walks and  *)
+(* fills, so it moves the state s -> s'; the load body then runs at s'.     *)
+(* The caller supplies the identity EA-transform [Htea] and the walk-fill   *)
+(* translate [Htr] (via exec_translateAddr_load_walk_u); the physical-side  *)
+(* facts are stated at the filled state s'.  Thin glue over the generic     *)
+(* exec_execute_LOAD_4_gpr_walk + the U pmpCheck grant.                     *)
+(* ===================================================================== *)
+Section VRU4Miss.
+  Variable rs1 rd : mword 5.
+  Variable imm : mword 12.
+  Variable v : bv 32.
+  Variable region : PMA_Region.
+  Variable s s' : mstate.
+  Variable pa : mword 64.
+  Let offset := sign_extend' 64 imm.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+  Let data2 : mword (4*1*8) :=
+    update_subrange_vec_dec (zeros' (4*1*8)) (4*(0+1)*8-1) (4*0*8) v.
+  Hypothesis Hrd : uint rd <> 0.
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Load Data)) s = Some (Virtaddr ea, s).
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr ea) 4 = true.
+  Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr ea)) (0 * 4))) (Load Data)) s
+                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
+  Hypothesis Hcp : register_lookup cur_privilege s'.(sregs) = User.
+  Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1" : mword 1) = false.
+  Hypothesis HpmpA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) = TOR.
+  Hypothesis Hpmp_ord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0) = false.
+  Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match.
+  Hypothesis HpmpR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) ('b"1") = true.
+  Hypothesis Hpmam : matching_pma_region (register_lookup pma_regions s'.(sregs)) (Physaddr pa) 4 = Some region.
+  Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
+  Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.
+  Hypothesis Hc : exec (within_clint (Physaddr pa) 4) s' = Some (false, s').
+  Hypothesis Hsig : exec (within_sig (Physaddr pa) 4) s' = Some (false, s').
+  Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 4) s' = Some (false, s').
+  Hypothesis Hdev : dev_addr pa = false.
+  Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N ->
+    s'.(mem) !! (pa_add pa j) = Some (nth_byte v j).
+
+  Lemma exec_execute_LOAD_4_U_miss (is_unsigned : bool) :
+    exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))) s
+      = Some (RETIRE_SUCCESS,
+              set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                (regval_into_reg (extend_value is_unsigned data2))).
+  Proof.
+    assert (Hpmp : exec (pmpCheck (Physaddr pa) 4 (Load Data) User) s' = Some (None, s')).
+    { exact (exec_pmpCheck_user_grant_load pa 4 s' HpmpA Hpmp_ord Hrange HpmpR). }
+    exact (exec_execute_LOAD_4_gpr_walk User is_unsigned rs1 rd imm ea v region s s' pa
+             Hrd Htea Halign Htr Hcp Hmprv Hpmp Hpmam Hpalign Hread Hc Hsig Hh Hdev Hbytes).
+  Qed.
+End VRU4Miss.
+
+(* ===================================================================== *)
 (* U-mode width-4 register-generic STORE (SW).                          *)
 (* ===================================================================== *)
 Section VWU4.
