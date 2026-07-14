@@ -10,4 +10,4 @@ CoqMakefile.conf
 *.log
 .*.cache
 /xv6-riscv
-/tools/__pycache__
+__pycache__
