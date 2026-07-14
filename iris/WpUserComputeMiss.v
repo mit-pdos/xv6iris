@@ -217,94 +217,8 @@ Section WpUserComputeMiss.
   Qed.
 
 
-  (* ------------------------------------------------------------------ *)
-  (* USTEP MISS case: a state-preserving retiring instruction whose page  *)
-  (* is NOT yet cached.  The generic template -- the fetch walks, fills   *)
-  (* the TLB with [upt_entry vpn ie], decodes to [ii], executes to a      *)
-  (* self-RETIRE, and the frame closes over the FILLED TLB.  Every other  *)
-  (* miss arm specialises the execute fact exactly as its hit twin does.  *)
-  (* ------------------------------------------------------------------ *)
-  Lemma ustep_nop_miss (ii : instruction)
-      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
-      (ms_v sc_v stval_v sepc_v : mword 64)
-      (g : gmap regidx (mword 64))
-      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
-      E (Φ : mval -> iProp Σ) :
-    ↑minstretN ⊆ E ->
-    (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) ->
-    is_lpad_instruction ii = false ->
-    upt_tlb_ok spec tlbvec ->
-    spec !! vpn = Some ie ->
-    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-     (exists ent', vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' /\
-        match_TLB_Entry ent' (mword_of_int 0 : mword 16)
-          (sign_extend' (57 - 12) vpn) = false)) ->
-    uw_check_ok (InstructionFetch tt) ie ->
-    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
-    (forall j : nat, (j < 4)%nat ->
-       code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)) ->
-    _get_Mstatus_SXL ms_v = 'b"10" ->
-    is_aligned_vaddr (Virtaddr va) 4 = true ->
-    neq_vec (bits_of_virtaddr (Virtaddr va))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true ->
-    isRVC (subrange_vec_dec w 15 0) = false ->
-    (forall s0, agree_on D_u s0 dstateU ->
-       exec (ext_decode w) s0 = Some (ii, s0)) ->
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ User -∗
-    mstatus ↦ᵣ ms_v -∗
-    scause ↦ᵣ sc_v -∗
-    stval ↦ᵣ stval_v -∗
-    sepc ↦ᵣ sepc_v -∗
-    tlb ↦ᵣ tlbvec -∗
-    pc_is va -∗
-    gpr_file g -∗
-    upt_inv root slots spec -∗
-    user_code -∗
-    user_data -∗
-    user_cfg -∗
-    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    intros HN Hexec_nop Hnlpad Hok Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
-           Hvpn_def Hpaal HnotRVC Hdec.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
-             Hgpr Hupt #Hcode Hdata Hcfg Hcont".
-    iApply (wp_instr_u_miss va vpn ie w ii ms_v tlbvec E Φ
-              HN Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
-              Hvpn_def Hpaal HnotRVC Hdec Hnlpad
-              with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hupt Hcfg").
-    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s1 := set_reg σ nextPC (add_vec_int va 4)).
-    iModIntro.
-    iExists s1.
-    iSplitR; [iPureIntro; exact (Hexec_nop s1) |].
-    iSplitL "Hreg Hmem".
-    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hupt' Hcfg'".
-    assert (Lnpc : register_lookup nextPC s1.(sregs) = add_vec_int va 4).
-    { unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iNext.
-    iApply "Hcont".
-    rewrite /user_frame.
-    iExists ms_v, sc_v, stval_v, sepc_v, (add_vec_int va 4), g,
-      (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
-    iFrame "Hhs' Hpriv' Hms' Hsc Hstv Hsepc Htlbc' Hgpr Hupt' Hcode Hdata Hcfg'".
-    iSplitR; [iPureIntro; exact HSXL |].
-    iSplitR; [iPureIntro; exact (upt_tlb_ok_fill spec tlbvec vpn ie Hsome Hok) |].
-    iFrame "Hpc' Hnpc".
-  Qed.
-
-
-  (* ---- TLB-miss twin of ustep_itype ---- *)
-  Lemma ustep_itype_miss (op : iop) (f : mword 64 -> mword 12 -> mword 64)
+  (* ---- combined (hit+miss) arm: ustep_itype_u ---- *)
+  Lemma ustep_itype_u (op : iop) (f : mword 64 -> mword 12 -> mword 64)
       (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
       (imm : mword 12) (rs1 rd : mword 5)
       (ms_v sc_v stval_v sepc_v : mword 64)
@@ -324,23 +238,19 @@ Section WpUserComputeMiss.
                                     (R_bitvector_64 (gpr_of_Z (uint rs1'))) s.(sregs))
                             imm')))) ->
     upt_tlb_ok spec tlbvec ->
-    (* fetch-MISS facts: spec-mapped vpn, hash slot empty/colliding *)
+    (* fetch-hit facts *)
     spec !! vpn = Some ie ->
-    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-     (exists ent', vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' /\
-        match_TLB_Entry ent' (mword_of_int 0 : mword 16)
-          (sign_extend' (57 - 12) vpn) = false)) ->
     uw_check_ok (InstructionFetch tt) ie ->
     update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
     (forall j : nat, (j < 4)%nat ->
-       code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)) ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
     _get_Mstatus_SXL ms_v = 'b"10" ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec
        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (* decode: w is this ITYPE op *)
     (forall s0, agree_on D_u s0 dstateU ->
@@ -364,14 +274,14 @@ Section WpUserComputeMiss.
     ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hexec_op Hok Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    intros HN Hexec_op Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
            Hvpn_def Hpaal HnotRVC Hdec Hrd.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
              [%Hdom Hfmap] Hupt #Hcode Hdata Hcfg Hcont".
     assert (Hnlpad : is_lpad_instruction (ITYPE (imm, Regidx rs1, Regidx rd, op))
                        = false) by (destruct op; reflexivity).
-    iApply (wp_instr_u_miss va vpn ie w (ITYPE (imm, Regidx rs1, Regidx rd, op))
-              ms_v tlbvec E Φ HN Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    iApply (wp_instr_u va vpn ie w (ITYPE (imm, Regidx rs1, Regidx rd, op))
+              ms_v tlbvec E Φ HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hupt Hcfg").
     iIntros (σ Hpceq Hag) "[Hreg Hmem]".
@@ -429,8 +339,8 @@ Section WpUserComputeMiss.
   Qed.
 
 
-  (* ---- TLB-miss twin of ustep_rtype ---- *)
-  Lemma ustep_rtype_miss (op : rop) (f : mword 64 -> mword 64 -> mword 64)
+  (* ---- combined (hit+miss) arm: ustep_rtype_u ---- *)
+  Lemma ustep_rtype_u (op : rop) (f : mword 64 -> mword 64 -> mword 64)
       (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
       (rs2 rs1 rd : mword 5)
       (ms_v sc_v stval_v sepc_v : mword 64)
@@ -451,23 +361,19 @@ Section WpUserComputeMiss.
                         else register_lookup
                                (R_bitvector_64 (gpr_of_Z (uint rs2'))) s.(sregs)))))) ->
     upt_tlb_ok spec tlbvec ->
-    (* fetch-MISS facts: spec-mapped vpn, hash slot empty/colliding *)
+    (* fetch-hit facts *)
     spec !! vpn = Some ie ->
-    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-     (exists ent', vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' /\
-        match_TLB_Entry ent' (mword_of_int 0 : mword 16)
-          (sign_extend' (57 - 12) vpn) = false)) ->
     uw_check_ok (InstructionFetch tt) ie ->
     update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
     (forall j : nat, (j < 4)%nat ->
-       code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)) ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
     _get_Mstatus_SXL ms_v = 'b"10" ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec
        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (* decode: w is this RTYPE op *)
     (forall s0, agree_on D_u s0 dstateU ->
@@ -491,14 +397,14 @@ Section WpUserComputeMiss.
     ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hexec_op Hok Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    intros HN Hexec_op Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
            Hvpn_def Hpaal HnotRVC Hdec Hrd.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
              [%Hdom Hfmap] Hupt #Hcode Hdata Hcfg Hcont".
     assert (Hnlpad : is_lpad_instruction (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))
                        = false) by (destruct op; reflexivity).
-    iApply (wp_instr_u_miss va vpn ie w (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))
-              ms_v tlbvec E Φ HN Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    iApply (wp_instr_u va vpn ie w (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))
+              ms_v tlbvec E Φ HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hupt Hcfg").
     iIntros (σ Hpceq Hag) "[Hreg Hmem]".
@@ -561,8 +467,8 @@ Section WpUserComputeMiss.
   Qed.
 
 
-  (* ---- TLB-miss twin of ustep_utype ---- *)
-  Lemma ustep_utype_miss (op : uop) (V : mword 20 -> mstate -> mword 64) (v : mword 64)
+  (* ---- combined (hit+miss) arm: ustep_utype_u ---- *)
+  Lemma ustep_utype_u (op : uop) (V : mword 20 -> mstate -> mword 64) (v : mword 64)
       (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
       (imm : mword 20) (rd : mword 5)
       (ms_v sc_v stval_v sepc_v : mword 64)
@@ -578,23 +484,19 @@ Section WpUserComputeMiss.
                       (regval_into_reg (V imm' s)))) ->
     (forall s', register_lookup PC s'.(sregs) = va -> V imm s' = v) ->
     upt_tlb_ok spec tlbvec ->
-    (* fetch-MISS facts: spec-mapped vpn, hash slot empty/colliding *)
+    (* fetch-hit facts *)
     spec !! vpn = Some ie ->
-    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-     (exists ent', vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' /\
-        match_TLB_Entry ent' (mword_of_int 0 : mword 16)
-          (sign_extend' (57 - 12) vpn) = false)) ->
     uw_check_ok (InstructionFetch tt) ie ->
     update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
     (forall j : nat, (j < 4)%nat ->
-       code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)) ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
     _get_Mstatus_SXL ms_v = 'b"10" ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec
        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, agree_on D_u s0 dstateU ->
        exec (ext_decode w) s0 = Some (UTYPE (imm, Regidx rd, op), s0)) ->
@@ -617,14 +519,14 @@ Section WpUserComputeMiss.
     ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hexec_op HV Hok Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    intros HN Hexec_op HV Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
            Hvpn_def Hpaal HnotRVC Hdec Hrd.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
              [%Hdom Hfmap] Hupt #Hcode Hdata Hcfg Hcont".
     assert (Hnlpad : is_lpad_instruction (UTYPE (imm, Regidx rd, op)) = false)
       by reflexivity.
-    iApply (wp_instr_u_miss va vpn ie w (UTYPE (imm, Regidx rd, op))
-              ms_v tlbvec E Φ HN Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    iApply (wp_instr_u va vpn ie w (UTYPE (imm, Regidx rd, op))
+              ms_v tlbvec E Φ HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hupt Hcfg").
     iIntros (σ Hpceq Hag) "[Hreg Hmem]".
@@ -678,8 +580,8 @@ Section WpUserComputeMiss.
   Qed.
 
 
-  (* ---- TLB-miss twin of ustep_shiftiop ---- *)
-  Lemma ustep_shiftiop_miss (op : sop) (f : mword 64 -> mword 6 -> mword 64)
+  (* ---- combined (hit+miss) arm: ustep_shiftiop_u ---- *)
+  Lemma ustep_shiftiop_u (op : sop) (f : mword 64 -> mword 6 -> mword 64)
       (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
       (shamt : mword 6) (rs1 rd : mword 5)
       (ms_v sc_v stval_v sepc_v : mword 64)
@@ -699,21 +601,17 @@ Section WpUserComputeMiss.
                             shamt')))) ->
     upt_tlb_ok spec tlbvec ->
     spec !! vpn = Some ie ->
-    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-     (exists ent', vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' /\
-        match_TLB_Entry ent' (mword_of_int 0 : mword 16)
-          (sign_extend' (57 - 12) vpn) = false)) ->
     uw_check_ok (InstructionFetch tt) ie ->
     update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
     (forall j : nat, (j < 4)%nat ->
-       code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)) ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
     _get_Mstatus_SXL ms_v = 'b"10" ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     autocast (T := mword) (subrange_vec_dec
        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     (forall s0, agree_on D_u s0 dstateU ->
        exec (ext_decode w) s0 = Some (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op), s0)) ->
@@ -736,14 +634,14 @@ Section WpUserComputeMiss.
     ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hexec_op Hok Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    intros HN Hexec_op Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
            Hvpn_def Hpaal HnotRVC Hdec Hrd.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
              [%Hdom Hfmap] Hupt #Hcode Hdata Hcfg Hcont".
     assert (Hnlpad : is_lpad_instruction (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op))
                        = false) by reflexivity.
-    iApply (wp_instr_u_miss va vpn ie w (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op))
-              ms_v tlbvec E Φ HN Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+    iApply (wp_instr_u va vpn ie w (SHIFTIOP (shamt, Regidx rs1, Regidx rd, op))
+              ms_v tlbvec E Φ HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
               Hvpn_def Hpaal HnotRVC Hdec Hnlpad
               with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hupt Hcfg").
     iIntros (σ Hpceq Hag) "[Hreg Hmem]".
@@ -798,6 +696,81 @@ Section WpUserComputeMiss.
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
+  Qed.
+
+
+  (* ---- combined (hit+miss) arm: ustep_nop_u ---- *)
+  Lemma ustep_nop_u (ii : instruction)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) ->
+    is_lpad_instruction ii = false ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ii, s0)) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hexec_nop Hnlpad Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc [Hpcr Hnpc]
+             Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iApply (wp_instr_u va vpn ie w ii
+              ms_v tlbvec E Φ HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon
+              Hvpn_def Hpaal HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpcr Hcode Hupt Hcfg").
+    iIntros (σ Hpceq Hag) "[Hreg Hmem]".
+    iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s1 := set_reg σ nextPC (add_vec_int va 4)).
+    iModIntro.
+    iExists s1.
+    iSplitR; [iPureIntro; exact (Hexec_nop s1) |].
+    iSplitL "Hreg Hmem".
+    { unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hupt' Hcfg'".
+    assert (Lnpc : register_lookup nextPC s1.(sregs) = add_vec_int va 4).
+    { unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iNext.
+    iApply "Hcont".
+    rewrite /user_frame.
+    iExists ms_v, sc_v, stval_v, sepc_v, (add_vec_int va 4), g, (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
+    iFrame "Hhs' Hpriv' Hms' Hsc Hstv Hsepc Htlbc' Hgpr Hupt' Hcode Hdata Hcfg'".
+    iSplitR; [iPureIntro; exact HSXL |].
+    iSplitR; [iPureIntro; exact (upt_tlb_ok_fill spec tlbvec vpn ie Hsome Hok) |].
+    iFrame "Hpc' Hnpc".
   Qed.
 
 End WpUserComputeMiss.
