@@ -122,10 +122,10 @@ UmodeData.v
 UmodeData4.v
 UmodeData2.v
 UmodeData1.v
-UmodeDataFault.v
 UmodeAmo4.v
 UmodeCsr.v
 UmodeLrsc.v
+UmodeDataFault.v
 WpUserLrsc.v
 WpUserLoop.v
 WpIntrStep.v
