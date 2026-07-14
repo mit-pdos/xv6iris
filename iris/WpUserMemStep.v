@@ -71,9 +71,127 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* (2) Window peel/restore for the STORE dispatcher.                        *)
+(*                                                                          *)
+(*     These are the [WpUserMemPeel.v] helpers RE-PROVEN here over the       *)
+(*     frame's NATIVE [Countable_mword] instance (the one [user_data]'s     *)
+(*     [dm : gmap Arch.pa (bv 8)] actually uses).  The [WpUserMemPeel.v]     *)
+(*     copies bake [bv_countable] (that file avoids [SailStdpp.Base]) and    *)
+(*     so DO NOT apply to a [dm] pulled from [user_data] here -- the two     *)
+(*     [Countable Arch.pa] instances are non-convertible.  Two Base-context  *)
+(*     tactic hazards worth recording: (a) bare [NoDup] resolves to          *)
+(*     [List.NoDup], not stdpp's [base.NoDup] -- qualify both the statement  *)
+(*     and the destructor ([list_relations.NoDup_cons]); (b) [simpl] over-    *)
+(*     reduces [Arch.pa]/its instances into a form where the generic map      *)
+(*     lemmas ([delete_insert_ne], [dom_insert_L]) can no longer synthesise   *)
+(*     [FinMap Arch.pa (gmap Arch.pa)] -- expose the [foldr] cons step with   *)
+(*     [cbn [foldr]] or an explicit [assert ... by reflexivity] instead, and  *)
+(*     avoid [set_solver] (it chokes the same way). *)
+
+(* window addresses are pairwise distinct when the window does not wrap *)
+Lemma pa_add_inj_nowrap (paD : Arch.pa) (n : nat) (j j' : nat) :
+  (uint paD + Z.of_nat n <= 18446744073709551616)%Z ->
+  (j < n)%nat -> (j' < n)%nat -> pa_add paD j = pa_add paD j' -> j = j'.
+Proof.
+  intros Hnw Hj Hj' Heq.
+  assert (Huj : uint (pa_add paD j) = uint paD + Z.of_nat j) by (apply uint_pa_add; lia).
+  assert (Huj' : uint (pa_add paD j') = uint paD + Z.of_nat j') by (apply uint_pa_add; lia).
+  rewrite Heq in Huj. rewrite Huj' in Huj. lia.
+Qed.
+
+Lemma NoDup_pa_window (paD : Arch.pa) (n : nat) :
+  (uint paD + Z.of_nat n <= 18446744073709551616)%Z ->
+  base.NoDup ((pa_add paD) <$> (seq 0 n)).
+Proof.
+  intro Hnw. apply NoDup_fmap_2_strong.
+  - intros x y Hx Hy Heq. apply elem_of_seq in Hx; apply elem_of_seq in Hy.
+    apply (pa_add_inj_nowrap paD n); [lia|lia|lia|exact Heq].
+  - apply NoDup_seq.
+Qed.
+
+(* gmap: deleting a key commutes past inserts of OTHER keys *)
+Lemma foldr_insert_delete_comm (paD : Arch.pa) (g : nat -> bv 8)
+    (k : Arch.pa) (l : list nat) (m : gmap Arch.pa (bv 8)) :
+  k ∉ ((pa_add paD) <$> l) ->
+  foldr (fun j acc => <[pa_add paD j := g j]> acc) (delete k m) l
+  = delete k (foldr (fun j acc => <[pa_add paD j := g j]> acc) m l).
+Proof.
+  induction l as [|x xs IH]; intro Hk.
+  - reflexivity.
+  - rewrite fmap_cons in Hk. apply not_elem_of_cons in Hk as [Hne Hk].
+    cbn [foldr]. rewrite (IH Hk).
+    symmetry. apply delete_insert_ne. exact Hne.
+Qed.
+
+(* inserting keys already present preserves the domain *)
+Lemma dom_foldr_insert_indom (g : nat -> bv 8) (paD : Arch.pa)
+    (l : list nat) (m : gmap Arch.pa (bv 8)) :
+  (forall j, j ∈ l -> pa_add paD j ∈ dom m) ->
+  dom (foldr (fun j acc => <[pa_add paD j := g j]> acc) m l) = dom m.
+Proof.
+  induction l as [|x xs IH]; intro Hin.
+  - reflexivity.
+  - assert (Hin' : forall j, j ∈ xs -> pa_add paD j ∈ dom m).
+    { intros j Hj. apply Hin. apply elem_of_list_further. exact Hj. }
+    assert (Hstep : foldr (fun j acc => <[pa_add paD j := g j]> acc) m (x :: xs)
+             = <[pa_add paD x := g x]> (foldr (fun j acc => <[pa_add paD j := g j]> acc) m xs))
+      by reflexivity.
+    rewrite Hstep. rewrite dom_insert_L. rewrite (IH Hin').
+    assert (Hx : pa_add paD x ∈ dom m) by (apply Hin; apply elem_of_list_here).
+    apply subseteq_union_1_L. apply singleton_subseteq_l. exact Hx.
+Qed.
+
+Section peel.
+  Context `{!riscvGS Σ}.
+
+  (* Peel the [pa_add paD 0 .. paD (|l|-1)] cells out of a frame-owned byte
+     map, keeping a restore wand.  [fold_new] is chosen by the caller at
+     restore time (for a store: [fun j => nth_byte vNew j]). *)
+  Lemma data_window_acc_gen (paD : Arch.pa) (l : list nat)
+      (fold_old : nat -> bv 8) (m : gmap Arch.pa (bv 8)) :
+    base.NoDup ((pa_add paD) <$> l) ->
+    (forall j, j ∈ l -> m !! pa_add paD j = Some (fold_old j)) ->
+    ⊢@{iPropI Σ}
+      ([∗ map] a↦b ∈ m, a ↦ₘ b) -∗
+      ([∗ list] j ∈ l, pa_add paD j ↦ₘ fold_old j) ∗
+      (∀ fold_new : nat -> bv 8,
+        ([∗ list] j ∈ l, pa_add paD j ↦ₘ fold_new j) -∗
+        [∗ map] a↦b ∈ (foldr (fun j acc => <[pa_add paD j := fold_new j]> acc) m l), a↦ₘ b).
+  Proof.
+    revert m. induction l as [|x xs IH]; intros m Hnd Hcont.
+    - iIntros "Hm". iSplitR "Hm".
+      { done. }
+      iIntros (fn) "_". cbn [foldr]. iFrame.
+    - rewrite fmap_cons in Hnd. apply list_relations.NoDup_cons in Hnd as [Hxni Hnd].
+      assert (Hmx : m !! pa_add paD x = Some (fold_old x))
+        by (apply Hcont; apply elem_of_list_here).
+      assert (Hcont' : forall j, j ∈ xs ->
+                 delete (pa_add paD x) m !! pa_add paD j = Some (fold_old j)).
+      { intros j Hj.
+        assert (Hne : pa_add paD x ≠ pa_add paD j).
+        { intro Hc. apply Hxni. rewrite Hc. apply elem_of_list_fmap.
+          exists j. split; [reflexivity|exact Hj]. }
+        rewrite (lookup_delete_ne _ _ _ Hne). apply Hcont.
+        apply elem_of_list_further. exact Hj. }
+      iIntros "Hm".
+      iDestruct (big_sepM_delete _ _ _ _ Hmx with "Hm") as "[Hx Hrest]".
+      iDestruct (IH (delete (pa_add paD x) m) Hnd Hcont' with "Hrest") as "[Hwin Hback]".
+      iSplitL "Hx Hwin".
+      { iFrame. }
+      iIntros (fn) "[Hxn Hwn]".
+      iDestruct ("Hback" $! fn with "Hwn") as "Hmap".
+      cbn [foldr].
+      iApply big_sepM_insert_delete.
+      iFrame "Hxn".
+      rewrite (foldr_insert_delete_comm paD fn (pa_add paD x) xs m Hxni).
+      iFrame "Hmap".
+  Qed.
+End peel.
+
+(* ---------------------------------------------------------------------- *)
 (* (3) Dispatcher-facing memory steps: consume [user_data] whole and       *)
-(*     derive the loaded value internally, so the caller supplies only the  *)
-(*     translation facts + a window-in-[data] premise (no value/bytes).     *)
+(*     derive the loaded/stored value internally, so the caller supplies    *)
+(*     only the translation facts + a window-in-[data] premise.             *)
 (* ---------------------------------------------------------------------- *)
 Section WpUserMemStep.
   Context `{!riscvGS Σ}.
@@ -91,6 +209,7 @@ Section WpUserMemStep.
   Local Notation user_data := (WpUserBase.user_data U).
   Local Notation user_frame := (WpUserBase.user_frame U).
   Local Notation ustep_ld_data := (WpUserMem.ustep_ld_data U).
+  Local Notation ustep_sd := (WpUserMem.ustep_sd U).
 
   (* Width-8 data-page load, dispatcher form: [user_data] whole in, value
      read from [dm] via [read_bytes] -- the caller only shows the target
@@ -187,5 +306,126 @@ Section WpUserMemStep.
               Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HvecD HchkD HupdD HpbmtD
               HalignD HcanonD Hvpn_defD HpaalD Hdomdm Hcwd
               with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hfmap Hcfg Hcont").
+  Qed.
+
+  (* Width-8 data-page STORE, dispatcher form: [user_data] whole in.  The
+     dispatcher assembles the OLD value from [dm], peels the 8-cell target
+     window with [data_window_acc_gen], and hands [ustep_sd] the window plus
+     a restore wand that rebuilds [user_data] from the NEW bytes (the store
+     leaves [dom dm = data] intact via [dom_foldr_insert_indom]).  The caller
+     supplies the translation facts, a no-wrap bound on [paD] (from
+     [addr_is_ram paD]), and [∀ j<8, pa_add paD j ∈ data]. *)
+  Lemma wp_user_sd_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs2 rs1 : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    (uint paD + 8 <= 18446744073709551616)%Z ->
+    upt_tlb_ok spec tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), s0)) ->
+    spec !! vpnD = Some ieD ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hnowrap Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval
+           Hcanon Hvpn_def Hpaal HnotRVC Hdec
+           HsomeD HvecD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin_in.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    set (vNew := (g !!! Regidx rs2)).
+    (* the OLD value, assembled from the owned data bytes (dm's own
+       Countable instance, so [read_bytes] does not apply) *)
+    assert (Hindom : forall j : nat, (j < 8)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin_in. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 8).
+    set (vold := (Z_to_bv 64 (assemble_bytes bs)) : mword 64).
+    assert (Hlen : length bs = 8%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 8)%nat -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 8))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 8 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 8 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst vold. rewrite (nth_byte_assemble8 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    (* peel the 8-cell window out of dm, keep the restore-to-map wand *)
+    assert (HND : base.NoDup ((pa_add paD) <$> (seq 0 8)))
+      by (apply NoDup_pa_window; exact Hnowrap).
+    assert (Hpeelcont : forall j, j ∈ seq 0 8 -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj. apply elem_of_seq in Hj. apply Hcwd. lia. }
+    iDestruct (data_window_acc_gen paD (seq 0 8) (fun j => nth_byte vold j) dm HND Hpeelcont
+                 with "Hfmap") as "[Hwin Hback]".
+    (* lift the restore-to-map wand into a restore-to-[user_data] wand *)
+    iAssert (([∗ list] j ∈ seq 0 8, pa_add paD j ↦ₘ nth_byte vNew j) -∗ user_data)%I
+      with "[Hback]" as "Hrestore".
+    { iIntros "Hnew".
+      iDestruct ("Hback" $! (fun j => nth_byte vNew j) with "Hnew") as "Hmap".
+      iExists (foldr (fun j acc => <[pa_add paD j := nth_byte vNew j]> acc) dm (seq 0 8)).
+      iSplitR.
+      { iPureIntro.
+        rewrite (dom_foldr_insert_indom (fun j => nth_byte vNew j) paD (seq 0 8) dm).
+        - exact Hdomdm.
+        - intros j Hj. rewrite Hdomdm. apply elem_of_seq in Hj. apply Hwin_in. lia. }
+      iExact "Hmap". }
+    iApply (ustep_sd va vpn ie w vpnD ieD imm rs2 rs1 vold ms_v sc_v stval_v sepc_v
+              g tlbvec E Φ HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval
+              Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD HvecD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hwin Hrestore Hcfg Hcont").
   Qed.
 End WpUserMemStep.
