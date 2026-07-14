@@ -64,20 +64,31 @@ jobs:
       - name: Install Rocq / Iris / Sail toolchain
         run: opam install -y $(cat .github/coq-deps.txt)
 
-      # ---- 1. Sail-generated Coq model (model-xv6iris/) ----
-      # `make model` only depends on the model's _CoqProject — no ELF, no Sail.
-      - name: Build Sail model (model-xv6iris/)
-        run: make SWITCH="$GITHUB_WORKSPACE" model
-
-      # ---- 2. Kernel dump (kernel-rocq/) ----
-      # Generate the CoqMakefile from the checked-in _CoqProject, then run it
-      # directly.  This skips the top-level `kernel-rocq` target, whose .v rules
-      # depend on the (absent) kernel ELF and would otherwise clone+build xv6 and
-      # regenerate KernelInstrs.v.
-      - name: Compile kernel dump (kernel-rocq/, no ELF rebuild / no regen)
+      # ---- 1 + 2. Sail model (model-xv6iris/) and kernel dump (kernel-rocq/) ----
+      # These two trees don't depend on one another, so build them concurrently.
+      #
+      #   * `make model` only depends on the model's _CoqProject — no ELF, no Sail.
+      #   * For kernel-rocq we generate the CoqMakefile from the checked-in
+      #     _CoqProject and run it directly, skipping the top-level `kernel-rocq`
+      #     target whose .v rules depend on the (absent) kernel ELF and would
+      #     otherwise clone+build xv6 and regenerate KernelInstrs.v.
+      #
+      # The kernel-rocq CoqMakefile is generated first (cheap); the model's is
+      # produced by `make model` itself.  Both sub-builds are then backgrounded
+      # and waited on, and the step fails if either one fails.
+      - name: Build Sail model + kernel dump (in parallel, no ELF rebuild / no regen)
         run: |
           make SWITCH="$GITHUB_WORKSPACE" kernel-rocq/CoqMakefile
-          opam exec -- make -C kernel-rocq -f CoqMakefile -j"$(nproc)"
+
+          make SWITCH="$GITHUB_WORKSPACE" model &
+          pid_model=$!
+          opam exec -- make -C kernel-rocq -f CoqMakefile -j"$(nproc)" &
+          pid_kernel=$!
+
+          rc=0
+          wait $pid_model || rc=1
+          wait $pid_kernel || rc=1
+          exit $rc
 
       # ---- 3. Iris proofs (iris/) ----
       # Built directly (not via `make proofs`) for the same reason: `proofs`
