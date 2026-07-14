@@ -181,6 +181,7 @@ WpUserComputeCU.v
 WpUserCtrl.v
 WpUserComputeC.v
 WpUserTrap.v
+WpUserTrapMiss.v
 WpUserMem.v
 WpUserMemC.v
 WpUserMem4.v
