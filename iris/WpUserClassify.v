@@ -2226,6 +2226,162 @@ Section WpUserClassify.
     repeat split; try assumption; try exact Hexp.
   Qed.
 
+  (* Compressed branch expanding to BTYPE, not taken -> RVC disjunct 24. *)
+  Lemma classify_c_btype_beq_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)), s)) ->
+    eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 23 right; left.
+    exists vpn, i, h, ii, BEQ, (fun v1 v2 => eq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption; try exact Hexp.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BEQ_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  Lemma classify_c_btype_bne_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)), s)) ->
+    neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hc.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 23 right; left.
+    exists vpn, i, h, ii, BNE, (fun v1 v2 => neq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption; try exact Hexp.
+    exact (fun imm' rs2' rs1' s Hf => exec_execute_BTYPE_BNE_fall imm' rs2' rs1' s Hf).
+  Qed.
+
+  (* C_BEQZ rs', imm : beqz -> beq rs', x0.  Not taken. *)
+  Lemma classify_c_beqz_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 8) (rs : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_BEQZ (imm, rs), s0)) ->
+    eq_vec (g !!! creg2reg_idx rs) (g !!! zreg) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hc.
+    destruct (creg2reg_idx rs) as [rs1] eqn:Hcs.
+    apply (classify_c_btype_beq_fall va ms_v g tlbvec vpn i h (C_BEQZ (imm, rs))
+             (sign_extend' 13 (concat_vec imm ('b"0" : mword 1)))
+             (zero_extend' 5 ('b"00")) rs1 Hf Hdec).
+    - intro s. rewrite <- Hcs. exact (exec_execute_C_BEQZ imm rs s).
+    - exact Hc.
+  Qed.
+
+  (* C_BNEZ rs', imm : bnez -> bne rs', x0.  Not taken. *)
+  Lemma classify_c_bnez_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 8) (rs : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_BNEZ (imm, rs), s0)) ->
+    neq_vec (g !!! creg2reg_idx rs) (g !!! zreg) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hc.
+    destruct (creg2reg_idx rs) as [rs1] eqn:Hcs.
+    apply (classify_c_btype_bne_fall va ms_v g tlbvec vpn i h (C_BNEZ (imm, rs))
+             (sign_extend' 13 (concat_vec imm ('b"0" : mword 1)))
+             (zero_extend' 5 ('b"00")) rs1 Hf Hdec).
+    - intro s. rewrite <- Hcs. exact (exec_execute_C_BNEZ imm rs s).
+    - exact Hc.
+  Qed.
+
+  (* Compressed branch expanding to BTYPE, taken (aligned) -> RVC disjunct 25. *)
+  Lemma classify_c_btype_beq_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)), s)) ->
+    eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 24 right; left.
+    exists vpn, i, h, ii, BEQ, (fun v1 v2 => eq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption; try exact Hexp.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 => exec_execute_BTYPE_BEQ_taken imm' rs2' rs1' s Ht Ha0 Ha1).
+  Qed.
+
+  Lemma classify_c_btype_bne_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (imm : mword 13) (rs2 rs1 : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)), s)) ->
+    neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hc H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 24 right; left.
+    exists vpn, i, h, ii, BNE, (fun v1 v2 => neq_vec v1 v2), imm, rs2, rs1.
+    repeat split; try assumption; try exact Hexp.
+    exact (fun imm' rs2' rs1' s Ht Ha0 Ha1 => exec_execute_BTYPE_BNE_taken imm' rs2' rs1' s Ht Ha0 Ha1).
+  Qed.
+
+  Lemma classify_c_beqz_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 8) (rs : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_BEQZ (imm, rs), s0)) ->
+    eq_vec (g !!! creg2reg_idx rs) (g !!! zreg) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0" : mword 1))))) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0" : mword 1))))) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hc H0 H1.
+    destruct (creg2reg_idx rs) as [rs1] eqn:Hcs.
+    apply (classify_c_btype_beq_taken va ms_v g tlbvec vpn i h (C_BEQZ (imm, rs))
+             (sign_extend' 13 (concat_vec imm ('b"0" : mword 1)))
+             (zero_extend' 5 ('b"00")) rs1 Hf Hdec).
+    - intro s. rewrite <- Hcs. exact (exec_execute_C_BEQZ imm rs s).
+    - exact Hc.
+    - exact H0.
+    - exact H1.
+  Qed.
+
+  Lemma classify_c_bnez_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 8) (rs : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_BNEZ (imm, rs), s0)) ->
+    neq_vec (g !!! creg2reg_idx rs) (g !!! zreg) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0" : mword 1))))) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0" : mword 1))))) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hc H0 H1.
+    destruct (creg2reg_idx rs) as [rs1] eqn:Hcs.
+    apply (classify_c_btype_bne_taken va ms_v g tlbvec vpn i h (C_BNEZ (imm, rs))
+             (sign_extend' 13 (concat_vec imm ('b"0" : mword 1)))
+             (zero_extend' 5 ('b"00")) rs1 Hf Hdec).
+    - intro s. rewrite <- Hcs. exact (exec_execute_C_BNEZ imm rs s).
+    - exact Hc.
+    - exact H0.
+    - exact H1.
+  Qed.
+
   (* The constructors this file classifies so far. *)
   Definition covered_u (ii : instruction) : bool :=
     match ii with
