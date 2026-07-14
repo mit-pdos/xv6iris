@@ -1603,6 +1603,145 @@ Section WpUserClassify.
              exec_execute_BTYPE_BGEU_taken imm' rs2' rs1' s Ht Ha0 Ha1).
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* Trap classifiers.  These are UNCONDITIONAL (join classify_word): the
+     frame facts they depend on -- cur_privilege = User, PC = va -- are
+     baked INSIDE the disjunct's [forall s, ... -> ...] execute clause and
+     discharged by the arm from the frame, not exposed as classify
+     hypotheses. *)
+
+  (* EBREAK: software breakpoint trap (tval = pc = va) -> disjunct 35. *)
+  Lemma classify_ebreak (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (EBREAK tt, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC) Hdec.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 34 right; left.
+    exists vpn, i, w, (EBREAK tt).
+    repeat split; try assumption.
+    all: first [ intros s Hpriv Hpc; exact (exec_execute_EBREAK_U va s Hpriv Hpc)
+               | reflexivity ].
+  Qed.
+
+  (* Generic privileged-illegal-in-User classifier -> disjunct 37: any [ii]
+     whose execute traps Illegal whenever cur_privilege = User (state
+     untouched) and which is not a landing pad. *)
+  Lemma classify_priv_illegal (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (ii : instruction) :
+    (forall s, register_lookup cur_privilege s.(sregs) = User ->
+       exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
+    is_lpad_instruction ii = false ->
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec Hlpad
+      (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC) Hdec.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 36 right; left.
+    exists vpn, i, w, ii.
+    repeat split; try assumption.
+  Qed.
+
+  (* The privileged families illegal in U-mode (cur_privilege = User): the
+     execute fact comes from UmodeFetchC's exec_execute_<OP>_illegal_U. *)
+  Lemma classify_mret (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (MRET tt, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_priv_illegal va ms_v g tlbvec vpn i w (MRET tt)).
+    - intros s Hpriv. exact (exec_execute_MRET_illegal_U s Hpriv).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  Lemma classify_sret (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (SRET tt, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_priv_illegal va ms_v g tlbvec vpn i w (SRET tt)).
+    - intros s Hpriv. exact (exec_execute_SRET_illegal_U s Hpriv).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  Lemma classify_wfi (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (WFI tt, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_priv_illegal va ms_v g tlbvec vpn i w (WFI tt)).
+    - intros s Hpriv. exact (exec_execute_WFI_illegal_U s Hpriv).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  Lemma classify_sfence_w_inval (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (SFENCE_W_INVAL tt, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_priv_illegal va ms_v g tlbvec vpn i w (SFENCE_W_INVAL tt)).
+    - intros s Hpriv. exact (exec_execute_SFENCE_W_INVAL_illegal_U s Hpriv).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  Lemma classify_sfence_inval_ir (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (SFENCE_INVAL_IR tt, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_priv_illegal va ms_v g tlbvec vpn i w (SFENCE_INVAL_IR tt)).
+    - intros s Hpriv. exact (exec_execute_SFENCE_INVAL_IR_illegal_U s Hpriv).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
+  Lemma classify_sfence_vma (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (w : mword 32) (rs2 rs1 : mword 5) :
+    ufetch_hit va vpn i w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (SFENCE_VMA (Regidx rs1, Regidx rs2), s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_priv_illegal va ms_v g tlbvec vpn i w (SFENCE_VMA (Regidx rs1, Regidx rs2))).
+    - intros s Hpriv. exact (exec_execute_SFENCE_VMA_illegal_U rs1 rs2 s Hpriv).
+    - reflexivity.
+    - exact Hf.
+    - exact Hdec.
+  Qed.
+
   (* The constructors this file classifies so far. *)
   Definition covered_u (ii : instruction) : bool :=
     match ii with
@@ -1683,6 +1822,9 @@ Section WpUserClassify.
     | CLMUL _ => true | CLMULH _ => true | CLMULR _ => true
     | ZBB_RTYPE _ => true | ZBB_RTYPEW _ => true | ZICOND_RTYPE _ => true
     | ZIMOP_MOP_R _ => true | ZIMOP_MOP_RR _ => true
+    | EBREAK _ => true
+    | MRET _ => true | SRET _ => true | WFI _ => true
+    | SFENCE_VMA _ => true | SFENCE_W_INVAL _ => true | SFENCE_INVAL_IR _ => true
     | _ => covered_u ii
     end.
 
@@ -1785,6 +1927,21 @@ Section WpUserClassify.
         destruct p as [[[mop rs2r] r1] r2];
         destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
         exact (classify_zimop_rr va ms_v g tlbvec vpn i w mop rs2 rs1 rd Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (EBREAK ?p, _) |- _ =>
+        destruct p; exact (classify_ebreak va ms_v g tlbvec vpn i w Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (MRET ?p, _) |- _ =>
+        destruct p; exact (classify_mret va ms_v g tlbvec vpn i w Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SRET ?p, _) |- _ =>
+        destruct p; exact (classify_sret va ms_v g tlbvec vpn i w Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (WFI ?p, _) |- _ =>
+        destruct p; exact (classify_wfi va ms_v g tlbvec vpn i w Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SFENCE_W_INVAL ?p, _) |- _ =>
+        destruct p; exact (classify_sfence_w_inval va ms_v g tlbvec vpn i w Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SFENCE_INVAL_IR ?p, _) |- _ =>
+        destruct p; exact (classify_sfence_inval_ir va ms_v g tlbvec vpn i w Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SFENCE_VMA ?p, _) |- _ =>
+        destruct p as [r1 r2]; destruct r1 as [rs1]; destruct r2 as [rs2];
+        exact (classify_sfence_vma va ms_v g tlbvec vpn i w rs2 rs1 Hf Hdec)
     end.
   Qed.
 
