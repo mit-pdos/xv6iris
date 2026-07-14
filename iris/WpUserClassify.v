@@ -1940,6 +1940,41 @@ Section WpUserClassify.
     - exact Hrd.
   Qed.
 
+  (* C_ADDI16SP : sp := sp + sext(imm<<4) (SP-relative, always rd=x2<>0). *)
+  Lemma classify_c_addi16sp (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 6) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ADDI16SP imm, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_c_itype va ms_v g tlbvec vpn i h (C_ADDI16SP imm)
+             ADDI (sign_extend' 12 (concat_vec imm (Ox"0" : mword 4)))
+             (zero_extend' 5 ('b"10")) (zero_extend' 5 ('b"10")) Hf Hdec).
+    - intro s. exact (exec_execute_C_ADDI16SP imm s).
+    - vm_compute; discriminate.
+  Qed.
+
+  (* C_ADDI4SPN rd', nzimm : rd' := sp + zext(nzimm<<2) (rd' a compressed
+     reg, x8-x15, always nonzero). *)
+  Lemma classify_c_addi4spn (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (nzimm : mword 8) (rdc : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ADDI4SPN (rdc, nzimm), s0)) ->
+    uint (match creg2reg_idx rdc with Regidx r => r end) <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    destruct (creg2reg_idx rdc) as [rd] eqn:Hc.
+    apply (classify_c_itype va ms_v g tlbvec vpn i h (C_ADDI4SPN (rdc, nzimm))
+             ADDI (concat_vec ('b"00" : mword 2) (concat_vec nzimm ('b"00" : mword 2)))
+             (zero_extend' 5 ('b"10")) rd Hf Hdec).
+    - intro s. rewrite <- Hc. exact (exec_execute_C_ADDI4SPN rdc nzimm s).
+    - exact Hrd.
+  Qed.
+
   (* Compressed op expanding to a retiring RTYPE compute op, rd<>x0 ->
      RVC RTYPE disjunct 18 (base fact the nonzero-rd RTYPE op-generic form). *)
   Lemma classify_c_rtype (va ms_v : mword 64) (g : gmap regidx (mword 64))
@@ -2015,6 +2050,64 @@ Section WpUserClassify.
     destruct (creg2reg_idx rsd) as [rd] eqn:Hcd; destruct (creg2reg_idx rs2) as [r2] eqn:Hc2.
     apply (classify_c_rtypew va ms_v g tlbvec vpn i h (C_SUBW (rsd, rs2)) SUBW r2 rd rd Hf Hdec).
     - intro s. rewrite <- Hcd, <- Hc2. exact (exec_execute_C_SUBW rsd rs2 s).
+    - exact Hrd.
+  Qed.
+
+  (* DIRECT compressed single-source compute (C_NOT / C_ZEXT_B run rX/wX
+     inline, no ExecuteAs), rd<>x0 -> RVC direct-compute disjunct 28. *)
+  Lemma classify_c_direct (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (F : mword 64 -> mword 64) (rs1 rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s, exec (execute ii) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd) 0 then s
+               else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                      (regval_into_reg
+                         (F (if Z.eqb (uint rs1) 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))))) ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hexp Hdec Hrd.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 27 right; left.
+    exists vpn, i, h, ii, F, rs1, rd.
+    repeat split; try assumption; try exact Hexp.
+  Qed.
+
+  Lemma classify_c_not (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (c : mword 3) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_NOT (Cregidx c), s0)) ->
+    uint (creg_bits c) <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    apply (classify_c_direct va ms_v g tlbvec vpn i h (C_NOT (Cregidx c))
+             not_vec (creg_bits c) (creg_bits c) Hf).
+    - intro s. exact (exec_execute_C_NOT_gpr c s).
+    - exact Hdec.
+    - exact Hrd.
+  Qed.
+
+  Lemma classify_c_zext_b (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (c : mword 3) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ZEXT_B (Cregidx c), s0)) ->
+    uint (creg_bits c) <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    apply (classify_c_direct va ms_v g tlbvec vpn i h (C_ZEXT_B (Cregidx c))
+             (fun v => zero_extend' 64 (subrange_vec_dec v 7 0)) (creg_bits c) (creg_bits c) Hf).
+    - intro s. exact (exec_execute_C_ZEXT_B_gpr c s).
+    - exact Hdec.
     - exact Hrd.
   Qed.
 
