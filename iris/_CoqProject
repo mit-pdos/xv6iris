@@ -194,5 +194,6 @@ WpUserSteps.v
 WpUserClassify.v
 WpUserMemPeel.v
 WpUserMemStep.v
+WpUserFull.v
 WpUserExec.v
 WpUartPutcSyncFull.v
