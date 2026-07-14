@@ -127,6 +127,7 @@ UmodeCsr.v
 UmodeLrsc.v
 UmodeDataFault.v
 WpUserLrsc.v
+WpUserDataFault.v
 WpUserLoop.v
 WpIntrStep.v
 WpIntrInv.v
