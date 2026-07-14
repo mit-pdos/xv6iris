@@ -1963,6 +1963,61 @@ Section WpUserClassify.
     reflexivity.
   Qed.
 
+  (* Compressed op expanding to a retiring RTYPEW op, rd<>x0 -> RVC RTYPEW
+     disjunct 31 (base fact the RTYPEW op-generic if-form). *)
+  Lemma classify_c_rtypew (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (op : ropw) (rs2 rs1 rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op)), s)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hrd.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 30 right; left.
+    exists vpn, i, h, ii, op, (gpr_rtypew_val op), rs2, rs1, rd.
+    repeat split; try assumption; try exact Hexp.
+    intros rs2' rs1' rd' s Hrd'.
+    rewrite (exec_execute_RTYPEW_gpr op rs2' rs1' rd' s).
+    replace (Z.eqb (uint rd') 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd').
+    reflexivity.
+  Qed.
+
+  (* RTYPEW-expanding creg instances: C_ADDW/C_SUBW.  rd = rs1 =
+     creg2reg_idx rsd (x8-x15), rs2 = creg2reg_idx rs2. *)
+  Lemma classify_c_addw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (rsd rs2 : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ADDW (rsd, rs2), s0)) ->
+    uint (match creg2reg_idx rsd with Regidx r => r end) <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    destruct (creg2reg_idx rsd) as [rd] eqn:Hcd; destruct (creg2reg_idx rs2) as [r2] eqn:Hc2.
+    apply (classify_c_rtypew va ms_v g tlbvec vpn i h (C_ADDW (rsd, rs2)) ADDW r2 rd rd Hf Hdec).
+    - intro s. rewrite <- Hcd, <- Hc2. exact (exec_execute_C_ADDW rsd rs2 s).
+    - exact Hrd.
+  Qed.
+
+  Lemma classify_c_subw (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (rsd rs2 : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_SUBW (rsd, rs2), s0)) ->
+    uint (match creg2reg_idx rsd with Regidx r => r end) <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    destruct (creg2reg_idx rsd) as [rd] eqn:Hcd; destruct (creg2reg_idx rs2) as [r2] eqn:Hc2.
+    apply (classify_c_rtypew va ms_v g tlbvec vpn i h (C_SUBW (rsd, rs2)) SUBW r2 rd rd Hf Hdec).
+    - intro s. rewrite <- Hcd, <- Hc2. exact (exec_execute_C_SUBW rsd rs2 s).
+    - exact Hrd.
+  Qed.
+
   (* Compressed op expanding to a retiring SHIFTIOP op, rd<>x0 -> RVC
      SHIFTIOP disjunct 20 (base fact the SHIFTIOP op-generic if-form). *)
   Lemma classify_c_shiftiop (va ms_v : mword 64) (g : gmap regidx (mword 64))
