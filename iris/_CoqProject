@@ -173,6 +173,7 @@ WpUartPutcSync.v
 WpUserBase.v
 WpUserFetch.v
 WpUserCompute.v
+WpUserComputeMiss.v
 WpUserCtrl.v
 WpUserComputeC.v
 WpUserTrap.v
