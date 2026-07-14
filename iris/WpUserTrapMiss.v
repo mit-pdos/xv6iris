@@ -81,14 +81,20 @@ Section WpUserTrapMiss.
   (* execute(->Illegal) + exception tower, landing in user_trap_frame     *)
   (* over the FILLED TLB.                                                  *)
   (* ================================================================== *)
-  Lemma ustep_illegal_st_miss (ii : instruction)
+  Lemma ustep_illegal_st_miss_cfg (ii : instruction)
       (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
       (ms_v sc_v stval_v sepc_v : mword 64)
       (g : gmap regidx (mword 64))
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       E (Φ : mval -> iProp Σ) :
     ↑minstretN ⊆ E ->
+    (* the config-gated illegal-execute fact: for config-gated ops
+       (ZICBOM/ZICBOZ) the caller may use menvcfg/senvcfg/Ext_S; direct
+       ops ignore the extra hyps *)
     (forall s, register_lookup cur_privilege s.(sregs) = User ->
+       register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+       register_lookup senvcfg s.(sregs) = (mword_of_int 0 : mword 64) ->
+       exec (currentlyEnabled Ext_S) s = Some (true, s) ->
        exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
     is_lpad_instruction ii = false ->
     upt_tlb_ok spec tlbvec ->
@@ -284,7 +290,12 @@ Section WpUserTrapMiss.
                     = Some (Step_Execute (Illegal_Instruction tt, zero_extend' 32 w), s_x)).
     { apply (exec_hart_active_progress_base_gen User σ σ' s_x w ii va
                (Illegal_Instruction tt) Lpriv Hdisp Hfetch Hdec' Hlpad Hnlpad LpcS).
-      - apply Hexec_ill. unfold s_x; lk. exact Lpriv.
+      - apply (Hexec_ill s_x).
+        + unfold s_x; lk. exact Lpriv.
+        + unfold s_x; lk. exact Lmenv'.
+        + unfold s_x; lk. exact Lsenv.
+        + rewrite exec_currentlyEnabled_S. do 2 f_equal.
+          unfold s_x; lk. rewrite Lmisa. exact HmisaS.
       - exact I. }
     (* ---- the dispatch arm: handle_exception at s_x ---- *)
     assert (LprivX : register_lookup cur_privilege s_x.(sregs) = User)
@@ -382,6 +393,62 @@ Section WpUserTrapMiss.
     iFrame "Hstvec Hmie Hmidl Hmedl Hmip Hmeip Hseip Hsatp Hmenv Hsenv
             Hmst0 Hsst0 Hpmpc Hpmpa".
     iFrame "Hpcr Hnpc".
+  Qed.
+
+  (* The simple (config-free) illegal miss engine: a thin wrapper over the
+     config-capable one for ops whose execute is Illegal from priv alone. *)
+  Lemma ustep_illegal_st_miss (ii : instruction)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    (forall s, register_lookup cur_privilege s.(sregs) = User ->
+       exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
+    is_lpad_instruction ii = false ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
+     (exists ent', vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' /\
+        match_TLB_Entry ent' (mword_of_int 0 : mword 16)
+          (sign_extend' (57 - 12) vpn) = false)) ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hexec_ill Hnlpad Hok Hsome Hmiss Hchk0 HupdN Hcw HSXL Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec.
+    iApply (ustep_illegal_st_miss_cfg ii va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN (fun s Hp _ _ _ => Hexec_ill s Hp) Hnlpad Hok Hsome Hmiss Hchk0 HupdN
+              Hcw HSXL Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec).
   Qed.
 
 

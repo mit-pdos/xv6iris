@@ -18,8 +18,8 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
 Require Import SmodeCore WpIntrCore WpDecodeBridge.
 Require Import UmodeTrap UmodeFetch UmodeFetchC UmodeStep UmodeEcall UmodeFetchFault.
-Require Import UptInv UmodeCsr.
-Require Import WpUserEcall WpUserTrap WpUserTrapMiss.
+Require Import UptInv UmodeCsr CboIllegal.
+Require Import WpUserEcall WpUserTrap WpUserTrapMiss WpUserPriv WpUserComputeMiss.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -40,6 +40,8 @@ Section WpUserPrivU.
   Local Notation user_data := (WpUserBase.user_data U).
   Local Notation user_trap_frame := (WpUserBase.user_trap_frame U).
   Local Notation ustep_illegal_st_u := (WpUserTrapMiss.ustep_illegal_st_u U).
+  Local Notation ustep_illegal_st_miss_cfg := (WpUserTrapMiss.ustep_illegal_st_miss_cfg U).
+  Local Notation Hspec := (WpUserBase.Hspec U).
 
   (* The shared, fetch-hit-FREE premises of the combined trap-fetch engine,
      abstracted over the nullary instruction [ii] and its decode target. *)
@@ -282,6 +284,136 @@ Section WpUserPrivU.
               va vpn ie w ms_v sc_v stval_v sepc_v g tlbvec E Φ
               Harm eq_refl
               (fun s Hs => exec_execute_CSRImm_illegal_u csr imm rd op s Hs Hpriv)).
+  Qed.
+
+  (* ---- config-gated illegal ops: execute is Illegal in User only under
+     the xv6 config (menvcfg/senvcfg enable bits pinned off).  Dispatch on
+     the TLB slot: hit -> the WpUserPriv hit arm; miss -> the config-capable
+     miss engine ustep_illegal_st_miss_cfg. ---- *)
+  Lemma ustep_zicbom_illegal_u (op : cbop_zicbom) (rs1 : regidx)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64)) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ZICBOM (op, rs1), s0)) ->
+    hw_config -∗ minstret_inv -∗ hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗ stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗ tlb ↦ᵣ tlbvec -∗ pc_is va -∗ gpr_file g -∗
+    upt_inv root slots spec -∗ user_code -∗ user_data -∗ user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec.
+    destruct (Hspec vpn ie Hsome) as (_ & _ & _ & Hwf).
+    destruct Hwf as (_ & _ & _ & _ & _ & _ & _ & _ & Hpbmt0).
+    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hvacc.
+    - destruct (match_TLB_Entry ent (mword_of_int 0 : mword 16)
+                  (sign_extend' (57 - 12) vpn)) eqn:Hmatch.
+      + destruct (Hok vpn ent Hvacc) as (vpn'' & i & Hspec'' & _ & Hent).
+        subst ent.
+        pose proof (upt_entry_match_inj vpn'' vpn i Hmatch) as Hvv. subst vpn''.
+        rewrite Hsome in Hspec''. inversion Hspec''. subst i.
+        assert (Harm : WpUserPriv.upriv_illegal_arm U (ZICBOM (op, rs1)) va vpn ie w
+                         ms_v sc_v stval_v sepc_v g tlbvec E Φ)
+          by (unfold WpUserPriv.upriv_illegal_arm; repeat split; assumption).
+        iApply (WpUserPriv.ustep_zicbom_illegal U op rs1 va vpn ie w
+                  ms_v sc_v stval_v sepc_v g tlbvec E Φ Harm).
+      + iApply (ustep_illegal_st_miss_cfg (ZICBOM (op, rs1)) va vpn ie w
+                  ms_v sc_v stval_v sepc_v g tlbvec E Φ HN
+                  (fun s Hp Hm Hse Hes => exec_execute_ZICBOM_illegal op rs1 s Hp Hm Hse Hes)
+                  ltac:(vm_compute; reflexivity) Hok Hsome
+                  (or_intror (ex_intro _ ent (conj Hvacc Hmatch))) Hchk0 HupdN
+                  ltac:(intros j Hj; rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact (Hcw j Hj))
+                  HSXL Hval Hcanon Hvpn_def
+                  ltac:(rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact Hpaal)
+                  HnotRVC Hdec).
+    - iApply (ustep_illegal_st_miss_cfg (ZICBOM (op, rs1)) va vpn ie w
+                ms_v sc_v stval_v sepc_v g tlbvec E Φ HN
+                (fun s Hp Hm Hse Hes => exec_execute_ZICBOM_illegal op rs1 s Hp Hm Hse Hes)
+                ltac:(vm_compute; reflexivity) Hok Hsome (or_introl Hvacc) Hchk0 HupdN
+                ltac:(intros j Hj; rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact (Hcw j Hj))
+                HSXL Hval Hcanon Hvpn_def
+                ltac:(rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact Hpaal)
+                HnotRVC Hdec).
+  Qed.
+
+  Lemma ustep_zicboz_illegal_u (rs1 : regidx)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64)) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ZICBOZ rs1, s0)) ->
+    hw_config -∗ minstret_inv -∗ hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗ stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗ tlb ↦ᵣ tlbvec -∗ pc_is va -∗ gpr_file g -∗
+    upt_inv root slots spec -∗ user_code -∗ user_data -∗ user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec.
+    destruct (Hspec vpn ie Hsome) as (_ & _ & _ & Hwf).
+    destruct Hwf as (_ & _ & _ & _ & _ & _ & _ & _ & Hpbmt0).
+    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hvacc.
+    - destruct (match_TLB_Entry ent (mword_of_int 0 : mword 16)
+                  (sign_extend' (57 - 12) vpn)) eqn:Hmatch.
+      + destruct (Hok vpn ent Hvacc) as (vpn'' & i & Hspec'' & _ & Hent).
+        subst ent.
+        pose proof (upt_entry_match_inj vpn'' vpn i Hmatch) as Hvv. subst vpn''.
+        rewrite Hsome in Hspec''. inversion Hspec''. subst i.
+        assert (Harm : WpUserPriv.upriv_illegal_arm U (ZICBOZ rs1) va vpn ie w
+                         ms_v sc_v stval_v sepc_v g tlbvec E Φ)
+          by (unfold WpUserPriv.upriv_illegal_arm; repeat split; assumption).
+        iApply (WpUserPriv.ustep_zicboz_illegal U rs1 va vpn ie w
+                  ms_v sc_v stval_v sepc_v g tlbvec E Φ Harm).
+      + iApply (ustep_illegal_st_miss_cfg (ZICBOZ rs1) va vpn ie w
+                  ms_v sc_v stval_v sepc_v g tlbvec E Φ HN
+                  (fun s Hp Hm _ _ => exec_execute_ZICBOZ_illegal rs1 s Hp Hm)
+                  ltac:(vm_compute; reflexivity) Hok Hsome
+                  (or_intror (ex_intro _ ent (conj Hvacc Hmatch))) Hchk0 HupdN
+                  ltac:(intros j Hj; rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact (Hcw j Hj))
+                  HSXL Hval Hcanon Hvpn_def
+                  ltac:(rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact Hpaal)
+                  HnotRVC Hdec).
+    - iApply (ustep_illegal_st_miss_cfg (ZICBOZ rs1) va vpn ie w
+                ms_v sc_v stval_v sepc_v g tlbvec E Φ HN
+                (fun s Hp Hm _ _ => exec_execute_ZICBOZ_illegal rs1 s Hp Hm)
+                ltac:(vm_compute; reflexivity) Hok Hsome (or_introl Hvacc) Hchk0 HupdN
+                ltac:(intros j Hj; rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact (Hcw j Hj))
+                HSXL Hval Hcanon Hvpn_def
+                ltac:(rewrite <- (WpUserComputeMiss.u_pa_upt_entry_walk vpn ie va); exact Hpaal)
+                HnotRVC Hdec).
   Qed.
 
 End WpUserPrivU.
