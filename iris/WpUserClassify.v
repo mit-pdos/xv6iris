@@ -624,6 +624,7 @@ Section WpUserClassify.
   Local Notation code := (WpUserBase.code U).
   Local Notation spec := (WpUserBase.spec U).
   Local Notation ustep_case := (WpUserSteps.ustep_case U).
+  Local Notation c_fetch_mode := (WpUserSteps.c_fetch_mode U).
 
   (* The fetch-hit premise bundle shared by [ustep_case]'s decode disjuncts
      (5-15): the word [w] is fetched from a mapped, checked, non-PBMT,
@@ -643,6 +644,24 @@ Section WpUserClassify.
       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
     is_aligned_paddr (Physaddr (u_pa (upt_entry vpn i) va vpn)) 4 = true /\
     isRVC (subrange_vec_dec w 15 0) = false.
+
+  (* The compressed-fetch premise bundle shared by [ustep_case]'s RVC
+     disjuncts (17-44): the 16-bit halfword [h] is fetched from a mapped,
+     checked, non-PBMT, canonical code page in RVC fetch mode.  [c_fetch_mode]
+     already folds the two alignment cases (4-aligned even / 2-aligned odd
+     halfword). *)
+  Definition cfetch_hit (va : mword 64) (vpn : mword 27) (i : uwalk_info)
+      (h : mword 16) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+    uw_check_ok (InstructionFetch tt) i /\
+    update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+    c_fetch_mode va vpn i h /\
+    isRVC h = true.
 
   (* A word whose execute is unconditionally state-preserving RETIRE lands in
      the no-op disjunct (11). *)
@@ -1740,6 +1759,114 @@ Section WpUserClassify.
     - reflexivity.
     - exact Hf.
     - exact Hdec.
+  Qed.
+
+  (* ================================================================== *)
+  (* COMPRESSED (RVC) classification.  Compressed halfwords [h] decode
+     (via [ext_decode_compressed]) to a C_* constructor whose [execute] is
+     a pure re-dispatch: either a direct RETIRE/Illegal/breakpoint or an
+     [ExecuteAs base_instr] that the engine re-runs.  The RVC disjuncts
+     (17-44) mirror the base ones with [cfetch_hit] in place of
+     [ufetch_hit] and an extra [ExecuteAs] expansion conjunct.  All the
+     per-C_op expansion facts are the trivial [exec_execute_C_*] reflexivity
+     lemmas in UmodeFetchC. *)
+
+  (* Compressed op whose execute unconditionally retires state-preserving
+     -> RVC no-op disjunct 26. *)
+  Lemma classify_c_nop (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction) :
+    (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) ->
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 25 right; left.
+    exists vpn, i, h, ii.
+    repeat split; try assumption.
+  Qed.
+
+  (* Compressed op whose execute unconditionally traps Illegal -> RVC trap
+     disjunct 27. *)
+  Lemma classify_c_illegal (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction) :
+    (forall s, exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 26 right; left.
+    exists vpn, i, h, ii.
+    repeat split; try assumption.
+  Qed.
+
+  (* C_EBREAK: expands (ExecuteAs) to the EBREAK breakpoint trap -> RVC
+     breakpoint disjunct 36. *)
+  Lemma classify_c_ebreak (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode_compressed h) s0 = Some (C_EBREAK tt, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 35 right; left.
+    exists vpn, i, h, (C_EBREAK tt).
+    repeat split; try assumption.
+    all: try (intro s; exact (exec_execute_C_EBREAK s)).
+  Qed.
+
+  (* Instances: the compressed hints/no-ops, the compressed illegal, and
+     the compressed breakpoint. *)
+  Lemma classify_c_nop_op (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (imm : mword 6) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_NOP imm, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_c_nop va ms_v g tlbvec vpn i h (C_NOP imm)); [ intro s; exact (exec_execute_C_NOP imm s) | exact Hf | exact Hdec ].
+  Qed.
+
+  Lemma classify_c_ntl (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (n : ntl_type) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_NTL n, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_c_nop va ms_v g tlbvec vpn i h (C_NTL n)); [ intro s; exact (exec_execute_C_NTL n s) | exact Hf | exact Hdec ].
+  Qed.
+
+  Lemma classify_zcmop (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (mop : mword 3) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ZCMOP mop, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_c_nop va ms_v g tlbvec vpn i h (ZCMOP mop)); [ intro s; exact (exec_execute_ZCMOP mop s) | exact Hf | exact Hdec ].
+  Qed.
+
+  Lemma classify_c_illegal_op (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (hw : mword 16) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_ILLEGAL hw, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec.
+    apply (classify_c_illegal va ms_v g tlbvec vpn i h (C_ILLEGAL hw)); [ intro s; exact (exec_execute_C_ILLEGAL hw s) | exact Hf | exact Hdec ].
   Qed.
 
   (* The constructors this file classifies so far. *)
