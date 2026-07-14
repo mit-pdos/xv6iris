@@ -18,7 +18,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import WpDecodeBridge.
 Require Import UmodeFetch UmodeEcall UmodeWalk.
-Require Import UptInv WpAuipc WpMmodeShiftiop WpGprStore.
+Require Import UptInv Pt4kWalk SmodePte WpAuipc WpMmodeShiftiop WpGprStore.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -45,6 +45,176 @@ Section WpUserComputeMiss.
   Local Notation user_data := (WpUserBase.user_data U).
   Local Notation user_frame := (WpUserBase.user_frame U).
   Local Notation wp_instr_u_miss := (WpUserBase.wp_instr_u_miss U).
+  Local Notation wp_instr_u_hit := (WpUserBase.wp_instr_u_hit U).
+
+
+  (* ------------------------------------------------------------------ *)
+  (* PA bridge: a FILLED entry translates exactly like the WALK that      *)
+  (* filled it.  [u_pa (upt_entry vpn ie) va vpn] (the hit-form address,  *)
+  (* read off the stored TLB entry) coincides with [u_walk_pa (uw_pte0    *)
+  (* ie) va] (the miss-form address, computed directly from the leaf      *)
+  (* PTE).  tlb_get_ppn on a level-0 entry drops the (zero) levelMask and *)
+  (* returns the leaf ppn.  This is the consistency fact that lets a      *)
+  (* single classification serve both the hit and the miss branch.        *)
+  (* ------------------------------------------------------------------ *)
+  Lemma u_pa_upt_entry_walk (vpn : mword 27) (ie : uwalk_info) (va : mword 64) :
+    u_pa (upt_entry vpn ie) va vpn = u_walk_pa (uw_pte0 ie) va.
+  Proof.
+    unfold u_pa, u_walk_pa. f_equal. f_equal.
+    unfold upt_entry, u_walk_entry, tlb_get_ppn.
+    cbn [TLB_Entry_levelMask TLB_Entry_ppn].
+    match goal with |- context[and_vec ?a (zero_extend' 64 ?b)] =>
+      replace (and_vec a (zero_extend' 64 b)) with (zeros' 64 : mword 64);
+      [| symmetry; apply and64_zero_r; vm_compute; reflexivity] end.
+    rewrite or64_zeros_r.
+    rewrite trunc44_zext.
+    apply zext44_and_ones. vm_compute. reflexivity.
+  Qed.
+
+
+  (* Updating a 64-slot TLB vector at a slot to the value it ALREADY holds
+     is the identity.  This is what collapses the miss-engine's FILLED TLB
+     back to the original one on the HIT branch of the combined engine, so
+     both branches can hand back one uniform (filled) frame.               *)
+  Lemma vec64_update_same {T} `{Inhabited T} (v : vec T (2 ^ 6)) (m : Z) (t : T) :
+    0 <= m < 64 -> vec_access_dec v m = t -> vec_update_dec v m t = v.
+  Proof.
+    intros Hm Hacc. destruct v as [xs Hlen].
+    assert (Hl : length xs = 64%nat) by (rewrite Hlen; reflexivity).
+    unfold vec_update_dec.
+    destruct (sumbool_of_bool (0 <=? m <? 2 ^ 6)) as [He|He].
+    2:{ exfalso.
+        assert (Ht : ((0 <=? m) && (m <? 2 ^ 6))%bool = true)
+          by (apply andb_true_intro; split; [apply Z.leb_le|apply Z.ltb_lt]; lia).
+        rewrite Ht in He. discriminate He. }
+    apply eq_sigT_hprop; [ intros ? ? ?; apply UIP_nat | ].
+    cbn [projT1].
+    unfold update_list_dec, update_list_inc, length_list. rewrite Hl.
+    change (Z.of_nat 64 - 1) with 63.
+    set (k := Z.to_nat (63 - m)).
+    assert (Hk : (k < length xs)%nat) by (unfold k; rewrite Hl; lia).
+    rewrite (tlb_list_update_insert xs k t Hk).
+    apply list_insert_id.
+    unfold vec_access_dec, access_list_dec, access_list_inc, length_list in Hacc.
+    cbn [projT1] in Hacc. rewrite Hl in Hacc.
+    change (Z.of_nat 64 - 1) with 63 in Hacc.
+    destruct (63 - m <? 0) eqn:Hlt.
+    { apply Z.ltb_lt in Hlt. lia. }
+    fold k in Hacc.
+    destruct (lookup_lt_is_Some_2 xs k Hk) as [y Hy].
+    rewrite Hy. f_equal.
+    rewrite (nth_lookup_Some xs k dummy_value y Hy) in Hacc. exact Hacc.
+  Qed.
+
+
+  (* ================================================================== *)
+  (* THE COMBINED FETCH ENGINE.  Given only [spec!!vpn = Some ie] and a  *)
+  (* [upt_tlb_ok] TLB (which the EMPTY TLB satisfies), it dispatches:     *)
+  (*   - a matching cached entry  -> the HIT engine (and the stored entry *)
+  (*     is forced to be [upt_entry vpn ie], so the filled TLB collapses  *)
+  (*     back to the original via [vec64_update_same]);                   *)
+  (*   - an empty or colliding slot -> the MISS engine (walk + fill),     *)
+  (*     converting the hit-form code address to the walk form via the PA *)
+  (*     bridge.                                                          *)
+  (* Both branches hand back ONE uniform continuation: the FILLED TLB and *)
+  (* [upt_inv].  Arms riding this need NO TLB-state hypothesis at all --  *)
+  (* exactly what makes the TOTAL step classification provable against an *)
+  (* arbitrary (cold) TLB.                                                *)
+  (* ================================================================== *)
+  Lemma wp_instr_u
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info)
+      (w : mword 32) (ii : instruction) (ms_v : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    is_lpad_instruction ii = false ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    PC ↦ᵣ va -∗
+    user_code -∗
+    upt_inv root slots spec -∗
+    user_cfg -∗
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = va)
+       (Hag : agree_on D_u σ dstateU),
+       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       ∃ (s_exec : mstate),
+         ⌜ exec (execute ii) (set_reg σ nextPC (add_vec_int va 4))
+             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
+         mstate_interp s_exec ∗
+         (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+          cur_privilege ↦ᵣ User -∗
+          mstatus ↦ᵣ ms_v -∗
+          tlb ↦ᵣ (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (upt_entry vpn ie))) -∗
+          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+          upt_inv root slots spec -∗
+          user_cfg -∗
+          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hok Hsome Hchk0 HupdN Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+           HnotRVC Hdec Hnlpad.
+    destruct (Hspec vpn ie Hsome) as (Hsl2 & Hsl1 & Hsl0 & Hwf).
+    destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0).
+    (* the code / align facts, transported onto the WALK address for the
+       two miss branches *)
+    assert (Hcw' : forall j : nat, (j < 4)%nat ->
+              code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)).
+    { intros j Hj. rewrite <- (u_pa_upt_entry_walk vpn ie va). exact (Hcw j Hj). }
+    assert (Hpaal' : is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true).
+    { rewrite <- (u_pa_upt_entry_walk vpn ie va). exact Hpaal. }
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Htlbc Hpc #Hcode Hupt Hcfg H".
+    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hvacc.
+    - (* the slot is occupied *)
+      destruct (match_TLB_Entry ent (mword_of_int 0 : mword 16)
+                  (sign_extend' (57 - 12) vpn)) eqn:Hmatch.
+      + (* HIT: the stored entry is forced to be [upt_entry vpn ie] *)
+        destruct (Hok vpn ent Hvacc) as (vpn'' & i & Hspec'' & _ & Hent).
+        subst ent.
+        pose proof (upt_entry_match_inj vpn'' vpn i Hmatch) as Hvv. subst vpn''.
+        rewrite Hsome in Hspec''. inversion Hspec''. subst i.
+        assert (Hfill_id : vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                             (Some (upt_entry vpn ie)) = tlbvec).
+        { apply vec64_update_same; [ pose proof (tlb_hash_range vpn); lia | exact Hvacc ]. }
+        iApply (wp_instr_u_hit va vpn ie w ii ms_v tlbvec E Φ HN Hvacc Hchk0 HupdN
+                  Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec Hnlpad
+                  with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpc Hcode Hcfg").
+        iIntros (σ Hpceq Hag Hpins) "Hσ".
+        iMod ("H" $! σ Hpceq Hag with "Hσ") as (s_exec) "(%Hexe & Hσ' & Hcont)".
+        iModIntro. iExists s_exec. iFrame "Hσ'". iSplitR; [iPureIntro; exact Hexe |].
+        iIntros "Hhs' Hpriv' Hms' Htlbc' Hpc' Hcfg'".
+        iApply ("Hcont" with "Hhs' Hpriv' Hms' [Htlbc'] Hpc' Hupt Hcfg'").
+        rewrite Hfill_id. iExact "Htlbc'".
+      + (* colliding miss: the walk fills a fresh entry *)
+        iApply (wp_instr_u_miss va vpn ie w ii ms_v tlbvec E Φ HN Hsome
+                  (or_intror (ex_intro _ ent (conj Hvacc Hmatch)))
+                  Hchk0 HupdN Hcw' HSXL Hval Hcanon Hvpn_def Hpaal' HnotRVC Hdec Hnlpad
+                  with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpc Hcode Hupt Hcfg H").
+    - (* empty miss: the walk fills the slot *)
+      iApply (wp_instr_u_miss va vpn ie w ii ms_v tlbvec E Φ HN Hsome
+                (or_introl Hvacc)
+                Hchk0 HupdN Hcw' HSXL Hval Hcanon Hvpn_def Hpaal' HnotRVC Hdec Hnlpad
+                with "Hhw Hinv Hhs Hpriv Hms Htlbc Hpc Hcode Hupt Hcfg H").
+  Qed.
 
 
   (* ------------------------------------------------------------------ *)
