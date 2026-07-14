@@ -1799,6 +1799,40 @@ Section WpSmodeLoad.
                           Hpc Hfile Hbw").
   Qed.
 
+  (* scfg wrapper for the base (4-byte) RAM load, mirror of wp_clw_s_ram_scfg. *)
+  Lemma wp_lw_s_ram_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : gmap regidx (mword 64)) (v : mword 32) {dq dqm : dfrac} :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    ↑minstretN ⊆ E ->
+    uint rd <> 0 ->
+    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
+    ea ↦₄{ dqm } v -∗
+    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
+      ea ↦₄{ dqm } v -∗
+      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros ea HN Hrd.
+    iIntros "Hsm Htlbinv Hpc Hfile Hinstr Hbw Hcont".
+    iDestruct (smode_config_unbundle with "Hsm") as
+      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
+    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+    iApply (wp_lw_s_ram root_ppn E Φ pc rd rs1 imm m v mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=dqm)
+              HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hbw").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hbw").
+  Qed.
+
   Lemma wp_ld_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (svpn : mword 27)
       (m : gmap regidx (mword 64)) (v : mword 64)

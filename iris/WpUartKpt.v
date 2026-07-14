@@ -167,14 +167,13 @@ Qed.
 (* ===================================================================== *)
 
 Section UartKptWp.
-Context `{!riscvGS Σ}.
+Context `{!riscvGS Σ, !sieG Σ}.
 Context `{CID : CpuId}.
 Existing Instance riscv_memGS.
 
-Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
+Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : gmap regidx (mword 64)) (u u' : uart_state)
-    (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
+    (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
@@ -184,14 +183,6 @@ Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   let lflags := PTE_DEV in
   let a0addr := pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) in
   ↑minstretN ⊆ E ->
-  eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-  eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-  _get_Mstatus_SXL mstatus0 = 'b"10" ->
-  and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-  eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-  pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-  eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-  menvcfg0 = MENVCFG_S ->
   (0 <= off < uart_size)%Z ->
   (* leaf-PTE facts (UART leaf: V set, R|W leaf, U/G clear, A/D preset) *)
   0 <= lflags < 256 ->
@@ -208,23 +199,25 @@ Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
   (* device write advances the UART *)
   uart_write u off storebyte = Some u' ->
-  hw_config -∗ minstret_inv -∗
-  hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
-  mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+  smode_config γ dq -∗
   tlb_inv root_ppn -∗
   pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
   uart_frag u -∗
-  ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+  ( smode_config γ dq -∗
     tlb_inv root_ppn -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗ gpr_file m -∗
     uart_frag u' -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) @ E {{ Φ }}.
 Proof.
-  intros ea a8 storebyte p1 p0 lppn lflags a0addr HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff
+  intros ea a8 storebyte p1 p0 lppn lflags a0addr HN Hoff
     Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hcanon Hvpn_def Hident Hpa Hwrite_u.
-  iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
+  iIntros "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
+  iDestruct (smode_config_unbundle with "Hsm") as
+    "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
+  iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+  iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+  iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 1)) mstatus0 mie_v mdv0 menvcfg0
             HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -364,7 +357,10 @@ Proof.
     iSplitL "Hreg Hmem Hdev'".
     { subst s_x; rewrite Hs'eq. unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev'". }
     iIntros "Hhs' Hpc'". iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs' Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
     { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb [Hpbytesb] [Hpmpc Hpmpa]").
       - iSplitR; [iPureIntro; exact Hok | iExact "Hpbytesb"].
       - iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 HA0 Hord0 Hpma_imp HX HW HR Hcov with "Hpmpc Hpmpa"). }
@@ -380,7 +376,10 @@ Proof.
     iIntros "Hhs' Hpc'". iEval (rewrite Lnpc) in "Hpc'".
     assert (Hfill : tlb_pt_consistent root_ppn tlbf).
     { unfold tlb_pt_consistent, tlbf. rewrite Hfe. apply uart_kpt_fill. exact Hconsf. }
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs' Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
     { iApply (tlb_inv_close root_ppn satp0 tlbf Hmode Hasid Hppn Hfill with "Hsatp Htlb [Hpbytesb] [Hpmpc Hpmpa]").
       - iSplitR; [iPureIntro; exact Hok | iExact "Hpbytesb"].
       - iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 HA0 Hord0 Hpma_imp HX HW HR Hcov with "Hpmpc Hpmpa"). }
@@ -388,10 +387,9 @@ Proof.
 Qed.
 
 (* The reworked S-mode UART LOAD (LB / LBU), mirror of the store. *)
-Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
+Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (b : bv 8)
-    (m : gmap regidx (mword 64)) (u u' : uart_state)
-    (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
+    (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let ldval : mword 64 := extend_value is_unsigned (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b) in
@@ -401,14 +399,6 @@ Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   let lflags := PTE_DEV in
   let a0addr := pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) in
   ↑minstretN ⊆ E ->
-  eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-  eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-  _get_Mstatus_SXL mstatus0 = 'b"10" ->
-  and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-  eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-  pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-  eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-  menvcfg0 = MENVCFG_S ->
   (0 <= off < uart_size)%Z ->
   uint rd <> 0 ->
   0 <= lflags < 256 ->
@@ -422,14 +412,11 @@ Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
   zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
   uart_read u off = Some (b, u') ->
-  hw_config -∗ minstret_inv -∗
-  hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
-  mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+  smode_config γ dq -∗
   tlb_inv root_ppn -∗
   pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
   uart_frag u -∗
-  ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+  ( smode_config γ dq -∗
     tlb_inv root_ppn -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     gpr_file (<[Regidx rd := regval_into_reg ldval]> m) -∗
@@ -437,9 +424,14 @@ Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
     WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) @ E {{ Φ }}.
 Proof.
-  intros ea a8 ldval p1 p0 lppn lflags a0addr HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff Hrd
+  intros ea a8 ldval p1 p0 lppn lflags a0addr HN Hoff Hrd
     Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hcanon Hvpn_def Hident Hpa Hread_u.
-  iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
+  iIntros "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
+  iDestruct (smode_config_unbundle with "Hsm") as
+    "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
+  iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+  iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+  iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) mstatus0 mie_v mdv0 menvcfg0
             HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -572,7 +564,10 @@ Proof.
     assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { subst s_x; cbn [sregs]. rewrite Hs'eq. tmig. unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs' Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
     { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb [Hpbytesb] [Hpmpc Hpmpa]").
       - iSplitR; [iPureIntro; exact Hok | iExact "Hpbytesb"].
       - iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 HA0 Hord0 Hpma_imp HX HW HR Hcov with "Hpmpc Hpmpa"). }
@@ -596,7 +591,10 @@ Proof.
     iEval (rewrite Lnpc) in "Hpc'".
     assert (Hfill : tlb_pt_consistent root_ppn tlbf).
     { unfold tlb_pt_consistent, tlbf. rewrite Hfe. apply uart_kpt_fill. exact Hconsf. }
-    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs' Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm [Hsatp Htlb Hpbytesb Hpmpc Hpmpa] [$Hpc' $Hnpc] [Hfmap] Huf'").
     { iApply (tlb_inv_close root_ppn satp0 tlbf Hmode Hasid Hppn Hfill with "Hsatp Htlb [Hpbytesb] [Hpmpc Hpmpa]").
       - iSplitR; [iPureIntro; exact Hok | iExact "Hpbytesb"].
       - iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00 HA0 Hord0 Hpma_imp HX HW HR Hcov with "Hpmpc Hpmpa"). }

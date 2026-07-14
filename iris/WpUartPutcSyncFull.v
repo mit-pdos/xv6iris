@@ -6,12 +6,12 @@
    LOADS (c.ldsp) have only [_scfg] (smode_config) leaves, so they are run
    through the VCgen (VcGenS.v) as [vop_s] blocks -- exactly as WpMycpu.v runs
    its prologue/epilogue.  The three instructions that are neither ordinary
-   value-ALU ops nor stack-slot VCgen ops are handled by dedicated leaves:
-     - c.mv  s1,a0     (0x96c) : [wp_cmv_gpr_s_config]  (WpSmodeRtype)
-     - c.addi16sp sp,32 (0x9ae): [wp_caddi16sp_gpr_s_raw] (built below -- the
-       library only ships the [_scfg] variant; +32 is out of c.addi's range so
-       it cannot be folded into the VCgen block)
-     - c.ret           (0x9b0) : [wp_cret_s_zca]        (WpSmodeJalr) *)
+   value-ALU ops nor stack-slot VCgen ops are handled by dedicated [_scfg]
+   leaves (each threads the same [smode_config] bundle):
+     - c.mv  s1,a0     (0x96c) : [wp_cmv_gpr_s_config_scfg] (WpSmodeRtype)
+     - c.addi16sp sp,32 (0x9ae): [wp_caddi16sp_gpr_s]       (WpSmodeGpr; +32
+       is out of c.addi's range so it cannot be folded into the VCgen block)
+     - c.ret           (0x9b0) : [wp_cret_s_zca_scfg]       (WpSmodeJalr) *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -26,7 +26,7 @@ Require Import WpDecode WpDecodeBridge WpRvcBridge KernelText StackOwn.
 Require Import WpGpr WpGprRvc.
 Require Import SmodePte Pt4kWalk KptPt SmodeCore CommonWalk.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
-Require Import WpSmodeItype WpSmodeRtype WpSmodeJalr.
+Require Import WpSmodeItype WpSmodeRtype WpSmodeJalr WpSmodeGpr.
 Require Import WpMemsetInstr KernelRvcDecode.
 Require Import VcGen VcGenS.
 Require Import WpUartPutcSync.
@@ -79,7 +79,7 @@ Proof.
 Qed.
 
 Section WpUartPutcSyncFull.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   (* [instr]-builder templates, copied verbatim from WpUartPutcSync.v. *)
@@ -178,55 +178,6 @@ Section WpUartPutcSyncFull.
   Lemma upi_4a : kernel_text -∗ instr (mword_of_int (UPS + 0x4a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
   Proof. mk_rvc4 (UPS + 0x4a)%Z (mword_of_int 0x64a2 : mword 16) (mword_of_int 0x610564a2 : mword 32)
     (mword_of_int (UPS + 0x4a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) podec_26 exec_execute_C_LDSP. Qed.
-
-  (* ===================================================================== *)
-  (*  Raw c.addi16sp leaf (the library ships only the [_scfg] variant).     *)
-  (*  Mirrors [wp_caddi16sp_gpr_s] onto the raw [wp_gpr_write_s_config]      *)
-  (*  engine, exactly as [wp_caddi_gpr_s_config] mirrors it for c.addi.      *)
-  (* ===================================================================== *)
-  Lemma wp_caddi16sp_gpr_s_raw (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (pc : mword 64) (imm6 : mword 6)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx csp_rs1 := regval_into_reg
-        (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
-  Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc csp_rs1 csp_rs1 csp_rs1
-              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
-              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
-              m mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsp
-              _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    change sp with (Regidx csp_rs1).
-    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (caddi16sp_imm imm6) s_pc).
-    replace (Z.eqb (uint csp_rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hsp).
-    unfold gpr_addi_val. rewrite Hva. reflexivity.
-  Qed.
 
   (* ===================================================================== *)
   (*  Local three-slot frame elim/intro (the library ships only the         *)
@@ -359,11 +310,20 @@ Section WpUartPutcSyncFull.
   (*  the low byte of the char [a0] is written to THR.  On exit ra/sp/s0/s1  *)
   (*  are restored (saved/restored via the 32-byte stack frame).            *)
   (* =================================================================== *)
-  Lemma wp_uartputc (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (n : nat)
+  (* [gpr_matches] from the [vregs_den] equality (the block runner's entry
+     interface wants the former; my ρ setup proves the latter). *)
+  Lemma gpr_matches_of_den (ρ : nat -> mword 64) (vr : gmap regidx sval)
+      (m : gmap regidx (mword 64)) :
+    vregs_den ρ vr = m -> gpr_matches ρ vr m.
+  Proof.
+    intros <- r sv Hr. unfold vregs_den.
+    rewrite lookup_total_alt lookup_fmap Hr. reflexivity.
+  Qed.
+
+  Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+      (m0 : gmap regidx (mword 64)) (n : nat) (q : Qp)
       (u u' : uart_state) (pv pkv : mword 32)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq dqm dqm2 : dfrac} :
+      {dqm dqm2 : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let s0_idx : mword 5 := mword_of_int 8 in
     let s1_idx : mword 5 := mword_of_int 9 in
@@ -378,15 +338,6 @@ Section WpUartPutcSyncFull.
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     (3 ≤ n)%nat ->
     ↑minstretN ⊆ E ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
@@ -394,17 +345,14 @@ Section WpUartPutcSyncFull.
     uart_write u 0 (autocast (T := mword)
        (subrange_vec_dec (and_vec (add_vec zero_reg a00)
           (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = Some u' ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗ kernel_text -∗
     pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     uart_frag u -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗ cur_privilege ↦ᵣ{ dq } Supervisor -∗
-      mstatus ↦ᵣ{ dq } mstatus0 -∗ mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    ( smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
       (∃ mf, gpr_file mf ∗ ⌜ mf !!! Regidx ra_idx = ra0
@@ -419,12 +367,11 @@ Section WpUartPutcSyncFull.
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
     intros ra_idx s0_idx s1_idx a0_idx pcE sp0 sp' ra0 s00 s10 a00 ret_tgt.
-    intros Hn3 HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0 Hpv Hpkv Hthre Hwrite.
+    intros Hn3 HN Hal0 Hpv Hpkv Hthre Hwrite.
     set (ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
     set (ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
     set (ea_s1 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             #Htext Hpc Hfile Hstk Hpk Hpkd Huf Hcont".
+    iIntros "Hsm Htlbinv #Htext Hpc Hfile Hstk Hpk Hpkd Huf Hcont".
     (* peel the three-slot frame off the abstract stack ownership. *)
     iDestruct (stack_own_split_1 sp0 3 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
     iDestruct (stack_own_3_elim with "Htop") as (raold s0old s1old) "(Hbra & Hbs0 & Hbs1)".
@@ -444,7 +391,7 @@ Section WpUartPutcSyncFull.
     assert (Hcsp2 : Regidx (mword_of_int 2 : mword 5) = Regidx csp_rs1)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
     (* ------------------------------------------------------------------ *)
-    (* SEAM 1: run the prologue block.                                     *)
+    (* SEAM 1: run the prologue block (smode_config threaded as one bundle).*)
     (* ------------------------------------------------------------------ *)
     iDestruct (gpr_file_dom with "Hfile") as "[%Hdom0 Hfile]".
     iDestruct (gpr_file_x0 m0 (mword_of_int 0) ltac:(vm_compute; reflexivity)
@@ -458,6 +405,7 @@ Section WpUartPutcSyncFull.
     assert (HdenA : vregs_den ρA vregs_init = m0).
     { apply (vregs_den_init_agree _ _ Hdom0 Hx00). intros k Hk.
       unfold ρA. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
+    assert (HmA : gpr_matches ρA vregs_init m0) by (apply gpr_matches_of_den; exact HdenA).
     (* the three block cells ARE the three stack words *)
     assert (Hara : sval_den ρA (SX 2 (wrap64 (-8))) = ea_ra).
     { cbn [sval_den].
@@ -478,133 +426,82 @@ Section WpUartPutcSyncFull.
       rewrite Hcsp2. unfold ea_s1, sp'. rewrite add_vec_off2.
       f_equal; f_equal; vm_compute; reflexivity. }
     assert (Hvra : sval_den ρA (SX 33 0) = (raold : mword 64)).
-    { cbn [sval_den].
-      replace (ρA 33%nat) with (raold : mword 64) by (unfold ρA; reflexivity).
-      change (add_vec (raold : mword 64) (mword_of_int 0))
-        with (add_vec_int (raold : mword 64) 0). apply avi0. }
+    { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     assert (Hvs0 : sval_den ρA (SX 34 0) = (s0old : mword 64)).
-    { cbn [sval_den].
-      replace (ρA 34%nat) with (s0old : mword 64) by (unfold ρA; reflexivity).
-      change (add_vec (s0old : mword 64) (mword_of_int 0))
-        with (add_vec_int (s0old : mword 64) 0). apply avi0. }
+    { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     assert (Hvs1 : sval_den ρA (SX 35 0) = (s1old : mword 64)).
-    { cbn [sval_den].
-      replace (ρA 35%nat) with (s1old : mword 64) by (unfold ρA; reflexivity).
-      change (add_vec (s1old : mword 64) (mword_of_int 0))
-        with (add_vec_int (s1old : mword 64) 0). apply avi0. }
+    { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     iDestruct (ups_prologue_instrs with "Htext") as "Hbi".
-    iEval (rewrite -HdenA) in "Hfile".
-    iApply (wp_vc_block_s_den root_ppn ups_prologue E Φ
+    iApply (wp_vc_block_s root_ppn ups_prologue E Φ
               (VSt UPS vregs_init ups_pro_heap0 [])
               (VSt (UPS + 10) ups_pro_regs1 ups_pro_heap1 [])
-              ρA mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 ups_prologue_run
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                    Hpc Hfile Hbi [Hbra Hbs0 Hbs1] []").
+              ρA m0 γ (dq:=DfracOwn q)
+              HN ups_prologue_run HmA
+              with "Hsm Htlbinv Hpc Hfile Hbi [Hbra Hbs0 Hbs1] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /ups_pro_heap0.
       cbn [big_opL fst snd]. rewrite Hara Has0 Has1 Hvra Hvs0 Hvs1.
       iFrame "Hbra Hbs0 Hbs1". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
-    (* SEAM 1 exit: the post register file denotes to m2, the stored words to
-       ra0/s00/s10. *)
-    set (m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0).
-    set (m2 := <[Regidx s0_idx := regval_into_reg
-                  (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> m1).
-    assert (Hspv : sval_den ρA (SX 2 (wrap64 (-32))) = sp').
-    { cbn [sval_den].
-      replace (ρA 2%nat) with (m0 !!! Regidx (mword_of_int 2 : mword 5))
-        by (unfold ρA; reflexivity).
-      rewrite Hcsp2. unfold sp'. f_equal; apply bv_eq; vm_compute; reflexivity. }
-    assert (Hs0v : sval_den ρA (SX 2 0)
-                   = add_vec (m1 !!! Regidx csp_rs1)
-                             (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8)))).
-    { cbn [sval_den].
-      replace (ρA 2%nat) with (m0 !!! Regidx (mword_of_int 2 : mword 5))
-        by (unfold ρA; reflexivity).
-      rewrite Hcsp2. unfold m1. rewrite lookup_total_insert.
-      unfold regval_into_reg, sp'. rewrite add_vec_off2.
-      f_equal; f_equal; vm_compute; reflexivity. }
-    assert (Hm2den : vregs_den ρA ups_pro_regs1 = m2).
-    { unfold ups_pro_regs1.
-      rewrite -vregs_den_insert -vregs_den_insert HdenA Hspv Hs0v.
-      unfold m2, m1, regval_into_reg. reflexivity. }
-    iEval (rewrite Hm2den) in "Hfile".
+    iIntros (M1) "%HmM1 Hsm Htlbinv Hpc Hfile Hheap _".
+    destruct HmM1 as [HmM1 _].
     (* the stored words: den (SX 1 0) = ra0, (SX 8 0) = s00, (SX 9 0) = s10 *)
     assert (Hvra0 : sval_den ρA (SX 1 0) = ra0).
-    { cbn [sval_den].
-      replace (ρA 1%nat) with (m0 !!! Regidx (mword_of_int 1 : mword 5))
-        by (unfold ρA; reflexivity).
-      change (add_vec (m0 !!! Regidx (mword_of_int 1 : mword 5)) (mword_of_int 0))
-        with (add_vec_int (m0 !!! Regidx (mword_of_int 1 : mword 5)) 0).
-      rewrite avi0. reflexivity. }
+    { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     assert (Hvs00 : sval_den ρA (SX 8 0) = s00).
-    { cbn [sval_den].
-      replace (ρA 8%nat) with (m0 !!! Regidx (mword_of_int 8 : mword 5))
-        by (unfold ρA; reflexivity).
-      change (add_vec (m0 !!! Regidx (mword_of_int 8 : mword 5)) (mword_of_int 0))
-        with (add_vec_int (m0 !!! Regidx (mword_of_int 8 : mword 5)) 0).
-      rewrite avi0. reflexivity. }
+    { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     assert (Hvs10 : sval_den ρA (SX 9 0) = s10).
-    { cbn [sval_den].
-      replace (ρA 9%nat) with (m0 !!! Regidx (mword_of_int 9 : mword 5))
-        by (unfold ρA; reflexivity).
-      change (add_vec (m0 !!! Regidx (mword_of_int 9 : mword 5)) (mword_of_int 0))
-        with (add_vec_int (m0 !!! Regidx (mword_of_int 9 : mword 5)) 0).
-      rewrite avi0. reflexivity. }
+    { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /ups_pro_heap1;
            cbn [big_opL fst snd];
            rewrite Hara Has0 Has1 Hvra0 Hvs00 Hvs10) in "Hheap".
     iDestruct "Hheap" as "(Hbra & Hbs0 & Hbs1 & _)".
-    (* pc: mword_of_int (UPS+10) -> add_vec_int pcE 10 *)
-    assert (Hpc10 : (mword_of_int (UPS + 10) : mword 64) = add_vec_int pcE 10)
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (cbn [vpc]; rewrite Hpc10) in "Hpc".
+    iEval (cbn [vpc]) in "Hpc".
+    (* read off the post-block registers I need downstream (sp, a0). *)
+    assert (HspM1 : M1 !!! Regidx csp_rs1 = sp').
+    { assert (Hl : ups_pro_regs1 !! Regidx csp_rs1 = Some (SX 2 (wrap64 (-32))))
+        by (vm_compute; reflexivity).
+      rewrite (HmM1 _ _ Hl). cbn [sval_den].
+      replace (ρA 2%nat) with (m0 !!! Regidx (mword_of_int 2 : mword 5))
+        by (unfold ρA; reflexivity).
+      rewrite Hcsp2. unfold sp'. f_equal; apply bv_eq; vm_compute; reflexivity. }
+    assert (Ha0M1 : M1 !!! Regidx a0_idx = a00).
+    { assert (Hl : ups_pro_regs1 !! Regidx a0_idx = Some (SX 10 0))
+        by (vm_compute; reflexivity).
+      rewrite (HmM1 _ _ Hl) sval_den_SX0. unfold ρA, a00, a0_idx. reflexivity. }
     (* ------------------------------------------------------------------ *)
     (* c.mv s1,a0 at 0x96c: s1 := a0.                                       *)
     (* ------------------------------------------------------------------ *)
     iPoseProof (upi_0a with "Htext") as "Hi0a".
-    iApply (wp_cmv_gpr_s_config root_ppn E Φ (add_vec_int pcE 10) s1_idx a0_idx m2
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi0a [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    set (m3 := <[Regidx s1_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2).
-    change (<[Regidx s1_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2) with m3.
+    iApply (wp_cmv_gpr_s_config_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x0a)) s1_idx a0_idx M1
+              (dq:=DfracOwn q)
+              HN ltac:(vm_compute; discriminate)
+              with "Hsm Htlbinv Hpc Hfile Hi0a [-]").
+    iIntros "Hsm Htlbinv Hpc Hfile".
     (* ------------------------------------------------------------------ *)
     (* the body (0x96e -> 0x9a8) via [wp_uartputc_body].                    *)
     (* ------------------------------------------------------------------ *)
-    assert (Ha0_23 : m2 !!! Regidx a0_idx = a00).
-    { unfold m2, m1. do 2 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      reflexivity. }
-    assert (HR9m3 : m3 !!! Regidx (mword_of_int 9) = add_vec zero_reg a00).
-    { unfold m3. change (Regidx s1_idx) with (Regidx (mword_of_int 9)).
-      rewrite lookup_total_insert. unfold regval_into_reg. rewrite Ha0_23. reflexivity. }
-    assert (Hpc0c : add_vec_int (add_vec_int pcE 10) 2
+    assert (Hpc0c : add_vec_int (mword_of_int (UPS + 0x0a)) 2
                     = (mword_of_int (UPS + 0x0c) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
-    iApply (wp_uartputc_body root_ppn E Φ m3 u u' pv pkv mstatus0 mie_v mdv0 menvcfg0
-              (dq:=dq) (dqm:=dqm) (dqm2:=dqm2)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hpv Hpkv Hthre
+    set (m3 := <[Regidx s1_idx := regval_into_reg (add_vec zero_reg (M1 !!! Regidx a0_idx))]> M1).
+    assert (HR9m3 : m3 !!! Regidx (mword_of_int 9) = add_vec zero_reg a00).
+    { unfold m3. change (Regidx s1_idx) with (Regidx (mword_of_int 9)).
+      rewrite lookup_total_insert. unfold regval_into_reg. rewrite Ha0M1. reflexivity. }
+    iApply (wp_uartputc_body root_ppn γ E Φ m3
+              u u' pv pkv (dq:=DfracOwn q) (dqm:=dqm) (dqm2:=dqm2)
+              HN Hpv Hpkv Hthre
               ltac:(rewrite HR9m3; exact Hwrite)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hpk Hpkd Huf").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hbody Hpk Hpkd Huf".
+              with "Hsm Htlbinv Htext Hpc Hfile Hpk Hpkd Huf").
+    iIntros "Hsm Htlbinv Hpc Hbody Hpk Hpkd Huf".
     iDestruct "Hbody" as (mf) "[Hfile %Hbagr]".
     destruct Hbagr as (Hbra_ag & Hbs0_ag & Hbsp_ag).
-    (* ra/s0/sp of [mf] agree with m3 (== ra0/s00/sp'). *)
-    assert (Hmf_ra : mf !!! Regidx (mword_of_int 1) = ra0).
-    { rewrite Hbra_ag. unfold m3.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      unfold m2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      unfold m1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      reflexivity. }
+    (* [mf]'s sp agrees with the body input (== sp'). *)
     assert (Hmf_sp : mf !!! Regidx (mword_of_int 2) = sp').
     { rewrite Hbsp_ag. unfold m3.
+      change (Regidx (mword_of_int 2)) with (Regidx csp_rs1).
       rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      unfold m2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      unfold m1. change (Regidx (mword_of_int 2)) with (Regidx csp_rs1).
-      rewrite lookup_total_insert. reflexivity. }
+      exact HspM1. }
     (* ------------------------------------------------------------------ *)
     (* SEAM 2: run the epilogue load block from [mf].                       *)
     (* ------------------------------------------------------------------ *)
@@ -619,6 +516,7 @@ Section WpUartPutcSyncFull.
     assert (HdenB : vregs_den ρB vregs_init = mf).
     { apply (vregs_den_init_agree _ _ Hdomf Hxf0). intros k Hk.
       unfold ρB. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
+    assert (HmB : gpr_matches ρB vregs_init mf) by (apply gpr_matches_of_den; exact HdenB).
     assert (HspB : ρB 2%nat = sp').
     { replace (ρB 2%nat) with (mf !!! Regidx (mword_of_int 2 : mword 5))
         by (unfold ρB; reflexivity). exact Hmf_sp. }
@@ -632,47 +530,38 @@ Section WpUartPutcSyncFull.
     { cbn [sval_den]. rewrite HspB. unfold ea_s1.
       f_equal; apply bv_eq; vm_compute; reflexivity. }
     assert (HvraB : sval_den ρB (SX 33 0) = ra0).
-    { cbn [sval_den].
-      replace (ρB 33%nat) with ra0 by (unfold ρB; reflexivity).
-      change (add_vec ra0 (mword_of_int 0)) with (add_vec_int ra0 0). apply avi0. }
+    { rewrite sval_den_SX0. unfold ρB. reflexivity. }
     assert (Hvs0B : sval_den ρB (SX 34 0) = s00).
-    { cbn [sval_den].
-      replace (ρB 34%nat) with s00 by (unfold ρB; reflexivity).
-      change (add_vec s00 (mword_of_int 0)) with (add_vec_int s00 0). apply avi0. }
+    { rewrite sval_den_SX0. unfold ρB. reflexivity. }
     assert (Hvs1B : sval_den ρB (SX 35 0) = s10).
-    { cbn [sval_den].
-      replace (ρB 35%nat) with s10 by (unfold ρB; reflexivity).
-      change (add_vec s10 (mword_of_int 0)) with (add_vec_int s10 0). apply avi0. }
-    assert (Hpc46 : (mword_of_int (UPS + 0x46) : mword 64)
-                    = (mword_of_int (UPS + 0x46) : mword 64)) by reflexivity.
-    iEval (rewrite -HdenB) in "Hfile".
+    { rewrite sval_den_SX0. unfold ρB. reflexivity. }
     iDestruct (ups_epilogue_instrs with "Htext") as "Hbi2".
-    iApply (wp_vc_block_s_den root_ppn ups_epilogue E Φ
+    iApply (wp_vc_block_s root_ppn ups_epilogue E Φ
               (VSt (UPS + 0x46) vregs_init ups_epi_heap [])
               (VSt (UPS + 0x46 + 6) ups_epi_regs1 ups_epi_heap [])
-              ρB mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 ups_epilogue_run
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                    Hpc Hfile Hbi2 [Hbra Hbs0 Hbs1] []").
+              ρB mf γ (dq:=DfracOwn q)
+              HN ups_epilogue_run HmB
+              with "Hsm Htlbinv Hpc Hfile Hbi2 [Hbra Hbs0 Hbs1] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /ups_epi_heap.
       cbn [big_opL fst snd]. rewrite HaraB Has0B Has1B HvraB Hvs0B Hvs1B.
       rewrite Hpra Hps0 Hps1. iFrame "Hbra Hbs0 Hbs1". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
-    (* SEAM 2 exit: the post register file denotes to [m_epi], and the cells
-       still hold ra0/s00/s10. *)
-    set (m_epi := <[Regidx (mword_of_int 9 : mword 5) := s10]>
-                   (<[Regidx (mword_of_int 8 : mword 5) := s00]>
-                     (<[Regidx (mword_of_int 1 : mword 5) := ra0]> mf))).
-    assert (Hmepiden : vregs_den ρB ups_epi_regs1 = m_epi).
-    { unfold ups_epi_regs1.
-      rewrite -vregs_den_insert -vregs_den_insert -vregs_den_insert HdenB
-              HvraB Hvs0B Hvs1B. reflexivity. }
-    iEval (rewrite Hmepiden) in "Hfile".
+    iIntros (M2) "%HmM2 Hsm Htlbinv Hpc Hfile Hheap _".
+    destruct HmM2 as [HmM2 _].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /ups_epi_heap;
            cbn [big_opL fst snd];
            rewrite HaraB Has0B Has1B HvraB Hvs0B Hvs1B) in "Hheap".
     iDestruct "Hheap" as "(Hbra & Hbs0 & Hbs1 & _)".
+    iEval (cbn [vpc]) in "Hpc".
+    (* read off M2's ra (= ra0) and sp (= sp'); s0/s1 are read in the finale. *)
+    assert (HraM2 : M2 !!! Regidx (mword_of_int 1) = ra0).
+    { assert (Hl : ups_epi_regs1 !! Regidx (mword_of_int 1) = Some (SX 33 0))
+        by (vm_compute; reflexivity).
+      rewrite (HmM2 _ _ Hl). exact HvraB. }
+    assert (HspM2 : M2 !!! Regidx csp_rs1 = sp').
+    { assert (Hl : ups_epi_regs1 !! Regidx csp_rs1 = Some (SX 2 0))
+        by (vm_compute; reflexivity).
+      rewrite (HmM2 _ _ Hl) sval_den_SX0. exact HspB. }
     (* ------------------------------------------------------------------ *)
     (* c.addi16sp sp,32 at 0x9ae: sp := sp + 32 = sp0.                      *)
     (* ------------------------------------------------------------------ *)
@@ -680,16 +569,14 @@ Section WpUartPutcSyncFull.
     assert (Hpc4c : (mword_of_int (UPS + 0x46 + 6) : mword 64)
                     = (mword_of_int (UPS + 0x4c) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (cbn [vpc]; rewrite Hpc4c) in "Hpc".
-    iApply (wp_caddi16sp_gpr_s_raw root_ppn E Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) m_epi
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi4c [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
+    iEval (rewrite Hpc4c) in "Hpc".
+    iApply (wp_caddi16sp_gpr_s root_ppn γ E Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) M2 q
+              HN with "Hsm Htlbinv Hpc Hfile Hi4c [-]").
+    iIntros "Hsm Htlbinv Hpc Hfile".
     set (m_epi2 := <[Regidx csp_rs1 := regval_into_reg
-                      (add_vec (m_epi !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2))))]> m_epi).
+                      (add_vec (M2 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2))))]> M2).
     change (<[Regidx csp_rs1 := regval_into_reg
-              (add_vec (m_epi !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2))))]> m_epi) with m_epi2.
+              (add_vec (M2 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2))))]> M2) with m_epi2.
     (* ------------------------------------------------------------------ *)
     (* c.ret at 0x9b0: PC := ra (= ra0).                                    *)
     (* ------------------------------------------------------------------ *)
@@ -697,20 +584,17 @@ Section WpUartPutcSyncFull.
     assert (Hra_final : m_epi2 !!! Regidx (mword_of_int 1) = ra0).
     { unfold m_epi2.
       rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      unfold m_epi.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert. reflexivity. }
+      exact HraM2. }
     assert (Hpc4e : add_vec_int (mword_of_int (UPS + 0x4c)) 2
                     = (mword_of_int (UPS + 0x4e) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4e) in "Hpc".
-    iApply (wp_cret_s_zca root_ppn E Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
-              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate) Hlpe
+    iApply (wp_cret_s_zca_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
+              (dq:=DfracOwn q)
+              HN ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra_final; exact Hal0)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi4e [-]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
+              with "Hsm Htlbinv Hpc Hfile Hi4e [-]").
+    iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite Hra_final) in "Hpc".
     (* rebundle the frame: the cells hold ra0/s00/s10 at pa_stk 1/2/3. *)
     iEval (rewrite Hpra) in "Hbra".
@@ -718,23 +602,23 @@ Section WpUartPutcSyncFull.
     iEval (rewrite Hps1) in "Hbs1".
     iDestruct (stack_own_3_intro with "Hbra Hbs0 Hbs1") as "Htop".
     iDestruct (stack_own_split_2 sp0 3 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc [Hfile] Hstk Hpk Hpkd Huf").
+    iApply ("Hcont" with "Hsm Htlbinv Hpc [Hfile] Hstk Hpk Hpkd Huf").
     iExists m_epi2. iFrame "Hfile". iPureIntro.
     (* ra/s0/s1/sp restored to their entry values. *)
     split; [| split; [| split]].
     - exact Hra_final.
     - unfold m_epi2.
       rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      unfold m_epi.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert. reflexivity.
+      assert (Hl : ups_epi_regs1 !! Regidx s0_idx = Some (SX 34 0))
+        by (vm_compute; reflexivity).
+      rewrite (HmM2 _ _ Hl). exact Hvs0B.
     - unfold m_epi2.
       rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      unfold m_epi. rewrite lookup_total_insert. reflexivity.
+      assert (Hl : ups_epi_regs1 !! Regidx s1_idx = Some (SX 35 0))
+        by (vm_compute; reflexivity).
+      rewrite (HmM2 _ _ Hl). exact Hvs1B.
     - unfold m_epi2. rewrite lookup_total_insert.
-      unfold regval_into_reg. unfold m_epi.
-      do 3 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      rewrite Hmf_sp. unfold sp', sp0.
+      unfold regval_into_reg. rewrite HspM2. unfold sp', sp0.
       change (caddi16sp_imm (mword_of_int 2)) with (caddi16sp_imm (mword_of_int 2 : mword 6)).
       apply ups_frame_cancel.
   Qed.
