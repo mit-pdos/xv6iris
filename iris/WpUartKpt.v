@@ -200,7 +200,6 @@ Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   (forall (mxr do_sum : bool) s', exec (check_PTE_permission (Store Data) Supervisor mxr do_sum (Mk_PTE_Flags (mword_of_int lflags)) (Mk_PTE_Ext (mword_of_int 0)) tt) s' = Some (PTE_Check_Success tt, s')) ->
   eq_vec (_get_PTE_Flags_G (Mk_PTE_Flags (mword_of_int lflags : mword 8))) ('b"1") = false ->
   update_PTE_Bits (mk_pte lppn lflags) (Store Data) = None ->
-  (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
   (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the walk's
      output page composes to [uart_pa off] (the UART identity mapping). *)
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
@@ -224,7 +223,7 @@ Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   WP (Loop : expr riscv_lang) @ E {{ Φ }}.
 Proof.
   intros ea a8 storebyte p1 p0 lppn lflags a0addr HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff
-    Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hpter Hcanon Hvpn_def Hident Hpa Hwrite_u.
+    Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hcanon Hvpn_def Hident Hpa Hwrite_u.
   iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
   iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 1)) mstatus0 mie_v mdv0 menvcfg0
@@ -278,9 +277,9 @@ Proof.
   assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0) by (unfold s_pc; tmig; exact Lmisa).
   assert (Hmem_pc : s_pc.(mem) = σ.(mem)) by (unfold s_pc, set_reg; reflexivity).
   assert (Hmdev_pc : s_pc.(mdev) = σ.(mdev)) by (unfold s_pc, set_reg; reflexivity).
-  destruct (Hpter pmar0 Hpma_all (pte_addr_at root_ppn (subrange_vec_dec uart_vpn 26 18))) as (region2 & Hm2r & Hpte2).
-  destruct (Hpter pmar0 Hpma_all (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9))) as (region1 & Hm1r & Hpte1).
-  destruct (Hpter pmar0 Hpma_all (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0))) as (region0 & Hm0r & Hpte0).
+  destruct (Hpma_imp pmar0 Hpma_all (pte_addr_at root_ppn (subrange_vec_dec uart_vpn 26 18))) as (region2 & Hm2r & Hpte2).
+  destruct (Hpma_imp pmar0 Hpma_all (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9))) as (region1 & Hm1r & Hpte1).
+  destruct (Hpma_imp pmar0 Hpma_all (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0))) as (region0 & Hm0r & Hpte0).
   assert (Hmatch2 : matching_pma_region (register_lookup pma_regions s_pc.(sregs))
             (Physaddr (pte_addr_at root_ppn (subrange_vec_dec uart_vpn 26 18))) 8 = Some region2)
     by (rewrite Lpma_pc; exact Hm2r).
@@ -418,7 +417,6 @@ Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   (forall (mxr do_sum : bool) s', exec (check_PTE_permission (Load Data) Supervisor mxr do_sum (Mk_PTE_Flags (mword_of_int lflags)) (Mk_PTE_Ext (mword_of_int 0)) tt) s' = Some (PTE_Check_Success tt, s')) ->
   eq_vec (_get_PTE_Flags_G (Mk_PTE_Flags (mword_of_int lflags : mword 8))) ('b"1") = false ->
   update_PTE_Bits (mk_pte lppn lflags) (Load Data) = None ->
-  (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
   zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
@@ -440,7 +438,7 @@ Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (off : Z) E (Φ : mval -> iProp Σ)
   WP (Loop : expr riscv_lang) @ E {{ Φ }}.
 Proof.
   intros ea a8 ldval p1 p0 lppn lflags a0addr HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff Hrd
-    Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hpter Hcanon Hvpn_def Hident Hpa Hread_u.
+    Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hcanon Hvpn_def Hident Hpa Hread_u.
   iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
   iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) mstatus0 mie_v mdv0 menvcfg0
@@ -490,9 +488,9 @@ Proof.
   assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0) by (unfold s_pc; tmig; exact Lmisa).
   assert (Hmem_pc : s_pc.(mem) = σ.(mem)) by (unfold s_pc, set_reg; reflexivity).
   assert (Hmdev_pc : s_pc.(mdev) = σ.(mdev)) by (unfold s_pc, set_reg; reflexivity).
-  destruct (Hpter pmar0 Hpma_all (pte_addr_at root_ppn (subrange_vec_dec uart_vpn 26 18))) as (region2 & Hm2r & Hpte2).
-  destruct (Hpter pmar0 Hpma_all (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9))) as (region1 & Hm1r & Hpte1).
-  destruct (Hpter pmar0 Hpma_all (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0))) as (region0 & Hm0r & Hpte0).
+  destruct (Hpma_imp pmar0 Hpma_all (pte_addr_at root_ppn (subrange_vec_dec uart_vpn 26 18))) as (region2 & Hm2r & Hpte2).
+  destruct (Hpma_imp pmar0 Hpma_all (pte_addr_at p1 (subrange_vec_dec uart_vpn 17 9))) as (region1 & Hm1r & Hpte1).
+  destruct (Hpma_imp pmar0 Hpma_all (pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0))) as (region0 & Hm0r & Hpte0).
   assert (Hmatch2 : matching_pma_region (register_lookup pma_regions s_pc.(sregs))
             (Physaddr (pte_addr_at root_ppn (subrange_vec_dec uart_vpn 26 18))) 8 = Some region2) by (rewrite Lpma_pc; exact Hm2r).
   assert (Hmatch1 : matching_pma_region (register_lookup pma_regions s_pc.(sregs))

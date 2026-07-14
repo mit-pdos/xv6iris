@@ -158,6 +158,8 @@ WpWakeup.v
 WpSmodeUart.v
 WpSmodeGen.v
 WpUartKpt.v
+KernelDataInv.v
+WpUartPutcSync.v
 WpUserBase.v
 WpUserFetch.v
 WpUserCompute.v
@@ -175,3 +177,4 @@ WpUserMemC1.v
 WpUserAmo.v
 WpUserSteps.v
 WpUserExec.v
+WpUartPutcSyncFull.v
