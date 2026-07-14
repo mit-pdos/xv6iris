@@ -1166,3 +1166,59 @@ Proof.
   rewrite Hm.
   repeat split; assumption.
 Qed.
+
+(* ===================================================================== *)
+(* 14. EXISTENTIALLY-QUANTIFIED A/D BITS (per PT entry).                  *)
+(* [kpt_adf] above is keyed by vpn -- one (A, D) pair per PT ENTRY of     *)
+(* this table (two virtual pages mapping the same physical page are two   *)
+(* entries with independent pairs) -- but as a lemma PARAMETER it forces  *)
+(* a single globally-agreed assignment.  The forms below quantify the     *)
+(* bits existentially instead: [P_kpt_e] admits, per RESIDENT TLB entry,  *)
+(* ANY (A, D) pair, and (in SmodeCore) [tlb_inv_e] hides the whole        *)
+(* assignment.  Specs state these; a proof that must EXECUTE opens the    *)
+(* existential and works at the skolem map, because under this build's    *)
+(* Svade semantics success genuinely depends on the bits (an access       *)
+(* through A=0 -- or a store through D=0 -- page-faults), so per-page bit *)
+(* facts about the skolem are exactly the undischargeable residue.        *)
+(* ===================================================================== *)
+
+(* a single entry with explicit bits: the constant-map instance *)
+Definition kpt_tlb_ent_b (root : mword 44) (vpn : mword 27) (ad : bool * bool) : TLB_Entry :=
+  kpt_tlb_ent_ad (fun _ => ad) root vpn.
+
+(* per-entry existential legal set: any mapped vpn's leaf, ANY A/D bits *)
+Definition P_kpt_e (root : mword 44) (e : TLB_Entry) : Prop :=
+  exists vpn ad, kpt_mapped vpn /\ e = kpt_tlb_ent_b root vpn ad.
+
+Lemma kpt_tlb_ent_ad_b (adf : kpt_adf) (root : mword 44) (vpn : mword 27) :
+  kpt_tlb_ent_ad adf root vpn = kpt_tlb_ent_b root vpn (adf vpn).
+Proof. reflexivity. Qed.
+
+Lemma P_kpt_ad_to_e (adf : kpt_adf) (root : mword 44) (e : TLB_Entry) :
+  P_kpt_ad adf root e -> P_kpt_e root e.
+Proof.
+  intros (vpn & Hm & ->).
+  exists vpn, (adf vpn). split; [exact Hm | apply kpt_tlb_ent_ad_b].
+Qed.
+
+Lemma P_kpt_to_e (root : mword 44) (e : TLB_Entry) :
+  P_kpt root e -> P_kpt_e root e.
+Proof.
+  intros HP. apply (P_kpt_ad_to_e kpt_adf1).
+  destruct HP as (vpn & Hm & ->).
+  exists vpn. split; [exact Hm | symmetry; apply kpt_tlb_ent_adf1].
+Qed.
+
+(* per-entry discrimination: ANY-bits entries still discriminate by vpn
+   tag alone, so the fetch/data chains work over [P_kpt_e]-consistent TLBs *)
+Lemma P_kpt_e_disc (root : mword 44) (a : mword 64) (e : TLB_Entry) :
+  addr_is_ram a ->
+  P_kpt_e root e ->
+  (exists ad, e = kpt_tlb_ent_b root (svpn_of a) ad) \/
+  match_TLB_Entry e (mword_of_int 0) (sign_extend' (57 - 12) (svpn_of a)) = false.
+Proof.
+  intros Hram (vpn & ad & Hm & ->).
+  destruct (decide (vpn = svpn_of a)) as [-> | Hne].
+  - left. exists ad. reflexivity.
+  - right. unfold kpt_tlb_ent_b, kpt_tlb_ent_ad. apply match_tlb4k_other. exact Hne.
+Qed.

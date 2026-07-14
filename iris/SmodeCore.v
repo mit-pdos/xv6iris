@@ -599,6 +599,48 @@ Proof.
     [ apply tlb_hash_range | apply P_kpt_ad_ram; exact Hram | exact Hc ].
 Qed.
 
+
+(* per-entry existentially-quantified consistency: every resident entry is
+   some mapped vpn's leaf with SOME (A, D) pair (KptPt.v §14) *)
+Definition tlb_pt_consistent_e (root_ppn : mword 44)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
+  tlb_consistent (P_kpt_e root_ppn) tlbvec.
+
+Lemma tlb_pt_consistent_ad_to_e (adf : kpt_adf) (root_ppn : mword 44)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  tlb_pt_consistent_ad adf root_ppn tlbvec ->
+  tlb_pt_consistent_e root_ppn tlbvec.
+Proof.
+  intros Hc i Hi. destruct (Hc i Hi) as [Hn | (e & He & HPe)].
+  - left; exact Hn.
+  - right. exists e. split; [exact He | exact (P_kpt_ad_to_e adf root_ppn e HPe)].
+Qed.
+
+Lemma tlb_pt_consistent_to_e (root_ppn : mword 44)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  tlb_pt_consistent root_ppn tlbvec ->
+  tlb_pt_consistent_e root_ppn tlbvec.
+Proof.
+  intros Hc i Hi. destruct (Hc i Hi) as [Hn | (e & He & HPe)].
+  - left; exact Hn.
+  - right. exists e. split; [exact He | exact (P_kpt_to_e root_ppn e HPe)].
+Qed.
+
+(* a fill with ANY-bits own-vpn entry preserves the existential form *)
+Lemma tlb_pt_consistent_e_fill (root_ppn : mword 44)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (a : mword 64) (ad : bool * bool) :
+  addr_is_ram a ->
+  tlb_pt_consistent_e root_ppn tlbvec ->
+  tlb_pt_consistent_e root_ppn
+    (vec_update_dec tlbvec (tlb_hash (__id 39) (svpn_of a))
+       (Some (kpt_tlb_ent_b root_ppn (svpn_of a) ad))).
+Proof.
+  intros Hram Hc.
+  apply tlb_consistent_fill; [ apply tlb_hash_range | | exact Hc ].
+  exists (svpn_of a), ad.
+  split; [ left; exact (ram_svpn_range a Hram) | reflexivity ].
+Qed.
+
 (* the bridges to the generic form are now definitional *)
 Lemma tlb_pt_consistent_to_generic (root_ppn : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
   tlb_pt_consistent root_ppn tlbvec ->
@@ -1925,6 +1967,28 @@ Section SmodeCoreIris.
     setoid_rewrite Hp.
     reflexivity.
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* Existentially-quantified A/D invariant: no assignment is fixed at   *)
+  (* the interface; a proof that must EXECUTE opens the existential and  *)
+  (* works at the skolem map (per-page bit facts about it are the        *)
+  (* model-imposed residue -- see KptPt.v §14).                          *)
+  (* ------------------------------------------------------------------ *)
+  Definition tlb_inv_e (root_ppn : mword 44) : iProp Σ :=
+    (∃ adm : kpt_adf, tlb_inv_ad adm root_ppn)%I.
+
+  Lemma tlb_inv_ad_to_e (adm : kpt_adf) (root_ppn : mword 44) :
+    tlb_inv_ad adm root_ppn -∗ tlb_inv_e root_ppn.
+  Proof. iIntros "H". iExists adm. iExact "H". Qed.
+
+  Lemma tlb_inv_to_e (root_ppn : mword 44) :
+    tlb_inv root_ppn -∗ tlb_inv_e root_ppn.
+  Proof.
+    iIntros "H". iExists kpt_adf1.
+    iApply (tlb_inv_adf1 root_ppn). iExact "H".
+  Qed.
+
+
 
 
   (* =================================================================== *)
