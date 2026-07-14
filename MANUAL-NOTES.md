@@ -28,7 +28,6 @@ Big things that still need to be done/explored:
 - liveness, or at least deadlock avoidance
 - file system
 - virtual memory / page tables
-- adequacy theorem
 
 Don't know where else to put this:
 
