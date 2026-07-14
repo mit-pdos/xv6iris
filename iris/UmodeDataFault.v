@@ -27,6 +27,13 @@ Require Import MemData4 MemData2 MemData1 WpGpr WpLoad UmodeLrsc.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* width-8 split helper (the width-4/2/1 analogs live in MemData4/2/1;
+   there is no MemData8, so it is proved here for the LD/SD fault towers). *)
+Lemma exec_split_misaligned_aligned_8 (vaddr : virtaddr) s :
+  is_aligned_vaddr vaddr 8 = true ->
+  exec (split_misaligned vaddr 8) s = Some ((1, 8), s).
+Proof. intro H. unfold split_misaligned. rewrite H. cbn [orb]. apply exec_returnm. Qed.
+
 (* LOAD: translateAddr faults through the walk with a load page fault *)
 Lemma exec_translateAddr_load_walk_u_pagefault
     (vpn : mword 27) (root : mword 44) (f : PTW_Error)
@@ -1178,3 +1185,197 @@ Section GenExecStoreFault1.
     cbn match. apply exec_returnM.
   Qed.
 End GenExecStoreFault1.
+
+
+Section GenLoadFault8.
+  Variable a : mword 64.
+  Variable s : mstate.
+  Let W : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_Load_Page_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 8 = true.
+  Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * 8))) (Load Data)) s
+                   = Some (Err (E_Load_Page_Fault tt, tt), s).
+
+  Lemma exec_vmem_read_addr_load_fault_8 :
+    exec (vmem_read_addr (Virtaddr a) 8 (Load Data) false false false) s
+      = Some (Err W, s).
+  Proof.
+    unfold vmem_read_addr.
+    rewrite exec_catch_early_return.
+    rewrite Halign. cbn [Riscv.rv64d.not negb].
+    assert (Hinner : execR (returnR (result (mword (8 * 8)) ExecutionResult) tt >>
+                            liftR (split_misaligned (Virtaddr a) 8)) s = Some (inr (1, 8), s)).
+    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_8 (Virtaddr a) s Halign). reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+    rewrite misaligned_order_1.
+    match goal with
+    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inl (Err W), s))
+    end.
+    { eapply execR_untilMT_1_early.
+      - reflexivity.
+      - cbn match.
+        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
+        cbn [bits_of_virtaddr] in *. cbn match.
+        match goal with
+        | |- execR (Defs.bind ?inner ?post) s = _ =>
+          assert (Hbody : execR inner s = Some (inl (Err W), s))
+        end.
+        { rewrite (execR_liftR_seq _ _ _ _ _
+            (exec_memory_exception (Virtaddr (add_vec_int a (0 * 8))) (E_Load_Page_Fault tt) s)).
+          cbn match. cbn [bits_of_virtaddr]. rewrite avi0_mul8.
+          unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+        rewrite execR_bind. rewrite Hbody. reflexivity. }
+    rewrite execR_bind. rewrite Hu. cbn match. reflexivity.
+  Qed.
+
+  Variable rs1 rd : mword 5.
+  Variable imm : mword 12.
+  Let offset := sign_extend' 64 imm.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Load Data)) s = Some (Virtaddr a, s).
+
+  Lemma exec_vmem_read_load_fault_8 :
+    exec (vmem_read (Regidx rs1) offset 8 (Load Data) false false false) s = Some (Err W, s).
+  Proof.
+    unfold vmem_read. rewrite exec_catch_early_return.
+    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Load Data) 8) s
+                   = Some (Ext_DataAddr_OK (Virtaddr a), s)).
+    { unfold get_transformed_data_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Load Data) 8 s)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ Htea).
+      apply exec_returnM. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
+    cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a) s)).
+    rewrite execR_liftR.
+    rewrite exec_vmem_read_addr_load_fault_8.
+    reflexivity.
+  Qed.
+
+  Lemma exec_execute_LOAD_fault_8 (is_unsigned : bool) :
+    exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 8))) s = Some (W, s).
+  Proof.
+    change (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 8)))
+      with (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned 8).
+    unfold execute_LOAD.
+    assert (Hass : exec (assert_exp' (Z.leb 8 xlen_bytes) "extensions/I/base_insts.sail:289.28-289.29" : M (_ = _)) s = Some (@eq_refl bool true, s)) by reflexivity.
+    rewrite (exec_bind_Some _ _ _ _ _ Hass).
+    rewrite (exec_bind_Some _ _ _ _ _ exec_vmem_read_load_fault_8).
+    cbn match. apply exec_returnM.
+  Qed.
+End GenLoadFault8.
+
+Section GenStoreFault8.
+  Variable a : mword 64.
+  Variable data : bv 64.
+  Variable s : mstate.
+  Let W : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_SAMO_Page_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 8 = true.
+  Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * 8))) (Store Data)) s
+                   = Some (Err (E_SAMO_Page_Fault tt, tt), s).
+
+  Lemma exec_vmem_write_addr_store_fault_8 :
+    exec (vmem_write_addr (Virtaddr a) 8 data (Store Data) false false false) s
+      = Some (Err W, s).
+  Proof.
+    unfold vmem_write_addr.
+    rewrite exec_catch_early_return.
+    rewrite Halign. cbn [Riscv.rv64d.not negb].
+    assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
+                            liftR (split_misaligned (Virtaddr a) 8)) s = Some (inr (1, 8), s)).
+    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_8 (Virtaddr a) s Halign). reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+    rewrite misaligned_order_1.
+    match goal with
+    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inl (Err W), s))
+    end.
+    { eapply execR_untilMT_1_early.
+      - reflexivity.
+      - cbn match.
+        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
+        cbn [bits_of_virtaddr] in *. cbn match.
+        match goal with
+        | |- execR (Defs.bind ?inner ?post) s = _ =>
+          assert (Hbody : execR inner s = Some (inl (Err W), s))
+        end.
+        { rewrite (execR_liftR_seq _ _ _ _ _
+            (exec_memory_exception (Virtaddr (add_vec_int a (0 * 8))) (E_SAMO_Page_Fault tt) s)).
+          cbn match. cbn [bits_of_virtaddr]. rewrite avi0_mul8.
+          unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+        rewrite execR_bind. rewrite Hbody. reflexivity. }
+    rewrite execR_bind. rewrite Hu. cbn match. reflexivity.
+  Qed.
+
+  Variable rs2 rs1 : mword 5.
+  Variable imm : mword 12.
+  Let offset := sign_extend' 64 imm.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Store Data)) s = Some (Virtaddr a, s).
+
+  Lemma exec_vmem_write_store_fault_8 :
+    exec (vmem_write (Regidx rs1) offset 8 data (Store Data) false false false) s = Some (Err W, s).
+  Proof.
+    unfold vmem_write. rewrite exec_catch_early_return.
+    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Store Data) 8) s
+                   = Some (Ext_DataAddr_OK (Virtaddr a), s)).
+    { unfold get_transformed_data_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Store Data) 8 s)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ Htea).
+      apply exec_returnM. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
+    cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a) s)).
+    rewrite execR_liftR.
+    rewrite exec_vmem_write_addr_store_fault_8.
+    reflexivity.
+  Qed.
+End GenStoreFault8.
+
+Section GenExecStoreFault8.
+  Variable a : mword 64.
+  Variable s : mstate.
+  Let W : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_SAMO_Page_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Variable rs2 rs1 : mword 5.
+  Variable imm : mword 12.
+  Let offset := sign_extend' 64 imm.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+  Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 8 = true.
+  Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * 8))) (Store Data)) s
+                   = Some (Err (E_SAMO_Page_Fault tt, tt), s).
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Store Data)) s = Some (Virtaddr a, s).
+
+  Lemma exec_execute_STORE_fault_8 :
+    exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s = Some (W, s).
+  Proof.
+    change (execute (STORE (imm, Regidx rs2, Regidx rs1, 8)))
+      with (execute_STORE imm (Regidx rs2) (Regidx rs1) 8).
+    unfold execute_STORE.
+    assert (Hass : exec (assert_exp' (Z.leb 8 xlen_bytes) "extensions/I/base_insts.sail:320.28-320.29" : M (_ = _)) s = Some (@eq_refl bool true, s)) by reflexivity.
+    rewrite (exec_bind_Some _ _ _ _ _ Hass).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+    cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_vmem_write_store_fault_8 a _ s Halign Htr rs1 imm Htea)).
+    cbn match. apply exec_returnM.
+  Qed.
+End GenExecStoreFault8.
