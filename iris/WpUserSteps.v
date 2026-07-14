@@ -31,7 +31,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import MinstretInv WpGpr.
+Require Import MinstretInv WpGpr InstrBytes.
 Require Import WpDecodeBridge.
 Require Import UmodeFetch UmodeEcall.
 Require Import UptInv WpUserEcall WpMemsetS WpGprStore.
@@ -98,6 +98,9 @@ Section WpUserSteps.
   Local Notation user_frame := (WpUserBase.user_frame U).
   Local Notation user_trap_frame := (WpUserBase.user_trap_frame U).
   Local Notation user_step_obligation := (WpUserBase.user_step_obligation U).
+  Local Notation user_code := (WpUserBase.user_code U).
+  Local Notation user_data := (WpUserBase.user_data U).
+  Local Notation user_cfg := (WpUserBase.user_cfg U).
   Local Notation wp_user_exec := (WpUserBase.wp_user_exec U).
   Local Notation ustep_branch_fall := (WpUserCtrl.ustep_branch_fall U).
   Local Notation ustep_branch_taken := (WpUserCtrl.ustep_branch_taken U).
@@ -1324,25 +1327,41 @@ Section WpUserSteps.
        (forall j : nat, (j < 1)%nat -> code !! pa_add paD j = Some (nth_byte v j))).
 
   (* the assembled Löb step obligation, v1 coverage *)
-  Theorem user_step_holds E (Φ : mval -> iProp Σ) :
+  (* [ustep_case_sound]: the post-unpack body of [user_step_holds] --
+     everything after the [ustep_case] disjunction is destructed -- as a
+     reusable lemma over the UNPACKED frame resources.  [user_step_holds]
+     is now a thin wrapper feeding it [Hclass]; [user_step_holds_full]
+     (the spatial dispatcher) will reuse it for the non-memory branch. *)
+  Theorem ustep_case_sound E (Φ : mval -> iProp Σ)
+      (ms_v sc_v stval_v sepc_v va : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
     ↑minstretN ⊆ E ->
     upt_fault_wf root slots spec ->
-    (forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
-            (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
-        upt_tlb_ok spec tlbvec ->
-        _get_Mstatus_SXL ms_v = 'b"10" ->
-        ustep_case va ms_v g tlbvec) ->
-    hw_config -∗ minstret_inv -∗ user_step_obligation E Φ.
+    upt_tlb_ok spec tlbvec ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    ustep_case va ms_v g tlbvec ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ ((user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) ∧
+       (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    intros HN Hfwf Hclass.
-    iIntros "#Hhw #Hinv".
-    rewrite /user_step_obligation.
-    iIntros "!> HP Hk".
-    rewrite {1}/user_frame.
-    iDestruct "HP" as (ms_v sc_v stval_v sepc_v va g tlbvec)
-      "(%HSXL & %Hok & Hhs & Hpriv & Hms & Hsc & Hstv & Hsepc & Htlbc & Hpc &
-        Hgpr & Hupt & #Hcode & Hdata & Hcfg)".
-    destruct (Hclass va ms_v g tlbvec Hok HSXL) as
+    intros HN Hfwf Hok HSXL Hcase.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hk".
+    destruct Hcase as
       [ (Hval & Hcanon)
       | [ (vpn & Hvpn & Hval & Hcanon & Hvpn_def)
         | [ (vpn & i & pte' & Hvec & Hchk & Hupd & Hval & Hcanon & Hvpn_def)
@@ -1753,6 +1772,29 @@ Section WpUserSteps.
                 HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
+  Qed.
+
+  Theorem user_step_holds E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_fault_wf root slots spec ->
+    (forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+            (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+        upt_tlb_ok spec tlbvec ->
+        _get_Mstatus_SXL ms_v = 'b"10" ->
+        ustep_case va ms_v g tlbvec) ->
+    hw_config -∗ minstret_inv -∗ user_step_obligation E Φ.
+  Proof.
+    intros HN Hfwf Hclass.
+    iIntros "#Hhw #Hinv".
+    rewrite /user_step_obligation.
+    iIntros "!> HP Hk".
+    rewrite {1}/user_frame.
+    iDestruct "HP" as (ms_v sc_v stval_v sepc_v va g tlbvec)
+      "(%HSXL & %Hok & Hhs & Hpriv & Hms & Hsc & Hstv & Hsepc & Htlbc & Hpc &
+        Hgpr & Hupt & #Hcode & Hdata & Hcfg)".
+    iApply (ustep_case_sound E Φ ms_v sc_v stval_v sepc_v va g tlbvec
+              HN Hfwf Hok HSXL (Hclass va ms_v g tlbvec Hok HSXL)
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg Hk").
   Qed.
 
 
