@@ -99,6 +99,7 @@ WpKernelvecNew.v
 WpIntrBits.v
 WpIntrCore.v
 WpUart.v
+RiscvAdequacy.v
 UmodeTrap.v
 CommonWalk.v
 UmodeFetch.v
