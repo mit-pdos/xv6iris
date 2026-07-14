@@ -15,8 +15,9 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodeCore.
 Require Import WpDecodeBridge.
 Require Import UmodeFetch UmodeFetchFault UmodeWalk.
@@ -190,6 +191,176 @@ Section DataFaultFrame.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
+  (* ---- s_x transport: the page walk reads PT-slot MEMORY (dischargeable
+     only at sigma, where mstate_interp sigma is held), but the model runs
+     [execute] at the POST-FETCH state s' = [set_reg sigma nextPC v] (mem
+     unchanged, only nextPC ticked).  These [_sx] clones extract the slot
+     bytes at sigma and re-run the PURE read_pte/walk reductions at s' with
+     s'-register lookups (= sigma's, via [tmig]/irrelevant_register_set) and
+     the sigma-extracted bytes (s'.(mem) = sigma.(mem) definitionally). ---- *)
+
+  (* one owned slot -> its [read_pte] fact AT s' = set_reg sigma nextPC v *)
+  Lemma upt_slot_read_pte_sx (a : mword 64) (w : bv 64) (dq : dfrac)
+      (σ : mstate) (v : mword 64) :
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    (a ↦₈{dq} w) -∗
+    ⌜exec (read_pte (Physaddr a) 8) (set_reg σ nextPC v)
+       = Some (Ok w, set_reg σ nextPC v)⌝.
+  Proof.
+    iIntros (HA Hord HR Hcov Hpter) "Hhw [Hreg [Hmem Hdev]] Hw".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.
+    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
+    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (word_pointsto_bytes with "Hw") as "Hbytes".
+    iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
+               σ.(mem) !! (pa_add a j) = Some (nth_byte w j)⌝)%I as %Hbf.
+    { iIntros (j Hj).
+      iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+    iAssert (⌜addr_is_ram a⌝)%I as %Hram.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+      iPureIntro. exact Hr0. }
+    iAssert (⌜addr_is_ram (pa_add a 7)⌝)%I as %Hram7.
+    { iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbytes") as "Hb7".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_ram with "Hb7") as %Hr7. iPureIntro. exact Hr7. }
+    iPureIntro.
+    pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
+    pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
+    destruct (Hpter pmar0 Hpma_all a) as (region & Hpmam & Hptep).
+    assert (HA' : pmpAddrMatchType_encdec_backwards
+              (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n (set_reg σ nextPC v).(sregs)) 0)) = TOR).
+    { unfold set_reg; cbn [sregs]. tmig. exact HA. }
+    assert (Hord' : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n (set_reg σ nextPC v).(sregs)) 0) = false).
+    { unfold set_reg; cbn [sregs]. tmig. exact Hord. }
+    assert (HR' : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n (set_reg σ nextPC v).(sregs)) 0)) ('b"1") = true).
+    { unfold set_reg; cbn [sregs]. tmig. exact HR. }
+    assert (Hpmam' : matching_pma_region (register_lookup pma_regions (set_reg σ nextPC v).(sregs)) (Physaddr a) 8 = Some region).
+    { unfold set_reg; cbn [sregs]. tmig. rewrite Lpma. exact Hpmam. }
+    assert (Hrange' : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n (set_reg σ nextPC v).(sregs)) 0)) 4)
+              (uint a) (uint (to_bits 64 8)) = PMP_Match).
+    { unfold set_reg; cbn [sregs]. tmig.
+      exact (ram_fetch_pmp a (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) 8 7
+               ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+               Hram Hram7 Hcov). }
+    assert (Lhtif' : register_lookup htif_tohost_base (set_reg σ nextPC v).(sregs) = None).
+    { unfold set_reg; cbn [sregs]. tmig. exact Lhtif. }
+    assert (Hbf' : forall j : nat, (N.of_nat j < 8)%N ->
+              (set_reg σ nextPC v).(mem) !! (pa_add a j) = Some (nth_byte w j)).
+    { unfold set_reg; cbn [mem]. exact Hbf. }
+    exact (exec_read_pte_S a region w (set_reg σ nextPC v)
+             HA' Hord' Hrange' HR' Hpmam' Hal Hptep
+             (within_clint_false a 8 (set_reg σ nextPC v) Hnc ltac:(lia))
+             (within_sig_false a 8 (set_reg σ nextPC v) Hns ltac:(lia))
+             (within_htif_false a 8 (set_reg σ nextPC v) Lhtif')
+             (addr_is_ram_not_dev _ Hram)
+             Hbf').
+  Qed.
+
+  (* the pt_walk-Err fact AT s' = set_reg sigma nextPC v (clone of
+     [upt_unmapped_walk_fault], slot reads via [upt_slot_read_pte_sx]) *)
+  Lemma upt_unmapped_walk_fault_sx (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (acc : MemoryAccessType mem_payload)
+      (mxr do_sum : bool) (σ : mstate) (v : mword 64) :
+    spec !! vpn = None ->
+    upt_fault_wf root slots spec ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exists f : PTW_Error,
+       exec (pt_walk 39 vpn acc User mxr do_sum root 2 false tt) (set_reg σ nextPC v)
+         = Some (Err (f, tt), set_reg σ nextPC v) /\
+       (f = PTW_Invalid_PTE tt \/ f = PTW_No_Permission tt)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf HA Hord HR Hcov Hpter) "#Hhw Hint [Hslots %Hspec]".
+    destruct (Hfwf vpn Hvpn) as
+      [ (w2 & Hs2 & Hi2)
+      | [ (w2 & w1 & Hs2 & Hv2 & Hn2 & Hs1 & Hi1)
+        | (w2 & w1 & w0 & Hs2 & Hv2 & Hn2 & Hs1 & Hv1 & Hn1 & Hs0 & Hleaf) ] ].
+    - iAssert (⌜exec (read_pte (Physaddr (uw_addr2 root vpn)) 8) (set_reg σ nextPC v)
+                 = Some (Ok w2, set_reg σ nextPC v)⌝)%I as %Hr2.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs2 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte_sx _ _ _ _ v HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iPureIntro. exists (PTW_Invalid_PTE tt). split; [|by left].
+      exact (exec_pt_walk_user_l2_invalid vpn acc User mxr do_sum root w2 (set_reg σ nextPC v) Hr2 Hi2).
+    - iAssert (⌜exec (read_pte (Physaddr (uw_addr2 root vpn)) 8) (set_reg σ nextPC v)
+                 = Some (Ok w2, set_reg σ nextPC v)⌝)%I as %Hr2.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs2 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte_sx _ _ _ _ v HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iAssert (⌜exec (read_pte (Physaddr (u_pte_addr (u_next_base w2)
+                        (subrange_vec_dec vpn 17 9))) 8) (set_reg σ nextPC v)
+                 = Some (Ok w1, set_reg σ nextPC v)⌝)%I as %Hr1.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs1 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte_sx _ _ _ _ v HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iPureIntro. exists (PTW_Invalid_PTE tt). split; [|by left].
+      apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root w2 _ (set_reg σ nextPC v) Hr2 Hv2 Hn2).
+      intros g' a.
+      exact (exec_rec_walk_l1_invalid vpn acc User mxr do_sum
+               (u_next_base w2) w1 g' a (set_reg σ nextPC v) Hr1 Hi1).
+    - iAssert (⌜exec (read_pte (Physaddr (uw_addr2 root vpn)) 8) (set_reg σ nextPC v)
+                 = Some (Ok w2, set_reg σ nextPC v)⌝)%I as %Hr2.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs2 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte_sx _ _ _ _ v HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iAssert (⌜exec (read_pte (Physaddr (u_pte_addr (u_next_base w2)
+                        (subrange_vec_dec vpn 17 9))) 8) (set_reg σ nextPC v)
+                 = Some (Ok w1, set_reg σ nextPC v)⌝)%I as %Hr1.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs1 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte_sx _ _ _ _ v HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iAssert (⌜exec (read_pte (Physaddr (u_pte_addr (u_next_base w1)
+                        (subrange_vec_dec vpn 8 0))) 8) (set_reg σ nextPC v)
+                 = Some (Ok w0, set_reg σ nextPC v)⌝)%I as %Hr0.
+      { iDestruct (big_sepM_lookup_acc _ _ _ _ Hs0 with "Hslots") as "[Hw _]".
+        iApply (upt_slot_read_pte_sx _ _ _ _ v HA Hord HR Hcov Hpter
+                  with "Hhw Hint Hw"). }
+      iPureIntro.
+      destruct Hleaf as [Hi0 | (Hv0 & Hl0 & Hden0)].
+      + exists (PTW_Invalid_PTE tt). split; [|by left].
+        apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root w2 _ (set_reg σ nextPC v) Hr2 Hv2 Hn2).
+        intros g' a.
+        apply (exec_rec_walk_l1_sub vpn acc User mxr do_sum
+                 (u_next_base w2) w1 g' _ a (set_reg σ nextPC v) Hr1 Hv1 Hn1).
+        intros g'' a0.
+        exact (exec_rec_walk_leaf_invalid vpn acc User mxr do_sum
+                 (u_next_base w1) w0 g'' a0 (set_reg σ nextPC v) Hr0 Hi0).
+      + exists (PTW_No_Permission tt). split; [|by right].
+        apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root w2 _ (set_reg σ nextPC v) Hr2 Hv2 Hn2).
+        intros g' a.
+        apply (exec_rec_walk_l1_sub vpn acc User mxr do_sum
+                 (u_next_base w2) w1 g' _ a (set_reg σ nextPC v) Hr1 Hv1 Hn1).
+        intros g'' a0.
+        exact (exec_rec_walk_leaf_noperm vpn acc User mxr do_sum
+                 (u_next_base w1) w0 g'' (PTE_No_Permission tt) a0 (set_reg σ nextPC v) Hr0 Hv0 Hl0
+                 (fun s0 => Hden0 acc mxr do_sum s0)).
+  Qed.
+
   (* frame-level: an UNMAPPED (or kernel-denied) data address page-faults,
      no state change -- the data analog of [upt_translateAddr_fetch_unmapped]. *)
   Lemma upt_translateAddr_load_unmapped (root : mword 44)
@@ -291,6 +462,128 @@ Section DataFaultFrame.
     exact (exec_translateAddr_store_walk_u_pagefault vpn root f va satp0 σ
              Lpriv LSXL HMPRV Lsatp Hmode Hasid Hroot
              (upt_lookup_TLB_unmapped spec vpn tlbvec σ Hvpn Hok Ltlb)
+             Hwalk Hte Hcanon Hvpn_def).
+  Qed.
+
+  (* ---- the s_x forms: the translate-Err fact AT the post-fetch state
+     [set_reg sigma nextPC v], for the LOAD/STORE fault Iris arms. ---- *)
+  Lemma upt_translateAddr_load_unmapped_sx (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (va satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) (v : mword 64) :
+    spec !! vpn = None ->
+    upt_fault_wf root slots spec ->
+    upt_tlb_ok spec tlbvec ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1" : mword 1) = false ->
+    register_lookup satp σ.(sregs) = satp0 ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (translateAddr (Virtaddr va) (Load Data)) (set_reg σ nextPC v)
+       = Some (Err (E_Load_Page_Fault tt, tt), set_reg σ nextPC v)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf Hok Lpriv LSXL HMPRV Lsatp Ltlb Hmode Hasid Hroot Hcanon Hvpn_def
+             HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_unmapped_walk_fault_sx root slots spec vpn (Load Data)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus (set_reg σ nextPC v).(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus (set_reg σ nextPC v).(sregs))) ('b"1"))
+                 σ v Hvpn Hfwf HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(f & Hwalk & Hf).
+    iPureIntro.
+    assert (Hte : exec (translationException (Load Data) f) (set_reg σ nextPC v)
+                    = Some (E_Load_Page_Fault tt, set_reg σ nextPC v)).
+    { destruct Hf as [-> | ->];
+        unfold translationException; cbn match; apply exec_returnm. }
+    assert (Lpriv' : register_lookup cur_privilege (set_reg σ nextPC v).(sregs) = User)
+      by (unfold set_reg; cbn [sregs]; tmig; exact Lpriv).
+    assert (LSXL' : _get_Mstatus_SXL (register_lookup mstatus (set_reg σ nextPC v).(sregs)) = 'b"10")
+      by (unfold set_reg; cbn [sregs]; tmig; exact LSXL).
+    assert (HMPRV' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus (set_reg σ nextPC v).(sregs))) ('b"1" : mword 1) = false)
+      by (unfold set_reg; cbn [sregs]; tmig; exact HMPRV).
+    assert (Lsatp' : register_lookup satp (set_reg σ nextPC v).(sregs) = satp0)
+      by (unfold set_reg; cbn [sregs]; tmig; exact Lsatp).
+    assert (Ltlb' : register_lookup tlb (set_reg σ nextPC v).(sregs) = tlbvec)
+      by (unfold set_reg; cbn [sregs]; tmig; exact Ltlb).
+    exact (exec_translateAddr_load_walk_u_pagefault vpn root f va satp0 (set_reg σ nextPC v)
+             Lpriv' LSXL' HMPRV' Lsatp' Hmode Hasid Hroot
+             (upt_lookup_TLB_unmapped spec vpn tlbvec (set_reg σ nextPC v) Hvpn Hok Ltlb')
+             Hwalk Hte Hcanon Hvpn_def).
+  Qed.
+
+  Lemma upt_translateAddr_store_unmapped_sx (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (va satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) (v : mword 64) :
+    spec !! vpn = None ->
+    upt_fault_wf root slots spec ->
+    upt_tlb_ok spec tlbvec ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1" : mword 1) = false ->
+    register_lookup satp σ.(sregs) = satp0 ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (translateAddr (Virtaddr va) (Store Data)) (set_reg σ nextPC v)
+       = Some (Err (E_SAMO_Page_Fault tt, tt), set_reg σ nextPC v)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf Hok Lpriv LSXL HMPRV Lsatp Ltlb Hmode Hasid Hroot Hcanon Hvpn_def
+             HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_unmapped_walk_fault_sx root slots spec vpn (Store Data)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus (set_reg σ nextPC v).(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus (set_reg σ nextPC v).(sregs))) ('b"1"))
+                 σ v Hvpn Hfwf HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(f & Hwalk & Hf).
+    iPureIntro.
+    assert (Hte : exec (translationException (Store Data) f) (set_reg σ nextPC v)
+                    = Some (E_SAMO_Page_Fault tt, set_reg σ nextPC v)).
+    { destruct Hf as [-> | ->];
+        unfold translationException; cbn match; apply exec_returnm. }
+    assert (Lpriv' : register_lookup cur_privilege (set_reg σ nextPC v).(sregs) = User)
+      by (unfold set_reg; cbn [sregs]; tmig; exact Lpriv).
+    assert (LSXL' : _get_Mstatus_SXL (register_lookup mstatus (set_reg σ nextPC v).(sregs)) = 'b"10")
+      by (unfold set_reg; cbn [sregs]; tmig; exact LSXL).
+    assert (HMPRV' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus (set_reg σ nextPC v).(sregs))) ('b"1" : mword 1) = false)
+      by (unfold set_reg; cbn [sregs]; tmig; exact HMPRV).
+    assert (Lsatp' : register_lookup satp (set_reg σ nextPC v).(sregs) = satp0)
+      by (unfold set_reg; cbn [sregs]; tmig; exact Lsatp).
+    assert (Ltlb' : register_lookup tlb (set_reg σ nextPC v).(sregs) = tlbvec)
+      by (unfold set_reg; cbn [sregs]; tmig; exact Ltlb).
+    exact (exec_translateAddr_store_walk_u_pagefault vpn root f va satp0 (set_reg σ nextPC v)
+             Lpriv' LSXL' HMPRV' Lsatp' Hmode Hasid Hroot
+             (upt_lookup_TLB_unmapped spec vpn tlbvec (set_reg σ nextPC v) Hvpn Hok Ltlb')
              Hwalk Hte Hcanon Hvpn_def).
   Qed.
 End DataFaultFrame.
