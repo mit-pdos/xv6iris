@@ -27,7 +27,7 @@ Require Import UmodeFetch UmodeEcall UptInv.
 Local Open Scope Z_scope.
 Import Defs.
 
-Require Import WpUserBase WpUserSteps WpUserMemStep.
+Require Import WpUserBase WpUserSteps WpUserMemStep WpUserDataFault.
 
 Section WpUserFull.
   Context `{!riscvGS Σ}.
@@ -56,6 +56,8 @@ Section WpUserFull.
   Local Notation wp_user_sw_frame := (WpUserMemStep.wp_user_sw_frame U).
   Local Notation wp_user_sh_frame := (WpUserMemStep.wp_user_sh_frame U).
   Local Notation wp_user_sb_frame := (WpUserMemStep.wp_user_sb_frame U).
+  Local Notation ustep_load_unmapped_fault := (WpUserDataFault.ustep_load_unmapped_fault U).
+  Local Notation ustep_store_unmapped_fault := (WpUserDataFault.ustep_store_unmapped_fault U).
 
   Definition ustep_mem_case (va ms_v : mword 64) (g : gmap regidx (mword 64))
       (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
@@ -331,8 +333,68 @@ Section WpUserFull.
        is_aligned_paddr (Physaddr paD) 1 = true /\
        (forall j : nat, (j < 1)%nat -> pa_add paD j ∈ data)).
 
+  (* the DATA-FAULT classification: the fetched word is a width-4 LOAD/STORE
+     whose effective address's vpn is UNMAPPED (spec!!vpnD=None), so the data
+     access page-faults into [user_trap_frame].  Packages exactly the pure
+     premises of [ustep_{load,store}_unmapped_fault] (the top-level
+     [upt_fault_wf], [upt_tlb_ok], [SXL] hyps of [user_step_holds_full] are
+     dropped -- they are already in scope). *)
+  Definition ustep_fault_case (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
+    (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4), s0)) /\
+       spec !! vpnD = None /\
+       is_aligned_vaddr (Virtaddr eaF) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD)
+    \/
+    (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs2 rs1 : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 4), s0)) /\
+       spec !! vpnD = None /\
+       is_aligned_vaddr (Virtaddr eaF) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD).
+
   (* the spatial-composed obligation: reduce [user_step_obligation] to the
-     success-path classification, dispatching memory words spatially *)
+     success-or-fault classification, dispatching memory/fault words spatially *)
   Theorem user_step_holds_full E (Φ : mval -> iProp Σ) :
     ↑minstretN ⊆ E ->
     upt_fault_wf root slots spec ->
@@ -340,7 +402,8 @@ Section WpUserFull.
             (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
         upt_tlb_ok spec tlbvec ->
         _get_Mstatus_SXL ms_v = 'b"10" ->
-        ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec) ->
+        ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+        \/ ustep_fault_case va ms_v g tlbvec) ->
     hw_config -∗ minstret_inv -∗ user_step_obligation E Φ.
   Proof.
     intros HN Hfwf Hfull.
@@ -351,7 +414,7 @@ Section WpUserFull.
     iDestruct "HP" as (ms_v sc_v stval_v sepc_v va g tlbvec)
       "(%HSXL & %Hok & Hhs & Hpriv & Hms & Hsc & Hstv & Hsepc & Htlbc & Hpc &
         Hgpr & Hupt & #Hcode & Hdata & Hcfg)".
-    destruct (Hfull va ms_v g tlbvec Hok HSXL) as [Hcase | Hmem].
+    destruct (Hfull va ms_v g tlbvec Hok HSXL) as [Hcase | [Hmem | Hfault]].
     - iApply (ustep_case_sound E Φ ms_v sc_v stval_v sepc_v va g tlbvec
                 HN Hfwf Hok HSXL Hcase
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg Hk").
@@ -399,6 +462,21 @@ Section WpUserFull.
         iApply (wp_user_sb_frame va vpn ie w vpnD ieD imm rs2 rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ
                   HN Hnowrap Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD HvecD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+    - (* fault branch: the data address is UNMAPPED -> page-fault trap frame *)
+      iAssert (▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I
+        with "[Hk]" as "HkT".
+      { iNext. iDestruct "Hk" as "[_ $]". }
+      destruct Hfault as [Hlf | Hsf].
+      + (* LOAD fault (width 4) *)
+        destruct Hlf as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_load_unmapped_fault va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
+      + (* STORE fault (width 4) *)
+        destruct Hsf as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_store_unmapped_fault va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
   Qed.
 
 End WpUserFull.
