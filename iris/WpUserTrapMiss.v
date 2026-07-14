@@ -77,6 +77,45 @@ Section WpUserTrapMiss.
   Notation ill_cause := (rv64d_types.Exception (E_Illegal_Instr tt)).
 
   (* ================================================================== *)
+  (* Shared tactic scaffolding for the trap-fetch MISS engines.  Every    *)
+  (* such engine opens with wp_exec_step_trapish_inv, reads the register   *)
+  (* file, walks + fills the data-less TLB, and fetches the trapping word  *)
+  (* through the filled state -- all IDENTICAL across illegal/ebreak/ecall.*)
+  (* These two Ltacs replay that shared prologue so each engine keeps only  *)
+  (* its own execute + exception tower + frame repack.                     *)
+  (* ================================================================== *)
+
+  (* Read every register cell the trap engines need, binding the standard
+     L<reg> names.  Assumes the reg interp is [Hreg] and the cells carry
+     the canonical hypothesis names introduced by the engines' iIntros. *)
+  Ltac umode_reg_valids :=
+    iDestruct (reg_valid with "Hreg Hpcr") as %Lpc;
+    iDestruct (reg_valid with "Hreg Hnpc") as %Lnpc;
+    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv;
+    iDestruct (reg_valid with "Hreg Hms") as %Lms;
+    iDestruct (reg_valid with "Hreg Hsc") as %Lsc;
+    iDestruct (reg_valid with "Hreg Htlbc") as %Ltlb;
+    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec;
+    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie;
+    iDestruct (reg_valid_dq with "Hreg Hmidl") as %Lmidl;
+    iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl;
+    iDestruct (reg_valid_dq with "Hreg Hmip") as %Lmip;
+    iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip;
+    iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip;
+    iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp;
+    iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv;
+    iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv;
+    iDestruct (reg_valid_dq with "Hreg Hmst0") as %Lmst0;
+    iDestruct (reg_valid_dq with "Hreg Hsst0") as %Lsst0;
+    iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc;
+    iDestruct (reg_valid_dq with "Hreg Hpmpa") as %Lpmpa;
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa;
+    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma;
+    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif;
+    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
+
+
+  (* ================================================================== *)
   (* The TLB-MISS trap-fetch engine: walk + fill + fetch + decode +      *)
   (* execute(->Illegal) + exception tower, landing in user_trap_frame     *)
   (* over the FILLED TLB.                                                  *)
@@ -151,30 +190,7 @@ Section WpUserTrapMiss.
     destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0).
     iApply (wp_exec_step_trapish_inv E Φ HN with "Hinv Hhs").
     iIntros (σ) "[Hreg [Hmem Hdev]]".
-    iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
-    iDestruct (reg_valid with "Hreg Hnpc") as %Lnpc.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hms") as %Lms.
-    iDestruct (reg_valid with "Hreg Hsc") as %Lsc.
-    iDestruct (reg_valid with "Hreg Htlbc") as %Ltlb.
-    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
-    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie.
-    iDestruct (reg_valid_dq with "Hreg Hmidl") as %Lmidl.
-    iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl.
-    iDestruct (reg_valid_dq with "Hreg Hmip") as %Lmip.
-    iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
-    iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip.
-    iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
-    iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
-    iDestruct (reg_valid_dq with "Hreg Hmst0") as %Lmst0.
-    iDestruct (reg_valid_dq with "Hreg Hsst0") as %Lsst0.
-    iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
-    iDestruct (reg_valid_dq with "Hreg Hpmpa") as %Lpmpa.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
-    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
+    umode_reg_valids.
     (* ---- walk-fill translate ---- *)
     assert (HA' : pmpAddrMatchType_encdec_backwards
               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
@@ -607,30 +623,7 @@ Section WpUserTrapMiss.
     destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0).
     iApply (wp_exec_step_trapish_inv E Φ HN with "Hinv Hhs").
     iIntros (σ) "[Hreg [Hmem Hdev]]".
-    iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
-    iDestruct (reg_valid with "Hreg Hnpc") as %Lnpc.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hms") as %Lms.
-    iDestruct (reg_valid with "Hreg Hsc") as %Lsc.
-    iDestruct (reg_valid with "Hreg Htlbc") as %Ltlb.
-    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
-    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie.
-    iDestruct (reg_valid_dq with "Hreg Hmidl") as %Lmidl.
-    iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl.
-    iDestruct (reg_valid_dq with "Hreg Hmip") as %Lmip.
-    iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
-    iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip.
-    iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
-    iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
-    iDestruct (reg_valid_dq with "Hreg Hmst0") as %Lmst0.
-    iDestruct (reg_valid_dq with "Hreg Hsst0") as %Lsst0.
-    iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
-    iDestruct (reg_valid_dq with "Hreg Hpmpa") as %Lpmpa.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
-    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
+    umode_reg_valids.
     assert (HA' : pmpAddrMatchType_encdec_backwards
               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
       by (rewrite Lpmpc; exact HpmpA).
@@ -991,30 +984,7 @@ Section WpUserTrapMiss.
     destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0).
     iApply (wp_exec_step_trapish_inv E Φ HN with "Hinv Hhs").
     iIntros (σ) "[Hreg [Hmem Hdev]]".
-    iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
-    iDestruct (reg_valid with "Hreg Hnpc") as %Lnpc.
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hms") as %Lms.
-    iDestruct (reg_valid with "Hreg Hsc") as %Lsc.
-    iDestruct (reg_valid with "Hreg Htlbc") as %Ltlb.
-    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
-    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie.
-    iDestruct (reg_valid_dq with "Hreg Hmidl") as %Lmidl.
-    iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl.
-    iDestruct (reg_valid_dq with "Hreg Hmip") as %Lmip.
-    iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
-    iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip.
-    iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
-    iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
-    iDestruct (reg_valid_dq with "Hreg Hmst0") as %Lmst0.
-    iDestruct (reg_valid_dq with "Hreg Hsst0") as %Lsst0.
-    iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
-    iDestruct (reg_valid_dq with "Hreg Hpmpa") as %Lpmpa.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
-    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
+    umode_reg_valids.
     assert (HA' : pmpAddrMatchType_encdec_backwards
               (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
       by (rewrite Lpmpc; exact HpmpA).
