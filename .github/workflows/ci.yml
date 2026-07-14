@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: coqdev
 
     steps:
       - uses: actions/checkout@v4
