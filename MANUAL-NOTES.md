@@ -25,6 +25,9 @@ Big things that still need to be done/explored:
   - flat model does instruction re-ordering, which means no sequential stepping through instructions
   - promising model requires future-write reasoning
   - DRF-SC is probably not sufficient to cover all kernel code
+  - not clear what the Iris program logic rules should look like for weak memory
+    - https://plv.mpi-sws.org/gps/
+    - https://people.mpi-sws.org/~haidang/publications/thesis.pdf
 - liveness, or at least deadlock avoidance
 - file system
 - virtual memory / page tables
