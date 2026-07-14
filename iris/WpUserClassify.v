@@ -453,6 +453,15 @@ Proof.
   apply exec_returnM.
 Qed.
 
+(* C_MUL is pure re-dispatch to a signed low-half MUL (no ExecuteAs work). *)
+Lemma exec_execute_C_MUL (rsdc rsc2 : cregidx) s :
+  exec (execute (C_MUL (rsdc, rsc2))) s
+  = Some (ExecuteAs (MUL (creg2reg_idx rsc2, creg2reg_idx rsdc, creg2reg_idx rsdc,
+                          {| mul_op_result_part := Low;
+                             mul_op_signed_rs1 := Signed;
+                             mul_op_signed_rs2 := Signed |})), s).
+Proof. reflexivity. Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* BTYPE execute-reductions for the four comparison ops not armed in
    WpMemsetS (BLT/BGE/BLTU/BGEU).  execute_BTYPE is uniform: read rs1/rs2,
@@ -2050,6 +2059,49 @@ Section WpUserClassify.
     destruct (creg2reg_idx rsd) as [rd] eqn:Hcd; destruct (creg2reg_idx rs2) as [r2] eqn:Hc2.
     apply (classify_c_rtypew va ms_v g tlbvec vpn i h (C_SUBW (rsd, rs2)) SUBW r2 rd rd Hf Hdec).
     - intro s. rewrite <- Hcd, <- Hc2. exact (exec_execute_C_SUBW rsd rs2 s).
+    - exact Hrd.
+  Qed.
+
+  (* Compressed op expanding to a retiring MUL op, rd<>x0 -> RVC MUL
+     disjunct 32 (base fact the MUL op-generic if-form). *)
+  Lemma classify_c_mulop (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction)
+      (mop : mul_op) (rs2 rs1 rd : mword 5) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (ExecuteAs (MUL (Regidx rs2, Regidx rs1, Regidx rd, mop)), s)) ->
+    uint rd <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hcfm & HisRVC) Hdec Hexp Hrd.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 31 right; left.
+    exists vpn, i, h, ii, mop,
+      (fun v1 v2 => mult_to_bits_half xlen (mop.(mul_op_signed_rs1))
+                      (mop.(mul_op_signed_rs2)) v1 v2 (mop.(mul_op_result_part))),
+      rs2, rs1, rd.
+    repeat split; try assumption; try exact Hexp.
+    intros rs2' rs1' rd' s Hrd'.
+    rewrite (exec_execute_MUL_if mop rs2' rs1' rd' s).
+    replace (Z.eqb (uint rd') 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd').
+    reflexivity.
+  Qed.
+
+  Lemma classify_c_mul (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (rsdc rsc2 : cregidx) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (C_MUL (rsdc, rsc2), s0)) ->
+    uint (match creg2reg_idx rsdc with Regidx r => r end) <> 0 ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrd.
+    destruct (creg2reg_idx rsdc) as [rd] eqn:Hcd; destruct (creg2reg_idx rsc2) as [r2] eqn:Hc2.
+    apply (classify_c_mulop va ms_v g tlbvec vpn i h (C_MUL (rsdc, rsc2))
+             {| mul_op_result_part := Low; mul_op_signed_rs1 := Signed; mul_op_signed_rs2 := Signed |}
+             r2 rd rd Hf Hdec).
+    - intro s. rewrite <- Hcd, <- Hc2. exact (exec_execute_C_MUL rsdc rsc2 s).
     - exact Hrd.
   Qed.
 
