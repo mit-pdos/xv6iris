@@ -59,6 +59,14 @@ Section WpUserFull.
   Local Notation medl_v := (WpUserBase.medl_v U).
   Local Notation ustep_lr_fault_u := (WpUserTrapish.ustep_lr_fault_u U).
   Local Notation ustep_sc_fault_u := (WpUserTrapish.ustep_sc_fault_u U).
+  Local Notation ustep_load_pf_4_u := (WpUserTrapish.ustep_load_pf_4_u U).
+  Local Notation ustep_load_pf_8_u := (WpUserTrapish.ustep_load_pf_8_u U).
+  Local Notation ustep_load_pf_2_u := (WpUserTrapish.ustep_load_pf_2_u U).
+  Local Notation ustep_load_pf_1_u := (WpUserTrapish.ustep_load_pf_1_u U).
+  Local Notation ustep_store_pf_4_u := (WpUserTrapish.ustep_store_pf_4_u U).
+  Local Notation ustep_store_pf_8_u := (WpUserTrapish.ustep_store_pf_8_u U).
+  Local Notation ustep_store_pf_2_u := (WpUserTrapish.ustep_store_pf_2_u U).
+  Local Notation ustep_store_pf_1_u := (WpUserTrapish.ustep_store_pf_1_u U).
   Local Notation ustep_load_unmapped_fault := (WpUserDataFault.ustep_load_unmapped_fault U).
   Local Notation ustep_store_unmapped_fault := (WpUserDataFault.ustep_store_unmapped_fault U).
   Local Notation ustep_load_unmapped_fault_8 := (WpUserDataFault.ustep_load_unmapped_fault_8 U).
@@ -352,7 +360,7 @@ Section WpUserFull.
       (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -378,7 +386,7 @@ Section WpUserFull.
     \/
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -404,7 +412,7 @@ Section WpUserFull.
     \/
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -430,7 +438,7 @@ Section WpUserFull.
     \/
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -456,7 +464,7 @@ Section WpUserFull.
     \/
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs2 rs1 : mword 5),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -482,7 +490,7 @@ Section WpUserFull.
     \/
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs2 rs1 : mword 5),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -508,7 +516,7 @@ Section WpUserFull.
     \/
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs2 rs1 : mword 5),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -534,7 +542,7 @@ Section WpUserFull.
     \/
     (exists vpn ie (w : mword 32) vpnD (imm : mword 12) (rs2 rs1 : mword 5),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       spec !! vpn = Some ie /\
        uw_check_ok (InstructionFetch tt) ie /\
        update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
@@ -706,44 +714,44 @@ Section WpUserFull.
       { iNext. iDestruct "Hk" as "[_ $]". }
       destruct Hfault as [Hl8 | [Hl4 | [Hl2 | [Hl1 | [Hs8 | [Hs4 | [Hs2 | [Hs1 | [Hlr | Hsc]]]]]]]]].
       + (* LOAD fault (width 8) *)
-        destruct Hl8 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_load_unmapped_fault_8 va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hl8 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_load_pf_8_u va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* LOAD fault (width 4) *)
-        destruct Hl4 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_load_unmapped_fault va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hl4 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_load_pf_4_u va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* LOAD fault (width 2) *)
-        destruct Hl2 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_load_unmapped_fault_2 va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hl2 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_load_pf_2_u va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* LOAD fault (width 1) *)
-        destruct Hl1 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_load_unmapped_fault_1 va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hl1 as (vpn & ie & w & vpnD & imm & rs1 & rd & is_unsigned & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_load_pf_1_u va vpn ie w vpnD rs1 rd imm is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* STORE fault (width 8) *)
-        destruct Hs8 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_store_unmapped_fault_8 va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hs8 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_store_pf_8_u va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* STORE fault (width 4) *)
-        destruct Hs4 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_store_unmapped_fault va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hs4 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_store_pf_4_u va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* STORE fault (width 2) *)
-        destruct Hs2 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_store_unmapped_fault_2 va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hs2 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_store_pf_2_u va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* STORE fault (width 1) *)
-        destruct Hs1 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hvec & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
-        iApply (ustep_store_unmapped_fault_1 va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                  HN Hok Hvec Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
+        destruct Hs1 as (vpn & ie & w & vpnD & imm & rs2 & rs1 & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD_none & HalignD & HcanonD & Hvpn_defD).
+        iApply (ustep_store_pf_1_u va vpn ie w vpnD rs2 rs1 imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD_none Hfwf HalignD HcanonD Hvpn_defD
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
       + (* LR access fault (atomic on non-reservable region) *)
         destruct Hlr as (vpn & ie & w & vpnD & ieD & rs1 & rd & aq & rl & Hsome & Hchk0 & HupdN & Hpbmt0 & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & HramD & HramD3 & Hresv & Hdel_loadaf).
