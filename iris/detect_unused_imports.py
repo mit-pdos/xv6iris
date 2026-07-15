@@ -559,8 +559,13 @@ def apply_edits(text: str, edits: list[Candidate], local_prefix: str) -> str:
 
 
 def apply_removals(dir_path: str, vfile: str, confirmed, local_prefix: str,
-                   include_rewrites: bool = False) -> int:
+                   include_rewrites: bool = False) -> tuple[int, int]:
     """Apply the build-confirmed edits of `confirmed` to `vfile` on disk.
+
+    Returns `(removed, repointed)` -- counted separately because they are not
+    the same change: a removal deletes dead code, a re-point swaps a forwarding
+    import for the module defining the name.  Callers report them apart rather
+    than describing a re-point as a "removed import".
 
     Re-parses the file and re-matches each candidate by (lineno, token), so this
     works both for freshly-verified results and for ones reloaded from a
@@ -580,7 +585,7 @@ def apply_removals(dir_path: str, vfile: str, confirmed, local_prefix: str,
     todo = [c for c in confirmed
             if getattr(c, "kind", "remove") == "remove" or include_rewrites]
     if not todo:
-        return 0
+        return (0, 0)
     path = os.path.join(dir_path, vfile)
     with open(path) as f:
         text = f.read()
@@ -599,7 +604,8 @@ def apply_removals(dir_path: str, vfile: str, confirmed, local_prefix: str,
                                via=list(getattr(c, "via", []))))
     with open(path, "w") as f:
         f.write(apply_edits(text, edits, local_prefix))
-    return len(edits)
+    n_rw = sum(1 for c in edits if c.kind == "rewrite")
+    return (len(edits) - n_rw, n_rw)
 
 
 def build(dir_path: str, vfile: str, flags: list[str] | None = None) -> tuple[bool, str]:
@@ -902,6 +908,9 @@ def main() -> int:
     if args.apply and not args.verify:
         ap.error("--apply requires --verify (refusing to delete unconfirmed "
                  "glob candidates)")
+    if args.apply_rewrites and not args.apply:
+        ap.error("--apply-rewrites requires --apply (it widens what --apply "
+                 "writes; on its own it would silently do nothing)")
 
     dir_path = os.path.abspath(args.dir)
     if shutil.which("opam") is None:
@@ -949,25 +958,32 @@ def main() -> int:
     # Apply LAST: verify_file() restores every file it touched, so the on-disk
     # text is the original one the candidates' line numbers refer to.
     if args.apply:
-        n_imports = n_files = 0
+        n_rm = n_rm_files = n_rw = n_rw_files = 0
         for r in results:
-            k = apply_removals(dir_path, r.vfile, r.removable, local_prefix,
-                               include_rewrites=args.apply_rewrites)
-            if k:
-                n_files += 1
-                n_imports += k
-                print(f"[apply] {r.vfile}: removed {k} import(s)",
+            rm, rw = apply_removals(dir_path, r.vfile, r.removable, local_prefix,
+                                    include_rewrites=args.apply_rewrites)
+            n_rm += rm
+            n_rw += rw
+            n_rm_files += bool(rm)
+            n_rw_files += bool(rw)
+            if rm or rw:
+                print(f"[apply] {r.vfile}: removed {rm}, re-pointed {rw}",
                       file=sys.stderr, flush=True)
-        # NB: `.github/workflows/dead-imports.yml` greps this exact wording to
-        # build its commit message -- keep the phrasing in sync with it.
-        print(f"[apply] removed {n_imports} import(s) across {n_files} file(s)",
+        # NB: `.github/workflows/dead-imports.yml` greps these two lines' exact
+        # wording to build its commit message -- keep the phrasing in sync.  The
+        # two counts stay separate: a re-point is not a removed import.
+        print(f"[apply] removed {n_rm} import(s) across {n_rm_files} file(s)",
               file=sys.stderr)
-        skipped = sum(1 for r in results for c in r.removable
-                      if getattr(c, "kind", "remove") == "rewrite")
-        if skipped and not args.apply_rewrites:
-            print(f"[apply] left {skipped} confirmed re-point(s) for a human "
-                  f"(see the report; --apply-rewrites applies them)",
-                  file=sys.stderr)
+        if args.apply_rewrites:
+            print(f"[apply] re-pointed {n_rw} import(s) across {n_rw_files} "
+                  f"file(s)", file=sys.stderr)
+        else:
+            skipped = sum(1 for r in results for c in r.removable
+                          if getattr(c, "kind", "remove") == "rewrite")
+            if skipped:
+                print(f"[apply] left {skipped} confirmed re-point(s) for a human "
+                      f"(see the report; --apply-rewrites applies them)",
+                      file=sys.stderr)
     return 0
 
 
