@@ -16,9 +16,11 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import SmodeCore WpIntrCore WpDecodeBridge.
 Require Import UmodeFetch UmodeEcall.
-Require Import UptInv UmodeData WpGprStore.
+Require Import UptInv.
+Require Import WpMmodeLeafBase.
 Require Import WpPushOffMem MemData4 UmodeData4.
-Require Import UmodeWalk WpUserComputeMiss.
+Require Import WpUserComputeMiss.
+Require Import CommonWalk.
 Local Open Scope Z_scope.
 Import Defs.
 

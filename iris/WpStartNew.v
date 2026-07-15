@@ -60,9 +60,18 @@ Require Import WpGprCsrwCommon.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode WpLeafCommon WpGpr.
-Require Import WpAuipc WpGprLui WpGprAddi WpMmodeShiftiop WpGprLogic WpMmodeJal WpGprStore WpGprRvc WpGprRvcTor.
+Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
+Require Import WpMmodeLeafBase.
+Require Import WpMmodeUtype.
+Require Import WpMmodeAddiw.
+Require Import WpMmodeItype.
+Require Import WpMmodeRtype.
+Require Import WpMmodeStore.
+Require Import WpMmodeJalr.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB WpGprCsrwC.
-Require Import WpGprMretWp WpGprMretNew.
+Require Import WpGprMretWp.
+Require Import WpMmodeLeafBase.
+Require Import WpMmodeMret.
 Require Import MinstretInv InstrBytes KernelText WpTimerinit.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.

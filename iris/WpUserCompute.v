@@ -34,7 +34,8 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import WpDecodeBridge.
 Require Import UmodeFetch UmodeEcall.
-Require Import UptInv WpAuipc WpMmodeShiftiop WpGprStore.
+Require Import UptInv WpAuipc WpMmodeShiftiop.
+Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
 Import Defs.
 

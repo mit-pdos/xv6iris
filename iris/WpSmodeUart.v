@@ -31,7 +31,7 @@ Require Import WpGpr.
 Require Import WpLoad WpMmodeLeafBase.
 Require Import WpSmodeGpr.
 Require Import WpUart.
-Require Import TrampPt TrampTlb.
+Require Import Pt4kWalk.
 Local Open Scope Z_scope.
 Import Defs.
 

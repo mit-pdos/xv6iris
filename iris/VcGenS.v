@@ -32,7 +32,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec WpGpr.
 Require Import MinstretInv InstrBytes.
-Require Import WpGprRvc.
+Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr.
 Require Import WpSmodeItype WpSmodeAddiw.
 Require Import VcGen.

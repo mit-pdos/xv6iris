@@ -28,8 +28,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import SmodeCore.
-Require Import UmodeWalk UptInv.
-Require Import TrampPt WpUserret WpGprRvcTor WpUserretEntry.
+Require Import UptInv.
+Require Import CommonWalk.
+Require Import TrampPt WpUserret WpUserretEntry.
+Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
 Import Defs.
 

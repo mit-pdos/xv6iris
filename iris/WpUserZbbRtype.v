@@ -16,7 +16,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import WpDecodeBridge.
 Require Import UmodeFetch UmodeEcall.
-Require Import UptInv ZicondGpr ZbbRtypeGpr.
+Require Import UptInv ZbbRtypeGpr.
 Require Import WpUserCompute.
 Local Open Scope Z_scope.
 Import Defs.

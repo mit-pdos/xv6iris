@@ -23,9 +23,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import SmodeCore.
-Require Import WpDecodeBridge.
-Require Import UmodeFetch UmodeFetchFault.
+Require Import UmodeFetch.
 Require Export CommonWalk.
 Local Open Scope Z_scope.
 Import Defs.

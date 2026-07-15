@@ -14,7 +14,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvExec RiscvFetchExec RiscvTryStep.
+Require Import RiscvLang RiscvExec RiscvTryStep.
 Require Import WpRvcBridge.
 Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.

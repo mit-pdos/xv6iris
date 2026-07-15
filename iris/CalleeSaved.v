@@ -22,7 +22,7 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import WpGprRvc.
+Require Import WpMmodeLeafBase.
 
 Definition callee_saved (m m' : gmap regidx (mword 64)) : Prop :=
   m' !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\                            (* x2  sp  *)

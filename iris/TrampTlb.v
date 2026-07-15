@@ -10,7 +10,6 @@ Require Import RiscvModelBytes RiscvLang RiscvExec RiscvExtras RiscvTryStep Risc
 Require Import WpGprCsrwCommon WpGprCsrwB.
 Require Import WpLeafCommon WpGpr WpLoad WpSmodeGpr.
 Require Import SmodeCore.
-Require Import TrampPt.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.

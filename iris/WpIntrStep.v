@@ -31,7 +31,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpGpr WpGprRvc.
+Require Import WpGpr.
+Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeSret KernelText.
 Require Import WpKernelvecNew.
 Require Import WpIntrBits WpIntrCore.

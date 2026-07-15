@@ -31,8 +31,15 @@ Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpLeafCommon KernelText WpAuipc.
-Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpPushOff.
+Require Import WpGpr.
+Require Import WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import WpSmodeAddiw.
+Require Import WpSmodeItype.
+Require Import WpSmodeJalr.
+Require Import WpSmodeRtype.
+Require Import WpSmodeShiftiop.
+Require Import WpSmodeUtype.
 Require Import WpMemsetInstr.
 Require Import WpRvcBridge.
 Require Import StackOwn.

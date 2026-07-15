@@ -16,7 +16,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 From Kernel Require KernelInstrs.
 Local Open Scope Z_scope.

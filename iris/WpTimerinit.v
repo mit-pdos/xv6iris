@@ -45,9 +45,16 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras WpDecode WpGpr.
-Require Import WpGprLui WpMmodeShiftiop WpGprLogic WpGprRvc WpGprRvcTor.
+Require Import WpMmodeShiftiop.
+Require Import WpMmodeLeafBase.
+Require Import WpMmodeUtype.
+Require Import WpMmodeItype.
+Require Import WpMmodeRtype.
+Require Import WpMmodeJalr.
+Require Import WpMmodeLoad.
+Require Import WpMmodeStore.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB.
-Require Import MinstretInv InstrBytes WpEntryNew.
+Require Import MinstretInv InstrBytes.
 Require Import KernelText.
 Require Import WpRvcBridge.
 Require Import StackOwn.

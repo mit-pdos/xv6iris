@@ -44,7 +44,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpDecode WpLeafCommon KernelText.
-Require Import WpGpr WpGprMret WpGprRvc.
+Require Import WpGpr WpGprMret.
+Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.

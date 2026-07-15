@@ -25,9 +25,17 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import MinstretInv InstrBytes.
 Require Import KernelText.
-Require Import WpGpr WpGprRvc.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
-Require Import WpMycpu WpCallMycpu WpAcquireMem.
+Require Import WpGpr.
+Require Import WpMmodeLeafBase.
+Require Import SmodeCore WpSmodeGpr WpKernelvecNew.
+Require Import WpSmodeBtype.
+Require Import WpSmodeItype.
+Require Import WpSmodeJalr.
+Require Import WpSmodeLoad.
+Require Import WpSmodeRtype.
+Require Import WpMycpu WpCallMycpu.
+Require Import WpSmodeBtype.
+Require Import WpSmodeLoad.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved StackOwn.
 Require Import WpHolding WpLock WpLockLeaves.

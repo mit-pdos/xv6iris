@@ -19,7 +19,8 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import MinstretInv InstrBytes.
-Require Import WpGpr WpGprLoad.
+Require Import WpGpr.
+Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr KernelText WpMemsetS.
 Require Import WpMemsetInstr.
 Require Import CalleeSaved.

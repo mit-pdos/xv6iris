@@ -34,9 +34,24 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import InstrBytes MinstretInv RiscvFetchExec WpGpr KernelText.
 Require Import WpLock.
-Require Import WpGprRvc.
-Require Import WpSmodeGpr WpMemsetS WpPushOff WpPushOffMem VcGen VcGenS.
-Require Import WpAcquireTop WpAcquireLock WpAcquireMem WpRelease WpMycpu WpPushOffTop.
+Require Import WpMmodeLeafBase.
+Require Import WpSmodeGpr VcGen VcGenS.
+Require Import WpSmodeBtype.
+Require Import WpSmodeItype.
+Require Import WpSmodeJal.
+Require Import WpSmodeJalr.
+Require Import WpSmodeLoad.
+Require Import WpSmodeRtype.
+Require Import WpSmodeStore.
+Require Import WpSmodeUtype.
+Require Import WpAcquireTop WpAcquireLock WpRelease WpMycpu.
+Require Import WpSmodeBtype.
+Require Import WpSmodeLoad.
+Require Import WpSmodeStore.
+Require Import WpSmodeItype.
+Require Import WpSmodeJal.
+Require Import WpSmodeJalr.
+Require Import WpSmodeRtype.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved.
 Require Import StackOwn.

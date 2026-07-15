@@ -12,9 +12,9 @@ From iris.base_logic.lib Require Import ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes WpLeafCommon WpGpr WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeGpr WpSpinNew.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import MinstretInv InstrBytes WpGpr WpMmodeLeafBase.
+Require Import SmodeCore.
 Require Import KernelText WpGprCsrwCommon WpSmodeJal StackOwn CalleeSaved WpMycpu.
 From Kernel Require KernelSyms.
 

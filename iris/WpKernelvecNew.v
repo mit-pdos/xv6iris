@@ -30,7 +30,8 @@ Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpLeafCommon.
-Require Import WpGpr WpGprRvc.
+Require Import WpGpr.
+Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr WpSmodeSret KernelText WpKvInstr.
 Require Import VcGen VcGenS.
 From Kernel Require KernelSyms.

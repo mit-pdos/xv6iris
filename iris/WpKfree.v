@@ -21,14 +21,30 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import RiscvLang RiscvPtsto.
 Require Import MinstretInv InstrBytes.
 Require Import KernelText WpAuipc.
-Require Import WpGpr WpMmodeShiftiop WpGprLui.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew WpPushOff.
-Require Import WpMycpu WpHolding WpAcquireMem.
+Require Import WpGpr.
+Require Import WpMmodeLeafBase.
+Require Import SmodeCore WpSmodeGpr WpKernelvecNew.
+Require Import WpSmodeBtype.
+Require Import WpSmodeItype.
+Require Import WpSmodeJal.
+Require Import WpSmodeJalr.
+Require Import WpSmodeLoad.
+Require Import WpSmodeRtype.
+Require Import WpSmodeShiftiop.
+Require Import WpSmodeStore.
+Require Import WpSmodeUtype.
+Require Import WpMycpu.
+Require Import WpSmodeBtype.
+Require Import WpSmodeLoad.
+Require Import WpSmodeStore.
 Require Import WpLock.
-Require Import WpAcquireLock WpRelease WpMemsetPage WpFreelistMem.
+Require Import WpAcquireLock WpRelease WpMemsetPage.
+Require Import WpSmodeBtype.
+Require Import WpSmodeLoad.
+Require Import WpSmodeStore.
 Require Import WpHoldingInv.
 Require Import StackOwn.
 Require Import CalleeSaved.

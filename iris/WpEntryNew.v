@@ -33,8 +33,14 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras WpDecode WpEntry WpGpr.
-Require Import WpAuipc WpGprLoad WpMmodeMul WpGprCsrr WpMmodeJal WpGprLui WpGprAddi WpGprLogic.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpDecode WpEntry WpGpr.
+Require Import WpAuipc WpMmodeMul WpMmodeJal.
+Require Import WpMmodeLeafBase.
+Require Import WpMmodeLoad.
+Require Import WpGprCsrrA.
+Require Import WpMmodeUtype.
+Require Import WpMmodeItype.
+Require Import WpMmodeRtype.
 Require Import MinstretInv InstrBytes KernelText.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.

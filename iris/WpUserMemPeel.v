@@ -22,7 +22,7 @@ From iris.base_logic.lib Require Import gen_heap.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto.
+Require Import RiscvModelBytes RiscvPtsto.
 Require Import SmodePte.
 Local Open Scope Z_scope.
 

@@ -19,8 +19,8 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodeCore.
-Require Import WpDecodeBridge.
-Require Import UmodeFetch UmodeFetchFault UmodeWalk.
+Require Import UmodeFetch.
+Require Import CommonWalk.
 Require Import UptInv.
 Require Import UmodeData.
 Require Import MemData4 MemData2 MemData1 WpGpr WpLoad UmodeLrsc.
