@@ -640,7 +640,7 @@ Section WpUserClassify.
      4-aligned canonical code page and is not compressed. *)
   Definition ufetch_hit (va : mword 64) (vpn : mword 27) (i : uwalk_info)
       (w : mword 32) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+    spec !! vpn = Some i /\
     uw_check_ok (InstructionFetch tt) i /\
     update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
     _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -661,7 +661,7 @@ Section WpUserClassify.
      halfword). *)
   Definition cfetch_hit (va : mword 64) (vpn : mword 27) (i : uwalk_info)
       (h : mword 16) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+    spec !! vpn = Some i /\
     uw_check_ok (InstructionFetch tt) i /\
     update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
     _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\

@@ -45,6 +45,11 @@ Require Import WpUserCompute.
 Require Import WpUserCtrl.
 Require Import WpUserComputeC.
 Require Import WpUserTrap.
+Require Import WpUserComputeMiss.
+Require Import WpUserCtrlU.
+Require Import WpUserComputeCU.
+Require Import WpUserTrapMiss.
+Require Import WpUserPrivU.
 Require Import WpUserMem.
 Require Import WpUserMemC.
 Require Import WpUserMem4.
@@ -103,50 +108,50 @@ Section WpUserSteps.
   Local Notation user_data := (WpUserBase.user_data U).
   Local Notation user_cfg := (WpUserBase.user_cfg U).
   Local Notation wp_user_exec := (WpUserBase.wp_user_exec U).
-  Local Notation ustep_branch_fall := (WpUserCtrl.ustep_branch_fall U).
-  Local Notation ustep_branch_taken := (WpUserCtrl.ustep_branch_taken U).
-  Local Notation ustep_c_branch_fall := (WpUserCtrl.ustep_c_branch_fall U).
-  Local Notation ustep_c_branch_taken := (WpUserCtrl.ustep_c_branch_taken U).
-  Local Notation ustep_c_compute1 := (WpUserComputeC.ustep_c_compute1 U).
-  Local Notation ustep_c_compute1_direct := (WpUserComputeC.ustep_c_compute1_direct U).
-  Local Notation ustep_c_ebreak := (WpUserTrap.ustep_c_ebreak U).
-  Local Notation ustep_c_illegal := (WpUserTrap.ustep_c_illegal U).
-  Local Notation ustep_c_ld_code := (WpUserMemC.ustep_c_ld_code U).
-  Local Notation ustep_c_itype := (WpUserComputeC.ustep_c_itype U).
-  Local Notation ustep_c_jal := (WpUserCtrl.ustep_c_jal U).
-  Local Notation ustep_c_jalr := (WpUserCtrl.ustep_c_jalr U).
-  Local Notation ustep_c_mul := (WpUserComputeC.ustep_c_mul U).
-  Local Notation ustep_c_nop := (WpUserComputeC.ustep_c_nop U).
-  Local Notation ustep_c_rtype := (WpUserComputeC.ustep_c_rtype U).
-  Local Notation ustep_c_rtype2 := (WpUserComputeC.ustep_c_rtype2 U).
-  Local Notation ustep_c_rtypew := (WpUserComputeC.ustep_c_rtypew U).
-  Local Notation ustep_c_shiftiop := (WpUserComputeC.ustep_c_shiftiop U).
-  Local Notation ustep_c_utype := (WpUserComputeC.ustep_c_utype U).
-  Local Notation ustep_compute1 := (WpUserCompute.ustep_compute1 U).
-  Local Notation ustep_ebreak := (WpUserTrap.ustep_ebreak U).
-  Local Notation ustep_ecall := (WpUserTrap.ustep_ecall U).
-  Local Notation ustep_fetch_adfault_hit := (WpUserFetch.ustep_fetch_adfault_hit U).
+  Local Notation ustep_branch_fall := (WpUserCtrlU.ustep_branch_fall_u U).
+  Local Notation ustep_branch_taken := (WpUserCtrlU.ustep_branch_taken_u U).
+  Local Notation ustep_c_branch_fall := (WpUserCtrlU.ustep_c_branch_fall_u U).
+  Local Notation ustep_c_branch_taken := (WpUserCtrlU.ustep_c_branch_taken_u U).
+  Local Notation ustep_c_compute1 := (WpUserComputeCU.ustep_c_compute1_u U).
+  Local Notation ustep_c_compute1_direct := (WpUserComputeCU.ustep_c_compute1_direct U).
+  Local Notation ustep_c_ebreak := (WpUserTrapMiss.ustep_c_ebreak_u U).
+  Local Notation ustep_c_illegal := (WpUserTrapMiss.ustep_c_illegal_u U).
+  Local Notation ustep_c_ld_code := (WpUserMemC.ustep_c_ld_code_u U).
+  Local Notation ustep_c_itype := (WpUserComputeCU.ustep_c_itype_u U).
+  Local Notation ustep_c_jal := (WpUserCtrlU.ustep_c_jal U).
+  Local Notation ustep_c_jalr := (WpUserCtrlU.ustep_c_jalr U).
+  Local Notation ustep_c_mul := (WpUserComputeCU.ustep_c_mul_u U).
+  Local Notation ustep_c_nop := (WpUserComputeCU.ustep_c_nop_u U).
+  Local Notation ustep_c_rtype := (WpUserComputeCU.ustep_c_rtype_u U).
+  Local Notation ustep_c_rtype2 := (WpUserComputeCU.ustep_c_rtype2_u U).
+  Local Notation ustep_c_rtypew := (WpUserComputeCU.ustep_c_rtypew_u U).
+  Local Notation ustep_c_shiftiop := (WpUserComputeCU.ustep_c_shiftiop_u U).
+  Local Notation ustep_c_utype := (WpUserComputeCU.ustep_c_utype_u U).
+  Local Notation ustep_compute1 := (WpUserComputeMiss.ustep_compute1_u U).
+  Local Notation ustep_ebreak := (WpUserTrapMiss.ustep_ebreak_u U).
+  Local Notation ustep_ecall := (WpUserTrapMiss.ustep_ecall_u U).
+  Local Notation ustep_fetch_adfault_hit := (WpUserFetch.ustep_fetch_adfault_u U).
   Local Notation ustep_fetch_noncanonical := (WpUserFetch.ustep_fetch_noncanonical U).
   Local Notation ustep_fetch_unmapped := (WpUserFetch.ustep_fetch_unmapped U).
-  Local Notation ustep_illegal := (WpUserTrap.ustep_illegal U).
-  Local Notation ustep_illegal_st := (WpUserTrap.ustep_illegal_st U).
-  Local Notation ustep_itype := (WpUserCompute.ustep_itype U).
-  Local Notation ustep_jal := (WpUserCtrl.ustep_jal U).
-  Local Notation ustep_jalr := (WpUserCtrl.ustep_jalr U).
-  Local Notation ustep_ld_code := (WpUserMem.ustep_ld_code U).
-  Local Notation ustep_lw_code := (WpUserMem4.ustep_lw_code U).
-  Local Notation ustep_c_lw_code := (WpUserMemC4.ustep_c_lw_code U).
-  Local Notation ustep_lh_code := (WpUserMem2.ustep_lh_code U).
-  Local Notation ustep_c_lh_code := (WpUserMemC2.ustep_c_lh_code U).
-  Local Notation ustep_lb_code := (WpUserMem1.ustep_lb_code U).
-  Local Notation ustep_c_lbu_code := (WpUserMemC1.ustep_c_lbu_code U).
-  Local Notation ustep_mul := (WpUserCompute.ustep_mul U).
-  Local Notation ustep_nop := (WpUserCompute.ustep_nop U).
-  Local Notation ustep_rtype := (WpUserCompute.ustep_rtype U).
-  Local Notation ustep_rtype2 := (WpUserCompute.ustep_rtype2 U).
-  Local Notation ustep_rtypew := (WpUserCompute.ustep_rtypew U).
-  Local Notation ustep_shiftiop := (WpUserCompute.ustep_shiftiop U).
-  Local Notation ustep_utype := (WpUserCompute.ustep_utype U).
+  Local Notation ustep_illegal := (WpUserPrivU.ustep_illegal_u U).
+  Local Notation ustep_illegal_st := (WpUserTrapMiss.ustep_illegal_st_u U).
+  Local Notation ustep_itype := (WpUserComputeMiss.ustep_itype_u U).
+  Local Notation ustep_jal := (WpUserCtrlU.ustep_jal U).
+  Local Notation ustep_jalr := (WpUserCtrlU.ustep_jalr U).
+  Local Notation ustep_ld_code := (WpUserMem.ustep_ld_code_u U).
+  Local Notation ustep_lw_code := (WpUserMem4.ustep_lw_code_u U).
+  Local Notation ustep_c_lw_code := (WpUserMemC4.ustep_c_lw_code_u U).
+  Local Notation ustep_lh_code := (WpUserMem2.ustep_lh_code_u U).
+  Local Notation ustep_c_lh_code := (WpUserMem2.ustep_c_lh_code_u U).
+  Local Notation ustep_lb_code := (WpUserMem1.ustep_lb_code_u U).
+  Local Notation ustep_c_lbu_code := (WpUserMem1.ustep_c_lbu_code_u U).
+  Local Notation ustep_mul := (WpUserComputeMiss.ustep_mul_u U).
+  Local Notation ustep_nop := (WpUserComputeMiss.ustep_nop_u U).
+  Local Notation ustep_rtype := (WpUserComputeMiss.ustep_rtype_u U).
+  Local Notation ustep_rtype2 := (WpUserComputeMiss.ustep_rtype2_u U).
+  Local Notation ustep_rtypew := (WpUserComputeMiss.ustep_rtypew_u U).
+  Local Notation ustep_shiftiop := (WpUserComputeMiss.ustep_shiftiop_u U).
+  Local Notation ustep_utype := (WpUserComputeMiss.ustep_utype_u U).
 
 
   (* the two compressed fetch modes, as one pure predicate (definitionally
@@ -185,7 +190,7 @@ Section WpUserSteps.
     \/
     (* 3: mapped, TLB hit, but the leaf needs an A update (ADUE = 0) *)
     (exists vpn i pte',
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = Some pte' /\
        is_aligned_vaddr (Virtaddr va) 4 = true /\
@@ -197,7 +202,7 @@ Section WpUserSteps.
     (* 4: fetch succeeds via a hit and the word is ECALL *)
     (exists vpn i,
        spec !! vpn = Some i /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        (forall j : nat, (j < 4)%nat ->
@@ -213,7 +218,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (op : iop)
             (f : mword 64 -> mword 12 -> mword 64)
             (imm : mword 12) (rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -244,7 +249,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (op : rop)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -276,7 +281,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (op : uop)
             (V : mword 20 -> mstate -> mword 64) (v : mword 64)
             (imm : mword 20) (rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -304,7 +309,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (op : sop)
             (f : mword 64 -> mword 6 -> mword 64)
             (shamt : mword 6) (rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -333,7 +338,7 @@ Section WpUserSteps.
     \/
     (* 9: fetch hit, retiring JAL (aligned target) *)
     (exists vpn i (w : mword 32) (imm : mword 21) (rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -354,7 +359,7 @@ Section WpUserSteps.
     \/
     (* 10: fetch hit, retiring JALR (aligned target from rs1) *)
     (exists vpn i (w : mword 32) (imm : mword 12) (rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -377,7 +382,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (ii : instruction),
        (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) /\
        is_lpad_instruction ii = false /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -397,7 +402,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (ii : instruction),
        (forall s, exec (execute ii) s = Some (Illegal_Instruction tt, s)) /\
        is_lpad_instruction ii = false /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -420,7 +425,7 @@ Section WpUserSteps.
           c (rvv rs1' s) (rvv rs2' s) = false ->
           exec (execute (BTYPE (imm', Regidx rs2', Regidx rs1', op))) s
             = Some (RETIRE_SUCCESS, s)) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -450,7 +455,7 @@ Section WpUserSteps.
             = Some (RETIRE_SUCCESS,
                     set_reg s nextPC (add_vec (register_lookup PC s.(sregs))
                                         (sign_extend' 64 imm')))) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -482,7 +487,7 @@ Section WpUserSteps.
                                 else register_lookup
                                        (R_bitvector_64 (gpr_of_Z (uint rs1'))) s.(sregs)))))) /\
        is_lpad_instruction (mk rs1 rd) = false /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -503,7 +508,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (w : mword 32) (imm : mword 12) (rs1 rd : mword 5) (v : mword 64),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -522,7 +527,7 @@ Section WpUserSteps.
           exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8), s0)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -538,7 +543,7 @@ Section WpUserSteps.
     (exists vpn i (h : mword 16) (ii : instruction) (op : iop)
             (f : mword 64 -> mword 12 -> mword 64)
             (imm : mword 12) (rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -568,7 +573,7 @@ Section WpUserSteps.
     (exists vpn i (h : mword 16) (ii : instruction) (op : rop)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -599,7 +604,7 @@ Section WpUserSteps.
     (exists vpn i (h : mword 16) (ii : instruction) (op : uop)
             (V : mword 20 -> mstate -> mword 64) (v : mword 64)
             (imm : mword 20) (rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -626,7 +631,7 @@ Section WpUserSteps.
     (exists vpn i (h : mword 16) (ii : instruction) (op : sop)
             (f : mword 64 -> mword 6 -> mword 64)
             (shamt : mword 6) (rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -666,7 +671,7 @@ Section WpUserSteps.
                                 else register_lookup
                                        (R_bitvector_64 (gpr_of_Z (uint rs1'))) s.(sregs)))))) /\
        is_lpad_instruction (mk rs1 rd) = false /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -684,7 +689,7 @@ Section WpUserSteps.
     \/
     (* 22: RVC fetch hit, compressed expanding to JAL (aligned target) *)
     (exists vpn i (h : mword 16) (ii : instruction) (imm : mword 21) (rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -704,7 +709,7 @@ Section WpUserSteps.
     \/
     (* 23: RVC fetch hit, compressed expanding to JALR (aligned target) *)
     (exists vpn i (h : mword 16) (ii : instruction) (imm : mword 12) (rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -730,7 +735,7 @@ Section WpUserSteps.
           c (rvv rs1' s) (rvv rs2' s) = false ->
           exec (execute (BTYPE (imm', Regidx rs2', Regidx rs1', op))) s
             = Some (RETIRE_SUCCESS, s)) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -760,7 +765,7 @@ Section WpUserSteps.
             = Some (RETIRE_SUCCESS,
                     set_reg s nextPC (add_vec (register_lookup PC s.(sregs))
                                         (sign_extend' 64 imm')))) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -781,7 +786,7 @@ Section WpUserSteps.
     (* 26: RVC fetch hit, a no-state-change retiring compressed instruction *)
     (exists vpn i (h : mword 16) (ii : instruction),
        (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -797,7 +802,7 @@ Section WpUserSteps.
     (* 27: RVC fetch hit, the compressed instruction is ILLEGAL -> trap *)
     (exists vpn i (h : mword 16) (ii : instruction),
        (forall s, exec (execute ii) s = Some (Illegal_Instruction tt, s)) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -822,7 +827,7 @@ Section WpUserSteps.
                             (F (if Z.eqb (uint rs1) 0 then zero_reg
                                 else register_lookup
                                        (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))))) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -840,7 +845,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (op : ropw)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -872,7 +877,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (mulop : mul_op)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -904,7 +909,7 @@ Section WpUserSteps.
     (exists vpn i (h : mword 16) (ii : instruction) (op : ropw)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -935,7 +940,7 @@ Section WpUserSteps.
     (exists vpn i (h : mword 16) (ii : instruction) (mulop : mul_op)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -966,7 +971,7 @@ Section WpUserSteps.
     (exists vpn i (w : mword 32) (mk2 : mword 5 -> mword 5 -> mword 5 -> instruction)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -999,7 +1004,7 @@ Section WpUserSteps.
     (exists vpn i (h : mword 16) (ii : instruction) (mk2 : mword 5 -> mword 5 -> mword 5 -> instruction)
             (f : mword 64 -> mword 64 -> mword 64)
             (rs2 rs1 rd : mword 5),
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1033,7 +1038,7 @@ Section WpUserSteps.
           exec (execute ii) s
             = Some (rv64d_types.Trap (User, make_sync_exception (E_Breakpoint Brk_Software) va, va), s)) /\
        is_lpad_instruction ii = false /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1052,7 +1057,7 @@ Section WpUserSteps.
     (* 36: RVC fetch hit, compressed expanding to a software BREAKPOINT trap *)
     (exists vpn i (h : mword 16) (ii : instruction),
        (forall s : mstate, exec (execute ii) s = Some (ExecuteAs (EBREAK tt), s)) /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1070,7 +1075,7 @@ Section WpUserSteps.
        (forall s, register_lookup cur_privilege s.(sregs) = User ->
           exec (execute ii) s = Some (Illegal_Instruction tt, s)) /\
        is_lpad_instruction ii = false /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1090,7 +1095,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (h : mword 16) (ii : instruction) (imm : mword 12) (rs1 rd : mword 5) (v : mword 64),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1108,7 +1113,7 @@ Section WpUserSteps.
           = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)), s)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -1124,7 +1129,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (w : mword 32) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) (v : mword 32),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1143,7 +1148,7 @@ Section WpUserSteps.
           exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4), s0)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -1159,7 +1164,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (h : mword 16) (ii : instruction) (imm : mword 12) (rs1 rd : mword 5) (v : mword 32),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1177,7 +1182,7 @@ Section WpUserSteps.
           = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 4)), s)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -1193,7 +1198,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (w : mword 32) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) (v : mword 16),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1212,7 +1217,7 @@ Section WpUserSteps.
           exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 2), s0)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -1228,7 +1233,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (h : mword 16) (ii : instruction) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) (v : mword 16),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1246,7 +1251,7 @@ Section WpUserSteps.
           = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 2)), s)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -1262,7 +1267,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (w : mword 32) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) (v : mword 8),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1281,7 +1286,7 @@ Section WpUserSteps.
           exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1), s0)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -1297,7 +1302,7 @@ Section WpUserSteps.
     (exists vpn i vpnD ieD (h : mword 16) (ii : instruction) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) (v : mword 8),
        let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
        let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn i) /\
+       spec !! vpn = Some i /\
        uw_check_ok (InstructionFetch tt) i /\
        update_PTE_Bits (uw_pte0 i) (InstructionFetch tt) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 i)) = ('b"00" : mword 2) /\
@@ -1315,7 +1320,7 @@ Section WpUserSteps.
           = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)), s)) /\
        uint rd <> 0 /\
        spec !! vpnD = Some ieD /\
-       vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = Some (upt_entry vpnD ieD) /\
+       spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
@@ -1476,300 +1481,300 @@ Section WpUserSteps.
     - (* A-bit fault on hit *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_fetch_adfault_hit va vpn i pte' ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hok Hvec Hchk Hupd HSXL Hval Hcanon Hvpn_def
+                tlbvec E Φ HN Hvec Hchk Hupd Hok HSXL Hval Hcanon Hvpn_def
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
     - (* ecall *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_ecall va vpn i ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hsome Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+                HN Hok Hsome Hchk Hupd Hcw HSXL Hval Hcanon Hvpn_def Hpaal
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
     - (* retiring ITYPE op *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_itype op f va vpn i w imm rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring RTYPE op *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_rtype op f va vpn i w rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring UTYPE op *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_utype op V v va vpn i w imm rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op HVeq Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op HVeq Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring SHIFTIOP op *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_shiftiop op f va vpn i w shamt rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring JAL *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_jal va vpn i w imm rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+                HN Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon Hvpn_def Hpaal
                 HnotRVC Hdec Hrd Halign0 Halign1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring JALR *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_jalr va vpn i w imm rs1 rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+                HN Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon Hvpn_def Hpaal
                 HnotRVC Hdec Hrd Halign0 Halign1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring NOP-like (no state change) *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_nop ii va vpn i w ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval Hcanon
+                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon
                 Hvpn_def Hpaal HnotRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* illegal instruction -> trap *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_illegal ii va vpn i w ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval Hcanon
+                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon
                 Hvpn_def Hpaal HnotRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
     - (* BTYPE branch not taken *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_branch_fall op c va vpn i w imm rs2 rs1 ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hcfalse
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* BTYPE branch taken *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_branch_taken op c va vpn i w imm rs2 rs1 ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hctrue Halign0 Halign1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* single-source compute (ADDIW etc.) *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_compute1 mk F va vpn i w rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* 8-byte LOAD from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_ld_code va vpn i w vpnD ieD imm rs1 rd v ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt Hcw HSXL HMPRV HMXR Hval
-                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HvecD HchkD HupdD HpbmtD
+                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hcw HSXL HMPRV HMXR Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
                 HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> retiring ITYPE *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_itype op f va vpn i h ii imm rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> retiring RTYPE *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_rtype op f va vpn i h ii rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> retiring UTYPE *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_utype op V v va vpn i h ii imm rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op HVeq Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op HVeq Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> retiring SHIFTIOP *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_shiftiop op f va vpn i h ii shamt rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> single-source compute *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_compute1 mk F va vpn i h ii rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op Hlpad Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> JAL *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_jal va vpn i h ii imm rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon Hvpn_def Hmode HisRVC
+                HN Hok Hvec Hchk Hupd HSXL Hcanon Hvpn_def Hmode HisRVC
                 Hdec Hexp Hrd Halign0 Halign1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> JALR *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_jalr va vpn i h ii imm rs1 rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon Hvpn_def Hmode HisRVC
+                HN Hok Hvec Hchk Hupd HSXL Hcanon Hvpn_def Hmode HisRVC
                 Hdec Hexp Hrd Halign0 Halign1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> BTYPE branch not taken *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_branch_fall op c va vpn i h ii imm rs2 rs1 ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hcfalse
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> BTYPE branch taken *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_branch_taken op c va vpn i h ii imm rs2 rs1 ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hctrue Halign0 Halign1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> NOP-like retire *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_nop ii va vpn i h ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon
+                HN Hexec_op Hok Hvec Hchk Hupd HSXL Hcanon
                 Hvpn_def Hmode HisRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed illegal -> trap *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_c_illegal ii va vpn i h ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon Hvpn_def
+                HN Hexec_op Hok Hvec Hchk Hupd HSXL Hcanon Hvpn_def
                 Hmode HisRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
     - (* compressed DIRECT single-source compute *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_compute1_direct F va vpn i h ii rs1 rd ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon
+                g tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL Hcanon
                 Hvpn_def Hmode HisRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring RTYPEW op *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_rtypew op f va vpn i w rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* retiring MUL *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_mul mulop f va vpn i w rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> retiring RTYPEW *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_rtypew op f va vpn i h ii rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> retiring MUL *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_mul mulop f va vpn i h ii rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* generic two-source compute (MULW/DIV/DIVW/REM/REMW/...) *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_rtype2 mk2 f va vpn i w rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hnlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval
+                tlbvec E Φ HN Hexec_op Hnlpad Hok Hvec Hchk Hupd Hcw HSXL Hval
                 Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> generic two-source compute *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_rtype2 mk2 f va vpn i h ii rs2 rs1 rd ms_v sc_v stval_v sepc_v g
-                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL
+                tlbvec E Φ HN Hexec_op Hok Hvec Hchk Hupd HSXL
                 Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* breakpoint trap (EBREAK) *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_ebreak ii va vpn i w ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval Hcanon
+                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon
                 Hvpn_def Hpaal HnotRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
     - (* compressed breakpoint trap (C_EBREAK) *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_c_ebreak ii va vpn i h ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hexec_op Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon Hvpn_def
+                HN Hexec_op Hok Hvec Hchk Hupd HSXL Hcanon Hvpn_def
                 Hmode HisRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
     - (* privileged instruction, illegal in User mode -> trap *)
       iDestruct "Hk" as "[_ HkT]".
       iApply (ustep_illegal_st ii va vpn i w ms_v sc_v stval_v sepc_v g tlbvec E Φ
-                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hpbmt Hcw HSXL Hval Hcanon
+                HN Hexec_op Hlpad Hok Hvec Hchk Hupd Hcw HSXL Hval Hcanon
                 Hvpn_def Hpaal HnotRVC Hdec
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
     - (* compressed -> 8-byte LOAD from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_ld_code va vpn i h ii vpnD ieD imm rs1 rd v ms_v sc_v stval_v
-                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt HSXL HMPRV HMXR
-                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HvecD HchkD
+                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd HSXL HMPRV HMXR
+                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HchkD
                 HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* width-4 LW/LWU from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_lw_code va vpn i w vpnD ieD imm rs1 rd is_unsigned v ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt Hcw HSXL HMPRV HMXR Hval
-                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HvecD HchkD HupdD HpbmtD
+                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hcw HSXL HMPRV HMXR Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
                 HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> width-4 C_LW from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_lw_code va vpn i h ii vpnD ieD imm rs1 rd v ms_v sc_v stval_v
-                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt HSXL HMPRV HMXR
-                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HvecD HchkD
+                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd HSXL HMPRV HMXR
+                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HchkD
                 HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* width-2 LH/LHU from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_lh_code va vpn i w vpnD ieD imm rs1 rd is_unsigned v ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt Hcw HSXL HMPRV HMXR Hval
-                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HvecD HchkD HupdD HpbmtD
+                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hcw HSXL HMPRV HMXR Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
                 HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> width-2 C_LH/C_LHU from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_lh_code va vpn i h ii vpnD ieD imm rs1 rd is_unsigned v ms_v sc_v stval_v
-                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt HSXL HMPRV HMXR
-                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HvecD HchkD
+                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd HSXL HMPRV HMXR
+                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HchkD
                 HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* width-1 LB/LBU from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_lb_code va vpn i w vpnD ieD imm rs1 rd is_unsigned v ms_v sc_v stval_v sepc_v
-                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt Hcw HSXL HMPRV HMXR Hval
-                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HvecD HchkD HupdD HpbmtD
+                g tlbvec E Φ HN Hok Hvec Hchk Hupd Hcw HSXL HMPRV HMXR Hval
+                Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
                 HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
     - (* compressed -> width-1 C_LBU from a code page *)
       iDestruct "Hk" as "[HkP _]".
       iApply (ustep_c_lbu_code va vpn i h ii vpnD ieD imm rs1 rd is_unsigned v ms_v sc_v stval_v
-                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd Hpbmt HSXL HMPRV HMXR
-                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HvecD HchkD
+                sepc_v g tlbvec E Φ HN Hok Hvec Hchk Hupd HSXL HMPRV HMXR
+                Hcanon Hvpn_def Hmode HisRVC Hdec Hexp Hrd HsomeD HchkD
                 HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
