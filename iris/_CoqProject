@@ -125,6 +125,7 @@ UmodeData1.v
 UmodeAmo4.v
 UmodeCsr.v
 UmodeLrsc.v
+UmodeLrscWalk.v
 UmodeDataFault.v
 WpUserLrsc.v
 WpUserDataFault.v
