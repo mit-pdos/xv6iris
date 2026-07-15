@@ -194,6 +194,7 @@ WpUserMem1.v
 WpUserMemC1.v
 WpUserAmo.v
 WpUserLrscMiss.v
+WpUserTrapish.v
 WpUserCsr.v
 WpUserZicond.v
 WpUserZbb.v
