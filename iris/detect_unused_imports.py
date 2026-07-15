@@ -68,6 +68,7 @@ Usage
   detect_unused_imports.py --dir . --verify --include-external   # also other packages
   detect_unused_imports.py --dir . --verify --files WpAdd.v WpAmo.v
   detect_unused_imports.py --dir . --verify --report unused_imports_report.md
+  detect_unused_imports.py --dir . --verify --apply   # delete them; then `make`
 """
 from __future__ import annotations
 
@@ -324,6 +325,37 @@ def rewrite_without(text: str, drop: list[Candidate]) -> str:
     return "\n".join(out_lines) + trailing_nl
 
 
+def apply_removals(dir_path: str, vfile: str, removable) -> int:
+    """Delete the build-confirmed `removable` imports from `vfile` on disk.
+
+    Re-parses the file and re-matches each candidate by (lineno, token), so this
+    works both for freshly-verified results and for ones reloaded from a
+    checkpoint (whose `stmt` is a stub carrying only lineno/raw).  A candidate
+    that no longer matches means the file moved under us since it was verified;
+    that is a hard error rather than a silent skip -- applying a stale removal
+    would delete the wrong line.
+    """
+    if not removable:
+        return 0
+    path = os.path.join(dir_path, vfile)
+    with open(path) as f:
+        text = f.read()
+    stmts = {s.lineno: s for s in parse_imports(text)}
+    drop: list[Candidate] = []
+    for c in removable:
+        stmt = stmts.get(c.stmt.lineno)
+        if stmt is None or c.token not in stmt.modules:
+            raise SystemExit(
+                f"apply: {vfile}:{c.stmt.lineno} no longer matches the verified "
+                f"import of `{c.token}` -- the file changed since verification; "
+                f"re-run without a stale --checkpoint"
+            )
+        drop.append(Candidate(stmt=stmt, token=c.token, full_path=c.full_path))
+    with open(path, "w") as f:
+        f.write(rewrite_without(text, drop))
+    return len(drop)
+
+
 def build(dir_path: str, vfile: str, flags: list[str] | None = None) -> tuple[bool, str]:
     """Compile <vfile> (writing its .vo/.glob). Return (ok, error_text).
 
@@ -543,6 +575,14 @@ def main() -> int:
                     help="build-confirm candidates (else: fast glob-only listing)")
     ap.add_argument("--all", action="store_true",
                     help="build-test EVERY import, ignoring the glob shortlist")
+    ap.add_argument("--apply", action="store_true",
+                    help="DELETE the build-confirmed removable imports from the "
+                         ".v files (requires --verify; the glob shortlist alone "
+                         "is ~half false positives and must never be applied). "
+                         "Single-file compiles do not prove the WHOLE tree still "
+                         "builds -- `Require` is transitive for LOADING, so a "
+                         "downstream file may reference a module this one pulled "
+                         "in.  Always run a full `make` afterwards.")
     ap.add_argument("--include-external", action="store_true",
                     help="also check imports of OTHER packages (SailStdpp, Riscv, "
                          "stdpp, iris.*, Kernel, Stdlib). Default: only this "
@@ -558,6 +598,10 @@ def main() -> int:
                     help="JSON file of per-file results; written after each file "
                          "and reused on restart (crash-resilient / partial harvest)")
     args = ap.parse_args()
+
+    if args.apply and not args.verify:
+        ap.error("--apply requires --verify (refusing to delete unconfirmed "
+                 "glob candidates)")
 
     dir_path = os.path.abspath(args.dir)
     if shutil.which("opam") is None:
@@ -599,6 +643,20 @@ def main() -> int:
         with open(args.report, "w") as f:
             f.write(report + "\n")
         print(f"\n[wrote {args.report}]", file=sys.stderr)
+
+    # Apply LAST: verify_file() restores every file it touched, so the on-disk
+    # text is the original one the candidates' line numbers refer to.
+    if args.apply:
+        n_imports = n_files = 0
+        for r in results:
+            k = apply_removals(dir_path, r.vfile, r.removable)
+            if k:
+                n_files += 1
+                n_imports += k
+                print(f"[apply] {r.vfile}: removed {k} import(s)",
+                      file=sys.stderr, flush=True)
+        print(f"[apply] removed {n_imports} import(s) across {n_files} file(s)",
+              file=sys.stderr)
     return 0
 
 
