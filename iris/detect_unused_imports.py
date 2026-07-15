@@ -62,9 +62,20 @@ Method (glob-shortlist + build-confirm)
    forwards to) and rebuild.  If it still builds, every candidate is genuinely
    applicable.  If it fails, fall back to one candidate at a time.  A candidate
    that still builds is CONFIRMED; one that breaks the build was actually NEEDED
-   (an instance/notation/hint false positive).  The file is ALWAYS restored to its
-   original bytes afterwards (and its `.vo` rebuilt from the original so the tree
-   stays green).
+   (an instance/notation/hint false positive).
+
+   A build-test NEVER touches the file under test.  The edited text is written to
+   a uniquely-named SIBLING copy (`Foo__dead_import_check_<pid>_<n>.v`) which coqc
+   compiles in its place, so the only artifacts written are that copy's own
+   `.vo`/`.glob` (deleted right after).  `Foo.v`, `Foo.vo` and `Foo.glob` are left
+   byte-identical throughout.  This is what makes step 3 SAFE TO RUN IN PARALLEL
+   (`--jobs`): files import each other, so a build-test that overwrote `Foo.vo`
+   -- even transiently, even with an identical-in-the-end rebuild -- would be read
+   half-written, or in its import-deleted form, by a concurrent test of a file
+   that requires `Foo`, silently corrupting that file's verdict.  A copy under a
+   fresh module name is imported by nobody, so nothing can observe it.  (The
+   `XV6_USE_MAKE=1` fallback builds the real target in place and is therefore
+   forced back to `--jobs 1`.)
 
 Caveats
 -------
@@ -90,6 +101,7 @@ Usage
 -----
   detect_unused_imports.py --dir .                  # list glob-only candidates (local pkg)
   detect_unused_imports.py --dir . --verify         # build-confirm candidates
+  detect_unused_imports.py --dir . --verify --jobs 8  # ... 8 files at a time
   detect_unused_imports.py --dir . --verify --all   # build-test ALL local imports
                                                     # (also covers unbuilt files)
   detect_unused_imports.py --dir . --allow-stale    # shortlist from out-of-date globs
@@ -101,13 +113,16 @@ Usage
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import hashlib
+import itertools
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass, field
 
 # ---------------------------------------------------------------------------
@@ -122,6 +137,13 @@ from dataclasses import dataclass, field
 SWITCH = os.environ.get("XV6_SWITCH", "/shared/xv6rocq")
 OPAM_PREFIX = ["opam", "exec", "--switch", SWITCH, "--"]
 USE_MAKE = os.environ.get("XV6_USE_MAKE") == "1"
+
+# Infix marking a build-test's throwaway copy of a file (see the module
+# docstring, step 3).  It is a legal Coq identifier fragment, so the copy's
+# module name is legal too, and it is distinctive enough that a real module can
+# never collide with it -- both properties are load-bearing.
+TEMP_MARK = "__dead_import_check_"
+_temp_counter = itertools.count()
 
 # Kinds of Coq stdlib prefixes we recognise as "already fully-qualified" logical
 # paths (so we do NOT prepend the local `-R .` prefix to them).
@@ -627,69 +649,115 @@ def build(dir_path: str, vfile: str, flags: list[str] | None = None) -> tuple[bo
     return ok, out
 
 
+def build_text(dir_path: str, vfile: str, text: str,
+               flags: list[str]) -> tuple[bool, str]:
+    """Compile `text` AS IF it were <vfile>, without touching <vfile>'s artifacts.
+
+    The text is written to a uniquely-named sibling copy and coqc is pointed at
+    that, so the compile writes only the copy's own `.vo`/`.glob` (removed on the
+    way out) and leaves `<vfile>`, `<vfile>.vo` and `<vfile>.glob` untouched.
+    That isolation is what lets build-tests of different files run concurrently:
+    they import each other's `.vo`, so an in-place test would hand a concurrent
+    test a `.vo` that is half-written or built from import-deleted source.
+
+    The copy is a SIBLING (not a tempdir) because it must sit under the same
+    `-R <dir> <prefix>` load path for its own `Require`s to resolve, and its
+    module name is `<vfile>`'s plus a unique suffix, so nothing requires it.
+    """
+    stem = f"{vfile[:-2]}{TEMP_MARK}{os.getpid()}_{next(_temp_counter)}"
+    litter = [os.path.join(dir_path, stem + ext)
+              for ext in (".v", ".vo", ".vos", ".vok", ".glob")]
+    litter.append(os.path.join(dir_path, f".{stem}.aux"))
+    try:
+        with open(os.path.join(dir_path, stem + ".v"), "w") as f:
+            f.write(text)
+        return build(dir_path, stem + ".v", flags)
+    finally:
+        for p in litter:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+
+
+def _narrow_candidates(res: FileResult, compiles) -> None:
+    """Split `res.candidates` into `removable`/`needed` using `compiles(cands)`.
+
+    `compiles` build-tests the file with exactly `cands` applied (and nothing
+    else), returning whether it still compiles; how that test is staged is the
+    caller's business (see `verify_file`).
+    """
+    # First: try removing ALL candidates at once (1 compile).
+    if compiles(res.candidates):
+        res.removable = list(res.candidates)
+        res.jointly_removable = True
+        return
+    # Fall back: one candidate at a time (each removed from the ORIGINAL,
+    # i.e. with every OTHER import still present).  This answers "is X
+    # redundant given the rest?".
+    for c in res.candidates:
+        if compiles([c]):
+            res.removable.append(c)
+        else:
+            res.needed.append(c)
+    # Individually-redundant does not guarantee JOINTLY removable (two
+    # imports might each cover for the other).  Confirm the whole
+    # `removable` set drops together; if not, greedily shrink it until the
+    # file compiles, moving the culprits back into `needed`.
+    if len(res.removable) > 1:
+        if compiles(res.removable):
+            res.jointly_removable = True
+        else:
+            res.jointly_removable = False
+            keep = list(res.removable)
+            # Greedily remove one at a time from the drop-set until it builds.
+            while keep:
+                if compiles(keep):
+                    break
+                moved = keep.pop()              # this one is NOT jointly-droppable
+                res.needed.append(moved)
+            res.removable = keep
+
+
 def verify_file(dir_path: str, res: FileResult, flags: list[str],
                 local_prefix: str) -> None:
-    """Build-confirm which of `res`'s candidate edits actually still compile."""
+    """Build-confirm which of `res`'s candidate edits actually still compile.
+
+    Every build-test compiles a throwaway COPY (`build_text`), so this touches
+    none of `res.vfile`'s own files and is safe to run concurrently with the
+    verification of any other file.  The one exception is `XV6_USE_MAKE=1`, whose
+    whole point is to drive the project's real make target: that has to edit the
+    file in place and rebuild its `.vo`, so it is serialised (`--jobs 1`).
+    """
     if not res.candidates:
         res.verified = True
         return
     path = os.path.join(dir_path, res.vfile)
     with open(path) as f:
         original = f.read()
-    backup = original
+
+    if not USE_MAKE:
+        _narrow_candidates(
+            res, lambda cands: build_text(
+                dir_path, res.vfile, apply_edits(original, cands, local_prefix),
+                flags)[0])
+        res.verified = True
+        return
 
     def write(cands):
         with open(path, "w") as f:
             f.write(apply_edits(original, cands, local_prefix))
 
-    def restore_and_rebuild():
-        with open(path, "w") as f:
-            f.write(backup)
-        build(dir_path, res.vfile, flags)  # leave a correct .vo behind
-
     try:
-        # First: try removing ALL candidates at once (1 compile).
-        write(res.candidates)
-        ok, _ = build(dir_path, res.vfile, flags)
-        if ok:
-            res.removable = list(res.candidates)
-            res.verified = True
-            res.jointly_removable = True
-            return
-        # Fall back: one candidate at a time (each removed from the ORIGINAL,
-        # i.e. with every OTHER import still present).  This answers "is X
-        # redundant given the rest?".
-        for c in res.candidates:
-            write([c])
-            ok, _ = build(dir_path, res.vfile, flags)
-            if ok:
-                res.removable.append(c)
-            else:
-                res.needed.append(c)
-        # Individually-redundant does not guarantee JOINTLY removable (two
-        # imports might each cover for the other).  Confirm the whole
-        # `removable` set drops together; if not, greedily shrink it until the
-        # file compiles, moving the culprits back into `needed`.
-        if len(res.removable) > 1:
-            write(res.removable)
-            ok, _ = build(dir_path, res.vfile, flags)
-            if ok:
-                res.jointly_removable = True
-            else:
-                res.jointly_removable = False
-                keep = list(res.removable)
-                # Greedily remove one at a time from the drop-set until it builds.
-                while keep:
-                    write(keep)
-                    ok, _ = build(dir_path, res.vfile, flags)
-                    if ok:
-                        break
-                    moved = keep.pop()          # this one is NOT jointly-droppable
-                    res.needed.append(moved)
-                res.removable = keep
+        def compiles(cands):
+            write(cands)
+            return build(dir_path, res.vfile, flags)[0]
+        _narrow_candidates(res, compiles)
         res.verified = True
     finally:
-        restore_and_rebuild()
+        with open(path, "w") as f:                # restore the original bytes
+            f.write(original)
+        build(dir_path, res.vfile, flags)         # leave a correct .vo behind
 
 
 # ---------------------------------------------------------------------------
@@ -896,6 +964,13 @@ def main() -> int:
     ap.add_argument("--include-export", action="store_true",
                     help="also consider `Require Export` lines (needs --full-make "
                          "to be sound; unsafe with single-file verify)")
+    ap.add_argument("--jobs", "-j", type=int, default=0,
+                    help="verify this many files concurrently (default: "
+                         "min(8, cpu count)). Each job is one coqc, and these "
+                         "are memory-hungry, so this is capped well below the "
+                         "core count; raise it if the box has the RAM. Files "
+                         "are build-tested through throwaway copies, so a job "
+                         "never sees another's edits. XV6_USE_MAKE=1 forces 1.")
     ap.add_argument("--files", nargs="*", default=None,
                     help="restrict to these .v files (default: all in --dir)")
     ap.add_argument("--report", default=None,
@@ -912,6 +987,16 @@ def main() -> int:
         ap.error("--apply-rewrites requires --apply (it widens what --apply "
                  "writes; on its own it would silently do nothing)")
 
+    jobs = args.jobs or min(8, os.cpu_count() or 1)
+    if jobs < 1:
+        ap.error("--jobs must be >= 1")
+    if USE_MAKE and jobs > 1:
+        # The make path edits the file in place and rebuilds the real .vo, which
+        # concurrent jobs would import mid-write.  Downgrade loudly.
+        print(f"warning: XV6_USE_MAKE=1 builds in place; forcing --jobs 1 "
+              f"(was {jobs})", file=sys.stderr)
+        jobs = 1
+
     dir_path = os.path.abspath(args.dir)
     if shutil.which("opam") is None:
         print("warning: `opam` not found; --verify will fail", file=sys.stderr)
@@ -922,14 +1007,21 @@ def main() -> int:
     if args.files:
         vfiles = sorted(args.files)
     else:
-        vfiles = sorted(f for f in os.listdir(dir_path) if f.endswith(".v"))
+        # Skip any build-test copy a killed run left behind: it is not a source
+        # file of this package, and analysing it would report its own imports.
+        vfiles = sorted(f for f in os.listdir(dir_path)
+                        if f.endswith(".v") and TEMP_MARK not in f)
 
     ckpt: dict[str, FileResult] = {}
     if args.checkpoint:
         for k, v in load_checkpoint(args.checkpoint).items():
             ckpt[k] = result_from_dict(v)
 
+    # Shortlist every file FIRST, serially: it is cheap (a .glob read), and the
+    # ExportGraph's memo tables are not thread-safe.  Only the build-confirm --
+    # the part that is minutes of coqc per file -- is parallelised.
     results: list[FileResult] = []
+    todo: list[FileResult] = []
     for vf in vfiles:
         if args.verify and vf in ckpt and ckpt[vf].verified:
             print(f"[skip] {vf}: from checkpoint", file=sys.stderr, flush=True)
@@ -939,14 +1031,31 @@ def main() -> int:
                            args.include_export, args.all, graph,
                            local_only=not args.include_external,
                            allow_stale=args.allow_stale)
+        results.append(res)
         if args.verify and res.candidates:
-            print(f"[verify] {vf}: {len(res.candidates)} candidate(s)...",
+            todo.append(res)
+
+    if todo:
+        # Each job compiles throwaway copies only (see build_text), so no job can
+        # observe another's edits -- concurrency changes the SPEED of --verify,
+        # never its verdicts.  The lock covers the shared checkpoint dict.
+        ckpt_lock = threading.Lock()
+
+        def verify_one(res: FileResult) -> None:
+            print(f"[verify] {res.vfile}: {len(res.candidates)} candidate(s)...",
                   file=sys.stderr, flush=True)
             verify_file(dir_path, res, flags, local_prefix)
-        results.append(res)
-        if args.checkpoint and args.verify:
-            ckpt[vf] = res
-            save_checkpoint(args.checkpoint, ckpt)
+            if args.checkpoint:
+                with ckpt_lock:
+                    ckpt[res.vfile] = res
+                    save_checkpoint(args.checkpoint, ckpt)
+            print(f"[done] {res.vfile}: {len(res.removable)} confirmed, "
+                  f"{len(res.needed)} needed", file=sys.stderr, flush=True)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+            futures = [pool.submit(verify_one, r) for r in todo]
+            for fut in concurrent.futures.as_completed(futures):
+                fut.result()   # re-raise in the main thread rather than swallow
 
     report = render_report(results, verified_mode=args.verify)
     print(report)
@@ -955,8 +1064,9 @@ def main() -> int:
             f.write(report + "\n")
         print(f"\n[wrote {args.report}]", file=sys.stderr)
 
-    # Apply LAST: verify_file() restores every file it touched, so the on-disk
-    # text is the original one the candidates' line numbers refer to.
+    # Apply LAST, and single-threaded: verification build-tests copies (or, under
+    # XV6_USE_MAKE, restores what it edited), so the on-disk text here is still
+    # the original one the candidates' line numbers refer to.
     if args.apply:
         n_rm = n_rm_files = n_rw = n_rw_files = 0
         for r in results:

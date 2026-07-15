@@ -105,6 +105,13 @@ jobs:
       # XV6_SWITCH overrides the checker's hard-coded dev switch
       # (/shared/xv6rocq) so its `opam exec --switch=... -- coqc` targets the
       # project-local switch built above.
+      #
+      # The build-confirm runs several files at a time (the checker's --jobs
+      # defaults to min(8, nproc); raise it here if the runner has RAM to
+      # spare).  Each test compiles a throwaway copy of the file rather than the
+      # file itself, so concurrent jobs never read a .vo another job is
+      # rewriting -- parallelism buys wall-clock only, and cannot change a
+      # verdict.
       - name: Remove dead imports
         id: apply
         working-directory: iris
