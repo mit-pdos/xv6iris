@@ -11,13 +11,12 @@ From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import SmodeCore WpGpr WpLoad.
-Require Import UmodeFetch MemData4 UmodeData.
-Require Import CommonWalk RiscvPtsto.
-Require Import UmodeAmo4 UmodeLrsc.
+Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import WpGpr WpLoad.
+Require Import UmodeFetch MemData4.
+Require Import CommonWalk.
+Require Import UmodeLrsc.
 Local Open Scope Z_scope.
 Import Defs.
 
