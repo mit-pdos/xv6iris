@@ -9,6 +9,14 @@ name: Dead imports
 # repeats ci.yml's build (same steps, same cached opam switch) and only then
 # runs the checker.  --apply then deletes the confirmed set.
 #
+# The build below is also what makes the checker's shortlist meaningful at all:
+# a file with no/outdated .glob is reported UNANALYSED rather than having every
+# one of its imports flagged, so an unbuilt tree here would silently sweep
+# nothing.  The checker also reports "re-points" (an import that only forwards a
+# name via `Require Export`, e.g. the deliberate WpGpr* shims).  Those are NOT
+# dead code and --apply leaves them alone -- they are a layering judgement for a
+# human, so this job only surfaces them in the run summary.
+#
 # WHY THE FULL REBUILD BELOW IS NOT OPTIONAL: --verify only proves each file
 # still compiles on its own.  `Require` is transitive for LOADING, so a
 # downstream file may reference a module that this file's import was what
@@ -99,13 +107,18 @@ jobs:
           XV6_SWITCH: ${{ github.workspace }}
         run: |
           python3 detect_unused_imports.py --dir . --verify --apply \
-            2>&1 | tee "$RUNNER_TEMP/apply.log"
+            --report "$RUNNER_TEMP/report.md" 2>&1 | tee "$RUNNER_TEMP/apply.log"
 
           # `|| true`: the runner's shell is `bash -eo pipefail`, so a grep that
           # matches nothing would kill the step before the :- default is used.
           summary=$(grep -oE 'removed [0-9]+ import\(s\) across [0-9]+ file\(s\)' \
             "$RUNNER_TEMP/apply.log" | tail -1 || true)
           echo "summary=${summary:-removed dead imports}" >> "$GITHUB_OUTPUT"
+
+          # The report is the only record of the findings this job does NOT
+          # apply (re-points, and imports the shortlist flagged but the build
+          # proved were needed); the log is discarded with the runner.
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Any deletions?
         id: changed
