@@ -118,6 +118,9 @@ Section WpUserTrapish.
        (Hnpc : register_lookup nextPC s_x.(sregs) = add_vec_int va 4)
        (Hpr : register_lookup cur_privilege s_x.(sregs) = User)
        (Hms : register_lookup mstatus s_x.(sregs) = ms_v)
+       (Hsatp : register_lookup satp s_x.(sregs) = satp0)
+       (Hpmpc : register_lookup pmpcfg_n s_x.(sregs) = pmpcfg0)
+       (Hpmpa : register_lookup pmpaddr_n s_x.(sregs) = pmpaddr00)
        (Hag : agree_on D_u s_x dstateU)
        (Htl : register_lookup tlb s_x.(sregs)
               = vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))),
@@ -267,6 +270,9 @@ Section WpUserTrapish.
       by (unfold s_x; lk; reflexivity).
     assert (LprivX : register_lookup cur_privilege s_x.(sregs) = User) by (unfold s_x; lk; exact Lpriv).
     assert (LmsX : register_lookup mstatus s_x.(sregs) = ms_v) by (unfold s_x; lk; exact Lms).
+    assert (LsatpX : register_lookup satp s_x.(sregs) = satp0) by (unfold s_x; lk; exact Lsatp).
+    assert (LpmpcX : register_lookup pmpcfg_n s_x.(sregs) = pmpcfg0) by (unfold s_x; lk; exact Lpmpc).
+    assert (LpmpaX : register_lookup pmpaddr_n s_x.(sregs) = pmpaddr00) by (unfold s_x; lk; exact Lpmpa).
     assert (LtlbX : register_lookup tlb s_x.(sregs) = tlbvec) by (unfold s_x; lk; exact Ltlb).
     assert (HagX : agree_on D_u s_x dstateU).
     { unfold s_x.
@@ -274,7 +280,7 @@ Section WpUserTrapish.
                (agree_u σ Lpriv Lmenv' Lsenv Lmst0 Lsst0 Lmisa')). }
     (* --- invoke the fault-body callback at s_x --- *)
     rewrite <- Hfill_id in LtlbX.
-    iMod ("K" $! s_x LpcX LnpcX LprivX LmsX HagX LtlbX
+    iMod ("K" $! s_x LpcX LnpcX LprivX LmsX LsatpX LpmpcX LpmpaX HagX LtlbX
             with "[Htlbc] Hupt Hgpr [Hreg Hmem Hdev]")
       as (tc xv s' tlbvecD) "(%Hexec & %Hdel & %LpcS & %LtlbS & %HokD & Hσ' & Htlbc & Hupt & Hgpr)".
     { rewrite Hfill_id. iExact "Htlbc". }
@@ -429,6 +435,9 @@ Section WpUserTrapish.
        (Hnpc : register_lookup nextPC s_x.(sregs) = add_vec_int va 4)
        (Hpr : register_lookup cur_privilege s_x.(sregs) = User)
        (Hms : register_lookup mstatus s_x.(sregs) = ms_v)
+       (Hsatp : register_lookup satp s_x.(sregs) = satp0)
+       (Hpmpc : register_lookup pmpcfg_n s_x.(sregs) = pmpcfg0)
+       (Hpmpa : register_lookup pmpaddr_n s_x.(sregs) = pmpaddr00)
        (Hag : agree_on D_u s_x dstateU)
        (Htl : register_lookup tlb s_x.(sregs)
               = vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))),
@@ -610,6 +619,9 @@ Section WpUserTrapish.
       by (unfold s_x; lk; reflexivity).
     assert (LprivX : register_lookup cur_privilege s_x.(sregs) = User) by (unfold s_x, σ'; lk; exact Lpriv).
     assert (LmsX : register_lookup mstatus s_x.(sregs) = ms_v) by (unfold s_x, σ'; lk; exact Lms).
+    assert (LsatpX : register_lookup satp s_x.(sregs) = satp0) by (unfold s_x, σ'; lk; exact Lsatp).
+    assert (LpmpcX : register_lookup pmpcfg_n s_x.(sregs) = pmpcfg0) by (unfold s_x, σ'; lk; exact Lpmpc).
+    assert (LpmpaX : register_lookup pmpaddr_n s_x.(sregs) = pmpaddr00) by (unfold s_x, σ'; lk; exact Lpmpa).
     assert (LtlbX : register_lookup tlb s_x.(sregs)
                     = vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
     { unfold s_x, set_reg; cbn [sregs].
@@ -618,7 +630,7 @@ Section WpUserTrapish.
     assert (HagX : agree_on D_u s_x dstateU).
     { unfold s_x. exact (agree_u_set_nextPC σ' (add_vec_int va 4) HagXf). }
     (* --- invoke the fault-body callback at s_x --- *)
-    iMod ("K" $! s_x LpcX LnpcX LprivX LmsX HagX LtlbX
+    iMod ("K" $! s_x LpcX LnpcX LprivX LmsX LsatpX LpmpcX LpmpaX HagX LtlbX
             with "Htlbc Hupt Hgpr [Hreg Hmem Hdev]")
       as (tc xv s' tlbvecD) "(%Hexec & %Hdel & %LpcS & %LtlbS & %HokD & Hσ' & Htlbc & Hupt & Hgpr)".
     { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
@@ -770,6 +782,9 @@ Section WpUserTrapish.
        (Hnpc : register_lookup nextPC s_x.(sregs) = add_vec_int va 4)
        (Hpr : register_lookup cur_privilege s_x.(sregs) = User)
        (Hms : register_lookup mstatus s_x.(sregs) = ms_v)
+       (Hsatp : register_lookup satp s_x.(sregs) = satp0)
+       (Hpmpc : register_lookup pmpcfg_n s_x.(sregs) = pmpcfg0)
+       (Hpmpa : register_lookup pmpaddr_n s_x.(sregs) = pmpaddr00)
        (Hag : agree_on D_u s_x dstateU)
        (Htl : register_lookup tlb s_x.(sregs)
               = vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))),
