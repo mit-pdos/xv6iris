@@ -841,5 +841,222 @@ Section WpUserTrapish.
                       Hcode Hdata Hcfg K Hcont").
   Qed.
 
+  (* Validation: the LR data-empty-miss fault arm riding wp_exec_trapish_u.
+     No fetch-hit hypothesis; the data slot (distinct from the fetch slot)
+     is empty, so the data EA walks + fills inside execute, then LR faults. *)
+  Lemma ustep_lr_fault_dm_u
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (rs1 rd : mword 5) (aq rl : bool)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (zeros' 64) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd), s0)) ->
+    spec !! vpnD = Some ieD ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpnD) = None ->
+    tlb_hash (__id 39) vpnD <> tlb_hash (__id 39) vpn ->
+    uw_check_ok (LoadReserved Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (LoadReserved Data) = None ->
+    is_aligned_vaddr (Virtaddr eaF) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 4 = true ->
+    addr_is_ram paD ->
+    addr_is_ram (pa_add paD 3) ->
+    (forall region s0, matching_pma_region (register_lookup pma_regions s0.(sregs)) (Physaddr paD) 4 = Some region ->
+       (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) = RsrvNone) ->
+    bit_to_bool (access_vec_dec medl_v (uint (exceptionType_bits_forwards (E_Load_Access_Fault tt)))) = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec
+           HsomeD HvecD Hslot_ne HchkD HupdD HalignD HcanonD Hvpn_defD HpaalD
+           HramD HramD3 Hresv Hdel_loadaf.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             #Hcode Hdata Hcfg Hcont".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    assert (Hnlpad : is_lpad_instruction (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd)) = false)
+      by reflexivity.
+    iApply (wp_exec_trapish_u va vpn ie w (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd))
+              ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+              HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                    Hcode Hdata Hcfg [] Hcont").
+    (* ==== the fault-body callback ==== *)
+    iIntros (s_x Hpcx Hnpcx Hprx Hmsx Hsatpx Hpmpcx Hpmpax Hagx Htlx)
+            "Htlbc Hupt Hgpr Hσ".
+    iDestruct "Hσ" as "[Hreg [Hmem Hdev]]".
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa0x.
+    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpmax.
+    set (tlbvec_f := vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
+    assert (LmisaX : register_lookup misa s_x.(sregs) = MISA_C) by (rewrite Lmisa0x; exact Hmisa_val0).
+    assert (LmenvX : register_lookup menvcfg s_x.(sregs) = MENVCFG_S).
+    { rewrite (Hagx (R_bitvector_64 menvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (LsenvX : register_lookup senvcfg s_x.(sregs) = mword_of_int 0).
+    { rewrite (Hagx (R_bitvector_64 senvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (HMPRVX : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s_x.(sregs))) ('b"1") = false)
+      by (rewrite Hmsx; exact HMPRV).
+    assert (HMXRX : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s_x.(sregs))) ('b"0") = true)
+      by (rewrite Hmsx; exact HMXR).
+    assert (HSXLX : _get_Mstatus_SXL (register_lookup mstatus s_x.(sregs)) = 'b"10")
+      by (rewrite Hmsx; exact HSXL).
+    assert (HmodeX : _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s_x.(sregs))) = ('b"1000" : mword 4))
+      by (rewrite Hsatpx; exact Hsatpmode).
+    assert (HESX : exec (currentlyEnabled Ext_S) s_x = Some (true, s_x)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal. rewrite LmisaX.
+      rewrite Hmisa_val0 in HmisaS. exact HmisaS. }
+    iDestruct "Hgpr" as "[%Hdom Hfmap]".
+    assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (g !!! Regidx rs1) s_x with "Hreg Hr1c") as %Hrv1.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iAssert (gpr_file g) with "[Hfmap]" as "Hgpr".
+    { rewrite /gpr_file. iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
+    assert (Hea_x : add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                             else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                            (zeros' 64) = eaF)
+      by (unfold eaF; rewrite Hrv1; reflexivity).
+    assert (Heaeq : add_vec_int (bits_of_virtaddr (Virtaddr eaF)) (0 * 4) = eaF)
+      by (cbn [bits_of_virtaddr]; apply avi0_mul4).
+    assert (HvecDf : vec_access_dec tlbvec_f (tlb_hash (__id 39) vpnD) = None).
+    { unfold tlbvec_f. rewrite (vec64_access_update _ _ _ _ (tlb_hash_range vpn)).
+      replace (Z.eqb (tlb_hash (__id 39) vpnD) (tlb_hash (__id 39) vpn)) with false
+        by (symmetry; apply Z.eqb_neq; exact Hslot_ne).
+      exact HvecD. }
+    iDestruct (upt_walk_read_ptes root slots spec vpnD ieD s_x HsomeD
+                 ltac:(rewrite Hpmpcx; exact HpmpA)
+                 ltac:(rewrite Hpmpax; exact Hpmp_ord)
+                 ltac:(rewrite Hpmpcx; exact HpmpR)
+                 ltac:(rewrite Hpmpax; exact Hpmp_cov)
+                 Hpter
+                 with "Hhw [$Hreg $Hmem $Hdev] Hupt")
+      as %(Hrd2 & Hrd1 & Hrd0 & _).
+    destruct (Hspec vpnD ieD HsomeD) as (Hsl2 & Hsl1 & Hsl0 & Hwf).
+    destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0D).
+    assert (Hpaw : u_walk_pa (uw_pte0 ieD) eaF = paD)
+      by (unfold paD; symmetry; exact (WpUserComputeMiss.u_pa_upt_entry_walk vpnD ieD eaF)).
+    set (tlbvecD := vec_update_dec (register_lookup tlb s_x.(sregs)) (tlb_hash (__id 39) vpnD)
+                      (Some (u_walk_entry vpnD (uw_pte2 ieD) (uw_pte1 ieD) (uw_pte0 ieD)
+                               (mword_of_int 0)))).
+    set (s' := set_reg s_x tlb tlbvecD).
+    assert (LprivX' : register_lookup cur_privilege s'.(sregs) = User)
+      by (unfold s', set_reg; cbn [sregs]; rewrite irrelevant_register_set; [ exact Hprx | vm_compute; reflexivity ]).
+    assert (LmsX' : register_lookup mstatus s'.(sregs) = ms_v)
+      by (unfold s', set_reg; cbn [sregs]; rewrite irrelevant_register_set; [ exact Hmsx | vm_compute; reflexivity ]).
+    assert (HMPRVX' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false)
+      by (rewrite LmsX'; exact HMPRV).
+    assert (LpmpcX' : register_lookup pmpcfg_n s'.(sregs) = pmpcfg0)
+      by (unfold s', set_reg; cbn [sregs]; rewrite irrelevant_register_set; [ exact Hpmpcx | vm_compute; reflexivity ]).
+    assert (LpmpaX' : register_lookup pmpaddr_n s'.(sregs) = pmpaddr00)
+      by (unfold s', set_reg; cbn [sregs]; rewrite irrelevant_register_set; [ exact Hpmpax | vm_compute; reflexivity ]).
+    assert (LpmaX' : register_lookup pma_regions s'.(sregs) = pmar0)
+      by (unfold s', set_reg; cbn [sregs]; rewrite irrelevant_register_set; [ exact Lpmax | vm_compute; reflexivity ]).
+    assert (LpcXx' : register_lookup PC s'.(sregs) = va)
+      by (unfold s', set_reg; cbn [sregs]; rewrite irrelevant_register_set; [ exact Hpcx | vm_compute; reflexivity ]).
+    assert (Htr_x : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr eaF)) (0 * 4))) (LoadReserved Data)) s_x
+                    = Some (Ok (Physaddr paD, PBMT_PMA, init_ext_ptw), s')).
+    { rewrite Heaeq. rewrite <- Hpaw.
+      exact (exec_translateAddr_loadres_walk_u vpnD root (uw_pte2 ieD) (uw_pte1 ieD) (uw_pte0 ieD)
+               eaF satp0 MENVCFG_S (register_lookup tlb s_x.(sregs)) s_x
+               H2i H2nl H1i H1nl H0i H0nl HchkD H0N LmisaX Hprx HSXLX HMPRVX Hsatpx Hsatpmode Hasid Hroot
+               eq_refl ltac:(rewrite Htlx; exact HvecDf) HupdD Hrd2 Hrd1 Hrd0 LmenvX
+               ltac:(vm_compute; reflexivity) HcanonD Hvpn_defD). }
+    assert (Htea_x : exec (transform_effective_address
+              (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                                 (zeros' 64))) (LoadReserved Data)) s_x
+                    = Some (Virtaddr eaF, s_x)).
+    { rewrite Hea_x.
+      exact (exec_transform_effective_address_loadres_u eaF s_x
+               Hprx HMPRVX HMXRX HSXLX HESX LsenvX LmenvX HmodeX). }
+    assert (HrangeDX : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0)) 4)
+              (uint paD) (uint (to_bits 64 4)) = PMP_Match).
+    { rewrite LpmpaX'.
+      exact (ram_fetch_pmp paD (vec_access_dec pmpaddr00 0) 4 3
+               ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+               HramD HramD3 Hpmp_cov). }
+    assert (Hpmp_x : exec (pmpCheck (Physaddr paD) 4 (LoadReserved Data) User) s' = Some (None, s')).
+    { exact (exec_pmpCheck_user_grant_loadres paD 4 s'
+               ltac:(rewrite LpmpcX'; exact HpmpA)
+               ltac:(rewrite LpmpaX'; exact Hpmp_ord)
+               HrangeDX
+               ltac:(rewrite LpmpcX'; exact HpmpR)). }
+    destruct (Hpma_all paD 4) as (regionD & HpmamD & _ & _ & _ & _).
+    assert (HpmamDX : matching_pma_region (register_lookup pma_regions s'.(sregs)) (Physaddr paD) 4 = Some regionD)
+      by (rewrite LpmaX'; exact HpmamD).
+    assert (HresvX : (override_PMA (PMA_Region_attributes regionD) PBMT_PMA).(PMA_reservability) = RsrvNone)
+      by (exact (Hresv regionD s' HpmamDX)).
+    set (resf := rv64d_types.Trap (User, make_sync_exception (E_Load_Access_Fault tt) eaF, va)).
+    assert (Hexec_lr : exec (execute (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd))) s_x = Some (resf, s')).
+    { pose proof (exec_execute_LOADRES_fault_walk User rs1 rd eaF regionD s_x s' paD aq rl
+                    Htea_x HalignD LprivX' HMPRVX' Htr_x Hpmp_x HpmamDX HpaalD HresvX) as HE0.
+      unfold resf. rewrite LprivX' LpcXx' in HE0. exact HE0. }
+    iMod (reg_update _ tlb _ tlbvecD with "Hreg Htlbc") as "[Hreg Htlbc]".
+    assert (LtlbS : register_lookup tlb s'.(sregs) = tlbvecD)
+      by (unfold s'; lk; reflexivity).
+    assert (HokD : upt_tlb_ok spec tlbvecD).
+    { unfold tlbvecD.
+      exact (upt_tlb_ok_fill spec (register_lookup tlb s_x.(sregs)) vpnD ieD HsomeD
+               ltac:(rewrite Htlx; exact (upt_tlb_ok_fill spec tlbvec vpn ie Hsome Hok))). }
+    iModIntro.
+    iExists (E_Load_Access_Fault tt), eaF, s', tlbvecD.
+    iSplitR; [iPureIntro; exact Hexec_lr |].
+    iSplitR; [iPureIntro; exact Hdel_loadaf |].
+    iSplitR; [iPureIntro; exact LpcXx' |].
+    iSplitR; [iPureIntro; exact LtlbS |].
+    iSplitR; [iPureIntro; exact HokD |].
+    iSplitL "Hreg Hmem Hdev".
+    { rewrite /mstate_interp. unfold s', set_reg; cbn [sregs mem mdev].
+      iFrame "Hreg Hmem Hdev". }
+    iFrame "Htlbc Hupt Hgpr".
+  Qed.
+
 End WpUserTrapish.
 
