@@ -722,5 +722,109 @@ Section WpUserTrapish.
     iFrame "Hpcr Hnpc".
   Qed.
 
+
+  (* Combined trapish fetch engine: dispatch on the TLB slot. *)
+  Lemma wp_exec_trapish_u
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ii : instruction) (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ii, s0)) ->
+    is_lpad_instruction ii = false ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    (* the fault-body callback K, at the post-fetch state s_x *)
+    (∀ (s_x : mstate)
+       (Hpc : register_lookup PC s_x.(sregs) = va)
+       (Hnpc : register_lookup nextPC s_x.(sregs) = add_vec_int va 4)
+       (Hpr : register_lookup cur_privilege s_x.(sregs) = User)
+       (Hms : register_lookup mstatus s_x.(sregs) = ms_v)
+       (Hag : agree_on D_u s_x dstateU)
+       (Htl : register_lookup tlb s_x.(sregs)
+              = vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))),
+       tlb ↦ᵣ (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))) -∗
+       upt_inv root slots spec -∗
+       gpr_file g -∗
+       mstate_interp s_x ={E ∖ ↑minstretN}=∗
+       ∃ (tc : ExceptionType) (xv : mword 64) (s' : mstate)
+         (tlbvecD : vec (option TLB_Entry) (2 ^ 6)),
+         ⌜ exec (execute ii) s_x
+             = Some (rv64d_types.Trap (User, make_sync_exception tc xv, va), s') ⌝ ∗
+         ⌜ bit_to_bool (access_vec_dec medl_v
+              (uint (exceptionType_bits_forwards tc))) = true ⌝ ∗
+         ⌜ register_lookup PC s'.(sregs) = va ⌝ ∗
+         ⌜ register_lookup tlb s'.(sregs) = tlbvecD ⌝ ∗
+         ⌜ upt_tlb_ok spec tlbvecD ⌝ ∗
+         mstate_interp s' ∗
+         tlb ↦ᵣ tlbvecD ∗
+         upt_inv root slots spec ∗
+         gpr_file g) -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec Hnlpad.
+    assert (Hcw' : forall j : nat, (j < 4)%nat ->
+              code !! pa_add (u_walk_pa (uw_pte0 ie) va) j = Some (nth_byte w j)).
+    { intros j Hj. rewrite <- (u_pa_upt_entry_walk vpn ie va). exact (Hcw j Hj). }
+    assert (Hpaal' : is_aligned_paddr (Physaddr (u_walk_pa (uw_pte0 ie) va)) 4 = true).
+    { rewrite <- (u_pa_upt_entry_walk vpn ie va). exact Hpaal. }
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             #Hcode Hdata Hcfg K Hcont".
+    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hvacc.
+    - destruct (match_TLB_Entry ent (mword_of_int 0 : mword 16)
+                  (sign_extend' (57 - 12) vpn)) eqn:Hmatch.
+      + destruct (Hok vpn ent Hvacc) as (vpn'' & i & Hspec'' & _ & Hent).
+        subst ent.
+        pose proof (upt_entry_match_inj vpn'' vpn i Hmatch) as Hvv. subst vpn''.
+        rewrite Hsome in Hspec''. inversion Hspec''. subst i.
+        iApply (wp_exec_trapish_hit va vpn ie w ii ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hvacc Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+                  HnotRVC Hdec Hnlpad
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                        Hcode Hdata Hcfg K Hcont").
+      + iApply (wp_exec_trapish_miss va vpn ie w ii ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome (or_intror (ex_intro _ ent (conj Hvacc Hmatch)))
+                  Hchk0 HupdN Hpbmt0 Hcw' HSXL Hval Hcanon Hvpn_def Hpaal' HnotRVC Hdec Hnlpad
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                        Hcode Hdata Hcfg K Hcont").
+    - iApply (wp_exec_trapish_miss va vpn ie w ii ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hok Hsome (or_introl Hvacc)
+                Hchk0 HupdN Hpbmt0 Hcw' HSXL Hval Hcanon Hvpn_def Hpaal' HnotRVC Hdec Hnlpad
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg K Hcont").
+  Qed.
+
 End WpUserTrapish.
 
