@@ -20,6 +20,7 @@ Require Import WpUserFull.
 Require Import WpDecodeBridge.
 Require Import UmodeEcall.
 Require Import DecodeSetU.
+Require Import AlignBits.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -505,6 +506,57 @@ Section Total.
     intros Hf Hdec [Hfall | [Htaken [H0 H1]]].
     - exact (classify_btype_fall_dispatch va ms_v g tlbvec vpn ie w imm rs2 rs1 op Hf Hdec Hfall).
     - exact (classify_btype_taken_dispatch va ms_v g tlbvec vpn ie w imm rs2 rs1 op Hf Hdec Htaken H0 H1).
+  Qed.
+
+  (* H4 FRAGMENT (fetch-fault + compute): the 4-aligned branch of
+     [user_classify] for pages whose instructions are all compute/system
+     (classifiable).  Derives [is_aligned_vaddr .. 4 = true] from the low-bit
+     facts via [align4_of_low_bits], handles the NON-canonical pc itself
+     ([produce_noncanonical]), and delegates the canonical page verdict
+     (unmapped / execute-denied / A-update / classifiable-retire) to
+     [dispatch_4aligned_canonical].  Control-flow (BTYPE/JAL/JALR) and data
+     (LOAD/STORE) pages are additional verdict legs (dispatch_4aligned_btype,
+     classify_jal/jalr, and the produce_mem / produce_fault producers); the
+     full H4 unions all of them under the decode-family case-split. *)
+  Lemma dispatch_4aligned_compute
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (vpn : mword 27) :
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    ( neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true
+      \/ ( neq_vec (bits_of_virtaddr (Virtaddr va))
+             (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false
+           /\ ( spec !! vpn = None
+                \/ (exists i, spec !! vpn = Some i /\ uw_check_denied (InstructionFetch tt) i)
+                \/ (exists ie pte', spec !! vpn = Some ie /\
+                      uw_check_ok (InstructionFetch tt) ie /\
+                      update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = Some pte')
+                \/ (exists ie, spec !! vpn = Some ie /\
+                      uw_check_ok (InstructionFetch tt) ie /\
+                      update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+                      _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
+                      is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true /\
+                      (forall j : nat, (j < 4)%nat ->
+                         exists b, code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some b) /\
+                      (forall w : mword 32, ufetch_hit va vpn ie w tlbvec ->
+                         forall ii, decodable_u ii = true ->
+                           (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+                           classifiable_u ii = true) /\
+                      (forall h : mword 16, cfetch_hit va vpn ie h tlbvec ->
+                         forall ii, decodable_c ii = true ->
+                           (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+                           WpUserClassify.classifiable_c ii = true)) ) ) ) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hb0 Hb1 Hvpn Hcase.
+    assert (Hal : is_aligned_vaddr (Virtaddr va) 4 = true)
+      by (apply align4_of_low_bits; assumption).
+    destruct Hcase as [Hnc | [Hcanon Hverdict]].
+    - exact (produce_noncanonical va ms_v g tlbvec Hal Hnc).
+    - exact (dispatch_4aligned_canonical va ms_v g tlbvec vpn Hal Hcanon Hvpn Hverdict).
   Qed.
 
   (* TOP-LEVEL REDUCTION for [user_classify].  Splits the total classification
