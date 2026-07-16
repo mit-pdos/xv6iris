@@ -367,3 +367,43 @@ Section UserFetchFaultArm.
   Qed.
 
 End UserFetchFaultArm.
+
+(* --------------------------------------------------------------------- *)
+(* Flavor corollary 1: an ODD user pc -- E_Fetch_Addr_Align.               *)
+(* --------------------------------------------------------------------- *)
+Section UserFetchFaultFlavors.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (C : ucfg) (pt : upt).
+
+  Lemma wp_user_step_fetch_align E Φ
+      (ms_v sc_v stval_v sepc_v va : mword 64)
+      (g : gmap regidx (mword 64))
+      (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
+    ↑minstretN ⊆ E ->
+    user_mstatus_ok ms_v ->
+    u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
+    neq_vec (access_vec_dec va 0) ('b"0") = true ->
+    hw_config -∗
+    minstret_inv -∗
+    sig_meip ↦ᵣ{ dqe1 } meip -∗
+    sig_seip ↦ᵣ{ dqe2 } seip -∗
+    user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
+    upt_inv pt -∗
+    user_cfg C -∗
+    ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
+       user_trap_frame C pt -∗
+       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hmsok Hd Hodd) "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
+    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Addr_Align tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+              with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
+    iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok
+                               %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
+    iPureIntro.
+    exact (exec_fetch_align_fault σ va Lpc Hodd).
+  Qed.
+
+End UserFetchFaultFlavors.
