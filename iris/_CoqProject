@@ -110,6 +110,7 @@ UserExec.v
 UserStep.v
 UserTrap.v
 UserTranslate.v
+UserMem.v
 UserFetch.v
 WpIntrStep.v
 WpIntrInv.v
