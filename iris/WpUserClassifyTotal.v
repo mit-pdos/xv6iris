@@ -2294,6 +2294,87 @@ Section Total.
     - exact (Hrest ii Hdu Hcl Hdec).
   Qed.
 
+  (* dispatch_word_ctrl: [dispatch_word_total] extended to also route the
+     control-flow families (BTYPE / JAL / JALR) internally via the
+     [dispatch_4aligned_*] dispatchers, taking their runtime guards as
+     DECODE-CONDITIONED hypotheses (each fires only for the word that
+     actually decodes to that family; since decode is deterministic, at
+     most one is nonvacuous).  This leaves the residual [Hrest] to handle
+     only the data / atomic / trap remainder (LOAD / STORE / AMO / LOADRES
+     / STORECON / ECALL / WRS), a strictly smaller obligation than
+     [dispatch_word_total]'s.  The guards carry the documented 4-aligned-
+     target restriction (2-aligned compressed targets need the RETIRING
+     [exec_jump_to_zca] generalization). *)
+  Lemma dispatch_word_ctrl
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (* JAL guard (decode-conditioned): 4-aligned target. *)
+    (forall (imm : mword 21) (rd : mword 5),
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (JAL (imm, Regidx rd), s0)) ->
+       eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true /\
+       bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false) ->
+    (* JALR guard: rs1<>x0, 4-aligned target. *)
+    (forall (imm : mword 12) (rs1 rd : mword 5),
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (JALR (imm, Regidx rs1, Regidx rd), s0)) ->
+       uint rs1 <> 0 /\
+       eq_vec (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 0) ('b"0") = true /\
+       bit_to_bool (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 1) = false) ->
+    (* BTYPE guard: branch-condition + (taken-only) 4-aligned target. *)
+    (forall (imm : mword 13) (rs2 rs1 : mword 5) (op : bop),
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) ->
+       ( (match op with
+          | BEQ  => eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+          | BNE  => neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+          | BLT  => zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+          | BGE  => zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+          | BLTU => zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+          | BGEU => zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+          end)
+         \/ ((match op with
+          | BEQ  => eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+          | BNE  => neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+          | BLT  => zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+          | BGE  => zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+          | BLTU => zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+          | BGEU => zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+          end)
+          /\ eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true
+          /\ bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false) )) ->
+    (* residual: data / atomic / trap families. *)
+    (forall ii, decodable_u ii = true -> classifiable_u ii = false ->
+       (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+       ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+       \/ ustep_fault_case va ms_v g tlbvec) ->
+    ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+    \/ ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Huf HjalG HjalrG HbtypeG Hrest.
+    destruct (decode_total_u_set w) as (ii & Hdu & Hdec).
+    destruct (classifiable_u ii) eqn:Hcl.
+    - left. exact (WpUserClassify.classify_word U va ms_v g tlbvec vpn ie w ii Huf Hdec Hcl).
+    - destruct ii; try discriminate Hcl;
+        lazymatch goal with
+        | Hdec : forall _, _ -> exec _ _ = Some (JAL ?p, _) |- _ =>
+            destruct p as [imm r1]; destruct r1 as [rd];
+            destruct (HjalG imm rd Hdec) as [H0 H1];
+            left; exact (dispatch_4aligned_jal va ms_v g tlbvec vpn ie w imm rd Huf Hdec H0 H1)
+        | Hdec : forall _, _ -> exec _ _ = Some (JALR ?p, _) |- _ =>
+            destruct p as [[imm r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+            destruct (HjalrG imm rs1 rd Hdec) as [Hrs1 [H0 H1]];
+            left; exact (dispatch_4aligned_jalr va ms_v g tlbvec vpn ie w imm rs1 rd Huf Hdec Hrs1 H0 H1)
+        | Hdec : forall _, _ -> exec _ _ = Some (BTYPE ?p, _) |- _ =>
+            destruct p as [[[imm rs2r] r1] op]; destruct rs2r as [rs2]; destruct r1 as [rs1];
+            left; exact (dispatch_4aligned_btype va ms_v g tlbvec vpn ie w imm rs2 rs1 op Huf Hdec
+                           (HbtypeG imm rs2 rs1 op Hdec))
+        | _ => exact (Hrest _ Hdu Hcl Hdec)
+        end.
+  Qed.
+
 
 End Total.
 
