@@ -2147,6 +2147,39 @@ Section Total.
       HeaAl HeaCanon HvpnD Hverdict).
   Qed.
 
+  (* ================================================================ *)
+  (* dispatch_word_total: the H4 fetch-word reduction.  Given a 4-      *)
+  (* aligned fetch hit, decode the word (decode_total_u_set) and route: *)
+  (* if the decoded instruction is [classifiable_u] (all compute /      *)
+  (* system / trap / no-op families), it lands in [ustep_case] via      *)
+  (* [classify_word] -- handled here.  Otherwise (LOAD / STORE / AMO /   *)
+  (* BTYPE / JAL / JALR / LOADRES / STORECON / ECALL / WRS -- the        *)
+  (* families carrying runtime data/branch/target verdicts) the routing  *)
+  (* is delegated to [Hrest].  This isolates the classifiable majority   *)
+  (* (fully proved) from the verdict-bearing remainder, exactly as       *)
+  (* [classify_word_of_decode] isolates classifiability -- but total     *)
+  (* over the whole decode image, so the caller need only handle the     *)
+  (* non-classifiable constructors.                                      *)
+  (* ================================================================ *)
+  Lemma dispatch_word_total
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall ii, decodable_u ii = true -> classifiable_u ii = false ->
+       (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+       ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+       \/ ustep_fault_case va ms_v g tlbvec) ->
+    ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+    \/ ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Huf Hrest.
+    destruct (decode_total_u_set w) as (ii & Hdu & Hdec).
+    destruct (classifiable_u ii) eqn:Hcl.
+    - left. exact (WpUserClassify.classify_word U va ms_v g tlbvec vpn ie w ii Huf Hdec Hcl).
+    - exact (Hrest ii Hdu Hcl Hdec).
+  Qed.
+
 
 End Total.
 
