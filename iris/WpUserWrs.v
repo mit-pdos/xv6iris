@@ -46,6 +46,41 @@ Lemma wait_is_nop_WRS (arg : wrsop) :
   wait_is_nop (match arg with WRS_STO => WAIT_WRS_STO | WRS_NTO => WAIT_WRS_NTO end) = false.
 Proof. destruct arg; reflexivity. Qed.
 
+(* shouldWakeForInterrupt tt = (mip & mie) <> 0 : reads mip, mie. *)
+Lemma exec_shouldWakeForInterrupt (s : mstate) :
+  exec (shouldWakeForInterrupt tt) s
+    = Some (neq_vec (and_vec (register_lookup mip s.(sregs)) (register_lookup mie s.(sregs)))
+                    (zeros' 64), s).
+Proof.
+  unfold shouldWakeForInterrupt.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mip s)). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mie s)). cbn beta.
+  apply exec_returnm.
+Qed.
+
+(* Interrupt-wake exit: when (mip & mie) <> 0 the waiting hart exits the
+   wait -- writes hart_state HART_ACTIVE and produces a retiring step.  This
+   branch is INDEPENDENT of the valid_reservation axiom. *)
+Lemma exec_run_hart_waiting_wake
+    (step_no : Z) (wr : WaitReason) (instbits : mword 32) (ew : bool) (s : mstate) :
+  neq_vec (and_vec (register_lookup mip s.(sregs)) (register_lookup mie s.(sregs)))
+          (zeros' 64) = true ->
+  exec (run_hart_waiting step_no wr instbits ew) s
+    = Some (Step_Execute (Retire_Success tt, instbits),
+            set_reg s hart_state (HART_ACTIVE tt)).
+Proof.
+  intros Hwake.
+  unfold run_hart_waiting.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_shouldWakeForInterrupt s)). cbn beta.
+  rewrite Hwake. cbn match.
+  change (get_config_print_instr tt) with false. cbn match.
+  assert (Hinner : exec (returnm tt >> write_reg hart_state (HART_ACTIVE tt)) s
+                   = Some (tt, set_reg s hart_state (HART_ACTIVE tt))).
+  { rewrite (exec_bind0_Some _ _ _ _ _ (exec_returnm tt s)). apply exec_write_reg. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hinner).
+  apply exec_returnm.
+Qed.
+
 (* ===================================================================== *)
 (* ENGINE DESIGN for the (TODO) ustep_wrs wait-state arm (task #33),      *)
 (* scoped from run_hart_waiting (rv64d.v).  For a hart already in         *)
