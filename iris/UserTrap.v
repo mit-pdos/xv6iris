@@ -331,3 +331,27 @@ Section UserIntrArm.
   Qed.
 
 End UserIntrArm.
+
+(* ===================================================================== *)
+(* §4 Exception delegation at User: with the cause's medeleg bit set (and  *)
+(* S present), a synchronous exception from U delegates to Supervisor.     *)
+(* ===================================================================== *)
+Lemma exec_exception_delegatee_U (e : ExceptionType) (medl : mword 64) s :
+  register_lookup medeleg s.(sregs) = medl ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  bit_to_bool (access_vec_dec medl (uint (exceptionType_bits_forwards e))) = true ->
+  exec (exception_delegatee e User) s = Some (Supervisor, s).
+Proof.
+  intros Hmedl HES Hbit.
+  unfold exception_delegatee. cbv zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg medeleg s)). cbn beta.
+  rewrite Hmedl.
+  match goal with |- exec (Defs.bind ?L _) s = _ =>
+    assert (Hsup : exec L s = Some (true, s)) end.
+  { rewrite (exec_and_boolM_Some _ _ _ _ _ HES). cbn match.
+    rewrite Hbit. apply exec_returnm. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hsup). cbn beta. cbn match.
+  replace (zopz0zI_u (privLevel_to_bits Supervisor) (privLevel_to_bits User))
+    with false by (vm_compute; reflexivity).
+  cbn match. apply exec_returnm.
+Qed.
