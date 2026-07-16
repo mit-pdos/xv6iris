@@ -1117,4 +1117,32 @@ Section WpUserFull.
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkT").
   Qed.
 
+
+  (* the END-TO-END theorem at FULL coverage.  Identical to
+     [wp_user_exec_v1] (WpUserSteps.v) except the classification hypothesis is
+     the full three-way disjunction [ustep_case \/ ustep_mem_case \/
+     ustep_fault_case], dispatched by [user_step_holds_full] above (rather than
+     the [ustep_case]-only [user_step_holds]).  A total classifier
+     [user_classify] proving that disjunction for every [va] plugs directly in
+     here and yields the unconditional "runs user code forever" statement. *)
+  Theorem wp_user_exec_full E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_fault_wf root slots spec ->
+    (forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+            (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+        upt_tlb_ok spec tlbvec ->
+        _get_Mstatus_SXL ms_v = 'b"10" ->
+        ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+        \/ ustep_fault_case va ms_v g tlbvec) ->
+    hw_config -∗ minstret_inv -∗
+    user_frame -∗
+    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hfwf Hfull.
+    iIntros "#Hhw #Hinv HP Htr".
+    iApply (WpUserBase.wp_user_exec U E Φ with "[] HP Htr").
+    iApply (user_step_holds_full E Φ HN Hfwf Hfull with "Hhw Hinv").
+  Qed.
+
 End WpUserFull.
