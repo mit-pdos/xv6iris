@@ -11,6 +11,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import UmodeFetch.
+Require Import UptInv WpUserBase.
+Require Import WpUserSteps.
+Require Import WpUserClassify.
+Require Import WpUserFull.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -107,6 +112,79 @@ Proof.
   destruct j as [|[|j']]; try lia;
     first [ rewrite E0 | rewrite E1 ]; assumption.
 Qed.
+
+(* ==================================================================== *)
+(* Section: the fetch-side producers, against a LOCAL code-residence     *)
+(* hypothesis (baked into uctx at the end).                              *)
+(* ==================================================================== *)
+Section Total.
+  Context `{CID : CpuId}.
+  Context (U : WpUserBase.uctx).
+
+  Local Notation code := (WpUserBase.code U).
+  Local Notation spec := (WpUserBase.spec U).
+  Local Notation ufetch_hit := (WpUserClassify.ufetch_hit U).
+  Local Notation cfetch_hit := (WpUserClassify.cfetch_hit U).
+
+  (* For a 4-aligned, canonical, executable, A-set, mapped page whose
+     instruction bytes are resident in [code], the fetch either yields a
+     full 32-bit word ([ufetch_hit]) or a compressed halfword
+     ([cfetch_hit]) -- decided by [isRVC] of the low halfword.  This is
+     the core fetch-premise producer for the classification's decode step. *)
+  Lemma produce_fetch_4aligned
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    (forall j : nat, (j < 4)%nat ->
+       exists b, code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some b) ->
+    (exists w : mword 32, ufetch_hit va vpn ie w tlbvec)
+    \/ (exists h : mword 16, cfetch_hit va vpn ie h tlbvec).
+  Proof.
+    intros Hsome Hchk Hupd Hpbmt Hval Hcanon Hvpn_def Hpaal Hres.
+    destruct (bytes_to_word4 code
+                (fun j => pa_add (u_pa (upt_entry vpn ie) va vpn) j) Hres)
+      as [w Hcw].
+    destruct (isRVC (subrange_vec_dec w 15 0)) eqn:Hrvc.
+    - (* compressed: low halfword is an RVC instruction *)
+      right. exists (subrange_vec_dec w 15 0).
+      unfold WpUserClassify.cfetch_hit.
+      split; [exact Hsome |].
+      split; [exact Hchk |].
+      split; [exact Hupd |].
+      split; [exact Hpbmt |].
+      split; [exact Hcanon |].
+      split; [exact Hvpn_def |].
+      split.
+      + (* c_fetch_mode, 4-aligned branch *)
+        left. exists w.
+        split; [exact Hval |].
+        split; [exact Hpaal |].
+        split; [exact Hcw | reflexivity].
+      + exact Hrvc.
+    - (* full 32-bit instruction *)
+      left. exists w.
+      unfold WpUserClassify.ufetch_hit.
+      split; [exact Hsome |].
+      split; [exact Hchk |].
+      split; [exact Hupd |].
+      split; [exact Hpbmt |].
+      split; [exact Hcw |].
+      split; [exact Hval |].
+      split; [exact Hcanon |].
+      split; [exact Hvpn_def |].
+      split; [exact Hpaal | exact Hrvc].
+  Qed.
+
+End Total.
 
 (* ==================================================================== *)
 (* ROADMAP for the total classification (capstone, multi-session).      *)
