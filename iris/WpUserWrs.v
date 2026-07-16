@@ -127,6 +127,12 @@ Proof.
   destruct Hwr as [-> | ->]; cbn match; apply exec_returnm.
 Qed.
 
+(* (The timed-out WRS exit -- valid reservation, exit_wait = true -- also
+   exits to a retiring step, but its post-write continuation is shaped
+   differently from the wake/invalid tail, so it is deferred; the stay and
+   the wake/reservation-invalid exits already cover the engine's core
+   safety cases.) *)
+
 (* ===================================================================== *)
 (* ENGINE DESIGN for the (TODO) ustep_wrs wait-state arm (task #33),      *)
 (* scoped from run_hart_waiting (rv64d.v).  For a hart already in         *)
