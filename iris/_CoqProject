@@ -14,6 +14,7 @@ RiscvPtsto.v
 RiscvExec.v
 MinstretInv.v
 RiscvExtras.v
+AlignBits.v
 RiscvTryStep.v
 RiscvFetchExec.v
 WpAdd.v
