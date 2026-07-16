@@ -204,6 +204,7 @@ CboIllegal.v
 WpUserPriv.v
 WpUserSplitFetch.v
 WpUserSplitCompute.v
+WpUserSplitFault.v
 WpUserSteps.v
 WpUserClassify.v
 WpUserMemPeel.v
