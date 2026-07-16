@@ -2068,6 +2068,86 @@ Section Total.
   Qed.
 
 
+  (* ================================================================ *)
+  (* ufetch_hit bridges: consume the bundled fetch-hit premise         *)
+  (* (produce_fetch_4aligned's output) directly, so the exhaustiveness  *)
+  (* case-split routes a decoded LOAD/STORE from [ufetch_hit] + the     *)
+  (* MPRV/MXR facts + the eaF verdict in one call.                      *)
+  (* ================================================================ *)
+  Lemma dispatch_load_from_ufetch
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) (W : Z) :
+    ufetch_hit va vpn ie w tlbvec ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, W), s0)) ->
+    uint rd <> 0 ->
+    (W = 8 -> is_unsigned = false) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) W = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ( spec !! vpnD = None
+      \/ (exists ieD, spec !! vpnD = Some ieD /\ uw_check_denied (Load Data) ieD)
+      \/ (exists ieD, spec !! vpnD = Some ieD /\
+            uw_check_ok (Load Data) ieD /\
+            update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+            _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+            is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD)
+              (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) W = true /\
+            (forall j : nat, (j < Z.to_nat W)%nat ->
+               pa_add (u_pa (upt_entry vpnD ieD)
+                 (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data)) ) ->
+    ustep_mem_case va ms_v g tlbvec \/ ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Huf Hmprv Hmxr Hdec Hrd Hisu8 HeaAl HeaCanon HvpnD Hverdict.
+    destruct Huf as (Hs & Hok & Hupd & Hpbmt & Hres & Hval & Hcanon & Hvpn & Hpaal & Hnrvc).
+    exact (dispatch_load_word va ms_v g tlbvec vpn ie w vpnD imm rs1 rd is_unsigned W
+      Hs Hok Hupd Hpbmt Hres Hmprv Hmxr Hval Hcanon Hvpn Hpaal Hnrvc Hdec Hrd Hisu8
+      HeaAl HeaCanon HvpnD Hverdict).
+  Qed.
+
+  Lemma dispatch_store_from_ufetch
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs2 rs1 : mword 5) (W : Z) :
+    ufetch_hit va vpn ie w tlbvec ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, W), s0)) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) W = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ( spec !! vpnD = None
+      \/ (exists ieD, spec !! vpnD = Some ieD /\ uw_check_denied (Store Data) ieD)
+      \/ (exists ieD, spec !! vpnD = Some ieD /\
+            uw_check_ok (Store Data) ieD /\
+            update_PTE_Bits (uw_pte0 ieD) (Store Data) = None /\
+            _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+            is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD)
+              (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) W = true /\
+            (uint (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) + W <= 18446744073709551616)%Z /\
+            (forall j : nat, (j < Z.to_nat W)%nat ->
+               pa_add (u_pa (upt_entry vpnD ieD)
+                 (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data)) ) ->
+    ustep_mem_case va ms_v g tlbvec \/ ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Huf Hmprv Hmxr Hdec HeaAl HeaCanon HvpnD Hverdict.
+    destruct Huf as (Hs & Hok & Hupd & Hpbmt & Hres & Hval & Hcanon & Hvpn & Hpaal & Hnrvc).
+    exact (dispatch_store_word va ms_v g tlbvec vpn ie w vpnD imm rs2 rs1 W
+      Hs Hok Hupd Hpbmt Hres Hmprv Hmxr Hval Hcanon Hvpn Hpaal Hnrvc Hdec
+      HeaAl HeaCanon HvpnD Hverdict).
+  Qed.
+
+
 End Total.
 
 (* ==================================================================== *)
