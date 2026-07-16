@@ -762,6 +762,57 @@ Section GenExecStoreconMisalign4.
 End GenExecStoreconMisalign4.
 
 (* ===================================================================== *)
+(* MISALIGNED AMO access fault (plat_misaligned_access.amo = AccessFault).*)
+(* execute_AMO checks alignment ITSELF (right after the effective-address *)
+(* transform): a misaligned AMOSWAP.W runs memory_exception directly with *)
+(* E_SAMO_Access_Fault -- NO translate, NO untilMT loop, no rs2 read.      *)
+(* ===================================================================== *)
+
+Section GenExecAmoswapMisalign4.
+  Variable rs2 rs1 rd : mword 5.
+  Variable a : mword 64.
+  Variable s : mstate.
+  Variable aq rl : bool.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (zeros' 64).
+  Let W_amo : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_SAMO_Access_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, Data, Data))) s = Some (Virtaddr a, s).
+  Hypothesis Hmisalign : is_aligned_vaddr (Virtaddr a) 4 = false.
+
+  Lemma exec_execute_AMOSWAP_fault_misalign :
+    exec (execute (AMO (AMOSWAP, aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd))) s = Some (W_amo, s).
+  Proof.
+    change (execute (AMO (AMOSWAP, aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd)))
+      with (execute_AMO AMOSWAP aq rl (Regidx rs2) (Regidx rs1) 4 (Regidx rd)).
+    unfold execute_AMO. cbn zeta.
+    rewrite exec_catch_early_return.
+    assert (Hae : exec (Defs.assert_exp' (Z.leb 4 (Z.mul xlen_bytes 2)) "extensions/A/zaamo_insts.sail:73.32-73.33") s = Some (eq_refl, s))
+      by (unfold assert_exp'; cbn match; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae).
+    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (AMOSWAP, Data, Data)) 4) s
+                   = Some (Ext_DataAddr_OK (Virtaddr a), s)).
+    { unfold get_transformed_data_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 (zeros' 64) (Atomic (AMOSWAP, Data, Data)) 4 s)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ Htea).
+      apply exec_returnM. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
+    cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a) s)).
+    rewrite Hmisalign. cbn [Riscv.rv64d.not negb]. cbv iota.
+    replace (plat_misaligned_access.(GlobalMisalignedExceptions_amo)) with AccessFault
+      by (vm_compute; reflexivity).
+    cbv zeta iota beta.
+    rewrite execR_liftR.
+    rewrite (exec_memory_exception (Virtaddr a) (E_SAMO_Access_Fault tt) s).
+    cbn match. cbn [bits_of_virtaddr]. reflexivity.
+  Qed.
+End GenExecAmoswapMisalign4.
+
+(* ===================================================================== *)
 (* translateAddr TLB-hit wrappers for LoadReserved / StoreConditional.     *)
 (* Clones of UmodeData's load/store wrappers with the access swapped; the  *)
 (* only differences are effectivePrivilege, is_shadow_stack, and the       *)
