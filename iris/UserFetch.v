@@ -165,7 +165,7 @@ Qed.
 (* ===================================================================== *)
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import SmodePte KptPt SmodeCore.
-Require Import UserPt UserExec UserStep UserTrap.
+Require Import UserPt UserExec UserStep UserTrap UserTranslate.
 
 Section UserFetchFaultArm.
   Context `{!riscvGS Σ}.
@@ -197,6 +197,7 @@ Section UserFetchFaultArm.
        ⌜upt_satp_ok pt usatp⌝ -∗
        ⌜register_lookup tlb σ.(sregs) = tlbvec⌝ -∗
        ⌜upt_tlb_ok pt.(u_map) tlbvec⌝ -∗
+       ⌜upt_wf pt⌝ -∗
        ⌜pmpAddrMatchType_encdec_backwards
           (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR⌝ -∗
        ⌜zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false⌝ -∗
@@ -271,7 +272,7 @@ Section UserFetchFaultArm.
       by (rewrite (T _ _ Lpmpa eq_refl); exact Hcov).
     iDestruct ("Hfd" $! s_a usatp tlbvec
                  (T _ _ Lpriv eq_refl) (T _ _ Lms eq_refl) (T _ _ Lpc eq_refl)
-                 (T _ _ Lsatp eq_refl) Hsatpok (T _ _ Ltlb eq_refl) Htlbok
+                 (T _ _ Lsatp eq_refl) Hsatpok (T _ _ Ltlb eq_refl) Htlbok Hwf
                  HA_a Hord_a HpmpR_a Hcov_a
                  Hpter
                  with "Hhw [Hreg Hmd] Hslots") as %Hfetch.
@@ -400,10 +401,109 @@ Section UserFetchFaultFlavors.
     iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Addr_Align tt) va
               ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
               with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
-    iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok
+    iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf
                                %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
     iPureIntro.
     exact (exec_fetch_align_fault σ va Lpc Hodd).
   Qed.
 
 End UserFetchFaultFlavors.
+
+(* --------------------------------------------------------------------- *)
+(* Flavor corollary 2: a NON-CANONICAL (even) user pc -- fetch page fault. *)
+(* --------------------------------------------------------------------- *)
+Section UserFetchFaultFlavors2.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (C : ucfg) (pt : upt).
+
+  Lemma wp_user_step_fetch_noncanonical E Φ
+      (ms_v sc_v stval_v sepc_v va : mword 64)
+      (g : gmap regidx (mword 64))
+      (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
+    ↑minstretN ⊆ E ->
+    user_mstatus_ok ms_v ->
+    u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true ->
+    hw_config -∗
+    minstret_inv -∗
+    sig_meip ↦ᵣ{ dqe1 } meip -∗
+    sig_seip ↦ᵣ{ dqe2 } seip -∗
+    user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
+    upt_inv pt -∗
+    user_cfg C -∗
+    ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
+       user_trap_frame C pt -∗
+       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hmsok Hd Hal Hcanon) "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
+    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Page_Fault tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+              with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
+    iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf
+                               %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
+    iPureIntro.
+    destruct Hsok as (Hmode & _).
+    apply (exec_fetch_fault_4 σ va Lpc (E_Fetch_Page_Fault tt) Hal).
+    exact (exec_translateAddr_fetch_u_noncanonical va usatp σ
+             Lpriv ltac:(rewrite Lms; destruct Hmsok as (HSXL & _); exact HSXL)
+             Lsatp Hmode Hcanon).
+  Qed.
+
+End UserFetchFaultFlavors2.
+
+(* --------------------------------------------------------------------- *)
+(* Flavor corollary 3: an UNMAPPED user pc -- fetch page fault through the *)
+(* owned page-table slots.                                                 *)
+(* --------------------------------------------------------------------- *)
+Section UserFetchFaultFlavors3.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (C : ucfg) (pt : upt).
+
+  Lemma wp_user_step_fetch_unmapped E Φ (vpn : mword 27)
+      (ms_v sc_v stval_v sepc_v va : mword 64)
+      (g : gmap regidx (mword 64))
+      (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
+    ↑minstretN ⊆ E ->
+    user_mstatus_ok ms_v ->
+    u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
+    pt.(u_map) !! vpn = None ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    hw_config -∗
+    minstret_inv -∗
+    sig_meip ↦ᵣ{ dqe1 } meip -∗
+    sig_seip ↦ᵣ{ dqe2 } seip -∗
+    user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
+    upt_inv pt -∗
+    user_cfg C -∗
+    ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
+       user_trap_frame C pt -∗
+       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hmsok Hd Hvpn Hal Hcanon Hvpn_def)
+      "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
+    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Page_Fault tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+              with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
+    iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf
+                               %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
+    iDestruct (upt_translateAddr_fetch_unmapped pt vpn va usatp tlbvec σ
+                 Hvpn (proj1 (proj2 Hwf))
+                 Htok Lpriv
+                 ltac:(rewrite Lms; destruct Hmsok as (HSXL & _); exact HSXL)
+                 Lsatp Ltlb Hsok Hcanon Hvpn_def HA Hord HR Hcov Hpter
+                 with "Hhw' Hint Hslots") as %Htr.
+    iPureIntro.
+    exact (exec_fetch_fault_4 σ va Lpc (E_Fetch_Page_Fault tt) Hal Htr).
+  Qed.
+
+End UserFetchFaultFlavors3.
