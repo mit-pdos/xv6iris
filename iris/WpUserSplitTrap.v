@@ -72,6 +72,8 @@ Section WpUserSplitTrap.
   Local Notation Hpter := (WpUserBase.Hpter U).
   Local Notation Hdel_loadpf := (WpUserBase.Hdel_loadpf U).
   Local Notation Hdel_samopf := (WpUserBase.Hdel_samopf U).
+  Local Notation Hdel_illegal := (WpUserBase.Hdel_illegal U).
+  Local Notation Hdel_break := (WpUserBase.Hdel_break U).
   Local Notation Hspec := (WpUserBase.Hspec U).
   Local Notation user_cfg := (WpUserBase.user_cfg U).
   Local Notation user_code := (WpUserBase.user_code U).
@@ -999,6 +1001,92 @@ Section WpUserSplitTrap.
                 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hnlpad
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg K Hcont").
+  Qed.
+
+  (* ================================================================== *)
+  (* 2-aligned EBREAK-in-U arm, riding [wp_exec_trapish_u_split].  The   *)
+  (* callback K returns the software-breakpoint Trap (cause E_Breakpoint *)
+  (* Brk_Software, stval = va) directly -- execute is state-preserving,  *)
+  (* so s' = s_x and tlbvecD = the fetch-fill (no data walk).            *)
+  (* ================================================================== *)
+  Lemma ustep_u_split_ebreak_u (ii : instruction)
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    (forall s, register_lookup cur_privilege s.(sregs) = User ->
+       register_lookup PC s.(sregs) = va ->
+       exec (execute ii) s
+         = Some (rv64d_types.Trap (User, make_sync_exception (E_Breakpoint Brk_Software) va, va), s)) ->
+    is_lpad_instruction ii = false ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ii, s0)) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hexec_bp Hnlpad Hok Hsome Hchk0 HupdN Hpbmt0 HcwL HcwH HSXL Hbit0 Hbit1
+           Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             #Hcode Hdata Hcfg Hcont".
+    iApply (wp_exec_trapish_u_split va vpn ie w ii ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hok Hsome Hchk0 HupdN Hpbmt0 HcwL HcwH HSXL Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                    Hcode Hdata Hcfg [] Hcont").
+    iIntros (s_x Hpcx Hnpcx Hprx Hmsx Hsatpx Hpmpcx Hpmpax Hagx Htlx)
+            "Htlbc Hupt Hgpr Hσ".
+    iModIntro.
+    iExists (E_Breakpoint Brk_Software), va, s_x,
+            (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
+    iSplitR; [iPureIntro; exact (Hexec_bp s_x Hprx Hpcx) |].
+    iSplitR; [iPureIntro; exact Hdel_break |].
+    iSplitR; [iPureIntro; exact Hpcx |].
+    iSplitR; [iPureIntro; exact Htlx |].
+    iSplitR; [iPureIntro; exact (upt_tlb_ok_fill spec tlbvec vpn ie Hsome Hok) |].
+    iFrame "Hσ Htlbc Hupt Hgpr".
   Qed.
 
 End WpUserSplitTrap.
