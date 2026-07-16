@@ -2152,4 +2152,916 @@ Section WpUserMemStep.
   Qed.
 
 
+  Lemma wp_user_split_ld_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs1 rd : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Load Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Load Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    (* the loaded value, assembled from the owned data bytes (dm's own
+       Countable instance, so [read_bytes] does not apply) *)
+    assert (Hindom : forall j : nat, (j < 8)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 8).
+    set (v := (Z_to_bv 64 (assemble_bytes bs)) : mword 64).
+    assert (Hlen : length bs = 8%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 8)%nat -> dm !! pa_add paD j = Some (nth_byte v j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 8))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 8 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 8 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst v. rewrite (nth_byte_assemble8 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    iApply (ustep_u_split_ld_u va vpn ie w vpnD ieD imm rs1 rd v ms_v sc_v stval_v sepc_v
+              g dm tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD Hdomdm Hcwd
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hfmap Hcfg Hcont").
+  Qed.
+
+  Lemma wp_user_split_lh_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 2), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Load Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Load Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 2 = true ->
+    (forall j : nat, (j < 2)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    assert (Hindom : forall j : nat, (j < 2)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 2).
+    set (v := (Z_to_bv 16 (assemble_bytes bs)) : mword 16).
+    assert (Hlen : length bs = 2%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 2)%nat -> dm !! pa_add paD j = Some (nth_byte v j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 2))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 2 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 2 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst v. rewrite (nth_byte_assemble2 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    iApply (ustep_u_split_lh_u va vpn ie w vpnD ieD imm rs1 rd is_unsigned v ms_v sc_v stval_v sepc_v
+              g dm tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD Hdomdm Hcwd
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hfmap Hcfg Hcont").
+  Qed.
+
+  Lemma wp_user_split_lb_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Load Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Load Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 1 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 1 = true ->
+    (forall j : nat, (j < 1)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    assert (Hindom : forall j : nat, (j < 1)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 1).
+    set (v := (Z_to_bv 8 (assemble_bytes bs)) : mword 8).
+    assert (Hlen : length bs = 1%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 1)%nat -> dm !! pa_add paD j = Some (nth_byte v j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 1))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 1 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 1 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst v. rewrite (nth_byte_assemble1 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    iApply (ustep_u_split_lb_u va vpn ie w vpnD ieD imm rs1 rd is_unsigned v ms_v sc_v stval_v sepc_v
+              g dm tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD Hdomdm Hcwd
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hfmap Hcfg Hcont").
+  Qed.
+
+  Lemma wp_user_split_sd_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs2 rs1 : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    (uint paD + 8 <= 18446744073709551616)%Z ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin_in.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    set (vNew := (g !!! Regidx rs2)).
+    (* the OLD value, assembled from the owned data bytes (dm's own
+       Countable instance, so [read_bytes] does not apply) *)
+    assert (Hindom : forall j : nat, (j < 8)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin_in. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 8).
+    set (vold := (Z_to_bv 64 (assemble_bytes bs)) : mword 64).
+    assert (Hlen : length bs = 8%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 8)%nat -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 8))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 8 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 8 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst vold. rewrite (nth_byte_assemble8 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    (* peel the 8-cell window out of dm, keep the restore-to-map wand *)
+    assert (HND : base.NoDup ((pa_add paD) <$> (seq 0 8)))
+      by (apply NoDup_pa_window; exact Hnowrap).
+    assert (Hpeelcont : forall j, j ∈ seq 0 8 -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj. apply elem_of_seq in Hj. apply Hcwd. lia. }
+    iDestruct (data_window_acc_gen paD (seq 0 8) (fun j => nth_byte vold j) dm HND Hpeelcont
+                 with "Hfmap") as "[Hwin Hback]".
+    (* lift the restore-to-map wand into a restore-to-[user_data] wand *)
+    iAssert (([∗ list] j ∈ seq 0 8, pa_add paD j ↦ₘ nth_byte vNew j) -∗ user_data)%I
+      with "[Hback]" as "Hrestore".
+    { iIntros "Hnew".
+      iDestruct ("Hback" $! (fun j => nth_byte vNew j) with "Hnew") as "Hmap".
+      iExists (foldr (fun j acc => <[pa_add paD j := nth_byte vNew j]> acc) dm (seq 0 8)).
+      iSplitR.
+      { iPureIntro.
+        rewrite (dom_foldr_insert_indom (fun j => nth_byte vNew j) paD (seq 0 8) dm).
+        - exact Hdomdm.
+        - intros j Hj. rewrite Hdomdm. apply elem_of_seq in Hj. apply Hwin_in. lia. }
+      iExact "Hmap". }
+    iApply (ustep_u_split_sd_u va vpn ie w vpnD ieD imm rs2 rs1 vold ms_v sc_v stval_v sepc_v
+              g tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hwin Hrestore Hcfg Hcont").
+  Qed.
+
+  Lemma wp_user_split_sw_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs2 rs1 : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    (uint paD + 4 <= 18446744073709551616)%Z ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 4), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 4 = true ->
+    (forall j : nat, (j < 4)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin_in.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    set (vNew := (autocast (T := mword)
+                    (subrange_vec_dec (g !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) : mword 32)).
+    (* the OLD value (mword 32), assembled from the owned data bytes *)
+    assert (Hindom : forall j : nat, (j < 4)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin_in. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 4).
+    set (vold := (Z_to_bv 32 (assemble_bytes bs)) : mword 32).
+    assert (Hlen : length bs = 4%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 4)%nat -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 4))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 4 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 4 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst vold. rewrite (nth_byte_assemble4 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    assert (HND : base.NoDup ((pa_add paD) <$> (seq 0 4)))
+      by (apply NoDup_pa_window; exact Hnowrap).
+    assert (Hpeelcont : forall j, j ∈ seq 0 4 -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj. apply elem_of_seq in Hj. apply Hcwd. lia. }
+    iDestruct (data_window_acc_gen paD (seq 0 4) (fun j => nth_byte vold j) dm HND Hpeelcont
+                 with "Hfmap") as "[Hwin Hback]".
+    iAssert (([∗ list] j ∈ seq 0 4, pa_add paD j ↦ₘ nth_byte vNew j) -∗ user_data)%I
+      with "[Hback]" as "Hrestore".
+    { iIntros "Hnew".
+      iDestruct ("Hback" $! (fun j => nth_byte vNew j) with "Hnew") as "Hmap".
+      iExists (foldr (fun j acc => <[pa_add paD j := nth_byte vNew j]> acc) dm (seq 0 4)).
+      iSplitR.
+      { iPureIntro.
+        rewrite (dom_foldr_insert_indom (fun j => nth_byte vNew j) paD (seq 0 4) dm).
+        - exact Hdomdm.
+        - intros j Hj. rewrite Hdomdm. apply elem_of_seq in Hj. apply Hwin_in. lia. }
+      iExact "Hmap". }
+    iApply (ustep_u_split_sw_u va vpn ie w vpnD ieD imm rs2 rs1 vold ms_v sc_v stval_v sepc_v
+              g tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hwin Hrestore Hcfg Hcont").
+  Qed.
+
+  Lemma wp_user_split_sh_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs2 rs1 : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    (uint paD + 2 <= 18446744073709551616)%Z ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 2), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 2 = true ->
+    (forall j : nat, (j < 2)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin_in.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    set (vNew := (autocast (T := mword)
+                    (subrange_vec_dec (g !!! Regidx rs2) (Z.sub (Z.mul 2 8) 1) 0) : mword 16)).
+    assert (Hindom : forall j : nat, (j < 2)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin_in. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 2).
+    set (vold := (Z_to_bv 16 (assemble_bytes bs)) : mword 16).
+    assert (Hlen : length bs = 2%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 2)%nat -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 2))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 2 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 2 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst vold. rewrite (nth_byte_assemble2 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    assert (HND : base.NoDup ((pa_add paD) <$> (seq 0 2)))
+      by (apply NoDup_pa_window; exact Hnowrap).
+    assert (Hpeelcont : forall j, j ∈ seq 0 2 -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj. apply elem_of_seq in Hj. apply Hcwd. lia. }
+    iDestruct (data_window_acc_gen paD (seq 0 2) (fun j => nth_byte vold j) dm HND Hpeelcont
+                 with "Hfmap") as "[Hwin Hback]".
+    iAssert (([∗ list] j ∈ seq 0 2, pa_add paD j ↦ₘ nth_byte vNew j) -∗ user_data)%I
+      with "[Hback]" as "Hrestore".
+    { iIntros "Hnew".
+      iDestruct ("Hback" $! (fun j => nth_byte vNew j) with "Hnew") as "Hmap".
+      iExists (foldr (fun j acc => <[pa_add paD j := nth_byte vNew j]> acc) dm (seq 0 2)).
+      iSplitR.
+      { iPureIntro.
+        rewrite (dom_foldr_insert_indom (fun j => nth_byte vNew j) paD (seq 0 2) dm).
+        - exact Hdomdm.
+        - intros j Hj. rewrite Hdomdm. apply elem_of_seq in Hj. apply Hwin_in. lia. }
+      iExact "Hmap". }
+    iApply (ustep_u_split_sh_u va vpn ie w vpnD ieD imm rs2 rs1 vold ms_v sc_v stval_v sepc_v
+              g tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hwin Hrestore Hcfg Hcont").
+  Qed.
+
+  Lemma wp_user_split_sb_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (imm : mword 12) (rs2 rs1 : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    (uint paD + 1 <= 18446744073709551616)%Z ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 1), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 1 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 1 = true ->
+    (forall j : nat, (j < 1)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin_in.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    set (vNew := (autocast (T := mword)
+                    (subrange_vec_dec (g !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8)).
+    assert (Hindom : forall j : nat, (j < 1)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin_in. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 1).
+    set (vold := (Z_to_bv 8 (assemble_bytes bs)) : mword 8).
+    assert (Hlen : length bs = 1%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 1)%nat -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 1))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 1 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 1 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst vold. rewrite (nth_byte_assemble1 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    assert (HND : base.NoDup ((pa_add paD) <$> (seq 0 1)))
+      by (apply NoDup_pa_window; exact Hnowrap).
+    assert (Hpeelcont : forall j, j ∈ seq 0 1 -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj. apply elem_of_seq in Hj. apply Hcwd. lia. }
+    iDestruct (data_window_acc_gen paD (seq 0 1) (fun j => nth_byte vold j) dm HND Hpeelcont
+                 with "Hfmap") as "[Hwin Hback]".
+    iAssert (([∗ list] j ∈ seq 0 1, pa_add paD j ↦ₘ nth_byte vNew j) -∗ user_data)%I
+      with "[Hback]" as "Hrestore".
+    { iIntros "Hnew".
+      iDestruct ("Hback" $! (fun j => nth_byte vNew j) with "Hnew") as "Hmap".
+      iExists (foldr (fun j acc => <[pa_add paD j := nth_byte vNew j]> acc) dm (seq 0 1)).
+      iSplitR.
+      { iPureIntro.
+        rewrite (dom_foldr_insert_indom (fun j => nth_byte vNew j) paD (seq 0 1) dm).
+        - exact Hdomdm.
+        - intros j Hj. rewrite Hdomdm. apply elem_of_seq in Hj. apply Hwin_in. lia. }
+      iExact "Hmap". }
+    iApply (ustep_u_split_sb_u va vpn ie w vpnD ieD imm rs2 rs1 vold ms_v sc_v stval_v sepc_v
+              g tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hwin Hrestore Hcfg Hcont").
+  Qed.
+
+  Lemma wp_user_split_amoswap_frame
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info)
+      (rs2 rs1 rd : mword 5)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (zeros' 64) in
+    let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+    ↑minstretN ⊆ E ->
+    (uint paD + 4 <= 18446744073709551616)%Z ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) ->
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Atomic (AMOSWAP, Data, Data)) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Atomic (AMOSWAP, Data, Data)) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr eaF) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr eaF))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr paD) 4 = true ->
+    (forall j : nat, (j < 4)%nat -> pa_add paD j ∈ data) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF paD HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+           HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd
+           HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin_in.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt #Hcode Hdata Hcfg Hcont".
+    iDestruct "Hdata" as (dm) "[%Hdomdm Hfmap]".
+    set (vN := sign_extend' (Z.mul 8 (__id 4)) (trunc (Z.mul (__id 4) 8)
+                 (g !!! Regidx rs2)) : mword 32).
+    (* the OLD value (mword 32), assembled from the owned data bytes *)
+    assert (Hindom : forall j : nat, (j < 4)%nat -> is_Some (dm !! pa_add paD j)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdomdm. apply Hwin_in. exact Hj. }
+    set (bs := (fun j => default (Z_to_bv 8 0) (dm !! pa_add paD j)) <$> seq 0 4).
+    set (vold := (Z_to_bv 32 (assemble_bytes bs)) : mword 32).
+    assert (Hlen : length bs = 4%nat)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    assert (Hcwd : forall j : nat, (j < 4)%nat -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj.
+      destruct (Hindom j Hj) as [bj Hbj].
+      assert (Hbsj : bs !!! j = bj).
+      { subst bs.
+        assert (Hjl : (j < length (seq 0 4))%nat) by (rewrite length_seq; exact Hj).
+        rewrite (list_lookup_total_fmap _ _ j Hjl).
+        assert (Hsj : seq 0 4 !!! j = j).
+        { apply list_lookup_total_correct.
+          pose proof (lookup_seq_lt 0 4 j Hj) as Hls. exact Hls. }
+        rewrite Hsj. rewrite Hbj. reflexivity. }
+      rewrite Hbj. f_equal. subst vold. rewrite (nth_byte_assemble4 bs j Hlen Hj).
+      symmetry. exact Hbsj. }
+    assert (HND : base.NoDup ((pa_add paD) <$> (seq 0 4)))
+      by (apply NoDup_pa_window; exact Hnowrap).
+    assert (Hpeelcont : forall j, j ∈ seq 0 4 -> dm !! pa_add paD j = Some (nth_byte vold j)).
+    { intros j Hj. apply elem_of_seq in Hj. apply Hcwd. lia. }
+    iDestruct (data_window_acc_gen paD (seq 0 4) (fun j => nth_byte vold j) dm HND Hpeelcont
+                 with "Hfmap") as "[Hwin Hback]".
+    iAssert (([∗ list] j ∈ seq 0 4, pa_add paD j ↦ₘ nth_byte vN j) -∗ user_data)%I
+      with "[Hback]" as "Hrestore".
+    { iIntros "Hnew".
+      iDestruct ("Hback" $! (fun j => nth_byte vN j) with "Hnew") as "Hmap".
+      iExists (foldr (fun j acc => <[pa_add paD j := nth_byte vN j]> acc) dm (seq 0 4)).
+      iSplitR.
+      { iPureIntro.
+        rewrite (dom_foldr_insert_indom (fun j => nth_byte vN j) paD (seq 0 4) dm).
+        - exact Hdomdm.
+        - intros j Hj. rewrite Hdomdm. apply elem_of_seq in Hj. apply Hwin_in. lia. }
+      iExact "Hmap". }
+    iApply (ustep_u_split_amoswap_w_u va vpn ie w vpnD ieD rs2 rs1 rd vold ms_v sc_v stval_v sepc_v
+              g tlbvec E Φ HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4
+              HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD
+              HalignD HcanonD Hvpn_defD HpaalD
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hwin Hrestore Hcfg Hcont").
+  Qed.
+
+
 End WpUserMemStep.
