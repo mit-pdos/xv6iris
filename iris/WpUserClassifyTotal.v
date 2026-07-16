@@ -11,10 +11,14 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvLang RiscvExec RiscvTryStep.
 Require Import UmodeFetch.
 Require Import UptInv WpUserBase.
 Require Import WpUserSteps.
 Require Import WpUserClassify.
+Require Import WpDecodeBridge.
+Require Import UmodeEcall.
+Require Import DecodeSetU.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -232,6 +236,47 @@ Section Total.
       split; [exact Hcanon |].
       split; [exact Hvpn_def |].
       split; [exact Hpaal | exact Hrvc].
+  Qed.
+
+  (* Case-5 dispatch for an executable, A-set, 4-aligned page whose full
+     32-bit words all decode to compute/system instructions in the
+     [classifiable_u] set: the fetch either retires (full word ->
+     [classify_word_of_decode] -> [ustep_case]) or is compressed and
+     hands back a [cfetch_hit] for the compressed dispatcher to consume.
+     This composes [produce_fetch_4aligned] with the proven full-word
+     classifier; it needs NO new arms and is total over rd (the full-word
+     compute disjuncts carry the [if uint rd =? 0 ...] form). *)
+  Lemma dispatch_full_page_classifiable
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (vpn : mword 27) (ie : uwalk_info)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    (forall j : nat, (j < 4)%nat ->
+       exists b, code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some b) ->
+    (forall w : mword 32, ufetch_hit va vpn ie w tlbvec ->
+       forall ii, decodable_u ii = true ->
+         (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+         classifiable_u ii = true) ->
+    ustep_case va ms_v g tlbvec
+    \/ (exists h : mword 16, cfetch_hit va vpn ie h tlbvec).
+  Proof.
+    intros Hsome Hchk Hupd Hpbmt Hval Hcanon Hvpn_def Hpaal Hres Hcl.
+    destruct (produce_fetch_4aligned va vpn ie tlbvec
+                Hsome Hchk Hupd Hpbmt Hval Hcanon Hvpn_def Hpaal Hres)
+      as [[w Huf] | [h Hcf]].
+    - left.
+      exact (WpUserClassify.classify_word_of_decode U va ms_v g tlbvec vpn ie w
+               Huf (Hcl w Huf)).
+    - right. exists h. exact Hcf.
   Qed.
 
 End Total.
