@@ -206,6 +206,7 @@ WpUserPriv.v
 WpUserSplitFetch.v
 WpUserSplitFetchMiss.v
 WpUserSplitData.v
+WpUserSplitMem.v
 WpUserSplitCompute.v
 WpUserSplitFault.v
 WpUserSteps.v
