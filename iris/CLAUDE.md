@@ -177,15 +177,100 @@ root `README.md`: state current behavior/config as fact, not "X used to do Y" /
 - `lockG Σ = exclR unitO`; `locked γ := own γ (Excl ())`; `lock_inv γ lk R := ∃ v, lock_word lk v ∗ (⌜v=0⌝ ∗ locked γ ∗ R ∨ ⌜v≠0⌝)`; `is_lock := inv lockN lock_inv` (`lockN` disjoint from `minstretN`). Core: `newlock`, `locked_exclusive`. Leaves in `WpLockLeaves.v` (`wp_amoswap_lockinv`, `wp_clw_lockinv{,_locked}` — the `_locked` twin refutes the free branch via `locked_exclusive`, `wp_sw_zero_lockinv`); higher levels in `WpHoldingInv.v`/`WpAcquireLock.v`/`WpRelease.v`.
 - **Invariant-opening leaf technique** (reusable): inside the σ-callback (mask `E ∖ ↑minstretN`) do `iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]"; [solve_ndisj|]`, strip the timeless window `iDestruct … as (w) "[>Hbytes Hbr]"`, use/update bytes for the exec witness, RE-CLOSE before the final `iModIntro`, and hand the `▷`-ed payload to the continuation (the engine's `▷ WP` strips it). pop_off preconditions (constrain callers): SIE=0, `noff>0` signed, `intena=0`.
 
+## Arbitrary user-mode execution (v2: UserPt.v / UserExec.v)
+
+The WP for arbitrary execution at User privilege — what belongs in `wp_userret`'s
+continuation. A FIRST attempt (v1, ~40 files) lives only in git history before
+`7c08ee1` and was rolled back for excessive complexity: do NOT resurrect those
+files or copy code from them; build fresh from the live tree.
+
+- **Design principles (v2):**
+  - *Contents-agnostic safety.* `upt_inv` owns every mapped page with EXISTENTIAL
+    contents — there is no concrete code image and no per-program classification.
+    Every fetched word must therefore be handled, which is exactly what decode
+    totality gives (`decode_total_u_set`/`decode_total_c_set`, DecodeSetU.v: the
+    complete U-mode decode images `decodable_u`/`decodable_c`).
+  - *One pure object.* `upt` = {`u_root`, `u_slots` (addr↦PTE-word map, per-SLOT
+    ownership — upper levels are shared by many vpns), `u_map` (vpn↦`umap_ent`,
+    the three walk PTE words), `u_data` (physical footprint of the mapped pages)}
+    with `upt_wf` = `upt_map_spec` (mapped walks read their recorded slots) ∧
+    `upt_unmapped_spec` (unmapped walks stop at an invalid slot — pins the
+    3-level-4K xv6 table shape) ∧ `upt_data_cov` (every leaf-translated pa,
+    `u_walk_pa`, lands in `u_data`). A kernel instantiation puts EVERY slot of
+    every PT page in `u_slots` (zero word = invalid PTE), so any vpn's walk
+    reads only owned slots.
+  - *Leaf permission/A/D bits are ARBITRARY* (`umap_ent_wf` is structure-only).
+    Which accesses succeed is decided per access from the actual bits via
+    `upte_check_ok`/`upte_check_denied` (at concrete mxr=0) and the
+    `update_PTE_Bits = None / Some` A-D split — success, denial, and
+    needs-update page fault are ALL safe outcomes. Kernel pages in the user
+    table (trampoline/trapframe, U=0) are ordinary `u_map` entries whose leaf
+    denies user access.
+  - *`upt_inv` mirrors `tlb_inv`'s bundling:* satp cell (+`upt_satp_ok`
+    geometry), tlb cell (+`upt_tlb_ok`: every resident entry is `um_tlb_ent` of
+    some mapped vpn; `upt_tlb_ok_empty`/`_fill`), `upt_slots_own` (`↦₈`),
+    `upt_data_own` (one aggregated existential byte map — accesses, including
+    page-straddling ones, look up plain addresses), `pmp_config`, `⌜upt_wf⌝`.
+    Ownership makes PT/page disjointness and kernel-protection facts free
+    (separation), and a user store trivially re-establishes the invariant.
+  - *Frames own exactly what a user step can touch:* `user_inv` = pins
+    (`user_mstatus_ok`: SXL=64, MPRV=0, MXR=0) + hart_state/priv=User +
+    existential mstatus/scause/stval/sepc/pc/gpr_file + `upt_inv` + `user_cfg`
+    (boot cells at dqc; interrupt-freedom `uc_mm`/`uc_s0`; `uc_del` delegates
+    every `user_exc` cause; stvec TV_Direct). `user_trap_frame` = same at
+    Supervisor, pc_is (stvec_base), `trap_mstatus_ok` adds SPP=User ∧ SIE=0.
+    Trap-CSR VALUES are existential at this join; per-cause step lemmas know
+    them precisely.
+  - *Capstone* `wp_user_exec` (axiom-clean): `user_step_obligation E Φ`
+    (□(user_inv -∗ ▷((user_inv -∗ WP) ∧ (user_trap_frame -∗ WP)) -∗ WP); the ∧
+    is additive — the prover picks one arm after case-analyzing the machine)
+    + `user_inv` + `stvec_handler_wp` (the assumed uservec re-entry contract)
+    ⊢ WP Loop. Discharging the step obligation is the whole remaining game.
+  - Slot-read layer (proven, UserPt.v §5): `upt_slot_read_pte` (one owned `↦₈`
+    slot ⇒ its `read_pte` exec fact; PMP/PMA/CLINT/SIG/HTIF discharge from
+    `hw_config` + the TOR facts), `upt_read_walk_ptes` (mapped vpn ⇒ all three
+    reads + wf), `upt_unmapped_walk_fault` / `upt_denied_walk_fault` (the
+    access-generic `pt_walk` fault facts, via CommonWalk's UserWalkFault).
+
+- **Worklist (step-obligation decomposition; keep each layer ONE lemma per
+  concern — the v1 failure mode was hit/miss × width × compressed × fault arm
+  cross-products):**
+  1. *translateAddr trichotomy* over `upt_inv`, access-generic: one lemma per
+     outcome class — Ok via TLB hit (state unchanged), Ok via walk+fill (state
+     = `set_reg s tlb (vec_update_dec …)`, consistency by `upt_tlb_ok_fill`),
+     Err page fault (non-canonical va / unmapped / denied / needs-update).
+     Built from CommonWalk `exec_translate_walk_user{,_nomatch,_err}` +
+     `exec_translate_TLB_miss_user{,_needs_update}` + the UserPt slot layer.
+     Absorb hit-vs-miss into ONE caller-facing interface with a uniform
+     continuation (present the hit TLB as the trivially-filled vector).
+  2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
+     `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
+     `update_PTE_Bits` None-vs-Some by the A(/D) bits.
+  3. *Fetch abstraction:* bytes out of `upt_data_own` (borrow `dm`, `mem_valid`
+     per byte) feeding the fetch geometry (4-aligned single read / 2-aligned
+     2+2 split / RVC / page-straddling halves translate separately) — outcome:
+     an arbitrary fetched word or a fetch fault into the trap arm.
+  4. *Execute dispatch by decode totality:* register-only ops via ONE generic
+     retire engine + per-family `_gpr` facts (live: ZicondGpr/ZbbGpr/ClmulGpr/
+     ZbbRtypeGpr + the WpMmodeLeafBase exec facts); ONE width-generic memory
+     access abstraction (load/store/AMO against `upt_data_own`); control flow;
+     ONE generic sync-trap delivery lemma (ecall/ebreak/illegal/page-fault →
+     `user_trap_frame`, delegation from `uc_del`); interrupts-never
+     (dispatchInterrupt = None at User from `uc_mm`/`uc_s0`).
+  5. *Kernel integration:* massage `wp_userret`'s postcondition into
+     `user_inv` at a concrete `upt` (trampoline + trapframe + process pages);
+     prove uservec's spec to discharge `stvec_handler_wp`; simplify
+     `wp_userret`'s precondition against the new abstractions.
+
 ## Userret / trampoline / user page table
 
 - `utlb_inv` (user-PT analog of `tlb_inv`): satp=usatp (Sv39, asid 0, ppn=uroot); 3-level walk uroot[255]→ul1[511]→ul0[511]=trampoline leaf (ppn 0x80006, flags 0x4B) and ul0[510]=trapframe leaf (flags 0xC7); slot-precise TLB consistency (slot 63 = user-tramp, slot 62 = tf; `tlb_hash 0x3FFFFFF=63`). The trampoline works because csrw satp does NOT flush → a fetch right after HITS the stale kernel-tramp entry (asid 0, same PA); the SECOND `sfence.vma x0,x0` empties the TLB so `utlb_inv` holds. Set A/D in leaf flags to avoid the `update_PTE_Bits` writeback. `mk_pte` layout: 53:10=ppn(44), 9:0=flags.
-- `UptBridge.v` (0 admits) reconciles `utlb_inv` (userret's concrete 4-slot fragment) with the concurrent agent's arbitrary-user-exec theory (`upt_inv` = owned PT-slot `↦₈` gmap + pure `upt_spec` walk + `upt_tlb_ok`, in `user_frame`/`user_cfg`, WpUserExec.v/UmodeWalk.v). Both directions proven: `utlb_inv_to_upt` and `upt_to_utlb_inv`; pure cores `tlb_hash_surj`, `upt_ok_utlb_consistent`.
+- `utlb_inv` is the CONCRETE special case of the v2 `upt_inv` (UserPt.v): bridging userret's postcondition into `user_inv` at a concrete `upt` instance is worklist item 5 above.
 - `wp_instr_u` (WpUserret.v) is the user-phase engine (same callback shape as `wp_instr_s_config_tlbinv`, hands satp/upmp/tlb/upte_bytes to the fupd; also `Hpins` = 6-way cur_priv/mstatus/satp/tlb/pmpcfg/pmpaddr pins and `Hag : agree_on D_u σ dstateU`). U-mode loads/stores need `mstatus.MPRV=0 ∧ MXR=0` pinned; FP is excluded STRUCTURALLY (FS=Off). **Reusable pa≠va generalization:** the SmodeCore fetch lemmas and WpSmodeGpr load sections bake `pa=va` — copy-generalize with a separate `pa` Variable (proofs go through mechanically; the `instr` footprint is at PA so reuse `instr pa is_rvc i` while the engine reads PC=va). sret-to-User: `exec_execute_SRET_menv` is newpriv-generic; `sret_newpriv=User` needs SPP=0 and `senvcfg=0` + `menvcfg=MENVCFG_S`.
 
-## Page-table-walk proof technique (CommonWalk.v / UmodeWalk.v)
+## Page-table-walk proof technique (CommonWalk.v)
 
-- The **privilege/access-generic** 3-level Sv39 walk core lives in `CommonWalk.v` (the slot-address helpers `u_pte_addr`/`u_next_base`/`u_global`, `exec_currentlyEnabled_Svnapot`/`_Svadu`, `exec_update_and_write_pte_needs_update`, `Section UserWalk` = success walk `exec_{rec_walk_leaf,rec_walk_l1,pt_walk_user,translate_walk_user,translate_TLB_miss_user}`, `Section UserWalkFault`). Every lemma is parametric over `acc : MemoryAccessType` and `p : Privilege` — instruction fetch, load, store, AMO all reuse it. `UmodeWalk.v` `Require Export`s CommonWalk (so its ~12 user-mode dependents see the names unchanged) and keeps ONLY the User/InstructionFetch translateAddr wrappers. Any new S-mode walk (e.g. the UART data walk) reuses CommonWalk directly — do NOT `Require` walk lemmas out of a `Umode*` file.
+- The **privilege/access-generic** 3-level Sv39 walk core lives in `CommonWalk.v` (the slot-address helpers `u_pte_addr`/`u_next_base`/`u_global`, `exec_currentlyEnabled_Svnapot`/`_Svadu`, `exec_update_and_write_pte_needs_update`, `Section UserWalk` = success walk `exec_{rec_walk_leaf,rec_walk_l1,pt_walk_user,translate_walk_user,translate_TLB_miss_user}` + `u_walk_entry`/`u_walk_pa`, `Section UserWalkFault`). Every lemma is parametric over `acc : MemoryAccessType` and `p : Privilege` — instruction fetch, load, store, AMO all reuse it. The `translateAddr`-level U-mode wrappers on top of it are v2 worklist item 1.
 
 - The walk Fixpoint (`_rec_pt_walk`, `{struct acc}`, guarded by `Zwf_guarded`/`pos_guard_wf`) EXPLODES under monolithic `cbn`/`cbv` (50 GB). Style: per-level ∀-Acc lemmas — `destruct` the Acc term BEFORE `cbn [_rec_pt_walk]` so exactly ONE level unfolds; a cross-level rewrite instantiates the next lemma at the opaque sub-Acc (`change (1-1) with 0` first); finish with a single terminal `cbn. reflexivity.`. Abstract-state `vm_compute` explosions in walks come from `exec_currentlyEnabled_*` recursing on the Zca gate reading misa → give walk lemmas a `misa=MISA_C` premise and transport via the decode bridge (`D_misa={misa}`). `exec_read_pte_S` needs a per-slot `PMA_supports_pte_read` (NOT supplied by `pma_allows_all`); `upt_inv` carries it per slot. Fault walks (invalid/no-perm/needs-update) compile by mirroring the success-walk scripts verbatim.
 

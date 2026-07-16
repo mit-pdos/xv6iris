@@ -105,6 +105,8 @@ RiscvAdequacy.v
 CommonWalk.v
 DecodeTotalU.v
 DecodeSetU.v
+UserPt.v
+UserExec.v
 WpIntrStep.v
 WpIntrInv.v
 WpPushOff.v
