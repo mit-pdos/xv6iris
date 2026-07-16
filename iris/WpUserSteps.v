@@ -41,10 +41,6 @@ Import Defs.
 
 Require Import WpUserBase.
 Require Import WpUserFetch.
-Require Import WpUserCompute.
-Require Import WpUserCtrl.
-Require Import WpUserComputeC.
-Require Import WpUserTrap.
 Require Import WpUserComputeMiss.
 Require Import WpUserCtrlU.
 Require Import WpUserComputeCU.
@@ -55,9 +51,7 @@ Require Import WpUserMemC.
 Require Import WpUserMem4.
 Require Import WpUserMemC4.
 Require Import WpUserMem2.
-Require Import WpUserMemC2.
 Require Import WpUserMem1.
-Require Import WpUserMemC1.
 
 Section WpUserSteps.
   Context `{!riscvGS Σ}.

@@ -17,9 +17,10 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import SmodeCore WpIntrCore WpDecodeBridge.
 Require Import UmodeFetch UmodeEcall.
-Require Import UptInv UmodeData WpGprStore.
-Require Import WpPushOffMem MemData4 UmodeData4 MemAmo4 UmodeAmo4.
-Require Import RiscvTryStep UmodeLrsc UmodeLrscWalk.
+Require Import UptInv UmodeData.
+Require Import WpMmodeLeafBase.
+Require Import MemData4.
+Require Import UmodeLrsc UmodeLrscWalk.
 Require Import WpLeafCommon UmodeTrap UmodeStep UmodeFetchFault.
 Require Import UmodeWalk WpUserComputeMiss.
 Require Import UmodeDataFault.
