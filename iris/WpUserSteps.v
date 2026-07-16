@@ -158,6 +158,7 @@ Section WpUserSteps.
   Local Notation ustep_utype := (WpUserComputeMiss.ustep_utype_u U).
   Local Notation ustep_u_split_compute := (WpUserSplitCompute.ustep_u_split_compute U).
   Local Notation ustep_u_split_compute_u := (WpUserSplitCompute.ustep_u_split_compute_u U).
+  Local Notation ustep_u_split_nop := (WpUserSplitCompute.ustep_u_split_nop U).
   Local Notation ustep_u_split_compute1_u := (WpUserSplitCompute.ustep_u_split_compute1_u U).
   Local Notation ustep_u_split_rtype2_u := (WpUserSplitCompute.ustep_u_split_rtype2_u U).
   Local Notation ustep_u_split_jal_u := (WpUserSplitCompute.ustep_u_split_jal_u U).
@@ -1933,7 +1934,44 @@ Section WpUserSteps.
        neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
        autocast (T := mword) (subrange_vec_dec
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnH).
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnH)
+    \/
+    (* 65: 2-aligned (pc == 2 mod 4) 32-bit split-fetch, GENERIC rd=x0 NO-OP
+       (HINT / nop such as [addi x0,x1,5]), FETCH-UNCONDITIONAL.  Non-
+       straddling (a single vpn/ie), spec-based: state-preserving retire
+       with NO register write.  Rides [ustep_u_split_nop] (via
+       [wp_instr_u_split_combined]).  This is the 2-aligned analogue of the
+       4-aligned generic no-state-change disjunct; it makes the 2-aligned
+       compute classification TOTAL over rd (rd=x0 has no route in the
+       rd<>0 compute disjuncts 54/55/56). *)
+    (exists (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (ii : instruction),
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (ii, s0)) /\
+       (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) /\
+       is_lpad_instruction ii = false).
 
   (* the assembled Löb step obligation, v1 coverage *)
   (* [ustep_case_sound]: the post-unpack body of [user_step_holds] --
@@ -2141,12 +2179,18 @@ Section WpUserSteps.
                                                                                                                                  HcwL & HcwH & Hbit0 & Hbit1 & Hvalign4 &
                                                                                                                                  HcanonL & Hvpn_defL & HalignL &
                                                                                                                                  HcanonH & Hvpn_defH & HalignH)
-                                                                                                                                | (vpnL & vpnH & ieL & ieH & ilo &
+                                                                                                                                | [ (vpnL & vpnH & ieL & ieH & ilo &
                                                                                                                                    HsomeL & Hchk0L & HupdNL & Hpbmt0L & HcwL & HnotRVC &
                                                                                                                                    HsomeH & HdenH &
                                                                                                                                    Hbit0 & Hbit1 & Hvalign4 &
                                                                                                                                    HcanonL & Hvpn_defL & HalignL &
-                                                                                                                                   HcanonH & Hvpn_defH) ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
+                                                                                                                                   HcanonH & Hvpn_defH)
+                                                                                                                                  | (vpn & ie & w & ii &
+                                                                                                                                     Hsome & Hchk0 & HupdN & HcwL & HcwH &
+                                                                                                                                     Hbit0 & Hbit1 & Hvalign4 &
+                                                                                                                                     HcanonL & Hvpn_defL & HalignL &
+                                                                                                                                     HcanonH & Hvpn_defH & HalignH & HnotRVC &
+                                                                                                                                     Hdec & Hexec_op & Hnlpad) ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                                                               ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
@@ -2648,6 +2692,17 @@ Section WpUserSteps.
                 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
+    - (* 65: 2-aligned split-fetch generic rd=x0 NO-OP, FETCH-UNCONDITIONAL *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_u_split_nop va vpn ie w ii
+                ms_v sc_v stval_v sepc_v g tlbvec E Φ HN Hexec_op Hnlpad Hok
+                Hsome Hchk0 HupdN HcwL HcwH
+                HSXL Hbit0 Hbit1 Hvalign4
+                HcanonL Hvpn_defL HalignL
+                HcanonH Hvpn_defH HalignH
+                HnotRVC Hdec
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
   Qed.
 
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :

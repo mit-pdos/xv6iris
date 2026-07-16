@@ -572,6 +572,152 @@ Section Total.
     repeat split; assumption.
   Qed.
 
+  (* Generic 2-aligned rd=x0 NO-OP (HINT/nop) -> disjunct 65 (the LAST
+     disjunct).  Any state-preserving retiring instruction whose word is
+     resident as a 2-aligned 32-bit split fetch.  This is the arm that makes
+     the 2-aligned compute classification TOTAL over rd. *)
+  Lemma classify_split_nop (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (ii : instruction) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ii, s0)) ->
+    (forall s, exec (execute ii) s = Some (RETIRE_SUCCESS, s)) ->
+    is_lpad_instruction ii = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hexec Hlpad.
+    unfold usplit_hit in Hu.
+    do 64 right.
+    exists vpn, ie, w, ii.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  (* ---- TOTAL-over-rd compute routers.  Each is the rd-total upgrade of the
+     corresponding non-total router: it drops the [uint rd <> 0] hypothesis
+     and case-splits on [uint rd = 0], routing rd=x0 to the NO-OP disjunct 65
+     via [classify_split_nop] and rd<>0 to the rd<>0 compute disjunct.  The
+     rd=0 leg needs the NO-OP execute fact, which it derives from the
+     execute premise in its if-over-rd form (at rd=0 the [if] collapses to
+     the state-preserving branch). ---- *)
+
+  (* ITYPE, TOTAL over rd -> disjunct 54 (rd<>0) or 65 (rd=0). *)
+  Lemma classify_split_compute_total (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (op : iop) (f : mword 64 -> mword 12 -> mword 64)
+      (imm : mword 12) (rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ITYPE (imm, Regidx rs1, Regidx rd, op), s0)) ->
+    (forall (rs1' rd' : mword 5) (imm' : mword 12) s,
+       exec (execute (ITYPE (imm', Regidx rs1', Regidx rd', op))) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (WpGpr.gpr_of_Z (uint rd')))
+                      (regval_into_reg
+                         (f (if Z.eqb (uint rs1') 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs1'))) s.(sregs))
+                            imm')))) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hexec.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_split_nop va ms_v g tlbvec vpn ie w
+               (ITYPE (imm, Regidx rs1, Regidx rd, op)) Hu Hdec).
+      + intros s. rewrite (Hexec rs1 rd imm s).
+        rewrite (proj2 (Z.eqb_eq (uint rd) 0) Hrd0). reflexivity.
+      + destruct op; reflexivity.
+    - exact (classify_split_compute va ms_v g tlbvec vpn ie w op f imm rs1 rd
+               Hu Hdec Hrd Hexec).
+  Qed.
+
+  (* Generic single-source, TOTAL over rd -> disjunct 55 (rd<>0) or 65 (rd=0). *)
+  Lemma classify_split_compute1_total (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (mk : mword 5 -> mword 5 -> instruction) (F : mword 64 -> mword 64)
+      (rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (mk rs1 rd, s0)) ->
+    (forall (rs1' rd' : mword 5) s,
+       exec (execute (mk rs1' rd')) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (WpGpr.gpr_of_Z (uint rd')))
+                      (regval_into_reg
+                         (F (if Z.eqb (uint rs1') 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs1'))) s.(sregs)))))) ->
+    is_lpad_instruction (mk rs1 rd) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hexec Hlpad.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_split_nop va ms_v g tlbvec vpn ie w (mk rs1 rd) Hu Hdec).
+      + intros s. rewrite (Hexec rs1 rd s).
+        rewrite (proj2 (Z.eqb_eq (uint rd) 0) Hrd0). reflexivity.
+      + exact Hlpad.
+    - exact (classify_split_compute1 va ms_v g tlbvec vpn ie w mk F rs1 rd
+               Hu Hdec Hrd Hexec Hlpad).
+  Qed.
+
+  (* Generic two-source, TOTAL over rd -> disjunct 56 (rd<>0) or 65 (rd=0).
+     Takes the execute fact in if-over-rd form (rather than the non-total
+     router's rd<>0-only form): the rd<>0 leg specialises it to the else
+     branch (feeding [classify_split_rtype2]); the rd=0 leg collapses it to
+     the state-preserving branch (feeding [classify_split_nop]). *)
+  Lemma classify_split_rtype2_total (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (mk2 : mword 5 -> mword 5 -> mword 5 -> instruction)
+      (f : mword 64 -> mword 64 -> mword 64)
+      (rs2 rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (mk2 rs2 rs1 rd, s0)) ->
+    (forall (rs2' rs1' rd' : mword 5) s,
+       exec (execute (mk2 rs2' rs1' rd')) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (WpGpr.gpr_of_Z (uint rd')))
+                      (regval_into_reg
+                         (f (if Z.eqb (uint rs1') 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs1'))) s.(sregs))
+                            (if Z.eqb (uint rs2') 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs2'))) s.(sregs)))))) ->
+    is_lpad_instruction (mk2 rs2 rs1 rd) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hexec Hlpad.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrd].
+    - apply (classify_split_nop va ms_v g tlbvec vpn ie w (mk2 rs2 rs1 rd) Hu Hdec).
+      + intros s. rewrite (Hexec rs2 rs1 rd s).
+        rewrite (proj2 (Z.eqb_eq (uint rd) 0) Hrd0). reflexivity.
+      + exact Hlpad.
+    - assert (Hexec_nz : forall (rs2' rs1' rd' : mword 5) s, uint rd' <> 0 ->
+         exec (execute (mk2 rs2' rs1' rd')) s
+         = Some (RETIRE_SUCCESS,
+                 set_reg s (R_bitvector_64 (WpGpr.gpr_of_Z (uint rd')))
+                   (regval_into_reg
+                      (f (if Z.eqb (uint rs1') 0 then zero_reg
+                          else register_lookup
+                                 (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs1'))) s.(sregs))
+                         (if Z.eqb (uint rs2') 0 then zero_reg
+                          else register_lookup
+                                 (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs2'))) s.(sregs)))))).
+      { intros rs2' rs1' rd' s Hnz. rewrite (Hexec rs2' rs1' rd' s).
+        rewrite (proj2 (Z.eqb_neq (uint rd') 0) Hnz). reflexivity. }
+      exact (classify_split_rtype2 va ms_v g tlbvec vpn ie w mk2 f rs2 rs1 rd
+               Hu Hdec Hrd Hexec_nz Hlpad).
+  Qed.
+
   Local Ltac split_asm Hu :=
     unfold usplit_hit in Hu;
     destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
