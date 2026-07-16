@@ -164,3 +164,40 @@ Proof.
   etransitivity; [ exact Hrhs | ].
   lia.
 Qed.
+
+(* ===================================================================== *)
+(* little-endian words built from bytes reproduce those bytes (the        *)
+(* width-4/2 clones of KallocInv's width-8 [nth_byte_assemble8]) -- how a *)
+(* fetched word is conjured from the EXISTENTIAL page contents            *)
+(* ===================================================================== *)
+Lemma nth_byte_assemble4 (bs : list (bv 8)) (j : nat) :
+  length bs = 4%nat -> (j < 4)%nat ->
+  nth_byte (Z_to_bv 32 (assemble_bytes bs) : mword 32) j = bs !!! j.
+Proof.
+  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
+  rewrite Z_to_bv_unsigned.
+  pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite Hlen in Hhi. simpl in Hhi.
+  assert (Hws : bv_wrap 32 (assemble_bytes bs) = assemble_bytes bs).
+  { apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
+  rewrite Hws.
+  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
+    by (apply assemble_bytes_byte; lia).
+  rewrite <- Hab.
+  f_equal. f_equal. lia.
+Qed.
+
+Lemma nth_byte_assemble2 (bs : list (bv 8)) (j : nat) :
+  length bs = 2%nat -> (j < 2)%nat ->
+  nth_byte (Z_to_bv 16 (assemble_bytes bs) : mword 16) j = bs !!! j.
+Proof.
+  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
+  rewrite Z_to_bv_unsigned.
+  pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite Hlen in Hhi. simpl in Hhi.
+  assert (Hws : bv_wrap 16 (assemble_bytes bs) = assemble_bytes bs).
+  { apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
+  rewrite Hws.
+  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
+    by (apply assemble_bytes_byte; lia).
+  rewrite <- Hab.
+  f_equal. f_equal. lia.
+Qed.
