@@ -20,6 +20,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodeCore.
 Require Import UmodeFetch.
+Require Import UmodeFetchFault.
 Require Import CommonWalk.
 Require Import UptInv.
 Require Import UmodeData.
@@ -188,6 +189,147 @@ Proof.
                    (eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"1"))
                    (eq_vec (_get_Mstatus_SUM (register_lookup mstatus s.(sregs))) ('b"1"))
                    (mword_of_int 0) root f s Hwalk))).
+  cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hte).
+  rewrite execR_returnR. cbn match.
+  reflexivity.
+Qed.
+
+(* translate-abstract DATA wrappers: whatever makes [translate] error (a
+   mapped-but-denied leaf via a TLB hit OR the walk), [translateAddr] for a
+   LOAD/STORE turns it into E_Load_Page_Fault / E_SAMO_Page_Fault.  These are
+   the DATA analogs of [exec_translateAddr_fetch_u_needs_update_of_translate];
+   needed for the NOPERM data fault, whose mapped vpn may be TLB-cached. *)
+Lemma exec_translateAddr_load_pf_of_translate
+    (vpn : mword 27) (root : mword 44) (f : PTW_Error)
+    (va satp0 : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = User ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
+  register_lookup satp s.(sregs) = satp0 ->
+  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+  zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+  autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+  exec (translate 39 (mword_of_int 0 : mword 16) root vpn (Load Data) User
+          (eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"1"))
+          (eq_vec (_get_Mstatus_SUM (register_lookup mstatus s.(sregs))) ('b"1")) tt) s
+    = Some (Err (f, tt), s) ->
+  exec (translationException (Load Data) f) s = Some (E_Load_Page_Fault tt, s) ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+  autocast (T := mword) (subrange_vec_dec
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+  exec (translateAddr (Virtaddr va) (Load Data)) s
+    = Some (Err (E_Load_Page_Fault tt, tt), s).
+Proof.
+  intros Hcp HSXL HMPRV Hsatp Hmode Hasid Hppn Htranslate Hte Hcanon Hvpn_def.
+  unfold translateAddr.
+  rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_load_nm _ _ s HMPRV)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_U_sv39 satp0 s HSXL Hsatp Hmode)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_load s)).
+  unfold Defs.bind0.
+  replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
+  rewrite execR_bind. rewrite execR_returnR. cbn match.
+  assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
+    by (cbn; apply exec_returnm).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
+  assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
+  { unfold get_satp.
+    assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
+                          "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
+    { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+      unfold assert_exp'. cbn match. apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hae).
+    change (Z.eqb 39 32) with false. cbn match.
+    unfold autocast_m.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+    rewrite Hsatp. apply exec_returnm. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgs).
+  assert (Hae2 : exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
+                        "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s)).
+  { replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+    unfold assert_exp'. cbn match. apply exec_returnm. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+  rewrite Hcanon. cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
+    replace vpnx with vpn by (symmetry; exact Hvpn_def);
+    replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid);
+    replace bppn with root by (symmetry; exact Hppn) end.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htranslate).
+  cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hte).
+  rewrite execR_returnR. cbn match.
+  reflexivity.
+Qed.
+
+Lemma exec_translateAddr_store_pf_of_translate
+    (vpn : mword 27) (root : mword 44) (f : PTW_Error)
+    (va satp0 : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = User ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
+  register_lookup satp s.(sregs) = satp0 ->
+  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+  zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+  autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+  exec (translate 39 (mword_of_int 0 : mword 16) root vpn (Store Data) User
+          (eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"1"))
+          (eq_vec (_get_Mstatus_SUM (register_lookup mstatus s.(sregs))) ('b"1")) tt) s
+    = Some (Err (f, tt), s) ->
+  exec (translationException (Store Data) f) s = Some (E_SAMO_Page_Fault tt, s) ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+  autocast (T := mword) (subrange_vec_dec
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+  exec (translateAddr (Virtaddr va) (Store Data)) s
+    = Some (Err (E_SAMO_Page_Fault tt, tt), s).
+Proof.
+  intros Hcp HSXL HMPRV Hsatp Hmode Hasid Hppn Htranslate Hte Hcanon Hvpn_def.
+  unfold translateAddr.
+  rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_store_nm _ _ s HMPRV)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_U_sv39 satp0 s HSXL Hsatp Hmode)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_store s)).
+  unfold Defs.bind0.
+  replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
+  rewrite execR_bind. rewrite execR_returnR. cbn match.
+  assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
+    by (cbn; apply exec_returnm).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
+  assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
+  { unfold get_satp.
+    assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
+                          "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
+    { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+      unfold assert_exp'. cbn match. apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hae).
+    change (Z.eqb 39 32) with false. cbn match.
+    unfold autocast_m.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+    rewrite Hsatp. apply exec_returnm. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgs).
+  assert (Hae2 : exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
+                        "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s)).
+  { replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+    unfold assert_exp'. cbn match. apply exec_returnm. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+  rewrite Hcanon. cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
+    replace vpnx with vpn by (symmetry; exact Hvpn_def);
+    replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid);
+    replace bppn with root by (symmetry; exact Hppn) end.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htranslate).
   cbn match.
   rewrite (execR_liftR_seq _ _ _ _ _ Hte).
   rewrite execR_returnR. cbn match.
@@ -470,6 +612,193 @@ Section DataFaultFrame.
              Lpriv LSXL HMPRV Lsatp Hmode Hasid Hroot
              (upt_lookup_TLB_unmapped spec vpn tlbvec σ Hvpn Hok Ltlb)
              Hwalk Hte Hcanon Hvpn_def).
+  Qed.
+
+  (* ---- the NOPERM (mapped-but-denied) data faults: a MAPPED vpn whose
+     leaf DENIES the access page-faults.  Since the vpn is mapped it may be
+     TLB-cached, so the translate is built by a hit/collision/empty
+     dispatch (unlike the unmapped case, whose vpn can never hit).  Same
+     cause (E_Load/SAMO_Page_Fault) and interface as the _unmapped lemmas. ---- *)
+  Lemma upt_translateAddr_load_noperm (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (i : uwalk_info) (va satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) :
+    spec !! vpn = Some i ->
+    uw_check_denied (Load Data) i ->
+    upt_tlb_ok spec tlbvec ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1" : mword 1) = false ->
+    register_lookup satp σ.(sregs) = satp0 ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (translateAddr (Virtaddr va) (Load Data)) σ
+       = Some (Err (E_Load_Page_Fault tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hsome Hden Hok Lpriv LSXL HMPRV Lsatp Ltlb Hmode Hasid Hroot Hcanon Hvpn_def
+             HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_walk_read_ptes root slots spec vpn i σ Hsome HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(Hrd2 & Hrd1 & Hrd0 & Hwf).
+    iPureIntro.
+    unfold uw_addr2, uw_addr1, uw_addr0 in Hrd2, Hrd1, Hrd0.
+    destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0).
+    assert (Htranslate : exec (translate 39 (mword_of_int 0 : mword 16) root vpn (Load Data) User
+              (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+              (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1")) tt) σ
+                       = Some (Err (PTW_No_Permission tt, tt), σ)).
+    { destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
+      - destruct (Hok vpn ent Hslot) as (vpn0 & i0 & Hspec0 & Hhash & Hent).
+        subst ent.
+        destruct (eq_vec (sign_extend' (57 - 12) vpn0) (sign_extend' (57 - 12) vpn)) eqn:Hmv.
+        + apply eq_vec_true_iff in Hmv. apply sext45_inj in Hmv. subst vpn0.
+          rewrite Hsome in Hspec0. injection Hspec0 as Heqi. subst i0.
+          assert (Hchk_te : forall (mxr do_sum : bool) s,
+                    exec (check_PTE_permission (Load Data) User mxr do_sum
+                            (Mk_PTE_Flags (subrange_vec_dec (tlb_get_pte 8 (upt_entry vpn i)) 7 0))
+                            (ext_bits_of_PTE (tlb_get_pte 8 (upt_entry vpn i))) tt) s
+                      = Some (PTE_Check_Failure (tt, PTE_No_Permission tt), s)).
+          { rewrite upt_entry_pte. exact Hden. }
+          exact (exec_translate_u_noperm (Load Data) (upt_entry vpn i) vpn Hchk_te
+                   (upt_entry_match vpn i)
+                   (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   root tlbvec σ Ltlb Hslot).
+        + assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ)).
+          { apply (exec_lookup_TLB_nomatch vpn (mword_of_int 0) (upt_entry vpn0 i0) tlbvec σ
+                     Ltlb Hslot).
+            rewrite upt_entry_match_gen. exact Hmv. }
+          exact (exec_translate_walk_user_noperm vpn root (uw_pte2 i) (uw_pte1 i) (uw_pte0 i)
+                   (Load Data)
+                   (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   H2i H2nl H1i H1nl H0i H0nl
+                   (fun s => Hden (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                                  (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1")) s)
+                   (mword_of_int 0) σ Hlk Hrd2 Hrd1 Hrd0).
+      - assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ)).
+        { unfold lookup_TLB.
+          rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb σ)).
+          rewrite Ltlb. rewrite Hslot. apply exec_returnm. }
+        exact (exec_translate_walk_user_noperm vpn root (uw_pte2 i) (uw_pte1 i) (uw_pte0 i)
+                 (Load Data)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 H2i H2nl H1i H1nl H0i H0nl
+                 (fun s => Hden (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                                (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1")) s)
+                 (mword_of_int 0) σ Hlk Hrd2 Hrd1 Hrd0). }
+    assert (Hte : exec (translationException (Load Data) (PTW_No_Permission tt)) σ
+                    = Some (E_Load_Page_Fault tt, σ)).
+    { unfold translationException. cbn match. apply exec_returnm. }
+    exact (exec_translateAddr_load_pf_of_translate vpn root (PTW_No_Permission tt) va satp0 σ
+             Lpriv LSXL HMPRV Lsatp Hmode Hasid Hroot Htranslate Hte Hcanon Hvpn_def).
+  Qed.
+
+  Lemma upt_translateAddr_store_noperm (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (i : uwalk_info) (va satp0 : mword 64)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) :
+    spec !! vpn = Some i ->
+    uw_check_denied (Store Data) i ->
+    upt_tlb_ok spec tlbvec ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1" : mword 1) = false ->
+    register_lookup satp σ.(sregs) = satp0 ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (translateAddr (Virtaddr va) (Store Data)) σ
+       = Some (Err (E_SAMO_Page_Fault tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hsome Hden Hok Lpriv LSXL HMPRV Lsatp Ltlb Hmode Hasid Hroot Hcanon Hvpn_def
+             HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_walk_read_ptes root slots spec vpn i σ Hsome HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(Hrd2 & Hrd1 & Hrd0 & Hwf).
+    iPureIntro.
+    unfold uw_addr2, uw_addr1, uw_addr0 in Hrd2, Hrd1, Hrd0.
+    destruct Hwf as (H2i & H2nl & H1i & H1nl & H0i & H0nl & H0N & Hglob & Hpbmt0).
+    assert (Htranslate : exec (translate 39 (mword_of_int 0 : mword 16) root vpn (Store Data) User
+              (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+              (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1")) tt) σ
+                       = Some (Err (PTW_No_Permission tt, tt), σ)).
+    { destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
+      - destruct (Hok vpn ent Hslot) as (vpn0 & i0 & Hspec0 & Hhash & Hent).
+        subst ent.
+        destruct (eq_vec (sign_extend' (57 - 12) vpn0) (sign_extend' (57 - 12) vpn)) eqn:Hmv.
+        + apply eq_vec_true_iff in Hmv. apply sext45_inj in Hmv. subst vpn0.
+          rewrite Hsome in Hspec0. injection Hspec0 as Heqi. subst i0.
+          assert (Hchk_te : forall (mxr do_sum : bool) s,
+                    exec (check_PTE_permission (Store Data) User mxr do_sum
+                            (Mk_PTE_Flags (subrange_vec_dec (tlb_get_pte 8 (upt_entry vpn i)) 7 0))
+                            (ext_bits_of_PTE (tlb_get_pte 8 (upt_entry vpn i))) tt) s
+                      = Some (PTE_Check_Failure (tt, PTE_No_Permission tt), s)).
+          { rewrite upt_entry_pte. exact Hden. }
+          exact (exec_translate_u_noperm (Store Data) (upt_entry vpn i) vpn Hchk_te
+                   (upt_entry_match vpn i)
+                   (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   root tlbvec σ Ltlb Hslot).
+        + assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ)).
+          { apply (exec_lookup_TLB_nomatch vpn (mword_of_int 0) (upt_entry vpn0 i0) tlbvec σ
+                     Ltlb Hslot).
+            rewrite upt_entry_match_gen. exact Hmv. }
+          exact (exec_translate_walk_user_noperm vpn root (uw_pte2 i) (uw_pte1 i) (uw_pte0 i)
+                   (Store Data)
+                   (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                   H2i H2nl H1i H1nl H0i H0nl
+                   (fun s => Hden (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                                  (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1")) s)
+                   (mword_of_int 0) σ Hlk Hrd2 Hrd1 Hrd0).
+      - assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ)).
+        { unfold lookup_TLB.
+          rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb σ)).
+          rewrite Ltlb. rewrite Hslot. apply exec_returnm. }
+        exact (exec_translate_walk_user_noperm vpn root (uw_pte2 i) (uw_pte1 i) (uw_pte0 i)
+                 (Store Data)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 H2i H2nl H1i H1nl H0i H0nl
+                 (fun s => Hden (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                                (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1")) s)
+                 (mword_of_int 0) σ Hlk Hrd2 Hrd1 Hrd0). }
+    assert (Hte : exec (translationException (Store Data) (PTW_No_Permission tt)) σ
+                    = Some (E_SAMO_Page_Fault tt, σ)).
+    { unfold translationException. cbn match. apply exec_returnm. }
+    exact (exec_translateAddr_store_pf_of_translate vpn root (PTW_No_Permission tt) va satp0 σ
+             Lpriv LSXL HMPRV Lsatp Hmode Hasid Hroot Htranslate Hte Hcanon Hvpn_def).
   Qed.
 
   (* ---- the s_x forms: the translate-Err fact AT the post-fetch state
