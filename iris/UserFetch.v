@@ -625,3 +625,102 @@ Section UserFetchFaultFlavors5.
   Qed.
 
 End UserFetchFaultFlavors5.
+
+(* ===================================================================== *)
+(* §5 The fetch-SUCCESS reductions (4-aligned pc): translation Ok +        *)
+(* readable bytes => F_Base / F_RVC.  Generic over the translate's output  *)
+(* state (hit: s' = s; walk: s' = the TLB-filled state) -- the mem_read    *)
+(* facts live at s'.                                                       *)
+(* ===================================================================== *)
+
+Lemma exec_fetch_bytes_ok (width : Z) (fs gs pa : mword 64)
+    (w : mword (8 * width)) (s s' : mstate) :
+  exec (translateAddr (Virtaddr gs) (InstructionFetch tt)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
+  exec (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) width false false false) s'
+    = Some (Ok w, s') ->
+  exec (fetch_bytes fs gs width) s
+    = Some (FetchBytes_Success (autocast (T := mword) w), s').
+Proof.
+  intros Htr Hmr.
+  unfold fetch_bytes.
+  rewrite exec_catch_early_return.
+  change (ext_fetch_check_pc fs gs) with (@None unit). cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ _ _
+    (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+            (Defs.liftR (translateAddr (Virtaddr gs) (InstructionFetch tt)))) s
+         = Some (inr (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), s'))).
+  2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+      rewrite execR_liftR. rewrite Htr.
+      cbn match. reflexivity. }
+  cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s')).
+  cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ _ _
+    (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa)
+                              width false false false)) s'
+         = Some (inr (Ok w), s'))).
+  2:{ rewrite execR_liftR. rewrite Hmr. cbn match. reflexivity. }
+  cbv iota beta.
+  rewrite execR_returnR_fwd. cbn match. reflexivity.
+Qed.
+
+Section UserFetchOk4.
+  Context (s s' : mstate) (pc pa : mword 64) (w : mword 32).
+  Hypothesis HpcPC : register_lookup PC s.(sregs) = pc.
+  Hypothesis Hvalign : is_aligned_vaddr (Virtaddr pc) 4 = true.
+  Hypothesis Htr :
+    exec (translateAddr (Virtaddr pc) (InstructionFetch tt)) s
+      = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
+  Hypothesis Hmr :
+    exec (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4 false false false) s'
+      = Some (Ok w, s').
+
+  Let HrdPC : exec (Defs.read_reg PC) s = Some (pc, s).
+  Proof. rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. Qed.
+
+  Lemma exec_fetch_ok_4 :
+    exec (fetch tt) s
+      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) w : mword 32) 15 0)
+               then F_RVC (subrange_vec_dec (autocast (T := mword) w : mword 32) 15 0)
+               else F_Base (autocast (T := mword) w)), s').
+  Proof using HpcPC Hvalign Htr Hmr.
+    destruct (align4_low_bits pc Hvalign) as [Hbit0 Hbit1].
+    unfold fetch.
+    rewrite exec_catch_early_return.
+    change (get_config_rvfi tt) with false. cbv iota beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    change (ext_fetch_check_pc pc pc) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ false s).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+        unfold or_boolM.
+        rewrite (execR_bind_Some _ _ _ false s).
+        2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit0.
+            apply execR_returnR_fwd. }
+        cbv iota beta.
+        unfold and_boolM.
+        rewrite (execR_bind_Some _ _ _ false s).
+        2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hbit1.
+            apply execR_returnR_fwd. }
+        cbv iota beta. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ true s).
+    2:{ unfold and_boolM.
+        rewrite (execR_bind_Some _ _ _ true s).
+        2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hvalign.
+            apply execR_returnR_fwd. }
+        cbv iota beta.
+        rewrite execR_liftR. rewrite exec_currentlyEnabled_Ziccif.
+        cbn match. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite (execR_liftR_seq _ _ _ _ _
+              (exec_fetch_bytes_ok 4 pc pc pa w s s' Htr Hmr)).
+    cbv iota beta.
+    destruct (isRVC (subrange_vec_dec (autocast (T := mword) w : mword 32) 15 0)) eqn:Hrvc;
+      rewrite Hrvc; rewrite execR_returnR_fwd; cbn match; reflexivity.
+  Qed.
+
+End UserFetchOk4.
