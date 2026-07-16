@@ -93,7 +93,6 @@ Record ucfg := UCfg {
                                mip; no timer device is modeled).  If a timer
                                ever gets modeled, mip moves into a shared
                                invariant exactly like the wires. *)
-  uc_dq      : dfrac;       (* hart_state fraction *)
   uc_dqc     : dfrac;       (* config-cell fraction *)
   (* stvec is DIRECT-mode: traps land exactly at its base *)
   uc_tvd : trapVectorMode_forwards (_get_Mtvec_Mode uc_stvec) = TV_Direct;
@@ -110,9 +109,28 @@ Record ucfg := UCfg {
 }.
 
 (* ===================================================================== *)
-(* §3 mstatus pins.  User execution never writes mstatus (only traps do,   *)
-(* and they exit the loop), so these ride through every retired step.      *)
+(* §3 hart-state and mstatus pins.                                         *)
 (* ===================================================================== *)
+
+(* the hart states user execution can put the core in: ACTIVE, or -- via
+   the Zawrs WRS.STO / WRS.NTO instructions, which are user-executable and
+   are NOT nops in this build -- WAITING.  (WFI in U-mode traps illegal
+   before entering the wait, so WAIT_WFI is unreachable from user code.)
+   The waiting-state step [run_hart_waiting] wakes when the raw
+   [mip & mie ≠ 0] ([shouldWakeForInterrupt] -- NOTE: the raw mip register
+   only, NOT the sig_* wires) or when the reservation is invalid; the
+   latter scrutinizes the OPAQUE platform axiom [valid_reservation], so
+   the wait-step arm of the step obligation case-splits on it -- BOTH
+   branches step (wake-and-retire vs stay-waiting), and both re-establish
+   [user_inv]. *)
+Definition user_hart_ok (hs : HartState) : Prop :=
+  match hs with
+  | HART_ACTIVE _ => True
+  | HART_WAITING (wr, _) => wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO
+  end.
+
+(* mstatus pins: user execution never writes mstatus (only traps do, and
+   they exit the loop), so these ride through every retired step. *)
 
 (* in the user phase: SXL fixed 64-bit, no M-mode memory-privilege override,
    MXR off (so a load's permission check is a pure function of the leaf's
@@ -140,7 +158,6 @@ Section UserExec.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Local Notation dq := (uc_dq C).
   Local Notation dqc := (uc_dqc C).
 
   (* the loop-constant config cells (fraction [dqc]: never written during
@@ -163,17 +180,20 @@ Section UserExec.
 
   (* ------------------------------------------------------------------- *)
   (* The loop invariant: A VALID USER-MODE EXECUTION STATE.  Everything an *)
-  (* instruction can change is existential: the pc (ANY value -- fetching  *)
+  (* instruction can change is existential: the hart state (ACTIVE, or     *)
+  (* WAITING after a user WRS -- entering/leaving the wait WRITES the      *)
+  (* cell, so it is owned at full fraction), the pc (ANY value -- fetching *)
   (* from a non-canonical or unmapped address page-faults safely), the     *)
   (* register file, the trap CSRs (stale until the next trap writes them), *)
   (* mstatus up to its pins, and -- inside [upt_inv] -- the TLB and the    *)
   (* mapped pages' contents.                                               *)
   (* ------------------------------------------------------------------- *)
   Definition user_inv : iProp Σ :=
-    (∃ (ms_v sc_v stval_v sepc_v va : mword 64)
+    (∃ (hs : HartState) (ms_v sc_v stval_v sepc_v va : mword 64)
        (g : gmap regidx (mword 64)),
+      ⌜user_hart_ok hs⌝ ∗
       ⌜user_mstatus_ok ms_v⌝ ∗
-      hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+      hart_state ↦ᵣ hs ∗
       cur_privilege ↦ᵣ User ∗
       mstatus ↦ᵣ ms_v ∗
       scause ↦ᵣ sc_v ∗
@@ -196,7 +216,7 @@ Section UserExec.
     (∃ (ms_v sc_v stval_v sepc_v : mword 64)
        (g : gmap regidx (mword 64)),
       ⌜trap_mstatus_ok ms_v⌝ ∗
-      hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+      hart_state ↦ᵣ HART_ACTIVE tt ∗
       cur_privilege ↦ᵣ Supervisor ∗
       mstatus ↦ᵣ ms_v ∗
       scause ↦ᵣ sc_v ∗
