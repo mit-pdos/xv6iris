@@ -237,11 +237,11 @@ End UTranslateHitFault.
 (* ===================================================================== *)
 
 Section UTranslateHitNoperm.
-  Context (ent : TLB_Entry) (vpn : mword 27).
+  Context (acc : MemoryAccessType mem_payload) (ent : TLB_Entry) (vpn : mword 27).
 
-  (* the leaf DENIES the fetch (no X / no U) *)
+  (* the leaf DENIES the access (no X/R/W or no U) *)
   Hypothesis Hchk_denied : forall (mxr do_sum : bool) s,
-    exec (check_PTE_permission (InstructionFetch tt) User mxr do_sum
+    exec (check_PTE_permission acc User mxr do_sum
             (Mk_PTE_Flags (subrange_vec_dec (tlb_get_pte 8 ent) 7 0))
             (ext_bits_of_PTE (tlb_get_pte 8 ent)) tt) s
       = Some (PTE_Check_Failure (tt, PTE_No_Permission tt), s).
@@ -249,7 +249,7 @@ Section UTranslateHitNoperm.
                         (sign_extend' (57 - 12) vpn) = true.
 
   Lemma exec_translate_TLB_hit_u_noperm (mxr do_sum : bool) s :
-    exec (translate_TLB_hit 39 (mword_of_int 0 : mword 16) vpn (InstructionFetch tt) User mxr do_sum
+    exec (translate_TLB_hit 39 (mword_of_int 0 : mword 16) vpn acc User mxr do_sum
             tt (tlb_hash (__id 39) vpn) ent) s
       = Some (Err (PTW_No_Permission tt, tt), s).
   Proof.
@@ -262,7 +262,7 @@ Section UTranslateHitNoperm.
         (base_ppn : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
     register_lookup tlb s.(sregs) = tlbvec ->
     vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent ->
-    exec (translate 39 (mword_of_int 0 : mword 16) base_ppn vpn (InstructionFetch tt) User mxr do_sum tt) s
+    exec (translate 39 (mword_of_int 0 : mword 16) base_ppn vpn acc User mxr do_sum tt) s
       = Some (Err (PTW_No_Permission tt, tt), s).
   Proof.
     intros Htlb Hvec.
@@ -274,6 +274,48 @@ Section UTranslateHitNoperm.
   Qed.
 
 End UTranslateHitNoperm.
+
+(* miss-path NOPERM: the TLB lookup misses, the 3-level walk reaches the
+   leaf, and the leaf DENIES the access -> [translate] errors with
+   No_Permission.  Access-generic; the leaf permission failure short-
+   circuits BEFORE the Svnapot gate (no misa premise, no leaf N-bit). *)
+Lemma exec_translate_walk_user_noperm
+    (vpn : mword 27) (root : mword 44) (pte2 pte1 pte0 : mword 64)
+    (acc : MemoryAccessType mem_payload) (mxr do_sum : bool)
+    (H2i : forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
+                             (ext_bits_of_PTE pte2)) s = Some (false, s))
+    (H2nl : pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte2 7 0)) = true)
+    (H1i : forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
+                             (ext_bits_of_PTE pte1)) s = Some (false, s))
+    (H1nl : pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte1 7 0)) = true)
+    (H0i : forall s, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                             (ext_bits_of_PTE pte0)) s = Some (false, s))
+    (H0nl : pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte0 7 0)) = false)
+    (Hchk0 : forall s, exec (check_PTE_permission acc User mxr do_sum
+                               (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
+                               (ext_bits_of_PTE pte0) tt) s
+       = Some (PTE_Check_Failure (tt, PTE_No_Permission tt), s))
+    (asid : mword 16) s :
+  exec (lookup_TLB 39 asid vpn) s = Some (None, s) ->
+  exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s = Some (Ok pte2, s) ->
+  exec (read_pte (Physaddr (u_pte_addr (u_next_base pte2) (subrange_vec_dec vpn 17 9))) 8) s = Some (Ok pte1, s) ->
+  exec (read_pte (Physaddr (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0))) 8) s = Some (Ok pte0, s) ->
+  exec (translate 39 asid root vpn acc User mxr do_sum tt) s
+    = Some (Err (PTW_No_Permission tt, tt), s).
+Proof.
+  intros Hlk Hrd2 Hrd1 Hrd0.
+  apply (exec_translate_walk_user_err vpn acc User mxr do_sum
+           asid root (PTW_No_Permission tt) s Hlk).
+  apply (exec_translate_TLB_miss_user_walk_err vpn acc User mxr do_sum
+           asid root (PTW_No_Permission tt) s).
+  apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root pte2 _ s Hrd2 H2i H2nl).
+  intros g' a.
+  apply (exec_rec_walk_l1_sub vpn acc User mxr do_sum
+           (u_next_base pte2) pte1 g' _ a s Hrd1 H1i H1nl).
+  intros g'' a0.
+  exact (exec_rec_walk_leaf_noperm vpn acc User mxr do_sum
+           (u_next_base pte1) pte0 g'' (PTE_No_Permission tt) a0 s Hrd0 H0i H0nl Hchk0).
+Qed.
 
 (* ===================================================================== *)
 (* §2 run_hart_active on a fetch failure: Step_Fetch_Failure, no state    *)
