@@ -84,6 +84,15 @@ Definition uw_check_ok (acc : MemoryAccessType mem_payload) (i : uwalk_info) : P
             (ext_bits_of_PTE (uw_pte0 i)) tt) s
       = Some (PTE_Check_Success tt, s).
 
+(* per-access permission fact on the leaf, in U-mode: the check DENIES
+   every user access with No_Permission (mxr/do_sum-generic) *)
+Definition uw_check_denied (acc : MemoryAccessType mem_payload) (i : uwalk_info) : Prop :=
+  forall (mxr do_sum : bool) s,
+    exec (check_PTE_permission acc User mxr do_sum
+            (Mk_PTE_Flags (subrange_vec_dec (uw_pte0 i) 7 0))
+            (ext_bits_of_PTE (uw_pte0 i)) tt) s
+      = Some (PTE_Check_Failure (tt, PTE_No_Permission tt), s).
+
 (* the pure spec: the slot map describes every mapped vpn's walk *)
 Definition upt_spec (root : mword 44)
     (slots : gmap (mword 64) (mword 64))
@@ -531,6 +540,44 @@ Section UptInv.
         exact (exec_rec_walk_leaf_noperm vpn acc User mxr do_sum
                  (u_next_base w1) w0 g'' (PTE_No_Permission tt) a0 σ Hr0 Hv0 Hl0
                  (fun s0 => Hden0 acc mxr do_sum s0)).
+  Qed.
+
+  (* the NOEXEC / no-permission twin: a MAPPED vpn whose leaf DENIES the
+     access (e.g. fetch from a non-executable page).  The three slot reads
+     come from [upt_walk_read_ptes]; the structural facts from [uw_wf]; the
+     leaf permission failure from [uw_check_denied]. *)
+  Lemma upt_noexec_walk_fault (root : mword 44)
+      (slots : gmap (mword 64) (mword 64))
+      (spec : gmap (mword 27) uwalk_info)
+      (vpn : mword 27) (i : uwalk_info) (acc : MemoryAccessType mem_payload)
+      (mxr do_sum : bool) (σ : mstate) :
+    spec !! vpn = Some i ->
+    uw_check_denied acc i ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_inv root slots spec -∗
+    ⌜exec (pt_walk 39 vpn acc User mxr do_sum root 2 false tt) σ
+       = Some (Err (PTW_No_Permission tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hvpn Hden HA Hord HR Hcov Hpter) "#Hhw Hint Hupt".
+    iDestruct (upt_walk_read_ptes root slots spec vpn i σ Hvpn HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hupt") as %(Hr2 & Hr1 & Hr0 & Hwf).
+    iPureIntro.
+    destruct Hwf as (Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & Hn0 & _).
+    apply (exec_pt_walk_user_sub vpn acc User mxr do_sum root (uw_pte2 i) _ σ Hr2 Hv2 Hn2).
+    intros g' a.
+    apply (exec_rec_walk_l1_sub vpn acc User mxr do_sum
+             (u_next_base (uw_pte2 i)) (uw_pte1 i) g' _ a σ Hr1 Hv1 Hn1).
+    intros g'' a0.
+    exact (exec_rec_walk_leaf_noperm vpn acc User mxr do_sum
+             (u_next_base (uw_pte1 i)) (uw_pte0 i) g'' (PTE_No_Permission tt) a0 σ
+             Hr0 Hv0 Hn0 (fun s0 => Hden mxr do_sum s0)).
   Qed.
 
   (* an UNMAPPED vpn can never hit the TLB: a colliding slot holds some

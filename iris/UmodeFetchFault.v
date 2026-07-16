@@ -231,6 +231,51 @@ Section UTranslateHitFault.
 End UTranslateHitFault.
 
 (* ===================================================================== *)
+(* §1b The NOPERM twin: a MAPPED but NON-EXECUTABLE leaf (fetch denied).   *)
+(*     The permission check FAILS with No_Permission, short-circuiting     *)
+(*     translate_TLB_hit to PTW_No_Permission BEFORE update_and_write_pte. *)
+(* ===================================================================== *)
+
+Section UTranslateHitNoperm.
+  Context (ent : TLB_Entry) (vpn : mword 27).
+
+  (* the leaf DENIES the fetch (no X / no U) *)
+  Hypothesis Hchk_denied : forall (mxr do_sum : bool) s,
+    exec (check_PTE_permission (InstructionFetch tt) User mxr do_sum
+            (Mk_PTE_Flags (subrange_vec_dec (tlb_get_pte 8 ent) 7 0))
+            (ext_bits_of_PTE (tlb_get_pte 8 ent)) tt) s
+      = Some (PTE_Check_Failure (tt, PTE_No_Permission tt), s).
+  Hypothesis Hmatch : match_TLB_Entry ent (mword_of_int 0 : mword 16)
+                        (sign_extend' (57 - 12) vpn) = true.
+
+  Lemma exec_translate_TLB_hit_u_noperm (mxr do_sum : bool) s :
+    exec (translate_TLB_hit 39 (mword_of_int 0 : mword 16) vpn (InstructionFetch tt) User mxr do_sum
+            tt (tlb_hash (__id 39) vpn) ent) s
+      = Some (Err (PTW_No_Permission tt, tt), s).
+  Proof.
+    unfold translate_TLB_hit. cbn zeta.
+    rewrite (exec_bind_Some _ _ _ _ _ (Hchk_denied mxr do_sum s)). cbn match.
+    apply exec_returnm.
+  Qed.
+
+  Lemma exec_translate_u_noperm (mxr do_sum : bool)
+        (base_ppn : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    register_lookup tlb s.(sregs) = tlbvec ->
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent ->
+    exec (translate 39 (mword_of_int 0 : mword 16) base_ppn vpn (InstructionFetch tt) User mxr do_sum tt) s
+      = Some (Err (PTW_No_Permission tt, tt), s).
+  Proof.
+    intros Htlb Hvec.
+    unfold translate.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_lookup_TLB_hit_u ent vpn Hmatch tlbvec s Htlb Hvec)).
+    cbn match.
+    apply exec_translate_TLB_hit_u_noperm.
+  Qed.
+
+End UTranslateHitNoperm.
+
+(* ===================================================================== *)
 (* §2 run_hart_active on a fetch failure: Step_Fetch_Failure, no state    *)
 (*    change (the TLB-hit fault path performs no write).                  *)
 (* ===================================================================== *)
