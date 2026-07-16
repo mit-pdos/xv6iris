@@ -201,3 +201,30 @@ Proof.
   rewrite <- Hab.
   f_equal. f_equal. lia.
 Qed.
+
+(* a 4-aligned va translates to a 4-aligned pa (the page offset carries
+   the low bits) *)
+Lemma pa4_aligned (p : mword 44) (va : mword 64) :
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  is_aligned_paddr (Physaddr (zero_extend' 64
+    (concat_vec p (subrange_vec_dec va 11 0)))) 4 = true.
+Proof.
+  intro Hal.
+  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
+  unfold is_aligned_paddr. apply Z.eqb_eq.
+  rewrite !(uint_unsigned_n _) in Hal |- *.
+  pose proof (bv_unsigned_in_range _ va) as Hr.
+  rewrite Z.rem_mod_nonneg in Hal by lia.
+  rewrite zext64_concat44_12_unsigned.
+  rewrite bv_subrange11.
+  pose proof (bv_unsigned_in_range _ p) as Hp.
+  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
+  rewrite Z.rem_mod_nonneg by lia.
+  rewrite <- Z.add_mod_idemp_l by lia.
+  replace ((bv_unsigned p * 4096) mod 4) with 0.
+  2:{ symmetry. apply Z.mod_divide; [ lia | ].
+      exists (bv_unsigned p * 1024). lia. }
+  rewrite Z.add_0_l.
+  rewrite <- Znumtheory.Zmod_div_mod; [ | lia | lia | exists 1024; reflexivity ].
+  exact Hal.
+Qed.
