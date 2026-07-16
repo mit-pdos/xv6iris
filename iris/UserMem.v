@@ -304,27 +304,33 @@ Section UserMemIris.
 
 
   (* the COMPLETE physical fetch fact: at the translated pc, the owned
-     pages provide a word readable by the U-mode fetch *)
+     pages provide a word readable by the U-mode fetch.  The read runs at
+     [σ'] (the possibly TLB-filled post-translate state, same memory);
+     the bytes are borrowed at [σ]. *)
   Lemma upt_fetch_mem_read (pt : upt) (vpn : mword 27) (e : umap_ent)
-      (va : mword 64) (σ : mstate) :
+      (va : mword 64) (σ σ' : mstate) :
     pt.(u_map) !! vpn = Some e ->
     upt_data_cov pt ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
+    σ'.(mem) = σ.(mem) ->
     pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
-    register_lookup cur_privilege σ.(sregs) = User ->
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ->
+    register_lookup cur_privilege σ'.(sregs) = User ->
+    register_lookup pma_regions σ'.(sregs) = register_lookup pma_regions σ.(sregs) ->
+    register_lookup htif_tohost_base σ'.(sregs) = register_lookup htif_tohost_base σ.(sregs) ->
     hw_config -∗
     mstate_interp σ -∗
     upt_data_own pt.(u_data) -∗
     ⌜exists w : mword 32,
        exec (mem_read (InstructionFetch tt) PBMT_PMA
-               (Physaddr (u_walk_pa (um_pte0 e) va)) 4 false false false) σ
-         = Some (Ok w, σ)⌝.
+               (Physaddr (u_walk_pa (um_pte0 e) va)) 4 false false false) σ'
+         = Some (Ok w, σ')⌝.
   Proof.
-    iIntros (Hvpn Hcov Hal HA Hord HX Hcovp Lpriv) "#Hhw Hint Hdata".
+    iIntros (Hvpn Hcov Hal Hmemeq HA Hord HX Hcovp Lpriv Lpma_eq Lhtif_eq)
+      "#Hhw Hint Hdata".
     iDestruct (upt_fetch_word pt vpn e va σ Hvpn Hcov Hal with "Hint Hdata")
       as %(w & Hbytes & Hram0 & Hram3).
     iDestruct "Hint" as "[Hreg [Hmem Hdev]]".
@@ -335,26 +341,32 @@ Section UserMemIris.
     iPureIntro.
     set (pa := u_walk_pa (um_pte0 e) va) in *.
     destruct (Hpma_all pa 4) as (region & Hpmam & Hexec & _).
-    assert (Hpmam' : matching_pma_region (register_lookup pma_regions σ.(sregs))
-              (Physaddr pa) 4 = Some region) by (rewrite Lpma; exact Hpmam).
+    assert (Hpmam' : matching_pma_region (register_lookup pma_regions σ'.(sregs))
+              (Physaddr pa) 4 = Some region)
+      by (rewrite Lpma_eq; rewrite Lpma; exact Hpmam).
     pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
     pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
     assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
               (uint pa) (uint (to_bits 64 4)) = PMP_Match).
     { exact (ram_fetch_pmp pa _ 4 3 ltac:(lia) ltac:(lia)
                ltac:(vm_compute; reflexivity) ltac:(reflexivity)
                Hram0 Hram3 Hcovp). }
     assert (Halp : is_aligned_paddr (Physaddr pa) 4 = true).
     { exact (pa4_aligned _ va Hal). }
+    assert (Hbytes' : forall j : nat, (N.of_nat j < 4)%N ->
+              σ'.(mem) !! pa_add pa j = Some (nth_byte w j))
+      by (rewrite Hmemeq; exact Hbytes).
+    assert (Lhtif' : register_lookup htif_tohost_base σ'.(sregs) = None)
+      by (rewrite Lhtif_eq; exact Lhtif).
     exists w.
-    exact (exec_mem_read_fetch_4_U PBMT_PMA pa region w σ
+    exact (exec_mem_read_fetch_4_U PBMT_PMA pa region w σ'
              HA Hord Hrange HX Hpmam' Halp Hexec
-             (within_clint_false pa 4 σ Hnc ltac:(lia))
-             (within_sig_false pa 4 σ Hns ltac:(lia))
-             (within_htif_false pa 4 σ Lhtif)
+             (within_clint_false pa 4 σ' Hnc ltac:(lia))
+             (within_sig_false pa 4 σ' Hns ltac:(lia))
+             (within_htif_false pa 4 σ' Lhtif')
              (addr_is_ram_not_dev _ Hram0)
-             Hbytes Lpriv).
+             Hbytes' Lpriv).
   Qed.
 
 End UserMemIris.
