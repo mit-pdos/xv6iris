@@ -2261,6 +2261,45 @@ Section Total.
       HeaAl HeaCanon HvpnD Hverdict).
   Qed.
 
+  (* AMOSWAP.W success producer: routes a decoded AMOSWAP.W (aq=true,
+     rl=false) from [ufetch_hit] + MPRV/MXR + the data-page SUCCESS facts
+     (mapped, permitted, aligned, resident) into the new AMOSWAP.W success
+     disjunct of [ustep_mem_case] (the 9th/last, [do 8 right]).  eaF has no
+     immediate ([add_vec (g rs1) (zeros' 64)]); width 4.  Non-AMOSWAP AMOs
+     and other aq/rl orderings route elsewhere (PMA access-fault / arm gap). *)
+  Lemma dispatch_amoswap_from_ufetch
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (rs2 rs1 rd : mword 5) :
+    ufetch_hit va vpn ie w tlbvec ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    (uint (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (zeros' 64)) vpnD) + 4 <= 18446744073709551616)%Z ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Atomic (AMOSWAP, Data, Data)) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Atomic (AMOSWAP, Data, Data)) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (zeros' 64))) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (zeros' 64))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (zeros' 64)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (zeros' 64)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (zeros' 64)) vpnD)) 4 = true ->
+    (forall j : nat, (j < 4)%nat ->
+       pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (zeros' 64)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros (Hs & Hok & Hupd & Hpbmt & Hres & Hval & Hcanon & Hvpn & Hpaal & Hnrvc)
+      Hmprv Hmxr Hdec Hrd Hnowrap HsD HokD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaalD Hresidence.
+    unfold WpUserFull.ustep_mem_case.
+    do 8 right. exists vpn, ie, w, vpnD, ieD, rs2, rs1, rd.
+    repeat split; assumption.
+  Qed.
+
   (* ================================================================ *)
   (* dispatch_word_total: the H4 fetch-word reduction.  Given a 4-      *)
   (* aligned fetch hit, decode the word (decode_total_u_set) and route: *)
