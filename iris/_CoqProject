@@ -108,6 +108,7 @@ DecodeSetU.v
 UserPt.v
 UserExec.v
 UserStep.v
+UserTrap.v
 UserTranslate.v
 WpIntrStep.v
 WpIntrInv.v

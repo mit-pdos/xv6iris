@@ -280,6 +280,24 @@ files or copy code from them; build fresh from the live tree.
      hypotheses that mention them and state those hypotheses via the FOLDED
      names — a raw-spelled RHS makes every derived epilogue term raw and
      the folded `replace`/rewrite patterns miss syntactically.
+     The INTERRUPT arm is DONE (UserTrap.v, axiom-clean):
+     `wp_user_step_interrupt` — a pending delegated interrupt
+     (`u_dispatch = Some (i, Supervisor)`) traps the ACTIVE user hart to
+     stvec, producing `user_trap_frame`; wire cells are borrowed
+     dfrac-generic and handed back. Pure layer: `utrap_ms` (trap-from-U
+     mstatus transform, SPP:=0) + bit facts (WpIntrBits mw_prep/tb1/tb2
+     scripts) discharging `trap_mstatus_ok` from `user_mstatus_ok`;
+     `exec_trap_handler_U_intr` / `exec_handle_interrupt_U` (TrapReduce
+     clone at cur_priv=User, SPP literal 'b"0"');
+     `exec_run_hart_active_pending_U`. Rides the LIVE privilege-agnostic
+     `wp_exec_step_interrupt_inv` engine. Iris arm recipe: ghost-update
+     EVERY physical write in tower order (repeated writes to the same CSR
+     each get their own reg_update — the interp goal is the literal
+     set_reg tower); elp's reset write is same-value (`elp_no_lp`: 1-bit
+     elp pinned ≠ LP_EXPECTED already holds NO_LP_EXPECTED) absorbed by
+     `reg_interp_set_same`; all iMods happen BEFORE the callback's
+     iModIntro. Remaining for the ACTIVE residue: the `u_dispatch = None`
+     fetch/decode/execute case analysis (items 1-4).
   2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
      `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
      `update_PTE_Bits` None-vs-Some by the A(/D) bits.
