@@ -81,6 +81,52 @@ Proof.
   apply exec_returnm.
 Qed.
 
+(* Reservation-invalid exit: WRS wait with no wake interrupt but an
+   invalid reservation exits to a retiring step (same tail as the wake
+   case).  [valid_reservation] is a pure sanctioned axiom (unit -> bool). *)
+Lemma exec_run_hart_waiting_wrs_invalid
+    (step_no : Z) (wr : WaitReason) (instbits : mword 32) (ew : bool) (s : mstate) :
+  (wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO) ->
+  neq_vec (and_vec (register_lookup mip s.(sregs)) (register_lookup mie s.(sregs)))
+          (zeros' 64) = false ->
+  valid_reservation tt = false ->
+  exec (run_hart_waiting step_no wr instbits ew) s
+    = Some (Step_Execute (Retire_Success tt, instbits),
+            set_reg s hart_state (HART_ACTIVE tt)).
+Proof.
+  intros Hwr Hnowake Hvr.
+  unfold run_hart_waiting.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_shouldWakeForInterrupt s)). cbn beta.
+  rewrite Hnowake. cbn match. rewrite Hvr.
+  assert (Hinner : exec (returnm tt >> write_reg hart_state (HART_ACTIVE tt)) s
+                   = Some (tt, set_reg s hart_state (HART_ACTIVE tt))).
+  { rewrite (exec_bind0_Some _ _ _ _ _ (exec_returnm tt s)). apply exec_write_reg. }
+  destruct Hwr as [-> | ->]; cbn match;
+    change (get_config_print_instr tt) with false; cbn match;
+    rewrite (exec_bind0_Some _ _ _ _ _ Hinner); apply exec_returnm.
+Qed.
+
+(* Stay-waiting: WRS wait with no wake interrupt, a valid reservation, and
+   not timed out (exit_wait = false) keeps the hart in HART_WAITING,
+   producing Step_Waiting (state unchanged).  This is the branch the
+   ustep_wrs engine's inner Lob self-recurses on.  (A timed-out WRS,
+   exit_wait = true, instead exits to a retiring step -- like the wake and
+   reservation-invalid cases.) *)
+Lemma exec_run_hart_waiting_wrs_stay
+    (step_no : Z) (wr : WaitReason) (instbits : mword 32) (s : mstate) :
+  (wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO) ->
+  neq_vec (and_vec (register_lookup mip s.(sregs)) (register_lookup mie s.(sregs)))
+          (zeros' 64) = false ->
+  valid_reservation tt = true ->
+  exec (run_hart_waiting step_no wr instbits false) s = Some (Step_Waiting wr, s).
+Proof.
+  intros Hwr Hnowake Hvr.
+  unfold run_hart_waiting.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_shouldWakeForInterrupt s)). cbn beta.
+  rewrite Hnowake. cbn match. rewrite Hvr.
+  destruct Hwr as [-> | ->]; cbn match; apply exec_returnm.
+Qed.
+
 (* ===================================================================== *)
 (* ENGINE DESIGN for the (TODO) ustep_wrs wait-state arm (task #33),      *)
 (* scoped from run_hart_waiting (rv64d.v).  For a hart already in         *)
