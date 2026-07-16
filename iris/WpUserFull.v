@@ -64,6 +64,7 @@ Section WpUserFull.
   Local Notation wp_user_sw_frame_u := (WpUserMemStep.wp_user_sw_frame_u U).
   Local Notation wp_user_sh_frame_u := (WpUserMemStep.wp_user_sh_frame_u U).
   Local Notation wp_user_sb_frame_u := (WpUserMemStep.wp_user_sb_frame_u U).
+  Local Notation wp_user_amoswap_frame_u := (WpUserMemStep.wp_user_amoswap_frame_u U).
   Local Notation medl_v := (WpUserBase.medl_v U).
   Local Notation ustep_lr_fault_u := (WpUserTrapish.ustep_lr_fault_u U).
   Local Notation ustep_sc_fault_u := (WpUserTrapish.ustep_sc_fault_u U).
@@ -351,7 +352,41 @@ Section WpUserFull.
        autocast (T := mword) (subrange_vec_dec
          (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
        is_aligned_paddr (Physaddr paD) 1 = true /\
-       (forall j : nat, (j < 1)%nat -> pa_add paD j ∈ data)).
+       (forall j : nat, (j < 1)%nat -> pa_add paD j ∈ data))
+    \/
+    (* AMOSWAP.W success (width 4, no immediate) *)
+    (exists vpn ie (w : mword 32) vpnD ieD (rs2 rs1 rd : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (zeros' 64) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       (uint paD + 4 <= 18446744073709551616)%Z /\
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd), s0)) /\
+       uint rd <> 0 /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Atomic (AMOSWAP, Data, Data)) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Atomic (AMOSWAP, Data, Data)) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 4 = true /\
+       (forall j : nat, (j < 4)%nat -> pa_add paD j ∈ data)).
 
   (* the DATA-FAULT classification: the fetched word is a width-4 LOAD/STORE
      whose effective address's vpn is UNMAPPED (spec!!vpnD=None), so the data
@@ -964,7 +999,7 @@ Section WpUserFull.
     - iAssert (▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I
         with "[Hk]" as "HkP".
       { iNext. iDestruct "Hk" as "[$ _]". }
-      destruct Hmem as [Hld | [Hlw | [Hlh | [Hlb | [Hsd | [Hsw | [Hsh | Hsb]]]]]]].
+      destruct Hmem as [Hld | [Hlw | [Hlh | [Hlb | [Hsd | [Hsw | [Hsh | [Hsb | Hamo]]]]]]]].
       + (* LD width 8 *)
         destruct Hld as (vpn & ie & w & vpnD & ieD & imm & rs1 & rd & Hsome & Hchk0 & HupdN & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
         iApply (wp_user_ld_data_frame_u va vpn ie w vpnD ieD imm rs1 rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
@@ -1004,6 +1039,11 @@ Section WpUserFull.
         destruct Hsb as (vpn & ie & w & vpnD & ieD & imm & rs2 & rs1 & Hnowrap & Hsome & Hchk0 & HupdN & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
         iApply (wp_user_sb_frame_u va vpn ie w vpnD ieD imm rs2 rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ
                   HN Hnowrap Hok Hsome Hchk0 HupdN Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* AMOSWAP.W width 4 *)
+        destruct Hamo as (vpn & ie & w & vpnD & ieD & rs2 & rs1 & rd & Hnowrap & Hsome & Hchk0 & HupdN & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_amoswap_frame_u va vpn ie w vpnD ieD rs2 rs1 rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hnowrap Hok Hsome Hchk0 HupdN Hcw HSXL HMPRV HMXR Hval Hcanon Hvpn_def Hpaal HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
     - (* fault branch: the data address is UNMAPPED -> page-fault trap frame *)
       iAssert (▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I
