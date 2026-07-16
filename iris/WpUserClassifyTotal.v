@@ -2296,7 +2296,7 @@ Section Total.
     intros (Hs & Hok & Hupd & Hpbmt & Hres & Hval & Hcanon & Hvpn & Hpaal & Hnrvc)
       Hmprv Hmxr Hdec Hrd Hnowrap HsD HokD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaalD Hresidence.
     unfold WpUserFull.ustep_mem_case.
-    do 8 right. exists vpn, ie, w, vpnD, ieD, rs2, rs1, rd.
+    do 8 right; left. exists vpn, ie, w, vpnD, ieD, rs2, rs1, rd.
     repeat split; assumption.
   Qed.
 
