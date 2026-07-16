@@ -576,6 +576,192 @@ Section GenExecStoreconFail4.
 End GenExecStoreconFail4.
 
 (* ===================================================================== *)
+(* MISALIGNED LR/SC access fault (plat_misaligned_access.lrsc =           *)
+(* AccessFault).  A misaligned LR.W / SC.W takes the not-is_aligned       *)
+(* branch of vmem_read_addr / vmem_write_addr: plat_misaligned_exception  *)
+(* returns Some AccessFault, memory_exception -> early_return the Trap.    *)
+(* NO translate, NO PMA -- a strictly SHORTER reduction than the aligned  *)
+(* fault towers above.                                                     *)
+(* ===================================================================== *)
+
+Lemma exec_plat_misaligned_exception_lrsc_true (acc : MemoryAccessType mem_payload) s :
+  is_amo_access acc = false ->
+  exec (plat_misaligned_exception acc true) s = Some (Some AccessFault, s).
+Proof.
+  intro Hna. unfold plat_misaligned_exception.
+  assert (Hass : exec (assert_exp (not (is_amo_access acc))
+                        "sys/vmem_utils.sail:85.35-85.36") s = Some (tt, s)).
+  { rewrite Hna. reflexivity. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hass). apply exec_returnm.
+Qed.
+
+Section GenVMemReadLoadresMisalign4.
+  Variable a : mword 64.
+  Variable s : mstate.
+  Variable aq rl : bool.
+  Let W : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_Load_Access_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Hmisalign : is_aligned_vaddr (Virtaddr a) 4 = false.
+
+  Lemma exec_vmem_read_addr_loadres_misalign :
+    exec (vmem_read_addr (Virtaddr a) 4 (LoadReserved Data) aq (andb aq rl) true) s
+      = Some (Err W, s).
+  Proof.
+    unfold vmem_read_addr. rewrite exec_catch_early_return.
+    rewrite Hmisalign. cbn [Riscv.rv64d.not negb].
+    match goal with
+    | |- context [ Defs.bind (Defs.bind0 ?ib ?sp) ?k ] =>
+      assert (Hinner : execR (Defs.bind0 ib sp) s = Some (inl (Err W), s))
+    end.
+    { rewrite execR_bind0.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                (exec_plat_misaligned_exception_lrsc_true (LoadReserved Data) s eq_refl)).
+      cbn match.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                (exec_memory_exception (Virtaddr a) (E_Load_Access_Fault tt) s)).
+      cbn match. cbn [bits_of_virtaddr].
+      unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+    rewrite execR_bind. rewrite Hinner. reflexivity.
+  Qed.
+End GenVMemReadLoadresMisalign4.
+
+Section GenExecLoadresMisalign4.
+  Variable rs1 rd : mword 5.
+  Variable a : mword 64.
+  Variable s : mstate.
+  Variable aq rl : bool.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (zeros' 64).
+  Let W : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_Load_Access_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (LoadReserved Data)) s = Some (Virtaddr a, s).
+  Hypothesis Hmisalign : is_aligned_vaddr (Virtaddr a) 4 = false.
+
+  Lemma exec_vmem_read_loadres_misalign :
+    exec (vmem_read (Regidx rs1) (zeros' 64) 4 (LoadReserved Data) aq (andb aq rl) true) s
+      = Some (Err W, s).
+  Proof.
+    unfold vmem_read. rewrite exec_catch_early_return.
+    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (LoadReserved Data) 4) s
+                   = Some (Ext_DataAddr_OK (Virtaddr a), s)).
+    { unfold get_transformed_data_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 (zeros' 64) (LoadReserved Data) 4 s)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ Htea).
+      apply exec_returnM. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
+    cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a) s)).
+    rewrite execR_liftR.
+    rewrite (exec_vmem_read_addr_loadres_misalign a s aq rl Hmisalign).
+    reflexivity.
+  Qed.
+
+  Lemma exec_execute_LOADRES_fault_misalign :
+    exec (execute (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd))) s = Some (W, s).
+  Proof.
+    change (execute (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd)))
+      with (execute_LOADRES aq rl (Regidx rs1) 4 (Regidx rd)).
+    unfold execute_LOADRES.
+    assert (Hass : exec (assert_exp' (Z.leb 4 xlen_bytes) "extensions/A/zalrsc_insts.sail:43.28-43.29" : M (_ = _)) s = Some (@eq_refl bool true, s)) by reflexivity.
+    rewrite (exec_bind_Some _ _ _ _ _ Hass).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_vmem_read_loadres_misalign)).
+    cbn match. apply exec_returnM.
+  Qed.
+End GenExecLoadresMisalign4.
+
+Section GenVMemWriteStoreconMisalign4.
+  Variable a : mword 64.
+  Variable dw : mword (8 * 4).
+  Variable s : mstate.
+  Variable aq rl : bool.
+  Let W' : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_SAMO_Access_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Hmisalign : is_aligned_vaddr (Virtaddr a) 4 = false.
+
+  Lemma exec_vmem_write_addr_storecon_misalign :
+    exec (vmem_write_addr (Virtaddr a) 4 dw (StoreConditional Data) (andb aq rl) rl true) s
+      = Some (Err W', s).
+  Proof.
+    unfold vmem_write_addr. rewrite exec_catch_early_return.
+    rewrite Hmisalign. cbn [Riscv.rv64d.not negb].
+    match goal with
+    | |- context [ Defs.bind (Defs.bind0 ?ib ?sp) ?k ] =>
+      assert (Hinner : execR (Defs.bind0 ib sp) s = Some (inl (Err W'), s))
+    end.
+    { rewrite execR_bind0.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                (exec_plat_misaligned_exception_lrsc_true (StoreConditional Data) s eq_refl)).
+      cbn match.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                (exec_memory_exception (Virtaddr a) (E_SAMO_Access_Fault tt) s)).
+      cbn match. cbn [bits_of_virtaddr].
+      unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+    rewrite execR_bind. rewrite Hinner. reflexivity.
+  Qed.
+End GenVMemWriteStoreconMisalign4.
+
+Section GenExecStoreconMisalign4.
+  Variable rs1 rs2 rd : mword 5.
+  Variable a : mword 64.
+  Variable s : mstate.
+  Variable aq rl : bool.
+  Variable dw_src : mword 64.
+  Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (zeros' 64).
+  Let W' : ExecutionResult :=
+    Trap (register_lookup cur_privilege s.(sregs),
+          make_sync_exception (E_SAMO_Access_Fault tt) a,
+          register_lookup PC s.(sregs)).
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (StoreConditional Data)) s = Some (Virtaddr a, s).
+  Hypothesis Hmisalign : is_aligned_vaddr (Virtaddr a) 4 = false.
+  Hypothesis Hrs2 : exec (rX_bits (Regidx rs2)) s = Some (dw_src, s).
+
+  Lemma exec_vmem_write_storecon_misalign :
+    exec (vmem_write (Regidx rs1) (zeros' 64) 4
+            (autocast (T := mword) (subrange_vec_dec dw_src (Z.sub (Z.mul 4 8) 1) 0))
+            (StoreConditional Data) (andb aq rl) rl true) s
+      = Some (Err W', s).
+  Proof.
+    unfold vmem_write. rewrite exec_catch_early_return.
+    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (StoreConditional Data) 4) s
+                   = Some (Ext_DataAddr_OK (Virtaddr a), s)).
+    { unfold get_transformed_data_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 (zeros' 64) (StoreConditional Data) 4 s)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ Htea).
+      apply exec_returnM. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
+    cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a) s)).
+    rewrite execR_liftR.
+    rewrite (exec_vmem_write_addr_storecon_misalign a
+               (autocast (T := mword) (subrange_vec_dec dw_src (Z.sub (Z.mul 4 8) 1) 0))
+               s aq rl Hmisalign).
+    reflexivity.
+  Qed.
+
+  Lemma exec_execute_STORECON_fault_misalign :
+    exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd))) s = Some (W', s).
+  Proof.
+    change (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd)))
+      with (execute_STORECON aq rl (Regidx rs2) (Regidx rs1) 4 (Regidx rd)).
+    unfold execute_STORECON.
+    assert (Hass : exec (assert_exp' (Z.leb 4 xlen_bytes) "extensions/A/zalrsc_insts.sail:68.28-68.29" : M (_ = _)) s = Some (@eq_refl bool true, s)) by reflexivity.
+    rewrite (exec_bind_Some _ _ _ _ _ Hass).
+    rewrite (exec_bind_Some _ _ _ _ _ Hrs2).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_vmem_write_storecon_misalign)).
+    cbn match. apply exec_returnM.
+  Qed.
+End GenExecStoreconMisalign4.
+
+(* ===================================================================== *)
 (* translateAddr TLB-hit wrappers for LoadReserved / StoreConditional.     *)
 (* Clones of UmodeData's load/store wrappers with the access swapped; the  *)
 (* only differences are effectivePrivilege, is_shadow_stack, and the       *)
