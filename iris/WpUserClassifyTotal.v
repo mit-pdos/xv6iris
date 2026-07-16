@@ -124,6 +124,57 @@ Section Total.
   Local Notation spec := (WpUserBase.spec U).
   Local Notation ufetch_hit := (WpUserClassify.ufetch_hit U).
   Local Notation cfetch_hit := (WpUserClassify.cfetch_hit U).
+  Local Notation ustep_case := (WpUserSteps.ustep_case U).
+
+  (* Fetch-fault producer 1: a 4-aligned but non-canonical pc lands in
+     [ustep_case] disjunct 1 (instruction-address fetch fault, no page
+     walk needed). *)
+  Lemma produce_noncanonical (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hal Hnc. unfold WpUserSteps.ustep_case.
+    left. split; assumption.
+  Qed.
+
+  (* Fetch-fault producer 2: a 4-aligned, canonical pc whose vpn is
+     unmapped (kernel-only) lands in [ustep_case] disjunct 2. *)
+  Lemma produce_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (vpn : mword 27) :
+    spec !! vpn = None ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hnone Hal Hcanon Hvpn. unfold WpUserSteps.ustep_case.
+    right; left. exists vpn. repeat split; assumption.
+  Qed.
+
+  (* Fetch-fault producer 3: a mapped, fetch-checked page whose leaf PTE
+     still needs an A-bit update (ADUE = 0) lands in [ustep_case]
+     disjunct 3 (the atomic-update fault). *)
+  Lemma produce_adfault (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (pte' : mword 64) :
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = Some pte' ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hsome Hchk Hupd Hal Hcanon Hvpn. unfold WpUserSteps.ustep_case.
+    right; right; left. exists vpn, ie, pte'. repeat split; assumption.
+  Qed.
 
   (* For a 4-aligned, canonical, executable, A-set, mapped page whose
      instruction bytes are resident in [code], the fetch either yields a
