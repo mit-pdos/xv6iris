@@ -469,6 +469,109 @@ Section Total.
       split; [exact HalignH | exact Hrvc].
   Qed.
 
+  (* ---- 2-ALIGNED split classify lemmas: route a decoded word + usplit_hit
+     into its 2-aligned [ustep_case] disjunct (52-64), the analogues of the
+     H4 [classify_*] lemmas.  Each unpacks [usplit_hit] and navigates to its
+     disjunct.  COMPUTE core first (disjuncts 54/55/56). *)
+
+  (* ITYPE 2-aligned compute -> disjunct 54. *)
+  Lemma classify_split_compute (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (op : iop) (f : mword 64 -> mword 12 -> mword 64)
+      (imm : mword 12) (rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (ITYPE (imm, Regidx rs1, Regidx rd, op), s0)) ->
+    uint rd <> 0 ->
+    (forall (rs1' rd' : mword 5) (imm' : mword 12) s,
+       exec (execute (ITYPE (imm', Regidx rs1', Regidx rd', op))) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (WpGpr.gpr_of_Z (uint rd')))
+                      (regval_into_reg
+                         (f (if Z.eqb (uint rs1') 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs1'))) s.(sregs))
+                            imm')))) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hrd Hexec.
+    unfold usplit_hit in Hu.
+    do 53 right; left.
+    exists vpn, ie, w, op, f, imm, rs1, rd.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  (* Generic single-source 2-aligned compute -> disjunct 55.  Covers every
+     single-source 32-bit compute family via the abstract [mk]/[F]. *)
+  Lemma classify_split_compute1 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (mk : mword 5 -> mword 5 -> instruction) (F : mword 64 -> mword 64)
+      (rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (mk rs1 rd, s0)) ->
+    uint rd <> 0 ->
+    (forall (rs1' rd' : mword 5) s,
+       exec (execute (mk rs1' rd')) s
+       = Some (RETIRE_SUCCESS,
+               if Z.eqb (uint rd') 0 then s
+               else set_reg s (R_bitvector_64 (WpGpr.gpr_of_Z (uint rd')))
+                      (regval_into_reg
+                         (F (if Z.eqb (uint rs1') 0 then zero_reg
+                             else register_lookup
+                                    (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs1'))) s.(sregs)))))) ->
+    is_lpad_instruction (mk rs1 rd) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hrd Hexec Hlpad.
+    unfold usplit_hit in Hu.
+    do 54 right; left.
+    exists vpn, ie, w, mk, F, rs1, rd.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  (* Generic two-source 2-aligned compute -> disjunct 56.  Covers every
+     two-source 32-bit compute family via the abstract [mk2]/[f]. *)
+  Lemma classify_split_rtype2 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (mk2 : mword 5 -> mword 5 -> mword 5 -> instruction)
+      (f : mword 64 -> mword 64 -> mword 64)
+      (rs2 rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (mk2 rs2 rs1 rd, s0)) ->
+    uint rd <> 0 ->
+    (forall (rs2' rs1' rd' : mword 5) s, uint rd' <> 0 ->
+       exec (execute (mk2 rs2' rs1' rd')) s
+       = Some (RETIRE_SUCCESS,
+               set_reg s (R_bitvector_64 (WpGpr.gpr_of_Z (uint rd')))
+                 (regval_into_reg
+                    (f (if Z.eqb (uint rs1') 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs1'))) s.(sregs))
+                       (if Z.eqb (uint rs2') 0 then zero_reg
+                        else register_lookup
+                               (R_bitvector_64 (WpGpr.gpr_of_Z (uint rs2'))) s.(sregs)))))) ->
+    is_lpad_instruction (mk2 rs2 rs1 rd) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hrd Hexec Hlpad.
+    unfold usplit_hit in Hu.
+    do 55 right; left.
+    exists vpn, ie, w, mk2, f, rs2, rs1, rd.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
   (* Case-5 dispatch for an executable, A-set, 4-aligned page whose full
      32-bit words all decode to compute/system instructions in the
      [classifiable_u] set: the fetch either retires (full word ->
