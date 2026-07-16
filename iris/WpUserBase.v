@@ -73,6 +73,8 @@ Record uctx := {
     (uint (exceptionType_bits_forwards (E_Illegal_Instr tt)))) = true;
   Hdel_break : bit_to_bool (access_vec_dec medl_v
     (uint (exceptionType_bits_forwards (E_Breakpoint Brk_Software)))) = true;
+  Hdel_fetch_addr_align : bit_to_bool (access_vec_dec medl_v
+    (uint (exceptionType_bits_forwards (E_Fetch_Addr_Align tt)))) = true;
   HpmpA : pmpAddrMatchType_encdec_backwards
     (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR;
   Hpmp_ord : zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false;

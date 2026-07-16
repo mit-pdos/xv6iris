@@ -191,6 +191,8 @@ Section WpUserFetch.
   Local Notation Hdel_samopf := (WpUserBase.Hdel_samopf U).
   Local Notation Hdel_illegal := (WpUserBase.Hdel_illegal U).
   Local Notation Hdel_break := (WpUserBase.Hdel_break U).
+  Local Notation Hdel_fetch_addr_align := (WpUserBase.Hdel_fetch_addr_align U).
+  Local Notation align_cause := (rv64d_types.Exception (E_Fetch_Addr_Align tt)).
   Local Notation HpmpA := (WpUserBase.HpmpA U).
   Local Notation Hpmp_ord := (WpUserBase.Hpmp_ord U).
   Local Notation HpmpX := (WpUserBase.HpmpX U).
@@ -1262,6 +1264,163 @@ Section WpUserFetch.
     rewrite /user_trap_frame.
     iExists (utrap_ms ms_v (landing_pad_bits_backwards NO_LP_EXPECTED)),
             (utrap_scause pf_cause sc_v), va, va, g, tlbvec.
+    iFrame "Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hgpr Hupt Hcode Hdata".
+    iSplitR; [iPureIntro; exact Hok |].
+    rewrite /user_cfg.
+    iFrame "Hstvec Hmie Hmidl Hmedl Hmip Hmeip Hseip Hsatp Hmenv Hsenv
+            Hmst0 Hsst0 Hpmpc Hpmpa".
+    iFrame "Hpcr Hnpc".
+  Qed.
+
+
+  (* An ODD pc [neq_vec va[0] 'b"0" = true] faults with a fetch-address-
+     misaligned exception (cause 0) BEFORE any translation.  Truncated clone
+     of ustep_fetch_noncanonical: the fetch fact comes directly from
+     exec_fetch_u_addr_align (no translate/PT premises), cause is
+     E_Fetch_Addr_Align, delegation via Hdel_fetch_addr_align.               *)
+  Lemma ustep_fetch_misalign
+      (va : mword 64)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    neq_vec (access_vec_dec va 0) ('b"0") = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros HN Hok HSXL Hodd.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             Hcode Hdata Hcfg Hcont".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    pose proof (elp_no_lp elp0 Help_np) as Help0.
+    iDestruct "Hpc" as "[Hpcr Hnpc]".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmidl & Hmedl & Hmip & Hmeip & Hseip &
+                          Hsatp & Hmenv & Hsenv & Hmst0 & Hsst0 & Hpmpc & Hpmpa)".
+    iApply (wp_exec_step_trapish_inv E Φ HN with "Hinv Hhs").
+    iIntros (σ) "[Hreg Hmem]".
+    iDestruct (reg_valid with "Hreg Hpcr") as %Lpc.
+    iDestruct (reg_valid with "Hreg Hnpc") as %Lnpc.
+    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hms") as %Lms.
+    iDestruct (reg_valid with "Hreg Hsc") as %Lsc.
+    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
+    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie.
+    iDestruct (reg_valid_dq with "Hreg Hmidl") as %Lmidl.
+    iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl.
+    iDestruct (reg_valid_dq with "Hreg Hmip") as %Lmip.
+    iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
+    iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip.
+    iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
+    (* ---- pure facts at σ ---- *)
+    assert (HES : exec (currentlyEnabled Ext_S) σ = Some (true, σ)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal. rewrite Lmisa. exact HmisaS. }
+    assert (Hdisp : exec (dispatchInterrupt User) σ = Some (None, σ)).
+    { apply exec_dispatchInterrupt_none_U.
+      exact (exec_getPendingSet_user_none σ mip_v mie_v midl_v meip seip
+               HES Lmip Lmeip Lseip Lmie Lmidl Hmm Hs0). }
+    (* the misalign fault: fetch of an odd pc, BEFORE any translation *)
+    pose proof (exec_fetch_u_addr_align va σ Lpc Hodd) as Hfetch.
+    pose proof (exec_run_hart_active_fetch_fault σ User (E_Fetch_Addr_Align tt) va
+                  Lpriv Hdisp Hfetch) as Hha.
+    (* the dispatch arm: handle_exception at σ *)
+    assert (LmisaS : eq_vec (_get_Misa_S (register_lookup misa σ.(sregs))) ('b"1") = true)
+      by (rewrite Lmisa; exact HmisaS).
+    assert (Lmedl' : bit_to_bool (access_vec_dec (register_lookup medeleg σ.(sregs))
+                       (uint (exceptionType_bits_forwards (E_Fetch_Addr_Align tt)))) = true)
+      by (rewrite Lmedl; exact Hdel_fetch_addr_align).
+    pose proof (exec_handle_exception_ne_M σ align_cause User va
+                  (xtval_exception_value (E_Fetch_Addr_Align tt) (bits_of_virtaddr (Virtaddr va)))
+                  ms_v sc_v stvec_v elp0
+                  (or_introl eq_refl) Lpriv Lms Lsc Lstvec Lelp LmisaS Htvd Lpc
+                  (bits_of_virtaddr (Virtaddr va)) (E_Fetch_Addr_Align tt)
+                  eq_refl eq_refl Lmedl') as Hhe.
+    match type of Hhe with _ = Some (_, ?T) => set (s_trap := T) in Hhe end.
+    assert (Hdispb : exec (try_step_dispatch (Step_Fetch_Failure (Virtaddr va, E_Fetch_Addr_Align tt))) σ
+                     = Some (tt, s_trap)).
+    { unfold try_step_dispatch. cbn match. exact Hhe. }
+    (* ---- ghost updates in tower order ---- *)
+    iMod (reg_update _ mstatus _ (update_subrange_vec_dec ms_v 23 23 elp0)
+            with "Hreg Hms") as "[Hreg Hms]".
+    assert (Hlkelp : register_lookup elp
+              (register_set mstatus (update_subrange_vec_dec ms_v 23 23 elp0) σ.(sregs))
+            = landing_pad_bits_backwards NO_LP_EXPECTED).
+    { rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].
+      rewrite Lelp. exact Help0. }
+    iDestruct (reg_interp_set_same _ elp _ Hlkelp with "Hreg") as "Hreg".
+    iMod (reg_update _ scause _
+            (update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
+               (bool_to_bit (trapCause_is_interrupt align_cause)))
+            with "Hreg Hsc") as "[Hreg Hsc]".
+    iMod (reg_update _ scause _ (utrap_scause align_cause sc_v)
+            with "Hreg Hsc") as "[Hreg Hsc]".
+    iMod (reg_update _ mstatus _
+            (update_subrange_vec_dec (update_subrange_vec_dec ms_v 23 23 elp0) 5 5
+               (_get_Mstatus_SIE (update_subrange_vec_dec ms_v 23 23 elp0)))
+            with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _
+            (update_subrange_vec_dec
+               (update_subrange_vec_dec (update_subrange_vec_dec ms_v 23 23 elp0) 5 5
+                  (_get_Mstatus_SIE (update_subrange_vec_dec ms_v 23 23 elp0))) 1 1 ('b"0"))
+            with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _ (utrap_ms ms_v elp0) with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ stval _
+            (tval (xtval_exception_value (E_Fetch_Addr_Align tt) (bits_of_virtaddr (Virtaddr va))))
+            with "Hreg Hstv") as "[Hreg Hstv]".
+    iMod (reg_update _ sepc _ va with "Hreg Hsepc") as "[Hreg Hsepc]".
+    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
+    iMod (reg_update _ nextPC _ (stvec_base stvec_v) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iModIntro.
+    iExists (Step_Fetch_Failure (Virtaddr va, E_Fetch_Addr_Align tt)), σ, s_trap.
+    iSplitR; [iPureIntro; exact Hha |].
+    iSplitR; [iPureIntro; exact Hdispb |].
+    iSplitR; [iPureIntro; reflexivity |].
+    assert (LpcT : register_lookup PC s_trap.(sregs) = va).
+    { unfold s_trap. lk. exact Lpc. }
+    rewrite LpcT.
+    iSplitL "Hpcr"; [iExact "Hpcr" |].
+    iSplitL "Hreg Hmem".
+    { unfold s_trap, set_reg; cbn [sregs mem mdev].
+      unfold utrap_ms, utrap_scause.
+      iFrame "Hreg Hmem". }
+    iNext.
+    iIntros "Hhs Hpcr".
+    assert (LnT : register_lookup nextPC s_trap.(sregs) = stvec_base stvec_v).
+    { unfold s_trap. lk. reflexivity. }
+    rewrite LnT.
+    rewrite Help0.
+    assert (Hstv : tval (xtval_exception_value (E_Fetch_Addr_Align tt)
+                           (bits_of_virtaddr (Virtaddr va))) = va)
+      by reflexivity.
+    iEval (rewrite Hstv) in "Hstv".
+    (* ---- repack the trap frame ---- *)
+    iApply "Hcont".
+    rewrite /user_trap_frame.
+    iExists (utrap_ms ms_v (landing_pad_bits_backwards NO_LP_EXPECTED)),
+            (utrap_scause align_cause sc_v), va, va, g, tlbvec.
     iFrame "Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hgpr Hupt Hcode Hdata".
     iSplitR; [iPureIntro; exact Hok |].
     rewrite /user_cfg.
