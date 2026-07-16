@@ -1505,6 +1505,73 @@ Section Total.
     repeat split; assumption.
   Qed.
 
+  (* ================================================================ *)
+  (* DATA-SIDE dispatcher for a decoded 4-byte LOAD.  Given the shared *)
+  (* fetch-side facts (page mapped, executable, A-set, the 4 code      *)
+  (* bytes present and decoding to [LOAD (imm, rs1, rd, is_unsigned,   *)
+  (* 4)]) plus a 3-way verdict on the effective data address           *)
+  (* eaF := g!!!rs1 + imm -- unmapped / mapped-but-denied / mapped-    *)
+  (* permitted-and-aligned -- route to [ustep_fault_case] (first two)  *)
+  (* or [ustep_mem_case] (third), composing the produce_* leaves.      *)
+  (* This is the H4 data-side leg for LW/LWU; the exhaustiveness proof  *)
+  (* supplies the verdict from the uctx data residence/perm fields.     *)
+  (* ================================================================ *)
+  Lemma dispatch_load4
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4), s0)) ->
+    uint rd <> 0 ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ( spec !! vpnD = None
+      \/ (exists ieD, spec !! vpnD = Some ieD /\ uw_check_denied (Load Data) ieD)
+      \/ (exists ieD, spec !! vpnD = Some ieD /\
+            uw_check_ok (Load Data) ieD /\
+            update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+            _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+            is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD)
+              (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 4 = true /\
+            (forall j : nat, (j < 4)%nat ->
+               pa_add (u_pa (upt_entry vpnD ieD)
+                 (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data)) ) ->
+    ustep_mem_case va ms_v g tlbvec \/ ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hs Hok Hupd Hpbmt Hres Hmprv Hmxr Hval Hcanon Hvpn Hpaal Hnrvc Hdec Hrd
+           HeaAl HeaCanon HvpnD Hverdict.
+    destruct Hverdict as [Hnone | [ [ieD [HsD Hden]] | [ieD [HsD [HokD [HupdD [HpbmtD [HpaalD Hdres]]]]]] ] ].
+    - (* unmapped data page -> load page-fault *)
+      right. exact (produce_fault_lw4_unmapped va ms_v g tlbvec vpn ie w vpnD imm rs1 rd is_unsigned
+        Hs Hok Hupd Hpbmt Hres Hmprv Hmxr Hval Hcanon Hvpn Hpaal Hnrvc Hdec Hnone HeaAl HeaCanon HvpnD).
+    - (* mapped but load-denied -> load page-fault (no-perm) *)
+      right. exact (produce_fault_lw4_noperm va ms_v g tlbvec vpn ie w vpnD ieD imm rs1 rd is_unsigned
+        Hs Hok Hupd Hpbmt Hres Hmprv Hmxr Hval Hcanon Hvpn Hpaal Hnrvc Hdec HsD Hden HeaAl HeaCanon HvpnD).
+    - (* mapped, permitted, aligned -> load success *)
+      left. exact (produce_mem_lw4 va ms_v g tlbvec vpn ie w vpnD ieD imm rs1 rd is_unsigned
+        Hs Hok Hupd Hres Hmprv Hmxr Hval Hcanon Hvpn Hpaal Hnrvc Hdec Hrd
+        HsD HokD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaalD Hdres).
+  Qed.
+
 
 End Total.
 
