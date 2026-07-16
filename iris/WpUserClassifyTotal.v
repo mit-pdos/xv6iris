@@ -466,6 +466,46 @@ Section Total.
     - exact (WpUserClassify.classify_btype_bgeu_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
   Qed.
 
+  (* BTYPE routing leg for the 4-aligned dispatcher: a fetched, decoded
+     conditional branch classifies either as fall-through (runtime condition
+     FALSE) or as taken to a 4-aligned target (condition TRUE + target bit0=0,
+     bit1=0).  Total over all six [bop].  The one uncovered runtime shape -- a
+     TAKEN branch to a 2-aligned (compressed) target -- is a separate arm (the
+     Zca jump-target generalization) and is simply not offered by the
+     disjunctive hypothesis here. *)
+  Lemma dispatch_4aligned_btype
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) (op : bop) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) ->
+    ( (match op with
+       | BEQ  => eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+       | BNE  => neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+       | BLT  => zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+       | BGE  => zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+       | BLTU => zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+       | BGEU => zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+       end)
+      \/ ((match op with
+       | BEQ  => eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+       | BNE  => neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+       | BLT  => zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+       | BGE  => zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+       | BLTU => zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+       | BGEU => zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+       end)
+       /\ eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true
+       /\ bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false) ) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec [Hfall | [Htaken [H0 H1]]].
+    - exact (classify_btype_fall_dispatch va ms_v g tlbvec vpn ie w imm rs2 rs1 op Hf Hdec Hfall).
+    - exact (classify_btype_taken_dispatch va ms_v g tlbvec vpn ie w imm rs2 rs1 op Hf Hdec Htaken H0 H1).
+  Qed.
+
   (* TOP-LEVEL REDUCTION for [user_classify].  Splits the total classification
      over pc's low two bits and discharges the ODD-pc branch outright (it lands
      in [ustep_case] disjunct 51, the fetch-address-misaligned fault, which is
