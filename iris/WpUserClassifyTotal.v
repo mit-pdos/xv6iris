@@ -11,7 +11,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvExec RiscvTryStep.
+Require Import RiscvLang RiscvExec RiscvTryStep RiscvExtras.
 Require Import UmodeFetch.
 Require Import UptInv WpUserBase.
 Require Import WpUserSteps.
@@ -117,6 +117,85 @@ Proof.
   exists h. intros j Hj.
   destruct j as [|[|j']]; try lia;
     first [ rewrite E0 | rewrite E1 ]; assumption.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(* Byte<->subrange bridges: split a 32-bit fetch word into its two     *)
+(* 16-bit halfwords (the [subrange_vec_dec w 15 0]/[w 31 16] shape the  *)
+(* 2-aligned split-fetch disjuncts use).  A word's low/high halfword    *)
+(* bytes are the word's own bytes 0,1 / 2,3.                            *)
+(* ------------------------------------------------------------------ *)
+
+Lemma subrange32_unsigned_15_0 (w : mword 32) :
+  bv_unsigned (subrange_vec_dec w 15 0 : mword 16) = bv_unsigned w `mod` 2 ^ 16.
+Proof.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  rewrite bv_extract_unsigned.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  change (Z.of_N 0) with 0.
+  rewrite Z.shiftr_0_r.
+  change (MachineWord.MachineWord.Z_idx (15 - 0 + 1)) with 16%N.
+  unfold bv_wrap, bv_modulus. reflexivity.
+Qed.
+
+Lemma subrange32_unsigned_31_16 (w : mword 32) :
+  bv_unsigned (subrange_vec_dec w 31 16 : mword 16) = (bv_unsigned w ≫ 16) `mod` 2 ^ 16.
+Proof.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  rewrite bv_extract_unsigned.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 16.
+  change (MachineWord.MachineWord.Z_idx (31 - 16 + 1)) with 16%N.
+  unfold bv_wrap, bv_modulus. reflexivity.
+Qed.
+
+Lemma modshift8 (a : Z) : ((a `mod` 2^16) / 2^8) `mod` 2^8 = (a / 2^8) `mod` 2^8.
+Proof.
+  replace (2^16) with (2^8 * 2^8) by lia.
+  rewrite (Zmod_eq a (2^8*2^8) ltac:(lia)).
+  set (q := a / (2^8*2^8)).
+  replace (a - q * (2^8 * 2^8)) with (a + (- (q * 2^8)) * 2^8) by ring.
+  rewrite (Z.div_add a (- (q * 2^8)) (2^8) ltac:(lia)).
+  replace (a / 2^8 + - (q * 2^8)) with (a / 2^8 + (- q) * 2^8) by ring.
+  rewrite Z_mod_plus_full. reflexivity.
+Qed.
+
+Lemma nth_byte_subrange_lo (w : mword 32) (j : nat) : (j < 2)%nat ->
+  nth_byte (subrange_vec_dec w 15 0 : mword 16) j = nth_byte w j.
+Proof.
+  intros Hj. apply bv_eq. rewrite !nth_byte_unsigned.
+  rewrite subrange32_unsigned_15_0.
+  destruct j as [|[|j']]; [ | | lia].
+  - replace (Z.of_N (8 * N.of_nat 0)) with 0 by (vm_compute; reflexivity).
+    rewrite !Z.shiftr_0_r.
+    apply Z.mod_mod_divide. exists (2^8). lia.
+  - replace (Z.of_N (8 * N.of_nat 1)) with 8 by (vm_compute; reflexivity).
+    rewrite (Z.shiftr_div_pow2 (bv_unsigned w `mod` 2 ^ 16) 8 ltac:(lia)).
+    rewrite (Z.shiftr_div_pow2 (bv_unsigned w) 8 ltac:(lia)).
+    apply modshift8.
+Qed.
+
+Lemma nth_byte_subrange_hi (w : mword 32) (j : nat) : (j < 2)%nat ->
+  nth_byte (subrange_vec_dec w 31 16 : mword 16) j = nth_byte w (2 + j)%nat.
+Proof.
+  intros Hj. apply bv_eq. rewrite !nth_byte_unsigned.
+  rewrite subrange32_unsigned_31_16.
+  rewrite (Z.shiftr_div_pow2 (bv_unsigned w) 16 ltac:(lia)).
+  destruct j as [|[|j']]; [ | | lia].
+  - replace (Z.of_N (8 * N.of_nat 0)) with 0 by (vm_compute; reflexivity).
+    replace (Z.of_N (8 * N.of_nat (2 + 0))) with 16 by (vm_compute; reflexivity).
+    rewrite Z.shiftr_0_r.
+    rewrite (Z.shiftr_div_pow2 (bv_unsigned w) 16 ltac:(lia)).
+    apply Z.mod_mod_divide. exists (2^8). lia.
+  - replace (Z.of_N (8 * N.of_nat 1)) with 8 by (vm_compute; reflexivity).
+    replace (Z.of_N (8 * N.of_nat (2 + 1))) with 24 by (vm_compute; reflexivity).
+    rewrite (Z.shiftr_div_pow2 ((bv_unsigned w / 2 ^ 16) `mod` 2 ^ 16) 8 ltac:(lia)).
+    rewrite (Z.shiftr_div_pow2 (bv_unsigned w) 24 ltac:(lia)).
+    rewrite modshift8. rewrite (Z.div_div (bv_unsigned w) (2^16) (2^8) ltac:(lia) ltac:(lia)).
+    change (2^16 * 2^8) with (2^24). reflexivity.
 Qed.
 
 (* ==================================================================== *)
@@ -264,6 +343,130 @@ Section Total.
       split; [exact Hcanon |].
       split; [exact Hvpn_def |].
       split; [exact Hpaal | exact Hrvc].
+  Qed.
+
+  (* ---- 2-ALIGNED (pc == 2 mod 4) SPLIT FETCH ---------------------- *)
+  (* [usplit_hit] is the [ufetch_hit] analogue for a 32-bit instruction at
+     a 2-aligned pc, fetched as two 16-bit halfwords (low at [va], high at
+     [va+2]) through a SINGLE non-straddling page [vpn].  It is EXACTLY the
+     fetch prefix of [ustep_case] disjunct 54 (and every 2-aligned split
+     arm), so the split classify lemmas unpack it into those disjuncts.  *)
+  Definition usplit_hit (va : mword 64) (vpn : mword 27) (ie : uwalk_info)
+      (w : mword 32) : Prop :=
+    spec !! vpn = Some ie /\
+    uw_check_ok (InstructionFetch tt) ie /\
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+    (forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+    neq_vec (access_vec_dec va 0) ('b"0") = false /\
+    neq_vec (access_vec_dec va 1) ('b"0") = true /\
+    is_aligned_vaddr (Virtaddr va) 4 = false /\
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+    isRVC (subrange_vec_dec w 15 0) = false.
+
+  (* The 2-aligned fetch producer: from the page facts + BOTH halfwords'
+     bytes resident in [code], the fetch is either a compressed 16-bit
+     instruction ([cfetch_hit], c_fetch_mode 2-aligned branch) or a full
+     32-bit split ([usplit_hit]).  The 2-aligned analogue of
+     [produce_fetch_4aligned]. *)
+  Lemma produce_fetch_2aligned
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true ->
+    (forall j : nat, (j < 2)%nat ->
+       exists b, code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some b) ->
+    (forall j : nat, (j < 2)%nat ->
+       exists b, code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j = Some b) ->
+    (exists w : mword 32, usplit_hit va vpn ie w)
+    \/ (exists h : mword 16, cfetch_hit va vpn ie h tlbvec).
+  Proof.
+    intros Hsome Hchk Hupd Hpbmt Hbit0 Hbit1 Hval4 HcanonL Hvpn_defL HalignL
+           HcanonH Hvpn_defH HalignH HresL HresH.
+    destruct (bytes_to_hword2 code
+                (fun j => pa_add (u_pa (upt_entry vpn ie) va vpn) j) HresL) as [hl HcwL].
+    destruct (bytes_to_hword2 code
+                (fun j => pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j) HresH) as [hh HcwH].
+    destruct (word_of_bytes4 (nth_byte hl 0%nat) (nth_byte hl 1%nat)
+                             (nth_byte hh 0%nat) (nth_byte hh 1%nat))
+      as (w & E0 & E1 & E2 & E3).
+    assert (HbL : forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+         = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)).
+    { intros j Hj. rewrite (nth_byte_subrange_lo w j Hj).
+      destruct j as [|[|j']]; [ | | lia].
+      - rewrite E0. exact (HcwL 0%nat ltac:(lia)).
+      - rewrite E1. exact (HcwL 1%nat ltac:(lia)). }
+    assert (HbH : forall j : nat, (j < 2)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+         = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)).
+    { intros j Hj. rewrite (nth_byte_subrange_hi w j Hj).
+      destruct j as [|[|j']]; [ | | lia].
+      - change (2 + 0)%nat with 2%nat. rewrite E2. exact (HcwH 0%nat ltac:(lia)).
+      - change (2 + 1)%nat with 3%nat. rewrite E3. exact (HcwH 1%nat ltac:(lia)). }
+    destruct (isRVC (subrange_vec_dec w 15 0)) eqn:Hrvc.
+    - (* compressed: low halfword is an RVC instruction *)
+      right. exists (subrange_vec_dec w 15 0 : mword 16).
+      unfold WpUserClassify.cfetch_hit.
+      split; [exact Hsome |].
+      split; [exact Hchk |].
+      split; [exact Hupd |].
+      split; [exact Hpbmt |].
+      split; [exact HcanonL |].
+      split; [exact Hvpn_defL |].
+      split.
+      + (* c_fetch_mode, 2-aligned branch *)
+        right.
+        split; [exact Hbit0 |].
+        split; [exact Hbit1 |].
+        split; [exact Hval4 |].
+        split; [exact HalignL |].
+        exact HbL.
+      + exact Hrvc.
+    - (* full 32-bit split instruction *)
+      left. exists w. unfold usplit_hit.
+      split; [exact Hsome |].
+      split; [exact Hchk |].
+      split; [exact Hupd |].
+      split; [exact HbL |].
+      split; [exact HbH |].
+      split; [exact Hbit0 |].
+      split; [exact Hbit1 |].
+      split; [exact Hval4 |].
+      split; [exact HcanonL |].
+      split; [exact Hvpn_defL |].
+      split; [exact HalignL |].
+      split; [exact HcanonH |].
+      split; [exact Hvpn_defH |].
+      split; [exact HalignH | exact Hrvc].
   Qed.
 
   (* Case-5 dispatch for an executable, A-set, 4-aligned page whose full
