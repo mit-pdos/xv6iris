@@ -24,6 +24,7 @@ Require Import UmodeLrsc UmodeLrscWalk.
 Require Import WpLeafCommon UmodeTrap UmodeStep UmodeFetchFault.
 Require Import UmodeWalk WpUserComputeMiss.
 Require Import UmodeDataFault.
+Require Import UmodeAmo4.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -4180,6 +4181,396 @@ Section WpUserTrapish.
     iSplitR; [iPureIntro; exact Hpcx |].
     iSplitR; [iPureIntro; exact Htlx |].
     iSplitR; [iPureIntro; exact HokF |].
+    iSplitL "Hreg Hmem Hdev".
+    { rewrite /mstate_interp. iFrame "Hreg Hmem Hdev". }
+    iFrame "Htlbc Hupt Hgpr".
+  Qed.
+
+
+
+
+  Lemma ustep_lr_fault_misalign_u
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (rs1 rd : mword 5) (aq rl : bool)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (zeros' 64) in
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd), s0)) ->
+    is_aligned_vaddr (Virtaddr eaF) 4 = false ->
+    bit_to_bool (access_vec_dec medl_v (uint (exceptionType_bits_forwards (E_Load_Access_Fault tt)))) = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec
+           HmisD Hdel_loadaf.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             #Hcode Hdata Hcfg Hcont".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    assert (Hnlpad : is_lpad_instruction (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd)) = false)
+      by reflexivity.
+    iApply (wp_exec_trapish_u va vpn ie w (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd))
+              ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+              HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                    Hcode Hdata Hcfg [] Hcont").
+    (* ==== the fault-body callback ==== *)
+    iIntros (s_x Hpcx Hnpcx Hprx Hmsx Hsatpx Hpmpcx Hpmpax Hagx Htlx)
+            "Htlbc Hupt Hgpr Hσ".
+    iDestruct "Hσ" as "[Hreg [Hmem Hdev]]".
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa0x.
+    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpmax.
+    set (tlbvec_f := vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
+    assert (LmisaX : register_lookup misa s_x.(sregs) = MISA_C) by (rewrite Lmisa0x; exact Hmisa_val0).
+    assert (LmenvX : register_lookup menvcfg s_x.(sregs) = MENVCFG_S).
+    { rewrite (Hagx (R_bitvector_64 menvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (LsenvX : register_lookup senvcfg s_x.(sregs) = mword_of_int 0).
+    { rewrite (Hagx (R_bitvector_64 senvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (HMPRVX : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s_x.(sregs))) ('b"1") = false)
+      by (rewrite Hmsx; exact HMPRV).
+    assert (HMXRX : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s_x.(sregs))) ('b"0") = true)
+      by (rewrite Hmsx; exact HMXR).
+    assert (HSXLX : _get_Mstatus_SXL (register_lookup mstatus s_x.(sregs)) = 'b"10")
+      by (rewrite Hmsx; exact HSXL).
+    assert (HmodeX : _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s_x.(sregs))) = ('b"1000" : mword 4))
+      by (rewrite Hsatpx; exact Hsatpmode).
+    assert (HESX : exec (currentlyEnabled Ext_S) s_x = Some (true, s_x)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal. rewrite LmisaX.
+      rewrite Hmisa_val0 in HmisaS. exact HmisaS. }
+    iDestruct "Hgpr" as "[%Hdom Hfmap]".
+    assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (g !!! Regidx rs1) s_x with "Hreg Hr1c") as %Hrv1.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iAssert (gpr_file g) with "[Hfmap]" as "Hgpr".
+    { rewrite /gpr_file. iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
+    assert (Hea_x : add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                             else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                            (zeros' 64) = eaF)
+      by (unfold eaF; rewrite Hrv1; reflexivity).
+    assert (Heaeq : add_vec_int (bits_of_virtaddr (Virtaddr eaF)) (0 * 4) = eaF)
+      by (cbn [bits_of_virtaddr]; apply avi0_mul4).
+    pose proof (upt_tlb_ok_fill spec tlbvec vpn ie Hsome Hok) as Hok_f.
+    assert (Htea_x : exec (transform_effective_address
+              (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                                 (zeros' 64))) (LoadReserved Data)) s_x
+                    = Some (Virtaddr eaF, s_x)).
+    { rewrite Hea_x.
+      exact (exec_transform_effective_address_loadres_u eaF s_x
+               Hprx HMPRVX HMXRX HSXLX HESX LsenvX LmenvX HmodeX). }
+    set (resf := rv64d_types.Trap (User, make_sync_exception (E_Load_Access_Fault tt) eaF, va)).
+    assert (Hexec_lr : exec (execute (LOADRES (aq, rl, Regidx rs1, 4, Regidx rd))) s_x = Some (resf, s_x)).
+    { pose proof (exec_execute_LOADRES_fault_misalign rs1 rd eaF s_x aq rl Htea_x HmisD) as HE0.
+      unfold resf. rewrite Hprx Hpcx in HE0. exact HE0. }
+    iModIntro.
+    iExists (E_Load_Access_Fault tt), eaF, s_x, tlbvec_f.
+    iSplitR; [iPureIntro; exact Hexec_lr |].
+    iSplitR; [iPureIntro; exact Hdel_loadaf |].
+    iSplitR; [iPureIntro; exact Hpcx |].
+    iSplitR; [iPureIntro; exact Htlx |].
+    iSplitR; [iPureIntro; exact Hok_f |].
+    iSplitL "Hreg Hmem Hdev".
+    { rewrite /mstate_interp. iFrame "Hreg Hmem Hdev". }
+    iFrame "Htlbc Hupt Hgpr".
+  Qed.
+
+
+  Lemma ustep_sc_fault_misalign_u
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (rs2 rs1 rd : mword 5) (aq rl : bool)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (zeros' 64) in
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd), s0)) ->
+    is_aligned_vaddr (Virtaddr eaF) 4 = false ->
+    bit_to_bool (access_vec_dec medl_v (uint (exceptionType_bits_forwards (E_SAMO_Access_Fault tt)))) = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec
+           HmisD Hdel_samoaf.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             #Hcode Hdata Hcfg Hcont".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    assert (Hnlpad : is_lpad_instruction (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd)) = false)
+      by reflexivity.
+    iApply (wp_exec_trapish_u va vpn ie w (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd))
+              ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+              HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                    Hcode Hdata Hcfg [] Hcont").
+    (* ==== the fault-body callback ==== *)
+    iIntros (s_x Hpcx Hnpcx Hprx Hmsx Hsatpx Hpmpcx Hpmpax Hagx Htlx)
+            "Htlbc Hupt Hgpr Hσ".
+    iDestruct "Hσ" as "[Hreg [Hmem Hdev]]".
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa0x.
+    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpmax.
+    set (tlbvec_f := vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
+    assert (LmisaX : register_lookup misa s_x.(sregs) = MISA_C) by (rewrite Lmisa0x; exact Hmisa_val0).
+    assert (LmenvX : register_lookup menvcfg s_x.(sregs) = MENVCFG_S).
+    { rewrite (Hagx (R_bitvector_64 menvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (LsenvX : register_lookup senvcfg s_x.(sregs) = mword_of_int 0).
+    { rewrite (Hagx (R_bitvector_64 senvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (HMPRVX : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s_x.(sregs))) ('b"1") = false)
+      by (rewrite Hmsx; exact HMPRV).
+    assert (HMXRX : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s_x.(sregs))) ('b"0") = true)
+      by (rewrite Hmsx; exact HMXR).
+    assert (HSXLX : _get_Mstatus_SXL (register_lookup mstatus s_x.(sregs)) = 'b"10")
+      by (rewrite Hmsx; exact HSXL).
+    assert (HmodeX : _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s_x.(sregs))) = ('b"1000" : mword 4))
+      by (rewrite Hsatpx; exact Hsatpmode).
+    assert (HESX : exec (currentlyEnabled Ext_S) s_x = Some (true, s_x)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal. rewrite LmisaX.
+      rewrite Hmisa_val0 in HmisaS. exact HmisaS. }
+    iDestruct "Hgpr" as "[%Hdom Hfmap]".
+    assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (g !!! Regidx rs1) s_x with "Hreg Hr1c") as %Hrv1.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iAssert (gpr_file g) with "[Hfmap]" as "Hgpr".
+    { rewrite /gpr_file. iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
+    assert (Hea_x : add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                             else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                            (zeros' 64) = eaF)
+      by (unfold eaF; rewrite Hrv1; reflexivity).
+    assert (Heaeq : add_vec_int (bits_of_virtaddr (Virtaddr eaF)) (0 * 4) = eaF)
+      by (cbn [bits_of_virtaddr]; apply avi0_mul4).
+    pose proof (upt_tlb_ok_fill spec tlbvec vpn ie Hsome Hok) as Hok_f.
+    assert (Htea_x : exec (transform_effective_address
+              (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                                 (zeros' 64))) (StoreConditional Data)) s_x
+                    = Some (Virtaddr eaF, s_x)).
+    { rewrite Hea_x.
+      exact (exec_transform_effective_address_storecon_u eaF s_x
+               Hprx HMPRVX HMXRX HSXLX HESX LsenvX LmenvX HmodeX). }
+    pose proof (exec_rX_bits_gpr rs2 s_x) as Hrs2_x.
+    set (resf := rv64d_types.Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) eaF, va)).
+    assert (Hexec_sc : exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd))) s_x = Some (resf, s_x)).
+    { pose proof (exec_execute_STORECON_fault_misalign rs1 rs2 rd eaF s_x aq rl _ Htea_x HmisD Hrs2_x) as HE0.
+      unfold resf. rewrite Hprx Hpcx in HE0. exact HE0. }
+    iModIntro.
+    iExists (E_SAMO_Access_Fault tt), eaF, s_x, tlbvec_f.
+    iSplitR; [iPureIntro; exact Hexec_sc |].
+    iSplitR; [iPureIntro; exact Hdel_samoaf |].
+    iSplitR; [iPureIntro; exact Hpcx |].
+    iSplitR; [iPureIntro; exact Htlx |].
+    iSplitR; [iPureIntro; exact Hok_f |].
+    iSplitL "Hreg Hmem Hdev".
+    { rewrite /mstate_interp. iFrame "Hreg Hmem Hdev". }
+    iFrame "Htlbc Hupt Hgpr".
+  Qed.
+
+
+  Lemma ustep_amoswap_fault_misalign_u
+      (va : mword 64) (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (rs2 rs1 rd : mword 5) (aq rl : bool)
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      E (Φ : mval -> iProp Σ) :
+    let eaF := add_vec (g !!! Regidx rs1) (zeros' 64) in
+    ↑minstretN ⊆ E ->
+    upt_tlb_ok spec tlbvec ->
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall j : nat, (j < 4)%nat ->
+       code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) ->
+    _get_Mstatus_SXL ms_v = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (AMO (AMOSWAP, aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd), s0)) ->
+    is_aligned_vaddr (Virtaddr eaF) 4 = false ->
+    bit_to_bool (access_vec_dec medl_v (uint (exceptionType_bits_forwards (E_SAMO_Access_Fault tt)))) = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    tlb ↦ᵣ tlbvec -∗
+    pc_is va -∗
+    gpr_file g -∗
+    upt_inv root slots spec -∗
+    user_code -∗
+    user_data -∗
+    user_cfg -∗
+    ▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    intros eaF HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL HMPRV HMXR Hval Hcanon
+           Hvpn_def Hpaal HnotRVC Hdec
+           HmisD Hdel_samoaf.
+    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+             #Hcode Hdata Hcfg Hcont".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    assert (Hnlpad : is_lpad_instruction (AMO (AMOSWAP, aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd)) = false)
+      by reflexivity.
+    iApply (wp_exec_trapish_u va vpn ie w (AMO (AMOSWAP, aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd))
+              ms_v sc_v stval_v sepc_v g tlbvec E Φ
+              HN Hok Hsome Hchk0 HupdN Hpbmt0 Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+              HnotRVC Hdec Hnlpad
+              with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                    Hcode Hdata Hcfg [] Hcont").
+    (* ==== the fault-body callback ==== *)
+    iIntros (s_x Hpcx Hnpcx Hprx Hmsx Hsatpx Hpmpcx Hpmpax Hagx Htlx)
+            "Htlbc Hupt Hgpr Hσ".
+    iDestruct "Hσ" as "[Hreg [Hmem Hdev]]".
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa0x.
+    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpmax.
+    set (tlbvec_f := vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (upt_entry vpn ie))).
+    assert (LmisaX : register_lookup misa s_x.(sregs) = MISA_C) by (rewrite Lmisa0x; exact Hmisa_val0).
+    assert (LmenvX : register_lookup menvcfg s_x.(sregs) = MENVCFG_S).
+    { rewrite (Hagx (R_bitvector_64 menvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (LsenvX : register_lookup senvcfg s_x.(sregs) = mword_of_int 0).
+    { rewrite (Hagx (R_bitvector_64 senvcfg) ltac:(vm_compute; reflexivity)). vm_compute; reflexivity. }
+    assert (HMPRVX : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s_x.(sregs))) ('b"1") = false)
+      by (rewrite Hmsx; exact HMPRV).
+    assert (HMXRX : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s_x.(sregs))) ('b"0") = true)
+      by (rewrite Hmsx; exact HMXR).
+    assert (HSXLX : _get_Mstatus_SXL (register_lookup mstatus s_x.(sregs)) = 'b"10")
+      by (rewrite Hmsx; exact HSXL).
+    assert (HmodeX : _get_Satp64_Mode (Mk_Satp64 (register_lookup satp s_x.(sregs))) = ('b"1000" : mword 4))
+      by (rewrite Hsatpx; exact Hsatpmode).
+    assert (HESX : exec (currentlyEnabled Ext_S) s_x = Some (true, s_x)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal. rewrite LmisaX.
+      rewrite Hmisa_val0 in HmisaS. exact HmisaS. }
+    iDestruct "Hgpr" as "[%Hdom Hfmap]".
+    assert (Hm1 : g !! Regidx rs1 = Some (g !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (g !!! Regidx rs1) s_x with "Hreg Hr1c") as %Hrv1.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iAssert (gpr_file g) with "[Hfmap]" as "Hgpr".
+    { rewrite /gpr_file. iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
+    assert (Hea_x : add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                             else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                            (zeros' 64) = eaF)
+      by (unfold eaF; rewrite Hrv1; reflexivity).
+    assert (Heaeq : add_vec_int (bits_of_virtaddr (Virtaddr eaF)) (0 * 4) = eaF)
+      by (cbn [bits_of_virtaddr]; apply avi0_mul4).
+    pose proof (upt_tlb_ok_fill spec tlbvec vpn ie Hsome Hok) as Hok_f.
+    assert (Htea_x : exec (transform_effective_address
+              (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_x.(sregs))
+                                 (zeros' 64))) (Atomic (AMOSWAP, Data, Data))) s_x
+                    = Some (Virtaddr eaF, s_x)).
+    { rewrite Hea_x.
+      exact (exec_transform_effective_address_amo_u eaF s_x
+               Hprx HMPRVX HMXRX HSXLX HESX LsenvX LmenvX HmodeX). }
+    set (resf := rv64d_types.Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) eaF, va)).
+    assert (Hexec_amo : exec (execute (AMO (AMOSWAP, aq, rl, Regidx rs2, Regidx rs1, 4, Regidx rd))) s_x = Some (resf, s_x)).
+    { pose proof (exec_execute_AMOSWAP_fault_misalign rs2 rs1 rd eaF s_x aq rl Htea_x HmisD) as HE0.
+      unfold resf. rewrite Hprx Hpcx in HE0. exact HE0. }
+    iModIntro.
+    iExists (E_SAMO_Access_Fault tt), eaF, s_x, tlbvec_f.
+    iSplitR; [iPureIntro; exact Hexec_amo |].
+    iSplitR; [iPureIntro; exact Hdel_samoaf |].
+    iSplitR; [iPureIntro; exact Hpcx |].
+    iSplitR; [iPureIntro; exact Htlx |].
+    iSplitR; [iPureIntro; exact Hok_f |].
     iSplitL "Hreg Hmem Hdev".
     { rewrite /mstate_interp. iFrame "Hreg Hmem Hdev". }
     iFrame "Htlbc Hupt Hgpr".
