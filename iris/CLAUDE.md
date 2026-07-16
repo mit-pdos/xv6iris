@@ -243,6 +243,13 @@ files or copy code from them; build fresh from the live tree.
      `exec_translate_TLB_miss_user{,_needs_update}` + the UserPt slot layer.
      Absorb hit-vs-miss into ONE caller-facing interface with a uniform
      continuation (present the hit TLB as the trivially-filled vector).
+     STARTED (UserTranslate.v): the mode-dispatch head every reduction begins
+     with — `exec_get_satp_39`, `exec_translationMode_U_sv39` (axiom-free).
+     Interrupts-never is DONE (UserStep.v, axiom-free):
+     `exec_getPendingSet_U_reduce` / `exec_dispatchInterrupt_U_none` (at User
+     the effective mIE/sIE are unconditionally true, so `uc_mm`+`uc_s0` alone
+     kill dispatch — no mstatus hypothesis) + the frame form
+     `dispatch_U_from_cfg` (hw_config + mstate_interp + `user_cfg C`).
   2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
      `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
      `update_PTE_Bits` None-vs-Some by the A(/D) bits.

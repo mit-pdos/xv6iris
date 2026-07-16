@@ -107,6 +107,8 @@ DecodeTotalU.v
 DecodeSetU.v
 UserPt.v
 UserExec.v
+UserStep.v
+UserTranslate.v
 WpIntrStep.v
 WpIntrInv.v
 WpPushOff.v
