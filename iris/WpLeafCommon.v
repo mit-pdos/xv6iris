@@ -200,3 +200,32 @@ Qed.
 Lemma exec_read_CSR_csrr s :
   exec (read_CSR csr_csrr) s = Some (register_lookup mhartid s.(sregs), s).
 Proof. exact (exec_read_reg (R_bitvector_64 mhartid) s). Qed.
+
+(* wX to x0 is a no-op (write discarded).  Twin of [exec_rX_bits_x0]. *)
+Lemma exec_wX_bits_x0 (i : mword 5) (v : mword 64) s :
+  uint i = 0 -> exec (wX_bits (Regidx i) v) s = Some (tt, s).
+Proof.
+  intro H. unfold wX_bits, wX. rewrite H.
+  cbv zeta. replace (Z.eqb 0 0) with true by reflexivity.
+  cbn match. apply exec_returnM.
+Qed.
+
+(* JAL with rd = x0 (zreg): the jump retires with NO link write, so the only
+   state change is nextPC := target.  Instantiate the rd-generic [exec_execute_JAL]
+   at rd := zreg and discharge the wX obligation with the x0-no-op fact. *)
+Lemma exec_execute_JAL_rd0 (imm : mword 21) s :
+  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+  bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
+  exec (execute (JAL (imm, zreg))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+Proof.
+  intros Halign Hbit1.
+  change (execute (JAL (imm, zreg))) with (execute_JAL imm zreg).
+  apply (exec_execute_JAL imm zreg s
+           (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
+           Halign Hbit1).
+  unfold zreg.
+  apply (exec_wX_bits_x0 (zero_extend' 5 ('b"00")) _ _).
+  vm_compute; reflexivity.
+Qed.

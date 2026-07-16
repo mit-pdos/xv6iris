@@ -2075,3 +2075,69 @@ Proof.
   apply exec_returnM.
 Qed.
 End ExecLoadGchk.
+
+(* ====================================================================== *)
+(* rd=x0 (no-op) execute facts for the two-source register families.       *)
+(* When rd = x0 the wX write is discarded, so the op retires state-         *)
+(* preserving for every op.  The ITYPE/SHIFTIOP/UTYPE analogs live in       *)
+(* WpUserClassify.v; RTYPE/RTYPEW/MUL are proved here (the shared base), so *)
+(* the orchestrator can wire them into the rd=0 RVC HINT arm.               *)
+(* ====================================================================== *)
+
+Lemma exec_execute_RTYPE_rd0 (op : rop) (rs2 rs1 rd : mword 5) s :
+  uint rd = 0 ->
+  exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hrd0.
+  assert (Hz : Z.eqb (uint rd) 0 = true) by (apply Z.eqb_eq; exact Hrd0).
+  change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op)))
+    with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) op).
+  unfold execute_RTYPE.
+  destruct op; cbn match;
+    match goal with
+    | |- exec (Defs.bind ?inner _) s = _ =>
+      let e := fresh "e" in let v := fresh "v" in
+      assert (e : exists v, exec inner s = Some (v, s));
+      [ eexists;
+        rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s));
+        rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s));
+        apply exec_returnm
+      | destruct e as [v e];
+        rewrite (exec_bind_Some _ _ _ _ _ e);
+        rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s));
+        rewrite Hz; apply exec_returnm ]
+    end.
+Qed.
+
+Lemma exec_execute_RTYPEW_rd0 (op : ropw) (rs2 rs1 rd : mword 5) s :
+  uint rd = 0 ->
+  exec (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hrd0.
+  assert (Hz : Z.eqb (uint rd) 0 = true) by (apply Z.eqb_eq; exact Hrd0).
+  change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, op)))
+    with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) op).
+  unfold execute_RTYPEW. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  rewrite Hz. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_MUL_rd0 (mulop : mul_op) (rs2 rs1 rd : mword 5) s :
+  uint rd = 0 ->
+  exec (execute (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hrd0.
+  assert (Hz : Z.eqb (uint rd) 0 = true) by (apply Z.eqb_eq; exact Hrd0).
+  change (execute (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop)))
+    with (execute_MUL (Regidx rs2) (Regidx rs1) (Regidx rd) mulop).
+  unfold execute_MUL. cbv beta zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  rewrite Hz. apply exec_returnM.
+Qed.
