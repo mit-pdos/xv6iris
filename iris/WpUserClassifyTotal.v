@@ -312,6 +312,39 @@ Section Total.
     - exact (WpUserClassify.classify_btype_bgeu_fall U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc).
   Qed.
 
+  (* Total BTYPE taken dispatch for a 4-aligned target: condition TRUE and
+     the branch target [va + sext imm] is 4-aligned (bit0 = 0, bit1 = 0)
+     -> the taken disjunct, for every branch op.  (A 2-aligned or odd
+     target that is taken is a separate, still-missing, arm.) *)
+  Lemma classify_btype_taken_dispatch
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) (op : bop) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) ->
+    match op with
+    | BEQ  => eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+    | BNE  => neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+    | BLT  => zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+    | BGE  => zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+    | BLTU => zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+    | BGEU => zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = true
+    end ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hc H0 H1. destruct op.
+    - exact (WpUserClassify.classify_btype_beq_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
+    - exact (WpUserClassify.classify_btype_bne_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
+    - exact (WpUserClassify.classify_btype_blt_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
+    - exact (WpUserClassify.classify_btype_bge_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
+    - exact (WpUserClassify.classify_btype_bltu_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
+    - exact (WpUserClassify.classify_btype_bgeu_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
+  Qed.
+
 End Total.
 
 (* ==================================================================== *)
