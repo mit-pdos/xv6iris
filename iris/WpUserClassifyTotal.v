@@ -135,6 +135,8 @@ Section Total.
   Local Notation ustep_mem_case := (WpUserFull.ustep_mem_case U).
   Local Notation ustep_fault_case := (WpUserFull.ustep_fault_case U).
   Local Notation data := (WpUserBase.data U).
+  Local Notation classify_jal := (WpUserClassify.classify_jal U).
+  Local Notation classify_jalr := (WpUserClassify.classify_jalr U).
 
   (* Fetch-fault producer 1: a 4-aligned but non-canonical pc lands in
      [ustep_case] disjunct 1 (instruction-address fetch fault, no page
@@ -507,6 +509,118 @@ Section Total.
     intros Hf Hdec [Hfall | [Htaken [H0 H1]]].
     - exact (classify_btype_fall_dispatch va ms_v g tlbvec vpn ie w imm rs2 rs1 op Hf Hdec Hfall).
     - exact (classify_btype_taken_dispatch va ms_v g tlbvec vpn ie w imm rs2 rs1 op Hf Hdec Htaken H0 H1).
+  Qed.
+
+  (* JAL rd=x0 (plain jump, no link): decode [JAL (imm, zreg)], target
+     4-aligned -> [ustep_case] disjunct 47.  The [zreg] link-register makes
+     this the no-link twin of [classify_jal]; there is no [uint rd] guard
+     (rd is fixed to x0), and disjunct 47 carries no PBMT conjunct (the
+     unpacked [Hpbmt] is simply unused). *)
+  Lemma classify_j (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (imm : mword 21) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JAL (imm, zreg), s0)) ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 46 right; left.
+    exists vpn, ie, w, imm.
+    repeat split; assumption.
+  Qed.
+
+  (* JALR rd=x0 (register-indirect jump, no link): decode
+     [JALR (imm, Regidx rs1, zreg)], rs1<>x0, target 4-aligned -> disjunct
+     48.  No-link twin of [classify_jalr]. *)
+  Lemma classify_jr (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 12) (rs1 : mword 5) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JALR (imm, Regidx rs1, zreg), s0)) ->
+    uint rs1 <> 0 ->
+    eq_vec (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros (Hvec & Hchk & Hupd & Hpbmt & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC)
+      Hdec Hrs1 H0 H1.
+    unfold ustep_case, WpUserSteps.ustep_case.
+    do 47 right; left.
+    exists vpn, ie, w, imm, rs1.
+    repeat split; assumption.
+  Qed.
+
+  (* Bridge: a register index with [uint rd = 0] IS the zero register
+     [zreg = Regidx (0 : mword 5)] -- used to collapse a decoded
+     [JAL (imm, Regidx rd)] / [JALR (.., Regidx rd)] with rd=x0 to the
+     no-link [zreg] form the [classify_j]/[classify_jr] disjuncts expect. *)
+  Lemma regidx_rd0_zreg (rd : mword 5) : uint rd = 0 -> Regidx rd = zreg.
+  Proof.
+    intro H. unfold zreg. f_equal. apply bv_eq.
+    rewrite <- (WpUserClassify.cls_uint_unsigned5 rd), H.
+    vm_compute. reflexivity.
+  Qed.
+
+  (* Total JAL dispatch (4-aligned target): decode [JAL (imm, Regidx rd)]
+     for ANY rd; rd<>x0 -> [classify_jal] (disjunct 9, links to rd),
+     rd=x0 -> [classify_j] (disjunct 47, no link).  The JAL analogue of
+     [dispatch_4aligned_btype], total over rd. *)
+  Lemma dispatch_4aligned_jal
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 21) (rd : mword 5) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JAL (imm, Regidx rd), s0)) ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec H0 H1.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrdnz].
+    - assert (Hz : Regidx rd = zreg) by (apply regidx_rd0_zreg; exact Hrd0).
+      apply (classify_j va ms_v g tlbvec vpn ie w imm Hf).
+      + intros s0 Hag. rewrite <- Hz. exact (Hdec s0 Hag).
+      + exact H0.
+      + exact H1.
+    - exact (classify_jal va ms_v g tlbvec vpn ie w imm rd Hf Hdec Hrdnz H0 H1).
+  Qed.
+
+  (* Total JALR dispatch (4-aligned target) over rd; rd<>x0 -> classify_jalr
+     (disjunct 10), rd=x0 -> classify_jr (disjunct 48).  The rd=x0 leg needs
+     rs1<>x0 (disjunct 48's premise); [jr x0] (rd=rs1=x0, a jump to a
+     constant address) has no disjunct and is a documented gap -- programs do
+     not emit it. *)
+  Lemma dispatch_4aligned_jalr
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 12) (rs1 rd : mword 5) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JALR (imm, Regidx rs1, Regidx rd), s0)) ->
+    uint rs1 <> 0 ->
+    eq_vec (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hrs1 H0 H1.
+    destruct (Z.eq_dec (uint rd) 0) as [Hrd0 | Hrdnz].
+    - assert (Hz : Regidx rd = zreg) by (apply regidx_rd0_zreg; exact Hrd0).
+      apply (classify_jr va ms_v g tlbvec vpn ie w imm rs1 Hf).
+      + intros s0 Hag. rewrite <- Hz. exact (Hdec s0 Hag).
+      + exact Hrs1.
+      + exact H0.
+      + exact H1.
+    - exact (classify_jalr va ms_v g tlbvec vpn ie w imm rs1 rd Hf Hdec Hrdnz H0 H1).
   Qed.
 
   (* H4 FRAGMENT (fetch-fault + compute): the 4-aligned branch of
