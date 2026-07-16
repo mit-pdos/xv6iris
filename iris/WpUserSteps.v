@@ -108,6 +108,7 @@ Section WpUserSteps.
   Local Notation ustep_c_branch_taken := (WpUserCtrlU.ustep_c_branch_taken_u U).
   Local Notation ustep_c_compute1 := (WpUserComputeCU.ustep_c_compute1_u U).
   Local Notation ustep_c_compute1_direct := (WpUserComputeCU.ustep_c_compute1_direct U).
+  Local Notation ustep_c_execas_nop := (WpUserComputeCU.ustep_c_execas_nop_u U).
   Local Notation ustep_c_ebreak := (WpUserTrapMiss.ustep_c_ebreak_u U).
   Local Notation ustep_c_illegal := (WpUserTrapMiss.ustep_c_illegal_u U).
   Local Notation ustep_c_ld_code := (WpUserMemC.ustep_c_ld_code_u U).
@@ -1335,7 +1336,23 @@ Section WpUserSteps.
        neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
        autocast (T := mword) (subrange_vec_dec
-         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn).
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn)
+    \/
+    (* 46: RVC HINT (rd=0), ExecuteAs base -> state-preserving retire *)
+    (exists vpn ie ii base (h : mword 16),
+       (forall s, exec (execute ii) s = Some (ExecuteAs base, s)) /\
+       (forall s, exec (execute base) s = Some (RETIRE_SUCCESS, s)) /\
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       c_fetch_mode va vpn ie h /\
+       isRVC h = true /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode_compressed h) s0 = Some (ii, s0))).
 
   (* the assembled Löb step obligation, v1 coverage *)
   (* [ustep_case_sound]: the post-unpack body of [user_step_holds] --
@@ -1469,7 +1486,8 @@ Section WpUserSteps.
                                                                                     | [ (vpn & i & vpnD & ieD & h & ii & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & HMPRV & HMXR & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hexp & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
                                                                                       | [ (vpn & i & vpnD & ieD & w & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
                                                                                         | [ (vpn & i & vpnD & ieD & h & ii & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & HMPRV & HMXR & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hexp & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
-                                                                                          | (vpn & i & Hsome & Hden & Hval & Hcanon & Hvpn_def) ] ] ] ] ] ] ]
+                                                                                          | [ (vpn & i & Hsome & Hden & Hval & Hcanon & Hvpn_def)
+                                                                                            | (vpn & ie & ii & base & h & Hexp & Hbase & Hsome & Hchk & Hupd & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec) ] ] ] ] ] ] ] ]
                                                                               ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
@@ -1790,6 +1808,13 @@ Section WpUserSteps.
                 HN Hsome Hden Hok HSXL Hval Hcanon Hvpn_def
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkT").
+    - (* RVC HINT (rd=0): ExecuteAs base -> state-preserving retire *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_c_execas_nop ii base va vpn ie h ms_v sc_v stval_v sepc_v g
+                tlbvec E Φ HN Hexp Hbase Hok Hsome Hchk Hupd HSXL Hcanon Hvpn_def
+                Hmode HisRVC Hdec
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
   Qed.
 
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :
