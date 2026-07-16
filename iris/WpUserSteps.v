@@ -127,6 +127,7 @@ Section WpUserSteps.
   Local Notation ustep_fetch_adfault_hit := (WpUserFetch.ustep_fetch_adfault_u U).
   Local Notation ustep_fetch_noncanonical := (WpUserFetch.ustep_fetch_noncanonical U).
   Local Notation ustep_fetch_unmapped := (WpUserFetch.ustep_fetch_unmapped U).
+  Local Notation ustep_noexec_fetch_fault := (WpUserFetch.ustep_noexec_fetch_fault U).
   Local Notation ustep_illegal := (WpUserPrivU.ustep_illegal_u U).
   Local Notation ustep_illegal_st := (WpUserTrapMiss.ustep_illegal_st_u U).
   Local Notation ustep_itype := (WpUserComputeMiss.ustep_itype_u U).
@@ -1324,7 +1325,17 @@ Section WpUserSteps.
        autocast (T := mword) (subrange_vec_dec
          (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
        is_aligned_paddr (Physaddr paD) 1 = true /\
-       (forall j : nat, (j < 1)%nat -> code !! pa_add paD j = Some (nth_byte v j))).
+       (forall j : nat, (j < 1)%nat -> code !! pa_add paD j = Some (nth_byte v j)))
+    \/
+    (* 45: mapped, but the leaf denies execute permission -> instr fetch page fault *)
+    (exists vpn i,
+       spec !! vpn = Some i /\
+       uw_check_denied (InstructionFetch tt) i /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn).
 
   (* the assembled Löb step obligation, v1 coverage *)
   (* [ustep_case_sound]: the post-unpack body of [user_step_holds] --
@@ -1457,7 +1468,8 @@ Section WpUserSteps.
                                                                                   | [ (vpn & i & vpnD & ieD & w & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
                                                                                     | [ (vpn & i & vpnD & ieD & h & ii & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & HMPRV & HMXR & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hexp & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
                                                                                       | [ (vpn & i & vpnD & ieD & w & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
-                                                                                        | (vpn & i & vpnD & ieD & h & ii & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & HMPRV & HMXR & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hexp & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd) ] ] ] ] ] ]
+                                                                                        | [ (vpn & i & vpnD & ieD & h & ii & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & HMPRV & HMXR & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hexp & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
+                                                                                          | (vpn & i & Hsome & Hden & Hval & Hcanon & Hvpn_def) ] ] ] ] ] ] ]
                                                                               ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
@@ -1772,6 +1784,12 @@ Section WpUserSteps.
                 HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hcwd
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
+    - (* non-exec fetch page fault (leaf denies execute) *)
+      iDestruct "Hk" as "[_ HkT]".
+      iApply (ustep_noexec_fetch_fault va vpn i ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hsome Hden Hok HSXL Hval Hcanon Hvpn_def
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkT").
   Qed.
 
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :
