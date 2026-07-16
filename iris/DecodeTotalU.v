@@ -18,10 +18,23 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvExec.
-Require Import WpDecodeBridge UmodeEcall.
+Require Import RiscvLang RiscvExec RiscvFetchExec.
+Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Import Defs.
+
+Notation dstateU := (dstate MENVCFG_S User).
+
+(* User decode read-set: cur_privilege + misa (extension gates) + the
+   registers the get_xLPE User arm probes (menvcfg / senvcfg / the
+   mstateen0-sstateen0 gates). *)
+Definition D_u (r : register) : bool :=
+  register_beq r (R_Privilege cur_privilege) ||
+  register_beq r (R_bitvector_64 menvcfg) ||
+  register_beq r (R_bitvector_64 senvcfg) ||
+  register_beq r (R_bitvector_64 mstateen0) ||
+  register_beq r (R_bitvector_32 sstateen0) ||
+  register_beq r (R_bitvector_64 misa).
 
 (* ===================================================================== *)
 (* §1 goodb structural rules.                                             *)
