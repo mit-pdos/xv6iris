@@ -750,6 +750,485 @@ Section Total.
     repeat split; assumption.
   Qed.
 
+  (* ---- 2-aligned MEMORY routers (success), widths 8/2/1 loads +
+     stores 8/4/2/1: clones of produce_split_mem_lw4 into ustep_mem_case's
+     2-aligned split twins (disjuncts 11-17). ---- *)
+  Lemma produce_split_mem_ld8 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Load Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Load Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hdec Hrd HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 10 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs1, rd.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_mem_lh2 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 2), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Load Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Load Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 2 = true ->
+    (forall j : nat, (j < 2)%nat -> pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hdec Hrd HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 11 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs1, rd, is_unsigned.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_mem_lb1 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Load Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Load Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 1 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 1 = true ->
+    (forall j : nat, (j < 1)%nat -> pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hdec Hrd HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 12 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs1, rd, is_unsigned.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_mem_sd8 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (uint (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) + 8 <= 18446744073709551616)%Z ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 8 = true ->
+    (forall j : nat, (j < 8)%nat -> pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hnowrap Hdec HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 13 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_mem_sw4 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (uint (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) + 4 <= 18446744073709551616)%Z ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 4), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 4 = true ->
+    (forall j : nat, (j < 4)%nat -> pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hnowrap Hdec HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 14 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_mem_sh2 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (uint (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) + 2 <= 18446744073709551616)%Z ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 2), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 2 = true ->
+    (forall j : nat, (j < 2)%nat -> pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hnowrap Hdec HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 15 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_mem_sb1 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (uint (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) + 1 <= 18446744073709551616)%Z ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 1), s0)) ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Store Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Store Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 1 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 1 = true ->
+    (forall j : nat, (j < 1)%nat -> pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hnowrap Hdec HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 16 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  (* ---- 2-aligned FAULT routers (data vpn UNMAPPED, spec!!vpnD=None):
+     route into ustep_fault_case's 2-aligned split page-fault disjuncts
+     (LOAD 21-24 widths 4/8/2/1, STORE 25-28 widths 8/4/2/1).
+     NOTE: there are NO 2-aligned DATA-NO-PERM (uw_check_denied) disjuncts
+     in ustep_fault_case, so the _noperm split routers cannot be built. ---- *)
+  Lemma produce_split_fault_lw4_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 21 right; left.
+    exists vpn, ie, w, vpnD, imm, rs1, rd, is_unsigned.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_fault_ld8_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 8), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 22 right; left.
+    exists vpn, ie, w, vpnD, imm, rs1, rd, is_unsigned.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_fault_lh2_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 2), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 23 right; left.
+    exists vpn, ie, w, vpnD, imm, rs1, rd, is_unsigned.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_fault_lb1_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 1 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 24 right; left.
+    exists vpn, ie, w, vpnD, imm, rs1, rd, is_unsigned.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_fault_sd8_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 25 right; left.
+    exists vpn, ie, w, vpnD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_fault_sw4_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 4), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 26 right; left.
+    exists vpn, ie, w, vpnD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_fault_sh2_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 2), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 2 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 27 right; left.
+    exists vpn, ie, w, vpnD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+  Lemma produce_split_fault_sb1_unmapped (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (imm : mword 12) (rs2 rs1 : mword 5) :
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 1), s0)) ->
+    spec !! vpnD = None ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 1 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt Hmprv Hmxr Hdec HspecD HeaAl HeaCanon HvpnD.
+    unfold WpUserFull.ustep_fault_case.
+    do 28 right; left.
+    exists vpn, ie, w, vpnD, imm, rs2, rs1.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
+
   (* Case-5 dispatch for an executable, A-set, 4-aligned page whose full
      32-bit words all decode to compute/system instructions in the
      [classifiable_u] set: the fetch either retires (full word ->
