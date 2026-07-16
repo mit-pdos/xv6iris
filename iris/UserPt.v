@@ -221,6 +221,112 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(* §3b Stored-entry bridges: a resident [um_tlb_ent] recovers the leaf     *)
+(* facts the TLB-hit translation consumes, matches exactly its own vpn     *)
+(* (asid 0), and an UNMAPPED vpn can never be cached.                      *)
+(* ===================================================================== *)
+
+Lemma upt_subrange64_id (w : mword 64) : subrange_vec_dec w 63 0 = w.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  rewrite bv_extract_0_unsigned.
+  change (MachineWord.MachineWord.Z_idx (63 - 0 + 1)) with 64%N.
+  apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+Lemma upt_eq_vec_refl {n} (x : mword n) : eq_vec x x = true.
+Proof. apply bool_decide_eq_true_2. reflexivity. Qed.
+
+(* dropping a zero-width mask is a no-op, at the two widths the entry uses *)
+Lemma upt_and_ones45 (x : mword 45) :
+  and_vec x (not_vec (zero_extend' (57 - 12) (ones 0 : mword 0))) = x.
+Proof.
+  apply bv_eq.
+  unfold and_vec, word_binop, with_word', with_word, MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  change (Z.sub 57 12) with 45.
+  match goal with |- context[Z.land _ (bv_unsigned ?m)] =>
+    change (bv_unsigned m) with (Z.ones 45) end.
+  rewrite Z.land_ones; [|lia].
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr. exact Hr.
+Qed.
+
+Lemma upt_and_ones27 (x : mword 27) :
+  and_vec x (not_vec (zero_extend' 27 (ones 0 : mword 0))) = x.
+Proof.
+  apply bv_eq.
+  unfold and_vec, word_binop, with_word', with_word, MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context[Z.land _ (bv_unsigned ?m)] =>
+    change (bv_unsigned m) with (Z.ones 27) end.
+  rewrite Z.land_ones; [|lia].
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr. exact Hr.
+Qed.
+
+(* the stored 8-byte PTE is the walk's leaf *)
+Lemma um_tlb_ent_pte (vpn : mword 27) (e : umap_ent) :
+  tlb_get_pte 8 (um_tlb_ent vpn e) = um_pte0 e.
+Proof.
+  unfold tlb_get_pte, um_tlb_ent, u_walk_entry. cbn [TLB_Entry_pte].
+  rewrite autocast_id. rewrite zero_extend'_id.
+  change (Z.sub (Z.mul 8 8) 1) with 63.
+  rewrite upt_subrange64_id. apply autocast_id.
+Qed.
+
+(* a stored walk entry matches a lookup for vpn' iff the sign-extended
+   vpns agree (asid is 0 on both sides, the entry is non-global) *)
+Lemma um_tlb_ent_match_gen (vpn vpn' : mword 27) (e : umap_ent) :
+  match_TLB_Entry (um_tlb_ent vpn e) (mword_of_int 0) (sign_extend' (57 - 12) vpn')
+  = eq_vec (sign_extend' (57 - 12) vpn) (sign_extend' (57 - 12) vpn').
+Proof.
+  unfold match_TLB_Entry, um_tlb_ent, u_walk_entry.
+  cbn [TLB_Entry_global TLB_Entry_asid TLB_Entry_vpn TLB_Entry_levelMask].
+  rewrite upt_and_ones45. rewrite upt_and_ones27. rewrite upt_eq_vec_refl.
+  rewrite orb_true_r. reflexivity.
+Qed.
+
+Lemma um_tlb_ent_match_inj (vpn vpn' : mword 27) (e : umap_ent) :
+  match_TLB_Entry (um_tlb_ent vpn e) (mword_of_int 0) (sign_extend' (57 - 12) vpn')
+    = true ->
+  vpn = vpn'.
+Proof.
+  rewrite um_tlb_ent_match_gen. intros He.
+  apply u_sext45_inj. apply eq_vec_true_iff. exact He.
+Qed.
+
+(* an UNMAPPED vpn can never hit the TLB: a colliding resident entry is
+   some mapped vpn's walk entry, whose match would force vpn equality *)
+Lemma upt_lookup_TLB_unmapped
+    (m : gmap (mword 27) umap_ent) (vpn : mword 27)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) :
+  m !! vpn = None ->
+  upt_tlb_ok m tlbvec ->
+  register_lookup tlb σ.(sregs) = tlbvec ->
+  exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ).
+Proof.
+  intros Hvpn Hok Ltlb.
+  destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
+  - destruct (Hok vpn ent Hslot) as (vpn' & e & Hvpn' & _ & ->).
+    apply (exec_lookup_TLB_nomatch vpn (mword_of_int 0) (um_tlb_ent vpn' e) tlbvec σ
+             Ltlb Hslot).
+    rewrite um_tlb_ent_match_gen.
+    match goal with |- ?E = false => destruct E eqn:He; [exfalso|reflexivity] end.
+    apply eq_vec_true_iff in He.
+    apply u_sext45_inj in He.
+    rewrite He in Hvpn'.
+    rewrite Hvpn in Hvpn'. discriminate.
+  - exact (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec σ Ltlb Hslot).
+Qed.
+
+(* ===================================================================== *)
 (* §4 The Iris half: ownership + the invariant bundle.                     *)
 (* ===================================================================== *)
 Section UserPtIris.

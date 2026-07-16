@@ -22,11 +22,13 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import WpGprCsrwB.
+Require Import SmodePte KptPt SmodeCore.
 Require Import CommonWalk UserPt.
 Local Open Scope Z_scope.
 Import Defs.
@@ -313,3 +315,108 @@ Proof.
   rewrite execR_returnR. cbn match.
   reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* §3 Frame-level fetch-fault facts over [upt_inv]'s pieces: fetching      *)
+(* from an unmapped or fetch-denied page faults with NO state change.      *)
+(* The mxr/do_sum the walk runs at are the goal's concrete mstatus         *)
+(* expressions; both fault lemmas are insensitive to them.                 *)
+(* ===================================================================== *)
+Section UserTranslateIris.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma upt_translateAddr_fetch_unmapped (pt : upt) (vpn : mword 27)
+      (va usatp : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (σ : mstate) :
+    pt.(u_map) !! vpn = None ->
+    upt_unmapped_spec pt ->
+    upt_tlb_ok pt.(u_map) tlbvec ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    register_lookup satp σ.(sregs) = usatp ->
+    register_lookup tlb σ.(sregs) = tlbvec ->
+    upt_satp_ok pt usatp ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_slots_own pt.(u_slots) -∗
+    ⌜exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+       = Some (Err (E_Fetch_Page_Fault tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hvpn Hfwf Hok Lpriv LSXL Lsatp Ltlb (Hmode & Hasid & Hppn)
+             Hcanon Hvpn_def HA Hord HR Hcov Hpter) "#Hhw Hint Hslots".
+    iDestruct (upt_unmapped_walk_fault pt vpn (InstructionFetch tt)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 σ Hvpn Hfwf HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hslots") as %Hwalk.
+    iPureIntro.
+    assert (Hte : exec (translationException (InstructionFetch tt) (PTW_Invalid_PTE tt)) σ
+                  = Some (E_Fetch_Page_Fault tt, σ)).
+    { unfold translationException. cbn match. apply exec_returnm. }
+    exact (exec_translateAddr_fetch_u_fault vpn pt.(u_root) (PTW_Invalid_PTE tt) va usatp σ
+             Lpriv LSXL Lsatp Hmode Hasid Hppn
+             (upt_lookup_TLB_unmapped pt.(u_map) vpn tlbvec σ Hvpn Hok Ltlb)
+             Hwalk Hte Hcanon Hvpn_def).
+  Qed.
+
+  (* a MAPPED pc page whose leaf DENIES instruction fetch (X = 0 or U = 0,
+     e.g. the trampoline).  Needs the vpn to also MISS the TLB -- which the
+     caller has when the resident entry does not match ([upt_tlb_ok] +
+     [um_tlb_ent_match_inj] handle residency in the composed trichotomy;
+     if the vpn's own entry IS resident, the hit path replays the stored
+     leaf's check and faults there instead -- future hit-path lemma). *)
+  Lemma upt_translateAddr_fetch_denied (pt : upt) (vpn : mword 27) (e : umap_ent)
+      (va usatp : mword 64) (σ : mstate) :
+    pt.(u_map) !! vpn = Some e ->
+    upt_map_spec pt ->
+    upte_check_denied (InstructionFetch tt)
+      (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+      (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+      (um_pte0 e) ->
+    exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ) ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    register_lookup satp σ.(sregs) = usatp ->
+    upt_satp_ok pt usatp ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
+    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    upt_slots_own pt.(u_slots) -∗
+    ⌜exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+       = Some (Err (E_Fetch_Page_Fault tt, tt), σ)⌝.
+  Proof.
+    iIntros (Hvpn Hspec Hden Hlk Lpriv LSXL Lsatp (Hmode & Hasid & Hppn)
+             Hcanon Hvpn_def HA Hord HR Hcov Hpter) "#Hhw Hint Hslots".
+    iDestruct (upt_denied_walk_fault pt vpn e (InstructionFetch tt)
+                 (eq_vec (_get_Mstatus_MXR (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 (eq_vec (_get_Mstatus_SUM (register_lookup mstatus σ.(sregs))) ('b"1"))
+                 σ Hvpn Hspec Hden HA Hord HR Hcov Hpter
+                 with "Hhw Hint Hslots") as %Hwalk.
+    iPureIntro.
+    assert (Hte : exec (translationException (InstructionFetch tt) (PTW_No_Permission tt)) σ
+                  = Some (E_Fetch_Page_Fault tt, σ)).
+    { unfold translationException. cbn match. apply exec_returnm. }
+    exact (exec_translateAddr_fetch_u_fault vpn pt.(u_root) (PTW_No_Permission tt) va usatp σ
+             Lpriv LSXL Lsatp Hmode Hasid Hppn Hlk Hwalk Hte Hcanon Hvpn_def).
+  Qed.
+
+End UserTranslateIris.
