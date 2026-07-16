@@ -1,9 +1,17 @@
-(* UserTrap.v -- the U-mode INTERRUPT trap tower: the exec-level reduction
-   of taking a pending (delegated, hence S-destined) interrupt OUT OF USER
-   MODE.  Mirrors WpIntrCore's Supervisor tower ([TrapReduce] /
-   [exec_run_hart_active_pending]); the only semantic difference is the
-   SPP write: trapping FROM User records SPP := 0 (so the handler's sret
-   returns to User).
+(* UserTrap.v -- the U-mode trap tower: the exec-level reduction of taking
+   a trap OUT OF USER MODE into the kernel's stvec handler.
+
+   ONE cause-generic tower serves every trap: [trap_handler del_priv c pc
+   info ext] writes the same register sequence for interrupts and for
+   synchronous exceptions -- only the scause value (interrupt bit + cause
+   bits, both functions of [c]) and the stval value ([tval info]: the
+   faulting address/info, or 0) differ.  The tower is proven once over an
+   abstract [c : TrapCause] and [info : option (mword 64)] (Section
+   [UTrapReduce]); [handle_interrupt], [exception_handler] and
+   [handle_exception] are equational instances inside the same section.
+   Mirrors WpIntrCore's Supervisor tower ([TrapReduce]); the semantic
+   difference from S-mode is the SPP write: trapping FROM User records
+   SPP := 0 (so the handler's sret returns to User).
 
    [utrap_ms] is the delivered mstatus as a function of the pre-trap one
    (SPELP := elp; SPIE := SIE; SIE := 0; SPP := 0, in the model's exact
@@ -60,12 +68,35 @@ Lemma utrap_ms_SXL (elp_v : mword 1) (ms : mword 64) :
 Proof. unfold utrap_ms, _get_Mstatus_SXL; cbn zeta; mw_prep; tb2. Qed.
 
 (* ===================================================================== *)
-(* §2 The trap_handler / handle_interrupt reduction at cur_priv = User.    *)
-(* Clone of WpIntrCore's [TrapReduce] with the SPP write flipped to 'b"0"; *)
-(* the DELIVERY privilege stays Supervisor (the interrupt was delegated).  *)
+(* §2 Exception delegation at User: with the cause's medeleg bit set (and  *)
+(* S present), a synchronous exception from U delegates to Supervisor.     *)
+(* ===================================================================== *)
+Lemma exec_exception_delegatee_U (e : ExceptionType) (medl : mword 64) s :
+  register_lookup medeleg s.(sregs) = medl ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  bit_to_bool (access_vec_dec medl (uint (exceptionType_bits_forwards e))) = true ->
+  exec (exception_delegatee e User) s = Some (Supervisor, s).
+Proof.
+  intros Hmedl HES Hbit.
+  unfold exception_delegatee. cbv zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg medeleg s)). cbn beta.
+  rewrite Hmedl.
+  match goal with |- exec (Defs.bind ?L _) s = _ =>
+    assert (Hsup : exec L s = Some (true, s)) end.
+  { rewrite (exec_and_boolM_Some _ _ _ _ _ HES). cbn match.
+    rewrite Hbit. apply exec_returnm. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hsup). cbn beta. cbn match.
+  replace (zopz0zI_u (privLevel_to_bits Supervisor) (privLevel_to_bits User))
+    with false by (vm_compute; reflexivity).
+  cbn match. apply exec_returnm.
+Qed.
+
+(* ===================================================================== *)
+(* §3 The trap tower at cur_priv = User, generic in the CAUSE [c] and the  *)
+(* tval payload [info]; delivery privilege Supervisor (delegated).         *)
 (* ===================================================================== *)
 Section UTrapReduce.
-  Context (s : mstate) (i : InterruptType) (pc0 : mword 64).
+  Context (s : mstate) (c : TrapCause) (info : option (mword 64)) (pc0 : mword 64).
   Context (ms_v sc_old stvec_v : mword 64) (elp_v : mword 1).
   Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = User.
   Hypothesis Hms : register_lookup mstatus s.(sregs) = ms_v.
@@ -81,10 +112,10 @@ Section UTrapReduce.
   Let s1 := set_reg s mstatus ms_e.
   Let s1e := set_reg s1 elp (landing_pad_bits_backwards NO_LP_EXPECTED).
   Let c1 := update_subrange_vec_dec sc_old (64 - 1) (64 - 1)
-              (bool_to_bit (trapCause_is_interrupt (Interrupt i))).
+              (bool_to_bit (trapCause_is_interrupt c)).
   Let s2 := set_reg s1e scause c1.
   Let c2 := update_subrange_vec_dec c1 (64 - 2) 0
-              (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i))).
+              (zero_extend' (64 - 1) (trapCause_bits_forwards c)).
   Let s3 := set_reg s2 scause c2.
   Let ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e).
   Let s4 := set_reg s3 mstatus ms_a.
@@ -92,12 +123,12 @@ Section UTrapReduce.
   Let s5 := set_reg s4 mstatus ms_b.
   Let ms_c := update_subrange_vec_dec ms_b 8 8 ('b"0").
   Let s6 := set_reg s5 mstatus ms_c.
-  Let s7 := set_reg s6 stval (zeros' 64).
+  Let s7 := set_reg s6 stval (tval info).
   Let s8 := set_reg s7 sepc pc0.
   Let s9 := set_reg s8 cur_privilege Supervisor.
 
-  Lemma exec_trap_handler_U_intr :
-    exec (trap_handler Supervisor (Interrupt i) pc0 None None) s
+  Lemma exec_trap_handler_U :
+    exec (trap_handler Supervisor c pc0 info None) s
       = Some (stvec_base stvec_v, s9).
   Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd.
     unfold trap_handler.
@@ -169,7 +200,7 @@ Section UTrapReduce.
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg sepc _ s7)).
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg cur_privilege _ s8)).
     cbn [handle_trap_extension].
-    rewrite (exec_bind0_Some _ _ _ _ _ (exec_track_trap_S (trapCause_is_interrupt (Interrupt i)) (trapCause_bits_forwards (Interrupt i)) s9)).
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_track_trap_S (trapCause_is_interrupt c) (trapCause_bits_forwards c) s9)).
     assert (Hrc : exec (Defs.read_reg scause : M _) s9 = Some (c2, s9)).
     { rewrite (exec_read_reg scause s9).
       unfold s9, s8, s7, s6, s5, s4, set_reg; cbn [sregs].
@@ -187,14 +218,57 @@ Section UTrapReduce.
     unfold stvec_base. apply exec_returnm.
   Qed.
 
-  Lemma exec_handle_interrupt_U :
+  (* --- instances: the three model entry points that reach the tower --- *)
+
+  Lemma exec_handle_interrupt_U (i : InterruptType)
+      (Hc : c = Interrupt i) (Hinfo : info = None) :
     exec (handle_interrupt i Supervisor) s
       = Some (tt, set_reg s9 nextPC (stvec_base stvec_v)).
   Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd Hpc.
     unfold handle_interrupt.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
     rewrite Hpc.
-    rewrite (exec_bind_Some _ _ _ _ _ exec_trap_handler_U_intr).
+    rewrite <- Hc. rewrite <- Hinfo.
+    rewrite (exec_bind_Some _ _ _ _ _ exec_trap_handler_U).
+    apply exec_set_next_pc.
+  Qed.
+
+  Lemma exec_exception_handler_U (e : ExceptionType) (xv : mword 64)
+      (Hc : c = rv64d_types.Exception e)
+      (Hinfo : info = xtval_exception_value e xv)
+      (Hdel : bit_to_bool (access_vec_dec (register_lookup medeleg s.(sregs))
+                (uint (exceptionType_bits_forwards e))) = true) :
+    exec (exception_handler User (make_sync_exception e xv) pc0) s
+      = Some (stvec_base stvec_v, s9).
+  Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd.
+    unfold exception_handler.
+    cbn [make_sync_exception sync_exception_trap sync_exception_excinfo
+         sync_exception_ext].
+    assert (HESs : exec (currentlyEnabled Ext_S) s = Some (true, s)).
+    { rewrite exec_currentlyEnabled_S. do 2 f_equal. exact HmisaS. }
+    rewrite (exec_bind_Some _ _ _ _ _
+              (exec_exception_delegatee_U e _ s eq_refl HESs Hdel)).
+    cbn beta.
+    change (get_config_print_exception tt) with false. cbn match.
+    erewrite exec_bind0_Some. 2: apply exec_returnm.
+    rewrite <- Hc. rewrite <- Hinfo.
+    apply exec_trap_handler_U.
+  Qed.
+
+  Lemma exec_handle_exception_U (e : ExceptionType) (xv : mword 64)
+      (Hc : c = rv64d_types.Exception e)
+      (Hinfo : info = xtval_exception_value e xv)
+      (Hdel : bit_to_bool (access_vec_dec (register_lookup medeleg s.(sregs))
+                (uint (exceptionType_bits_forwards e))) = true) :
+    exec (handle_exception xv e) s
+      = Some (tt, set_reg s9 nextPC (stvec_base stvec_v)).
+  Proof using Hpriv Hms Hsc Hstvec Help HmisaS Htvd Hpc.
+    unfold handle_exception.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite Hpriv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)). cbn beta.
+    rewrite Hpc.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_exception_handler_U e xv Hc Hinfo Hdel)).
     apply exec_set_next_pc.
   Qed.
 
@@ -218,7 +292,7 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §3 The Iris INTERRUPT arm: a pending delegated interrupt traps the      *)
+(* §4 The Iris INTERRUPT arm: a pending delegated interrupt traps the      *)
 (* ACTIVE user hart to stvec, producing [user_trap_frame].  Rides the      *)
 (* live [wp_exec_step_interrupt_inv] engine; the wire cells are BORROWED   *)
 (* (dfrac-generic) and handed back to the continuation.                    *)
@@ -277,12 +351,11 @@ Section UserIntrArm.
       - rewrite Hd. reflexivity.
       - rewrite exec_currentlyEnabled_S. rewrite Lmisa. rewrite HmisaS. reflexivity.
       - exact (uc_mm C). }
-    pose proof (exec_trap_handler_U_intr σ i va ms_v sc_v (uc_stvec C) elp0
+    pose proof (exec_handle_interrupt_U σ (Interrupt i) None va ms_v sc_v
+                  (uc_stvec C) elp0
                   Lpriv Lms Lsc Lstvec Lelp
-                  ltac:(rewrite Lmisa; exact HmisaS) (uc_tvd C)) as Htrap.
-    pose proof (exec_handle_interrupt_U σ i va ms_v sc_v (uc_stvec C) elp0
-                  Lpriv Lms Lsc Lstvec Lelp
-                  ltac:(rewrite Lmisa; exact HmisaS) (uc_tvd C) Lpc) as Hhi.
+                  ltac:(rewrite Lmisa; exact HmisaS) (uc_tvd C) Lpc
+                  i eq_refl eq_refl) as Hhi.
     (* ghost updates, mirroring the tower's write order *)
     iMod (reg_update _ mstatus _ (update_subrange_vec_dec ms_v 23 23 elp0)
             with "Hreg Hms") as "[Hreg Hms]".
@@ -296,7 +369,7 @@ Section UserIntrArm.
     iMod (reg_update _ mstatus _ _ with "Hreg Hms") as "[Hreg Hms]".
     iMod (reg_update _ mstatus _ _ with "Hreg Hms") as "[Hreg Hms]".
     iMod (reg_update _ mstatus _ (utrap_ms elp0 ms_v) with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ stval _ (zeros' 64) with "Hreg Hstval") as "[Hreg Hstval]".
+    iMod (reg_update _ stval _ (tval None) with "Hreg Hstval") as "[Hreg Hstval]".
     iMod (reg_update _ sepc _ va with "Hreg Hsepc") as "[Hreg Hsepc]".
     iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
     iMod (reg_update _ nextPC _ (stvec_base (uc_stvec C)) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -316,7 +389,7 @@ Section UserIntrArm.
     iDestruct "Hcont" as "Hcont".
     iApply ("Hcont" with "Hmeip Hseip").
     (* re-assemble the trap frame *)
-    iExists (utrap_ms elp0 ms_v), _, (zeros' 64), va, g.
+    iExists (utrap_ms elp0 ms_v), _, (tval None), va, g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt".
     iSplitR.
     { iPureIntro.
@@ -331,27 +404,3 @@ Section UserIntrArm.
   Qed.
 
 End UserIntrArm.
-
-(* ===================================================================== *)
-(* §4 Exception delegation at User: with the cause's medeleg bit set (and  *)
-(* S present), a synchronous exception from U delegates to Supervisor.     *)
-(* ===================================================================== *)
-Lemma exec_exception_delegatee_U (e : ExceptionType) (medl : mword 64) s :
-  register_lookup medeleg s.(sregs) = medl ->
-  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
-  bit_to_bool (access_vec_dec medl (uint (exceptionType_bits_forwards e))) = true ->
-  exec (exception_delegatee e User) s = Some (Supervisor, s).
-Proof.
-  intros Hmedl HES Hbit.
-  unfold exception_delegatee. cbv zeta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg medeleg s)). cbn beta.
-  rewrite Hmedl.
-  match goal with |- exec (Defs.bind ?L _) s = _ =>
-    assert (Hsup : exec L s = Some (true, s)) end.
-  { rewrite (exec_and_boolM_Some _ _ _ _ _ HES). cbn match.
-    rewrite Hbit. apply exec_returnm. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hsup). cbn beta. cbn match.
-  replace (zopz0zI_u (privLevel_to_bits Supervisor) (privLevel_to_bits User))
-    with false by (vm_compute; reflexivity).
-  cbn match. apply exec_returnm.
-Qed.
