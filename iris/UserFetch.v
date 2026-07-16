@@ -507,3 +507,57 @@ Section UserFetchFaultFlavors3.
   Qed.
 
 End UserFetchFaultFlavors3.
+
+(* --------------------------------------------------------------------- *)
+(* Flavor corollary 4: a MAPPED pc page whose leaf DENIES instruction      *)
+(* fetch (X = 0 or U = 0, e.g. the trampoline) -- fetch page fault,        *)
+(* regardless of the TLB state.                                            *)
+(* --------------------------------------------------------------------- *)
+Section UserFetchFaultFlavors4.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (C : ucfg) (pt : upt).
+
+  Lemma wp_user_step_fetch_denied E Φ (vpn : mword 27) (e : umap_ent)
+      (ms_v sc_v stval_v sepc_v va : mword 64)
+      (g : gmap regidx (mword 64))
+      (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
+    ↑minstretN ⊆ E ->
+    user_mstatus_ok ms_v ->
+    u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
+    pt.(u_map) !! vpn = Some e ->
+    (forall mxr do_sum, upte_check_denied (InstructionFetch tt) mxr do_sum (um_pte0 e)) ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    hw_config -∗
+    minstret_inv -∗
+    sig_meip ↦ᵣ{ dqe1 } meip -∗
+    sig_seip ↦ᵣ{ dqe2 } seip -∗
+    user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
+    upt_inv pt -∗
+    user_cfg C -∗
+    ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
+       user_trap_frame C pt -∗
+       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Proof.
+    iIntros (HN Hmsok Hd Hvpn Hden Hal Hcanon Hvpn_def)
+      "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
+    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Page_Fault tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+              with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
+    iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf
+                               %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
+    iDestruct (upt_translateAddr_fetch_denied_full pt vpn e va usatp tlbvec σ
+                 Hvpn (proj1 Hwf) Htok (Hden _ _) Lpriv
+                 ltac:(rewrite Lms; destruct Hmsok as (HSXL & _); exact HSXL)
+                 Lsatp Ltlb Hsok Hcanon Hvpn_def HA Hord HR Hcov Hpter
+                 with "Hhw' Hint Hslots") as %Htr.
+    iPureIntro.
+    exact (exec_fetch_fault_4 σ va Lpc (E_Fetch_Page_Fault tt) Hal Htr).
+  Qed.
+
+End UserFetchFaultFlavors4.
