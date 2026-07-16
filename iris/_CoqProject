@@ -215,3 +215,4 @@ WpUserDecodeWidth.v
 WpUserClassifyTotal.v
 WpUserExec.v
 WpUartPutcSyncFull.v
+WpUserWrs.v
