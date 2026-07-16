@@ -16,6 +16,7 @@ Require Import UmodeFetch.
 Require Import UptInv WpUserBase.
 Require Import WpUserSteps.
 Require Import WpUserClassify.
+Require Import WpUserFull.
 Require Import WpDecodeBridge.
 Require Import UmodeEcall.
 Require Import DecodeSetU.
@@ -129,6 +130,8 @@ Section Total.
   Local Notation ufetch_hit := (WpUserClassify.ufetch_hit U).
   Local Notation cfetch_hit := (WpUserClassify.cfetch_hit U).
   Local Notation ustep_case := (WpUserSteps.ustep_case U).
+  Local Notation ustep_mem_case := (WpUserFull.ustep_mem_case U).
+  Local Notation ustep_fault_case := (WpUserFull.ustep_fault_case U).
 
   (* Fetch-fault producer 1: a 4-aligned but non-canonical pc lands in
      [ustep_case] disjunct 1 (instruction-address fetch fault, no page
@@ -388,6 +391,50 @@ Section Total.
     - exact (WpUserClassify.classify_btype_bge_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
     - exact (WpUserClassify.classify_btype_bltu_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
     - exact (WpUserClassify.classify_btype_bgeu_taken U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc H0 H1).
+  Qed.
+
+  (* TOP-LEVEL REDUCTION for [user_classify].  Splits the total classification
+     over pc's low two bits and discharges the ODD-pc branch outright (it lands
+     in [ustep_case] disjunct 51, the fetch-address-misaligned fault, which is
+     just the pure fact [neq_vec (access_vec_dec va 0) 'b"0" = true]).  The two
+     remaining branches -- 4-aligned (bit1=0) and 2-aligned (bit1=1) -- are
+     left as obligations [H4]/[H2].  This is the skeleton of [user_classify]:
+     once H4 and H2 are proven (even conditionally, e.g. under the aligned-data
+     side hypothesis), [user_classify_from_branches H4 H2] IS the total
+     classifier, and [wp_user_exec_full (user_step_holds_full ...)] turns it
+     into the end-to-end "runs user code forever" theorem. *)
+  Theorem user_classify_from_branches :
+    (forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+            (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+        upt_tlb_ok spec tlbvec ->
+        _get_Mstatus_SXL ms_v = 'b"10" ->
+        neq_vec (access_vec_dec va 0) ('b"0") = false ->
+        neq_vec (access_vec_dec va 1) ('b"0") = false ->
+        ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+        \/ ustep_fault_case va ms_v g tlbvec) ->
+    (forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+            (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+        upt_tlb_ok spec tlbvec ->
+        _get_Mstatus_SXL ms_v = 'b"10" ->
+        neq_vec (access_vec_dec va 0) ('b"0") = false ->
+        neq_vec (access_vec_dec va 1) ('b"0") = true ->
+        ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+        \/ ustep_fault_case va ms_v g tlbvec) ->
+    forall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+           (tlbvec : vec (option TLB_Entry) (2 ^ 6)),
+      upt_tlb_ok spec tlbvec ->
+      _get_Mstatus_SXL ms_v = 'b"10" ->
+      ustep_case va ms_v g tlbvec \/ ustep_mem_case va ms_v g tlbvec
+      \/ ustep_fault_case va ms_v g tlbvec.
+  Proof.
+    intros H4 H2 va ms_v g tlbvec Hok HSXL.
+    destruct (neq_vec (access_vec_dec va 0) ('b"0")) eqn:Hb0.
+    - (* ODD pc: ustep_case disjunct 51 (fetch-address-misalign fault) *)
+      left. unfold WpUserSteps.ustep_case.
+      do 50 right. left. exact Hb0.
+    - destruct (neq_vec (access_vec_dec va 1) ('b"0")) eqn:Hb1.
+      + exact (H2 va ms_v g tlbvec Hok HSXL Hb0 Hb1).
+      + exact (H4 va ms_v g tlbvec Hok HSXL Hb0 Hb1).
   Qed.
 
 End Total.
