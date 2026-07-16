@@ -626,6 +626,89 @@ Proof.
   exact (exec_jump_to _ s Halign Hbit1).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* Compressed-register non-zero facts.  Every RVC compressed register     *)
+(* [creg2reg_idx (Cregidx i)] / [creg_bits c] denotes one of x8..x15 (its  *)
+(* MSB, bit 3, is set), so its index is >= 8 and never x0.  The compressed *)
+(* compute leaves that consume a [creg] therefore have their [uint _ <> 0] *)
+(* side condition discharged unconditionally (unlike the seven wide-reg    *)
+(* HINT-capable ops C_ADDI/C_LI/C_SLLI/C_MV/C_ADD/C_ADDIW/C_LUI, whose rd   *)
+(* CAN be x0).                                                             *)
+Lemma cls_land_shift_low (a f k : Z) :
+  0 <= k -> 0 <= f < 2 ^ k -> Z.land (a * 2 ^ k) f = 0.
+Proof.
+  intros Hk Hf.
+  apply Z.bits_inj_iff'; intros n Hn.
+  rewrite Z.land_spec Z.bits_0.
+  destruct (Z.ltb_spec n k) as [Hlt | Hge].
+  - replace (Z.testbit (a * 2 ^ k) n) with false;
+      [ reflexivity
+      | symmetry; rewrite <- (Z.shiftl_mul_pow2 a k Hk); apply Z.shiftl_spec_low; lia ].
+  - destruct (Z.ltb_spec 0 f) as [Hpos | Hnp].
+    + replace (Z.testbit f n) with false; [ apply andb_false_r |].
+      symmetry; apply Z.bits_above_log2; [lia |].
+      assert (Z.log2 f < k); [| lia].
+      apply Z.log2_lt_pow2; [exact Hpos | exact (proj2 Hf)].
+    + replace f with 0 by lia. rewrite Z.bits_0. apply andb_false_r.
+Qed.
+
+Lemma cls_lor_disjoint_add (a b : Z) :
+  Z.land a b = 0 -> Z.lor a b = a + b.
+Proof.
+  intro Hd. rewrite <- (Z.lxor_lor _ _ Hd).
+  symmetry. apply Z.add_nocarry_lxor. exact Hd.
+Qed.
+
+Lemma cls_uint_unsigned5 (a : mword 5) : uint a = bv_unsigned a.
+Proof.
+  pose proof (bv_unsigned_in_range _ a) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  rewrite Z2N.id; [ reflexivity | lia ].
+Qed.
+
+Lemma cls_creg_shape_unsigned (c : mword 3) :
+  bv_unsigned (zero_extend' 5 (concat_vec ('b"1" : mword 1) c) : mword 5)
+  = 8 + bv_unsigned c.
+Proof.
+  assert (Hc : 0 <= bv_unsigned c < 8).
+  { pose proof (bv_unsigned_in_range _ c) as Hr. unfold bv_modulus in Hr.
+    change (Z.of_N (MachineWord.MachineWord.Z_idx 3)) with 3 in Hr.
+    change (2 ^ 3) with 8 in Hr. exact Hr. }
+  unfold zero_extend', concat_vec.
+  cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
+       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
+       SailStdpp.Values.with_word autocast].
+  cbn.
+  destruct (Z.eq_dec (Z.of_N (1 + 3)) (1 + 3)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
+  rewrite (TypeCasts.cast_Z_refl (H := e2)).
+  unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  erewrite bv_zero_extend_unsigned by (cbn; lia).
+  erewrite bv_concat_unsigned by (cbn; lia).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 3)) with 3.
+  rewrite (Z.shiftl_mul_pow2 _ (Z.of_N 3) ltac:(lia)).
+  match goal with |- context [bv_unsigned ?b1 * 2 ^ Z.of_N 3] =>
+    replace (bv_unsigned b1) with 1 by (vm_compute; reflexivity) end.
+  assert (Hdis : Z.land (1 * 2 ^ Z.of_N 3) (bv_unsigned c) = 0).
+  { apply cls_land_shift_low; [ lia | change (2 ^ Z.of_N 3) with 8; exact Hc ]. }
+  rewrite (cls_lor_disjoint_add _ _ Hdis).
+  reflexivity.
+Qed.
+
+Lemma cls_creg_shape_nz (c : mword 3) :
+  uint (zero_extend' 5 (concat_vec ('b"1" : mword 1) c)) <> 0.
+Proof.
+  rewrite cls_uint_unsigned5. rewrite cls_creg_shape_unsigned.
+  pose proof (bv_unsigned_in_range _ c). lia.
+Qed.
+
+Lemma cls_creg_bits_nz (c : mword 3) : uint (creg_bits c) <> 0.
+Proof. exact (cls_creg_shape_nz c). Qed.
+
+Lemma cls_creg_idx_nz (rc : cregidx) :
+  uint (match creg2reg_idx rc with Regidx r => r end) <> 0.
+Proof. destruct rc as [i]. exact (cls_creg_shape_nz i). Qed.
+
 Section WpUserClassify.
   Context `{CID : CpuId}.
   Context (U : WpUserBase.uctx).
@@ -2798,6 +2881,173 @@ Section WpUserClassify.
     intros Hf Hcl.
     destruct (decode_total_u_set w) as (ii & Hdu & Hdec).
     exact (classify_word va ms_v g tlbvec vpn i w ii Hf Hdec (Hcl ii Hdu Hdec)).
+  Qed.
+
+  (* ==================================================================== *)
+  (* Compressed classification dispatcher: the RVC twin of                *)
+  (* [classify_word_of_decode].  Mirrors [covered_u]/[classifiable_u]/    *)
+  (* [classify_word]/[classify_word_of_decode] but keyed on the 16-bit    *)
+  (* halfword [h] and [cfetch_hit] instead of [w]/[ufetch_hit].           *)
+  (* ==================================================================== *)
+
+  (* The compressed trap/no-op constructors handled unconditionally:      *)
+  (* C_NOP/C_NTL/ZCMOP retire (RVC no-op disjunct 26), C_ILLEGAL traps    *)
+  (* Illegal (disjunct 27), C_EBREAK is the RVC breakpoint (disjunct 36). *)
+  Definition covered_c (ii : instruction) : bool :=
+    match ii with
+    | C_NOP _ => true | C_NTL _ => true | ZCMOP _ => true
+    | C_ILLEGAL _ => true | C_EBREAK _ => true
+    | _ => false
+    end.
+
+  (* The compressed image [decodable_c] constructors that have a classify *)
+  (* leaf into [ustep_case]: every loop-free compressed compute op plus    *)
+  (* the [covered_c] trap/no-op set.  The seven wide-register HINT-capable *)
+  (* ops (C_ADDI/C_LI/C_SLLI/C_MV/C_ADD/C_ADDIW/C_LUI) are classifiable    *)
+  (* ONLY when their destination register is not x0 -- at rd=x0 they are   *)
+  (* RVC HINT no-ops with no compressed compute leaf, so the predicate     *)
+  (* excludes that case (bakes [rd <> 0] into its truth).  Compressed-     *)
+  (* register (creg, x8..x15) and SP-relative ops are always classifiable  *)
+  (* (their register is never x0).  Excluded (no leaf / runtime guards,    *)
+  (* exactly as [classifiable_u] excludes them): the compressed control    *)
+  (* flow C_JALR/C_BEQZ/C_BNEZ (guarded) and C_J/C_JR (no leaf, link x0),  *)
+  (* and every compressed load/store (standalone spatial).                *)
+  Definition classifiable_c (ii : instruction) : bool :=
+    match ii with
+    | C_ADDI (_, Regidx rd) => negb (Z.eqb (uint rd) 0)
+    | C_LI (_, Regidx rd) => negb (Z.eqb (uint rd) 0)
+    | C_SLLI (_, Regidx rd) => negb (Z.eqb (uint rd) 0)
+    | C_MV (Regidx rd, _) => negb (Z.eqb (uint rd) 0)
+    | C_ADD (Regidx rd, _) => negb (Z.eqb (uint rd) 0)
+    | C_ADDIW (_, Regidx rd) => negb (Z.eqb (uint rd) 0)
+    | C_LUI (_, Regidx rd) => negb (Z.eqb (uint rd) 0)
+    | C_ANDI _ => true | C_ADDI16SP _ => true | C_ADDI4SPN _ => true
+    | C_AND _ => true | C_OR _ => true | C_XOR _ => true | C_SUB _ => true
+    | C_ADDW _ => true | C_SUBW _ => true | C_MUL _ => true
+    | C_NOT _ => true | C_ZEXT_B _ => true
+    | C_SRLI _ => true | C_SRAI _ => true
+    | _ => covered_c ii
+    end.
+
+  (* Dispatch any [classifiable_c] decoded compressed instruction to its   *)
+  (* [classify_c_*] leaf.  Structured like [classify_word]: [destruct ii]  *)
+  (* peels off every non-classifiable constructor by [discriminate], and a *)
+  (* [lazymatch] on [Hdec]'s constructor routes each survivor.  For the    *)
+  (* seven HINT-capable ops the [rd <> 0] side condition is recovered from *)
+  (* [classifiable_c ii = true]; for the creg/SP ops it is discharged by   *)
+  (* [cls_creg_idx_nz]/[cls_creg_bits_nz].                                 *)
+  Lemma classify_c_word (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) (ii : instruction) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+    classifiable_c ii = true ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hcl.
+    destruct ii; try discriminate Hcl.
+    all: lazymatch goal with
+    (* --- trap / no-op set (covered_c) --- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_NOP ?p, _) |- _ =>
+        exact (classify_c_nop_op va ms_v g tlbvec vpn i h p Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_NTL ?p, _) |- _ =>
+        exact (classify_c_ntl va ms_v g tlbvec vpn i h p Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (ZCMOP ?p, _) |- _ =>
+        exact (classify_zcmop va ms_v g tlbvec vpn i h p Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ILLEGAL ?p, _) |- _ =>
+        exact (classify_c_illegal_op va ms_v g tlbvec vpn i h p Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_EBREAK ?p, _) |- _ =>
+        destruct p; exact (classify_c_ebreak va ms_v g tlbvec vpn i h Hf Hdec)
+    (* --- wide-register HINT-capable compute (rd <> 0 from Hcl) --- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ADDI ?p, _) |- _ =>
+        destruct p as [imm r]; destruct r as [rd];
+        cbv [classifiable_c] in Hcl; apply negb_true_iff in Hcl; apply Z.eqb_neq in Hcl;
+        exact (classify_c_addi va ms_v g tlbvec vpn i h imm rd Hf Hdec Hcl)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_LI ?p, _) |- _ =>
+        destruct p as [imm r]; destruct r as [rd];
+        cbv [classifiable_c] in Hcl; apply negb_true_iff in Hcl; apply Z.eqb_neq in Hcl;
+        exact (classify_c_li va ms_v g tlbvec vpn i h imm rd Hf Hdec Hcl)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_SLLI ?p, _) |- _ =>
+        destruct p as [shamt r]; destruct r as [rd];
+        cbv [classifiable_c] in Hcl; apply negb_true_iff in Hcl; apply Z.eqb_neq in Hcl;
+        exact (classify_c_slli va ms_v g tlbvec vpn i h shamt rd Hf Hdec Hcl)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_MV ?p, _) |- _ =>
+        destruct p as [r1 r2]; destruct r1 as [rd]; destruct r2 as [rs2];
+        cbv [classifiable_c] in Hcl; apply negb_true_iff in Hcl; apply Z.eqb_neq in Hcl;
+        exact (classify_c_mv va ms_v g tlbvec vpn i h rd rs2 Hf Hdec Hcl)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ADD ?p, _) |- _ =>
+        destruct p as [r1 r2]; destruct r1 as [rsd]; destruct r2 as [rs2];
+        cbv [classifiable_c] in Hcl; apply negb_true_iff in Hcl; apply Z.eqb_neq in Hcl;
+        exact (classify_c_add va ms_v g tlbvec vpn i h rsd rs2 Hf Hdec Hcl)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ADDIW ?p, _) |- _ =>
+        destruct p as [imm r]; destruct r as [rd];
+        cbv [classifiable_c] in Hcl; apply negb_true_iff in Hcl; apply Z.eqb_neq in Hcl;
+        exact (classify_c_addiw va ms_v g tlbvec vpn i h imm rd Hf Hdec Hcl)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_LUI ?p, _) |- _ =>
+        destruct p as [imm r]; destruct r as [rd];
+        cbv [classifiable_c] in Hcl; apply negb_true_iff in Hcl; apply Z.eqb_neq in Hcl;
+        exact (classify_c_lui va ms_v g tlbvec vpn i h imm rd Hf Hdec Hcl)
+    (* --- creg / SP compute (register never x0) --- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ANDI ?p, _) |- _ =>
+        destruct p as [imm rdc];
+        exact (classify_c_andi va ms_v g tlbvec vpn i h imm rdc Hf Hdec (cls_creg_idx_nz rdc))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ADDI16SP ?p, _) |- _ =>
+        exact (classify_c_addi16sp va ms_v g tlbvec vpn i h p Hf Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ADDI4SPN ?p, _) |- _ =>
+        destruct p as [rdc nzimm];
+        exact (classify_c_addi4spn va ms_v g tlbvec vpn i h nzimm rdc Hf Hdec (cls_creg_idx_nz rdc))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_AND ?p, _) |- _ =>
+        destruct p as [rsd rs2];
+        exact (classify_c_and va ms_v g tlbvec vpn i h rsd rs2 Hf Hdec (cls_creg_idx_nz rsd))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_OR ?p, _) |- _ =>
+        destruct p as [rsd rs2];
+        exact (classify_c_or va ms_v g tlbvec vpn i h rsd rs2 Hf Hdec (cls_creg_idx_nz rsd))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_XOR ?p, _) |- _ =>
+        destruct p as [rsd rs2];
+        exact (classify_c_xor va ms_v g tlbvec vpn i h rsd rs2 Hf Hdec (cls_creg_idx_nz rsd))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_SUB ?p, _) |- _ =>
+        destruct p as [rsd rs2];
+        exact (classify_c_sub va ms_v g tlbvec vpn i h rsd rs2 Hf Hdec (cls_creg_idx_nz rsd))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ADDW ?p, _) |- _ =>
+        destruct p as [rsd rs2];
+        exact (classify_c_addw va ms_v g tlbvec vpn i h rsd rs2 Hf Hdec (cls_creg_idx_nz rsd))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_SUBW ?p, _) |- _ =>
+        destruct p as [rsd rs2];
+        exact (classify_c_subw va ms_v g tlbvec vpn i h rsd rs2 Hf Hdec (cls_creg_idx_nz rsd))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_MUL ?p, _) |- _ =>
+        destruct p as [rsdc rsc2];
+        exact (classify_c_mul va ms_v g tlbvec vpn i h rsdc rsc2 Hf Hdec (cls_creg_idx_nz rsdc))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_NOT ?p, _) |- _ =>
+        destruct p as [c];
+        exact (classify_c_not va ms_v g tlbvec vpn i h c Hf Hdec (cls_creg_bits_nz c))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_ZEXT_B ?p, _) |- _ =>
+        destruct p as [c];
+        exact (classify_c_zext_b va ms_v g tlbvec vpn i h c Hf Hdec (cls_creg_bits_nz c))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_SRLI ?p, _) |- _ =>
+        destruct p as [shamt rsd];
+        exact (classify_c_srli va ms_v g tlbvec vpn i h shamt rsd Hf Hdec (cls_creg_idx_nz rsd))
+    | Hdec : forall _, _ -> exec _ _ = Some (C_SRAI ?p, _) |- _ =>
+        destruct p as [shamt rsd];
+        exact (classify_c_srai va ms_v g tlbvec vpn i h shamt rsd Hf Hdec (cls_creg_idx_nz rsd))
+    end.
+  Qed.
+
+  (* The full compressed pipeline: [decode_total_c_set] supplies the       *)
+  (* unique decoded compressed instruction and its [decodable_c]           *)
+  (* membership; the caller confirms -- by computation on that             *)
+  (* constructor -- that it is [classifiable_c].                           *)
+  Lemma classify_c_word_of_decode (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (i : uwalk_info) (h : mword 16) :
+    cfetch_hit va vpn i h tlbvec ->
+    (forall ii, decodable_c ii = true ->
+       (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+       classifiable_c ii = true) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hcl.
+    destruct (decode_total_c_set h) as (ii & Hdc & Hdec).
+    exact (classify_c_word va ms_v g tlbvec vpn i h ii Hf Hdec (Hcl ii Hdc Hdec)).
   Qed.
 
 End WpUserClassify.
