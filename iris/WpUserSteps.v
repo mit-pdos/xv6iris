@@ -1414,7 +1414,25 @@ Section WpUserSteps.
        eq_vec (access_vec_dec
           (add_vec va (sign_extend' 64 (sign_extend' 21 (concat_vec imm ('b"0" : mword 1))))) 0) ('b"0") = true /\
        bit_to_bool (access_vec_dec
-          (add_vec va (sign_extend' 64 (sign_extend' 21 (concat_vec imm ('b"0" : mword 1))))) 1) = false).
+          (add_vec va (sign_extend' 64 (sign_extend' 21 (concat_vec imm ('b"0" : mword 1))))) 1) = false)
+    \/
+    (* 50: RVC fetch hit, retiring C_JR rd=x0 (no link, aligned target from rs1) *)
+    (exists vpn ie (h : mword 16) (rs1 : mword 5),
+       vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (upt_entry vpn ie) /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       c_fetch_mode va vpn ie h /\
+       isRVC h = true /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode_compressed h) s0 = Some (C_JR (Regidx rs1), s0)) /\
+       uint rs1 <> 0 /\
+       eq_vec (access_vec_dec (jalr_target (g !!! Regidx rs1) (zeros' 12)) 0) ('b"0") = true /\
+       bit_to_bool (access_vec_dec (jalr_target (g !!! Regidx rs1) (zeros' 12)) 1) = false).
 
   (* the assembled Löb step obligation, v1 coverage *)
   (* [ustep_case_sound]: the post-unpack body of [user_step_holds] --
@@ -1552,7 +1570,8 @@ Section WpUserSteps.
                                                                                             | [ (vpn & ie & ii & base & h & Hexp & Hbase & Hsome & Hchk & Hupd & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec)
                                                                                               | [ (vpn & ie & w & imm & Hsome & Hchk & Hupd & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hal0 & Hal1)
                                                                                                 | [ (vpn & ie & w & imm & rs1 & Hsome & Hchk & Hupd & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrs1 & Hal0 & Hal1)
-                                                                                                  | (vpn & ie & h & imm & Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hal0 & Hal1) ] ] ] ] ] ] ] ] ] ] ]
+                                                                                                  | [ (vpn & ie & h & imm & Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hal0 & Hal1)
+                                                                                                    | (vpn & ie & h & rs1 & Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hrs1 & Hal0 & Hal1) ] ] ] ] ] ] ] ] ] ] ] ]
                                                                               ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
@@ -1899,6 +1918,13 @@ Section WpUserSteps.
       iApply (ustep_c_j va vpn ie h imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
                 HN Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon Hvpn_def Hmode HisRVC
                 Hdec Hal0 Hal1
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
+    - (* compressed C_JR rd=x0 (no link) *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_c_jr va vpn ie h rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hok Hvec Hchk Hupd Hpbmt HSXL Hcanon Hvpn_def Hmode HisRVC
+                Hdec Hrs1 Hal0 Hal1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
   Qed.
