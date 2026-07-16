@@ -187,20 +187,36 @@ Section UserExec.
   (* register file, the trap CSRs (stale until the next trap writes them), *)
   (* mstatus up to its pins, and -- inside [upt_inv] -- the TLB and the    *)
   (* mapped pages' contents.                                               *)
+  (*                                                                       *)
+  (* PC vs nextPC: while ACTIVE the two are in lock-step ([pc_is]-shaped:  *)
+  (* the previous step's epilogue ticked PC := nextPC).  While WAITING     *)
+  (* they are DECOUPLED -- the enter-wait step skips the tick (the model's *)
+  (* epilogue only ticks when the hart ends the step ACTIVE), so PC still  *)
+  (* points at the WRS and nextPC at the instruction after it; the wake    *)
+  (* step retires and ticks, restoring lock-step at [va'].                 *)
   (* ------------------------------------------------------------------- *)
+  (* the per-step mutable register cells, as one bundle (shared between
+     [user_inv] and the unpacked step obligations) *)
+  Definition user_regs (hs : HartState)
+      (ms_v sc_v stval_v sepc_v va va' : mword 64)
+      (g : gmap regidx (mword 64)) : iProp Σ :=
+    (hart_state ↦ᵣ hs ∗
+     cur_privilege ↦ᵣ User ∗
+     mstatus ↦ᵣ ms_v ∗
+     scause ↦ᵣ sc_v ∗
+     stval ↦ᵣ stval_v ∗
+     sepc ↦ᵣ sepc_v ∗
+     PC ↦ᵣ va ∗
+     nextPC ↦ᵣ va' ∗
+     gpr_file g)%I.
+
   Definition user_inv : iProp Σ :=
-    (∃ (hs : HartState) (ms_v sc_v stval_v sepc_v va : mword 64)
+    (∃ (hs : HartState) (ms_v sc_v stval_v sepc_v va va' : mword 64)
        (g : gmap regidx (mword 64)),
       ⌜user_hart_ok hs⌝ ∗
       ⌜user_mstatus_ok ms_v⌝ ∗
-      hart_state ↦ᵣ hs ∗
-      cur_privilege ↦ᵣ User ∗
-      mstatus ↦ᵣ ms_v ∗
-      scause ↦ᵣ sc_v ∗
-      stval ↦ᵣ stval_v ∗
-      sepc ↦ᵣ sepc_v ∗
-      pc_is va ∗
-      gpr_file g ∗
+      ⌜forall u, hs = HART_ACTIVE u -> va' = va⌝ ∗
+      user_regs hs ms_v sc_v stval_v sepc_v va va' g ∗
       upt_inv pt ∗
       user_cfg)%I.
 
@@ -240,6 +256,22 @@ Section UserExec.
   (* ------------------------------------------------------------------- *)
   Definition user_step_obligation E (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (user_inv -∗
+        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) ∧
+           (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+        WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I.
+
+  (* the ACTIVE-hart residue of the step obligation: same contract, but the
+     machine is handed over UNPACKED, with the hart pinned ACTIVE and the
+     pc in lock-step ([user_step_obligation_holds], UserStep.v, discharges
+     the WAITING case -- the WRS stay/wake steps -- so this is all that is
+     left to prove) *)
+  Definition user_step_obligation_active E (Φ : mval -> iProp Σ) : iProp Σ :=
+    (□ (∀ (ms_v sc_v stval_v sepc_v va : mword 64)
+          (g : gmap regidx (mword 64)),
+        ⌜user_mstatus_ok ms_v⌝ -∗
+        user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
+        upt_inv pt -∗
+        user_cfg -∗
         ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) ∧
            (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
         WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I.

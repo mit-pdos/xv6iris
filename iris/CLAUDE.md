@@ -262,6 +262,24 @@ files or copy code from them; build fresh from the live tree.
      no-pending corollary `exec_dispatchInterrupt_U_none`, and the Iris form
      `dispatch_U_from_regs` (all cells dfrac-generic BORROWED resources, so
      the wire values can come from the future device-shared invariant).
+     The WAITING-hart arm is DONE (UserStep.v, axiom-clean):
+     `user_step_obligation_holds` reduces `user_step_obligation` to its
+     ACTIVE residue `user_step_obligation_active` (UserExec.v: same contract,
+     machine handed over unpacked via `user_regs`, hart pinned ACTIVE, pc in
+     lock-step); `wp_user_exec_active` is the capstone over the residue.
+     The WAITING case: `wp_user_step_waiting` steps a WRS-suspended hart by
+     case-splitting on wake = raw `mip & mie ≠ 0` and then on the OPAQUE
+     `valid_reservation` axiom — destructing an opaque bool axiom in the
+     proof makes BOTH branches reducible (stay-waiting: the step's only
+     write is minstret_increment, NO pc tick; wake: hart_state := ACTIVE,
+     tick, bump), each re-entering `user_inv`. Exec layer:
+     `exec_run_hart_waiting_{wake,wake_resv,stay}` +
+     `exec_riscv_step_wait_{stay,wake}` (clones of RiscvExec's
+     StepHartActive spine with the WAITING arm selected). PROOF GOTCHA: a
+     try_step wrapper section must declare its `Let` states BEFORE the
+     hypotheses that mention them and state those hypotheses via the FOLDED
+     names — a raw-spelled RHS makes every derived epilogue term raw and
+     the folded `replace`/rewrite patterns miss syntactically.
   2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
      `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
      `update_PTE_Bits` None-vs-Some by the A(/D) bits.
