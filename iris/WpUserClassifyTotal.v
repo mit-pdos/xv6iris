@@ -183,6 +183,26 @@ Section Total.
     right; right; left. exists vpn, ie, pte'. repeat split; assumption.
   Qed.
 
+  (* Fetch-fault producer 4: a 4-aligned, canonical, MAPPED page whose leaf
+     PTE denies EXECUTE permission lands in [ustep_case] disjunct 45 (the
+     instruction-fetch page fault).  [uw_check_denied] is the negation twin of
+     [uw_check_ok]; at wiring, the uctx field [Hfetch_perm_total] supplies
+     [uw_check_ok fetch ie \/ uw_check_denied fetch ie] for every mapped vpn. *)
+  Lemma produce_noexec (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (vpn : mword 27) (i : uwalk_info) :
+    spec !! vpn = Some i ->
+    uw_check_denied (InstructionFetch tt) i ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hsome Hden Hal Hcanon Hvpn. unfold WpUserSteps.ustep_case.
+    do 44 right. left. exists vpn, i. repeat split; assumption.
+  Qed.
+
   (* For a 4-aligned, canonical, executable, A-set, mapped page whose
      instruction bytes are resident in [code], the fetch either yields a
      full 32-bit word ([ufetch_hit]) or a compressed halfword
@@ -325,6 +345,59 @@ Section Total.
                Huf (Hcl_u w Huf)).
     - exact (WpUserClassify.classify_c_word_of_decode U va ms_v g tlbvec vpn ie h
                Hcf (Hcl_c h Hcf)).
+  Qed.
+
+  (* 4-ALIGNED CANONICAL page router (fetch-fault + classifiable-compute legs).
+     Given va is 4-aligned and canonical with page number [vpn], and a "page
+     verdict" for [vpn] -- one of {unmapped, execute-denied, A-update-needed,
+     or (executable, A-set, PBMT-normal, resident, and every instruction in the
+     page classifiable on both geometries)} -- the classification lands in
+     [ustep_case].  The verdict is exactly what the uctx wf fields supply per
+     mapped page.  This covers the fetch-fault outcomes and the compute/system
+     retire; control-flow (JAL/JALR/BTYPE) and data (LOAD/STORE/AMO) are
+     additional verdict legs routed by classify_* / the data side (follow-up).
+     Non-canonical va is handled separately by [produce_noncanonical]. *)
+  Lemma dispatch_4aligned_canonical
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (vpn : mword 27) :
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    ( spec !! vpn = None
+      \/ (exists i, spec !! vpn = Some i /\ uw_check_denied (InstructionFetch tt) i)
+      \/ (exists ie pte', spec !! vpn = Some ie /\
+            uw_check_ok (InstructionFetch tt) ie /\
+            update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = Some pte')
+      \/ (exists ie, spec !! vpn = Some ie /\
+            uw_check_ok (InstructionFetch tt) ie /\
+            update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+            _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) /\
+            is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true /\
+            (forall j : nat, (j < 4)%nat ->
+               exists b, code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some b) /\
+            (forall w : mword 32, ufetch_hit va vpn ie w tlbvec ->
+               forall ii, decodable_u ii = true ->
+                 (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+                 classifiable_u ii = true) /\
+            (forall h : mword 16, cfetch_hit va vpn ie h tlbvec ->
+               forall ii, decodable_c ii = true ->
+                 (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+                 WpUserClassify.classifiable_c ii = true)) ) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hal Hcanon Hvpn Hverdict.
+    destruct Hverdict as
+      [Hnone
+      | [ [i [Hs Hden]]
+      | [ [ie [pte' [Hs [Hok Hupd]]]]
+      | [ie [Hs [Hok [Hupd [Hpbmt [Hpaal [Hres [Hcl_u Hcl_c]]]]]]]] ] ] ].
+    - exact (produce_unmapped va ms_v g tlbvec vpn Hnone Hal Hcanon Hvpn).
+    - exact (produce_noexec va ms_v g tlbvec vpn i Hs Hden Hal Hcanon Hvpn).
+    - exact (produce_adfault va ms_v g tlbvec vpn ie pte' Hs Hok Hupd Hal Hcanon Hvpn).
+    - exact (dispatch_full_page va ms_v g vpn ie tlbvec
+               Hs Hok Hupd Hpbmt Hal Hcanon Hvpn Hpaal Hres Hcl_u Hcl_c).
   Qed.
 
   (* Total BTYPE not-taken dispatch: a fetched, decoded conditional branch
