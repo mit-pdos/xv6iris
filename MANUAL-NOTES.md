@@ -18,6 +18,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - user-mode exec: predicate for all possible decode results (4-byte and 2-byte), then proof for every instruction in that predicate
 - shared CLAUDE.md memory in repo
 - device model: DevLoop opcode, concurrent WP, shared access to CPU SEIP
+- user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
 
 Big things that still need to be done/explored:
 
