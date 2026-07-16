@@ -857,3 +857,75 @@ Section UserTranslateIris3.
   Qed.
 
 End UserTranslateIris3.
+
+(* ===================================================================== *)
+(* §8 The fetch-SUCCESS translateAddr wrappers.  The HIT outputs the SAME  *)
+(* physical address as the walk ([um_tlb_ent_ppn]), and the walk wrappers  *)
+(* (§2) already present the filled TLB -- so a caller sees ONE uniform     *)
+(* outcome: pa = u_walk_pa (um_pte0 e) va, TLB = the (possibly trivially)  *)
+(* filled vector.                                                          *)
+(* ===================================================================== *)
+
+(* translate on a RESIDENT own entry whose leaf passes the fetch check
+   and needs no A-bit update: state UNCHANGED *)
+Lemma exec_translate_hit_ok_u
+    (vpn : mword 27) (e : umap_ent) (root : mword 44)
+    (acc : MemoryAccessType mem_payload) (mxr do_sum : bool)
+    (tlbvec : type_of_register tlb) s :
+  register_lookup tlb s.(sregs) = tlbvec ->
+  vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (um_tlb_ent vpn e) ->
+  upte_pbmt0 (um_pte0 e) ->
+  upte_check_ok acc mxr do_sum (um_pte0 e) ->
+  update_PTE_Bits (autocast (T := mword) (um_pte0 e) : mword 64) acc = None ->
+  exec (translate 39 (mword_of_int 0) root vpn acc User mxr do_sum tt) s
+    = Some (Ok (autocast (T := mword)
+                  ((autocast (T := mword) (PPN_of_PTE (um_pte0 e))) : mword 44),
+                PBMT_PMA, tt), s).
+Proof.
+  intros Htlb Hvec Hpbmt Hok Hupd.
+  unfold translate.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec (um_tlb_ent vpn e) s
+               Htlb Hvec (um_tlb_ent_match_self vpn e))).
+  cbn match.
+  apply exec_translate_TLB_hit_ok_u; assumption.
+Qed.
+
+(* translateAddr on the resident own entry: pa = the walk's pa *)
+Lemma exec_translateAddr_fetch_u_hit
+    (vpn : mword 27) (e : umap_ent) (root : mword 44)
+    (va satp0 : mword 64) (tlbvec : type_of_register tlb) s :
+  register_lookup cur_privilege s.(sregs) = User ->
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  register_lookup satp s.(sregs) = satp0 ->
+  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+  zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+  autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+  register_lookup tlb s.(sregs) = tlbvec ->
+  vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (um_tlb_ent vpn e) ->
+  upte_pbmt0 (um_pte0 e) ->
+  (forall mxr do_sum, upte_check_ok (InstructionFetch tt) mxr do_sum (um_pte0 e)) ->
+  update_PTE_Bits (autocast (T := mword) (um_pte0 e) : mword 64) (InstructionFetch tt) = None ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+  autocast (T := mword) (subrange_vec_dec
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+  exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+    = Some (Ok (Physaddr (u_walk_pa (um_pte0 e) va), PBMT_PMA, init_ext_ptw), s).
+Proof.
+  intros Hcp HSXL Hsatp Hmode Hasid Hppn Htlb Hvec Hpbmt Hok Hupd Hcanon Hvpn_def.
+  utr_head Hcp HSXL Hsatp Hmode.
+  rewrite Hcanon. cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+  match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
+    replace vpnx with vpn by (symmetry; exact Hvpn_def);
+    replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid);
+    replace bppn with root by (symmetry; exact Hppn) end.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (exec_translate_hit_ok_u vpn e root (InstructionFetch tt) _ _
+                tlbvec s Htlb Hvec Hpbmt (Hok _ _) Hupd)).
+  cbn match.
+  rewrite execR_returnR. cbn match.
+  reflexivity.
+Qed.
