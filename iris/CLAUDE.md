@@ -216,11 +216,21 @@ files or copy code from them; build fresh from the live tree.
   - *Frames own exactly what a user step can touch:* `user_inv` = pins
     (`user_mstatus_ok`: SXL=64, MPRV=0, MXR=0) + hart_state/priv=User +
     existential mstatus/scause/stval/sepc/pc/gpr_file + `upt_inv` + `user_cfg`
-    (boot cells at dqc; interrupt-freedom `uc_mm`/`uc_s0`; `uc_del` delegates
-    every `user_exc` cause; stvec TV_Direct). `user_trap_frame` = same at
-    Supervisor, pc_is (stvec_base), `trap_mstatus_ok` adds SPP=User ∧ SIE=0.
-    Trap-CSR VALUES are existential at this join; per-cause step lemmas know
-    them precisely.
+    (boot cells at dqc; `uc_mm` = mie&~mideleg=0 so every dispatched interrupt
+    is S-destined; `uc_del` delegates every `user_exc` cause; stvec
+    TV_Direct). `user_trap_frame` = same at Supervisor, pc_is (stvec_base),
+    `trap_mstatus_ok` adds SPP=User ∧ SIE=0. Trap-CSR VALUES are existential
+    at this join; per-cause step lemmas know them precisely.
+  - *Interrupts are UNMASKABLE at User* (effective mIE/sIE are architecturally
+    true below the current privilege — unlike the kernel proofs, which mask
+    via SIE=0). The device loop raises the `sig_seip` wire concurrently, so
+    the wire cells are deliberately NOT in `user_cfg`: they will live in an
+    invariant shared with the device WP (NOT plumbed yet — the kernel-side
+    S-mode proofs equally still pin the wires and need the same device-model
+    rework). Every user step case-splits on the dispatch decision
+    `u_dispatch` (UserStep.v): pending delegated interrupt → the interrupt
+    trap to stvec, ANOTHER producer of `user_trap_frame`; None →
+    fetch/execute.
   - *Capstone* `wp_user_exec` (axiom-clean): `user_step_obligation E Φ`
     (□(user_inv -∗ ▷((user_inv -∗ WP) ∧ (user_trap_frame -∗ WP)) -∗ WP); the ∧
     is additive — the prover picks one arm after case-analyzing the machine)
@@ -245,11 +255,13 @@ files or copy code from them; build fresh from the live tree.
      continuation (present the hit TLB as the trivially-filled vector).
      STARTED (UserTranslate.v): the mode-dispatch head every reduction begins
      with — `exec_get_satp_39`, `exec_translationMode_U_sv39` (axiom-free).
-     Interrupts-never is DONE (UserStep.v, axiom-free):
-     `exec_getPendingSet_U_reduce` / `exec_dispatchInterrupt_U_none` (at User
-     the effective mIE/sIE are unconditionally true, so `uc_mm`+`uc_s0` alone
-     kill dispatch — no mstatus hypothesis) + the frame form
-     `dispatch_U_from_cfg` (hw_config + mstate_interp + `user_cfg C`).
+     The dispatch decision is DONE (UserStep.v, axiom-free):
+     `exec_getPendingSet_U_reduce` / `exec_dispatchInterrupt_U_reduce` reduce
+     the dispatcher to `u_dispatch` over the CURRENT mip/wire values (no
+     mstatus hypothesis — both effective enables are true at User), the
+     no-pending corollary `exec_dispatchInterrupt_U_none`, and the Iris form
+     `dispatch_U_from_regs` (all cells dfrac-generic BORROWED resources, so
+     the wire values can come from the future device-shared invariant).
   2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
      `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
      `update_PTE_Bits` None-vs-Some by the A(/D) bits.
@@ -262,8 +274,11 @@ files or copy code from them; build fresh from the live tree.
      ZbbRtypeGpr + the WpMmodeLeafBase exec facts); ONE width-generic memory
      access abstraction (load/store/AMO against `upt_data_own`); control flow;
      ONE generic sync-trap delivery lemma (ecall/ebreak/illegal/page-fault →
-     `user_trap_frame`, delegation from `uc_del`); interrupts-never
-     (dispatchInterrupt = None at User from `uc_mm`/`uc_s0`).
+     `user_trap_frame`, delegation from `uc_del`); the INTERRUPT-trap arm
+     (`u_dispatch = Some (i, Supervisor)` → the interrupt trap tower →
+     `user_trap_frame`), whose wire values come from the invariant shared
+     with the device WP — designing that shared invariant is joint work with
+     updating the kernel-side proofs for the device model.
   5. *Kernel integration:* massage `wp_userret`'s postcondition into
      `user_inv` at a concrete `upt` (trampoline + trapframe + process pages);
      prove uservec's spec to discharge `stvec_handler_wp`; simplify

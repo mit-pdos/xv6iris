@@ -24,18 +24,31 @@
                        handler contract ⊢ WP Loop.
 
    The step obligation is where all the real work lands; it is discharged by
-   the fetch/decode/execute case analysis (fetch trichotomy x decode totality
-   [DecodeTotalU/DecodeSetU] x per-family execute outcomes).  Everything an
-   instruction can do falls in one of the two continuations:
+   the per-step case analysis (interrupt dispatch x fetch trichotomy x decode
+   totality [DecodeTotalU/DecodeSetU] x per-family execute outcomes).
+   Everything a step can do falls in one of the two continuations:
      - retire: compute/branch/jump (register file changes), loads/stores/AMOs
        to mapped pages (the page contents are existential in [upt_inv], so a
        store trivially re-establishes it), TLB fills ([upt_tlb_ok_fill]);
-     - trap: ecall/ebreak, illegal (incl. all privileged instructions),
-       fetch/load/store page faults (unmapped or permission-denied or
-       A/D-update-needed pages), misaligned accesses.
-   Interrupts never preempt: [uc_mm]/[uc_s0] say no interrupt is both
-   pending and enabled-for-dispatch, so the hart never enters the interrupt
-   path during user execution (the device wires are pinned by [user_cfg]). *)
+     - trap TO STVEC: a pending delegated INTERRUPT (see below), ecall/ebreak,
+       illegal (incl. all privileged instructions), fetch/load/store page
+       faults (unmapped or permission-denied or A/D-update-needed pages),
+       misaligned accesses.
+   INTERRUPTS CAN PREEMPT ANY STEP: at User privilege the effective SIE is
+   architecturally true (unmaskable), and the device loop (DevLoop's wire
+   step) may raise the external-interrupt wire [sig_seip] concurrently at
+   any time.  So the user frame does NOT own the wire cells; they will be
+   owned by an invariant SHARED with the device-execution WP, from which a
+   step engine borrows the CURRENT wire value across each step (that shared
+   invariant is not plumbed yet -- the kernel-side S-mode proofs equally
+   still pin the wires and need the same device-model rework; the step
+   lemmas here therefore take the wire values as borrowed dfrac-generic
+   cells, agnostic to where they come from).  Each step case-splits on the
+   dispatch decision ([u_dispatch], UserStep.v): pending-and-enabled
+   delegated interrupt -> the interrupt trap to stvec (Supervisor), which is
+   just another producer of [user_trap_frame]; none -> fetch/execute.
+   [uc_mm] (mie & ~mideleg = 0, a boot constant) only rules out M-DESTINED
+   interrupts, so every dispatched interrupt goes to Supervisor.            *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -75,19 +88,21 @@ Record ucfg := UCfg {
   uc_mie     : mword 64;
   uc_mideleg : mword 64;
   uc_medeleg : mword 64;
-  uc_mip     : mword 64;
-  uc_meip    : mword 1;     (* the M/S external-interrupt wire pins *)
-  uc_seip    : mword 1;
+  uc_mip     : mword 64;    (* the mip REGISTER: kernel-written only in this
+                               model (the device drives the sig_* WIRES, not
+                               mip; no timer device is modeled).  If a timer
+                               ever gets modeled, mip moves into a shared
+                               invariant exactly like the wires. *)
   uc_dq      : dfrac;       (* hart_state fraction *)
   uc_dqc     : dfrac;       (* config-cell fraction *)
   (* stvec is DIRECT-mode: traps land exactly at its base *)
   uc_tvd : trapVectorMode_forwards (_get_Mtvec_Mode uc_stvec) = TV_Direct;
-  (* no M-level interrupt is enabled-but-undelegated ... *)
+  (* no M-level interrupt is enabled-but-undelegated: every dispatched
+     interrupt is S-destined (goes to stvec, not an M-mode handler).  The
+     S-destined pending set is NOT constrained -- the device raises the
+     sig_seip wire concurrently, and a pending delegated interrupt simply
+     traps to stvec (the interrupt arm of the step obligation). *)
   uc_mm  : and_vec uc_mie (not_vec uc_mideleg) = zeros' 64;
-  (* ... and no delegated S-level interrupt is pending-and-enabled: the
-     interrupt dispatcher never fires during user execution *)
-  uc_s0  : and_vec (s_mip_bits uc_mip uc_meip uc_seip)
-             (and_vec uc_mie uc_mideleg) = zeros' 64;
   (* every exception user execution can raise is delegated to S-mode *)
   uc_del : forall e : ExceptionType, user_exc e = true ->
              bit_to_bool (access_vec_dec uc_medeleg
@@ -130,15 +145,17 @@ Section UserExec.
 
   (* the loop-constant config cells (fraction [dqc]: never written during
      user execution; the complementary fraction stays with the kernel).
-     satp / tlb / pmp cells live inside [upt_inv] (UserPt.v). *)
+     satp / tlb / pmp cells live inside [upt_inv] (UserPt.v).  The
+     external-interrupt WIRES sig_meip / sig_seip are deliberately ABSENT:
+     the device loop writes them concurrently, so they cannot be pinned
+     here -- they will live in an invariant shared with the device WP,
+     and each step borrows their current values across the step. *)
   Definition user_cfg : iProp Σ :=
     (stvec ↦ᵣ{ dqc } uc_stvec C ∗
      mie ↦ᵣ{ dqc } uc_mie C ∗
      mideleg ↦ᵣ{ dqc } uc_mideleg C ∗
      medeleg ↦ᵣ{ dqc } uc_medeleg C ∗
      mip ↦ᵣ{ dqc } uc_mip C ∗
-     sig_meip ↦ᵣ{ dqc } uc_meip C ∗
-     sig_seip ↦ᵣ{ dqc } uc_seip C ∗
      menvcfg ↦ᵣ{ dqc } MENVCFG_S ∗
      senvcfg ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) ∗
      mstateen0 ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) ∗

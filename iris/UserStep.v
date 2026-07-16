@@ -1,15 +1,26 @@
 (* UserStep.v -- step-engine bricks for arbitrary user-mode execution
-   (UserExec.v).  First brick: INTERRUPTS NEVER PREEMPT the user phase.
+   (UserExec.v).  First brick: the INTERRUPT DISPATCH decision at User.
 
    At User privilege the effective mIE and sIE are both unconditionally
-   true (priv < M and priv < S), so [getPendingSet User] is decided purely
-   by the pending-and-enabled sets: the M-destined set is empty by
-   [uc_mm] (mie & ~mideleg = 0) and the S-destined set [s_pending] is
-   empty by [uc_s0] -- hence [dispatchInterrupt User] returns None and
-   every user-phase step goes down the fetch/execute path.
+   true (priv < M and priv < S): interrupts are architecturally UNMASKABLE,
+   and the device loop may raise the sig_seip wire concurrently at any
+   time.  So every user-phase step begins with a genuine case split on the
+   dispatch decision [u_dispatch] over the CURRENT wire/CSR values:
+     - Some (i, Supervisor): a pending delegated interrupt -- the step
+       takes the interrupt trap to stvec (the interrupt arm of the step
+       obligation, landing in [user_trap_frame]);
+     - None: the step proceeds to fetch/execute.
+   The M-destined set is empty by [uc_mm] (mie & ~mideleg = 0, a boot
+   constant), so a dispatched interrupt always goes to Supervisor.
 
-   Mirrors WpIntrCore's Supervisor reductions ([exec_getPendingSet_S_reduce]
-   / [exec_dispatchInterrupt_S_reduce] / [dispatch_S_from_regs]); the User
+   [exec_getPendingSet_U_reduce] / [exec_dispatchInterrupt_U_reduce] reduce
+   the model's dispatcher to [u_dispatch], parameterized by the current
+   register values; the Iris form [dispatch_U_from_regs] takes the cells at
+   arbitrary dfracs, so it works both with today's pinned cells and with
+   values borrowed from the future invariant shared with the device WP
+   (neither the user- nor the kernel-side proofs are plumbed for that
+   sharing yet).  Mirrors WpIntrCore's Supervisor reductions
+   ([exec_getPendingSet_S_reduce] / [dispatch_S_from_regs]); the User
    variants are simpler because neither mstatus.MIE nor mstatus.SIE is
    consulted below the current privilege.                                 *)
 From Stdlib Require Import ZArith Bool Lia.
@@ -26,8 +37,18 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* §1 getPendingSet / dispatchInterrupt at User privilege.                 *)
+(* §1 The dispatch decision at User: purely the S-destined pending set     *)
+(* [s_pending] (no mstatus gate -- both effective enables are true).       *)
 (* ===================================================================== *)
+
+Definition u_dispatch (mip_v : mword 64) (meip seip : mword 1)
+    (mie_v mdv : mword 64) : option (InterruptType * Privilege) :=
+  if neq_vec (s_pending mip_v meip seip mie_v mdv) (zeros' 64)
+  then match findPendingInterrupt (s_pending mip_v meip seip mie_v mdv) with
+       | Some i => Some (i, Supervisor)
+       | None => None
+       end
+  else None.
 
 Lemma exec_getPendingSet_U_reduce (s : mstate)
     (mip_v mie_v mdv_v : mword 64) (meip seip : mword 1) :
@@ -105,6 +126,32 @@ Proof.
   apply exec_returnm.
 Qed.
 
+Lemma exec_dispatchInterrupt_U_reduce (s : mstate)
+    (mip_v mie_v mdv_v : mword 64) (meip seip : mword 1) :
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  register_lookup mip s.(sregs) = mip_v ->
+  register_lookup sig_meip s.(sregs) = meip ->
+  register_lookup sig_seip s.(sregs) = seip ->
+  register_lookup mie s.(sregs) = mie_v ->
+  register_lookup mideleg s.(sregs) = mdv_v ->
+  and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
+  exec (dispatchInterrupt User) s
+    = Some (u_dispatch mip_v meip seip mie_v mdv_v, s).
+Proof.
+  intros HES Hmip Hmeip Hseip Hmie Hmdl Hmm.
+  unfold dispatchInterrupt.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (exec_getPendingSet_U_reduce s mip_v mie_v mdv_v meip seip
+               HES Hmip Hmeip Hseip Hmie Hmdl Hmm)).
+  unfold u_dispatch.
+  destruct (neq_vec (s_pending mip_v meip seip mie_v mdv_v) (zeros' 64)).
+  - cbn match. destruct (findPendingInterrupt (s_pending mip_v meip seip mie_v mdv_v));
+      apply exec_returnm.
+  - cbn match. apply exec_returnm.
+Qed.
+
+(* the no-pending corollary: with the S-destined set empty AT THIS STEP,
+   the dispatcher is a no-op and the step proceeds to fetch/execute *)
 Lemma exec_dispatchInterrupt_U_none (s : mstate)
     (mip_v mie_v mdv_v : mword 64) (meip seip : mword 1) :
   exec (currentlyEnabled Ext_S) s = Some (true, s) ->
@@ -118,37 +165,42 @@ Lemma exec_dispatchInterrupt_U_none (s : mstate)
   exec (dispatchInterrupt User) s = Some (None, s).
 Proof.
   intros HES Hmip Hmeip Hseip Hmie Hmdl Hmm Hs0.
-  unfold dispatchInterrupt.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (exec_getPendingSet_U_reduce s mip_v mie_v mdv_v meip seip
-               HES Hmip Hmeip Hseip Hmie Hmdl Hmm)).
-  unfold s_pending. rewrite Hs0.
+  rewrite (exec_dispatchInterrupt_U_reduce s mip_v mie_v mdv_v meip seip
+             HES Hmip Hmeip Hseip Hmie Hmdl Hmm).
+  unfold u_dispatch, s_pending. rewrite Hs0.
   assert (Hnq : neq_vec (zeros' 64 : mword 64) (zeros' 64) = false)
     by (vm_compute; reflexivity).
-  rewrite Hnq.
-  cbn match. apply exec_returnm.
+  rewrite Hnq. reflexivity.
 Qed.
 
 (* ===================================================================== *)
-(* §2 The frame-level form: from [hw_config] + [user_cfg]'s cells, the     *)
-(* interrupt dispatcher is a no-op at any user-phase machine state.        *)
+(* §2 The frame-level form: the dispatch decision from BORROWED cells.     *)
+(* All cells are dfrac-generic, so the wire cells (sig_meip / sig_seip)    *)
+(* can come from the future invariant shared with the device WP -- the     *)
+(* engine opens it, applies this with the current wire values, and closes  *)
+(* it before the step commits.                                             *)
 (* ===================================================================== *)
 Section UserStepIris.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  Context (C : ucfg).
 
-  Lemma dispatch_U_from_cfg (σ : mstate) :
+  Lemma dispatch_U_from_regs (σ : mstate)
+      (mip_v mie_v mdv_v : mword 64) (meip seip : mword 1)
+      {dqp dqe1 dqe2 dqi dqd : dfrac} :
+    and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
     hw_config -∗
     mstate_interp σ -∗
-    user_cfg C -∗
-    ⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝.
+    mip ↦ᵣ{ dqp } mip_v -∗
+    sig_meip ↦ᵣ{ dqe1 } meip -∗
+    sig_seip ↦ᵣ{ dqe2 } seip -∗
+    mie ↦ᵣ{ dqi } mie_v -∗
+    mideleg ↦ᵣ{ dqd } mdv_v -∗
+    ⌜exec (dispatchInterrupt User) σ
+       = Some (u_dispatch mip_v meip seip mie_v mdv_v, σ)⌝.
   Proof.
-    iIntros "Hhw [Hreg [Hmem Hdev]] Hcfg".
+    iIntros (Hmm) "Hhw [Hreg [Hmem Hdev]] Hmip Hmeip Hseip Hmie Hmdl".
     iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
-    iDestruct "Hcfg" as
-      "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmeip & Hseip & Hrest)".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid_dq with "Hreg Hmip")  as %Lmip.
     iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
@@ -156,12 +208,8 @@ Section UserStepIris.
     iDestruct (reg_valid_dq with "Hreg Hmie")  as %Lmie.
     iDestruct (reg_valid_dq with "Hreg Hmdl")  as %Lmdl.
     iPureIntro.
-    apply (exec_dispatchInterrupt_U_none σ (uc_mip C) (uc_mie C) (uc_mideleg C)
-             (uc_meip C) (uc_seip C));
-      try assumption.
-    - rewrite exec_currentlyEnabled_S. rewrite Lmisa. rewrite HmisaS. reflexivity.
-    - exact (uc_mm C).
-    - exact (uc_s0 C).
+    apply exec_dispatchInterrupt_U_reduce; try assumption.
+    rewrite exec_currentlyEnabled_S. rewrite Lmisa. rewrite HmisaS. reflexivity.
   Qed.
 
 End UserStepIris.
