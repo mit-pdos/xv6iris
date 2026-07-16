@@ -65,7 +65,15 @@ Section WpUserFull.
   Local Notation wp_user_sh_frame_u := (WpUserMemStep.wp_user_sh_frame_u U).
   Local Notation wp_user_sb_frame_u := (WpUserMemStep.wp_user_sb_frame_u U).
   Local Notation wp_user_amoswap_frame_u := (WpUserMemStep.wp_user_amoswap_frame_u U).
+  Local Notation wp_user_split_ld_frame := (WpUserMemStep.wp_user_split_ld_frame U).
   Local Notation wp_user_split_lw_frame := (WpUserMemStep.wp_user_split_lw_frame U).
+  Local Notation wp_user_split_lh_frame := (WpUserMemStep.wp_user_split_lh_frame U).
+  Local Notation wp_user_split_lb_frame := (WpUserMemStep.wp_user_split_lb_frame U).
+  Local Notation wp_user_split_sd_frame := (WpUserMemStep.wp_user_split_sd_frame U).
+  Local Notation wp_user_split_sw_frame := (WpUserMemStep.wp_user_split_sw_frame U).
+  Local Notation wp_user_split_sh_frame := (WpUserMemStep.wp_user_split_sh_frame U).
+  Local Notation wp_user_split_sb_frame := (WpUserMemStep.wp_user_split_sb_frame U).
+  Local Notation wp_user_split_amoswap_frame := (WpUserMemStep.wp_user_split_amoswap_frame U).
   Local Notation medl_v := (WpUserBase.medl_v U).
   Local Notation ustep_lr_fault_u := (WpUserTrapish.ustep_lr_fault_u U).
   Local Notation ustep_sc_fault_u := (WpUserTrapish.ustep_sc_fault_u U).
@@ -424,6 +432,353 @@ Section WpUserFull.
        spec !! vpnD = Some ieD /\
        uw_check_ok (Load Data) ieD /\
        update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 4 = true /\
+       (forall j : nat, (j < 4)%nat -> pa_add paD j ∈ data))
+    \/
+    (* ld/lh/lb/sd/sw/sh/sb/amoswap 2-aligned split-fetch twins *)
+    (exists vpn ie (w : mword 32) vpnD ieD (imm : mword 12) (rs1 rd : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8), s0)) /\
+       uint rd <> 0 /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Load Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 8 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 8 = true /\
+       (forall j : nat, (j < 8)%nat -> pa_add paD j ∈ data))
+    \/
+    (exists vpn ie (w : mword 32) vpnD ieD (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 2), s0)) /\
+       uint rd <> 0 /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Load Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 2 = true /\
+       (forall j : nat, (j < 2)%nat -> pa_add paD j ∈ data))
+    \/
+    (exists vpn ie (w : mword 32) vpnD ieD (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1), s0)) /\
+       uint rd <> 0 /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Load Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Load Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 1 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 1 = true /\
+       (forall j : nat, (j < 1)%nat -> pa_add paD j ∈ data))
+    \/
+    (exists vpn ie (w : mword 32) vpnD ieD (imm : mword 12) (rs2 rs1 : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       (uint paD + 8 <= 18446744073709551616)%Z /\
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 8), s0)) /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Store Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Store Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 8 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 8 = true /\
+       (forall j : nat, (j < 8)%nat -> pa_add paD j ∈ data))
+    \/
+    (exists vpn ie (w : mword 32) vpnD ieD (imm : mword 12) (rs2 rs1 : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       (uint paD + 4 <= 18446744073709551616)%Z /\
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 4), s0)) /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Store Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Store Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 4 = true /\
+       (forall j : nat, (j < 4)%nat -> pa_add paD j ∈ data))
+    \/
+    (exists vpn ie (w : mword 32) vpnD ieD (imm : mword 12) (rs2 rs1 : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       (uint paD + 2 <= 18446744073709551616)%Z /\
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 2), s0)) /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Store Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Store Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 2 = true /\
+       (forall j : nat, (j < 2)%nat -> pa_add paD j ∈ data))
+    \/
+    (exists vpn ie (w : mword 32) vpnD ieD (imm : mword 12) (rs2 rs1 : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (sign_extend' 64 imm) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       (uint paD + 1 <= 18446744073709551616)%Z /\
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (STORE (imm, Regidx rs2, Regidx rs1, 1), s0)) /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Store Data) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Store Data) = None /\
+       _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
+       is_aligned_vaddr (Virtaddr eaF) 1 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr eaF))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr eaF)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD /\
+       is_aligned_paddr (Physaddr paD) 1 = true /\
+       (forall j : nat, (j < 1)%nat -> pa_add paD j ∈ data))
+    \/
+    (* AMOSWAP.W success (width 4, no immediate) *)
+    (exists vpn ie (w : mword 32) vpnD ieD (rs2 rs1 rd : mword 5),
+       let eaF := add_vec (g !!! Regidx rs1) (zeros' 64) in
+       let paD := u_pa (upt_entry vpnD ieD) eaF vpnD in
+       (uint paD + 4 <= 18446744073709551616)%Z /\
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j
+            = Some (nth_byte (subrange_vec_dec w 15 0 : mword 16) j)) /\
+       (forall j : nat, (j < 2)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn) j
+            = Some (nth_byte (subrange_vec_dec w 31 16 : mword 16) j)) /\
+       eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false /\
+       eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true /\
+       neq_vec (access_vec_dec va 0) ('b"0") = false /\
+       neq_vec (access_vec_dec va 1) ('b"0") = true /\
+       is_aligned_vaddr (Virtaddr va) 4 = false /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 2 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) (add_vec_int va 2) vpn)) 2 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd), s0)) /\
+       uint rd <> 0 /\
+       spec !! vpnD = Some ieD /\
+       uw_check_ok (Atomic (AMOSWAP, Data, Data)) ieD /\
+       update_PTE_Bits (uw_pte0 ieD) (Atomic (AMOSWAP, Data, Data)) = None /\
        _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) /\
        is_aligned_vaddr (Virtaddr eaF) 4 = true /\
        neq_vec (bits_of_virtaddr (Virtaddr eaF))
@@ -1044,7 +1399,7 @@ Section WpUserFull.
     - iAssert (▷ (user_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I
         with "[Hk]" as "HkP".
       { iNext. iDestruct "Hk" as "[$ _]". }
-      destruct Hmem as [Hld | [Hlw | [Hlh | [Hlb | [Hsd | [Hsw | [Hsh | [Hsb | [Hamo | Hslw]]]]]]]]].
+      destruct Hmem as [Hld | [Hlw | [Hlh | [Hlb | [Hsd | [Hsw | [Hsh | [Hsb | [Hamo | [Hslw | [Hsld | [Hslh | [Hslb | [Hssd | [Hssw | [Hssh | [Hssb | Hsamo]]]]]]]]]]]]]]]]].
       + (* LD width 8 *)
         destruct Hld as (vpn & ie & w & vpnD & ieD & imm & rs1 & rd & Hsome & Hchk0 & HupdN & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
         iApply (wp_user_ld_data_frame_u va vpn ie w vpnD ieD imm rs1 rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
@@ -1094,6 +1449,46 @@ Section WpUserFull.
         destruct Hslw as (vpn & ie & w & vpnD & ieD & imm & rs1 & rd & is_unsigned & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
         iApply (wp_user_split_lw_frame va vpn ie w vpnD ieD imm rs1 rd is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
                   HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* LD split-fetch (2-aligned, width 8) *)
+        destruct Hsld as (vpn & ie & w & vpnD & ieD & imm & rs1 & rd & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_ld_frame va vpn ie w vpnD ieD imm rs1 rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* LH split-fetch (2-aligned, width 2) *)
+        destruct Hslh as (vpn & ie & w & vpnD & ieD & imm & rs1 & rd & is_unsigned & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_lh_frame va vpn ie w vpnD ieD imm rs1 rd is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* LB split-fetch (2-aligned, width 1) *)
+        destruct Hslb as (vpn & ie & w & vpnD & ieD & imm & rs1 & rd & is_unsigned & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_lb_frame va vpn ie w vpnD ieD imm rs1 rd is_unsigned ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* SD split-fetch (2-aligned, width 8) *)
+        destruct Hssd as (vpn & ie & w & vpnD & ieD & imm & rs2 & rs1 & Hnowrap & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_sd_frame va vpn ie w vpnD ieD imm rs2 rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* SW split-fetch (2-aligned, width 4) *)
+        destruct Hssw as (vpn & ie & w & vpnD & ieD & imm & rs2 & rs1 & Hnowrap & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_sw_frame va vpn ie w vpnD ieD imm rs2 rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* SH split-fetch (2-aligned, width 2) *)
+        destruct Hssh as (vpn & ie & w & vpnD & ieD & imm & rs2 & rs1 & Hnowrap & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_sh_frame va vpn ie w vpnD ieD imm rs2 rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* SB split-fetch (2-aligned, width 1) *)
+        destruct Hssb as (vpn & ie & w & vpnD & ieD & imm & rs2 & rs1 & Hnowrap & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_sb_frame va vpn ie w vpnD ieD imm rs2 rs1 ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
+                  with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
+      + (* AMOSWAP.W split-fetch (2-aligned, width 4) *)
+        destruct Hsamo as (vpn & ie & w & vpnD & ieD & rs2 & rs1 & rd & Hnowrap & Hsome & Hchk0 & HupdN & HcwL & HcwH & HMPRV & HMXR & Hbit0 & Hbit1 & Hvalign4 & HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC & Hdec & Hrd & HsomeD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hwin).
+        iApply (wp_user_split_amoswap_frame va vpn ie w vpnD ieD rs2 rs1 rd ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                  HN Hnowrap Hok Hsome Hchk0 HupdN HcwL HcwH HSXL HMPRV HMXR Hbit0 Hbit1 Hvalign4 HcanonL Hvpn_defL HalignL HcanonH Hvpn_defH HalignH HnotRVC Hdec Hrd HsomeD HchkD HupdD HpbmtD HalignD HcanonD Hvpn_defD HpaalD Hwin
                   with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt Hcode Hdata Hcfg HkP").
     - (* fault branch: the data address is UNMAPPED -> page-fault trap frame *)
       iAssert (▷ (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I
