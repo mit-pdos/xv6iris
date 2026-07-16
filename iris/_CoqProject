@@ -202,6 +202,7 @@ WpUserClmul.v
 WpUserZbbRtype.v
 CboIllegal.v
 WpUserPriv.v
+WpUserSplitFetch.v
 WpUserSteps.v
 WpUserClassify.v
 WpUserMemPeel.v
