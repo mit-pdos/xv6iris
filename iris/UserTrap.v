@@ -404,3 +404,110 @@ Section UserIntrArm.
   Qed.
 
 End UserIntrArm.
+
+(* ===================================================================== *)
+(* §5 The trapish riscv_step wrappers: a step whose run_hart_active        *)
+(* result is a FAILED FETCH or an execute-produced TRAP delivers the       *)
+(* exception (tower above) and ticks PC := nextPC (= the handler base);    *)
+(* neither shape retires, so minstret is NOT bumped.                       *)
+(* ===================================================================== *)
+
+Section StepFetchFailure.
+  Context (s s_f s_trap : mstate) (vaddr : mword 64) (ex : ExceptionType) (b : bool).
+  Hypothesis Hsi :
+    exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
+      = Some (b, s).
+  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
+  Hypothesis Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hha :
+    exec (run_hart_active 0) s_a = Some (Step_Fetch_Failure (Virtaddr vaddr, ex), s_f).
+  Hypothesis Hhe :
+    exec (handle_exception vaddr ex) s_f = Some (tt, s_trap).
+  Hypothesis Hhart_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt.
+
+  Let s_tick : mstate := set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)).
+
+  Lemma exec_riscv_step_fetch_failure : exec riscv_step s = Some (tt, s_tick).
+  Proof using All.
+    unfold riscv_step.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (try_step 0 false) s = Some (false, s_tick))).
+    { reflexivity. }
+    unfold try_step.
+    cbn [ext_pre_step_hook].
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)). cbn beta.
+    rewrite Hhart_a. cbn beta iota.
+    rewrite (exec_bind_Some _ _ _ _ _ Hha). cbn beta.
+    cbn match.
+    (* Step_Fetch_Failure arm: handle_exception, then the epilogue *)
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind0_Some.
+        2:{ exact Hhe. }
+        apply (exec_read_reg hart_state s_trap). }
+    rewrite Hhart_trap. cbn beta iota.
+    erewrite exec_bind0_Some.
+    2:{ apply exec_tick_pc. }
+    (* retired = false: and_boolM (returnM false) _ short-circuits *)
+    erewrite exec_bind_Some.
+    2:{ unfold Defs.and_boolM.
+        erewrite exec_bind_Some.
+        2:{ apply (exec_returnM false s_tick). }
+        cbn beta iota. apply (exec_returnM false s_tick). }
+    cbn beta iota.
+    apply exec_returnm.
+  Qed.
+End StepFetchFailure.
+
+Section StepExecuteTrap.
+  Context (s s_x s_trap : mstate) (p : Privilege) (exc : sync_exception)
+          (pcx : mword 64) (ib : mword 32) (b : bool).
+  Hypothesis Hsi :
+    exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
+      = Some (b, s).
+  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
+  Hypothesis Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hha :
+    exec (run_hart_active 0) s_a
+      = Some (Step_Execute (rv64d_types.Trap (p, exc, pcx), ib), s_x).
+  Hypothesis Hxh :
+    exec (Defs.bind (exception_handler p exc pcx) set_next_pc) s_x
+      = Some (tt, s_trap).
+  Hypothesis Hhart_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt.
+
+  Let s_tick : mstate := set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)).
+
+  Lemma exec_riscv_step_execute_trap : exec riscv_step s = Some (tt, s_tick).
+  Proof using All.
+    unfold riscv_step.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (try_step 0 false) s = Some (false, s_tick))).
+    { reflexivity. }
+    unfold try_step.
+    cbn [ext_pre_step_hook].
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)). cbn beta.
+    rewrite Hhart_a. cbn beta iota.
+    rewrite (exec_bind_Some _ _ _ _ _ Hha). cbn beta.
+    cbn match.
+    (* Step_Execute (Trap ...) arm: exception_handler >>= set_next_pc *)
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind0_Some.
+        2:{ exact Hxh. }
+        apply (exec_read_reg hart_state s_trap). }
+    rewrite Hhart_trap. cbn beta iota.
+    erewrite exec_bind0_Some.
+    2:{ apply exec_tick_pc. }
+    erewrite exec_bind_Some.
+    2:{ unfold Defs.and_boolM.
+        erewrite exec_bind_Some.
+        2:{ apply (exec_returnM false s_tick). }
+        cbn beta iota. apply (exec_returnM false s_tick). }
+    cbn beta iota.
+    apply exec_returnm.
+  Qed.
+End StepExecuteTrap.
