@@ -130,6 +130,7 @@ Section WpUserSteps.
   Local Notation ustep_fetch_adfault_hit := (WpUserFetch.ustep_fetch_adfault_u U).
   Local Notation ustep_fetch_noncanonical := (WpUserFetch.ustep_fetch_noncanonical U).
   Local Notation ustep_fetch_unmapped := (WpUserFetch.ustep_fetch_unmapped U).
+  Local Notation ustep_fetch_misalign := (WpUserFetch.ustep_fetch_misalign U).
   Local Notation ustep_noexec_fetch_fault := (WpUserFetch.ustep_noexec_fetch_fault U).
   Local Notation ustep_illegal := (WpUserPrivU.ustep_illegal_u U).
   Local Notation ustep_illegal_st := (WpUserTrapMiss.ustep_illegal_st_u U).
@@ -1432,7 +1433,10 @@ Section WpUserSteps.
           exec (ext_decode_compressed h) s0 = Some (C_JR (Regidx rs1), s0)) /\
        uint rs1 <> 0 /\
        eq_vec (access_vec_dec (jalr_target (g !!! Regidx rs1) (zeros' 12)) 0) ('b"0") = true /\
-       bit_to_bool (access_vec_dec (jalr_target (g !!! Regidx rs1) (zeros' 12)) 1) = false).
+       bit_to_bool (access_vec_dec (jalr_target (g !!! Regidx rs1) (zeros' 12)) 1) = false)
+    \/
+    (* 51: ODD pc -> fetch-address-misaligned fault (cause 0), before translation *)
+    (neq_vec (access_vec_dec va 0) ('b"0") = true).
 
   (* the assembled Löb step obligation, v1 coverage *)
   (* [ustep_case_sound]: the post-unpack body of [user_step_holds] --
@@ -1571,7 +1575,7 @@ Section WpUserSteps.
                                                                                               | [ (vpn & ie & w & imm & Hsome & Hchk & Hupd & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hal0 & Hal1)
                                                                                                 | [ (vpn & ie & w & imm & rs1 & Hsome & Hchk & Hupd & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrs1 & Hal0 & Hal1)
                                                                                                   | [ (vpn & ie & h & imm & Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hal0 & Hal1)
-                                                                                                    | (vpn & ie & h & rs1 & Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hrs1 & Hal0 & Hal1) ] ] ] ] ] ] ] ] ] ] ] ]
+                                                                                                    | [ (vpn & ie & h & rs1 & Hvec & Hchk & Hupd & Hpbmt & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hrs1 & Hal0 & Hal1) | Hodd ] ] ] ] ] ] ] ] ] ] ] ] ]
                                                                               ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
@@ -1927,6 +1931,12 @@ Section WpUserSteps.
                 Hdec Hrs1 Hal0 Hal1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
+    - (* ODD pc -> fetch-address-misaligned fault (cause 0) *)
+      iDestruct "Hk" as "[_ HkT]".
+      iApply (ustep_fetch_misalign va ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hok HSXL Hodd
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkT").
   Qed.
 
   Theorem user_step_holds E (Φ : mval -> iProp Σ) :
