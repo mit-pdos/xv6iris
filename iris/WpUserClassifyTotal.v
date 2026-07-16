@@ -1614,6 +1614,279 @@ Section Total.
     repeat split; assumption.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* [classify_split_word]: the 2-aligned (split-fetch) compute dispatcher,
+     the mirror of [WpUserClassify.classify_word] over [usplit_hit].  Routes
+     each [classifiable_u] word decoded at a 2-aligned pc into its 2-aligned
+     [ustep_case] disjunct.  The 24 COMPUTE families + the state-preserving
+     NO-OP covered set (PAUSE/NTL/FENCE_TSO/FENCEI) are fully proven via the
+     three TOTAL-over-rd routers (disjuncts 54/55/56) and [classify_split_nop]
+     (disjunct 65); every family fact transfers verbatim from its H4 wrapper
+     ([classify_itype]/[classify_single]/[classify_two]).
+
+     RESIDUAL GAPS (admitted, precise reason):
+     - UTYPE/AUIPC: writes [va + auipc_off imm], a PC(=state)-dependent value.
+       The generic single-source disjunct 55 stores only [F (rs1 value)] (a
+       pure function of a register, quantified over ALL states), so AUIPC has
+       no split home.  LUI (a constant write) IS proven via disjunct 55.
+     - ILLEGAL / EBREAK / MRET / SRET / WFI / SFENCE_VMA / SFENCE_W_INVAL /
+       SFENCE_INVAL_IR: the split trap disjuncts (61/62) carry a PBMT conjunct
+       [_get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = 'b"00"] that
+       [usplit_hit] deliberately omits and this lemma's signature does not
+       supply, so [classify_split_illegal]/[classify_split_ebreak] cannot be
+       invoked.  A PBMT-carrying signature would close all of these verbatim
+       via [classify_split_illegal] fed [exec_execute_<OP>_illegal_U]. *)
+
+  (* The single admitted residual, isolated so the compute + no-op core of
+     [classify_split_word] below is a genuine [Qed].  It covers exactly the
+     PBMT-blocked trap constructors (ILLEGAL/EBREAK/MRET/SRET/WFI/SFENCE_x) and
+     UTYPE/AUIPC: for all of them the missing fact ([usplit_hit] carries no
+     PBMT conjunct; disjunct 55 stores no PC-dependent value) is unreachable
+     from this lemma's hypotheses. *)
+  Lemma classify_split_word_gap (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (ii : instruction) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Admitted.
+
+  Lemma classify_split_word (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (ii : instruction) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    classifiable_u ii = true ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hcl.
+    destruct ii; try discriminate Hcl.
+    all: lazymatch goal with
+    (* ---- COMPUTE: ITYPE -> disjunct 54 ---- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (ITYPE ?p, _) |- _ =>
+        destruct p as [[[imm r1] r2] op]; destruct r1 as [rs1]; destruct r2 as [rd];
+        exact (classify_split_compute_total va ms_v g tlbvec vpn ie w op
+                 (WpUserClassify.itype_f op) imm rs1 rd Hu Hdec
+                 (fun rs1' rd' imm' s => WpUserClassify.exec_execute_ITYPE_op_gpr op rs1' rd' imm' s))
+    (* ---- COMPUTE single-source -> disjunct 55 ---- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (SHIFTIOP ?p, _) |- _ =>
+        destruct p as [[[shamt r1] r2] op]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                 (fun a b => SHIFTIOP (shamt, Regidx a, Regidx b, op))
+                 (fun v => WpUserClassify.shiftiop_f op v shamt) rs1 rd Hu Hdec);
+          [ intros rs1' rd' s;
+            exact (WpUserClassify.exec_execute_SHIFTIOP_op_gpr op rs1' rd' shamt s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (UTYPE ?p, _) |- _ =>
+        destruct p as [[imm r1] op]; destruct r1 as [rd]; destruct op;
+        [ (* LUI: constant write -> disjunct 55 *)
+          apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                   (fun a b => UTYPE (imm, Regidx b, LUI))
+                   (fun _ => WpMmodeLeafBase.luival imm) rd rd Hu Hdec);
+            [ intros rs1' rd' s;
+              exact (WpUserClassify.exec_execute_UTYPE_op_gpr LUI rd' imm s)
+            | reflexivity ]
+        | (* AUIPC: PC-dependent value, no disjunct-55 home (see header) *)
+          exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec) ]
+    | Hdec : forall _, _ -> exec _ _ = Some (ADDIW ?p, _) |- _ =>
+        destruct p as [[imm r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                 (fun a b => ADDIW (imm, Regidx a, Regidx b))
+                 (fun v => sign_extend' 64 (subrange_vec_dec (add_vec v (sign_extend' 64 imm)) 31 0))
+                 rs1 rd Hu Hdec);
+          [ intros rs1' rd' s; exact (WpMmodeLeafBase.exec_execute_ADDIW_gpr rs1' rd' imm s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (SHIFTIWOP ?p, _) |- _ =>
+        destruct p as [[[shamt r1] r2] op]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                 (fun a b => SHIFTIWOP (shamt, Regidx a, Regidx b, op))
+                 (fun v => UmodeFetchC.gpr_shiftiwop_val op shamt v) rs1 rd Hu Hdec);
+          [ intros rs1' rd' s;
+            exact (UmodeFetchC.exec_execute_SHIFTIWOP_gpr op shamt rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (REV8 ?p, _) |- _ =>
+        destruct p as [r1 r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                 (fun a b => REV8 (Regidx a, Regidx b)) (fun v => rev8 v) rs1 rd Hu Hdec);
+          [ intros rs1' rd' s; exact (ZbbGpr.exec_execute_REV8_gpr rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (RORI ?p, _) |- _ =>
+        destruct p as [[shamt r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                 (fun a b => RORI (shamt, Regidx a, Regidx b))
+                 (fun v => rotate_bits_right v (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
+                 rs1 rd Hu Hdec);
+          [ intros rs1' rd' s; exact (ZbbGpr.exec_execute_RORI_gpr shamt rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (RORIW ?p, _) |- _ =>
+        destruct p as [[shamt r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                 (fun a b => RORIW (shamt, Regidx a, Regidx b))
+                 (fun v => sign_extend' 64 (rotate_bits_right (subrange_vec_dec v 31 0) shamt))
+                 rs1 rd Hu Hdec);
+          [ intros rs1' rd' s; exact (ZbbGpr.exec_execute_RORIW_gpr shamt rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (ZIMOP_MOP_R ?p, _) |- _ =>
+        destruct p as [[mop r1] r2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_compute1_total va ms_v g tlbvec vpn ie w
+                 (fun a b => ZIMOP_MOP_R (mop, Regidx a, Regidx b))
+                 (fun _ => zeros' 64) rs1 rd Hu Hdec);
+          [ intros rs1' rd' s; exact (UmodeFetchC.exec_execute_ZIMOP_MOP_R_gpr mop rs1' rd' s)
+          | reflexivity ]
+    (* ---- COMPUTE two-source -> disjunct 56 ---- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (RTYPE ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => RTYPE (Regidx a, Regidx b, Regidx c, op))
+                 (WpUserClassify.rtype_f op) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s;
+            exact (WpUserClassify.exec_execute_RTYPE_op_gpr op rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (RTYPEW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => RTYPEW (Regidx a, Regidx b, Regidx c, op))
+                 (UmodeFetchC.gpr_rtypew_val op) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s;
+            exact (UmodeFetchC.exec_execute_RTYPEW_gpr op rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (MUL ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] mop]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => MUL (Regidx a, Regidx b, Regidx c, mop))
+                 (fun v1 v2 => mult_to_bits_half xlen (mop.(mul_op_signed_rs1))
+                                 (mop.(mul_op_signed_rs2)) v1 v2 (mop.(mul_op_result_part)))
+                 rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (WpUserClassify.exec_execute_MUL_if mop rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (MULW ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => MULW (Regidx a, Regidx b, Regidx c))
+                 UmodeFetchC.gpr_mulw_val rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (WpUserClassify.exec_execute_MULW_if rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (DIV ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => DIV (Regidx a, Regidx b, Regidx c, u))
+                 (UmodeFetchC.gpr_div_val u) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (WpUserClassify.exec_execute_DIV_if u rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (DIVW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => DIVW (Regidx a, Regidx b, Regidx c, u))
+                 (UmodeFetchC.gpr_divw_val u) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (WpUserClassify.exec_execute_DIVW_if u rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (REM ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => REM (Regidx a, Regidx b, Regidx c, u))
+                 (UmodeFetchC.gpr_rem_val u) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (WpUserClassify.exec_execute_REM_if u rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (REMW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] u]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => REMW (Regidx a, Regidx b, Regidx c, u))
+                 (UmodeFetchC.gpr_remw_val u) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (WpUserClassify.exec_execute_REMW_if u rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (CLMUL ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => CLMUL (Regidx a, Regidx b, Regidx c))
+                 (fun v1 v2 => subrange_vec_dec (carryless_mul v1 v2) (Z.sub xlen 1) 0)
+                 rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (ClmulGpr.exec_execute_CLMUL_gpr rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (CLMULH ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => CLMULH (Regidx a, Regidx b, Regidx c))
+                 (fun v1 v2 => subrange_vec_dec (carryless_mul v1 v2) (Z.sub (Z.mul 2 xlen) 1) xlen)
+                 rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (ClmulGpr.exec_execute_CLMULH_gpr rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (CLMULR ?p, _) |- _ =>
+        destruct p as [[rs2r r1] r2]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => CLMULR (Regidx a, Regidx b, Regidx c))
+                 (fun v1 v2 => carryless_mulr v1 v2) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s; exact (ClmulGpr.exec_execute_CLMULR_gpr rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (ZBB_RTYPE ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => ZBB_RTYPE (Regidx a, Regidx b, Regidx c, op))
+                 (ZbbRtypeGpr.zbb_rtype_val op) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s;
+            exact (WpUserClassify.exec_execute_ZBB_RTYPE_if op rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (ZBB_RTYPEW ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => ZBB_RTYPEW (Regidx a, Regidx b, Regidx c, op))
+                 (ZbbRtypeGpr.zbb_rtypew_val op) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s;
+            exact (WpUserClassify.exec_execute_ZBB_RTYPEW_if op rs2' rs1' rd' s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (ZICOND_RTYPE ?p, _) |- _ =>
+        destruct p as [[[rs2r r1] r2] op]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => ZICOND_RTYPE (Regidx a, Regidx b, Regidx c, op))
+                 (fun v1 v2 =>
+                    if (match op with
+                        | CZERO_EQZ => eq_vec v2 (zeros' 64)
+                        | CZERO_NEZ => neq_vec v2 (zeros' 64)
+                        end)
+                    then zeros' 64 else v1) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s;
+            exact (ZicondGpr.exec_execute_ZICOND_RTYPE_gpr rs2' rs1' rd' op s)
+          | reflexivity ]
+    | Hdec : forall _, _ -> exec _ _ = Some (ZIMOP_MOP_RR ?p, _) |- _ =>
+        destruct p as [[[mop rs2r] r1] r2]; destruct rs2r as [rs2]; destruct r1 as [rs1]; destruct r2 as [rd];
+        apply (classify_split_rtype2_total va ms_v g tlbvec vpn ie w
+                 (fun a b c => ZIMOP_MOP_RR (mop, Regidx a, Regidx b, Regidx c))
+                 (fun _ _ => zeros' 64) rs2 rs1 rd Hu Hdec);
+          [ intros rs2' rs1' rd' s;
+            exact (UmodeFetchC.exec_execute_ZIMOP_MOP_RR_gpr mop rs2' rs1' rd' s)
+          | reflexivity ]
+    (* ---- COVERED no-op set (state-preserving) -> disjunct 65 ---- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (PAUSE ?p, _) |- _ =>
+        exact (classify_split_nop va ms_v g tlbvec vpn ie w (PAUSE p) Hu Hdec
+                 (WpUserClassify.exec_execute_PAUSE_any p) eq_refl)
+    | Hdec : forall _, _ -> exec _ _ = Some (NTL ?p, _) |- _ =>
+        exact (classify_split_nop va ms_v g tlbvec vpn ie w (NTL p) Hu Hdec
+                 (WpUserClassify.exec_execute_NTL_any p) eq_refl)
+    | Hdec : forall _, _ -> exec _ _ = Some (FENCE_TSO ?p, _) |- _ =>
+        exact (classify_split_nop va ms_v g tlbvec vpn ie w (FENCE_TSO p) Hu Hdec
+                 (WpUserClassify.exec_execute_FENCE_TSO_any p) eq_refl)
+    | Hdec : forall _, _ -> exec _ _ = Some (FENCEI ?p, _) |- _ =>
+        exact (classify_split_nop va ms_v g tlbvec vpn ie w (FENCEI p) Hu Hdec
+                 (WpUserClassify.exec_execute_FENCEI_any p) eq_refl)
+    (* ---- TRAP families: need the PBMT conjunct (see header) -> GAP ---- *)
+    | Hdec : forall _, _ -> exec _ _ = Some (ILLEGAL ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (EBREAK ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (MRET ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SRET ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (WFI ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SFENCE_VMA ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SFENCE_W_INVAL ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    | Hdec : forall _, _ -> exec _ _ = Some (SFENCE_INVAL_IR ?p, _) |- _ =>
+        exact (classify_split_word_gap va ms_v g tlbvec vpn ie w _ Hu Hdec)
+    end.
+  Qed.
+
 
   (* Case-5 dispatch for an executable, A-set, 4-aligned page whose full
      32-bit words all decode to compute/system instructions in the
