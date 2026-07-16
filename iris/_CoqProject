@@ -204,6 +204,7 @@ WpUserZbbRtype.v
 CboIllegal.v
 WpUserPriv.v
 WpUserSplitFetch.v
+WpUserSplitFetchMiss.v
 WpUserSplitCompute.v
 WpUserSplitFault.v
 WpUserSteps.v
