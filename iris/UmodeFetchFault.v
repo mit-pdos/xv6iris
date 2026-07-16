@@ -228,6 +228,34 @@ Section UTranslateHitFault.
     rewrite execR_returnR_fwd. cbn match. reflexivity.
   Qed.
 
+  (* the ODD pc turns fetch into a deliverable fetch-address-misaligned fault
+     BEFORE any translation: the first or_boolM disjunct [neq_vec PC[0] 'b"0"]
+     short-circuits true, and the outer [if w__7] returns F_Error at pc. *)
+  Lemma exec_fetch_u_addr_align (va : mword 64) (s : mstate) :
+    register_lookup PC s.(sregs) = va ->
+    neq_vec (access_vec_dec va 0) ('b"0") = true ->
+    exec (fetch tt) s = Some (F_Error (E_Fetch_Addr_Align tt, va), s).
+  Proof.
+    intros HpcPC Hodd.
+    assert (HrdPC : exec (Defs.read_reg PC) s = Some (va, s)).
+    { rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. }
+    unfold fetch.
+    rewrite exec_catch_early_return.
+    change (get_config_rvfi tt) with false. cbv iota beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+    rewrite (execR_bind_Some _ _ _ true s).
+    2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+        unfold or_boolM.
+        rewrite (execR_bind_Some _ _ _ true s).
+        2:{ rewrite (execR_liftR_seq _ _ _ _ _ HrdPC). rewrite Hodd. apply execR_returnR_fwd. }
+        cbv iota beta. reflexivity. }
+    cbv iota beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite execR_returnR_fwd. cbn match. reflexivity.
+  Qed.
+
 End UTranslateHitFault.
 
 (* ===================================================================== *)
