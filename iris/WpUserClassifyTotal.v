@@ -1040,7 +1040,7 @@ Section Total.
   Proof.
     intros.
     unfold WpUserFull.ustep_mem_case.
-    do 7 right. exists vpn, ie, w, vpnD, ieD, imm, rs2, rs1.
+    do 7 right; left. exists vpn, ie, w, vpnD, ieD, imm, rs2, rs1.
     repeat split; assumption.
   Qed.
 
