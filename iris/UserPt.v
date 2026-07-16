@@ -41,7 +41,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import SmodePte KptPt SmodeCore.
+Require Import SmodePte Pt4kWalk KptPt SmodeCore.
 Require Import CommonWalk.
 Local Open Scope Z_scope.
 Import Defs.
@@ -300,6 +300,58 @@ Lemma um_tlb_ent_match_inj (vpn vpn' : mword 27) (e : umap_ent) :
 Proof.
   rewrite um_tlb_ent_match_gen. intros He.
   apply u_sext45_inj. apply eq_vec_true_iff. exact He.
+Qed.
+
+(* dropping the zero-width mask at the entry's ppn width *)
+Lemma upt_and_ones44 (x : mword 44) :
+  and_vec x (not_vec (zero_extend' 44 (ones 0 : mword 0))) = x.
+Proof.
+  apply bv_eq.
+  unfold and_vec, word_binop, with_word', with_word, MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context[Z.land _ (bv_unsigned ?m)] =>
+    change (bv_unsigned m) with (Z.ones 44) end.
+  rewrite Z.land_ones; [|lia].
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr. exact Hr.
+Qed.
+
+Lemma upt_zext44_id (a : mword 44) : zero_extend' 44 a = a.
+Proof.
+  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec to_word get_word
+       MachineWord.MachineWord.zero_extend].
+  apply bv_eq. rewrite bv_zero_extend_unsigned. reflexivity. lia.
+Qed.
+
+(* the stored entry's page type is PBMT_PMA (leaf PBMT bits pinned 0) *)
+Lemma um_tlb_ent_pbmt (vpn : mword 27) (e : umap_ent) (s : mstate) :
+  upte_pbmt0 (um_pte0 e) ->
+  exec (tlb_get_pbmt (um_tlb_ent vpn e)) s = Some (PBMT_PMA, s).
+Proof.
+  intros Hp.
+  unfold tlb_get_pbmt, um_tlb_ent, u_walk_entry. cbn [TLB_Entry_pte].
+  rewrite autocast_id. rewrite zero_extend'_id.
+  rewrite Hp.
+  apply exec_returnm.
+Qed.
+
+(* [tlb_get_ppn] on a stored (4K, levelMask-0) entry is the leaf's ppn,
+   for ANY looked-up vpn -- the SAME ppn the walk path outputs, so the
+   hit and walk translations agree on the physical address *)
+Lemma um_tlb_ent_ppn (vpn vpn' : mword 27) (e : umap_ent) :
+  tlb_get_ppn 39 (um_tlb_ent vpn e) vpn'
+  = autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (um_pte0 e))) : mword 44).
+Proof.
+  unfold tlb_get_ppn, um_tlb_ent, u_walk_entry.
+  cbn [TLB_Entry_levelMask TLB_Entry_ppn].
+  match goal with |- context[and_vec ?x ?m] =>
+    replace (and_vec x m) with (zeros' 64 : mword 64);
+    [| symmetry; apply and64_zero_r; vm_compute; reflexivity] end.
+  rewrite or64_zeros_r.
+  rewrite upt_and_ones44.
+  rewrite upt_zext44_id.
+  apply trunc44_zext.
 Qed.
 
 (* an UNMAPPED vpn can never hit the TLB: a colliding resident entry is
