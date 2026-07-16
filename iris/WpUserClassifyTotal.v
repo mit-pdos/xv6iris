@@ -572,6 +572,143 @@ Section Total.
     repeat split; assumption.
   Qed.
 
+  Local Ltac split_asm Hu :=
+    unfold usplit_hit in Hu;
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC);
+    repeat split; assumption.
+
+  (* ---- 2-aligned CONTROL routers (disjuncts 57-60). ---- *)
+
+  (* JAL (rd links, 4-aligned target) -> disjunct 57. *)
+  Lemma classify_split_jal (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 21) (rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JAL (imm, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hrd Hal0 Hal1.
+    do 56 right; left. exists vpn, ie, w, imm, rd. split_asm Hu.
+  Qed.
+
+  (* JALR (rd links, target-aligned via frame rs1) -> disjunct 58. *)
+  Lemma classify_split_jalr (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 12) (rs1 rd : mword 5) :
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (JALR (imm, Regidx rs1, Regidx rd), s0)) ->
+    uint rd <> 0 ->
+    eq_vec (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (WpMmodeLeafBase.jalr_target (g !!! Regidx rs1) imm) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hdec Hrd Hal0 Hal1.
+    do 57 right; left. exists vpn, ie, w, imm, rs1, rd. split_asm Hu.
+  Qed.
+
+  (* BTYPE not-taken -> disjunct 59. *)
+  Lemma classify_split_btype_fall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (op : bop)
+      (c : mword 64 -> mword 64 -> bool) (imm : mword 13) (rs2 rs1 : mword 5) :
+    (forall (imm' : mword 13) (rs2' rs1' : mword 5) s,
+       c (WpMemsetS.rvv rs1' s) (WpMemsetS.rvv rs2' s) = false ->
+       exec (execute (BTYPE (imm', Regidx rs2', Regidx rs1', op))) s
+         = Some (RETIRE_SUCCESS, s)) ->
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) ->
+    c (g !!! Regidx rs1) (g !!! Regidx rs2) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec Hu Hdec Hc.
+    do 58 right; left. exists vpn, ie, w, op, c, imm, rs2, rs1. split_asm Hu.
+  Qed.
+
+  (* BTYPE taken (to a 4-aligned target) -> disjunct 60. *)
+  Lemma classify_split_btype_taken (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (op : bop)
+      (c : mword 64 -> mword 64 -> bool) (imm : mword 13) (rs2 rs1 : mword 5) :
+    (forall (imm' : mword 13) (rs2' rs1' : mword 5) s,
+       c (WpMemsetS.rvv rs1' s) (WpMemsetS.rvv rs2' s) = true ->
+       eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs))
+                 (sign_extend' 64 imm')) 0) ('b"0") = true ->
+       bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs))
+                 (sign_extend' 64 imm')) 1) = false ->
+       exec (execute (BTYPE (imm', Regidx rs2', Regidx rs1', op))) s
+         = Some (RETIRE_SUCCESS,
+                 set_reg s nextPC (add_vec (register_lookup PC s.(sregs))
+                                     (sign_extend' 64 imm')))) ->
+    usplit_hit va vpn ie w ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) ->
+    c (g !!! Regidx rs1) (g !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec Hu Hdec Hc Hal0 Hal1.
+    do 59 right; left. exists vpn, ie, w, op, c, imm, rs2, rs1. split_asm Hu.
+  Qed.
+
+  (* ---- 2-aligned TRAP routers (disjuncts 61-63).  These disjuncts carry a
+     PBMT conjunct [usplit_hit] omits, so it is passed separately. ---- *)
+
+  (* Illegal-in-U -> disjunct 61. *)
+  Lemma classify_split_illegal (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (ii : instruction) :
+    (forall s, register_lookup cur_privilege s.(sregs) = User ->
+       exec (execute ii) s = Some (Illegal_Instruction tt, s)) ->
+    is_lpad_instruction ii = false ->
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec Hlpad Hu Hpbmt Hdec.
+    do 60 right; left. exists vpn, ie, w, ii. split_asm Hu.
+  Qed.
+
+  (* EBREAK-in-U (software breakpoint) -> disjunct 62. *)
+  Lemma classify_split_ebreak (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32) (ii : instruction) :
+    (forall s, register_lookup cur_privilege s.(sregs) = User ->
+       register_lookup PC s.(sregs) = va ->
+       exec (execute ii) s
+         = Some (rv64d_types.Trap (User, make_sync_exception (E_Breakpoint Brk_Software) va, va), s)) ->
+    is_lpad_instruction ii = false ->
+    usplit_hit va vpn ie w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hexec Hlpad Hu Hpbmt Hdec.
+    do 61 right; left. exists vpn, ie, w, ii. split_asm Hu.
+  Qed.
+
+  (* ECALL (byte-keyed to [ecall_w]) -> disjunct 63. *)
+  Lemma classify_split_ecall (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) :
+    usplit_hit va vpn ie WpUserEcall.ecall_w ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hpbmt.
+    do 62 right; left. exists vpn, ie. split_asm Hu.
+  Qed.
+
   (* Case-5 dispatch for an executable, A-set, 4-aligned page whose full
      32-bit words all decode to compute/system instructions in the
      [classifiable_u] set: the fetch either retires (full word ->
