@@ -279,6 +279,39 @@ Section Total.
     - right. exists h. exact Hcf.
   Qed.
 
+  (* Total BTYPE not-taken dispatch: a fetched, decoded conditional branch
+     whose runtime condition is FALSE falls through to pc+4, landing in
+     the fall-through disjunct regardless of branch op.  The fall case
+     needs no target-alignment side condition, so this is total over all
+     six [bop] constructors (the taken case additionally needs a 4-aligned
+     target, and 2-aligned/misaligned taken targets are a separate arm). *)
+  Lemma classify_btype_fall_dispatch
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (imm : mword 13) (rs2 rs1 : mword 5) (op : bop) :
+    ufetch_hit va vpn ie w tlbvec ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (BTYPE (imm, Regidx rs2, Regidx rs1, op), s0)) ->
+    match op with
+    | BEQ  => eq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+    | BNE  => neq_vec (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+    | BLT  => zopz0zI_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+    | BGE  => zopz0zKzJ_s (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+    | BLTU => zopz0zI_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+    | BGEU => zopz0zKzJ_u (g !!! Regidx rs1) (g !!! Regidx rs2) = false
+    end ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hf Hdec Hc. destruct op.
+    - exact (WpUserClassify.classify_btype_beq_fall U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc).
+    - exact (WpUserClassify.classify_btype_bne_fall U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc).
+    - exact (WpUserClassify.classify_btype_blt_fall U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc).
+    - exact (WpUserClassify.classify_btype_bge_fall U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc).
+    - exact (WpUserClassify.classify_btype_bltu_fall U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc).
+    - exact (WpUserClassify.classify_btype_bgeu_fall U va ms_v g tlbvec vpn ie w imm rs2 rs1 Hf Hdec Hc).
+  Qed.
+
 End Total.
 
 (* ==================================================================== *)
