@@ -15,7 +15,6 @@ Require Import UmodeFetch.
 Require Import UptInv WpUserBase.
 Require Import WpUserSteps.
 Require Import WpUserClassify.
-Require Import WpUserFull.
 Local Open Scope Z_scope.
 Import Defs.
 
