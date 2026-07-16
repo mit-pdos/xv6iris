@@ -133,6 +133,8 @@ Section WpUserSteps.
   Local Notation ustep_illegal_st := (WpUserTrapMiss.ustep_illegal_st_u U).
   Local Notation ustep_itype := (WpUserComputeMiss.ustep_itype_u U).
   Local Notation ustep_jal := (WpUserCtrlU.ustep_jal U).
+  Local Notation ustep_j := (WpUserCtrlU.ustep_j U).
+  Local Notation ustep_jr := (WpUserCtrlU.ustep_jr U).
   Local Notation ustep_jalr := (WpUserCtrlU.ustep_jalr U).
   Local Notation ustep_ld_code := (WpUserMem.ustep_ld_code_u U).
   Local Notation ustep_lw_code := (WpUserMem4.ustep_lw_code_u U).
@@ -1352,7 +1354,26 @@ Section WpUserSteps.
        c_fetch_mode va vpn ie h /\
        isRVC h = true /\
        (forall s0, agree_on D_u s0 dstateU ->
-          exec (ext_decode_compressed h) s0 = Some (ii, s0))).
+          exec (ext_decode_compressed h) s0 = Some (ii, s0)))
+    \/
+    (* 47: fetch hit, retiring JAL rd=x0 (no link, aligned target) *)
+    (exists vpn ie (w : mword 32) (imm : mword 21),
+       spec !! vpn = Some ie /\
+       uw_check_ok (InstructionFetch tt) ie /\
+       update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None /\
+       (forall j : nat, (j < 4)%nat ->
+          code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some (nth_byte w j)) /\
+       is_aligned_vaddr (Virtaddr va) 4 = true /\
+       neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+       autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn /\
+       is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true /\
+       isRVC (subrange_vec_dec w 15 0) = false /\
+       (forall s0, agree_on D_u s0 dstateU ->
+          exec (ext_decode w) s0 = Some (JAL (imm, zreg), s0)) /\
+       eq_vec (access_vec_dec (add_vec va (sign_extend' 64 imm)) 0) ('b"0") = true /\
+       bit_to_bool (access_vec_dec (add_vec va (sign_extend' 64 imm)) 1) = false).
 
   (* the assembled Löb step obligation, v1 coverage *)
   (* [ustep_case_sound]: the post-unpack body of [user_step_holds] --
@@ -1487,7 +1508,8 @@ Section WpUserSteps.
                                                                                       | [ (vpn & i & vpnD & ieD & w & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & Hcw & HMPRV & HMXR & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
                                                                                         | [ (vpn & i & vpnD & ieD & h & ii & imm & rs1 & rd & is_unsigned & v & Hvec & Hchk & Hupd & Hpbmt & HMPRV & HMXR & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec & Hexp & Hrd & HsomeD & HvecD & HchkD & HupdD & HpbmtD & HalignD & HcanonD & Hvpn_defD & HpaalD & Hcwd)
                                                                                           | [ (vpn & i & Hsome & Hden & Hval & Hcanon & Hvpn_def)
-                                                                                            | (vpn & ie & ii & base & h & Hexp & Hbase & Hsome & Hchk & Hupd & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec) ] ] ] ] ] ] ] ]
+                                                                                            | [ (vpn & ie & ii & base & h & Hexp & Hbase & Hsome & Hchk & Hupd & Hcanon & Hvpn_def & Hmode & HisRVC & Hdec)
+                                                                                              | (vpn & ie & w & imm & Hsome & Hchk & Hupd & Hcw & Hval & Hcanon & Hvpn_def & Hpaal & HnotRVC & Hdec & Hal0 & Hal1) ] ] ] ] ] ] ] ] ]
                                                                               ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ] ]
                                   ] ] ] ] ] ] ] ] ] ] ] ] ] ] ].
     - (* non-canonical *)
@@ -1813,6 +1835,13 @@ Section WpUserSteps.
       iApply (ustep_c_execas_nop ii base va vpn ie h ms_v sc_v stval_v sepc_v g
                 tlbvec E Φ HN Hexp Hbase Hok Hsome Hchk Hupd HSXL Hcanon Hvpn_def
                 Hmode HisRVC Hdec
+                with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
+                      Hcode Hdata Hcfg HkP").
+    - (* retiring JAL rd=x0 (no link) *)
+      iDestruct "Hk" as "[HkP _]".
+      iApply (ustep_j va vpn ie w imm ms_v sc_v stval_v sepc_v g tlbvec E Φ
+                HN Hok Hsome Hchk Hupd Hcw HSXL Hval Hcanon Hvpn_def Hpaal
+                HnotRVC Hdec Hal0 Hal1
                 with "Hhw Hinv Hhs Hpriv Hms Hsc Hstv Hsepc Htlbc Hpc Hgpr Hupt
                       Hcode Hdata Hcfg HkP").
   Qed.
