@@ -298,6 +298,41 @@ files or copy code from them; build fresh from the live tree.
      `reg_interp_set_same`; all iMods happen BEFORE the callback's
      iModIntro. Remaining for the ACTIVE residue: the `u_dispatch = None`
      fetch/decode/execute case analysis (items 1-4).
+     FETCH-FAULT ARMS ALL DONE (UserFetch.v, axiom-clean): the generic
+     callback arm `wp_user_step_fetch_fault` + five flavor corollaries
+     (align / noncanonical / unmapped / denied / needs-update) — every way
+     a 4-aligned-or-odd user pc can fail to fetch produces
+     `user_trap_frame`. Supporting layers: UserTrap.v (ONE cause-generic
+     trap tower `exec_trap_handler_U` over `c : TrapCause` + tval payload,
+     with handle_interrupt / exception_handler / handle_exception as
+     equational instances in the same section; trapish riscv_step wrappers
+     for the fetch-failure and execute-trap step shapes; delegation
+     `exec_exception_delegatee_U`); UserTranslate.v (the COMPLETE fetch
+     translateAddr trichotomy: success via hit `exec_translateAddr_fetch_u_hit`
+     — pa uniformly `u_walk_pa (um_pte0 e) va` — or walk/nomatch fill; Err
+     via noncanonical/unmapped/denied/needs-update with all-slot-case
+     composers `upt_translateAddr_fetch_{unmapped,denied_full,needs_update_full}`);
+     UserFetch.v §1-5 (fetch reductions: align fault, translate-fault,
+     fetch_bytes ok/fault state-generic, `exec_fetch_ok_4` with the
+     F_RVC/F_Base dispatch in ONE lemma over the existential word);
+     UserMem.v (U-mode PMP grant + `exec_mem_read_fetch_{4,2}_U` cloned
+     from the S layer; `upt_fetch_word` — the fetched word conjured from
+     `upt_data_own`'s existential bytes, peel/restore per byte;
+     `upt_fetch_mem_read` — the complete physical fetch fact); UserBits.v
+     (minimal-import page-window arithmetic: `pa_window`, `off4_bound`,
+     `pa4_aligned`, `bv_subrange11`, `nth_byte_assemble4/2`; GOTCHA: do
+     bv-level steps by etransitivity/exact — goal rewrites of
+     width-carrying bv lemmas miss on implicit-width spellings).
+     REMAINING for the ACTIVE residue: the Iris fetch-success composer
+     over `upt_inv` (hit: σ unchanged / walk: `set_reg σ tlb filled`, the
+     arm destructs — upt_inv's existential tlbvec makes term-level
+     hit/walk uniformity unnecessary), the RETIRING step engine
+     (wp_exec_step_minstret + tick/bump bookkeeping, callback =
+     `exec_hart_active_progress_base_gen/_RVC_gen`), decode dispatch
+     (`decode_total_u_set`/`decode_total_c_set`), and the execute families
+     (register-only engine + `_gpr` facts; ecall/ebreak/illegal via the
+     proven execute-trap wrapper + tower; WRS enter-wait; memory arms;
+     LR/SC always-fault), then assemble `user_step_obligation_active`.
   2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
      `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
      `update_PTE_Bits` None-vs-Some by the A(/D) bits.
