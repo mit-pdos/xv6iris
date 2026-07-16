@@ -279,6 +279,51 @@ Section Total.
     - right. exists h. exact Hcf.
   Qed.
 
+  (* Case-5 dispatch, STRENGTHENED: for an executable, A-set, 4-aligned page
+     whose fetched instruction -- full 32-bit OR compressed 16-bit -- is
+     classifiable, the fetch RETIRES into [ustep_case] outright.  This is
+     [dispatch_full_page_classifiable] with the leftover [cfetch_hit] escape
+     hatch discharged by the compressed classifier [classify_c_word_of_decode]
+     (GAP2).  It composes produce_fetch_4aligned (isRVC split) with the two
+     word/halfword classifiers, needs NO new arms, and is total over rd on
+     both geometries (the compute disjuncts carry the total rd form; RVC rd=x0
+     HINTs are outside [classifiable_c] by construction). *)
+  Lemma dispatch_full_page
+      (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (vpn : mword 27) (ie : uwalk_info)
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    spec !! vpn = Some ie ->
+    uw_check_ok (InstructionFetch tt) ie ->
+    update_PTE_Bits (uw_pte0 ie) (InstructionFetch tt) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ie)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpn ie) va vpn)) 4 = true ->
+    (forall j : nat, (j < 4)%nat ->
+       exists b, code !! pa_add (u_pa (upt_entry vpn ie) va vpn) j = Some b) ->
+    (forall w : mword 32, ufetch_hit va vpn ie w tlbvec ->
+       forall ii, decodable_u ii = true ->
+         (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode w) s0 = Some (ii, s0)) ->
+         classifiable_u ii = true) ->
+    (forall h : mword 16, cfetch_hit va vpn ie h tlbvec ->
+       forall ii, decodable_c ii = true ->
+         (forall s0, agree_on D_u s0 dstateU -> exec (ext_decode_compressed h) s0 = Some (ii, s0)) ->
+         WpUserClassify.classifiable_c ii = true) ->
+    ustep_case va ms_v g tlbvec.
+  Proof.
+    intros Hsome Hchk Hupd Hpbmt Hval Hcanon Hvpn_def Hpaal Hres Hcl_u Hcl_c.
+    destruct (produce_fetch_4aligned va vpn ie tlbvec
+                Hsome Hchk Hupd Hpbmt Hval Hcanon Hvpn_def Hpaal Hres)
+      as [[w Huf] | [h Hcf]].
+    - exact (WpUserClassify.classify_word_of_decode U va ms_v g tlbvec vpn ie w
+               Huf (Hcl_u w Huf)).
+    - exact (WpUserClassify.classify_c_word_of_decode U va ms_v g tlbvec vpn ie h
+               Hcf (Hcl_c h Hcf)).
+  Qed.
+
   (* Total BTYPE not-taken dispatch: a fetched, decoded conditional branch
      whose runtime condition is FALSE falls through to pc+4, landing in
      the fall-through disjunct regardless of branch op.  The fall case
