@@ -10,7 +10,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language lifting.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodePte SmodeCore.
 Local Open Scope Z_scope.
 Import Defs.
@@ -219,3 +221,85 @@ Proof.
       cbn match. unfold mem_read_callback. apply exec_returnM. }
   cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §3 Sourcing the fetched word from the OWNED pages.                      *)
+(* ===================================================================== *)
+Require Import KptPt CommonWalk UserBits UserPt.
+
+(* bytes of a 4-byte-aligned access stay on the translated page *)
+Lemma u_walk_pa_window (pte0 : mword 64) (va : mword 64) (j : nat) :
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  (j < 4)%nat ->
+  pa_add (u_walk_pa pte0 va) j = u_walk_pa pte0 (add_vec_int va (Z.of_nat j)).
+Proof.
+  intros Hal Hj.
+  pose proof (off4_bound va Hal) as Hb.
+  exact (pa_window _ va j ltac:(lia)).
+Qed.
+
+Section UserMemIris.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  (* borrow the data pages: the 4 bytes at the translated pc exist (with
+     SOME values -- the page contents are existential), assembled into the
+     fetched word, and the window is RAM *)
+  Lemma upt_fetch_word (pt : upt) (vpn : mword 27) (e : umap_ent)
+      (va : mword 64) (σ : mstate) :
+    pt.(u_map) !! vpn = Some e ->
+    upt_data_cov pt ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    mstate_interp σ -∗
+    upt_data_own pt.(u_data) -∗
+    ⌜exists w : mword 32,
+       (forall j : nat, (N.of_nat j < 4)%N ->
+          σ.(mem) !! pa_add (u_walk_pa (um_pte0 e) va) j = Some (nth_byte w j))
+       /\ addr_is_ram (u_walk_pa (um_pte0 e) va)
+       /\ addr_is_ram (pa_add (u_walk_pa (um_pte0 e) va) 3)⌝.
+  Proof.
+    iIntros (Hvpn Hcov Hal) "[Hreg [Hmem Hdev]] Hdata".
+    iDestruct "Hdata" as (dm) "[%Hdom Hbytes]".
+    set (pa := u_walk_pa (um_pte0 e) va).
+    (* each window byte is covered, hence present in dm with SOME value *)
+    assert (Hin : forall j : nat, (j < 4)%nat -> pa_add pa j ∈ dom dm).
+    { intros j Hj. rewrite Hdom.
+      unfold pa. rewrite (u_walk_pa_window _ _ _ Hal Hj).
+      exact (Hcov vpn e (add_vec_int va (Z.of_nat j)) Hvpn). }
+    assert (H0 : is_Some (dm !! pa_add pa 0)) by (apply elem_of_dom, Hin; lia).
+    assert (H1 : is_Some (dm !! pa_add pa 1)) by (apply elem_of_dom, Hin; lia).
+    assert (H2 : is_Some (dm !! pa_add pa 2)) by (apply elem_of_dom, Hin; lia).
+    assert (H3 : is_Some (dm !! pa_add pa 3)) by (apply elem_of_dom, Hin; lia).
+    destruct H0 as [b0 Hb0]. destruct H1 as [b1 Hb1].
+    destruct H2 as [b2 Hb2]. destruct H3 as [b3 Hb3].
+    set (w := Z_to_bv 32 (assemble_bytes [b0; b1; b2; b3]) : mword 32).
+    assert (Hw : forall j : nat, (j < 4)%nat ->
+              nth_byte w j = [b0; b1; b2; b3] !!! j).
+    { intros j Hj. apply nth_byte_assemble4; [reflexivity | exact Hj]. }
+    (* the byte points-to give the physical-memory facts; each peel is
+       restored so the next one finds the map intact *)
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb0 with "Hbytes") as "[Hb0' Hrest]".
+    iDestruct (mem_valid with "Hmem Hb0'") as %Hp0.
+    iDestruct (mem_ram with "Hb0'") as %Hram0.
+    iDestruct ("Hrest" with "Hb0'") as "Hbytes".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb1 with "Hbytes") as "[Hb1' Hrest]".
+    iDestruct (mem_valid with "Hmem Hb1'") as %Hp1.
+    iDestruct ("Hrest" with "Hb1'") as "Hbytes".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb2 with "Hbytes") as "[Hb2' Hrest]".
+    iDestruct (mem_valid with "Hmem Hb2'") as %Hp2.
+    iDestruct ("Hrest" with "Hb2'") as "Hbytes".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb3 with "Hbytes") as "[Hb3' Hrest]".
+    iDestruct (mem_valid with "Hmem Hb3'") as %Hp3.
+    iDestruct (mem_ram with "Hb3'") as %Hram3.
+    iDestruct ("Hrest" with "Hb3'") as "Hbytes".
+    iPureIntro.
+    exists w.
+    split; [ | split; [ rewrite <- (pa_add_0 pa); exact Hram0 | exact Hram3 ] ].
+    intros j HjN.
+    assert (Hj : (j < 4)%nat) by lia.
+    rewrite Hw; [ | exact Hj ].
+    destruct j as [ | [ | [ | [ | ] ] ] ]; try lia; cbn [lookup_total list_lookup_total];
+      [ exact Hp0 | exact Hp1 | exact Hp2 | exact Hp3 ].
+  Qed.
+
+End UserMemIris.
