@@ -709,6 +709,47 @@ Section Total.
     do 62 right; left. exists vpn, ie. split_asm Hu.
   Qed.
 
+  (* ---- 2-aligned MEMORY router (success): route a decoded 2-aligned width-4
+     LOAD + usplit_hit + data-side verdict into the 2-aligned LW disjunct of
+     [ustep_mem_case] (disjunct 10 = the first 2-aligned split twin).  The
+     2-aligned analogue of [produce_mem_lw4].  The disjunct uses [let]
+     bindings for eaF/paD, so [cbv zeta] exposes the conjunction. ---- *)
+  Lemma produce_split_mem_lw4 (va ms_v : mword 64) (g : gmap regidx (mword 64))
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+      (vpn : mword 27) (ie : uwalk_info) (w : mword 32)
+      (vpnD : mword 27) (ieD : uwalk_info) (imm : mword 12) (rs1 rd : mword 5)
+      (is_unsigned : bool) :
+    usplit_hit va vpn ie w ->
+    eq_vec (_get_Mstatus_MPRV ms_v) ('b"1" : mword 1) = false ->
+    eq_vec (_get_Mstatus_MXR ms_v) ('b"0") = true ->
+    (forall s0, agree_on D_u s0 dstateU ->
+       exec (ext_decode w) s0 = Some (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4), s0)) ->
+    uint rd <> 0 ->
+    spec !! vpnD = Some ieD ->
+    uw_check_ok (Load Data) ieD ->
+    update_PTE_Bits (uw_pte0 ieD) (Load Data) = None ->
+    _get_PTE_Ext_PBMT (ext_bits_of_PTE (uw_pte0 ieD)) = ('b"00" : mword 2) ->
+    is_aligned_vaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm))))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)))) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpnD ->
+    is_aligned_paddr (Physaddr (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD)) 4 = true ->
+    (forall j : nat, (j < 4)%nat ->
+       pa_add (u_pa (upt_entry vpnD ieD) (add_vec (g !!! Regidx rs1) (sign_extend' 64 imm)) vpnD) j ∈ data) ->
+    ustep_mem_case va ms_v g tlbvec.
+  Proof.
+    intros Hu Hmprv Hmxr Hdec Hrd HspecD HchkD HupdD HpbmtD HeaAl HeaCanon HvpnD HpaAl Hres.
+    unfold WpUserFull.ustep_mem_case.
+    do 9 right; left.
+    exists vpn, ie, w, vpnD, ieD, imm, rs1, rd, is_unsigned.
+    cbv zeta.
+    unfold usplit_hit in Hu.
+    destruct Hu as (Hsome & Hchk & Hupd & HbL & HbH & Hbit0 & Hbit1 & Hval4 &
+                    HcanonL & Hvpn_defL & HalignL & HcanonH & Hvpn_defH & HalignH & HnotRVC).
+    repeat split; assumption.
+  Qed.
+
   (* Case-5 dispatch for an executable, A-set, 4-aligned page whose full
      32-bit words all decode to compute/system instructions in the
      [classifiable_u] set: the fetch either retires (full word ->
