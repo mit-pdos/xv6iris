@@ -663,7 +663,8 @@ Section UserRetireEngine.
             = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
          PC ↦ᵣ (register_lookup PC s_x.(sregs)) ∗
          mstate_interp s_x ∗
-         ▷ (PC ↦ᵣ (register_lookup nextPC s_x.(sregs)) -∗
+         ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+            PC ↦ᵣ (register_lookup nextPC s_x.(sregs)) -∗
             WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
@@ -705,7 +706,7 @@ Section UserRetireEngine.
       unfold s_tick, set_reg; cbn [sregs mem mdev].
       iFrame "Hreg Hmd".
       iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
-      iApply ("Hcont" with "Hpc").
+      iApply ("Hcont" with "Hhs Hpc").
     - iModIntro. iExists s_tick.
       iSplitR. { iPureIntro. exact Hstep. }
       iNext.
@@ -715,7 +716,7 @@ Section UserRetireEngine.
       unfold s_tick, set_reg; cbn [sregs mem mdev].
       iFrame "Hreg Hmd".
       iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-      iApply ("Hcont" with "Hpc").
+      iApply ("Hcont" with "Hhs Hpc").
   Qed.
 
 End UserRetireEngine.
