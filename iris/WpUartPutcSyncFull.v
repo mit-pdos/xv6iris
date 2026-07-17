@@ -30,6 +30,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpSmodeRtype WpSmodeJalr WpSmodeGpr.
 Require Import WpMemsetInstr KernelRvcDecode.
 Require Import VcGen VcGenS.
+Require Import CalleeSaved.
 Require Import WpUartPutcSync.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -308,8 +309,11 @@ Section WpUartPutcSyncFull.
   (*  Registers: ra=x1 sp=x2 s0=x8 s1=x9 a0=x10.  The panic path taken is   *)
   (*  panicking != 0 && panicked == 0 (so no push_off/pop_off, no infinite  *)
   (*  spin); the UART is THRE-ready so the wait loop exits immediately and   *)
-  (*  the low byte of the char [a0] is written to THR.  On exit ra/sp/s0/s1  *)
-  (*  are restored (saved/restored via the 32-byte stack frame).            *)
+  (*  the low byte of the char [a0] is written to THR.                      *)
+  (*  On exit every callee-saved register holds its entry value             *)
+  (*  ([callee_saved m0 mf]: sp/tp/s0/s1/s2..s11 -- sp/s0/s1 by way of the   *)
+  (*  32-byte stack frame, the rest because nothing on the path writes       *)
+  (*  them), and so does ra, which the frame also saves and restores.        *)
   (* =================================================================== *)
   (* [gpr_matches] from the [vregs_den] equality (the block runner's entry
      interface wants the former; my ρ setup proves the latter). *)
@@ -326,15 +330,10 @@ Section WpUartPutcSyncFull.
       (u u' : uart_state) (pv pkv : mword 32)
       {dqm dqm2 : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
-    let s0_idx : mword 5 := mword_of_int 8 in
-    let s1_idx : mword 5 := mword_of_int 9 in
     let a0_idx : mword 5 := mword_of_int 10 in
     let pcE := mword_of_int UPS in
     let sp0 := m0 !!! Regidx csp_rs1 in
-    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
-    let s10 := m0 !!! Regidx s1_idx in
     let a00 := m0 !!! Regidx a0_idx in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     (3 ≤ n)%nat ->
@@ -352,13 +351,12 @@ Section WpUartPutcSyncFull.
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     uart_frag u -∗
-    ( smode_config γ (DfracOwn q) -∗
+    ( ∀ mf,
+      smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
       pc_is ret_tgt -∗
-      (∃ mf, gpr_file mf ∗ ⌜ mf !!! Regidx ra_idx = ra0
-                          /\ mf !!! Regidx s0_idx = s00
-                          /\ mf !!! Regidx s1_idx = s10
-                          /\ mf !!! Regidx csp_rs1 = sp0 ⌝) -∗
+      gpr_file mf -∗
+      ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
       stack_own sp0 n -∗
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
@@ -366,8 +364,16 @@ Section WpUartPutcSyncFull.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ra_idx s0_idx s1_idx a0_idx pcE sp0 sp' ra0 s00 s10 a00 ret_tgt.
+    intros ra_idx a0_idx pcE sp0 ra0 a00 ret_tgt.
     intros Hn3 Hal0 Hpv Hpkv Hthre Hwrite.
+    (* Frame geometry and the two saved s-registers: proof-local, since the
+       statement itself no longer mentions them. *)
+    pose (s0_idx := (mword_of_int 8 : mword 5)).
+    pose (s1_idx := (mword_of_int 9 : mword 5)).
+    pose (sp' := add_vec (m0 !!! Regidx csp_rs1)
+                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
+    pose (s00 := m0 !!! Regidx s0_idx).
+    pose (s10 := m0 !!! Regidx s1_idx).
     set (ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
     set (ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
     set (ea_s1 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
@@ -443,7 +449,8 @@ Section WpUartPutcSyncFull.
       iFrame "Hbra Hbs0 Hbs1". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
     iIntros (M1) "%HmM1 Hsm Htlbinv Hpc Hfile Hheap _".
-    destruct HmM1 as [HmM1 _].
+    (* keep [agree_off]: it pins every register the prologue does not write. *)
+    destruct HmM1 as [HmM1 HaoM1].
     (* the stored words: den (SX 1 0) = ra0, (SX 8 0) = s00, (SX 9 0) = s10 *)
     assert (Hvra0 : sval_den ρA (SX 1 0) = ra0).
     { rewrite sval_den_SX0. unfold ρA. reflexivity. }
@@ -493,13 +500,13 @@ Section WpUartPutcSyncFull.
  Hpv Hpkv Hthre
               ltac:(rewrite HR9m3; exact Hwrite)
               with "Hsm Htlbinv Htext Hpc Hfile Hpk Hpkd Huf").
-    iIntros "Hsm Htlbinv Hpc Hbody Hpk Hpkd Huf".
-    iDestruct "Hbody" as (mf) "[Hfile %Hbagr]".
-    destruct Hbagr as (Hbra_ag & Hbs0_ag & Hbsp_ag).
+    iIntros (mf) "Hsm Htlbinv Hpc Hfile %Hcs_body Hpk Hpkd Huf".
+    destruct Hcs_body as (B2 & B4 & B8 & B9 & B18 & B19 & B20 & B21
+                          & B22 & B23 & B24 & B25 & B26 & B27).
     (* [mf]'s sp agrees with the body input (== sp'). *)
     assert (Hmf_sp : mf !!! Regidx (mword_of_int 2) = sp').
-    { rewrite Hbsp_ag. unfold m3.
-      change (Regidx (mword_of_int 2)) with (Regidx csp_rs1).
+    { change (Regidx (mword_of_int 2)) with (Regidx csp_rs1).
+      rewrite B2. unfold m3.
       rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       exact HspM1. }
     (* ------------------------------------------------------------------ *)
@@ -547,7 +554,7 @@ Section WpUartPutcSyncFull.
       rewrite Hpra Hps0 Hps1. iFrame "Hbra Hbs0 Hbs1". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
     iIntros (M2) "%HmM2 Hsm Htlbinv Hpc Hfile Hheap _".
-    destruct HmM2 as [HmM2 _].
+    destruct HmM2 as [HmM2 HaoM2].
     iEval (rewrite /vheap_own; cbn [vheap]; rewrite /ups_epi_heap;
            cbn [big_opL fst snd];
            rewrite HaraB Has0B Has1B HvraB Hvs0B Hvs1B) in "Hheap".
@@ -602,25 +609,67 @@ Section WpUartPutcSyncFull.
     iEval (rewrite Hps1) in "Hbs1".
     iDestruct (stack_own_3_intro with "Hbra Hbs0 Hbs1") as "Htop".
     iDestruct (stack_own_split_2 sp0 3 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc [Hfile] Hstk Hpk Hpkd Huf").
-    iExists m_epi2. iFrame "Hfile". iPureIntro.
-    (* ra/s0/s1/sp restored to their entry values. *)
-    split; [| split; [| split]].
-    - exact Hra_final.
-    - unfold m_epi2.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      assert (Hl : ups_epi_regs1 !! Regidx s0_idx = Some (SX 34 0))
-        by (vm_compute; reflexivity).
-      rewrite (HmM2 _ _ Hl). exact Hvs0B.
-    - unfold m_epi2.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      assert (Hl : ups_epi_regs1 !! Regidx s1_idx = Some (SX 35 0))
-        by (vm_compute; reflexivity).
-      rewrite (HmM2 _ _ Hl). exact Hvs1B.
-    - unfold m_epi2. rewrite lookup_total_insert.
-      unfold regval_into_reg. rewrite HspM2. unfold sp', sp0.
+    (* A block leaves every register it does not write at its [vregs_init]
+       entry, so that register's post-block value is exactly its pre-block one:
+       the block's [gpr_matches] reads the entry off [vregs_init], and the
+       [vregs_den] identity that set the block up denotes it back to the input
+       file.  (An entry outside [vregs_init] is impossible for an [mword 5], but
+       [agree_off] discharges that branch without a case analysis.) *)
+    assert (Hagree_pro : forall r : mword 5,
+              ups_pro_regs1 !! Regidx r = vregs_init !! Regidx r ->
+              M1 !!! Regidx r = m0 !!! Regidx r).
+    { intros r Hr. destruct (vregs_init !! Regidx r) as [sv|] eqn:Hv.
+      - rewrite (HmM1 _ _ Hr) -HdenA.
+        symmetry. exact (vregs_den_lookup ρA vregs_init _ _ Hv).
+      - exact (HaoM1 _ Hr). }
+    assert (Hagree_epi : forall r : mword 5,
+              ups_epi_regs1 !! Regidx r = vregs_init !! Regidx r ->
+              M2 !!! Regidx r = mf !!! Regidx r).
+    { intros r Hr. destruct (vregs_init !! Regidx r) as [sv|] eqn:Hv.
+      - rewrite (HmM2 _ _ Hr) -HdenB.
+        symmetry. exact (vregs_den_lookup ρB vregs_init _ _ Hv).
+      - exact (HaoM2 _ Hr). }
+    (* A register that neither block writes, that the body preserves, and that
+       neither the [c.mv s1,a0] nor the [c.addi16sp sp,32] touches, still holds
+       its entry value at the return. *)
+    assert (Huntouched : forall r : mword 5,
+              ups_epi_regs1 !! Regidx r = vregs_init !! Regidx r ->
+              ups_pro_regs1 !! Regidx r = vregs_init !! Regidx r ->
+              Regidx csp_rs1 <> Regidx r ->
+              Regidx s1_idx <> Regidx r ->
+              mf !!! Regidx r = m3 !!! Regidx r ->
+              m_epi2 !!! Regidx r = m0 !!! Regidx r).
+    { intros r He Hp Hne1 Hne2 Hbody.
+      unfold m_epi2. rewrite lookup_total_insert_ne; [| exact Hne1].
+      rewrite (Hagree_epi _ He) Hbody. unfold m3.
+      rewrite lookup_total_insert_ne; [| exact Hne2].
+      exact (Hagree_pro _ Hp). }
+    iApply ("Hcont" $! m_epi2 with "Hsm Htlbinv Hpc Hfile [%] Hstk Hpk Hpkd Huf").
+    split; [| exact Hra_final].
+    unfold callee_saved. repeat split.
+    (* every callee-saved register except sp/s0/s1 is simply never written *)
+    all: try (apply Huntouched;
+                [ vm_compute; reflexivity | vm_compute; reflexivity
+                | vm_compute; discriminate | vm_compute; discriminate
+                | first [ exact B4  | exact B18 | exact B19 | exact B20
+                        | exact B21 | exact B22 | exact B23 | exact B24
+                        | exact B25 | exact B26 | exact B27 ] ]).
+    (* sp/s0/s1: spilled to the frame by the prologue, reloaded by the epilogue *)
+    - (* sp: the -32/+32 frame adjustment cancels *)
+      unfold m_epi2. rewrite lookup_total_insert.
+      unfold regval_into_reg. rewrite HspM2. unfold sp'.
       change (caddi16sp_imm (mword_of_int 2)) with (caddi16sp_imm (mword_of_int 2 : mword 6)).
       apply ups_frame_cancel.
+    - (* s0: reloaded from the frame slot holding the entry s0 *)
+      unfold m_epi2.
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      etransitivity; [ apply (HmM2 _ (SX 34 0)); vm_compute; reflexivity |].
+      exact Hvs0B.
+    - (* s1: likewise *)
+      unfold m_epi2.
+      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      etransitivity; [ apply (HmM2 _ (SX 35 0)); vm_compute; reflexivity |].
+      exact Hvs1B.
   Qed.
 
 End WpUartPutcSyncFull.

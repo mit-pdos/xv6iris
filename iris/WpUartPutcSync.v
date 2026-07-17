@@ -29,6 +29,7 @@ Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Require Import WpAuipc.
 Require Import WpSmodeItype WpSmodeBtype WpSmodeUtype WpSmodeLoad.
 Require Import WpUart WpSmodeUart WpUartKpt.
+Require Import CalleeSaved.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
@@ -810,12 +811,12 @@ Section WpUartPutcSync.
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     uart_frag u -∗
-    ( smode_config γ dq -∗
+    ( ∀ mf,
+      smode_config γ dq -∗
       tlb_inv root_ppn -∗
       pc_is (mword_of_int (UPS + 0x46)) -∗
-      (∃ mf, gpr_file mf ∗ ⌜ mf !!! Regidx (mword_of_int 1) = m !!! Regidx (mword_of_int 1)
-                          /\ mf !!! Regidx (mword_of_int 8) = m !!! Regidx (mword_of_int 8)
-                          /\ mf !!! Regidx (mword_of_int 2) = m !!! Regidx (mword_of_int 2) ⌝) -∗
+      gpr_file mf -∗
+      ⌜ callee_saved m mf ⌝ -∗
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
       uart_frag u' -∗
@@ -851,9 +852,10 @@ Section WpUartPutcSync.
  Hpv
               with "Hsm Htlbinv Ht Hpc Hfile Hpk").
     iIntros "Hsm Htlbinv Hpc Hfile Hpk".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc [Hfile] Hpk Hpkd Huf").
-    iExists _. iFrame "Hfile". iPureIntro.
-    (* callee-saved: ra/s0/sp untouched by the body (only a4/a5/a0 written) *)
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile [%] Hpk Hpkd Huf").
+    (* The body writes only a4/a5/a0, none of them callee-saved, so every
+       callee-saved register still holds its entry value. *)
+    unfold callee_saved.
     repeat split; unfold ppc_f6, ppc_f5, ppc_f4, ppc_f3, ppc_f2, ppc_f1, f2, f1;
       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]); reflexivity.
   Qed.
