@@ -68,6 +68,8 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_memGS  :: gen_heapGpreS Arch.pa (bv 8) Σ;
   riscv_pre_uartGS :: ghost_varG Σ uart_state;
   riscv_pre_plicGS :: ghost_varG Σ plic_state;
+  (* the UART ghosts carried by [dev_inv_body] (WpUart.v) *)
+  riscv_pre_uartGhostGS :: uartGhostG Σ;
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -75,7 +77,8 @@ Definition riscvΣ : gFunctors :=
      ghost_mapΣ register (sigT type_of_register);
      gen_heapΣ Arch.pa (bv 8);
      ghost_varΣ uart_state;
-     ghost_varΣ plic_state ].
+     ghost_varΣ plic_state;
+     uartGhostΣ ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -282,7 +285,10 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ} (g : gstate)
-    (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) :
+    (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
+    (* [dev_inv] freezes DLAB, so the initial UART must already have it clear
+       -- i.e. the invariant is allocated after the divisor latch is set. *)
+    (Hdlab : uart_dlab g.(gdev).(duart) = false) :
   forall t2 g2 e2,
     rtc erased_step (cpu_pool [], g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -292,9 +298,11 @@ Proof.
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
   iIntros "(Hwires & _ & Huf & Hpf)".
-  iMod (inv_alloc devN _ dev_inv_body with "[Huf Hpf]") as "#Hinv".
-  { iNext. rewrite /dev_inv_body.
-    iExists g.(gdev).(duart), g.(gdev).(dplic). iFrame "Huf Hpf". }
+  (* allocate the four UART ghosts at the initial device state *)
+  iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
+  iMod (dev_inv_alloc _ γ with "[Huf Hpf Hacc Hout Htx Hdl]") as "#Hinv".
+  { rewrite /dev_inv_body.
+    iExists g.(gdev).(duart), g.(gdev).(dplic). iFrame. }
   iMod (wire_inv_alloc _ (fun c => register_lookup sig_seip (g.(gregs) c))
           (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hwires]")
     as "#Hwinv".
@@ -304,5 +312,5 @@ Proof.
     { apply disjoint_singleton_l, not_elem_of_singleton. discriminate. }
     rewrite !big_sepS_singleton. done. }
   iModIntro. iSplitR; [done|].
-  iApply (wp_dev_loop with "Hinv Hwinv").
+  iApply (wp_dev_loop γ with "Hinv Hwinv").
 Qed.

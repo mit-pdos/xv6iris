@@ -181,6 +181,167 @@ Definition uart_rx_push (u : uart_state) (b : bv 8) : option uart_state :=
                     (u_fcr u) (u_dll u) (u_dlm u))
   else None.
 
+(* -- the accepted-byte trace -- *)
+
+(* [uart_acc u] is every byte the UART has ACCEPTED for transmission: those
+   already on the wire ([u_out]) followed by those still queued ([u_tx]).  It
+   is the right notion for a driver's postcondition, because a driver returns
+   as soon as its byte is in the tx FIFO -- the move to [u_out] is the device
+   thread's own later step, so [u_out] alone is not yet observable at a
+   driver's return, while [uart_acc] already is.
+
+   The point of the concatenation is that it is STABLE under the device's
+   autonomous drain: [uart_tx_pop] moves one byte from the head of [u_tx] to
+   the tail of [u_out], which reassociates to the very same list.  So a CPU
+   pushing to THR is the only transition that grows it (see
+   [uart_write_thr_acc]), and a ghost lower bound on it is preserved by every
+   device step. *)
+Definition uart_acc (u : uart_state) : list (bv 8) := u_out u ++ u_tx u.
+
+(* the drain step leaves the accepted trace completely unchanged *)
+Lemma uart_tx_pop_acc (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_tx_pop u = Some (b, u') -> uart_acc u' = uart_acc u.
+Proof.
+  unfold uart_tx_pop, uart_acc. destruct (u_tx u) as [| b0 tx'] eqn:Htx.
+  - discriminate.
+  - intro H. injection H as <- <-. cbn [u_out u_tx].
+    rewrite <- app_assoc. reflexivity.
+Qed.
+
+(* a byte arriving on the rx side touches neither [u_out] nor [u_tx] *)
+Lemma uart_rx_push_acc (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_rx_push u b = Some u' -> uart_acc u' = uart_acc u.
+Proof.
+  unfold uart_rx_push, uart_acc.
+  destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
+  intro H. injection H as <-. reflexivity.
+Qed.
+
+(* A THR write appends the byte to the accepted trace -- but ONLY with DLAB
+   clear (else offset 0 is the divisor latch, not THR) and only with room in
+   the FIFO (the model drops the byte when full, exactly as the hardware
+   does).  Both premises are genuinely needed: neither is derivable from a
+   contents-agnostic view of the device. *)
+Lemma uart_write_thr_acc (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_dlab u = false ->
+  (length (u_tx u) < uart_fifo_depth)%nat ->
+  uart_write u 0 b = Some u' ->
+  uart_acc u' = uart_acc u ++ [b].
+Proof.
+  intros Hdlab Hroom. unfold uart_write, uart_acc. cbn [Z.eqb].
+  rewrite Hdlab.
+  rewrite (proj2 (Nat.ltb_lt _ _) Hroom).
+  intro H. injection H as <-. cbn [u_out u_tx]. rewrite app_assoc. reflexivity.
+Qed.
+
+(* Writes to IER/LCR and to the read-only/ignored offsets leave the accepted
+   trace alone. *)
+Lemma uart_write_acc_quiet (u : uart_state) (off : Z) (b : bv 8) (u' : uart_state) :
+  off = 1 \/ off = 3 \/ off = 4 \/ off = 5 \/ off = 6 \/ off = 7 ->
+  uart_write u off b = Some u' -> uart_acc u' = uart_acc u.
+Proof.
+  unfold uart_write, uart_acc.
+  intros [-> | [-> | [-> | [-> | [-> | ->]]]]]; cbn [Z.eqb orb];
+    try (destruct (uart_dlab u));
+    intro H; injection H as <-; reflexivity.
+Qed.
+
+(* NOTE (deliberate, load-bearing): there is NO general monotonicity lemma for
+   [uart_write].  An FCR write (offset 2) with bit 2 set CLEARS the tx FIFO,
+   which SHRINKS [uart_acc] -- the queued bytes are discarded, never sent.  So
+   any invariant holding a monotone [uart_acc] ghost forbids that write: code
+   doing a FIFO-clearing FCR write cannot be verified while such an invariant
+   is in force, and must run before it is allocated.  xv6's [uart_init] does
+   exactly this write (FCR_FIFO_CLEAR = bits 1|2). *)
+
+(* -- the transmitted prefix [u_out] -- *)
+
+(* [u_out] is append-only: the drain step is the ONLY transition that touches
+   it, and it only ever appends.  This is what lets an observation of "the tx
+   FIFO is empty" survive later device steps: see [uart_tx_still_empty]. *)
+Lemma uart_tx_pop_out (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_tx_pop u = Some (b, u') -> u_out u' = u_out u ++ [b].
+Proof.
+  unfold uart_tx_pop. destruct (u_tx u) as [| b0 tx'] eqn:Htx; [discriminate|].
+  intro H. injection H as <- <-. reflexivity.
+Qed.
+
+Lemma uart_rx_push_out (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_rx_push u b = Some u' -> u_out u' = u_out u.
+Proof.
+  unfold uart_rx_push.
+  destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
+  intro H. injection H as <-. reflexivity.
+Qed.
+
+(* no MMIO access transmits anything: every [uart_write] branch, and every
+   [uart_read] branch, carries [u_out] through untouched *)
+Lemma uart_write_out (u : uart_state) (off : Z) (b : bv 8) (u' : uart_state) :
+  uart_write u off b = Some u' -> u_out u' = u_out u.
+Proof.
+  unfold uart_write.
+  destruct (off =? 0).
+  { destruct (uart_dlab u).
+    - intro H; injection H as <-; reflexivity.
+    - destruct (length (u_tx u) <? uart_fifo_depth)%nat;
+        intro H; injection H as <-; reflexivity. }
+  destruct (off =? 1).
+  { destruct (uart_dlab u); intro H; injection H as <-; reflexivity. }
+  destruct (off =? 2). { intro H; injection H as <-; reflexivity. }
+  destruct (off =? 3). { intro H; injection H as <-; reflexivity. }
+  destruct ((off =? 4) || (off =? 5) || (off =? 6) || (off =? 7)).
+  { intro H; injection H as <-; reflexivity. }
+  discriminate.
+Qed.
+
+(* -- DLAB (LCR bit 7) -- *)
+
+(* No autonomous device transition touches the line control register, so DLAB
+   is stable across every device step: only a CPU write to offset 3 can change
+   it. *)
+Lemma uart_tx_pop_dlab (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_tx_pop u = Some (b, u') -> uart_dlab u' = uart_dlab u.
+Proof.
+  unfold uart_tx_pop. destruct (u_tx u) as [| b0 tx'] eqn:Htx; [discriminate|].
+  intro H. injection H as <- <-. reflexivity.
+Qed.
+
+Lemma uart_rx_push_dlab (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_rx_push u b = Some u' -> uart_dlab u' = uart_dlab u.
+Proof.
+  unfold uart_rx_push.
+  destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
+  intro H. injection H as <-. reflexivity.
+Qed.
+
+(* -- exclusive-transmitter reasoning -- *)
+
+(* THE KEY STABILITY FACT.  Suppose at the THRE poll the FIFO was empty (so
+   the accepted trace [l] had all been transmitted), and suppose that at some
+   later point the accepted trace is STILL [l] -- which is exactly what an
+   exclusive transmitter owner knows, since only a THR write grows it and only
+   the owner may perform one.  Then the FIFO is still empty at that later
+   point: the device can only have moved bytes from [u_tx] to [u_out], and
+   [u_out] has already reached [l], so there is nothing left to move.
+
+   This is what makes "polled THRE, therefore the write will not be dropped"
+   sound in the presence of a concurrently draining device and other harts. *)
+Lemma uart_tx_still_empty (u u2 : uart_state) (l : list (bv 8)) :
+  uart_acc u = l ->
+  u_tx u = [] ->
+  uart_acc u2 = l ->
+  l `prefix_of` u_out u2 ->
+  u_tx u2 = [].
+Proof.
+  unfold uart_acc. intros Hacc Htx Hacc2 [k Hk].
+  (* |u_out u2| = |l| + |k|, and |u_out u2| + |u_tx u2| = |l| *)
+  assert (Hlen : (length (u_out u2) + length (u_tx u2) = length l)%nat).
+  { rewrite <- length_app, Hacc2. reflexivity. }
+  rewrite Hk in Hlen. rewrite length_app in Hlen.
+  assert (Htx2 : length (u_tx u2) = 0%nat) by lia.
+  by apply nil_length_inv.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 2. The PLIC: S-mode contexts only (context 2h+1 of hart h, as xv6 uses). *)
 (*    Sources 1..31 (one 32-bit enable word); the UART is source 10.       *)

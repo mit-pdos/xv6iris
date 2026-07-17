@@ -25,7 +25,8 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants ghost_map ghost_var gen_heap.
+From iris.base_logic.lib Require Import invariants ghost_map ghost_var gen_heap own.
+From iris.algebra.lib Require Import mono_list dfrac_agree.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -334,62 +335,411 @@ Qed.
 (*     invariant + the wire invariant.                                     *)
 (* ===================================================================== *)
 
+(* ===================================================================== *)
+(*  The accepted-byte trace ghost.                                         *)
+(*                                                                         *)
+(*  [uart_acc u = u_out u ++ u_tx u] (DevModel.v) is every byte the UART    *)
+(*  has accepted for transmission.  It grows ONLY when a CPU pushes to THR  *)
+(*  and is left exactly alone by every autonomous device step, so it can be *)
+(*  tracked by a MONOTONE ghost list: the invariant holds the authoritative *)
+(*  copy, and a client keeps a persistent lower bound [uart_sent γo l] --   *)
+(*  "the bytes [l] have been accepted, in that order".  That is the         *)
+(*  strongest thing a driver can report at its return: its byte is by then  *)
+(*  in the tx FIFO, and [u_out] alone would not yet mention it.             *)
+(*                                                                         *)
+(*  A monotone trace is only sound because nothing ever un-accepts a byte.  *)
+(*  See the NOTE at [uart_write_thr_acc] (DevModel.v): a FIFO-clearing FCR  *)
+(*  write WOULD shrink it, so no such write can be verified under [dev_inv].*)
+(* ===================================================================== *)
+
+(*  The UART's ghost names travel together in ONE record, so [dev_inv] and
+    every client-facing resource take a single [γ : uart_names] rather than a
+    fistful of gnames:
+
+      un_acc   mono_list over [uart_acc]  -- the persistent accepted-byte
+               history.  Grows only on a THR push; a lower bound
+               [uart_sent γ l] is a permanent record that [l] was accepted.
+      un_out   mono_list over [u_out]     -- the transmitted prefix.  Its
+               lower bound is what carries a THRE observation forward across
+               later device steps (see [uart_tx_still_empty], DevModel.v).
+      un_tx    ghost_var halves over the accepted trace -- EXCLUSIVE
+               ownership of the transmitter (see [uart_tx_own] below).
+      un_dlab  dfrac_agree over DLAB -- freezable to a persistent fact.       *)
+Record uart_names := UartNames {
+  un_acc  : gname;
+  un_out  : gname;
+  un_tx   : gname;
+  un_dlab : gname;
+}.
+
+Class uartGhostG (Σ : gFunctors) := UartGhostG {
+  uart_ghost_listG :: inG Σ (mono_listR (leibnizO (bv 8)));
+  uart_ghost_txG :: ghost_varG Σ (list (bv 8));
+  uart_ghost_dlabG :: inG Σ (dfrac_agreeR (leibnizO bool));
+}.
+
+Definition uartGhostΣ : gFunctors :=
+  #[ GFunctor (mono_listR (leibnizO (bv 8)));
+     ghost_varΣ (list (bv 8));
+     GFunctor (dfrac_agreeR (leibnizO bool)) ].
+
+Global Instance subG_uartGhostG Σ : subG uartGhostΣ Σ -> uartGhostG Σ.
+Proof. solve_inG. Qed.
+
 Section DevLoop.
   Context `{!riscvGS Σ}.
+  Context `{!uartGhostG Σ}.
 
   Definition devN : namespace := nroot .@ "dev".
 
-  (* the device invariant: the user halves of the device state.  The
-     interrupt-pin wires the PLIC drives live in their own invariant
-     [wire_inv] (WireInv.v): the PLIC may flip a hart's external-interrupt
-     pin at any time, so no CPU-side proof may pin it. *)
-  Definition dev_inv_body : iProp Σ :=
+  (* ---- the accepted-byte trace: persistent history ---- *)
+  Definition uart_sent_auth (γ : uart_names) (u : uart_state) : iProp Σ :=
+    own γ.(un_acc) (●ML (uart_acc u : list (leibnizO (bv 8)))).
+  Definition uart_sent (γ : uart_names) (l : list (bv 8)) : iProp Σ :=
+    own γ.(un_acc) (◯ML (l : list (leibnizO (bv 8)))).
+
+  (* ---- the transmitted prefix: carries a THRE observation forward ---- *)
+  Definition uart_out_auth (γ : uart_names) (u : uart_state) : iProp Σ :=
+    own γ.(un_out) (●ML (u_out u : list (leibnizO (bv 8)))).
+  Definition uart_out_lb (γ : uart_names) (l : list (bv 8)) : iProp Σ :=
+    own γ.(un_out) (◯ML (l : list (leibnizO (bv 8)))).
+
+  (* ---- EXCLUSIVE ownership of the transmitter ----
+
+     [uart_tx_own γ l] is the right to push bytes, and says the accepted trace
+     is EXACTLY [l].  It is one half of a [ghost_var]; the invariant holds the
+     other.  Two consequences make it do its job:
+
+       - it is stable across DEVICE steps, because draining does not change
+         [uart_acc] (that is the whole point of tracking the concatenation);
+       - a THR push DOES change [uart_acc], so it needs both halves -- the
+         invariant's and the owner's.  A hart without the token therefore
+         cannot push at all, which is what pins the FIFO between a THRE poll
+         and the write that follows it. *)
+  Definition uart_tx_own (γ : uart_names) (l : list (bv 8)) : iProp Σ :=
+    ghost_var γ.(un_tx) (1/2) l.
+  Definition uart_tx_auth (γ : uart_names) (u : uart_state) : iProp Σ :=
+    ghost_var γ.(un_tx) (1/2) (uart_acc u).
+
+  (* ---- DLAB, freezable to a persistent fact ---- *)
+  Definition uart_dlab_is (γ : uart_names) (dq : dfrac) (b : bool) : iProp Σ :=
+    own γ.(un_dlab) (to_dfrac_agree dq (b : leibnizO bool)).
+  Definition uart_dlab_auth (γ : uart_names) (u : uart_state) : iProp Σ :=
+    uart_dlab_is γ (DfracOwn (1/2)) (uart_dlab u).
+  (* the persistent form: DLAB is false and can never change again *)
+  Definition uart_dlab_off (γ : uart_names) : iProp Σ :=
+    uart_dlab_is γ DfracDiscarded false.
+
+  Global Instance uart_sent_persistent γ l : Persistent (uart_sent γ l).
+  Proof. rewrite /uart_sent. apply _. Qed.
+  Global Instance uart_sent_timeless γ l : Timeless (uart_sent γ l).
+  Proof. rewrite /uart_sent. apply _. Qed.
+  Global Instance uart_out_lb_persistent γ l : Persistent (uart_out_lb γ l).
+  Proof. rewrite /uart_out_lb. apply _. Qed.
+  Global Instance uart_out_lb_timeless γ l : Timeless (uart_out_lb γ l).
+  Proof. rewrite /uart_out_lb. apply _. Qed.
+  Global Instance uart_dlab_off_persistent γ : Persistent (uart_dlab_off γ).
+  Proof. rewrite /uart_dlab_off /uart_dlab_is. apply _. Qed.
+  Global Instance uart_dlab_is_timeless γ dq b : Timeless (uart_dlab_is γ dq b).
+  Proof. rewrite /uart_dlab_is. apply _. Qed.
+  Global Instance uart_sent_auth_timeless γ u : Timeless (uart_sent_auth γ u).
+  Proof. rewrite /uart_sent_auth. apply _. Qed.
+  Global Instance uart_out_auth_timeless γ u : Timeless (uart_out_auth γ u).
+  Proof. rewrite /uart_out_auth. apply _. Qed.
+
+  (* -- accepted trace -- *)
+  Lemma uart_sent_get γ u :
+    uart_sent_auth γ u -∗ uart_sent_auth γ u ∗ uart_sent γ (uart_acc u).
+  Proof.
+    iIntros "Ha". rewrite /uart_sent_auth /uart_sent.
+    iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
+    iDestruct "Ha" as "[$ $]".
+  Qed.
+
+  Lemma uart_sent_prefix γ u l :
+    uart_sent_auth γ u -∗ uart_sent γ l -∗ ⌜ l `prefix_of` uart_acc u ⌝.
+  Proof.
+    iIntros "Ha Hl". rewrite /uart_sent_auth /uart_sent.
+    by iDestruct (own_valid_2 with "Ha Hl") as %?%mono_list_both_valid_L.
+  Qed.
+
+  Lemma uart_sent_update γ u u' :
+    uart_acc u `prefix_of` uart_acc u' ->
+    uart_sent_auth γ u ==∗ uart_sent_auth γ u' ∗ uart_sent γ (uart_acc u').
+  Proof.
+    iIntros (Hpre) "Ha". rewrite /uart_sent_auth.
+    iMod (own_update _ _ (●ML (uart_acc u' : list (leibnizO (bv 8))))
+            with "Ha") as "Ha"; [by apply mono_list_update|].
+    iDestruct (uart_sent_get with "Ha") as "[$ $]". done.
+  Qed.
+
+  Lemma uart_sent_auth_stable γ u u' :
+    uart_acc u' = uart_acc u -> uart_sent_auth γ u -∗ uart_sent_auth γ u'.
+  Proof. iIntros (Heq) "Ha". rewrite /uart_sent_auth Heq. done. Qed.
+
+  (* -- transmitted prefix -- *)
+  Lemma uart_out_get γ u :
+    uart_out_auth γ u -∗ uart_out_auth γ u ∗ uart_out_lb γ (u_out u).
+  Proof.
+    iIntros "Ha". rewrite /uart_out_auth /uart_out_lb.
+    iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
+    iDestruct "Ha" as "[$ $]".
+  Qed.
+
+  Lemma uart_out_prefix γ u l :
+    uart_out_auth γ u -∗ uart_out_lb γ l -∗ ⌜ l `prefix_of` u_out u ⌝.
+  Proof.
+    iIntros "Ha Hl". rewrite /uart_out_auth /uart_out_lb.
+    by iDestruct (own_valid_2 with "Ha Hl") as %?%mono_list_both_valid_L.
+  Qed.
+
+  Lemma uart_out_update γ u u' :
+    u_out u `prefix_of` u_out u' ->
+    uart_out_auth γ u ==∗ uart_out_auth γ u' ∗ uart_out_lb γ (u_out u').
+  Proof.
+    iIntros (Hpre) "Ha". rewrite /uart_out_auth.
+    iMod (own_update _ _ (●ML (u_out u' : list (leibnizO (bv 8))))
+            with "Ha") as "Ha"; [by apply mono_list_update|].
+    iDestruct (uart_out_get with "Ha") as "[$ $]". done.
+  Qed.
+
+  Lemma uart_out_auth_stable γ u u' :
+    u_out u' = u_out u -> uart_out_auth γ u -∗ uart_out_auth γ u'.
+  Proof. iIntros (Heq) "Ha". rewrite /uart_out_auth Heq. done. Qed.
+
+  (* -- exclusive transmitter -- *)
+
+  (* the owner's view of the accepted trace is the real one *)
+  Lemma uart_tx_own_agree γ u l :
+    uart_tx_auth γ u -∗ uart_tx_own γ l -∗ ⌜ uart_acc u = l ⌝.
+  Proof.
+    iIntros "Ha Ho". rewrite /uart_tx_auth /uart_tx_own.
+    by iDestruct (ghost_var_agree with "Ha Ho") as %?.
+  Qed.
+
+  (* pushing needs BOTH halves: this is what excludes a tokenless hart *)
+  Lemma uart_tx_own_update γ u l u' :
+    uart_tx_auth γ u -∗ uart_tx_own γ l ==∗
+    uart_tx_auth γ u' ∗ uart_tx_own γ (uart_acc u').
+  Proof.
+    iIntros "Ha Ho". rewrite /uart_tx_auth /uart_tx_own.
+    iMod (ghost_var_update_2 (uart_acc u') with "Ha Ho") as "[$ $]";
+      [apply Qp.half_half|]. done.
+  Qed.
+
+  Lemma uart_tx_auth_stable γ u u' :
+    uart_acc u' = uart_acc u -> uart_tx_auth γ u -∗ uart_tx_auth γ u'.
+  Proof. iIntros (Heq) "Ha". rewrite /uart_tx_auth Heq. done. Qed.
+
+  (* -- DLAB -- *)
+  Lemma uart_dlab_agree γ u dq b :
+    uart_dlab_auth γ u -∗ uart_dlab_is γ dq b -∗ ⌜ uart_dlab u = b ⌝.
+  Proof.
+    iIntros "Ha Hb". rewrite /uart_dlab_auth /uart_dlab_is.
+    by iDestruct (own_valid_2 with "Ha Hb") as %[_ ?]%dfrac_agree_op_valid_L.
+  Qed.
+
+  Lemma uart_dlab_auth_stable γ u u' :
+    uart_dlab u' = uart_dlab u -> uart_dlab_auth γ u -∗ uart_dlab_auth γ u'.
+  Proof. iIntros (Heq) "Ha". rewrite /uart_dlab_auth Heq. done. Qed.
+
+  (* freeze a half into the permanent fact "DLAB is false" *)
+  Lemma uart_dlab_freeze γ :
+    uart_dlab_is γ (DfracOwn (1/2)) false ==∗ uart_dlab_off γ.
+  Proof.
+    iIntros "H". rewrite /uart_dlab_is /uart_dlab_off /uart_dlab_is.
+    iApply (own_update with "H"). apply dfrac_agree_persist.
+  Qed.
+
+  (* ---- THE PAYOFF ----
+
+     This is what the whole ghost arrangement exists to prove, and it is worth
+     stating on its own because it is the design's crux.
+
+     A driver polls the LSR, sees THRE, and only then writes the byte.  For
+     that write not to be silently dropped it needs the FIFO to still have
+     room WHEN IT LANDS -- a fact about a LATER state, across which both the
+     device thread and every other hart may have run.
+
+     Given the transmitter token and the bound the poll handed back, the two
+     premises of [uart_write_thr_acc] (DevModel.v) follow at ANY later opening
+     of the invariant:
+
+       - the token pins [uart_acc u2 = l], because the only transition that
+         grows the accepted trace is a THR push and a push needs the token's
+         half of the ghost_var, which we are holding;
+       - [uart_out_lb] says the transmitted prefix has already reached [l],
+         and the device can only ever extend it;
+       - so by [uart_tx_still_empty] there is nothing left in the FIFO;
+       - and the frozen [uart_dlab_off] says offset 0 really is THR.
+
+     Note what is NOT needed: any assumption about the other harts' code.  A
+     hart without the token simply cannot perform a push, so exclusion is by
+     ghost arithmetic rather than by trusting anyone's proof. *)
+  Lemma uart_tx_ready_persists γ (u u2 : uart_state) (l : list (bv 8)) :
+    u_tx u = [] ->
+    uart_acc u = l ->
+    uart_tx_own γ l -∗ uart_out_lb γ l -∗ uart_dlab_off γ -∗
+    uart_tx_auth γ u2 -∗ uart_out_auth γ u2 -∗ uart_dlab_auth γ u2 -∗
+    ⌜ u_tx u2 = [] /\ uart_dlab u2 = false ⌝.
+  Proof.
+    iIntros (Htx Hacc) "Hown Hlb Hoff Htxa Houta Hdla".
+    iDestruct (uart_tx_own_agree with "Htxa Hown") as %Hacc2.
+    iDestruct (uart_out_prefix with "Houta Hlb") as %Hpre.
+    iDestruct (uart_dlab_agree with "Hdla Hoff") as %Hdlab.
+    iPureIntro. split; [| exact Hdlab].
+    exact (uart_tx_still_empty u u2 l Hacc Htx Hacc2 Hpre).
+  Qed.
+
+  (* and the poll side: seeing THRE at [u] while holding the token yields
+     exactly the two things [uart_tx_ready_persists] wants carried forward *)
+  Lemma uart_tx_poll_thre γ (u : uart_state) (l : list (bv 8)) :
+    uart_thre u = true ->
+    uart_tx_own γ l -∗ uart_tx_auth γ u -∗ uart_out_auth γ u -∗
+    uart_out_auth γ u ∗ uart_out_lb γ l ∗ ⌜ u_tx u = [] /\ uart_acc u = l ⌝.
+  Proof.
+    iIntros (Hthre) "Hown Htxa Houta".
+    iDestruct (uart_tx_own_agree with "Htxa Hown") as %Hacc.
+    assert (Htx : u_tx u = []).
+    { unfold uart_thre in Hthre. by destruct (u_tx u). }
+    (* THRE means the FIFO is empty, so the accepted trace IS the
+       transmitted prefix: [uart_acc u = u_out u ++ [] = u_out u]. *)
+    assert (Hout : u_out u = l).
+    { rewrite -Hacc /uart_acc Htx. by rewrite app_nil_r. }
+    iDestruct (uart_out_get with "Houta") as "[$ Hlb]".
+    rewrite Hout. iFrame "Hlb". done.
+  Qed.
+
+  (* the device invariant: the user halves of the device state, plus the four
+     UART ghosts.  The interrupt-pin wires the PLIC drives live in their own
+     invariant [wire_inv] (WireInv.v): the PLIC may flip a hart's
+     external-interrupt pin at any time, so no CPU-side proof may pin it. *)
+  Definition dev_inv_body (γ : uart_names) : iProp Σ :=
     (∃ (u : uart_state) (p : plic_state),
-       uart_frag u ∗ plic_frag p)%I.
+       uart_frag u ∗ plic_frag p ∗
+       uart_sent_auth γ u ∗ uart_out_auth γ u ∗
+       uart_tx_auth γ u ∗ uart_dlab_auth γ u)%I.
 
   Global Instance uart_frag_timeless u : Timeless (uart_frag u).
   Proof. rewrite /uart_frag. apply _. Qed.
   Global Instance plic_frag_timeless p : Timeless (plic_frag p).
   Proof. rewrite /plic_frag. apply _. Qed.
-  Global Instance dev_inv_body_timeless : Timeless dev_inv_body.
+  Global Instance dev_inv_body_timeless γ : Timeless (dev_inv_body γ).
   Proof. rewrite /dev_inv_body. apply _. Qed.
 
-  Lemma wp_dev_loop Φ :
-    inv devN dev_inv_body -∗ wire_inv -∗
+  (* The device invariant as a client-facing, duplicable proposition.  The
+     device state is shared between the device thread and every CPU that
+     touches UART/PLIC MMIO, so NO proof may hold [uart_frag]/[plic_frag]
+     across a step: a client threads [dev_inv] and borrows the fragment by
+     opening it around the access. *)
+  Definition dev_inv (γ : uart_names) : iProp Σ := inv devN (dev_inv_body γ).
+
+  Global Instance dev_inv_persistent γ : Persistent (dev_inv γ).
+  Proof. rewrite /dev_inv. apply _. Qed.
+
+  Lemma dev_inv_alloc E γ : dev_inv_body γ ={E}=∗ dev_inv γ.
+  Proof. iIntros "Hbody". rewrite /dev_inv. by iApply inv_alloc. Qed.
+
+  (* Allocate all four UART ghosts from an initial device state.  Hands back
+     the invariant's halves (as [dev_inv_body]'s ghost conjuncts) together
+     with the caller's own resources: the exclusive transmitter, the opening
+     accepted-trace bound, and -- IF the initial DLAB is already clear, which
+     is the caller's obligation to check -- the permanent [uart_dlab_off].
+     Freezing it here is what makes the fact usable as a precondition
+     downstream, and is exactly why device init must precede this call. *)
+  Lemma uart_ghosts_alloc (u : uart_state) :
+    uart_dlab u = false ->
+    ⊢ |==> ∃ γ, uart_sent_auth γ u ∗ uart_out_auth γ u ∗
+                uart_tx_auth γ u ∗ uart_dlab_auth γ u ∗
+                uart_tx_own γ (uart_acc u) ∗ uart_sent γ (uart_acc u) ∗
+                uart_dlab_off γ.
+  Proof.
+    intro Hdlab.
+    iMod (own_alloc (●ML (uart_acc u : list (leibnizO (bv 8))))) as (γa) "Ha";
+      [apply mono_list_auth_valid|].
+    iMod (own_alloc (●ML (u_out u : list (leibnizO (bv 8))))) as (γb) "Hb";
+      [apply mono_list_auth_valid|].
+    iMod (ghost_var_alloc (uart_acc u)) as (γc) "Hc".
+    (* allocate DLAB directly at [false]: [Hdlab] says that IS the initial
+       value, and it keeps both halves in the shape the freeze wants *)
+    iMod (own_alloc (to_dfrac_agree (DfracOwn 1) (false : leibnizO bool)))
+      as (γd) "Hd"; [done|].
+    (* peel the caller's permanent accepted-trace bound off the authority *)
+    iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
+    iDestruct "Ha" as "[Ha Hsent]".
+    (* split the ghost_var into the invariant's half and the caller's token *)
+    iEval (rewrite -Qp.half_half) in "Hc".
+    iDestruct (ghost_var_split with "Hc") as "[Hc1 Hc2]".
+    (* split the DLAB agree into the invariant's half and one to freeze *)
+    iEval (rewrite -Qp.half_half -dfrac_op_own dfrac_agree_op own_op) in "Hd".
+    iDestruct "Hd" as "[Hd1 Hd2]".
+    iMod (uart_dlab_freeze (UartNames γa γb γc γd) with "[Hd2]") as "#Hoff".
+    { rewrite /uart_dlab_is /=. iExact "Hd2". }
+    iModIntro. iExists (UartNames γa γb γc γd).
+    rewrite /uart_sent_auth /uart_out_auth /uart_tx_auth /uart_tx_own
+            /uart_dlab_auth /uart_dlab_is /uart_sent /=.
+    rewrite Hdlab.
+    iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hoff".
+  Qed.
+
+  Lemma wp_dev_loop γ Φ :
+    dev_inv γ -∗ wire_inv -∗
     WP (DevLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "#Hinv #Hwinv".
+    iIntros "#Hinv #Hwinv". rewrite /dev_inv.
     iLöb as "IH".
     iApply wp_dev_step.
     iIntros (gr d) "[Hgr Hdev]".
     iInv "Hinv" as ">Hbody" "Hclose".
     iInv "Hwinv" as ">Hwbody" "Hwclose".
-    iDestruct "Hbody" as (u p) "[Hu Hp]".
+    iDestruct "Hbody" as (u p) "(Hu & Hp & Hacc & Hout & Htx & Hdl)".
     iDestruct "Hwbody" as (seip meip) "Hwires".
     iDestruct (dev_interp_agree with "Hdev Hu Hp") as %[Hu Hp].
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' gr' Hstep).
     iMod "Hmask" as "_".
-    destruct Hstep as [b u' Htx | b u' Hrx | p' Hirq Hlatch | c].
-    - (* a byte leaves the tx FIFO *)
+    destruct Hstep as [b u' Htx0 | b u' Hrx | p' Hirq Hlatch | c].
+    - (* a byte leaves the tx FIFO: it moves from the head of [u_tx] to the
+         tail of [u_out], so the accepted trace is UNCHANGED. *)
+      rewrite Hu in Htx0.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
+      (* the accepted trace, the transmitter token and DLAB are all untouched;
+         only the transmitted prefix grows, by exactly the drained byte. *)
+      iDestruct (uart_sent_auth_stable _ u u'
+                   (uart_tx_pop_acc _ _ _ Htx0) with "Hacc") as "Hacc".
+      iDestruct (uart_tx_auth_stable _ u u'
+                   (uart_tx_pop_acc _ _ _ Htx0) with "Htx") as "Htx".
+      iDestruct (uart_dlab_auth_stable _ u u'
+                   (uart_tx_pop_dlab _ _ _ Htx0) with "Hdl") as "Hdl".
+      iMod (uart_out_update _ u u' with "Hout") as "[Hout _]".
+      { rewrite (uart_tx_pop_out _ _ _ Htx0). by apply prefix_app_r. }
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu' Hp]") as "_".
+      iMod ("Hclose" with "[Hu' Hp Hacc Hout Htx Hdl]") as "_".
       { iNext. iExists u', p. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
-    - (* a byte arrives from the outside world *)
+    - (* a byte arrives from the outside world: rx only, trace untouched *)
+      rewrite Hu in Hrx.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
+      (* rx touches neither the tx side nor LCR: every ghost is unchanged *)
+      iDestruct (uart_sent_auth_stable _ u u'
+                   (uart_rx_push_acc _ b _ Hrx) with "Hacc") as "Hacc".
+      iDestruct (uart_tx_auth_stable _ u u'
+                   (uart_rx_push_acc _ b _ Hrx) with "Htx") as "Htx".
+      iDestruct (uart_dlab_auth_stable _ u u'
+                   (uart_rx_push_dlab _ b _ Hrx) with "Hdl") as "Hdl".
+      iDestruct (uart_out_auth_stable _ u u'
+                   (uart_rx_push_out _ b _ Hrx) with "Hout") as "Hout".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu' Hp]") as "_".
+      iMod ("Hclose" with "[Hu' Hp Hacc Hout Htx Hdl]") as "_".
       { iNext. iExists u', p. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
-    - (* the gateway latches the UART's interrupt level *)
+    - (* the gateway latches the UART's interrupt level: the UART is untouched *)
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu Hp']") as "_".
+      iMod ("Hclose" with "[Hu Hp' Hacc Hout Htx Hdl]") as "_".
       { iNext. iExists u, p'. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
@@ -412,7 +762,7 @@ Section DevLoop.
         intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
         rewrite /seip' decide_False; [ done | ].
         intros ->. apply Hne, elem_of_singleton. reflexivity. }
-      iMod ("Hclose" with "[Hu Hp]") as "_".
+      iMod ("Hclose" with "[Hu Hp Hacc Hout Htx Hdl]") as "_".
       { iNext. iExists u, p. iFrame. }
       iModIntro. iFrame "Hgr' Hdev". iApply "IH".
   Qed.
