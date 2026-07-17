@@ -14,10 +14,12 @@ Local Open Scope Z_scope.
 (* A functional partial interpreter [exec] mirroring the relational [run] *)
 (* of RiscvModelLang, plus the DETERMINISM bridge:                         *)
 (*   exec m s = Some (x,s')  ->  run m s x s'  /\  run m s is unique.      *)
-(* From that, a single reusable WP rule [wp_exec_step]: a deterministic    *)
-(* op whose [exec] yields [Some (tt, s')] gives a WP step, with NO         *)
-(* per-instruction determinism reasoning (the unique-run discharges        *)
-(* wp_lift_step's "forall next-state" obligation).                         *)
+(* From that, a single reusable WP rule [wp_exec_step]: [prim_step] picks  *)
+(* the tick flag nondeterministically, so the caller supplies exec         *)
+(* witnesses for BOTH [riscv_step false] and [riscv_step true] (each       *)
+(* branch deterministic; the unique-run discharges wp_lift_step's          *)
+(* "forall next-state" obligation), and the continuation re-establishes   *)
+(* [mstate_interp] for whichever successor the step took.                  *)
 (*                                                                         *)
 (* [run]/[prim_step]/RiscvModelLang are UNCHANGED; [exec] is auxiliary.    *)
 (*                                                                         *)
@@ -153,35 +155,41 @@ Section WPExec.
      that hart's [mstate] view, and restore the global bridge afterwards.  Every
      leaf WP is written in terms of the single-hart [mstate_interp] and never
      sees [gregs]. *)
-  Lemma wp_exec_step E Φ :
-    (∀ σ, mstate_interp σ ={E,∅}=∗
-       ∃ σ', ⌜exec riscv_step σ = Some (tt, σ')⌝ ∗
-          ▷ (|={∅,E}=> mstate_interp σ' ∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}))
-    ⊢ WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+  Lemma wp_exec_step Φ :
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+       ∃ σ' σ'', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
+                 ⌜exec (riscv_step true)  σ = Some (tt, σ'')⌝ ∗
+          ▷ (∀ tick : bool, |={∅,⊤}=> mstate_interp (if tick then σ'' else σ') ∗
+                            WP (Loop : expr riscv_lang) {{ Φ }}))
+    ⊢ WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev)) with "[Hri Hmem Hdev]")
-      as (σ') "[%Hexec Hk]".
+      as (σ' σ'') "(%Hexecf & %Hexect & Hk)".
     { rewrite /mstate_interp /=. iFrame "Hri Hmem Hdev". }
-    pose proof (exec_run_det _ _ _ _ Hexec) as [Hrun Huniq].
+    pose proof (exec_run_det _ _ _ _ Hexecf) as [Hrunf Huniqf].
+    pose proof (exec_run_det _ _ _ _ Hexect) as [Hrunt Huniqt].
     iModIntro. iSplitR.
     { iPureIntro.
       exists [], (LoopE cpu_id),
              (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem) σ'.(mdev)), [].
       left.
       exists cpu_id. split; [done|]. split; [done|]. split; [done|]. split; [done|].
-      exists tt, σ'. split; [exact Hrun|done]. }
+      exists false, tt, σ'. split; [exact Hrunf|done]. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(cpu2 & Hcpu2 & -> & _ & -> & u2 & σ2' & Hrun2 & ->)
+    destruct Hstep as [(cpu2 & Hcpu2 & -> & _ & -> & tick2 & u2 & σ2' & Hrun2 & ->)
                       |(Hcontra & _)]; last discriminate Hcontra.
     injection Hcpu2 as <-.
-    destruct (Huniq _ _ Hrun2) as [_ ->].
-    iMod "Hk" as "[(Hri' & Hmem' & Hdev') HWP]".
-    iDestruct ("Hclose" with "Hri'") as "Hgr'".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
+    iSpecialize ("Hk" $! tick2).
+    destruct tick2;
+      [ destruct (Huniqt _ _ Hrun2) as [_ ->]
+      | destruct (Huniqf _ _ Hrun2) as [_ ->] ];
+      iMod "Hk" as "[(Hri' & Hmem' & Hdev') HWP]";
+      iDestruct ("Hclose" with "Hri'") as "Hgr'";
+      iIntros "_ !>"; rewrite /state_interp /=; iFrame "Hgr' Hmem' Hdev' HWP".
   Qed.
 
 End WPExec.
@@ -199,12 +207,12 @@ Section WPDev.
      which needs its ghost-map fragment unless the written value is
      unchanged) and the device interpretation.  [gen_heap_interp] is framed:
      no device step touches the byte memory. *)
-  Lemma wp_dev_step E Φ :
-    (∀ gr d, gregs_interp gr ∗ dev_interp d ={E,∅}=∗
-       ▷ (∀ d' gr', ⌜dev_step d gr d' gr'⌝ ={∅,E}=∗
+  Lemma wp_dev_step Φ :
+    (∀ gr d, gregs_interp gr ∗ dev_interp d ={⊤,∅}=∗
+       ▷ (∀ d' gr', ⌜dev_step d gr d' gr'⌝ ={∅,⊤}=∗
             gregs_interp gr' ∗ dev_interp d' ∗
-            WP (DevLoop : expr riscv_lang) @ E {{ Φ }}))
-    ⊢ WP (DevLoop : expr riscv_lang) @ E {{ Φ }}.
+            WP (DevLoop : expr riscv_lang) {{ Φ }}))
+    ⊢ WP (DevLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
@@ -240,7 +248,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 (* RiscvModelExecClose.v                                                   *)
 (*                                                                         *)
 (* Close the ADD weakest-precondition via the deterministic-step route:    *)
-(* prove [exec riscv_step s = Some (tt, s_final)] and apply [wp_exec_step]  *)
+(* prove [exec (riscv_step false) s = Some (tt, s_final)] and apply         *)
+(* [wp_exec_step]                                                            *)
 (* (no Hcycle, no per-instruction determinism).                            *)
 (* ====================================================================== *)
 
@@ -331,6 +340,26 @@ Lemma exec_bind0_Some {Y} (m : M unit) (n : M Y) s u st :
   exec m s = Some (u, st) -> exec (Defs.bind0 m n) s = exec n st.
 Proof. intros H. rewrite exec_bind0 H. reflexivity. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* The tick-branch witness for [wp_exec_step]: [riscv_step true] runs the  *)
+(* same [try_step] and then [tick_clock] from the no-tick successor, so a  *)
+(* caller composes its no-tick witness with a [tick_clock] exec fact.      *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma exec_riscv_step_tick (s s' s'' : mstate) :
+  exec (riscv_step false) s = Some (tt, s') ->
+  exec (tick_clock tt) s' = Some (tt, s'') ->
+  exec (riscv_step true) s = Some (tt, s'').
+Proof.
+  intros H1 H2.
+  unfold riscv_step in H1 |- *.
+  rewrite exec_bind in H1. rewrite exec_bind.
+  destruct (exec (try_step 0 false) s) as [[b s1]|]; [|discriminate].
+  cbn beta iota in H1 |- *.
+  rewrite exec_returnm in H1.
+  inversion H1; subst. exact H2.
+Qed.
+
 (* exec-leaves (functional twins of run_read_reg / run_write_reg). *)
 Lemma exec_read_reg (r : register) s :
   exec (Defs.read_reg r : M _) s = Some (register_lookup r s.(sregs), s).
@@ -380,7 +409,7 @@ Section StepHartActive.
                       (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
          else s_tick.
 
-  Lemma exec_riscv_step_hart_active : exec riscv_step s = Some (tt, s_final).
+  Lemma exec_riscv_step_hart_active : exec (riscv_step false) s = Some (tt, s_final).
   Proof using All.
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _

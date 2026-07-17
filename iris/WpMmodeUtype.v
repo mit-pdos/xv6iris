@@ -21,10 +21,9 @@ Section WpAuipcGpr.
      register: the result is [pc + auipc_off imm].  [gpr_file] is indexed by
      [regidx] and complete, so no membership obligation; [rd <> 0] is kept
      (the write to x0 is a no-op). *)
-  Lemma wp_auipc_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_auipc_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (imm : mword 20) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
@@ -36,12 +35,12 @@ Section WpAuipcGpr.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec pc (auipc_off imm))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc false (UTYPE (imm, Regidx rd, AUIPC)) pmpcfg0
-              HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr Φ pc false (UTYPE (imm, Regidx rd, AUIPC)) pmpcfg0
+              Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
@@ -99,10 +98,9 @@ Section WpLuiGpr.
      the ABSOLUTE [luival imm] (not PC-relative).  [gpr_file] is indexed by
      [regidx] and complete, so no membership obligation; [rd <> 0] is kept
      (the write to x0 is a no-op). *)
-  Lemma wp_lui_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rd : mword 5)
+  Lemma wp_lui_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rd : mword 5)
       (imm : mword 20) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
@@ -114,12 +112,12 @@ Section WpLuiGpr.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc is_rvc (UTYPE (imm, Regidx rd, LUI)) pmpcfg0
-              HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr Φ pc is_rvc (UTYPE (imm, Regidx rd, LUI)) pmpcfg0
+              Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))

@@ -304,5 +304,5 @@ Proof.
     { apply disjoint_singleton_l, not_elem_of_singleton. discriminate. }
     rewrite !big_sepS_singleton. done. }
   iModIntro. iSplitR; [done|].
-  iApply (wp_dev_loop with "Hinv Hwinv"); solve_ndisj.
+  iApply (wp_dev_loop with "Hinv Hwinv").
 Qed.

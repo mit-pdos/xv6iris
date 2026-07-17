@@ -19,12 +19,11 @@ Section WpSmodeRtype.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_cadd_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_cadd_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -45,16 +44,16 @@ Section WpSmodeRtype.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (add_vec (m !!! Regidx rd) (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd rd rs2
+    unshelve iApply (wp_gpr_write_s_config root_ppn Φ pc rd rd rs2
               (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD))
               (add_vec (m !!! Regidx rd) (m !!! Regidx rs2))
               m mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
               _
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva Hvb.
@@ -65,12 +64,11 @@ Section WpSmodeRtype.
     unfold gpr_rd_val. rewrite Hva Hvb. reflexivity.
   Qed.
 
-  Lemma wp_cmv_gpr_s_config (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_cmv_gpr_s_config (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -90,16 +88,16 @@ Section WpSmodeRtype.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec zero_reg (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config root_ppn E Φ pc rd rs2 rs2
+    unshelve iApply (wp_gpr_write_s_config root_ppn Φ pc rd rs2 rs2
               (RTYPE (Regidx rs2, zreg, Regidx rd, ADD))
               (add_vec zero_reg (m !!! Regidx rs2))
               m mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd _
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd _
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
@@ -112,27 +110,26 @@ Section WpSmodeRtype.
       rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_cmv_gpr_s_config_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_cmv_gpr_s_config_scfg (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) -∗
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec zero_reg (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_cmv_gpr_s_config root_ppn E Φ pc rd rs2 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
+    iApply (wp_cmv_gpr_s_config root_ppn Φ pc rd rs2 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
@@ -141,10 +138,9 @@ Section WpSmodeRtype.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-  Lemma wp_cmv_gpr_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_cmv_gpr_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗
@@ -153,17 +149,17 @@ Section WpSmodeRtype.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec zero_reg (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_cmv_gpr_s_config root_ppn E Φ pc rd rs2 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
+    iApply (wp_cmv_gpr_s_config root_ppn Φ pc rd rs2 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
@@ -175,10 +171,9 @@ Section WpSmodeRtype.
   (* Specific per-instruction leaf lemmas (instr precondition fixes the RTYPE op;
      a pure map-form value hypothesis replaces the generic [exec (execute i)]). *)
 
-  Lemma wp_sltu_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_sltu_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     zero_extend' 64 (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2))) = wval ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
@@ -186,23 +181,22 @@ Section WpSmodeRtype.
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs2
+    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ Φ pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) wval m (dq:=dq)
-              HN Hrd _
+ Hrd _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva Hvb.
     rewrite (exec_execute_RTYPE_SLTU_gpr rs2 rs1 rd s_pc Hrd).
     unfold gpr_sltu_val. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_cor_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_cor_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     or_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
@@ -210,23 +204,22 @@ Section WpSmodeRtype.
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_scfg root_ppn γ E Φ pc rd rs1 rs2
+    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_scfg root_ppn γ Φ pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) wval m (dq:=dq)
-              HN Hrd _
+ Hrd _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva Hvb.
     rewrite (exec_execute_RTYPE_OR_gpr rs2 rs1 rd s_pc Hrd).
     unfold gpr_or_val. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_sub_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_sub_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
@@ -234,13 +227,13 @@ Section WpSmodeRtype.
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs2
+    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ Φ pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m (dq:=dq)
-              HN Hrd _
+ Hrd _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva Hvb.
     change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)))
@@ -250,10 +243,9 @@ Section WpSmodeRtype.
     unfold gpr_sub_val. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_add_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_add_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     add_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
@@ -261,13 +253,13 @@ Section WpSmodeRtype.
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs2
+    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ Φ pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) wval m (dq:=dq)
-              HN Hrd _
+ Hrd _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva Hvb.
     change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))

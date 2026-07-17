@@ -169,7 +169,7 @@ Section WpMemsetPage.
   (*  wp_memset_s_full_kt's ~30 per-byte side conditions are DERIVED from   *)
   (*  [page_valid p]; the ~15 standard S-mode config facts are kept.        *)
   (* =================================================================== *)
-  Lemma wp_memset_page (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_memset_page (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (cval : mword 64) (n : nat)
       (γ : gname) {dq : dfrac} :
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -187,7 +187,6 @@ Section WpMemsetPage.
     (* argument setup by the caller before the [jal memset] *)
     m0 !!! Regidx a1_idx = cval ->
     m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
-    ↑minstretN ⊆ E ->
     (* the caller's return target's low bit is clear (2-aligned target OK: Zca return) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γ dq -∗
@@ -203,10 +202,10 @@ Section WpMemsetPage.
       page_own p -∗
       gpr_file mfin -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt Hn2 Hpv Hcval Ha2 HN Hret0.
+    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt Hn2 Hpv Hcval Ha2 Hret0.
     iIntros "Hsm Htlbinv
              #Htext Hpc Hfile Hstk Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
@@ -220,10 +219,10 @@ Section WpMemsetPage.
     (* --- apply the whole-function memset WP.  The Sv39 geometry is now
        derived inside the memset proof (at the [wp_sb_s] leaf); only the
        argument-setup couplings [Hbexec_add / Hcount0 / Hret0 / Hcmp] remain. --- *)
-    iApply (wp_memset_s_full_kt root_ppn E Φ m0 4096
+    iApply (wp_memset_s_full_kt root_ppn Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) olds n
               γ (dq:=dq)
-              Hn2 HN
+              Hn2
               (* Hvalue_add : the add computes a4 := 4096 + p (a4 := a2 + a0) *)
               ltac:(match goal with
                     | |- context [ ?mm !!! Regidx (mword_of_int 12) ] =>

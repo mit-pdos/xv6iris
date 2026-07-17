@@ -298,10 +298,9 @@ Section WpCsrwGprNewC.
      (preserved unconditionally from [ms_old] by the legalizer, hence still
      needing the old invariant fact here), no old-value MIE/MPRV fact is
      threaded through. ---- *)
-  Lemma wp_csrw_mstatus_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_mstatus_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     mmode_config (DfracOwn 1) -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
@@ -318,14 +317,14 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (Hpmp) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & #Hinv & Hhs & Hpriv0 & Hmst)".
     iDestruct "Hmst" as (ms0) "(Hms0 & %HmIE & %HMPRV & %HSXL)".
-    iApply (wp_instr_config E Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
-              pmpcfg0 ms0 HN Hpmp HmIE
+    iApply (wp_instr_config Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
+              pmpcfg0 ms0 Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".
@@ -382,10 +381,9 @@ Section WpCsrwGprNewC.
      the chain proves [pmp_allows_all (pmpcfg_written ...)] separately for the
      instructions that follow.  mstatus is unchanged, so the continuation gets
      an opaque REBUILT [mmode_config (DfracOwn 1)]. ---- *)
-  Lemma wp_csrw_pmpcfg0_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_pmpcfg0_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     mmode_config (DfracOwn 1) -∗
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
@@ -396,14 +394,14 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg_written (m !!! Regidx rs1) pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (Hpmp) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & #Hinv & Hhs & Hpriv0 & Hmst)".
     iDestruct "Hmst" as (ms0) "(Hms0 & %HmIE & %HMPRV & %HSXL)".
-    iApply (wp_instr_config E Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
-              pmpcfg0 ms0 HN Hpmp HmIE
+    iApply (wp_instr_config Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
+              pmpcfg0 ms0 Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -453,10 +451,9 @@ Section WpCsrwGprNewC.
      receives the same raw cells with mstatus at the EXPLICIT legalized
      value -- no re-quantification over a hidden old value, so the chain
      keeps a single mstatus symbol end-to-end. ---- *)
-  Lemma wp_csrw_mstatus_raw E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_mstatus_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : gmap regidx (mword 64)) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
     hw_config -∗
@@ -474,12 +471,12 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config E Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
-              pmpcfg0 ms0 HN Hpmp HmIE
+    iIntros (Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_config Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
+              pmpcfg0 ms0 Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".
@@ -534,10 +531,9 @@ Section WpCsrwGprNewC.
      touch mstatus), so a chain that pins the value across the write keeps
      it without a fresh existential.  pmpcfg_n itself is FULL (it is the
      written cell); the continuation receives the concrete written value. ---- *)
-  Lemma wp_csrw_pmpcfg0_raw E (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_pmpcfg0_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : gmap regidx (mword 64)) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
     hw_config -∗
@@ -555,12 +551,12 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg_written (m !!! Regidx rs1) pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config E Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
-              pmpcfg0 ms0 HN Hpmp HmIE
+    iIntros (Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_config Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
+              pmpcfg0 ms0 Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

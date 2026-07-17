@@ -29,7 +29,7 @@ Section Lock.
   Context `{!riscvGS Σ, !lockG Σ}.
 
   (* sibling of [minstretN]; the two are disjoint by construction, so a leaf
-     can open [is_lock] INSIDE the step engine's [E ∖ ↑minstretN] callback. *)
+     can open [is_lock] INSIDE the step engine's [⊤ ∖ ↑minstretN] callback. *)
   Definition lockN : namespace := nroot .@ "xv6spinlock".
 
   Definition locked (γ : gname) : iProp Σ := own γ (Excl ()).

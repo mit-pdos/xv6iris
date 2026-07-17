@@ -143,22 +143,21 @@ Qed.
   (*  stripping it internally), that later strips [IH] and closes the    *)
   (*  loop back onto [pc_spin] with every resource unchanged.           *)
   (* ================================================================= *)
-  Lemma wp_spin E (Φ : mval -> iProp Σ) (m : gmap regidx (mword 64))
+  Lemma wp_spin (Φ : mval -> iProp Σ) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc_spin -∗
     gpr_file m -∗
     kernel_text -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     assert (Hbit0 : eq_vec (access_vec_dec pc_spin 0) ('b"0") = true)
       by (vm_compute; reflexivity).
     assert (Htgt : add_vec pc_spin (sign_extend' 64 jimm_spin) = pc_spin)
       by (apply bv_eq; vm_compute; reflexivity).
-    iIntros (HN Hpmp) "Hmm Hpmpc Hpc Hfile #Htext".
+    iIntros (Hpmp) "Hmm Hpmpc Hpc Hfile #Htext".
     (* pull the (persistent, constant) misa.C fact out once, so it survives Löb *)
     iDestruct "Hmm" as "(#Hhw & Hmmrest)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -173,7 +172,7 @@ Qed.
     iPoseProof (spin_instr with "Htext") as "Hinstr".
     iDestruct "Hpc" as "[Hpc Hnpc]".
     (* one leaf step of [c.j spin]; [wp_instr] hands back [▷ WP Loop] *)
-    iApply (wp_instr E Φ pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 HN Hpmp
+    iApply (wp_instr Φ pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 Hpmp
               with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

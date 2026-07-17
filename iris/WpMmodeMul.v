@@ -70,10 +70,9 @@ Section WpMulGpr.
      run the register-generic execute, and rebuild the file.  Sources may be x0
      ([gpr_pt_value] reads them uniformly); [rd <> 0] is kept (write to x0 is a
      no-op, and [exec_execute_MUL_gpr] assumes it). *)
-  Lemma wp_mul_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 rd : mword 5)
+  Lemma wp_mul_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 rd : mword 5)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn 1) -∗
@@ -90,12 +89,12 @@ Section WpMulGpr.
              (mulop_mul.(mul_op_signed_rs2))
              (m !!! Regidx rs1) (m !!! Regidx rs2)
              (mulop_mul.(mul_op_result_part)))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0
-              HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr Φ pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0
+              Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     (* completeness gives the (total) lookups for rs1, rs2 and rd *)

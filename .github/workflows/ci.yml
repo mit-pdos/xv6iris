@@ -98,3 +98,21 @@ jobs:
         run: |
           make SWITCH="$GITHUB_WORKSPACE" iris/CoqMakefile
           opam exec -- make -C iris -f CoqMakefile -j"$(nproc)"
+
+      # ---- 4. Dead-code report (iris/) ----
+      # Informational only: find_dead.py reads the .glob files the step above
+      # just emitted and lists definitions/lemmas nothing references.  Its hits
+      # are heuristic (hint-DB-only lemmas and not-yet-consumed top-level
+      # theorems can appear), so the output is logged for a human to read and
+      # the step never fails the build.  Needs no opam env — it is plain Python
+      # over .glob/.v text.
+      #
+      # This runs only if the build succeeded (a step with no `if:` is skipped
+      # once an earlier one fails), which is also what makes the report
+      # meaningful at all: find_dead.py scans whatever .glob files it finds and
+      # says nothing about the rest, so on an unbuilt tree it reports a
+      # cheerful "0 unreferenced ... (of 0 globs scanned)".  Read the glob count
+      # in the trailing == line before trusting a clean report.
+      - name: Dead-code report (iris/, informational)
+        working-directory: iris
+        run: python3 find_dead.py --dir . --triage

@@ -29,12 +29,11 @@ Section WpUserretAll.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_userret (kroot kl1 kl0 uroot ul1 ul0 tfp : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_userret (kroot kl1 kl0 uroot ul1 ul0 tfp : mword 44) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (usatp : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64)
       (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
       (rg2 rg1 rg0t rg0f rgk2 rgk1 rgk0 : PMA_Region) {dqk dqm : dfrac} :
-    ↑minstretN ⊆ E ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -168,10 +167,10 @@ Section WpUserretAll.
       pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 112)))) (Z.sub pagesize_bits 1) 0))) va0f dqm -∗
       ktramp_pte_bytes kroot kl1 kl0 dqk -∗
       pte_super_bytes kroot (DfracOwn 1) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HN HSIE HMPRV HSXL HTVM HMXR Hmm Hpmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup
+    intros HSIE HMPRV HSXL HTVM HMXR Hmm Hpmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup
       Ha0 HuMode Huasid Huppn HrU2 HrU1 HrU0t HrU0f HrK2 HrK1 HrK0.
     iIntros "#Hkt #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
              Hktlb Hktramp Hupte Hpc Hfile
@@ -247,20 +246,20 @@ Section WpUserretAll.
     iPoseProof (ui_cld_a0 with "Hkt") as "Hi_va0f".
     iPoseProof (ui_sret with "Hkt") as "Hi_sret".
     (* ================= entry: the page-table switch ================= *)
-    iApply (wp_userret_entry kroot kl1 kl0 uroot ul1 ul0 tfp E Φ m usatp
+    iApply (wp_userret_entry kroot kl1 kl0 uroot ul1 ul0 tfp Φ m usatp
               mstatus0 mie_v mdv0 menvcfg0 rg2 rg1 rg0t rg0f rgk2 rgk1 rgk0
-              HN HSIE HSXL HTVM Hmm HPBMTE Hmenvval0 Ha0 HuMode Huasid Huppn
+ HSIE HSXL HTVM Hmm HPBMTE Hmenvval0 Ha0 HuMode Huasid Huppn
               HrU2 HrU1 HrU0t HrU0f HrK2 HrK1 HrK0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hktramp Hupte
                     Hpc Hfile Hi_sfence1 Hi_csrw Hi_sfence2").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hktramp Hsuper".
     (* ---- lui @ 0xa8 ---- *)
-    iApply (wp_ualu uroot ul1 ul0 tfp E Φ 0xa8 false ai_lui m
+    iApply (wp_ualu uroot ul1 ul0 tfp Φ 0xa8 false ai_lui m
               usatp
               (mword_of_int 33554432 : mword 64)
               (fun _ : mstate => luival (mword_of_int 0x2000))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(intro s; exact (exec_execute_UTYPE_LUI_gpr (mword_of_int 10) (mword_of_int 0x2000) s))
               ltac:(intros s _; apply bv_eq; vm_compute; reflexivity)
               Ha0
@@ -289,12 +288,12 @@ Section WpUserretAll.
                     = Some (regval_into_reg (mword_of_int 33554432 : mword 64)))
       by (apply lookup_insert).
     (* ---- addiw @ 0xac ---- *)
-    iApply (wp_ualu uroot ul1 ul0 tfp E Φ 0xac true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)
+    iApply (wp_ualu uroot ul1 ul0 tfp Φ 0xac true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)
               (regval_into_reg (mword_of_int 33554432 : mword 64))
               (mword_of_int 33554431 : mword 64)
               (gpr_addiw_val (mword_of_int 10) (sign_extend' 12 (mword_of_int 63 : mword 6)))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(intro s; exact (exec_execute_ADDIW_gpr (mword_of_int 10) (mword_of_int 10) (sign_extend' 12 (mword_of_int 63 : mword 6)) s))
               ltac:(intros s Hl; unfold gpr_addiw_val;
                     replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false
@@ -326,12 +325,12 @@ Section WpUserretAll.
                     = Some (regval_into_reg (mword_of_int 33554431 : mword 64)))
       by (apply lookup_insert).
     (* ---- slli @ 0xae ---- *)
-    iApply (wp_ualu uroot ul1 ul0 tfp E Φ 0xae true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m))
+    iApply (wp_ualu uroot ul1 ul0 tfp Φ 0xae true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m))
               (regval_into_reg (mword_of_int 33554431 : mword 64))
               (mword_of_int TRAPFRAME : mword 64)
               (gpr_slli_val (mword_of_int 10) (mword_of_int 13))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(intro s; exact (exec_execute_SHIFTIOP_SLLI_gpr (mword_of_int 10) (mword_of_int 10) (mword_of_int 13) s))
               ltac:(intros s Hl; unfold gpr_slli_val, gpr_src;
                     replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false
@@ -368,8 +367,8 @@ Section WpUserretAll.
     assert (Ha0_0 : M0 !! Regidx (mword_of_int 10) = Some (mword_of_int TRAPFRAME))
       by (unfold M0; apply lookup_insert).
     (* ---- ld x1, 40(a0) @ 0xb0 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xb0 40 (mword_of_int 1) false M0 vra
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xb0 40 (mword_of_int 1) false M0 vra
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_0
@@ -403,8 +402,8 @@ Section WpUserretAll.
     { unfold M1. rewrite lookup_insert_ne; [exact Ha0_0 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x2, 48(a0) @ 0xb4 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xb4 48 (mword_of_int 2) false M1 vsp
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xb4 48 (mword_of_int 2) false M1 vsp
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_1
@@ -438,8 +437,8 @@ Section WpUserretAll.
     { unfold M2. rewrite lookup_insert_ne; [exact Ha0_1 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x3, 56(a0) @ 0xb8 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xb8 56 (mword_of_int 3) false M2 vgp
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xb8 56 (mword_of_int 3) false M2 vgp
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -473,8 +472,8 @@ Section WpUserretAll.
     { unfold M3. rewrite lookup_insert_ne; [exact Ha0_2 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x4, 64(a0) @ 0xbc ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xbc 64 (mword_of_int 4) false M3 vtp
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xbc 64 (mword_of_int 4) false M3 vtp
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_3
@@ -508,8 +507,8 @@ Section WpUserretAll.
     { unfold M4. rewrite lookup_insert_ne; [exact Ha0_3 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x5, 72(a0) @ 0xc0 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xc0 72 (mword_of_int 5) false M4 vt0
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xc0 72 (mword_of_int 5) false M4 vt0
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_4
@@ -543,8 +542,8 @@ Section WpUserretAll.
     { unfold M5. rewrite lookup_insert_ne; [exact Ha0_4 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x6, 80(a0) @ 0xc4 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xc4 80 (mword_of_int 6) false M5 vt1
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xc4 80 (mword_of_int 6) false M5 vt1
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_5
@@ -578,8 +577,8 @@ Section WpUserretAll.
     { unfold M6. rewrite lookup_insert_ne; [exact Ha0_5 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x7, 88(a0) @ 0xc8 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xc8 88 (mword_of_int 7) false M6 vt2
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xc8 88 (mword_of_int 7) false M6 vt2
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_6
@@ -614,8 +613,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x8, 96(a0) @ 0xcc ---- *)
     iEval (change (ai_cld_tgt 0 12) with (ai_ld 8 96)) in "Hi_vs0".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xcc 96 (mword_of_int 8) true M7 vs0
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xcc 96 (mword_of_int 8) true M7 vs0
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_7
@@ -650,8 +649,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x9, 104(a0) @ 0xce ---- *)
     iEval (change (ai_cld_tgt 1 13) with (ai_ld 9 104)) in "Hi_vs1".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xce 104 (mword_of_int 9) true M8 vs1
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xce 104 (mword_of_int 9) true M8 vs1
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_8
@@ -686,8 +685,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x11, 120(a0) @ 0xd0 ---- *)
     iEval (change (ai_cld_tgt 3 15) with (ai_ld 11 120)) in "Hi_va1".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xd0 120 (mword_of_int 11) true M9 va1
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xd0 120 (mword_of_int 11) true M9 va1
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_9
@@ -722,8 +721,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x12, 128(a0) @ 0xd2 ---- *)
     iEval (change (ai_cld_tgt 4 16) with (ai_ld 12 128)) in "Hi_va2".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xd2 128 (mword_of_int 12) true M10 va2
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xd2 128 (mword_of_int 12) true M10 va2
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_10
@@ -758,8 +757,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x13, 136(a0) @ 0xd4 ---- *)
     iEval (change (ai_cld_tgt 5 17) with (ai_ld 13 136)) in "Hi_va3".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xd4 136 (mword_of_int 13) true M11 va3
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xd4 136 (mword_of_int 13) true M11 va3
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_11
@@ -794,8 +793,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x14, 144(a0) @ 0xd6 ---- *)
     iEval (change (ai_cld_tgt 6 18) with (ai_ld 14 144)) in "Hi_va4".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xd6 144 (mword_of_int 14) true M12 va4
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xd6 144 (mword_of_int 14) true M12 va4
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_12
@@ -830,8 +829,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x15, 152(a0) @ 0xd8 ---- *)
     iEval (change (ai_cld_tgt 7 19) with (ai_ld 15 152)) in "Hi_va5".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xd8 152 (mword_of_int 15) true M13 va5
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xd8 152 (mword_of_int 15) true M13 va5
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_13
@@ -865,8 +864,8 @@ Section WpUserretAll.
     { unfold M14. rewrite lookup_insert_ne; [exact Ha0_13 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x16, 160(a0) @ 0xda ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xda 160 (mword_of_int 16) false M14 va6
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xda 160 (mword_of_int 16) false M14 va6
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_14
@@ -900,8 +899,8 @@ Section WpUserretAll.
     { unfold M15. rewrite lookup_insert_ne; [exact Ha0_14 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x17, 168(a0) @ 0xde ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xde 168 (mword_of_int 17) false M15 va7
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xde 168 (mword_of_int 17) false M15 va7
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_15
@@ -935,8 +934,8 @@ Section WpUserretAll.
     { unfold M16. rewrite lookup_insert_ne; [exact Ha0_15 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x18, 176(a0) @ 0xe2 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xe2 176 (mword_of_int 18) false M16 vs2
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xe2 176 (mword_of_int 18) false M16 vs2
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_16
@@ -970,8 +969,8 @@ Section WpUserretAll.
     { unfold M17. rewrite lookup_insert_ne; [exact Ha0_16 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x19, 184(a0) @ 0xe6 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xe6 184 (mword_of_int 19) false M17 vs3
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xe6 184 (mword_of_int 19) false M17 vs3
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_17
@@ -1005,8 +1004,8 @@ Section WpUserretAll.
     { unfold M18. rewrite lookup_insert_ne; [exact Ha0_17 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x20, 192(a0) @ 0xea ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xea 192 (mword_of_int 20) false M18 vs4
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xea 192 (mword_of_int 20) false M18 vs4
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_18
@@ -1040,8 +1039,8 @@ Section WpUserretAll.
     { unfold M19. rewrite lookup_insert_ne; [exact Ha0_18 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x21, 200(a0) @ 0xee ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xee 200 (mword_of_int 21) false M19 vs5
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xee 200 (mword_of_int 21) false M19 vs5
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_19
@@ -1075,8 +1074,8 @@ Section WpUserretAll.
     { unfold M20. rewrite lookup_insert_ne; [exact Ha0_19 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x22, 208(a0) @ 0xf2 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xf2 208 (mword_of_int 22) false M20 vs6
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xf2 208 (mword_of_int 22) false M20 vs6
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_20
@@ -1110,8 +1109,8 @@ Section WpUserretAll.
     { unfold M21. rewrite lookup_insert_ne; [exact Ha0_20 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x23, 216(a0) @ 0xf6 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xf6 216 (mword_of_int 23) false M21 vs7
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xf6 216 (mword_of_int 23) false M21 vs7
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_21
@@ -1145,8 +1144,8 @@ Section WpUserretAll.
     { unfold M22. rewrite lookup_insert_ne; [exact Ha0_21 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x24, 224(a0) @ 0xfa ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xfa 224 (mword_of_int 24) false M22 vs8
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xfa 224 (mword_of_int 24) false M22 vs8
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_22
@@ -1180,8 +1179,8 @@ Section WpUserretAll.
     { unfold M23. rewrite lookup_insert_ne; [exact Ha0_22 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x25, 232(a0) @ 0xfe ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0xfe 232 (mword_of_int 25) false M23 vs9
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0xfe 232 (mword_of_int 25) false M23 vs9
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_23
@@ -1215,8 +1214,8 @@ Section WpUserretAll.
     { unfold M24. rewrite lookup_insert_ne; [exact Ha0_23 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x26, 240(a0) @ 0x102 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0x102 240 (mword_of_int 26) false M24 vs10
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0x102 240 (mword_of_int 26) false M24 vs10
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_24
@@ -1250,8 +1249,8 @@ Section WpUserretAll.
     { unfold M25. rewrite lookup_insert_ne; [exact Ha0_24 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x27, 248(a0) @ 0x106 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0x106 248 (mword_of_int 27) false M25 vs11
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0x106 248 (mword_of_int 27) false M25 vs11
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_25
@@ -1285,8 +1284,8 @@ Section WpUserretAll.
     { unfold M26. rewrite lookup_insert_ne; [exact Ha0_25 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x28, 256(a0) @ 0x10a ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0x10a 256 (mword_of_int 28) false M26 vt3
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0x10a 256 (mword_of_int 28) false M26 vt3
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_26
@@ -1320,8 +1319,8 @@ Section WpUserretAll.
     { unfold M27. rewrite lookup_insert_ne; [exact Ha0_26 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x29, 264(a0) @ 0x10e ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0x10e 264 (mword_of_int 29) false M27 vt4
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0x10e 264 (mword_of_int 29) false M27 vt4
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_27
@@ -1355,8 +1354,8 @@ Section WpUserretAll.
     { unfold M28. rewrite lookup_insert_ne; [exact Ha0_27 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x30, 272(a0) @ 0x112 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0x112 272 (mword_of_int 30) false M28 vt5
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0x112 272 (mword_of_int 30) false M28 vt5
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_28
@@ -1390,8 +1389,8 @@ Section WpUserretAll.
     { unfold M29. rewrite lookup_insert_ne; [exact Ha0_28 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x31, 280(a0) @ 0x116 ---- *)
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0x116 280 (mword_of_int 31) false M29 vt6
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0x116 280 (mword_of_int 31) false M29 vt6
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_29
@@ -1426,8 +1425,8 @@ Section WpUserretAll.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x10, 112(a0) @ 0x11a ---- *)
     iEval (change (ai_cld_tgt 2 14) with (ai_ld 10 112)) in "Hi_va0f".
-    iApply (wp_uld uroot ul1 ul0 tfp E Φ 0x11a 112 (mword_of_int 10) true M30 va0f
-              mstatus0 mie_v mdv0 menvcfg0 HN
+    iApply (wp_uld uroot ul1 ul0 tfp Φ 0x11a 112 (mword_of_int 10) true M30 va0f
+              mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_30
@@ -1458,9 +1457,9 @@ Section WpUserretAll.
     iEval (rewrite Hpcx_0x11a) in "Hpc".
     set (M31 := <[Regidx (mword_of_int 10) := regval_into_reg va0f]> M30).
     (* ---- sret @ 0x11c ---- *)
-    iApply (wp_usret uroot ul1 ul0 tfp E Φ M31
+    iApply (wp_usret uroot ul1 ul0 tfp Φ M31
               mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hfile Hi_sret").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hfile".
     subst M31 M30 M29 M28 M27 M26 M25 M24 M23 M22 M21 M20 M19 M18 M17 M16 M15 M14 M13 M12 M11 M10 M9 M8 M7 M6 M5 M4 M3 M2 M1 M0.

@@ -321,7 +321,7 @@ Section WpUartPutcSyncFull.
     rewrite lookup_total_alt lookup_fmap Hr. reflexivity.
   Qed.
 
-  Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (n : nat) (q : Qp)
       (u u' : uart_state) (pv pkv : mword 32)
       {dqm dqm2 : dfrac} :
@@ -338,7 +338,6 @@ Section WpUartPutcSyncFull.
     let a00 := m0 !!! Regidx a0_idx in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     (3 ≤ n)%nat ->
-    ↑minstretN ⊆ E ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
@@ -364,11 +363,11 @@ Section WpUartPutcSyncFull.
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
       uart_frag u' -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros ra_idx s0_idx s1_idx a0_idx pcE sp0 sp' ra0 s00 s10 a00 ret_tgt.
-    intros Hn3 HN Hal0 Hpv Hpkv Hthre Hwrite.
+    intros Hn3 Hal0 Hpv Hpkv Hthre Hwrite.
     set (ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
     set (ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
     set (ea_s1 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
@@ -433,11 +432,11 @@ Section WpUartPutcSyncFull.
     assert (Hvs1 : sval_den ρA (SX 35 0) = (s1old : mword 64)).
     { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     iDestruct (ups_prologue_instrs with "Htext") as "Hbi".
-    iApply (wp_vc_block_s root_ppn ups_prologue E Φ
+    iApply (wp_vc_block_s root_ppn ups_prologue Φ
               (VSt UPS vregs_init ups_pro_heap0 [])
               (VSt (UPS + 10) ups_pro_regs1 ups_pro_heap1 [])
               ρA m0 γ (dq:=DfracOwn q)
-              HN ups_prologue_run HmA
+ ups_prologue_run HmA
               with "Hsm Htlbinv Hpc Hfile Hbi [Hbra Hbs0 Hbs1] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /ups_pro_heap0.
       cbn [big_opL fst snd]. rewrite Hara Has0 Has1 Hvra Hvs0 Hvs1.
@@ -473,9 +472,9 @@ Section WpUartPutcSyncFull.
     (* c.mv s1,a0 at 0x96c: s1 := a0.                                       *)
     (* ------------------------------------------------------------------ *)
     iPoseProof (upi_0a with "Htext") as "Hi0a".
-    iApply (wp_cmv_gpr_s_config_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x0a)) s1_idx a0_idx M1
+    iApply (wp_cmv_gpr_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x0a)) s1_idx a0_idx M1
               (dq:=DfracOwn q)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi0a [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     (* ------------------------------------------------------------------ *)
@@ -489,9 +488,9 @@ Section WpUartPutcSyncFull.
     assert (HR9m3 : m3 !!! Regidx (mword_of_int 9) = add_vec zero_reg a00).
     { unfold m3. change (Regidx s1_idx) with (Regidx (mword_of_int 9)).
       rewrite lookup_total_insert. unfold regval_into_reg. rewrite Ha0M1. reflexivity. }
-    iApply (wp_uartputc_body root_ppn γ E Φ m3
+    iApply (wp_uartputc_body root_ppn γ Φ m3
               u u' pv pkv (dq:=DfracOwn q) (dqm:=dqm) (dqm2:=dqm2)
-              HN Hpv Hpkv Hthre
+ Hpv Hpkv Hthre
               ltac:(rewrite HR9m3; exact Hwrite)
               with "Hsm Htlbinv Htext Hpc Hfile Hpk Hpkd Huf").
     iIntros "Hsm Htlbinv Hpc Hbody Hpk Hpkd Huf".
@@ -537,11 +536,11 @@ Section WpUartPutcSyncFull.
     assert (Hvs1B : sval_den ρB (SX 35 0) = s10).
     { rewrite sval_den_SX0. unfold ρB. reflexivity. }
     iDestruct (ups_epilogue_instrs with "Htext") as "Hbi2".
-    iApply (wp_vc_block_s root_ppn ups_epilogue E Φ
+    iApply (wp_vc_block_s root_ppn ups_epilogue Φ
               (VSt (UPS + 0x46) vregs_init ups_epi_heap [])
               (VSt (UPS + 0x46 + 6) ups_epi_regs1 ups_epi_heap [])
               ρB mf γ (dq:=DfracOwn q)
-              HN ups_epilogue_run HmB
+ ups_epilogue_run HmB
               with "Hsm Htlbinv Hpc Hfile Hbi2 [Hbra Hbs0 Hbs1] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /ups_epi_heap.
       cbn [big_opL fst snd]. rewrite HaraB Has0B Has1B HvraB Hvs0B Hvs1B.
@@ -571,8 +570,8 @@ Section WpUartPutcSyncFull.
                     = (mword_of_int (UPS + 0x4c) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4c) in "Hpc".
-    iApply (wp_caddi16sp_gpr_s root_ppn γ E Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) M2 q
-              HN with "Hsm Htlbinv Hpc Hfile Hi4c [-]").
+    iApply (wp_caddi16sp_gpr_s root_ppn γ Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) M2 q
+              with "Hsm Htlbinv Hpc Hfile Hi4c [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     set (m_epi2 := <[Regidx csp_rs1 := regval_into_reg
                       (add_vec (M2 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2))))]> M2).
@@ -590,9 +589,9 @@ Section WpUartPutcSyncFull.
                     = (mword_of_int (UPS + 0x4e) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4e) in "Hpc".
-    iApply (wp_cret_s_zca_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
+    iApply (wp_cret_s_zca_scfg root_ppn γ Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
               (dq:=DfracOwn q)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra_final; exact Hal0)
               with "Hsm Htlbinv Hpc Hfile Hi4e [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".

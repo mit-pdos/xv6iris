@@ -855,10 +855,9 @@ Section WpInstrU.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_instr_u (uroot ul1 ul0 tfp : mword 44) E Φ
+  Lemma wp_instr_u (uroot ul1 ul0 tfp : mword 44) Φ
       (va pa : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -911,7 +910,7 @@ Section WpInstrU.
        upmp_config uroot ul1 ul0 tfp -∗
        tlb ↦ᵣ tlbvec_f -∗
        upte_bytes uroot ul1 ul0 tfp (DfracOwn 1) -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -920,10 +919,10 @@ Section WpInstrU.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
              Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2
              Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al Hram0 Hram1 Hram2b Hram3b)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hutlb Hpc Hinstr H".
@@ -938,7 +937,7 @@ Section WpInstrU.
     destruct (Hpteregion pmar0 Hpma_all) as (Hr2 & Hr1 & Hr0t & Hr0f).
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_u uroot ul1 ul0 tfp σ va pa r
                  usatp mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 rg2 rg1 rg0t rg0f pmar0 tlbvec

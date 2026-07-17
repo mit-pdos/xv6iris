@@ -350,14 +350,13 @@ Section WpStepTramp.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_step_tramp (p2 p1 p0 : mword 44) E Φ
+  Lemma wp_step_tramp (p2 p1 p0 : mword 44) Φ
       (va pa : mword 64) (i : instruction)
       (satp0 mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (rgA rgB rgC : PMA_Region)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       {dq dqA dqB dqC : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
@@ -430,7 +429,7 @@ Section WpStepTramp.
        pte8 (pte_addr_at p2 idx2t) (pte_ptr p1) dqA -∗
        pte8 (pte_addr_at p1 idx1t) (pte_ptr p0) dqB -∗
        pte8 (pte_addr_at p0 idx0t) pte_tramp dqC -∗
-       mstate_interp σf ={E ∖ ↑minstretN}=∗
+       mstate_interp σf ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σf nextPC (add_vec_int (register_lookup PC σf.(sregs)) 4))
@@ -438,10 +437,10 @@ Section WpStepTramp.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HSXL Hmm HPBMTE Hmenvval0 Hmode Hppn Hasid Hslot HX Hcov
+    iIntros (HSIE HSXL Hmm HPBMTE Hmenvval0 Hmode Hppn Hasid Hslot HX Hcov
              HpA HpB HpC HrA HrB HrC
              Hcanon Hvpn Hident Hal4 Hpa4 Hram0 Hram3b)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Htlb Hpmpc Hpmpa
@@ -458,7 +457,7 @@ Section WpStepTramp.
     destruct r as [e | w | h | erx].
     - iDestruct "Hbytes" as "[_ %Hbf]". done.
     - (* F_Base w: the only possible geometry at a 4-aligned non-RVC va *)
-      iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+      iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
       iIntros (σ) "Hsi".
       iDestruct (fetch_from_instr_bytes_tramp p2 p1 p0 σ va pa w
                    satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 rgA rgB rgC pmar0 tlbvec
@@ -525,11 +524,10 @@ Section WpUserretEntryTop.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_userret_entry (kroot kl1 kl0 uroot ul1 ul0 tfp : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_userret_entry (kroot kl1 kl0 uroot ul1 ul0 tfp : mword 44) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (usatp : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       (rg2 rg1 rg0t rg0f rgk2 rgk1 rgk0 : PMA_Region) {dq dqk : dfrac} :
-    ↑minstretN ⊆ E ->
     (* S-mode config *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -592,10 +590,10 @@ Section WpUserretEntryTop.
       gpr_file m -∗
       ktramp_pte_bytes kroot kl1 kl0 dqk -∗
       pte_super_bytes kroot (DfracOwn 1) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HN HSIE HSXL HTVM Hmm HPBMTE Hmenvval0 Ha0 HuMode Huasid Huppn
+    intros HSIE HSXL HTVM Hmm HPBMTE Hmenvval0 Ha0 HuMode Huasid Huppn
       HrU2 HrU1 HrU0t HrU0f HrK2 HrK1 HrK0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hktramp Hupte
              [Hpc Hnpc] [%Hdom Hfmap] Hi1 Hi2 Hi3 Hcont".
@@ -635,9 +633,9 @@ Section WpUserretEntryTop.
     assert (Hva03 : add_vec_int (uva 0xa4) 4 = uva 0xa8)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ================= STEP 1: sfence.vma (kernel PT) ================= *)
-    iApply (wp_step_tramp kroot kl1 kl0 E Φ (uva 0x9c) (upa 0x9c) ai_sfence
+    iApply (wp_step_tramp kroot kl1 kl0 Φ (uva 0x9c) (upa 0x9c) ai_sfence
               ksatp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 rgk2 rgk1 rgk0 tlbvec0
-              HN HSIE HSXL Hmm HPBMTE Hmenvval0 HkMode Hkppn Hkasid
+ HSIE HSXL Hmm HPBMTE Hmenvval0 HkMode Hkppn Hkasid
               (ktramp_slot63 kroot tlbvec0 Hconsk)
               HX Hcov HpKA HpKB HpKC HrK2 HrK1 HrK0
               ltac:(vm_compute; reflexivity)
@@ -676,9 +674,9 @@ Section WpUserretEntryTop.
     iEval (rewrite Lnpc1) in "Hpc".
     iNext.
     (* ================= STEP 2: csrw satp, a0 (kernel PT) ================= *)
-    iApply (wp_step_tramp kroot kl1 kl0 E Φ (uva 0xa0) (upa 0xa0) ai_csrw
+    iApply (wp_step_tramp kroot kl1 kl0 Φ (uva 0xa0) (upa 0xa0) ai_csrw
               ksatp0 mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 rgk2 rgk1 rgk0 tlbz1
-              HN HSIE HSXL Hmm HPBMTE Hmenvval0 HkMode Hkppn Hkasid
+ HSIE HSXL Hmm HPBMTE Hmenvval0 HkMode Hkppn Hkasid
               (empty_slot63 tlbz1 Hnone1)
               HX Hcov HpKA HpKB HpKC HrK2 HrK1 HrK0
               ltac:(vm_compute; reflexivity)
@@ -752,9 +750,9 @@ Section WpUserretEntryTop.
         rewrite (vec64_access_update tlbz1 63 63 _ ltac:(lia)).
         replace (Z.eqb 63 63) with true by reflexivity.
         unfold tramp_ent, pte_tramp. reflexivity. }
-    iApply (wp_step_tramp uroot ul1 ul0 E Φ (uva 0xa4) (upa 0xa4) ai_sfence
+    iApply (wp_step_tramp uroot ul1 ul0 Φ (uva 0xa4) (upa 0xa4) ai_sfence
               usatp mstatus0 mie_v mdv0 menvcfg0 pmpcfg0 pmpaddr00 rg2 rg1 rg0t tv2
-              HN HSIE HSXL Hmm HPBMTE Hmenvval0 HuMode Huppn Huasid
+ HSIE HSXL Hmm HPBMTE Hmenvval0 HuMode Huppn Huasid
               Hslot3
               HX Hcov HpUA HpUB HpUC HrU2 HrU1 HrU0t
               ltac:(vm_compute; reflexivity)

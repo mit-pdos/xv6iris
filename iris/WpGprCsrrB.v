@@ -251,29 +251,31 @@ Section WpCsrrGprB.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  (* time (0xC01): Ext_Zicntr-gated, no misa premise needed (holds for any state). *)
-  Lemma wp_csrr_time_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
-      (mtime_in : mword 64) (m : gmap regidx (mword 64))
+  (* time (0xC01): Ext_Zicntr-gated, no misa premise needed (holds for any state).
+     [mtime] lives in [clock_inv] and advances nondeterministically with the
+     clock tick, so this leaf owns NO mtime cell and cannot pin the value the
+     instruction reads: the continuation is ∀-quantified over the read value
+     [tv].  (No clock_inv opening is needed either -- the exec witness reads
+     mtime straight off the abstract step state σ.) *)
+  Lemma wp_csrr_time_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+      (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
-    mtime ↦ᵣ mtime_in -∗
     instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
-    ( mmode_config (DfracOwn q) -∗
+    ( ∀ tv : mword 64,
+      mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd :=
-        regval_into_reg (mtime_in)]> m) -∗
-      mtime ↦ᵣ mtime_in -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      gpr_file (<[Regidx rd := regval_into_reg tv]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hcsr Hinstr Hcont".
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
@@ -282,48 +284,45 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_instr E Φ pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) pmpcfg0
-              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr Φ pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) pmpcfg0
+              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
       by (apply lookup_lookup_total_dom; apply Hdom).
     iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hcsr") as %Lcsr.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     assert (LprivS : register_lookup cur_privilege
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = Machine).
     { unfold set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
-    assert (Hrv : time_rdval (set_reg σ nextPC (add_vec_int pc 4))
-             = mtime_in).
-    { rewrite time_rdval_set_nextPC. unfold time_rdval. rewrite Lcsr. apply subrange64_id. }
+    set (tv := time_rdval (set_reg σ nextPC (add_vec_int pc 4))).
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (mtime_in))
+            (regval_into_reg tv)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (mtime_in))
+    iDestruct ("Hfins" $! (regval_into_reg tv)
                  with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
                (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (mtime_in))).
+               (regval_into_reg tv)).
     iSplitR.
     { iPureIntro. rewrite Hpceq.
       change (execute (CSRReg (csr_time, zreg, Regidx rd, CSRRS)))
         with (execute_CSRReg csr_time zreg (Regidx rd) CSRRS).
       rewrite (exec_execute_csrr_time_gpr rd
                  (set_reg σ nextPC (add_vec_int pc 4)) Hrd LprivS).
-      rewrite Hrv. reflexivity. }
+      reflexivity. }
     iSplitL "Hreg Hmem".
     { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int pc 4))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (mtime_in))).(sregs)
+                (regval_into_reg tv)).(sregs)
              = add_vec_int pc 4).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
@@ -332,17 +331,16 @@ Section WpCsrrGprB.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine_half_csrr with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hcsr").
+    iApply ("Hcont" $! tv with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
   Qed.
 
   (* menvcfg (0x30A): Ext_U-gated; misa.U recovered from hw_config. *)
-  Lemma wp_csrr_menvcfg_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_menvcfg_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (menvcfg_in : mword 64) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
@@ -357,10 +355,10 @@ Section WpCsrrGprB.
       gpr_file (<[Regidx rd :=
         regval_into_reg (menvcfg_in)]> m) -∗
       menvcfg ↦ᵣ menvcfg_in -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hcsr Hinstr Hcont".
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
@@ -369,8 +367,8 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_instr E Φ pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) pmpcfg0
-              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr Φ pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) pmpcfg0
+              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
@@ -431,10 +429,9 @@ Section WpCsrrGprB.
   (* sie (0x104): Ext_S-gated; misa.S recovered from hw_config.  The read
      value is a VIEW over TWO registers ([lower_mie mie mideleg]), so both
      cells are threaded (returned unchanged). *)
-  Lemma wp_csrr_sie_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_sie_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (mie_in mideleg_in : mword 64) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
@@ -451,10 +448,10 @@ Section WpCsrrGprB.
         regval_into_reg (lower_mie mie_in mideleg_in)]> m) -∗
       mie ↦ᵣ mie_in -∗
       mideleg ↦ᵣ mideleg_in -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hmie Hmdl Hinstr Hcont".
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hmie Hmdl Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
@@ -463,8 +460,8 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_instr E Φ pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
-              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr Φ pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
+              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))

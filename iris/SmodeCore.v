@@ -1549,11 +1549,10 @@ Section SmodeCoreIris.
   (* wp_exec_step_decode_execute_inv is (semantically) the p := Machine,  *)
   (* σf := σ instance.                                                    *)
   (* =================================================================== *)
-  Lemma wp_exec_step_decode_execute_inv_priv (p : Privilege) E Φ {dq : dfrac} :
-    ↑minstretN ⊆ E →
+  Lemma wp_exec_step_decode_execute_inv_priv (p : Privilege) Φ {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ, mstate_interp σ ={E ∖ ↑minstretN}=∗
+    (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (r : FetchResult) (i : instruction) (σf s_exec : mstate),
          ⌜ register_lookup cur_privilege σ.(sregs) = p ⌝ ∗
          ⌜ exec (dispatchInterrupt p) σ = Some (None, σ) ⌝ ∗
@@ -1583,11 +1582,11 @@ Section SmodeCoreIris.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN) "Hinv Hhs H".
-    iApply (wp_exec_step_hart_active_inv E Φ HN with "Hinv Hhs").
+    iIntros "Hinv Hhs H".
+    iApply (wp_exec_step_hart_active_inv Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iMod ("H" $! σ with "Hsi") as (r i σf s_exec)
       "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
@@ -3223,15 +3222,14 @@ Section SmodeCoreIris.
   (* invariant).  Subsumes [wp_instr_s] (hit) and [wp_instr_s_fill]       *)
   (* (walk), which become internal to this engine.                        *)
   (* =================================================================== *)
-  Lemma wp_instr_s_tlbinv (root_ppn : mword 44) (γ : gname) E Φ
+  Lemma wp_instr_s_tlbinv (root_ppn : mword 44) (γ : gname) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     smode_config γ dq -∗
     tlb_inv root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -3241,15 +3239,15 @@ Section SmodeCoreIris.
          (smode_config γ dq -∗
           tlb_inv root_ppn -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     (* Open [tlb_inv] ONCE and drive the UNIFIED fetch (each chunk translates
        through its own vpn, 0/1/2 slots filled) -- no hit/walk split, no
        same-page premise.  Re-bundle [smode_config] and re-seal [tlb_inv]
        (with the fetch's [tlbvec2]) in the caller's continuation.  The ambient
        PMP config is opened out of [tlb_inv] and re-sealed unchanged. *)
-    iIntros (HN)
+    iIntros
       "Hsm Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -3266,7 +3264,7 @@ Section SmodeCoreIris.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -3305,7 +3303,7 @@ Section SmodeCoreIris.
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsie Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").
@@ -3348,16 +3346,15 @@ Section SmodeCoreIris.
   Qed.
 
   (* arbitrary-A/D plain step engine *)
-  Lemma wp_instr_s_tlbinv_ad (adf : kpt_adf) (root_ppn : mword 44) (γ : gname) E Φ
+  Lemma wp_instr_s_tlbinv_ad (adf : kpt_adf) (root_ppn : mword 44) (γ : gname) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     (forall a, addr_is_ram a -> fst (adf (svpn_of a)) = true) ->
     smode_config γ dq -∗
     tlb_inv_ad adf root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -3367,15 +3364,15 @@ Section SmodeCoreIris.
          (smode_config γ dq -∗
           tlb_inv_ad adf root_ppn -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     (* Open [tlb_inv] ONCE and drive the UNIFIED fetch (each chunk translates
        through its own vpn, 0/1/2 slots filled) -- no hit/walk split, no
        same-page premise.  Re-bundle [smode_config] and re-seal [tlb_inv]
        (with the fetch's [tlbvec2]) in the caller's continuation.  The ambient
        PMP config is opened out of [tlb_inv] and re-sealed unchanged. *)
-    iIntros (HN Hada)
+    iIntros (Hada)
       "Hsm Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_ad_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -3392,7 +3389,7 @@ Section SmodeCoreIris.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent_ad adf root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -3431,7 +3428,7 @@ Section SmodeCoreIris.
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsie Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").
@@ -3482,9 +3479,8 @@ Section SmodeCoreIris.
   (* entry is either the superpage (hit) or fails to match the RAM fetch    *)
   (* vpn (walk).  The client (e.g. the UART store/load WP) supplies both.   *)
   (* =================================================================== *)
-  Lemma wp_instr_s_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) (γ : gname) E Φ
+  Lemma wp_instr_s_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) (γ : gname) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     (forall a, addr_is_ram a -> P (kpt_tlb_ent root_ppn (svpn_of a))) ->
     (forall a e, addr_is_ram a -> P e ->
        e = kpt_tlb_ent root_ppn (svpn_of a) \/
@@ -3494,7 +3490,7 @@ Section SmodeCoreIris.
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -3504,10 +3500,10 @@ Section SmodeCoreIris.
          (smode_config γ dq -∗
           tlb_inv_gen P root_ppn -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HPsuper Hdisc)
+    iIntros (HPsuper Hdisc)
       "Hsm Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_gen_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -3524,7 +3520,7 @@ Section SmodeCoreIris.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent_gen root_ppn P σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -3563,7 +3559,7 @@ Section SmodeCoreIris.
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsie Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").
@@ -3606,9 +3602,8 @@ Section SmodeCoreIris.
   Qed.
 
   (* arbitrary-A/D P-generic step engine *)
-  Lemma wp_instr_s_tlbinv_gen_ad (adf : kpt_adf) (P : TLB_Entry -> Prop) (root_ppn : mword 44) (γ : gname) E Φ
+  Lemma wp_instr_s_tlbinv_gen_ad (adf : kpt_adf) (P : TLB_Entry -> Prop) (root_ppn : mword 44) (γ : gname) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     (forall a, addr_is_ram a -> P (kpt_tlb_ent_ad adf root_ppn (svpn_of a))) ->
     (forall a e, addr_is_ram a -> P e ->
        e = kpt_tlb_ent_ad adf root_ppn (svpn_of a) \/
@@ -3619,7 +3614,7 @@ Section SmodeCoreIris.
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -3629,10 +3624,10 @@ Section SmodeCoreIris.
          (smode_config γ dq -∗
           tlb_inv_gen_ad adf P root_ppn -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HPsuper Hdisc Hada)
+    iIntros (HPsuper Hdisc Hada)
       "Hsm Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_gen_ad_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -3649,7 +3644,7 @@ Section SmodeCoreIris.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent_gen_ad adf root_ppn P σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -3688,7 +3683,7 @@ Section SmodeCoreIris.
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hsie Hsatp Hmiec Hmdlc Hmenvc Hpmpc Hpmpa Htlb Hpbytes]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] [Hsatp Htlb Hpbytes Hpmpc Hpmpa] Hpc'").

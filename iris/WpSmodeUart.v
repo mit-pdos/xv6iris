@@ -996,7 +996,7 @@ Qed.
 (*     device store tower, and threads the device ghost [uart_frag].        *)
 (* ===================================================================== *)
 
-Lemma wp_sb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mval -> iProp Σ)
+Lemma wp_sb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : gmap regidx (mword 64)) (u u' : uart_state)
     (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
@@ -1004,7 +1004,6 @@ Lemma wp_sb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mva
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
   let a0addr := pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) in
-  ↑minstretN ⊆ E ->
   eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
   eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
   _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -1043,15 +1042,15 @@ Lemma wp_sb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mva
     tlb_inv_gen (P_uart4k root_ppn lppn (mk_pte lppn lflags) a0addr) root_ppn -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗ gpr_file m -∗
     uart_map root_ppn p1 p0 lppn lflags dq -∗ uart_frag u' -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 storebyte a0addr HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff
+  intros ea a8 storebyte a0addr HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff
     Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hlppn_pin Hlf_pin Hpter Hcanon Hvpn_def Hident Hpa Hwrite_u.
   iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huartmap Huf Hcont".
-  iApply (wp_instr_s_config_tlbinv_gen (P_uart4k root_ppn lppn (mk_pte lppn lflags) a0addr) root_ppn E Φ pc is_rvc
+  iApply (wp_instr_s_config_tlbinv_gen (P_uart4k root_ppn lppn (mk_pte lppn lflags) a0addr) root_ppn Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 1)) mstatus0 mie_v mdv0 menvcfg0
-            HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
             (P_uart4k_super root_ppn lppn (mk_pte lppn lflags) a0addr)
             (P_uart4k_disc root_ppn lppn (mk_pte lppn lflags) a0addr)
             with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -1218,7 +1217,7 @@ Qed.
 (*     zero-extended (LBU) per [is_unsigned].                               *)
 (* ===================================================================== *)
 
-Lemma wp_lb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mval -> iProp Σ)
+Lemma wp_lb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (b : bv 8)
     (m : gmap regidx (mword 64)) (u u' : uart_state)
     (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
@@ -1226,7 +1225,6 @@ Lemma wp_lb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mva
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let ldval : mword 64 := extend_value is_unsigned (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b) in
   let a0addr := pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) in
-  ↑minstretN ⊆ E ->
   eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
   eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
   _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -1263,15 +1261,15 @@ Lemma wp_lb_uart_s (root_ppn p1 p0 lppn : mword 44) (lflags off : Z) E (Φ : mva
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     gpr_file (<[Regidx rd := regval_into_reg ldval]> m) -∗
     uart_map root_ppn p1 p0 lppn lflags dq -∗ uart_frag u' -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 ldval a0addr HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff Hrd
+  intros ea a8 ldval a0addr HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hoff Hrd
     Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hlppn_pin Hlf_pin Hpter Hcanon Hvpn_def Hident Hpa Hread_u.
   iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huartmap Huf Hcont".
-  iApply (wp_instr_s_config_tlbinv_gen (P_uart4k root_ppn lppn (mk_pte lppn lflags) a0addr) root_ppn E Φ pc is_rvc
+  iApply (wp_instr_s_config_tlbinv_gen (P_uart4k root_ppn lppn (mk_pte lppn lflags) a0addr) root_ppn Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) mstatus0 mie_v mdv0 menvcfg0
-            HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
             (P_uart4k_super root_ppn lppn (mk_pte lppn lflags) a0addr)
             (P_uart4k_disc root_ppn lppn (mk_pte lppn lflags) a0addr)
             with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").

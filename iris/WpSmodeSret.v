@@ -232,12 +232,11 @@ Section WpSretGpr.
   (* owned PTE and fills slot 5 (preserving the invariant).  SRET itself  *)
   (* never touches the TLB, so the invariant round-trips unchanged.       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sret_gpr (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_sret_gpr (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       (m : gmap regidx (mword 64))
       :
-    ↑minstretN ⊆ E ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -274,10 +273,10 @@ Section WpSretGpr.
       sepc ↦ᵣ sepc0 -∗
       pc_is (sret_tgt sepc0) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HTSR Hsup Hlpe0)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HTSR Hsup Hlpe0)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc
        [Hpc Hnpc] Hfile Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -289,9 +288,9 @@ Section WpSretGpr.
               register_lookup menvcfg sz.(sregs) = menvcfg0 ->
               exec (get_xLPE (sret_newpriv mstatus0)) sz = Some (false, sz)).
     { intros sz Hm. rewrite Hsup. apply exec_get_xLPE_S. rewrite Hm. exact Hlpe0. }
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (SRET tt)
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc false (SRET tt)
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".

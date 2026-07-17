@@ -27,12 +27,11 @@ Section WpStoreGpr.
      alignment; the config the translation / PMP checks read is recovered from the
      KEPT half of [mmode_config] + [hw_config].  No register is written ([gpr_file]
      is handed back UNCHANGED). *)
-  Lemma wp_store_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
+  Lemma wp_store_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
       (imm : mword 12) (m : gmap regidx (mword 64)) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
-    ↑minstretN ⊆ E ->
     (* the 8-byte DATA access needs the stronger all-OFF form: an 8-byte
        window can partially overlap a TOR/NA4 boundary (partial match faults
        even in M-mode), so unlocked-ness alone does not suffice.  The fetch
@@ -49,10 +48,10 @@ Section WpStoreGpr.
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
       ea ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros offset ea HN Hpmp.
+    intros offset ea Hpmp.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -64,8 +63,8 @@ Section WpStoreGpr.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite & _).
-    iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
-              HN (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
+ (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -176,13 +175,12 @@ Section MmodeStoreTor.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_store_gpr_tor E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
+  Lemma wp_store_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
       (imm : mword 12) (m : gmap regidx (mword 64)) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     mmode_config (DfracOwn q) -∗
@@ -198,10 +196,10 @@ Section MmodeStoreTor.
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
       ea ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros offset ea HN Hpmp Htor.
+    intros offset ea Hpmp Htor.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -213,8 +211,8 @@ Section MmodeStoreTor.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite & _).
-    iApply (wp_instr E Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
-              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
+              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -323,13 +321,12 @@ Section MmodeStoreTor.
 
   (* ---- c.ldsp rd, uimm(sp), TOR-aware ---- *)
 
-  Lemma wp_csdsp_gpr_tor E (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 6)
+  Lemma wp_csdsp_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 6)
       (rs2 : mword 5) (m : gmap regidx (mword 64)) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) in
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
@@ -342,13 +339,13 @@ Section MmodeStoreTor.
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       ea ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea HN Hpmp Htor.
+    intros imm ea Hpmp Htor.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
-    iApply (wp_store_gpr_tor E Φ pc true csp_rs1 rs2 imm m vold
-              pmpcfg0 pmpaddrs q HN Hpmp Htor
+    iApply (wp_store_gpr_tor Φ pc true csp_rs1 rs2 imm m vold
+              pmpcfg0 pmpaddrs q Hpmp Htor
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
   Qed.
 
