@@ -22,6 +22,25 @@ From Kernel Require KernelInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* ===================================================================== *)
+(*  The 4-byte fetch window of the kernel image, as a computed word.      *)
+(* ===================================================================== *)
+
+(* [kb_word_at A] is the 32-bit little-endian word formed by the image bytes
+   at A..A+3 -- the fetch window at [A], whatever [A]'s 4-alignment (see
+   [instr_bytes_rvc_any]).  Computing it from the image is what lets a call
+   site name an instruction by its address alone, with no hand-written window
+   word.  Bytes outside the image default to 0; nothing relies on that, as the
+   tactics below prove every byte against [kernel_bytes] explicitly. *)
+Definition kb_byte (A : Z) : bv 8 :=
+  default (bv_0 8) (KernelInstrs.kernel_bytes !! A).
+
+Definition kb_word_at (A : Z) : mword 32 :=
+  mword_of_int (bv_unsigned (kb_byte A)
+              + 256 * bv_unsigned (kb_byte (A + 1))
+              + 65536 * bv_unsigned (kb_byte (A + 2))
+              + 16777216 * bv_unsigned (kb_byte (A + 3))).
+
 Section KernelText.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -113,4 +132,103 @@ Section KernelText.
     iExact "Hw".
   Qed.
 
+  (* ---- ALIGNMENT-AGNOSTIC RVC introduction (the one clients should use) ----
+     [instr_bytes] asks for 4 bytes at a 4-aligned pc and only 2 at a merely
+     2-aligned one, so [instr_bytes_rvc4] / [instr_bytes_rvc2] above oblige the
+     caller to know pc's 4-alignment -- which no kernel-code proof should
+     depend on, since inserting one instruction anywhere upstream shifts every
+     later address by 2 and flips the parity of the rest of the image.
+     This lemma discharges BOTH arms from the SAME premises: hand over the
+     4-byte window [w] whose low half is [h].  The 4-aligned arm takes it
+     as-is; the 2-aligned arm keeps only the low 2 bytes, which ARE [h]'s bytes
+     by [nth_byte_subrange_lo].  Owning 4 bytes where the fetch reads 2 is
+     free: the window comes from the persistent [kernel_text], and a
+     mid-function instruction always has a successor in the image. *)
+  Lemma instr_bytes_rvc_any (pc : mword 64) (h : mword 16) (w : mword 32) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    isRVC h = true ->
+    subrange_vec_dec w 15 0 = h ->
+    ([∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j) -∗
+    instr_bytes pc (F_RVC h).
+  Proof.
+    iIntros (H2 Hr Hs) "#Hw". rewrite /instr_bytes. iEval (cbv beta iota).
+    iSplitR; [iPureIntro; exact H2|].
+    iSplitR; [iPureIntro; exact Hr|].
+    (* [h]'s bytes ARE the window's low bytes.  Derived by [apply] (which
+       unifies up to conversion) rather than [rewrite]: [subrange_vec_dec]'s
+       [autocast] makes the two elaborations non-syntactic. *)
+    assert (Hb : forall j : nat, (N.of_nat j < 2)%N -> nth_byte h j = nth_byte w j).
+    { intros j Hj. rewrite <- Hs. apply nth_byte_subrange_lo. exact Hj. }
+    destruct (is_aligned_vaddr (Virtaddr pc) 4).
+    - (* 4-aligned: the window is exactly what this arm asks for *)
+      iExists w. iSplitR; [iPureIntro; exact Hs|]. iExact "Hw".
+    - (* 2-aligned only: project the window's low 2 bytes onto [h]'s.  The
+         bytes are persistent, so the unused high half is simply dropped. *)
+      iApply big_sepL_intro. iIntros "!>" (k j Hk).
+      apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+      (* pull the byte out while [Hw] is still in [big_sepL] form: a proofmode
+         [simpl] would reduce the HYPOTHESIS too and break the unification. *)
+      iDestruct (big_sepL_lookup _ _ k k with "Hw") as "Hk".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      rewrite Nat.add_0_l. rewrite (Hb k ltac:(lia)). iExact "Hk".
+  Qed.
+
 End KernelText.
+
+(* ===================================================================== *)
+(*  The kernel-window [instr] tactics.  This is their one home: every      *)
+(*  whole-function proof file imports KernelText, so change them HERE.     *)
+(*                                                                        *)
+(*    [mk_rvc  A h pc ast decname expname] -- 2-byte compressed instr      *)
+(*    [mk_base A w pc ast decname]         -- 4-byte base instr            *)
+(*                                                                        *)
+(*  Both are ALIGNMENT-AGNOSTIC: neither mentions [A]'s 4-alignment, so an *)
+(*  upstream edit shifting the image by 2 -- which flips the parity of     *)
+(*  every later address -- leaves every call site untouched.  [mk_rvc]     *)
+(*  takes no window word: it computes the window from the image            *)
+(*  ([kb_word_at A]) and proves it against [kernel_bytes].                 *)
+(* ===================================================================== *)
+
+Ltac mk_rvc A h pc ast decname expname :=
+  let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
+  let Hrvc := fresh "Hrvc" in let Hsub := fresh "Hsub" in
+  let Hbytes := fresh "Hbytes" in
+  assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+  assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+  assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
+  assert (Hsub : subrange_vec_dec (kb_word_at A) 15 0 = h)
+    by (apply bv_eq; vm_compute; reflexivity);
+  assert (Hbytes : forall j, (j < 4)%nat ->
+      KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte (kb_word_at A) j))
+    by (intros j Hj;
+        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+  iIntros "#Ht"; rewrite /instr;
+  iSplitR; [iPureIntro; exact Hlpad|];
+  iExists (F_RVC h);
+  iSplitR; [iPureIntro; reflexivity|];
+  iSplitL "";
+  [ iApply (instr_bytes_rvc_any pc h (kb_word_at A) H2al Hrvc Hsub);
+    iApply (kernel_window_pc A (kb_word_at A) 4 pc eq_refl Hbytes with "Ht")
+  | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+    eexists; (split; [ apply decname; assumption
+                     | split; [ vm_compute; reflexivity
+                              | intro; apply expname ] ]) ].
+
+Ltac mk_base A w pc ast decname :=
+  let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
+  let Hnrvc := fresh "Hnrvc" in let Hbytes := fresh "Hbytes" in
+  assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
+  assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
+  assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
+  assert (Hbytes : forall j, (j < 4)%nat ->
+      KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
+    by (intros j Hj;
+        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+  iIntros "#Ht"; rewrite /instr;
+  iSplitR; [iPureIntro; exact Hlpad|];
+  iExists (F_Base w);
+  iSplitR; [iPureIntro; reflexivity|];
+  iSplitL "";
+  [ iApply (instr_bytes_base pc w H2al Hnrvc);
+    iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
+  | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].

@@ -102,98 +102,30 @@ Section WpReleaseInstr.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Local Ltac mk_rvc4 A h w pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hsub := fresh "Hsub" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = true) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hsub : subrange_vec_dec w 15 0 = h) by (apply bv_eq; vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_rvc2 A h pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = false) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte h j))
-      by (intros j Hj;
-          do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
-      iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_base A w pc ast decname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let Hnrvc := fresh "Hnrvc" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_Base w);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_base pc w H2al Hnrvc);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
-
   Notation RL := KernelSyms.release.
 
   Lemma rli_00 : kernel_text -∗ instr (mword_of_int (RL + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc2 (RL + 0x00)%Z (mword_of_int 0x1101 : mword 16)
+  Proof. mk_rvc (RL + 0x00)%Z (mword_of_int 0x1101 : mword 16)
     (mword_of_int (RL + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) podec_00 exec_execute_C_ADDI. Qed.
 
   Lemma rli_02 : kernel_text -∗ instr (mword_of_int (RL + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
-  Proof. mk_rvc4 (RL + 0x02)%Z (mword_of_int 0xec06 : mword 16) (mword_of_int 0xe822ec06 : mword 32)
+  Proof. mk_rvc (RL + 0x02)%Z (mword_of_int 0xec06 : mword 16)
     (mword_of_int (RL + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) podec_02 exec_execute_C_SDSP. Qed.
 
   Lemma rli_04 : kernel_text -∗ instr (mword_of_int (RL + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
-  Proof. mk_rvc2 (RL + 0x04)%Z (mword_of_int 0xe822 : mword 16)
+  Proof. mk_rvc (RL + 0x04)%Z (mword_of_int 0xe822 : mword 16)
     (mword_of_int (RL + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) podec_04 exec_execute_C_SDSP. Qed.
 
   Lemma rli_06 : kernel_text -∗ instr (mword_of_int (RL + 0x06) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).
-  Proof. mk_rvc4 (RL + 0x06)%Z (mword_of_int 0xe426 : mword 16) (mword_of_int 0x1000e426 : mword 32)
+  Proof. mk_rvc (RL + 0x06)%Z (mword_of_int 0xe426 : mword 16)
     (mword_of_int (RL + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) podec_06 exec_execute_C_SDSP. Qed.
 
   Lemma rli_08 : kernel_text -∗ instr (mword_of_int (RL + 0x08) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
-  Proof. mk_rvc2 (RL + 0x08)%Z (mword_of_int 0x1000 : mword 16)
+  Proof. mk_rvc (RL + 0x08)%Z (mword_of_int 0x1000 : mword 16)
     (mword_of_int (RL + 0x08) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) podec_08 exec_execute_C_ADDI4SPN. Qed.
 
   Lemma rli_0a : kernel_text -∗ instr (mword_of_int (RL + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
-  Proof. mk_rvc4 (RL + 0x0a)%Z (mword_of_int 0x84aa : mword 16) (mword_of_int 0xf0ef84aa : mword 32)
+  Proof. mk_rvc (RL + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
     (mword_of_int (RL + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) aqdec_mv_s1_a0 exec_execute_C_MV. Qed.
 
   Lemma rli_0c : kernel_text -∗ instr (mword_of_int (RL + 0x0c) : mword 64) false (JAL (mword_of_int 0x1fff06 : mword 21, Regidx (mword_of_int 1))).
@@ -201,7 +133,7 @@ Section WpReleaseInstr.
     (mword_of_int (RL + 0x0c) : mword 64) (JAL (mword_of_int 0x1fff06 : mword 21, Regidx (mword_of_int 1))) rldec_jal_holding. Qed.
 
   Lemma rli_10 : kernel_text -∗ instr (mword_of_int (RL + 0x10) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
-  Proof. mk_rvc2 (RL + 0x10)%Z (mword_of_int 0xcd11 : mword 16)
+  Proof. mk_rvc (RL + 0x10)%Z (mword_of_int 0xcd11 : mword 16)
     (mword_of_int (RL + 0x10) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) ppdec_beqz1c exec_execute_C_BEQZ. Qed.
 
   Lemma rli_12 : kernel_text -∗ instr (mword_of_int (RL + 0x12) : mword 64) false (STORE (mword_of_int 16, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)).
@@ -221,23 +153,23 @@ Section WpReleaseInstr.
     (mword_of_int (RL + 0x1e) : mword 64) (JAL (mword_of_int 0x1fff9a : mword 21, Regidx (mword_of_int 1))) rldec_jal_popoff. Qed.
 
   Lemma rli_22 : kernel_text -∗ instr (mword_of_int (RL + 0x22) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc4 (RL + 0x22)%Z (mword_of_int 0x60e2 : mword 16) (mword_of_int 0x644260e2 : mword 32)
+  Proof. mk_rvc (RL + 0x22)%Z (mword_of_int 0x60e2 : mword 16)
     (mword_of_int (RL + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) podec_22 exec_execute_C_LDSP. Qed.
 
   Lemma rli_24 : kernel_text -∗ instr (mword_of_int (RL + 0x24) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc2 (RL + 0x24)%Z (mword_of_int 0x6442 : mword 16)
+  Proof. mk_rvc (RL + 0x24)%Z (mword_of_int 0x6442 : mword 16)
     (mword_of_int (RL + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) podec_24 exec_execute_C_LDSP. Qed.
 
   Lemma rli_26 : kernel_text -∗ instr (mword_of_int (RL + 0x26) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
-  Proof. mk_rvc4 (RL + 0x26)%Z (mword_of_int 0x64a2 : mword 16) (mword_of_int 0x610564a2 : mword 32)
+  Proof. mk_rvc (RL + 0x26)%Z (mword_of_int 0x64a2 : mword 16)
     (mword_of_int (RL + 0x26) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) podec_26 exec_execute_C_LDSP. Qed.
 
   Lemma rli_28 : kernel_text -∗ instr (mword_of_int (RL + 0x28) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)).
-  Proof. mk_rvc2 (RL + 0x28)%Z (mword_of_int 0x6105 : mword 16)
+  Proof. mk_rvc (RL + 0x28)%Z (mword_of_int 0x6105 : mword 16)
     (mword_of_int (RL + 0x28) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)) podec_28 exec_execute_C_ADDI16SP. Qed.
 
   Lemma rli_2a : kernel_text -∗ instr (mword_of_int (RL + 0x2a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc4 (RL + 0x2a)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int 0x65178082 : mword 32)
+  Proof. mk_rvc (RL + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (RL + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
 
 End WpReleaseInstr.

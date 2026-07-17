@@ -145,74 +145,6 @@ Section WpUartPutcSync.
   (* ------------------------------------------------------------------- *)
   (* The three [instr]-builder templates, copied verbatim from WpMycpu.   *)
   (* ------------------------------------------------------------------- *)
-  Local Ltac mk_rvc4 A h w pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hsub := fresh "Hsub" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = true) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hsub : subrange_vec_dec w 15 0 = h) by (apply bv_eq; vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_rvc2 A h pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = false) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte h j))
-      by (intros j Hj;
-          do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
-      iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_base A w pc ast decname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let Hnrvc := fresh "Hnrvc" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_Base w);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_base pc w H2al Hnrvc);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
-
   Notation UPS := KernelSyms.uartputc_sync.
 
   (* ------------------------------------------------------------------- *)
@@ -223,7 +155,7 @@ Section WpUartPutcSync.
     (mword_of_int (UPS + 0x20) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI)) updc_10000737. Qed.
 
   Lemma upi_24 : kernel_text -∗ instr (mword_of_int (UPS + 0x24) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 5 : mword 6), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_rvc2 (UPS + 0x24)%Z (mword_of_int 0x0715 : mword 16)
+  Proof. mk_rvc (UPS + 0x24)%Z (mword_of_int 0x0715 : mword 16)
     (mword_of_int (UPS + 0x24) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 5 : mword 6), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) uprvc_0715 exec_execute_C_ADDI. Qed.
 
   Lemma upi_26 : kernel_text -∗ instr (mword_of_int (UPS + 0x26) : mword 64) false (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), true, 1)).
@@ -235,7 +167,7 @@ Section WpUartPutcSync.
     (mword_of_int (UPS + 0x2a) : mword 64) (ITYPE (mword_of_int 32 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) updc_0207f793. Qed.
 
   Lemma upi_2e : kernel_text -∗ instr (mword_of_int (UPS + 0x2e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
-  Proof. mk_rvc4 (UPS + 0x2e)%Z (mword_of_int 0xdfe5 : mword 16) (mword_of_int 0xf513dfe5 : mword 32)
+  Proof. mk_rvc (UPS + 0x2e)%Z (mword_of_int 0xdfe5 : mword 16)
     (mword_of_int (UPS + 0x2e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) uprvc_dfe5 exec_execute_C_BEQZ. Qed.
 
   Lemma upi_30 : kernel_text -∗ instr (mword_of_int (UPS + 0x30) : mword 64) false (ITYPE (mword_of_int 255 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ANDI)).
@@ -260,7 +192,7 @@ Section WpUartPutcSync.
     (mword_of_int (UPS + 0x10) : mword 64) (LOAD (mword_of_int 0x8b6 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8b67a783. Qed.
 
   Lemma upi_14 : kernel_text -∗ instr (mword_of_int (UPS + 0x14) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 30 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
-  Proof. mk_rvc2 (UPS + 0x14)%Z (mword_of_int 0xcf95 : mword 16)
+  Proof. mk_rvc (UPS + 0x14)%Z (mword_of_int 0xcf95 : mword 16)
     (mword_of_int (UPS + 0x14) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 30 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) uprvc_cf95 exec_execute_C_BEQZ. Qed.
 
   (* --- panicked-check (0x978 auipc / 0x97c lw / 0x980 c.bnez) --- *)
@@ -273,7 +205,7 @@ Section WpUartPutcSync.
     (mword_of_int (UPS + 0x1a) : mword 64) (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8a87a783. Qed.
 
   Lemma upi_1e : kernel_text -∗ instr (mword_of_int (UPS + 0x1e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
-  Proof. mk_rvc4 (UPS + 0x1e)%Z (mword_of_int 0xef85 : mword 16) (mword_of_int 0x0737ef85 : mword 32)
+  Proof. mk_rvc (UPS + 0x1e)%Z (mword_of_int 0xef85 : mword 16)
     (mword_of_int (UPS + 0x1e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) uprvc_ef85 exec_execute_C_BNEZ. Qed.
 
   (* --- 2nd panicking-check (0x99e auipc / 0x9a2 lw / 0x9a6 c.beqz) --- *)
@@ -286,7 +218,7 @@ Section WpUartPutcSync.
     (mword_of_int (UPS + 0x40) : mword 64) (LOAD (mword_of_int 0x886 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8867a783. Qed.
 
   Lemma upi_44 : kernel_text -∗ instr (mword_of_int (UPS + 0x44) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
-  Proof. mk_rvc2 (UPS + 0x44)%Z (mword_of_int 0xcb91 : mword 16)
+  Proof. mk_rvc (UPS + 0x44)%Z (mword_of_int 0xcb91 : mword 16)
     (mword_of_int (UPS + 0x44) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) uprvc_cb91 exec_execute_C_BEQZ. Qed.
 
   (* ------------------------------------------------------------------- *)

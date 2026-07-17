@@ -202,125 +202,57 @@ Section WpHolding.
   (* ------------------------------------------------------------------- *)
   (* [instr] facts for the four fast-path instructions.                    *)
   (* ------------------------------------------------------------------- *)
-  Local Ltac mk_rvc4 A h w pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hsub := fresh "Hsub" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = true) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hsub : subrange_vec_dec w 15 0 = h) by (apply bv_eq; vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_rvc2 A h pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = false) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte h j))
-      by (intros j Hj;
-          do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
-      iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_base A w pc ast decname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let Hnrvc := fresh "Hnrvc" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_Base w);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_base pc w H2al Hnrvc);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
-
   Lemma hi_00 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x0) : mword 64) true
       (LOAD (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x0)%Z (mword_of_int 0x411c : mword 16) (mword_of_int 0xe399411c : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x0)%Z (mword_of_int 0x411c : mword 16)
     (mword_of_int (KernelSyms.holding + 0x0) : mword 64)
     (LOAD (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)) hdec_lw hexec_lw. Qed.
 
   Lemma hi_02 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x2) : mword 64) true
       (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x2)%Z (mword_of_int 0xe399 : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x2)%Z (mword_of_int 0xe399 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x2) : mword 64)
     (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) hdec_bnez exec_execute_C_BNEZ. Qed.
 
   Lemma hi_04 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x4) : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x4)%Z (mword_of_int 0x4501 : mword 16) (mword_of_int 0x80824501 : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x4)%Z (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x4) : mword 64)
     (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) hdec_li exec_execute_C_LI. Qed.
 
   Lemma hi_06 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x6) : mword 64) true
       (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x6)%Z (mword_of_int 0x8082 : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x6)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x6) : mword 64)
     (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
 
 
   Lemma his_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x08) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x08)%Z (mword_of_int 0x1101 : mword 16) (mword_of_int 0xec061101 : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x08)%Z (mword_of_int 0x1101 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x08) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) podec_00 exec_execute_C_ADDI. Qed.
 
   Lemma his_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x0a) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x0a)%Z (mword_of_int 0xec06 : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x0a)%Z (mword_of_int 0xec06 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x0a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) podec_02 exec_execute_C_SDSP. Qed.
 
   Lemma his_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x0c) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x0c)%Z (mword_of_int 0xe822 : mword 16) (mword_of_int 0xe426e822 : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x0c)%Z (mword_of_int 0xe822 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x0c) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) podec_04 exec_execute_C_SDSP. Qed.
 
   Lemma his_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x0e) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x0e)%Z (mword_of_int 0xe426 : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x0e)%Z (mword_of_int 0xe426 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x0e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) podec_06 exec_execute_C_SDSP. Qed.
 
   Lemma his_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x10) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x10)%Z (mword_of_int 0x1000 : mword 16) (mword_of_int 0x691c1000 : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x10)%Z (mword_of_int 0x1000 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x10) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) podec_08 exec_execute_C_ADDI4SPN. Qed.
 
   Lemma his_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x12) : mword 64) true (LOAD (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x12)%Z (mword_of_int 0x691c : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x12)%Z (mword_of_int 0x691c : mword 16)
     (mword_of_int (KernelSyms.holding + 0x12) : mword 64) (LOAD (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)) hdec_ld hexec_ld. Qed.
 
   Lemma his_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x14) : mword 64) true (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 9), ADD)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x14)%Z (mword_of_int 0x84be : mword 16) (mword_of_int 0x00ef84be : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x14)%Z (mword_of_int 0x84be : mword 16)
     (mword_of_int (KernelSyms.holding + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 9), ADD)) podec_0e exec_execute_C_MV. Qed.
 
   Lemma his_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x16) : mword 64) false (JAL (mword_of_int 0xd2c : mword 21, Regidx (mword_of_int 1))).
@@ -336,23 +268,23 @@ Section WpHolding.
     (mword_of_int (KernelSyms.holding + 0x1e) : mword 64) (ITYPE (mword_of_int 1, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLTIU)) hdec_seqz. Qed.
 
   Lemma his_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x22) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x22)%Z (mword_of_int 0x60e2 : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x22)%Z (mword_of_int 0x60e2 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) podec_22 exec_execute_C_LDSP. Qed.
 
   Lemma his_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x24) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x24)%Z (mword_of_int 0x6442 : mword 16) (mword_of_int 0x64a26442 : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x24)%Z (mword_of_int 0x6442 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) podec_24 exec_execute_C_LDSP. Qed.
 
   Lemma his_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x26) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x26)%Z (mword_of_int 0x64a2 : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x26)%Z (mword_of_int 0x64a2 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x26) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) podec_26 exec_execute_C_LDSP. Qed.
 
   Lemma his_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x28) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)).
-  Proof. mk_rvc4 (KernelSyms.holding + 0x28)%Z (mword_of_int 0x6105 : mword 16) (mword_of_int 0x80826105 : mword 32)
+  Proof. mk_rvc (KernelSyms.holding + 0x28)%Z (mword_of_int 0x6105 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x28) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)) podec_28 exec_execute_C_ADDI16SP. Qed.
 
   Lemma his_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x2a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc2 (KernelSyms.holding + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
+  Proof. mk_rvc (KernelSyms.holding + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
 
 End WpHolding.

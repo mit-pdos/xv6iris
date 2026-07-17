@@ -301,83 +301,15 @@ Section WpSwtchVc.
   Notation SW := KernelSyms.swtch.
 
   (* the three instr-builder templates, copied verbatim from WpMycpu/WpKallocDecode *)
-  Local Ltac mk_rvc4 A h w pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hsub := fresh "Hsub" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = true) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hsub : subrange_vec_dec w 15 0 = h) by (apply bv_eq; vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_rvc2 A h pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in let Hrvc := fresh "Hrvc" in
-    let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = false) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte h j))
-      by (intros j Hj;
-          do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
-      iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac mk_base A w pc ast decname :=
-    let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
-    let Hnrvc := fresh "Hnrvc" in let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_Base w);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_base pc w H2al Hnrvc);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
-
   (* ------ the 28 instr facts of swtch's straight-line body ------ *)
   Lemma swi_00 : kernel_text -∗ instr (mword_of_int (SW + 0x00) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 1), Regidx (mword_of_int 10), 8)).
   Proof. mk_base (SW + 0x00)%Z (mword_of_int 0x00153023 : mword 32) (mword_of_int (SW + 0x00) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 1), Regidx (mword_of_int 10), 8)) swb_00153023. Qed.
   Lemma swi_04 : kernel_text -∗ instr (mword_of_int (SW + 0x04) : mword 64) false (STORE (mword_of_int 8 : mword 12, Regidx (mword_of_int 2), Regidx (mword_of_int 10), 8)).
   Proof. mk_base (SW + 0x04)%Z (mword_of_int 0x00253423 : mword 32) (mword_of_int (SW + 0x04) : mword 64) (STORE (mword_of_int 8 : mword 12, Regidx (mword_of_int 2), Regidx (mword_of_int 10), 8)) swb_00253423. Qed.
   Lemma swi_08 : kernel_text -∗ instr (mword_of_int (SW + 0x08) : mword 64) true (STORE (mword_of_int 16 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), 8)).
-  Proof. mk_rvc2 (SW + 0x08)%Z (mword_of_int 0xe900 : mword 16) (mword_of_int (SW + 0x08) : mword 64) (STORE (mword_of_int 16 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), 8)) swdc_e900 swx_csd_s0. Qed.
+  Proof. mk_rvc (SW + 0x08)%Z (mword_of_int 0xe900 : mword 16) (mword_of_int (SW + 0x08) : mword 64) (STORE (mword_of_int 16 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), 8)) swdc_e900 swx_csd_s0. Qed.
   Lemma swi_0a : kernel_text -∗ instr (mword_of_int (SW + 0x0a) : mword 64) true (STORE (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), 8)).
-  Proof. mk_rvc4 (SW + 0x0a)%Z (mword_of_int 0xed04 : mword 16) (mword_of_int 0x3023ed04 : mword 32) (mword_of_int (SW + 0x0a) : mword 64) (STORE (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), 8)) swdc_ed04 swx_csd_s1. Qed.
+  Proof. mk_rvc (SW + 0x0a)%Z (mword_of_int 0xed04 : mword 16) (mword_of_int (SW + 0x0a) : mword 64) (STORE (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), 8)) swdc_ed04 swx_csd_s1. Qed.
   Lemma swi_0c : kernel_text -∗ instr (mword_of_int (SW + 0x0c) : mword 64) false (STORE (mword_of_int 32 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), 8)).
   Proof. mk_base (SW + 0x0c)%Z (mword_of_int 0x03253023 : mword 32) (mword_of_int (SW + 0x0c) : mword 64) (STORE (mword_of_int 32 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), 8)) swb_03253023. Qed.
   Lemma swi_10 : kernel_text -∗ instr (mword_of_int (SW + 0x10) : mword 64) false (STORE (mword_of_int 40 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 10), 8)).
@@ -403,9 +335,9 @@ Section WpSwtchVc.
   Lemma swi_38 : kernel_text -∗ instr (mword_of_int (SW + 0x38) : mword 64) false (LOAD (mword_of_int 8 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 2), false, 8)).
   Proof. mk_base (SW + 0x38)%Z (mword_of_int 0x0085b103 : mword 32) (mword_of_int (SW + 0x38) : mword 64) (LOAD (mword_of_int 8 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 2), false, 8)) swb_0085b103. Qed.
   Lemma swi_3c : kernel_text -∗ instr (mword_of_int (SW + 0x3c) : mword 64) true (LOAD (mword_of_int 16 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc2 (SW + 0x3c)%Z (mword_of_int 0x6980 : mword 16) (mword_of_int (SW + 0x3c) : mword 64) (LOAD (mword_of_int 16 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 8), false, 8)) swdc_6980 swx_cld_s0. Qed.
+  Proof. mk_rvc (SW + 0x3c)%Z (mword_of_int 0x6980 : mword 16) (mword_of_int (SW + 0x3c) : mword 64) (LOAD (mword_of_int 16 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 8), false, 8)) swdc_6980 swx_cld_s0. Qed.
   Lemma swi_3e : kernel_text -∗ instr (mword_of_int (SW + 0x3e) : mword 64) true (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 9), false, 8)).
-  Proof. mk_rvc4 (SW + 0x3e)%Z (mword_of_int 0x6d84 : mword 16) (mword_of_int 0xb9036d84 : mword 32) (mword_of_int (SW + 0x3e) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 9), false, 8)) swdc_6d84 swx_cld_s1. Qed.
+  Proof. mk_rvc (SW + 0x3e)%Z (mword_of_int 0x6d84 : mword 16) (mword_of_int (SW + 0x3e) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 9), false, 8)) swdc_6d84 swx_cld_s1. Qed.
   Lemma swi_40 : kernel_text -∗ instr (mword_of_int (SW + 0x40) : mword 64) false (LOAD (mword_of_int 32 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 18), false, 8)).
   Proof. mk_base (SW + 0x40)%Z (mword_of_int 0x0205b903 : mword 32) (mword_of_int (SW + 0x40) : mword 64) (LOAD (mword_of_int 32 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 18), false, 8)) swb_0205b903. Qed.
   Lemma swi_44 : kernel_text -∗ instr (mword_of_int (SW + 0x44) : mword 64) false (LOAD (mword_of_int 40 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 19), false, 8)).
@@ -430,7 +362,7 @@ Section WpSwtchVc.
   (* +0x68 c.ret : jalr x0,0(x1) *)
   Lemma swi_ret : kernel_text -∗ instr (mword_of_int (SW + 0x68) : mword 64) true
       (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc2 (SW + 0x68)%Z (mword_of_int 0x8082 : mword 16)
+  Proof. mk_rvc (SW + 0x68)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (SW + 0x68) : mword 64)
     (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
 

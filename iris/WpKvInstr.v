@@ -4,7 +4,7 @@
    SmodeCore's [kv_decode1] / [kv_instr1]; this file provides #2..#38:
    17 c.sdsp saves, the jal into kerneltrap, 17 c.ldsp restores, the
    c.addi16sp sp,+256, and the closing sret.  Decode templates are
-   WpTimerinit's; constructor templates are WpTimerinit's ti_mk_*. *)
+   WpTimerinit's; constructor templates are KernelText's [mk_rvc] / [mk_base]. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -298,337 +298,262 @@ Section WpKvInstr.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Local Ltac kv_mk_rvc4 A h w pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in
-    let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in
-    let Hrvc := fresh "Hrvc" in
-    let Hsub := fresh "Hsub" in
-    let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = true) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hsub : subrange_vec_dec w 15 0 = h) by (apply bv_eq; vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc4 pc h w H2al H4al Hrvc Hsub);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac kv_mk_rvc2 A h pc ast decname expname :=
-    let Hlpad := fresh "Hlpad" in
-    let H2al := fresh "H2al" in
-    let H4al := fresh "H4al" in
-    let Hrvc := fresh "Hrvc" in
-    let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (H4al : is_aligned_vaddr (Virtaddr pc) 4 = false) by (vm_compute; reflexivity);
-    assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte h j))
-      by (intros j Hj;
-          do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_RVC h);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_rvc2 pc h H2al H4al Hrvc);
-      iApply (kernel_window_pc A h 2 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-      eexists; (split; [ apply decname; assumption
-                       | split; [ vm_compute; reflexivity
-                                | intro; apply expname ] ]) ].
-
-  Local Ltac kv_mk_base A w pc ast decname :=
-    let Hlpad := fresh "Hlpad" in
-    let H2al := fresh "H2al" in
-    let Hnrvc := fresh "Hnrvc" in
-    let Hbytes := fresh "Hbytes" in
-    assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
-    assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
-    assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
-      by (intros j Hj;
-          do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
-    iIntros "#Ht"; rewrite /instr;
-    iSplitR; [iPureIntro; exact Hlpad|];
-    iExists (F_Base w);
-    iSplitR; [iPureIntro; reflexivity|];
-    iSplitL "";
-    [ iApply (instr_bytes_base pc w H2al Hnrvc);
-      iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-    | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
-
   Lemma kv_i2 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 1 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x2) (mword_of_int 0xe006 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x2) (mword_of_int 0xe006 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 1 : mword 5), sp, 8)) kv_dec2 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i3 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x4) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 3 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x4) (mword_of_int 0xe80e : mword 16) (mword_of_int 0xf016e80e : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x4) (mword_of_int 0xe80e : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x4) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 3 : mword 5), sp, 8)) kv_dec3 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i4 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x6) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 5 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x6) (mword_of_int 0xf016 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x6) (mword_of_int 0xf016 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x6) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 5 : mword 5), sp, 8)) kv_dec4 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i5 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x8) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 6 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x8) (mword_of_int 0xf41a : mword 16) (mword_of_int 0xf81ef41a : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x8) (mword_of_int 0xf41a : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x8) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 6 : mword 5), sp, 8)) kv_dec5 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i6 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0xa) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), Regidx (mword_of_int 7 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0xa) (mword_of_int 0xf81e : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0xa) (mword_of_int 0xf81e : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0xa) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), Regidx (mword_of_int 7 : mword 5), sp, 8)) kv_dec6 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i7 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0xc) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), Regidx (mword_of_int 10 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0xc) (mword_of_int 0xe4aa : mword 16) (mword_of_int 0xe8aee4aa : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0xc) (mword_of_int 0xe4aa : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0xc) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), Regidx (mword_of_int 10 : mword 5), sp, 8)) kv_dec7 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i8 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0xe) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), Regidx (mword_of_int 11 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0xe) (mword_of_int 0xe8ae : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0xe) (mword_of_int 0xe8ae : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0xe) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), Regidx (mword_of_int 11 : mword 5), sp, 8)) kv_dec8 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i9 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x10) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), Regidx (mword_of_int 12 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x10) (mword_of_int 0xecb2 : mword 16) (mword_of_int 0xf0b6ecb2 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x10) (mword_of_int 0xecb2 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x10) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), Regidx (mword_of_int 12 : mword 5), sp, 8)) kv_dec9 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i10 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x12) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 6) ('b"000")), Regidx (mword_of_int 13 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x12) (mword_of_int 0xf0b6 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x12) (mword_of_int 0xf0b6 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x12) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 6) ('b"000")), Regidx (mword_of_int 13 : mword 5), sp, 8)) kv_dec10 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i11 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x14) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 13 : mword 6) ('b"000")), Regidx (mword_of_int 14 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x14) (mword_of_int 0xf4ba : mword 16) (mword_of_int 0xf8bef4ba : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x14) (mword_of_int 0xf4ba : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x14) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 13 : mword 6) ('b"000")), Regidx (mword_of_int 14 : mword 5), sp, 8)) kv_dec11 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i12 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x16) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 6) ('b"000")), Regidx (mword_of_int 15 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x16) (mword_of_int 0xf8be : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x16) (mword_of_int 0xf8be : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x16) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 6) ('b"000")), Regidx (mword_of_int 15 : mword 5), sp, 8)) kv_dec12 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i13 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x18) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 6) ('b"000")), Regidx (mword_of_int 16 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x18) (mword_of_int 0xfcc2 : mword 16) (mword_of_int 0xe146fcc2 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x18) (mword_of_int 0xfcc2 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x18) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 6) ('b"000")), Regidx (mword_of_int 16 : mword 5), sp, 8)) kv_dec13 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i14 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x1a) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 6) ('b"000")), Regidx (mword_of_int 17 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x1a) (mword_of_int 0xe146 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x1a) (mword_of_int 0xe146 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x1a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 6) ('b"000")), Regidx (mword_of_int 17 : mword 5), sp, 8)) kv_dec14 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i15 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x1c) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 27 : mword 6) ('b"000")), Regidx (mword_of_int 28 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x1c) (mword_of_int 0xedf2 : mword 16) (mword_of_int 0xf1f6edf2 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x1c) (mword_of_int 0xedf2 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x1c) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 27 : mword 6) ('b"000")), Regidx (mword_of_int 28 : mword 5), sp, 8)) kv_dec15 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i16 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x1e) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 28 : mword 6) ('b"000")), Regidx (mword_of_int 29 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x1e) (mword_of_int 0xf1f6 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x1e) (mword_of_int 0xf1f6 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x1e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 28 : mword 6) ('b"000")), Regidx (mword_of_int 29 : mword 5), sp, 8)) kv_dec16 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i17 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x20) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 29 : mword 6) ('b"000")), Regidx (mword_of_int 30 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x20) (mword_of_int 0xf5fa : mword 16) (mword_of_int 0xf9fef5fa : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x20) (mword_of_int 0xf5fa : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x20) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 29 : mword 6) ('b"000")), Regidx (mword_of_int 30 : mword 5), sp, 8)) kv_dec17 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i18 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x22) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 30 : mword 6) ('b"000")), Regidx (mword_of_int 31 : mword 5), sp, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x22) (mword_of_int 0xf9fe : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x22) (mword_of_int 0xf9fe : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x22) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 30 : mword 6) ('b"000")), Regidx (mword_of_int 31 : mword 5), sp, 8)) kv_dec18 exec_execute_C_SDSP.
   Qed.
 
   Lemma kv_i19 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) false (JAL (mword_of_int 0x1fd246 : mword 21, Regidx (mword_of_int 1 : mword 5))).
   Proof.
-    kv_mk_base (KernelSyms.kernelvec + 0x24) (mword_of_int 0xa46fd0ef : mword 32)
+    mk_base (KernelSyms.kernelvec + 0x24) (mword_of_int 0xa46fd0ef : mword 32)
       (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) (JAL (mword_of_int 0x1fd246 : mword 21, Regidx (mword_of_int 1 : mword 5))) kv_dec19.
   Qed.
 
   Lemma kv_i20 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x28) (mword_of_int 0x6082 : mword 16) (mword_of_int 0x61c26082 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x28) (mword_of_int 0x6082 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1 : mword 5), false, 8)) kv_dec20 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i21 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 3 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x2a) (mword_of_int 0x61c2 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x2a) (mword_of_int 0x61c2 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 3 : mword 5), false, 8)) kv_dec21 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i22 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x2c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 5 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x2c) (mword_of_int 0x7282 : mword 16) (mword_of_int 0x73227282 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x2c) (mword_of_int 0x7282 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 5 : mword 5), false, 8)) kv_dec22 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i23 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x2e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 6 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x2e) (mword_of_int 0x7322 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x2e) (mword_of_int 0x7322 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 6 : mword 5), false, 8)) kv_dec23 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i24 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x30) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 7 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x30) (mword_of_int 0x73c2 : mword 16) (mword_of_int 0x652673c2 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x30) (mword_of_int 0x73c2 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 7 : mword 5), false, 8)) kv_dec24 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i25 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x32) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 10 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x32) (mword_of_int 0x6526 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x32) (mword_of_int 0x6526 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x32) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 10 : mword 5), false, 8)) kv_dec25 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i26 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x34) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 11 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x34) (mword_of_int 0x65c6 : mword 16) (mword_of_int 0x666665c6 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x34) (mword_of_int 0x65c6 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x34) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 11 : mword 5), false, 8)) kv_dec26 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i27 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x36) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 12 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x36) (mword_of_int 0x6666 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x36) (mword_of_int 0x6666 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x36) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 12 : mword 5), false, 8)) kv_dec27 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i28 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x38) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 6) ('b"000")), sp, Regidx (mword_of_int 13 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x38) (mword_of_int 0x7686 : mword 16) (mword_of_int 0x77267686 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x38) (mword_of_int 0x7686 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x38) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 6) ('b"000")), sp, Regidx (mword_of_int 13 : mword 5), false, 8)) kv_dec28 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i29 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x3a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 13 : mword 6) ('b"000")), sp, Regidx (mword_of_int 14 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x3a) (mword_of_int 0x7726 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x3a) (mword_of_int 0x7726 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x3a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 13 : mword 6) ('b"000")), sp, Regidx (mword_of_int 14 : mword 5), false, 8)) kv_dec29 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i30 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x3c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 6) ('b"000")), sp, Regidx (mword_of_int 15 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x3c) (mword_of_int 0x77c6 : mword 16) (mword_of_int 0x786677c6 : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x3c) (mword_of_int 0x77c6 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x3c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 6) ('b"000")), sp, Regidx (mword_of_int 15 : mword 5), false, 8)) kv_dec30 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i31 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x3e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 6) ('b"000")), sp, Regidx (mword_of_int 16 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x3e) (mword_of_int 0x7866 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x3e) (mword_of_int 0x7866 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x3e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 6) ('b"000")), sp, Regidx (mword_of_int 16 : mword 5), false, 8)) kv_dec31 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i32 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x40) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 6) ('b"000")), sp, Regidx (mword_of_int 17 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x40) (mword_of_int 0x688a : mword 16) (mword_of_int 0x6e6e688a : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x40) (mword_of_int 0x688a : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x40) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 6) ('b"000")), sp, Regidx (mword_of_int 17 : mword 5), false, 8)) kv_dec32 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i33 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x42) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 27 : mword 6) ('b"000")), sp, Regidx (mword_of_int 28 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x42) (mword_of_int 0x6e6e : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x42) (mword_of_int 0x6e6e : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x42) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 27 : mword 6) ('b"000")), sp, Regidx (mword_of_int 28 : mword 5), false, 8)) kv_dec33 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i34 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x44) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 28 : mword 6) ('b"000")), sp, Regidx (mword_of_int 29 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x44) (mword_of_int 0x7e8e : mword 16) (mword_of_int 0x7f2e7e8e : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x44) (mword_of_int 0x7e8e : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x44) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 28 : mword 6) ('b"000")), sp, Regidx (mword_of_int 29 : mword 5), false, 8)) kv_dec34 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i35 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x46) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 29 : mword 6) ('b"000")), sp, Regidx (mword_of_int 30 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x46) (mword_of_int 0x7f2e : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x46) (mword_of_int 0x7f2e : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x46) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 29 : mword 6) ('b"000")), sp, Regidx (mword_of_int 30 : mword 5), false, 8)) kv_dec35 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i36 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x48) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 30 : mword 6) ('b"000")), sp, Regidx (mword_of_int 31 : mword 5), false, 8)).
   Proof.
-    kv_mk_rvc4 (KernelSyms.kernelvec + 0x48) (mword_of_int 0x7fce : mword 16) (mword_of_int 0x61117fce : mword 32)
+    mk_rvc (KernelSyms.kernelvec + 0x48) (mword_of_int 0x7fce : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x48) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 30 : mword 6) ('b"000")), sp, Regidx (mword_of_int 31 : mword 5), false, 8)) kv_dec36 exec_execute_C_LDSP.
   Qed.
 
   Lemma kv_i37 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 16 : mword 6), sp, sp, ADDI)).
   Proof.
-    kv_mk_rvc2 (KernelSyms.kernelvec + 0x4a) (mword_of_int 0x6111 : mword 16)
+    mk_rvc (KernelSyms.kernelvec + 0x4a) (mword_of_int 0x6111 : mword 16)
       (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 16 : mword 6), sp, sp, ADDI)) kv_dec37 exec_execute_C_ADDI16SP.
   Qed.
 
   Lemma kv_i38 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) false (SRET tt).
   Proof.
-    kv_mk_base (KernelSyms.kernelvec + 0x4c) (mword_of_int 0x10200073 : mword 32)
+    mk_base (KernelSyms.kernelvec + 0x4c) (mword_of_int 0x10200073 : mword 32)
       (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) (SRET tt) kv_dec38.
   Qed.
 
