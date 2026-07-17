@@ -31,6 +31,7 @@ Require Import WpSmodeRtype WpSmodeJalr WpSmodeGpr.
 Require Import WpMemsetInstr KernelRvcDecode.
 Require Import VcGen VcGenS.
 Require Import CalleeSaved.
+Require Import WpUart.
 Require Import WpUartPutcSync.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -82,6 +83,7 @@ Qed.
 
 Section WpUartPutcSyncFull.
   Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!uartGhostG Σ}.
   Context `{CID : CpuId}.
 
   (* [instr]-builder templates, copied verbatim from WpUartPutcSync.v. *)
@@ -276,9 +278,10 @@ Section WpUartPutcSyncFull.
     rewrite lookup_total_alt lookup_fmap Hr. reflexivity.
   Qed.
 
-  Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+      (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (n : nat) (q : Qp)
-      (u u' : uart_state) (pv pkv : mword 32)
+      (l : list (bv 8)) (pv pkv : mword 32)
       {dqm dqm2 : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -287,21 +290,21 @@ Section WpUartPutcSyncFull.
     let ra0 := m0 !!! Regidx ra_idx in
     let a00 := m0 !!! Regidx a0_idx in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (* the byte written to THR: the low 8 bits of the char in a0 *)
+    let sb : mword 8 := autocast (T := mword)
+       (subrange_vec_dec (and_vec (add_vec zero_reg a00)
+          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
     (3 ≤ n)%nat ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-    uart_thre u = true ->
-    uart_write u 0 (autocast (T := mword)
-       (subrange_vec_dec (and_vec (add_vec zero_reg a00)
-          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = Some u' ->
     smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗ kernel_text -∗
     pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    uart_frag u -∗
+    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ mf,
       smode_config γ (DfracOwn q) -∗
       tlb_inv root_ppn -∗
@@ -311,12 +314,12 @@ Section WpUartPutcSyncFull.
       stack_own sp0 n -∗
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-      uart_frag u' -∗
+      uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ra_idx a0_idx pcE sp0 ra0 a00 ret_tgt.
-    intros Hn3 Hal0 Hpv Hpkv Hthre Hwrite.
+    intros ra_idx a0_idx pcE sp0 ra0 a00 ret_tgt sb.
+    intros Hn3 Hal0 Hpv Hpkv.
     (* Frame geometry and the two saved s-registers: proof-local, since the
        statement itself no longer mentions them. *)
     pose (s0_idx := (mword_of_int 8 : mword 5)).
@@ -328,7 +331,7 @@ Section WpUartPutcSyncFull.
     set (ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))).
     set (ea_s0 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))).
     set (ea_s1 := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
-    iIntros "Hsm Htlbinv #Htext Hpc Hfile Hstk Hpk Hpkd Huf Hcont".
+    iIntros "Hsm Htlbinv #Htext Hpc Hfile Hstk Hpk Hpkd #Hdinv Hown #Hoff Hcont".
     (* peel the three-slot frame off the abstract stack ownership. *)
     iDestruct (stack_own_split_1 sp0 3 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
     iDestruct (stack_own_3_elim with "Htop") as (raold s0old s1old) "(Hbra & Hbs0 & Hbs1)".
@@ -446,12 +449,17 @@ Section WpUartPutcSyncFull.
     assert (HR9m3 : m3 !!! Regidx (mword_of_int 9) = add_vec zero_reg a00).
     { unfold m3. change (Regidx s1_idx) with (Regidx (mword_of_int 9)).
       rewrite lookup_total_insert. unfold regval_into_reg. rewrite Ha0M1. reflexivity. }
-    iApply (wp_uartputc_body root_ppn γ Φ m3
-              u u' pv pkv (dq:=DfracOwn q) (dqm:=dqm) (dqm2:=dqm2)
- Hpv Hpkv Hthre
-              ltac:(rewrite HR9m3; exact Hwrite)
-              with "Hsm Htlbinv Htext Hpc Hfile Hpk Hpkd Huf").
-    iIntros (mf) "Hsm Htlbinv Hpc Hfile %Hcs_body Hpk Hpkd Huf".
+    (* the body's store byte is about m3!!!s1 = add_vec zero_reg a00 = our sb *)
+    assert (Hsbm3 : (autocast (T := mword)
+                      (subrange_vec_dec (and_vec (m3 !!! Regidx (mword_of_int 9))
+                         (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = sb).
+    { unfold sb. rewrite HR9m3. reflexivity. }
+    iApply (wp_uartputc_body root_ppn γ γd Φ m3 l pv pkv
+              (dq:=DfracOwn q) (dqm:=dqm) (dqm2:=dqm2)
+ Hpv Hpkv
+              with "Hsm Htlbinv Htext Hpc Hfile Hpk Hpkd Hdinv Hown Hoff").
+    iIntros (mf) "Hsm Htlbinv Hpc Hfile %Hcs_body Hpk Hpkd Hown Hsent".
+    iEval (rewrite Hsbm3) in "Hown". iEval (rewrite Hsbm3) in "Hsent".
     destruct Hcs_body as (B2 & B4 & B8 & B9 & B18 & B19 & B20 & B21
                           & B22 & B23 & B24 & B25 & B26 & B27).
     (* [mf]'s sp agrees with the body input (== sp'). *)
@@ -595,7 +603,7 @@ Section WpUartPutcSyncFull.
       rewrite (Hagree_epi _ He) Hbody. unfold m3.
       rewrite lookup_total_insert_ne; [| exact Hne2].
       exact (Hagree_pro _ Hp). }
-    iApply ("Hcont" $! m_epi2 with "Hsm Htlbinv Hpc Hfile [%] Hstk Hpk Hpkd Huf").
+    iApply ("Hcont" $! m_epi2 with "Hsm Htlbinv Hpc Hfile [%] Hstk Hpk Hpkd Hown Hsent").
     split; [| exact Hra_final].
     unfold callee_saved. repeat split.
     (* every callee-saved register except sp/s0/s1 is simply never written *)

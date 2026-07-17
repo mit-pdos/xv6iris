@@ -1591,6 +1591,9 @@ Qed.
               ltac:(unfold m2, m1; rewrite lookup_total_insert_ne; [ rewrite lookup_total_insert_ne; [ exact Hn0 | vm_compute; discriminate ] | vm_compute; discriminate ])
               ltac:(rewrite Htgt; exact Hal0)
               with "Hsm Htlbinv Hpc Hfile Hi8 [-]").
+    (* the taken leaf hands the step's later out (so loops can use it); this
+       caller does not need it, so strip it straight away *)
+    iNext.
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite Htgt) in "Hpc".
     assert (Hra_eq : m1 !!! Regidx ra_idx = m0 !!! Regidx ra_idx)

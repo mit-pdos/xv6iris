@@ -140,6 +140,8 @@ Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed
 Section WpUartPutcSync.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
+  (* the device leaves open [dev_inv], whose ghosts need this *)
+  Context `{!uartGhostG Σ}.
   Context `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
@@ -286,29 +288,72 @@ Section WpUartPutcSync.
   (* base register already holds the concrete UART register address.        *)
   (* ------------------------------------------------------------------- *)
 
-  (* the byte the [lbu] leaf writes back when the read returns [uart_lsr u] *)
-  Definition uart_lsr_ldval (u : uart_state) : mword 64 :=
-    extend_value true (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) (uart_lsr u)).
+  (* the value the [lbu] leaf writes back for a read byte [b].  The device
+     state is shared, so the poll cannot name the byte in advance: everything
+     downstream is phrased in terms of [b] and only re-connected to the UART
+     inside the leaf's ghost step. *)
+  Definition lsr_ldval_of (b : bv 8) : mword 64 :=
+    extend_value true (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b).
 
-  Lemma wp_uart_lsr_read_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5)
-      (m : gmap regidx (mword 64)) (u : uart_state) {dq : dfrac} :
+  (* the byte the [lbu] leaf writes back when the read returns [uart_lsr u] *)
+  Definition uart_lsr_ldval (u : uart_state) : mword 64 := lsr_ldval_of (uart_lsr u).
+
+  (* THE POLL'S BRANCH TEST, as a function of the read byte: [andi a5,a5,32]
+     then [c.beqz a5].  True = THRE clear = branch taken = spin again. *)
+  Definition lsr_thre_clear (b : bv 8) : bool :=
+    eq_vec (and_vec (lsr_ldval_of b) (sign_extend' 64 (mword_of_int 32 : mword 12))) zero_reg.
+
+  (* THRE-ready path: after [lbu (LSR)] + [andi ...,32], a5 masks to bit5 = 32,
+     so the loop's [c.beqz a5] falls through. *)
+  Lemma uart_thre_beqz (u : uart_state) :
+    uart_thre u = true -> lsr_thre_clear (uart_lsr u) = false.
+  Proof.
+    intro H. unfold lsr_thre_clear, lsr_ldval_of, uart_lsr. rewrite H.
+    destruct (uart_rx_ready u); vm_compute; reflexivity.
+  Qed.
+
+  (* the converse: THRE clear really does take the branch, so the two cases of
+     the poll are exactly [uart_thre u] *)
+  Lemma uart_nothre_beqz (u : uart_state) :
+    uart_thre u = false -> lsr_thre_clear (uart_lsr u) = true.
+  Proof.
+    intro H. unfold lsr_thre_clear, lsr_ldval_of, uart_lsr. rewrite H.
+    destruct (uart_rx_ready u); vm_compute; reflexivity.
+  Qed.
+
+  (* The THR write.  This is where the whole ghost design pays off: the caller
+     brings the transmitter token, the out-bound the poll handed back, and the
+     frozen DLAB fact; [uart_tx_ready_persists] turns them into
+     [uart_write_thr_acc]'s two premises AT THE WRITE'S OWN STATE, so the byte
+     provably lands in the FIFO rather than being dropped.  The postcondition
+     is the grown token plus a permanent [uart_sent] record. *)
+  (* The LSR poll's load.  Takes [dev_inv] + the transmitter token; hands back
+     the token and -- IF the read byte says THRE was set -- the [uart_out_lb]
+     bound that makes the observation survive to the later THR write
+     ([uart_tx_ready_persists], WpUart.v). *)
+  Lemma wp_uart_lsr_read_s (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
+      (m : gmap regidx (mword 64)) (l : list (bv 8)) {dq : dfrac} :
     uint rd <> 0 ->
     m !!! Regidx rs1 = uart_pa 5 ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
-    uart_frag u -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+    dev_inv γd -∗ uart_tx_own γd l -∗
+    ( ∀ b : bv 8,
+      smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (uart_lsr_ldval u)]> m) -∗
-      uart_frag u -∗
+      gpr_file (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) -∗
+      uart_tx_own γd l -∗
+      (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Haddr)
-      "Hsm Htlbinv Hpc Hfile Hinstr Huf Hcont".
-    iApply (wp_lb_uart_s_kpt root_ppn γ 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
-              (uart_lsr u) m u u (dq:=dq)
+      "Hsm Htlbinv Hpc Hfile Hinstr #Hdinv Hown Hcont".
+    iApply (wp_lb_uart_s_kpt root_ppn γ γd 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
+              m (uart_tx_own γd l)
+              (fun b => uart_tx_own γd l ∗ (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l))%I
+              (dq:=dq)
 
               ltac:(unfold uart_size; lia) Hrd
               ltac:(unfold PTE_DEV; lia)
@@ -321,39 +366,44 @@ Section WpUartPutcSync.
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(reflexivity)
-              with "Hsm Htlbinv Hpc Hfile Hinstr Huf [Hcont]").
-    unfold uart_lsr_ldval. iApply "Hcont".
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hdinv Hown [] [Hcont]").
+    - (* the ghost step, run with [dev_inv] open: the LSR read is a pure
+         observation, so every ghost carries over unchanged; if THRE was set
+         we additionally extract the out-bound. *)
+      iIntros (u b u') "%Hread Hg Hown".
+      rewrite uart_read_lsr in Hread. injection Hread as <- <-.
+      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
+      destruct (uart_thre u) eqn:Hthre.
+      + iDestruct (uart_tx_poll_thre γd u l Hthre with "Hown Htx Hout")
+          as "(Hown & Htx & Hout & #Hlb & %Hfacts)".
+        iModIntro. iFrame "Hs Hout Htx Hdl Hown". iIntros (_). iExact "Hlb".
+      + iModIntro. iFrame "Hs Hout Htx Hdl Hown".
+        iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
+    - iIntros (b) "Hsm Htlbinv Hpc Hfile [Hown Hlb]".
+      iApply ("Hcont" $! b with "Hsm Htlbinv Hpc Hfile Hown Hlb").
   Qed.
 
-  (* THRE-ready path: after [lbu (LSR)] + [andi ...,32], a5 masks to bit5 = 32,
-     so the loop's [c.beqz a5] falls through. *)
-  Lemma uart_thre_beqz (u : uart_state) :
-    uart_thre u = true ->
-    eq_vec (and_vec (uart_lsr_ldval u) (sign_extend' 64 (mword_of_int 32 : mword 12))) zero_reg = false.
-  Proof.
-    intro H. unfold uart_lsr_ldval, uart_lsr. rewrite H.
-    destruct (uart_rx_ready u); vm_compute; reflexivity.
-  Qed.
-
-  Lemma wp_uart_thr_write_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
+  Lemma wp_uart_thr_write_s (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+      (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
+      (m : gmap regidx (mword 64)) (l : list (bv 8)) {dq : dfrac} :
     m !!! Regidx rs1 = uart_pa 0 ->
-    uart_write u 0 (autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = Some u' ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
-    uart_frag u -∗
+    dev_inv γd -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      uart_frag u' -∗
+      uart_tx_own γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
+      uart_sent γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Haddr Hwrite)
-      "Hsm Htlbinv Hpc Hfile Hinstr Huf Hcont".
-    iApply (wp_sb_uart_s_kpt root_ppn γ 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
-              m u u' (dq:=dq)
+    iIntros (Haddr)
+      "Hsm Htlbinv Hpc Hfile Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
+    set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
+    iApply (wp_sb_uart_s_kpt root_ppn γ γd 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+              m (uart_tx_own γd l)
+              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I
+              (dq:=dq)
 
               ltac:(unfold uart_size; lia)
               ltac:(unfold PTE_DEV; lia)
@@ -366,8 +416,33 @@ Section WpUartPutcSync.
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              Hwrite
-              with "Hsm Htlbinv Hpc Hfile Hinstr Huf Hcont").
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hdinv Hown [] [Hcont]").
+    - (* the ghost step, with [dev_inv] open at the write's OWN state [u] *)
+      iIntros (u u') "%Hwrite Hg Hown".
+      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
+      (* the poll's observation still holds HERE -- this is the payoff: the
+         token pins uart_acc u = l and the out-bound says l is all transmitted,
+         so at THIS state the FIFO is empty and (frozen) DLAB is clear *)
+      iDestruct (uart_tx_ready_persists γd u l
+                   with "Hown Hlb Hoff Htx Hout Hdl") as %[Hempty Hdlab].
+      iDestruct (uart_tx_own_agree with "Htx Hown") as %Haccu.
+      (* so the FIFO has room, and the accepted trace grows by exactly [sb] *)
+      assert (Hroom : (length (u_tx u) < uart_fifo_depth)%nat).
+      { rewrite Hempty. cbn [length]. unfold uart_fifo_depth. lia. }
+      assert (Hacc' : uart_acc u' = l ++ [sb]).
+      { rewrite (uart_write_thr_acc u sb u' Hdlab Hroom Hwrite) Haccu. reflexivity. }
+      iMod (uart_tx_own_update γd u l u' with "Htx Hown") as "[Htx Hown]".
+      iMod (uart_sent_update γd u u' with "Hs") as "[Hs Hsent]".
+      { rewrite Haccu Hacc'. by apply prefix_app_r. }
+      iDestruct (uart_out_auth_stable γd u u' (uart_write_out _ _ _ _ Hwrite)
+                   with "Hout") as "Hout".
+      iDestruct (uart_dlab_auth_stable γd u u'
+                   (uart_write_dlab_0 _ _ _ Hwrite) with "Hdl") as "Hdl".
+      iEval (rewrite Hacc') in "Hown".
+      iEval (rewrite Hacc') in "Hsent".
+      iModIntro. rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Hown Hsent".
+    - iIntros "Hsm Htlbinv Hpc Hfile [Hown Hsent]".
+      iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hown Hsent").
   Qed.
 
   (* =================================================================== *)
@@ -436,25 +511,186 @@ Section WpUartPutcSync.
     unfold regval_into_reg. reflexivity.
   Qed.
 
-  Lemma wp_uartputc_devcore (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
-    uart_thre u = true ->
-    uart_write u 0 (autocast (T := mword)
-       (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
-          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = Some u' ->
+  (* The mask [andi a5,a5,32] applied to the LSR-load value for a read byte. *)
+  Definition lsr_masked (b : bv 8) : mword 64 :=
+    and_vec (lsr_ldval_of b) (sign_extend' 64 (mword_of_int 32 : mword 12)).
+
+  (* The post-loop register maps, now indexed by the EXIT byte [b] the poll
+     observed (not by a UART state, which the caller can no longer name):
+       f4' : loop exit at 0x992, a5 = [andi]-masked LSR value
+       f5' : after [zext.b a0,s1]     (0x992)
+       f6' : after [lui a5,0x10000]   (0x996), the pre-THR-store map. *)
+  Definition ppc_f4' (m : gmap regidx (mword 64)) (b : bv 8) : gmap regidx (mword 64) :=
+    <[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> (ppc_f2 m).
+  Definition ppc_f5' (m : gmap regidx (mword 64)) (b : bv 8) : gmap regidx (mword 64) :=
+    <[Regidx (mword_of_int 10) := regval_into_reg (and_vec (ppc_f4' m b !!! Regidx (mword_of_int 9))
+        (sign_extend' 64 (mword_of_int 255 : mword 12)))]> (ppc_f4' m b).
+  Definition ppc_f6' (m : gmap regidx (mword 64)) (b : bv 8) : gmap regidx (mword 64) :=
+    <[Regidx (mword_of_int 15) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> (ppc_f5' m b).
+
+  Lemma ppc_f4'_s1 (m : gmap regidx (mword 64)) (b : bv 8) :
+    ppc_f4' m b !!! Regidx (mword_of_int 9) = m !!! Regidx (mword_of_int 9).
+  Proof.
+    unfold ppc_f4', ppc_f2, ppc_f1.
+    do 3 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+  Qed.
+
+  Lemma ppc_f6'_a5 (m : gmap regidx (mword 64)) (b : bv 8) :
+    ppc_f6' m b !!! Regidx (mword_of_int 15) = uart_pa 0.
+  Proof.
+    unfold ppc_f6'. rewrite lookup_total_insert.
+    apply bv_eq; vm_compute; reflexivity.
+  Qed.
+
+  Lemma ppc_f6'_a0 (m : gmap regidx (mword 64)) (b : bv 8) :
+    ppc_f6' m b !!! Regidx (mword_of_int 10)
+    = and_vec (m !!! Regidx (mword_of_int 9)) (sign_extend' 64 (mword_of_int 255 : mword 12)).
+  Proof.
+    unfold ppc_f6', ppc_f5'.
+    rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+    rewrite lookup_total_insert. rewrite ppc_f4'_s1. reflexivity.
+  Qed.
+
+  (* ================================================================= *)
+  (*  THE THRE POLL LOOP: 0x988 -> 0x990, run under [dev_inv].          *)
+  (*    0x988  lbu   a5,0(a4)   -- read LSR (a4 = uart_pa 5)            *)
+  (*    0x98c  andi  a5,a5,32   -- mask THRE bit                        *)
+  (*    0x990  c.beqz a5,0x988  -- THRE clear -> spin; set -> fall out  *)
+  (*                                                                    *)
+  (*  Unlike the old straight-line devcore, THRE is NOT assumed: the    *)
+  (*  device state is shared, so any given LSR read may find the FIFO   *)
+  (*  non-empty and the branch may loop.  Proved by Löb, mirroring      *)
+  (*  WpAcquireLock's spin loop -- the [c.beqz]-taken back edge is      *)
+  (*  [wp_cbeqz_taken_s_config_scfg], whose step-later strips the IH.   *)
+  (*                                                                    *)
+  (*  On exit (THRE set), the loop hands the caller the transmitter     *)
+  (*  token back AND [uart_out_lb l]: the observation that at the read  *)
+  (*  the accepted trace [l] was fully transmitted.  That bound is what *)
+  (*  [uart_tx_ready_persists] later turns into "the FIFO is still      *)
+  (*  empty at the THR write".  Only a5 is clobbered, so the exit map   *)
+  (*  is [<[a5 := lsr_masked b]> mentry] for whatever byte b was seen.  *)
+  (* ================================================================= *)
+  Lemma wp_uartputc_poll (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+      (Φ : mval -> iProp Σ) (mentry : gmap regidx (mword 64)) (l : list (bv 8))
+      {dq : dfrac} :
+    mentry !!! Regidx (mword_of_int 14) = uart_pa 5 ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗ kernel_text -∗
-    pc_is (mword_of_int (UPS + 0x20)) -∗ gpr_file m -∗ uart_frag u -∗
-    ( smode_config γ dq -∗
+    pc_is (mword_of_int (UPS + 0x26)) -∗ gpr_file mentry -∗
+    dev_inv γd -∗ uart_tx_own γd l -∗
+    ( ∀ b : bv 8,
+      smode_config γ dq -∗
       tlb_inv root_ppn -∗
-      pc_is (mword_of_int (UPS + 0x3c)) -∗
-      gpr_file (ppc_f6 m u) -∗
-      uart_frag u' -∗
+      pc_is (mword_of_int (UPS + 0x30)) -∗
+      gpr_file (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> mentry) -∗
+      uart_tx_own γd l -∗ uart_out_lb γd l -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hthre Hwrite)
-      "Hsm Htlbinv #Ht Hpc Hfile Huf Hcont".
+    intros Ha4e.
+    iIntros "Hsm Htlbinv #Ht Hpc Hfile #Hdinv Hown Hcont".
+    iDestruct (upi_26 with "Ht") as "#Hi26".
+    iDestruct (upi_2a with "Ht") as "#Hi2a".
+    iDestruct (upi_2e with "Ht") as "#Hi2e".
+    assert (P2a : add_vec_int (mword_of_int (UPS + 0x26) : mword 64) 4 = mword_of_int (UPS + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (P2e : add_vec_int (mword_of_int (UPS + 0x2a) : mword 64) 4 = mword_of_int (UPS + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (P30 : add_vec_int (mword_of_int (UPS + 0x2e) : mword 64) 2 = mword_of_int (UPS + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
+    (* the c.beqz-taken back edge lands at the loop head 0x988 = UPS+0x26 *)
+    assert (Htgt : add_vec (mword_of_int (UPS + 0x2e) : mword 64)
+                     (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0"))))
+                   = mword_of_int (UPS + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
+    (* The loop invariant, proved by Löb.  The loop-head map [m] agrees with
+       [mentry] off a5 and keeps a4 = uart_pa 5; the continuation is a PREMISE
+       so each iteration receives a fresh copy (WpAcquireLock's spin idiom).
+       Proved from the persistent context only (instruction facts + dev_inv),
+       so the caller's own resources are free to feed it at [m := mentry]. *)
+    iAssert (∀ m : gmap regidx (mword 64),
+      ⌜ m !!! Regidx (mword_of_int 14) = uart_pa 5 ⌝ -∗
+      ⌜ forall Y, <[Regidx (mword_of_int 15) := Y]> m
+                = <[Regidx (mword_of_int 15) := Y]> mentry ⌝ -∗
+      smode_config γ dq -∗ tlb_inv root_ppn -∗
+      pc_is (mword_of_int (UPS + 0x26)) -∗ gpr_file m -∗ uart_tx_own γd l -∗
+      ( ∀ b : bv 8, smode_config γ dq -∗ tlb_inv root_ppn -∗
+          pc_is (mword_of_int (UPS + 0x30)) -∗
+          gpr_file (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> mentry) -∗
+          uart_tx_own γd l -∗ uart_out_lb γd l -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "Loop".
+    { iLöb as "IH". iIntros (m Ha4m Hagm) "Hsm Htlbinv Hpc Hfile Hown Hk".
+      (* 0x988  lbu a5,0(a4)  -- LSR read, under dev_inv *)
+      iApply (wp_uart_lsr_read_s root_ppn γ γd Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
+                m l (dq:=dq)
+ ltac:(vm_compute; discriminate) Ha4m
+                with "Hsm Htlbinv Hpc Hfile Hi26 Hdinv Hown").
+      iIntros (b) "Hsm Htlbinv Hpc Hfile Hown Hlb".
+      iEval (rewrite P2a) in "Hpc".
+      (* 0x98c  andi a5,a5,32 *)
+      iApply (wp_andi_s root_ppn γ Φ (mword_of_int (UPS + 0x2a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 32 : mword 12)
+                (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_ldval_of b)]> m) (dq:=dq)
+ ltac:(vm_compute; discriminate)
+                with "Hsm Htlbinv Hpc Hfile Hi2a").
+      iIntros "Hsm Htlbinv Hpc Hfile".
+      iEval (rewrite lookup_total_insert insert_insert) in "Hfile".
+      change (and_vec (lsr_ldval_of b) (sign_extend' 64 (mword_of_int 32 : mword 12)))
+        with (lsr_masked b) in *.
+      iEval (rewrite P2e) in "Hpc".
+      (* 0x990  c.beqz a5,0x988 : the test is exactly [lsr_thre_clear b] *)
+      destruct (lsr_thre_clear b) eqn:Hcase.
+      - (* THRE clear: branch TAKEN back to 0x988, loop via the IH.  The taken
+           leaf hands its step's later out, so [iNext] strips the IH's. *)
+        iApply (wp_cbeqz_taken_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x2e)) (mword_of_int 252 : mword 8)
+                  (Cregidx (mword_of_int 7)) (mword_of_int 15)
+                  (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> m) (dq:=dq)
+ ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                  ltac:(rewrite lookup_total_insert; unfold regval_into_reg, lsr_masked;
+                        exact Hcase)
+                  ltac:(vm_compute; reflexivity)
+                  with "Hsm Htlbinv Hpc Hfile Hi2e").
+        iNext.
+        iIntros "Hsm Htlbinv Hpc Hfile".
+        iEval (rewrite Htgt) in "Hpc".
+        iApply ("IH" $! (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> m)
+                  with "[%] [%] Hsm Htlbinv Hpc Hfile Hown Hk").
+        + rewrite lookup_total_insert_ne; [exact Ha4m | vm_compute; discriminate].
+        + intro Y. rewrite insert_insert. exact (Hagm Y).
+      - (* THRE set: branch FALLS THROUGH to 0x992, exit with the out-bound *)
+        iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x2e)) (mword_of_int 252 : mword 8)
+                  (Cregidx (mword_of_int 7)) (mword_of_int 15)
+                  (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> m) (dq:=dq)
+ ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                  ltac:(rewrite lookup_total_insert; unfold regval_into_reg, lsr_masked;
+                        exact Hcase)
+                  with "Hsm Htlbinv Hpc Hfile Hi2e").
+        iIntros "Hsm Htlbinv Hpc Hfile".
+        iEval (rewrite P30) in "Hpc".
+        iEval (rewrite (Hagm (regval_into_reg (lsr_masked b)))) in "Hfile".
+        iApply ("Hk" $! b with "Hsm Htlbinv Hpc Hfile Hown").
+        by iApply "Hlb". }
+    iApply ("Loop" $! mentry with "[%] [%] Hsm Htlbinv Hpc Hfile Hown Hcont").
+    - exact Ha4e.
+    - reflexivity.
+  Qed.
+
+  Lemma wp_uartputc_devcore (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+      (Φ : mval -> iProp Σ)
+      (m : gmap regidx (mword 64)) (l : list (bv 8)) {dq : dfrac} :
+    let sb : mword 8 := autocast (T := mword)
+       (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
+          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
+    smode_config γ dq -∗
+    tlb_inv root_ppn -∗ kernel_text -∗
+    pc_is (mword_of_int (UPS + 0x20)) -∗ gpr_file m -∗
+    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    ( ∀ b : bv 8,
+      smode_config γ dq -∗
+      tlb_inv root_ppn -∗
+      pc_is (mword_of_int (UPS + 0x3c)) -∗
+      gpr_file (ppc_f6' m b) -∗
+      uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros sb.
+    iIntros "Hsm Htlbinv #Ht Hpc Hfile #Hdinv Hown #Hoff Hcont".
     assert (P24 : add_vec_int (mword_of_int (UPS + 0x20) : mword 64) 4 = mword_of_int (UPS + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     assert (P26 : add_vec_int (mword_of_int (UPS + 0x24) : mword 64) 2 = mword_of_int (UPS + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     assert (P2a : add_vec_int (mword_of_int (UPS + 0x26) : mword 64) 4 = mword_of_int (UPS + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -485,54 +721,49 @@ Section WpUartPutcSync.
               with "Hsm Htlbinv Hpc Hfile Hi24").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P26) in "Hpc".
-    (* 0x988  lbu a5,0(a4)  -- LSR read *)
-    iApply (wp_uart_lsr_read_s root_ppn γ Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
-              (ppc_f2 m) u (dq:=dq)
- ltac:(vm_compute; discriminate)
+    (* 0x988 -> 0x990  the THRE poll loop (Löb; may spin), exits at 0x992 with
+       the read byte [b] and the out-bound [uart_out_lb l] *)
+    iApply (wp_uartputc_poll root_ppn γ γd Φ (ppc_f2 m) l (dq:=dq)
               (ppc_f2_a4 m)
-              with "Hsm Htlbinv Hpc Hfile Hi26 Huf").
-    iIntros "Hsm Htlbinv Hpc Hfile Huf".
-    iEval (rewrite P2a) in "Hpc".
-    (* 0x98c  andi a5,a5,32 *)
-    iApply (wp_andi_s root_ppn γ Φ (mword_of_int (UPS + 0x2a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 32 : mword 12)
-              (ppc_f3 m u) (dq:=dq)
- ltac:(vm_compute; discriminate)
-              with "Hsm Htlbinv Hpc Hfile Hi2a").
-    iIntros "Hsm Htlbinv Hpc Hfile".
-    iEval (rewrite P2e) in "Hpc".
-    (* 0x990  c.beqz a5,0x988  -- falls through (a5 = 32 != 0) *)
-    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x2e)) (mword_of_int 252 : mword 8)
-              (Cregidx (mword_of_int 7)) (mword_of_int 15) (ppc_f4 m u) (dq:=dq)
-
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              (ppc_f4_a5 m u Hthre)
-              with "Hsm Htlbinv Hpc Hfile Hi2e").
-    iIntros "Hsm Htlbinv Hpc Hfile".
-    iEval (rewrite P30) in "Hpc".
+              with "Hsm Htlbinv Ht Hpc Hfile Hdinv Hown").
+    iIntros (b) "Hsm Htlbinv Hpc Hfile Hown #Hlb".
+    (* the poll's exit map <[a5:=lsr_masked b]>(ppc_f2 m) IS ppc_f4' m b *)
+    iEval (change (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> (ppc_f2 m))
+             with (ppc_f4' m b)) in "Hfile".
     (* 0x992  zext.b a0,s1  (andi a0,s1,255) *)
     iApply (wp_andi_s root_ppn γ Φ (mword_of_int (UPS + 0x30)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 255 : mword 12)
-              (ppc_f4 m u) (dq:=dq)
+              (ppc_f4' m b) (dq:=dq)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi30").
     iIntros "Hsm Htlbinv Hpc Hfile".
+    iEval (change (<[Regidx (mword_of_int 10) := regval_into_reg (and_vec (ppc_f4' m b !!! Regidx (mword_of_int 9))
+             (sign_extend' 64 (mword_of_int 255 : mword 12)))]> (ppc_f4' m b))
+             with (ppc_f5' m b)) in "Hfile".
     iEval (rewrite P34) in "Hpc".
     (* 0x996  lui a5,0x10000 *)
     iApply (wp_lui_s root_ppn γ Φ (mword_of_int (UPS + 0x34)) (mword_of_int 15) (mword_of_int 0x10000 : mword 20)
-              (ppc_f5 m u) (dq:=dq)
+              (ppc_f5' m b) (dq:=dq)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi34").
     iIntros "Hsm Htlbinv Hpc Hfile".
+    iEval (change (<[Regidx (mword_of_int 15) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> (ppc_f5' m b))
+             with (ppc_f6' m b)) in "Hfile".
     iEval (rewrite P38) in "Hpc".
-    (* 0x99a  sb a0,0(a5)  -- THR write *)
-    iApply (wp_uart_thr_write_s root_ppn γ Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
-              (ppc_f6 m u) u u' (dq:=dq)
-
-              (ppc_f6_a5 m u)
-              ltac:(rewrite ppc_f6_a0; exact Hwrite)
-              with "Hsm Htlbinv Hpc Hfile Hi38 Huf").
-    iIntros "Hsm Htlbinv Hpc Hfile Huf".
+    (* 0x99a  sb a0,0(a5)  -- THR write.  a0 = zext.b of s1, and the store byte
+       the wrapper enqueues is exactly devcore's [sb] (ppc_f6'_a0).  The payoff:
+       the out-bound + token + frozen DLAB establish the FIFO is still empty. *)
+    assert (Hsbb : (autocast (T := mword)
+                      (subrange_vec_dec (ppc_f6' m b !!! Regidx (mword_of_int 10))
+                         (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = sb).
+    { unfold sb. rewrite ppc_f6'_a0. reflexivity. }
+    iApply (wp_uart_thr_write_s root_ppn γ γd Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
+              (ppc_f6' m b) l (dq:=dq)
+              (ppc_f6'_a5 m b)
+              with "Hsm Htlbinv Hpc Hfile Hi38 Hdinv Hown Hlb Hoff [Hcont]").
+    iIntros "Hsm Htlbinv Hpc Hfile Hown Hsent".
+    iEval (rewrite Hsbb) in "Hown". iEval (rewrite Hsbb) in "Hsent".
     iEval (rewrite P3c) in "Hpc".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Huf").
+    iApply ("Hcont" $! b with "Hsm Htlbinv Hpc Hfile Hown Hsent").
   Qed.
 
   (* =================================================================== *)
@@ -728,21 +959,21 @@ Section WpUartPutcSync.
   (*  on the panic path (panicking != 0, panicked = 0), THRE ready.         *)
   (*  Chains the four body chunks under one plain [tlb_inv].                 *)
   (* =================================================================== *)
-  Lemma wp_uartputc_body (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (u u' : uart_state) (pv pkv : mword 32)
+  Lemma wp_uartputc_body (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+      (Φ : mval -> iProp Σ)
+      (m : gmap regidx (mword 64)) (l : list (bv 8)) (pv pkv : mword 32)
       {dq dqm dqm2 : dfrac} :
+    let sb : mword 8 := autocast (T := mword)
+       (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
+          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-    uart_thre u = true ->
-    uart_write u 0 (autocast (T := mword)
-       (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
-          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = Some u' ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗ kernel_text -∗
     pc_is (mword_of_int (UPS + 0x0c)) -∗ gpr_file m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    uart_frag u -∗
+    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ mf,
       smode_config γ dq -∗
       tlb_inv root_ppn -∗
@@ -751,12 +982,13 @@ Section WpUartPutcSync.
       ⌜ callee_saved m mf ⌝ -∗
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-      uart_frag u' -∗
+      uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpv Hpkv Hthre Hwrite)
-      "Hsm Htlbinv #Ht Hpc Hfile Hpk Hpkd Huf Hcont".
+    intros sb.
+    iIntros (Hpv Hpkv)
+      "Hsm Htlbinv #Ht Hpc Hfile Hpk Hpkd #Hdinv Hown #Hoff Hcont".
     (* 0x96e -> 0x978 : panicking check (falls through) *)
     iApply (wp_uartputc_panicking_check root_ppn γ Φ m pv (dq:=dq) (dqm:=dqm)
  Hpv
@@ -773,22 +1005,27 @@ Section WpUartPutcSync.
                (<[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x16)) (auipc_off (mword_of_int 0xa : mword 20)))]> f1)).
     assert (HR9 : f2 !!! Regidx (mword_of_int 9) = m !!! Regidx (mword_of_int 9)).
     { unfold f2, f1. do 4 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity. }
-    (* 0x982 -> 0x99e : device core (LSR read + THR write) *)
-    iApply (wp_uartputc_devcore root_ppn γ Φ f2 u u' (dq:=dq)
- Hthre
-              ltac:(rewrite HR9; exact Hwrite)
-              with "Hsm Htlbinv Ht Hpc Hfile Huf").
-    iIntros "Hsm Htlbinv Hpc Hfile Huf".
+    (* the device core's store byte is about f2!!!s1, but that equals m!!!s1 *)
+    assert (Hsbf2 : (autocast (T := mword)
+                      (subrange_vec_dec (and_vec (f2 !!! Regidx (mword_of_int 9))
+                         (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = sb).
+    { unfold sb. rewrite HR9. reflexivity. }
+    (* 0x982 -> 0x99e : device core (THRE poll loop + THR write) *)
+    iApply (wp_uartputc_devcore root_ppn γ γd Φ f2 l (dq:=dq)
+              with "Hsm Htlbinv Ht Hpc Hfile Hdinv Hown Hoff").
+    iIntros (b) "Hsm Htlbinv Hpc Hfile Hown Hsent".
+    iEval (rewrite Hsbf2) in "Hown". iEval (rewrite Hsbf2) in "Hsent".
     (* 0x99e -> 0x9a8 : 2nd panicking check (falls through) *)
-    iApply (wp_uartputc_panicking_check2 root_ppn γ Φ (ppc_f6 f2 u) pv (dq:=dq) (dqm:=dqm)
+    iApply (wp_uartputc_panicking_check2 root_ppn γ Φ (ppc_f6' f2 b) pv (dq:=dq) (dqm:=dqm)
  Hpv
               with "Hsm Htlbinv Ht Hpc Hfile Hpk").
     iIntros "Hsm Htlbinv Hpc Hfile Hpk".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile [%] Hpk Hpkd Huf").
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile [%] Hpk Hpkd Hown Hsent").
     (* The body writes only a4/a5/a0, none of them callee-saved, so every
        callee-saved register still holds its entry value. *)
     unfold callee_saved.
-    repeat split; unfold ppc_f6, ppc_f5, ppc_f4, ppc_f3, ppc_f2, ppc_f1, f2, f1;
+    repeat split;
+      unfold ppc_f6', ppc_f5', ppc_f4', ppc_f2, ppc_f1, f2, f1;
       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]); reflexivity.
   Qed.
 

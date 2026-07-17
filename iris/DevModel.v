@@ -163,6 +163,58 @@ Definition uart_write (u : uart_state) (off : Z) (b : bv 8) : option uart_state 
   else if (off =? 4) || (off =? 5) || (off =? 6) || (off =? 7) then Some u
   else None.
 
+(* Reading the LSR is a pure observation: it returns the status byte and does
+   NOT advance the device (unlike RHR, which pops the rx FIFO). *)
+Lemma uart_read_lsr (u : uart_state) : uart_read u 5 = Some (uart_lsr u, u).
+Proof. reflexivity. Qed.
+
+(* -- MMIO totality --
+
+   Every offset xv6 can name is serviced: no UART access in [0, uart_size)
+   ever gets stuck.  A driver proof running under a contents-agnostic
+   invariant cannot supply a [uart_read]/[uart_write] equation as a premise
+   (it does not know the state), so it needs these to conjure the result. *)
+
+Lemma uart_read_total (u : uart_state) (off : Z) :
+  0 <= off < uart_size -> exists b u', uart_read u off = Some (b, u').
+Proof.
+  unfold uart_read, uart_size. intro Hoff.
+  destruct (off =? 0) eqn:E0.
+  { destruct (uart_dlab u); [by do 2 eexists|].
+    destruct (u_rx u); by do 2 eexists. }
+  destruct (off =? 1) eqn:E1.
+  { destruct (uart_dlab u); by do 2 eexists. }
+  destruct (off =? 2) eqn:E2. { by do 2 eexists. }
+  destruct (off =? 3) eqn:E3. { by do 2 eexists. }
+  destruct (off =? 5) eqn:E5. { by do 2 eexists. }
+  destruct ((off =? 4) || (off =? 6) || (off =? 7)) eqn:E4.
+  { by do 2 eexists. }
+  exfalso.
+  apply Z.eqb_neq in E0, E1, E2, E3, E5.
+  apply orb_false_elim in E4 as [E4 E7]. apply orb_false_elim in E4 as [E4 E6].
+  apply Z.eqb_neq in E4, E6, E7. lia.
+Qed.
+
+Lemma uart_write_total (u : uart_state) (off : Z) (b : bv 8) :
+  0 <= off < uart_size -> exists u', uart_write u off b = Some u'.
+Proof.
+  unfold uart_write, uart_size. intro Hoff.
+  destruct (off =? 0) eqn:E0.
+  { destruct (uart_dlab u); [by eexists|].
+    destruct (length (u_tx u) <? uart_fifo_depth)%nat; by eexists. }
+  destruct (off =? 1) eqn:E1.
+  { destruct (uart_dlab u); by eexists. }
+  destruct (off =? 2) eqn:E2. { by eexists. }
+  destruct (off =? 3) eqn:E3. { by eexists. }
+  destruct ((off =? 4) || (off =? 5) || (off =? 6) || (off =? 7)) eqn:E4.
+  { by eexists. }
+  exfalso.
+  apply Z.eqb_neq in E0, E1, E2, E3.
+  apply orb_false_elim in E4 as [E4 E7]. apply orb_false_elim in E4 as [E4 E6].
+  apply orb_false_elim in E4 as [E4 E5].
+  apply Z.eqb_neq in E4, E5, E6, E7. lia.
+Qed.
+
 (* -- the UART's autonomous transitions (the device "thread") -- *)
 
 (* transmit: move the head of the tx FIFO onto the wire *)
@@ -314,6 +366,24 @@ Proof.
   intro H. injection H as <-. reflexivity.
 Qed.
 
+(* Only a write to offset 3 (LCR) can change DLAB; in particular a THR write
+   cannot, so DLAB stays frozen across a driver's data writes. *)
+Lemma uart_write_lcr_0 (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_write u 0 b = Some u' -> u_lcr u' = u_lcr u.
+Proof.
+  unfold uart_write. cbn [Z.eqb].
+  destruct (uart_dlab u).
+  - intro H; injection H as <-; reflexivity.
+  - destruct (length (u_tx u) <? uart_fifo_depth)%nat;
+      intro H; injection H as <-; reflexivity.
+Qed.
+
+Lemma uart_write_dlab_0 (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_write u 0 b = Some u' -> uart_dlab u' = uart_dlab u.
+Proof.
+  intro H. unfold uart_dlab. by rewrite (uart_write_lcr_0 _ _ _ H).
+Qed.
+
 (* -- exclusive-transmitter reasoning -- *)
 
 (* THE KEY STABILITY FACT.  Suppose at the THRE poll the FIFO was empty (so
@@ -339,6 +409,22 @@ Proof.
   { rewrite <- length_app, Hacc2. reflexivity. }
   rewrite Hk in Hlen. rewrite length_app in Hlen.
   assert (Htx2 : length (u_tx u2) = 0%nat) by lia.
+  by apply nil_length_inv.
+Qed.
+
+(* The same conclusion phrased at ONE state: if the accepted trace is [l] and
+   [l] has already all been transmitted, the FIFO is empty.  This is the form a
+   THR write uses -- it needs no witness of an earlier polled state, only what
+   the transmitter token ([uart_acc u = l]) and the carried [uart_out_lb l]
+   ([l `prefix_of` u_out u]) give at the write's OWN state. *)
+Lemma uart_tx_empty_of_out (u : uart_state) (l : list (bv 8)) :
+  uart_acc u = l -> l `prefix_of` u_out u -> u_tx u = [].
+Proof.
+  unfold uart_acc. intros Hacc [k Hk].
+  assert (Hlen : (length (u_out u) + length (u_tx u) = length l)%nat).
+  { rewrite <- length_app, Hacc. reflexivity. }
+  rewrite Hk in Hlen. rewrite length_app in Hlen.
+  assert (Htx : length (u_tx u) = 0%nat) by lia.
   by apply nil_length_inv.
 Qed.
 

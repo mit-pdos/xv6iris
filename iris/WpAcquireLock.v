@@ -5,8 +5,9 @@
    (WpLockLeaves.wp_amoswap_lockinv).  If the lock stays held the amoswap
    loop spins forever -- proved by Löb induction in [wp_acquire_lock_loop],
    where EACH iteration opens the invariant: a nonzero read re-enters the
-   induction hypothesis (the c.bnez-taken step runs on the raw engine so its
-   later strips the IH's), a zero read exits with [locked γ ∗ R].
+   induction hypothesis (the c.bnez-taken step is [wp_cbnez_taken_s], which
+   hands its step's later out so [iNext] can strip the IH's), a zero read
+   exits with [locked γ ∗ R].
 
    Both lemmas are clones of WpAcquireTop.wp_acquire{_spin} with the lock
    word accessed through the invariant instead of an owned byte window. *)
@@ -244,58 +245,24 @@ Section WpAcquireLock.
       assert (Hpp24 : add_vec_int (mword_of_int (AQ + 0x22) : mword 64) 2 = mword_of_int (AQ + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp24) in "Hpc".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Htok HRes").
-    - (* ---- w <> 0: c.bnez TAKEN back to +0x1a; loop via the Löb IH ---- *)
-    (* ---- +0x22: c.bnez a5 TAKEN (a5 = sext32(1) <> 0), back to +0x1a ----
-       Run on the raw engine so the step's later strips the Löb IH's. *)
-    iDestruct "Hpc" as "[Hpc Hnpc]".
-    iDestruct "Hfile" as "[%Hdom Hfmap]".
-    iApply (wp_instr_s_config_tlbinv root_ppn Φ (mword_of_int (AQ + 0x22)) true
-              (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE))
-              mstatus0 mie_v mdv0 menvcfg0
+    - (* ---- w <> 0: c.bnez TAKEN back to +0x1a; loop via the Löb IH ----
+         [wp_cbnez_taken_s] hands the step's later out precisely so this can run
+         on the packaged leaf: [iNext] strips it against the Löb IH.  (This
+         block used to drive the raw engine by hand for want of that later.) *)
+      iApply (wp_cbnez_taken_s root_ppn Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+                (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 w)]> M0)
+                mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hj22").
-    iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
-      "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 w)]> M0) !! Regidx (mword_of_int 15 : mword 5)
-                  = Some ((<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 w)]> M0) !!! Regidx (mword_of_int 15 : mword 5)))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int (mword_of_int (AQ + 0x22)) 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int (mword_of_int (AQ + 0x22)) 2)).
-    assert (Hpcv : register_lookup PC s_pc.(sregs) = mword_of_int (AQ + 0x22)).
-    { unfold s_pc, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value (mword_of_int 15) _ s_pc with "Hreg Hrac") as %Lva.
-    iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iMod (reg_update _ nextPC _ (mword_of_int (AQ + 0x1a)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro. iExists (set_reg s_pc nextPC (mword_of_int (AQ + 0x1a))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc.
-      replace (creg2reg_idx (Cregidx (mword_of_int 7))) with (Regidx (mword_of_int 15 : mword 5))
-        by (vm_compute; reflexivity).
-      change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
-      assert (Htk : neq_vec (rvv (mword_of_int 15) s_pc) (rvv (zero_extend' 5 ('b"00") : mword 5) s_pc) = true).
-      { unfold rvv. rewrite Lva.
-        replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
-          by (vm_compute; reflexivity).
-        cbn match.
-        rewrite lookup_total_insert. exact Hwnz. }
-      epose proof (exec_execute_BTYPE_BNE_taken (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")))
-                     (zero_extend' 5 ('b"00")) (mword_of_int 15) s_pc Htk) as Hred.
-      rewrite Hpcv Htgt in Hred.
-      exact (Hred ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)). }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC (mword_of_int (AQ + 0x1a))).(sregs) = mword_of_int (AQ + 0x1a))
-      by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    (* strip the step's later against the Löb hypothesis and loop *)
-    iNext.
-    iApply ("IH" $! (sign_extend' 64 w) with "Hhs' Hpriv Hms Hmie Hmdl Hmenv [Hsatp Htlb Hpbytes Hpmp] [$Hpc' $Hnpc] [Hfmap] Hcont").
-    { iApply (tlb_inv_close root_ppn satp0 tlbvec_f Hmode Hasid Hppn Hconsf with "Hsatp Htlb Hpbytes Hpmp"). }
-    iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                ltac:(rewrite lookup_total_insert; exact Hwnz)
+                ltac:(rewrite Htgt; vm_compute; reflexivity)
+                ltac:(rewrite Htgt; vm_compute; reflexivity)
+                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hj22 [-]").
+      iNext.
+      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
+      iEval (rewrite Htgt) in "Hpc".
+      iApply ("IH" $! (sign_extend' 64 w)
+                with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hcont").
   Qed.
 
   (* [smode_config] view of the amoswap retry loop: unbundle -> raw loop ->

@@ -576,19 +576,17 @@ Section DevLoop.
      Note what is NOT needed: any assumption about the other harts' code.  A
      hart without the token simply cannot perform a push, so exclusion is by
      ghost arithmetic rather than by trusting anyone's proof. *)
-  Lemma uart_tx_ready_persists γ (u u2 : uart_state) (l : list (bv 8)) :
-    u_tx u = [] ->
-    uart_acc u = l ->
+  Lemma uart_tx_ready_persists γ (u2 : uart_state) (l : list (bv 8)) :
     uart_tx_own γ l -∗ uart_out_lb γ l -∗ uart_dlab_off γ -∗
     uart_tx_auth γ u2 -∗ uart_out_auth γ u2 -∗ uart_dlab_auth γ u2 -∗
     ⌜ u_tx u2 = [] /\ uart_dlab u2 = false ⌝.
   Proof.
-    iIntros (Htx Hacc) "Hown Hlb Hoff Htxa Houta Hdla".
+    iIntros "Hown Hlb Hoff Htxa Houta Hdla".
     iDestruct (uart_tx_own_agree with "Htxa Hown") as %Hacc2.
     iDestruct (uart_out_prefix with "Houta Hlb") as %Hpre.
     iDestruct (uart_dlab_agree with "Hdla Hoff") as %Hdlab.
     iPureIntro. split; [| exact Hdlab].
-    exact (uart_tx_still_empty u u2 l Hacc Htx Hacc2 Hpre).
+    exact (uart_tx_empty_of_out u2 l Hacc2 Hpre).
   Qed.
 
   (* and the poll side: seeing THRE at [u] while holding the token yields
@@ -596,7 +594,8 @@ Section DevLoop.
   Lemma uart_tx_poll_thre γ (u : uart_state) (l : list (bv 8)) :
     uart_thre u = true ->
     uart_tx_own γ l -∗ uart_tx_auth γ u -∗ uart_out_auth γ u -∗
-    uart_out_auth γ u ∗ uart_out_lb γ l ∗ ⌜ u_tx u = [] /\ uart_acc u = l ⌝.
+    uart_tx_own γ l ∗ uart_tx_auth γ u ∗ uart_out_auth γ u ∗ uart_out_lb γ l ∗
+    ⌜ u_tx u = [] /\ uart_acc u = l ⌝.
   Proof.
     iIntros (Hthre) "Hown Htxa Houta".
     iDestruct (uart_tx_own_agree with "Htxa Hown") as %Hacc.
@@ -606,19 +605,41 @@ Section DevLoop.
        transmitted prefix: [uart_acc u = u_out u ++ [] = u_out u]. *)
     assert (Hout : u_out u = l).
     { rewrite -Hacc /uart_acc Htx. by rewrite app_nil_r. }
-    iDestruct (uart_out_get with "Houta") as "[$ Hlb]".
-    rewrite Hout. iFrame "Hlb". done.
+    iDestruct (uart_out_get with "Houta") as "[Houta Hlb]".
+    rewrite Hout. iFrame "Hown Htxa Houta Hlb". done.
   Qed.
 
   (* the device invariant: the user halves of the device state, plus the four
      UART ghosts.  The interrupt-pin wires the PLIC drives live in their own
      invariant [wire_inv] (WireInv.v): the PLIC may flip a hart's
      external-interrupt pin at any time, so no CPU-side proof may pin it. *)
+  (* the invariant's four ghost halves at a given UART state, bundled.  A
+     device leaf hands this to its caller's ghost step while the invariant is
+     open, and takes it back at the advanced state. *)
+  Definition uart_ghosts (γ : uart_names) (u : uart_state) : iProp Σ :=
+    (uart_sent_auth γ u ∗ uart_out_auth γ u ∗
+     uart_tx_auth γ u ∗ uart_dlab_auth γ u)%I.
+
+  Global Instance uart_ghosts_timeless γ u : Timeless (uart_ghosts γ u).
+  Proof. rewrite /uart_ghosts. apply _. Qed.
+
+  (* a transition that moves no UART ghost quantity carries them all over *)
+  Lemma uart_ghosts_stable γ u u' :
+    uart_acc u' = uart_acc u ->
+    u_out u' = u_out u ->
+    uart_dlab u' = uart_dlab u ->
+    uart_ghosts γ u -∗ uart_ghosts γ u'.
+  Proof.
+    iIntros (Ha Ho Hd) "(Hs & Hout & Htx & Hdl)". rewrite /uart_ghosts.
+    iDestruct (uart_sent_auth_stable _ u u' Ha with "Hs") as "$".
+    iDestruct (uart_out_auth_stable _ u u' Ho with "Hout") as "$".
+    iDestruct (uart_tx_auth_stable _ u u' Ha with "Htx") as "$".
+    iDestruct (uart_dlab_auth_stable _ u u' Hd with "Hdl") as "$".
+  Qed.
+
   Definition dev_inv_body (γ : uart_names) : iProp Σ :=
     (∃ (u : uart_state) (p : plic_state),
-       uart_frag u ∗ plic_frag p ∗
-       uart_sent_auth γ u ∗ uart_out_auth γ u ∗
-       uart_tx_auth γ u ∗ uart_dlab_auth γ u)%I.
+       uart_frag u ∗ plic_frag p ∗ uart_ghosts γ u)%I.
 
   Global Instance uart_frag_timeless u : Timeless (uart_frag u).
   Proof. rewrite /uart_frag. apply _. Qed.
@@ -692,7 +713,7 @@ Section DevLoop.
     iIntros (gr d) "[Hgr Hdev]".
     iInv "Hinv" as ">Hbody" "Hclose".
     iInv "Hwinv" as ">Hwbody" "Hwclose".
-    iDestruct "Hbody" as (u p) "(Hu & Hp & Hacc & Hout & Htx & Hdl)".
+    iDestruct "Hbody" as (u p) "(Hu & Hp & Hg)".
     iDestruct "Hwbody" as (seip meip) "Hwires".
     iDestruct (dev_interp_agree with "Hdev Hu Hp") as %[Hu Hp].
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
@@ -705,6 +726,8 @@ Section DevLoop.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
       (* the accepted trace, the transmitter token and DLAB are all untouched;
          only the transmitted prefix grows, by exactly the drained byte. *)
+      iEval (rewrite /uart_ghosts) in "Hg".
+      iDestruct "Hg" as "(Hacc & Hout & Htx & Hdl)".
       iDestruct (uart_sent_auth_stable _ u u'
                    (uart_tx_pop_acc _ _ _ Htx0) with "Hacc") as "Hacc".
       iDestruct (uart_tx_auth_stable _ u u'
@@ -716,30 +739,26 @@ Section DevLoop.
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
       iMod ("Hclose" with "[Hu' Hp Hacc Hout Htx Hdl]") as "_".
-      { iNext. iExists u', p. iFrame. }
+      { iNext. iExists u', p. rewrite /uart_ghosts. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* a byte arrives from the outside world: rx only, trace untouched *)
       rewrite Hu in Hrx.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
       (* rx touches neither the tx side nor LCR: every ghost is unchanged *)
-      iDestruct (uart_sent_auth_stable _ u u'
-                   (uart_rx_push_acc _ b _ Hrx) with "Hacc") as "Hacc".
-      iDestruct (uart_tx_auth_stable _ u u'
-                   (uart_rx_push_acc _ b _ Hrx) with "Htx") as "Htx".
-      iDestruct (uart_dlab_auth_stable _ u u'
-                   (uart_rx_push_dlab _ b _ Hrx) with "Hdl") as "Hdl".
-      iDestruct (uart_out_auth_stable _ u u'
-                   (uart_rx_push_out _ b _ Hrx) with "Hout") as "Hout".
+      iDestruct (uart_ghosts_stable _ u u'
+                   (uart_rx_push_acc _ b _ Hrx)
+                   (uart_rx_push_out _ b _ Hrx)
+                   (uart_rx_push_dlab _ b _ Hrx) with "Hg") as "Hg".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu' Hp Hacc Hout Htx Hdl]") as "_".
+      iMod ("Hclose" with "[Hu' Hp Hg]") as "_".
       { iNext. iExists u', p. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* the gateway latches the UART's interrupt level: the UART is untouched *)
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu Hp' Hacc Hout Htx Hdl]") as "_".
+      iMod ("Hclose" with "[Hu Hp' Hg]") as "_".
       { iNext. iExists u, p'. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
@@ -762,7 +781,7 @@ Section DevLoop.
         intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
         rewrite /seip' decide_False; [ done | ].
         intros ->. apply Hne, elem_of_singleton. reflexivity. }
-      iMod ("Hclose" with "[Hu Hp Hacc Hout Htx Hdl]") as "_".
+      iMod ("Hclose" with "[Hu Hp Hg]") as "_".
       { iNext. iExists u, p. iFrame. }
       iModIntro. iFrame "Hgr' Hdev". iApply "IH".
   Qed.
