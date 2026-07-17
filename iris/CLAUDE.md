@@ -221,6 +221,34 @@ files or copy code from them; build fresh from the live tree.
     TV_Direct). `user_trap_frame` = same at Supervisor, pc_is (stvec_base),
     `trap_mstatus_ok` adds SPP=User ∧ SIE=0. Trap-CSR VALUES are existential
     at this join; per-cause step lemmas know them precisely.
+  - *The external-interrupt WIRES live in a shared invariant, never owned by
+    an arm.* `sig_meip`/`sig_seip` are written concurrently by the device
+    loop, so a user arm must NOT take `sig_meip ↦ v` as a hypothesis (a held
+    fragment would be contradicted the instant the device writes). They are
+    borrowed transiently through `wires_acc wN` (UserExec.v — a persistent,
+    namespace-parametric `inv_acc`-style accessor any wire-owning invariant
+    implements) inside ONE unified step wrapper, which reads the current
+    values, builds the pure dispatch fact, closes the accessor, then
+    case-splits `u_dispatch` and routes to a branch. Every branch
+    (retire / interrupt-trap / fetch-fault / …) therefore takes the wire
+    VALUES + the pure dispatch fact, NOT the wire cells: see
+    `retire_obligation` (UserCompute.v), which takes
+    `⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝` as a hypothesis.
+    KNOWN DEBT: `wp_user_step_interrupt` (UserTrap.v), the fetch-fault arms
+    (UserFetch.v) and the WRS wait arm (UserStep.v) were built EARLY and
+    still own the wire cells + each open their own `wp_exec_step` — they must
+    be refactored into payload-BRANCH form (fupd producing the step payload,
+    taking wire values + dispatch fact) so the unified wrapper can dispatch
+    them within a SINGLE step. Their PURE reductions (trap tower, fetch
+    faults, wait steps) are unaffected and reused verbatim.
+  - *Register/memory CONTENTS are never tracked — only safety.* `user_inv`
+    binds the gpr file existentially, so a compute step re-establishes SOME
+    `gpr_file g'` (the written fragment set to whatever the post-state holds,
+    via `gpr_file_acc` — no value threading). `retire_obligation`
+    (UserCompute.v) is the value-agnostic, TLB-fill-tolerant per-step retire
+    interface the classification discharges per integer-compute family
+    (owns exactly what run_hart_active mutates: interp + gpr file + nextPC +
+    upt_inv; returns them re-established at s_x, existential gpr file).
   - *Interrupts are UNMASKABLE at User* (effective mIE/sIE are architecturally
     true below the current privilege — unlike the kernel proofs, which mask
     via SIE=0). The device loop raises the `sig_seip` wire concurrently, so
@@ -296,8 +324,20 @@ files or copy code from them; build fresh from the live tree.
      set_reg tower); elp's reset write is same-value (`elp_no_lp`: 1-bit
      elp pinned ≠ LP_EXPECTED already holds NO_LP_EXPECTED) absorbed by
      `reg_interp_set_same`; all iMods happen BEFORE the callback's
-     iModIntro. Remaining for the ACTIVE residue: the `u_dispatch = None`
-     fetch/decode/execute case analysis (items 1-4).
+     iModIntro. NOTE this arm still OWNS the wires — KNOWN DEBT, see the
+     wire-ownership bullet above; refactor to payload-branch form.
+     ACTIVE-RESIDUE ENGINES DONE (all axiom-clean): fetch-success composer
+     `upt_fetch_instr` (UserFetch §6, word from the existential pages via
+     `upt_fetch_word`/`upt_fetch_mem_read`, UserMem.v); RETIRING engine
+     `wp_user_step_retire` (UserStep, tick+bump, returns hart_state);
+     decode-agreement `agree_u` + `decodable_{u,c}_not_lpad` (UserStep);
+     register-only retire interface `retire_obligation`/`gpr_file_acc`
+     (UserCompute). LEFT — the assembly: the UNIFIED STEP WRAPPER (one
+     `wp_exec_step` + `wires_acc`, read wires, case-split `u_dispatch`) and,
+     under None, the total classification (fetch → `decode_total_{u,c}_set`
+     → destruct → per-family discharge `retire_obligation` / route to
+     data-memory / execute-trap via `exec_riscv_step_execute_trap` + tower /
+     WRS-enter). Branches must be payload form.
      FETCH-FAULT ARMS ALL DONE (UserFetch.v, axiom-clean): the generic
      callback arm `wp_user_step_fetch_fault` + five flavor corollaries
      (align / noncanonical / unmapped / denied / needs-update) — every way
