@@ -744,3 +744,20 @@ Proof.
     first [ vm_compute; reflexivity
           | apply bv_eq; vm_compute; reflexivity ].
 Qed.
+
+(* the U-mode decode image contains no landing-pad instruction (the
+   Zicfilp gate is off at dstateU), so the lpad side condition of the
+   run_hart_active dispatch discharges for every decodable word *)
+Require Import DecodeSetU.
+
+Lemma decodable_u_not_lpad (i : instruction) :
+  decodable_u i = true -> is_lpad_instruction i = false.
+Proof.
+  intro Hd. destruct i; first [ reflexivity | discriminate Hd ].
+Qed.
+
+Lemma decodable_c_not_lpad (i : instruction) :
+  decodable_c i = true -> is_lpad_instruction i = false.
+Proof.
+  intro Hd. destruct i; first [ reflexivity | discriminate Hd ].
+Qed.
