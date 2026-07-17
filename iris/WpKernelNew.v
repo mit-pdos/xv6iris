@@ -90,7 +90,7 @@ Section WpKernelNew.
       medeleg ↦ᵣ legalize_medeleg medeleg0 st_ffff -∗
       mideleg ↦ᵣ st_mdl1 mideleg0 -∗
       mie ↦ᵣ st_mie1 mie0 mideleg0 -∗
-      menvcfg ↦ᵣ menvcfg_legalized menvcfg0 (ti_menv1 menvcfg0) -∗
+      menvcfg ↦ᵣ menvcfg_legalized (st_menv_adue menvcfg0) (ti_menv1 (st_menv_adue menvcfg0)) -∗
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline tv) -∗
       entry_ld_ea ↦₈{ dq } v_stack0 -∗

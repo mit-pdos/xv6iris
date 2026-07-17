@@ -249,13 +249,12 @@ Section WpAcquireLock.
          [wp_cbnez_taken_s] hands the step's later out precisely so this can run
          on the packaged leaf: [iNext] strips it against the Löb IH.  (This
          block used to drive the raw engine by hand for want of that later.) *)
-      iApply (wp_cbnez_taken_s root_ppn Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbnez_taken_s_zca_later root_ppn Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 w)]> M0)
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rewrite lookup_total_insert; exact Hwnz)
-                ltac:(rewrite Htgt; vm_compute; reflexivity)
                 ltac:(rewrite Htgt; vm_compute; reflexivity)
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hj22 [-]").
       iNext.
@@ -524,7 +523,7 @@ Section WpAcquireLock.
     (* ---- 0x0c: jal ra,push_off ---- *)
     assert (EQ0e : add_vec_int (mword_of_int (AQ + 0x0c) : mword 64) 2 = mword_of_int (AQ + 0x0e))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s root_ppn γc Φ (mword_of_int (AQ + 0x0c)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fffba : mword 21)
+    iApply (wp_jal_gpr_s_zca root_ppn γc Φ (mword_of_int (AQ + 0x0c)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fffba : mword 21)
               A2 1%Qp
  ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
@@ -665,7 +664,7 @@ Section WpAcquireLock.
     (* ---- 0x12: jal ra,holding ---- *)
     assert (EQ14 : add_vec_int (mword_of_int (AQ + 0x12) : mword 64) 2 = mword_of_int (AQ + 0x14))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s root_ppn γc Φ (mword_of_int (AQ + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff88 : mword 21)
+    iApply (wp_jal_gpr_s_zca root_ppn γc Φ (mword_of_int (AQ + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff88 : mword 21)
               B1 1%Qp
  ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)

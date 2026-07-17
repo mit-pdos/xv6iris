@@ -110,6 +110,40 @@ Proof.
   reflexivity.
 Qed.
 
+(* the compressed-extension jump: with Ext_Zca enabled the model accepts a
+   merely 2-aligned target (bit 0 = 0), so bit 1 need not be 0. *)
+Lemma exec_jump_to_zca (target : mword 64) s :
+  eq_vec (access_vec_dec target 0) ('b"0") = true ->
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
+Proof.
+  intros Halign Hzca.
+  unfold jump_to. rewrite exec_catch_early_return.
+  change (ext_control_check_pc target) with (@None unit). cbv iota beta.
+  rewrite (execR_bind_Some _ _ _ false s).
+  2:{ unfold Defs.bind0.
+      erewrite execR_bind_Some.
+      2:{ erewrite execR_bind_Some.
+          2:{ apply execR_returnR_fwd. }
+          rewrite execR_liftR. unfold assert_exp. rewrite Halign. cbn match.
+          rewrite exec_returnm. reflexivity. }
+      unfold and_boolM.
+      rewrite (execR_bind_Some _ _ _ (bit_to_bool (access_vec_dec target 1)) s).
+      2:{ apply execR_returnR_fwd. }
+      destruct (bit_to_bool (access_vec_dec target 1)).
+      - cbv iota beta.
+        rewrite (execR_bind_Some _ _ _ true s).
+        2:{ rewrite execR_liftR. rewrite Hzca. reflexivity. }
+        cbv iota beta. apply execR_returnR_fwd.
+      - cbv iota beta. apply execR_returnR_fwd. }
+  cbv iota beta.
+  unfold Defs.bind0.
+  rewrite (execR_bind_Some _ _ _ tt (set_reg s nextPC target)).
+  2:{ rewrite execR_liftR. rewrite exec_set_next_pc. reflexivity. }
+  rewrite (execR_returnR_fwd RETIRE_SUCCESS (set_reg s nextPC target)).
+  reflexivity.
+Qed.
+
 Lemma exec_execute_JAL (imm : mword 21) (rd : regidx) s s_w :
   eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
   bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->

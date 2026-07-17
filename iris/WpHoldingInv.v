@@ -369,12 +369,12 @@ Section WpHoldingInv.
     (* case split: is the lock held? *)
     destruct (neq_vec (sign_extend' 64 lockv) zero_reg) eqn:Hheld.
     - (* ===== SLOW PATH: lock word nonzero, c.bnez TAKEN ===== *)
-      iApply (wp_cbnez_taken_s_scfg root_ppn γc Φ (mword_of_int (KernelSyms.holding + 0x02)) (mword_of_int 3) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbnez_taken_s_zca_scfg root_ppn γc Φ (mword_of_int (KernelSyms.holding + 0x02)) (mword_of_int 3) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 H1 (dq:=DfracOwn 1)
- 
+
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Ha5; exact Hheld)
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
                 with "Hcfg Htlbinv Hpc Hfile Hi02 [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       assert (Hpc08 : add_vec (mword_of_int (KernelSyms.holding + 0x02) : mword 64)
@@ -932,12 +932,12 @@ Section WpHoldingInv.
     destruct (neq_vec (sign_extend' 64 lockv) zero_reg) eqn:Hheld;
       [ | exfalso; rewrite Hheldp in Hheld; discriminate ].
     - (* ===== SLOW PATH: lock word nonzero, c.bnez TAKEN ===== *)
-      iApply (wp_cbnez_taken_s_scfg root_ppn γc Φ (mword_of_int (KernelSyms.holding + 0x02)) (mword_of_int 3) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbnez_taken_s_zca_scfg root_ppn γc Φ (mword_of_int (KernelSyms.holding + 0x02)) (mword_of_int 3) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 H1 (dq:=DfracOwn 1)
- 
+
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Ha5; exact Hheld)
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
                 with "Hcfg Htlbinv Hpc Hfile Hi02 [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
       assert (Hpc08 : add_vec (mword_of_int (KernelSyms.holding + 0x02) : mword 64)

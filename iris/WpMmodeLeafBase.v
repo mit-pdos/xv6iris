@@ -1189,6 +1189,37 @@ Proof.
   rewrite Hrdz. cbn match. apply exec_returnm.
 Qed.
 
+(* [exec_execute_JALR_ret] for a merely 2-aligned return target under the C
+   extension: the model's misalignment check reduces via [exec_jump_to_zca],
+   so only bit 0 = 0 (automatic for [cret_target]) is needed, not bit 1. *)
+Lemma exec_execute_JALR_ret_zca (imm : mword 12) (rs1 rdz : mword 5) s :
+  uint rs1 <> 0 -> uint rdz = 0 ->
+  exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s) ->
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  eq_vec (access_vec_dec (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0")) 0) ('b"0") = true ->
+  exec (execute_JALR imm (Regidx rs1) (Regidx rdz)) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s nextPC (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0"))).
+Proof.
+  intros Hrs1 Hrdz Hzic Hzca Halign.
+  unfold execute_JALR.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (Defs.bind0 (update_elp_state (Regidx rs1)) (get_next_pc tt)) s
+                 = Some (register_lookup nextPC s.(sregs), s))).
+  2:{ rewrite (exec_bind0_Some _ _ _ _ _
+                (_ : exec (update_elp_state (Regidx rs1)) s = Some (tt, s))).
+      2:{ unfold update_elp_state. rewrite (exec_bind_Some _ _ _ _ _ Hzic). cbn match. apply exec_returnm. }
+      unfold get_next_pc. exact (exec_read_reg nextPC s). }
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to_zca _ s Halign Hzca)).
+  cbn match.
+  rewrite (exec_bind0_Some _ _ _ _ _
+            (exec_wX_bits_gpr rdz (register_lookup nextPC s.(sregs))
+                (set_reg s nextPC (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0"))))).
+  rewrite Hrdz. cbn match. apply exec_returnm.
+Qed.
+
 (* ====================================================================== *)
 (* The register-GENERIC JALR WP: ONE lemma for `jalr rd, imm(rs1)`, ANY    *)
 (* rd/rs1 (both nonzero), with all GPRs held as the single [gpr_file].      *)

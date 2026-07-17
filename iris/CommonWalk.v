@@ -60,44 +60,13 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* The A/D-update extension probes and the needs-update page-fault leaf.  *)
-(* (moved here from UmodeFetchFault so the generic walk owns them.)        *)
+(* The A/D-update extension probe.                                        *)
 (* ===================================================================== *)
 Lemma exec_currentlyEnabled_Svadu s :
   exec (currentlyEnabled Ext_Svadu) s = Some (true, s).
 Proof.
   unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
   vm_compute. reflexivity.
-Qed.
-
-(* ADUE = 0 (Svade behaviour): an A/D update is required but forbidden. *)
-Lemma exec_update_and_write_pte_needs_update
-    (pteAddr : physaddr) (pte pte' : mword 64) (acc : MemoryAccessType mem_payload) s :
-  update_PTE_Bits pte acc = Some pte' ->
-  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
-  exec (update_and_write_pte pteAddr 8 pte acc) s
-    = Some (Err (PTW_PTE_Needs_Update tt), s).
-Proof.
-  intros Hupd Hmenv.
-  unfold update_and_write_pte.
-  rewrite Hupd. cbn match.
-  erewrite exec_bind_Some.
-  2:{ (* the ADUE gate evaluates to false *)
-      unfold or_boolM.
-      erewrite exec_bind_Some.
-      2:{ rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Svadu s)).
-          rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)).
-          rewrite Hmenv.
-          replace (eq_vec (_get_MEnvcfg_ADUE MENVCFG_S) ('b"1" : mword 1)) with false
-            by (vm_compute; reflexivity).
-          apply exec_returnm. }
-      cbn beta iota.
-      erewrite exec_and_boolM_Some.
-      2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Svadu s)).
-          apply (exec_returnM (not true) s). }
-      cbn [not negb]. apply (exec_returnM false s). }
-  cbn beta iota.
-  apply exec_returnm.
 Qed.
 
 (* Sv39 TLB tags are 45-bit sign-extensions of the 27-bit vpn; since the
@@ -331,29 +300,6 @@ Section UserWalk.
     { unfold update_and_write_pte. rewrite Hnoupd. cbn match. apply exec_returnm. }
     rewrite (exec_bind_Some _ _ _ _ _ Hupd). cbn match.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_add_to_TLB_user asid s)).
-    apply exec_returnm.
-  Qed.
-
-  (* fault: the leaf needs an A/D update the config forbids (ADUE = 0) *)
-  Lemma exec_translate_TLB_miss_user_needs_update (asid : mword 16) (pte' : mword 64) s :
-    register_lookup misa s.(sregs) = MISA_C ->
-    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = Some pte' ->
-    exec (read_pte (Physaddr addr2) 8) s = Some (Ok pte2, s) ->
-    exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
-    exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
-    register_lookup menvcfg s.(sregs) = MENVCFG_S ->
-    exec (translate_TLB_miss 39 asid root vpn acc p mxr do_sum tt) s
-      = Some (Err (PTW_PTE_Needs_Update tt, tt), s).
-  Proof.
-    intros Hmisa Hupd_some Hrd2 Hrd1 Hrd0 Hmenv.
-    unfold translate_TLB_miss. cbn zeta.
-    rewrite (exec_bind_Some _ _ _ _ _
-               (exec_pt_walk_user MENVCFG_S s Hmisa Hrd2 Hrd1 Hrd0 Hmenv
-                  ltac:(vm_compute; reflexivity))).
-    cbn match.
-    erewrite exec_bind_Some.
-    2:{ eapply exec_update_and_write_pte_needs_update; [ exact Hupd_some | exact Hmenv ]. }
-    cbn match.
     apply exec_returnm.
   Qed.
 

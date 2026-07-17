@@ -155,8 +155,8 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 
 (* +0x12  a9450513  addi a0,a0,-1388 *)
 Lemma mydec_addi s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xa9450513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 0xa94 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
+  exec (ext_decode (mword_of_int 0xa8650513 : mword 32)) s
+  = Some (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* ===================================================================== *)
@@ -174,7 +174,7 @@ Definition mycpu_ret (tp0 : mword 64) : mword 64 :=
     (add_vec
        (add_vec (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14)
                 (auipc_off (mword_of_int 0x11 : mword 20)))
-       (sign_extend' 64 (mword_of_int 0xa94 : mword 12)))
+       (sign_extend' 64 (mword_of_int 0xa86 : mword 12)))
     (mycpu_a5 tp0).
 
 
@@ -264,9 +264,9 @@ Section WpMycpu.
   Proof. mk_base (KernelSyms.mycpu + 0x0e)%Z (mword_of_int 0x00011517 : mword 32)
     (mword_of_int (KernelSyms.mycpu + 0x0e) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) mydec_auipc. Qed.
 
-  Lemma myi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) false (ITYPE (mword_of_int 0xa94 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.mycpu + 0x12)%Z (mword_of_int 0xa9450513 : mword 32)
-    (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) (ITYPE (mword_of_int 0xa94 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) mydec_addi. Qed.
+  Lemma myi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) false (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.mycpu + 0x12)%Z (mword_of_int 0xa8650513 : mword 32)
+    (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) mydec_addi. Qed.
 
   Lemma myi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.mycpu + 0x16)%Z (mword_of_int 0x953e : mword 16)
@@ -343,7 +343,7 @@ Section WpMycpu.
     let imm_dealloc : mword 6 := mword_of_int 16 in
     let nzimm_s0 : mword 8 := mword_of_int 4 in
     let imm_auipc : mword 20 := mword_of_int 0x11 in
-    let imm_addi : mword 12 := mword_of_int 0xa94 in
+    let imm_addi : mword 12 := mword_of_int 0xa86 in
     let shamt_slli : mword 6 := mword_of_int 7 in
     let imm_addiw : mword 6 := mword_of_int 0 in
     let sp0 := m0 !!! Regidx csp_rs1 in

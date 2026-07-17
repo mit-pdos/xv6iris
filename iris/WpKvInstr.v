@@ -135,8 +135,8 @@ Proof. intro HmisaC. kv_dec_sd (mword_of_int 0xf9fe : mword 16) s HmisaC. Qed.
 
 Lemma kv_dec19 s :
   register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xa46fd0ef : mword 32)) s
-  = Some (JAL (mword_of_int 0x1fd246 : mword 21, Regidx (mword_of_int 1 : mword 5)), s).
+  exec (ext_decode (mword_of_int 0xa44fd0ef : mword 32)) s
+  = Some (JAL (mword_of_int 0x1fd244 : mword 21, Regidx (mword_of_int 1 : mword 5)), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 Lemma kv_dec20 s :
@@ -418,10 +418,10 @@ Section WpKvInstr.
   Qed.
 
   Lemma kv_i19 :
-    kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) false (JAL (mword_of_int 0x1fd246 : mword 21, Regidx (mword_of_int 1 : mword 5))).
+    kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) false (JAL (mword_of_int 0x1fd244 : mword 21, Regidx (mword_of_int 1 : mword 5))).
   Proof.
-    mk_base (KernelSyms.kernelvec + 0x24) (mword_of_int 0xa46fd0ef : mword 32)
-      (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) (JAL (mword_of_int 0x1fd246 : mword 21, Regidx (mword_of_int 1 : mword 5))) kv_dec19.
+    mk_base (KernelSyms.kernelvec + 0x24) (mword_of_int 0xa44fd0ef : mword 32)
+      (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64) (JAL (mword_of_int 0x1fd244 : mword 21, Regidx (mword_of_int 1 : mword 5))) kv_dec19.
   Qed.
 
   Lemma kv_i20 :

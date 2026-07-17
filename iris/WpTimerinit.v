@@ -533,8 +533,8 @@ Section WpTimerinitThm.
     (* data side: TOR entry 0 grants both 8-byte stack slots. *)
     pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_ra sp0) 8 ->
     pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_s0 sp0) 8 ->
-    (* the return target (= ra0 with bit 0 cleared) is 4-aligned. *)
-    is_aligned_paddr (Physaddr (cret_target ra0)) 4 = true ->
+    (* the return target (= ra0 with bit 0 cleared) is 2-aligned (C ext). *)
+    is_aligned_paddr (Physaddr (cret_target ra0)) 2 = true ->
     (* entry register file: sp/ra/s0 (ra0 stays SYMBOLIC -- the caller's
        return address; timerinit spills and reloads it). *)
     m !!! Regidx csp_rs1 = sp0 ->
@@ -869,9 +869,9 @@ Section WpTimerinitThm.
     assert (L29ra : ti_mout m sp0 menv0 mcen0 tv ra0 s00 !!! Regidx ti_ra = ra0)
       by (ti_unfold; ti_look).
     assert (Hret_al' : is_aligned_paddr (Physaddr
-              (cret_target (ti_mout m sp0 menv0 mcen0 tv ra0 s00 !!! Regidx ti_ra))) 4 = true)
+              (cret_target (ti_mout m sp0 menv0 mcen0 tv ra0 s00 !!! Regidx ti_ra))) 2 = true)
       by (rewrite L29ra; exact Hret_al).
-    iApply (wp_cret_gpr Φ ti_pc29 ti_ra (ti_mout m sp0 menv0 mcen0 tv ra0 s00) pmpcfg1 q
+    iApply (wp_cret_gpr_zca Φ ti_pc29 ti_ra (ti_mout m sp0 menv0 mcen0 tv ra0 s00) pmpcfg1 q
               Hpmp Hnz_ra Hret_al'
               with "Hmm Hpmpc Hpc Hfile Hi29").
     iEval (rewrite L29ra). iIntros "Hmm Hpmpc Hpc Hfile".

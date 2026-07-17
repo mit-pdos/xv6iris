@@ -123,7 +123,7 @@ Section Kalloc.
     let R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m in
     let R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1 in
     let R3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x0a) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R2 in
-    let R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fe : mword 12)))]> R3 in
+    let R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7f0 : mword 12)))]> R3 in
     let mA := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)]> R4 in
     let lkA := mA !!! Regidx (mword_of_int 10 : mword 5) in
     let q_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
@@ -257,7 +257,7 @@ Section Kalloc.
     assert (Hpp0e : add_vec_int (mword_of_int (AK + 0x0a) : mword 64) 4 = mword_of_int (AK + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     (* +0x0e addi a0,a0,2046  (a0 := &kmem) *)
-    iApply (wp_addi4_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7fe : mword 12)
+    iApply (wp_addi4_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7f0 : mword 12)
               R3 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi0e [-]").
@@ -301,21 +301,21 @@ Section Kalloc.
     iPoseProof (kai_1a with "Htext") as "Hi1a".
     iPoseProof (kai_1e with "Htext") as "Hi1e".
     (* +0x16 auipc s1,0x12 *)
-    iApply (wp_auipc_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x16)) (mword_of_int 9 : mword 5) (mword_of_int 0x12 : mword 20)
+    iApply (wp_auipc_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x16)) (mword_of_int 9 : mword 5) (mword_of_int 0x11 : mword 20)
               mfin (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi16 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
-    set (R6 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x16) : mword 64) (auipc_off (mword_of_int 0x12 : mword 20)))]> mfin).
-    assert (Hs1R6 : R6 !!! Regidx (mword_of_int 9 : mword 5) = add_vec (mword_of_int (AK + 0x16) : mword 64) (auipc_off (mword_of_int 0x12 : mword 20)))
+    set (R6 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x16) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> mfin).
+    assert (Hs1R6 : R6 !!! Regidx (mword_of_int 9 : mword 5) = add_vec (mword_of_int (AK + 0x16) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))
       by (rewrite /R6; apply lookup_total_insert).
     assert (Hpp1a : add_vec_int (mword_of_int (AK + 0x16) : mword 64) 4 = mword_of_int (AK + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a ld s1,-2038(s1) : s1 := *(kmem.freelist) = head *)
     iDestruct "HRres" as (head pages) "[Hflw Hchain]".
-    assert (Hldaddr : add_vec (R6 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x80a : mword 12)) = fl).
+    assert (Hldaddr : add_vec (R6 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fc : mword 12)) = fl).
     { rewrite Hs1R6 Hfl. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_ld_s_ram_scfg root_ppn γc Φ (mword_of_int (AK + 0x1a)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x80a : mword 12)
+    iApply (wp_ld_s_ram_scfg root_ppn γc Φ (mword_of_int (AK + 0x1a)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x7fc : mword 12)
               R6 head (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi1a [Hflw] [-]").
@@ -355,12 +355,12 @@ Section Kalloc.
       assert (Hpp50 : add_vec_int (mword_of_int (AK + 0x4c) : mword 64) 4 = mword_of_int (AK + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp50) in "Hpc".
       (* +0x50 addi a0,a0,1980  (a0 := &kmem) *)
-      iApply (wp_addi4_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x50)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7bc : mword 12)
+      iApply (wp_addi4_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x50)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7ae : mword 12)
                 E1 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
                 with "Hcfg Htlbinv Hpc Hfile Hi50 [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
-      set (E2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (E1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7bc : mword 12)))]> E1).
+      set (E2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (E1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7ae : mword 12)))]> E1).
       assert (Ha0kmem2 : E2 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int KernelSyms.kmem).
       { rewrite /E2 lookup_total_insert /E1 lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
       assert (Hpp54 : add_vec_int (mword_of_int (AK + 0x50) : mword 64) 4 = mword_of_int (AK + 0x54)) by (apply bv_eq; vm_compute; reflexivity).
@@ -598,9 +598,9 @@ Section Kalloc.
       assert (Hpp26 : add_vec_int (mword_of_int (AK + 0x22) : mword 64) 4 = mword_of_int (AK + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp26) in "Hpc".
       (* +0x26 sd a5,2046(a4) : kmem.freelist := nxt *)
-      assert (Hstaddr : add_vec (R9 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fe : mword 12)) = fl).
+      assert (Hstaddr : add_vec (R9 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 0x7f0 : mword 12)) = fl).
       { rewrite Ha4R9 Hfl. apply bv_eq; vm_compute; reflexivity. }
-      iApply (wp_sd_s_ram_scfg root_ppn γc Φ (mword_of_int (AK + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x7fe : mword 12)
+      iApply (wp_sd_s_ram_scfg root_ppn γc Φ (mword_of_int (AK + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x7f0 : mword 12)
                 R9 p (dq:=DfracOwn 1)
 
                 with "Hcfg Htlbinv Hpc Hfile Hi26 [Hflw] [-]").
@@ -626,12 +626,12 @@ Section Kalloc.
       assert (Hpp2e : add_vec_int (mword_of_int (AK + 0x2a) : mword 64) 4 = mword_of_int (AK + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2e) in "Hpc".
       (* +0x2e addi a0,a0,2014  (a0 := &kmem) *)
-      iApply (wp_addi4_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x2e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7de : mword 12)
+      iApply (wp_addi4_s_scfg root_ppn γc Φ (mword_of_int (AK + 0x2e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7d0 : mword 12)
                 R10 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
                 with "Hcfg Htlbinv Hpc Hfile Hi2e [-]").
       iIntros "Hcfg Htlbinv Hpc Hfile".
-      set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7de : mword 12)))]> R10).
+      set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7d0 : mword 12)))]> R10).
       assert (Ha0kmem : R11 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int KernelSyms.kmem).
       { rewrite /R11 lookup_total_insert /R10 lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
       assert (Hpp32 : add_vec_int (mword_of_int (AK + 0x2e) : mword 64) 4 = mword_of_int (AK + 0x32)) by (apply bv_eq; vm_compute; reflexivity).

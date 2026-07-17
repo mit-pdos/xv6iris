@@ -502,7 +502,7 @@ Section WpReleaseTop.
     assert (Hpp0c : add_vec_int (mword_of_int (RL + 0x0a) : mword 64) 2 = mword_of_int (RL + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     (* +0x0c jal ra,holding *)
-    iApply (wp_jal_gpr_s root_ppn γc Φ (mword_of_int (RL + 0x0c)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff06 : mword 21)
+    iApply (wp_jal_gpr_s_zca root_ppn γc Φ (mword_of_int (RL + 0x0c)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff06 : mword 21)
               R3 1%Qp
  ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)

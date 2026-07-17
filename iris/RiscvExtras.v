@@ -481,6 +481,35 @@ Proof.
     rewrite Z.mul_comm. apply Z_mod_mult.
 Qed.
 
+(* 2-byte alignment -> bit 0 = 0.  Under the C extension the model's [jump_to]
+   only needs the target's bit 0 clear (IALIGN = 2), so a 2-aligned target
+   suffices for the compressed jump path ([exec_jump_to_zca]). *)
+Lemma align2_low_bit (pc : mword 64) :
+  is_aligned_vaddr (Virtaddr pc) 2 = true ->
+  neq_vec (access_vec_dec pc 0) ('b"0") = false.
+Proof.
+  unfold is_aligned_vaddr. intros H%Z.eqb_eq. rewrite uint_unsigned in H.
+  apply Zrem_divides in H. destruct H as [k Hk].
+  unfold neq_vec; rewrite negb_false_iff;
+    unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word;
+    rewrite MachineWord.MachineWord.eqb_true_iff; apply bv_eq;
+    rewrite bv_extract_unsigned;
+    replace (bv_unsigned ('b"0")) with 0%Z by (vm_compute; reflexivity);
+    unfold bv_wrap, bv_modulus; rewrite Hk.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0%Z.
+  rewrite Z.shiftr_0_r.
+  replace (2 ^ Z.of_N 1)%Z with 2%Z by reflexivity.
+  rewrite Z.mul_comm. apply Z_mod_mult.
+Qed.
+
+Lemma aligned2_jump_bit (a : mword 64) :
+  is_aligned_paddr (Physaddr a) 2 = true ->
+  eq_vec (access_vec_dec a 0) ('b"0") = true.
+Proof.
+  intros H. pose proof (align2_low_bit a H) as H0.
+  unfold neq_vec in H0. apply negb_false_iff in H0. exact H0.
+Qed.
+
 (* 4-byte alignment of a jump target -> the two low-bit facts the model's
    [jump_to] checks (bit 0 = 0 via [eq_vec .. 'b"0"], bit 1 = 0 via
    [bit_to_bool]).  Lets JAL / JALR state a single [is_aligned_paddr .. 4]

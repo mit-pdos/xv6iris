@@ -94,10 +94,10 @@ Lemma updc_0000a797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x972  8b67a783  lw a5,-1866(a5)  (panicking) *)
-Lemma updc_8b67a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x8b67a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 0x8b6 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4), s).
+(* 0x972  8a87a783  lw a5,-1880(a5)  (panicking) *)
+Lemma updc_8a87a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x8a87a783 : mword 32)) s
+  = Some (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4), s).
 Proof. decode_bridge_ms. Qed.
 
 (* 0x976  cf95  c.beqz a5,0x9b2  (offset +60) *)
@@ -106,10 +106,10 @@ Lemma uprvc_cf95 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   = Some (C_BEQZ (mword_of_int 30, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x97c  8a87a783  lw a5,-1880(a5)  (panicked) *)
-Lemma updc_8a87a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x8a87a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4), s).
+(* 0x97c  8a87a783  lw a5,-1894(a5)  (panicked) *)
+Lemma updc_89a7a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x89a7a783 : mword 32)) s
+  = Some (LOAD (mword_of_int 0x89a : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4), s).
 Proof. decode_bridge_ms. Qed.
 
 (* 0x980  ef85  c.bnez a5,0x9b8  (offset +56) *)
@@ -118,10 +118,10 @@ Lemma uprvc_ef85 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   = Some (C_BNEZ (mword_of_int 28, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x9a2  8867a783  lw a5,-1914(a5)  (panicking, 2nd read) *)
-Lemma updc_8867a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x8867a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 0x886 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4), s).
+(* 0x9a2  8787a783  lw a5,-1928(a5)  (panicking, 2nd read) *)
+Lemma updc_8787a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x8787a783 : mword 32)) s
+  = Some (LOAD (mword_of_int 0x878 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4), s).
 Proof. decode_bridge_ms. Qed.
 
 (* 0x9a6  cb91  c.beqz a5,0x9ba  (offset +20) *)
@@ -189,9 +189,9 @@ Section WpUartPutcSync.
   Proof. mk_base (UPS + 0x0c)%Z (mword_of_int 0x0000a797 : mword 32)
     (mword_of_int (UPS + 0x0c) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) updc_0000a797. Qed.
 
-  Lemma upi_10 : kernel_text -∗ instr (mword_of_int (UPS + 0x10) : mword 64) false (LOAD (mword_of_int 0x8b6 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (UPS + 0x10)%Z (mword_of_int 0x8b67a783 : mword 32)
-    (mword_of_int (UPS + 0x10) : mword 64) (LOAD (mword_of_int 0x8b6 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8b67a783. Qed.
+  Lemma upi_10 : kernel_text -∗ instr (mword_of_int (UPS + 0x10) : mword 64) false (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (UPS + 0x10)%Z (mword_of_int 0x8a87a783 : mword 32)
+    (mword_of_int (UPS + 0x10) : mword 64) (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8a87a783. Qed.
 
   Lemma upi_14 : kernel_text -∗ instr (mword_of_int (UPS + 0x14) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 30 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (UPS + 0x14)%Z (mword_of_int 0xcf95 : mword 16)
@@ -202,9 +202,9 @@ Section WpUartPutcSync.
   Proof. mk_base (UPS + 0x16)%Z (mword_of_int 0x0000a797 : mword 32)
     (mword_of_int (UPS + 0x16) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) updc_0000a797. Qed.
 
-  Lemma upi_1a : kernel_text -∗ instr (mword_of_int (UPS + 0x1a) : mword 64) false (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (UPS + 0x1a)%Z (mword_of_int 0x8a87a783 : mword 32)
-    (mword_of_int (UPS + 0x1a) : mword 64) (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8a87a783. Qed.
+  Lemma upi_1a : kernel_text -∗ instr (mword_of_int (UPS + 0x1a) : mword 64) false (LOAD (mword_of_int 0x89a : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (UPS + 0x1a)%Z (mword_of_int 0x89a7a783 : mword 32)
+    (mword_of_int (UPS + 0x1a) : mword 64) (LOAD (mword_of_int 0x89a : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_89a7a783. Qed.
 
   Lemma upi_1e : kernel_text -∗ instr (mword_of_int (UPS + 0x1e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (UPS + 0x1e)%Z (mword_of_int 0xef85 : mword 16)
@@ -215,9 +215,9 @@ Section WpUartPutcSync.
   Proof. mk_base (UPS + 0x3c)%Z (mword_of_int 0x0000a797 : mword 32)
     (mword_of_int (UPS + 0x3c) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) updc_0000a797. Qed.
 
-  Lemma upi_40 : kernel_text -∗ instr (mword_of_int (UPS + 0x40) : mword 64) false (LOAD (mword_of_int 0x886 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
-  Proof. mk_base (UPS + 0x40)%Z (mword_of_int 0x8867a783 : mword 32)
-    (mword_of_int (UPS + 0x40) : mword 64) (LOAD (mword_of_int 0x886 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8867a783. Qed.
+  Lemma upi_40 : kernel_text -∗ instr (mword_of_int (UPS + 0x40) : mword 64) false (LOAD (mword_of_int 0x878 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
+  Proof. mk_base (UPS + 0x40)%Z (mword_of_int 0x8787a783 : mword 32)
+    (mword_of_int (UPS + 0x40) : mword 64) (LOAD (mword_of_int 0x878 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) updc_8787a783. Qed.
 
   Lemma upi_44 : kernel_text -∗ instr (mword_of_int (UPS + 0x44) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (UPS + 0x44)%Z (mword_of_int 0xcb91 : mword 16)
@@ -769,7 +769,7 @@ Section WpUartPutcSync.
   (* =================================================================== *)
   (*  PANIC-CHECK CHUNK: uartputc_sync 0x96e -> 0x978.                     *)
   (*    0x96e  auipc a5,0xa                                                *)
-  (*    0x972  lw    a5,-1866(a5)     -> read global `panicking`           *)
+  (*    0x980  lw    a5,-1880(a5)     -> read global `panicking`           *)
   (*    0x976  beqz  a5,0x9b2         (c.beqz; on panicking!=0 falls thru) *)
   (*  The global word is read from a persistent (DfracDiscarded) snapshot   *)
   (*  `panicking_pa ↦₄□ pv`, the read-only-global analogue of kernel_data;  *)
@@ -807,13 +807,13 @@ Section WpUartPutcSync.
               with "Hsm Htlbinv Hpc Hfile Hi0c").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P10) in "Hpc".
-    (* 0x972 lw a5,-1866(a5) : reads panicking; align the snapshot to the ea *)
+    (* 0x980 lw a5,-1880(a5) : reads panicking; align the snapshot to the ea *)
     set (g1 := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x0c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m).
-    assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x8b6 : mword 12))
+    assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x8a8 : mword 12))
                   = (mword_of_int KernelSyms.panicking : mword 64)).
     { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
-    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x10)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8b6 : mword 12)
+    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x10)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8a8 : mword 12)
               g1 pv (dq:=dq) (dqm:=dqm)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi10 Hsnap").
@@ -870,11 +870,11 @@ Section WpUartPutcSync.
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P1a) in "Hpc".
     set (g1 := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x16)) (auipc_off (mword_of_int 0xa : mword 20)))]> m).
-    assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x8a8 : mword 12))
+    assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x89a : mword 12))
                   = (mword_of_int KernelSyms.panicked : mword 64)).
     { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
-    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x1a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8a8 : mword 12)
+    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x1a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x89a : mword 12)
               g1 pkv (dq:=dq) (dqm:=dqm)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi1a Hsnap").
@@ -930,11 +930,11 @@ Section WpUartPutcSync.
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P40) in "Hpc".
     set (g1 := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x3c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m).
-    assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x886 : mword 12))
+    assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x878 : mword 12))
                   = (mword_of_int KernelSyms.panicking : mword 64)).
     { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
-    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x40)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x886 : mword 12)
+    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x40)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x878 : mword 12)
               g1 pv (dq:=dq) (dqm:=dqm)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi40 Hsnap").

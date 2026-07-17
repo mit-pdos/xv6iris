@@ -20,9 +20,12 @@
        fetch/store leaf);
      - leaf A/D bits are PRESET in the default instance (xv6 leaves them
        clear).  §12 below generalizes the whole layer over a per-leaf A/D
-       assignment [kpt_adf]; under this build's Svade semantics
-       (menvcfg.ADUE = 0) an access needing an A/D update page-faults, so
-       success lemmas require A (and D for stores) on the touched page;
+       assignment [kpt_adf].  This build is Svadu (menvcfg.ADUE = 1): an
+       access needing an A/D update has it written back.  The success
+       lemmas require A (and D for stores) on the touched page so that no
+       update is needed ([update_PTE_Bits = None]) and the walk therefore
+       leaves the state UNCHANGED; without it the write-back would perturb
+       the state and the clean success lemma would not hold;
      - table pages are CONSECUTIVE from the root (kalloc's actual boot
        order yields descending pages);
      - the TRAMPOLINE mapping (root[255]) and the per-proc kernel stacks
@@ -735,11 +738,11 @@ Qed.
 (* generalized over a PER-LEAF A/D assignment [adf : mword 27 -> bool *   *)
 (* bool] ((A, D) per vpn), so the faithful kvmmake initial state (A/D     *)
 (* CLEAR) is representable.  Model-imposed side conditions (this build    *)
-(* runs Svade semantics, menvcfg.ADUE = 0, so the walk never writes A/D   *)
-(* back): an access through an A=0 leaf -- or a store through a D=0 leaf  *)
-(* -- raises PTW_PTE_Needs_Update instead of retiring, hence the success  *)
-(* lemmas require A=1 (and D=1 for stores); D stays ARBITRARY on pages    *)
-(* that are only fetched/loaded.                                          *)
+(* runs Svadu semantics, menvcfg.ADUE = 1, so the walk WRITES A/D back    *)
+(* on an access that needs them): an access through an A=0 leaf -- or a   *)
+(* store through a D=0 leaf -- would perturb the PTE, so the clean        *)
+(* no-state-change success lemmas require A=1 (and D=1 for stores); D     *)
+(* stays ARBITRARY on pages that are only fetched/loaded.                 *)
 (* ===================================================================== *)
 
 Definition kpt_adf : Type := mword 27 -> bool * bool.
@@ -1175,10 +1178,10 @@ Qed.
 (* bits existentially instead: [P_kpt_e] admits, per RESIDENT TLB entry,  *)
 (* ANY (A, D) pair, and (in SmodeCore) [tlb_inv_e] hides the whole        *)
 (* assignment.  Specs state these; a proof that must EXECUTE opens the    *)
-(* existential and works at the skolem map, because under this build's    *)
-(* Svade semantics success genuinely depends on the bits (an access       *)
-(* through A=0 -- or a store through D=0 -- page-faults), so per-page bit *)
-(* facts about the skolem are exactly the undischargeable residue.        *)
+(* existential and works at the skolem map, because success genuinely     *)
+(* depends on the bits (an access through A=0 -- or a store through D=0 -- *)
+(* needs a write-back the clean success lemma cannot absorb), so per-page  *)
+(* bit facts about the skolem are exactly the undischargeable residue.     *)
 (* ===================================================================== *)
 
 (* a single entry with explicit bits: the constant-map instance *)

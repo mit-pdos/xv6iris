@@ -5,16 +5,19 @@
    access [acc] at virtual address [va] from a user-phase machine state, the
    model's [translateAddr (Virtaddr va) acc] takes exactly one of
 
-     - Ok  : [va]'s vpn is mapped, the leaf check passes and no A/D update
-             is needed.  Output pa = [u_walk_pa (um_pte0 e) va] (covered by
-             [u_data] via [upt_data_cov]); output state = the input with the
-             tlb slot holding [um_tlb_ent vpn e] -- UNIFORMLY presented as
-             the filled vector (on a hit the fill is the identity), so
-             callers never split on hit/miss ([upt_tlb_ok_fill] re-seals);
-     - Err : non-canonical va, unmapped vpn ([upt_unmapped_walk_fault]),
-             leaf check denied ([upt_denied_walk_fault]), or A/D update
-             needed (Svade: menvcfg.ADUE = 0) -- the access page-faults with
-             NO state change, feeding the trap arm of the step obligation.
+     - Ok  : [va]'s vpn is mapped and the leaf check passes.  Output pa =
+             [u_walk_pa (um_pte0 e) va] (covered by [u_data] via
+             [upt_data_cov]); output state = the input with the tlb slot
+             holding [um_tlb_ent vpn e] -- UNIFORMLY presented as the filled
+             vector (on a hit the fill is the identity), so callers never
+             split on hit/miss ([upt_tlb_ok_fill] re-seals).  No A/D update
+             ever fires: the page tables carry A/D preset, so every walk
+             takes [update_PTE_Bits = None] (this build is Svadu, ADUE=1,
+             but with A/D preset the write-back path is never entered);
+     - Err : non-canonical va, unmapped vpn ([upt_unmapped_walk_fault]), or
+             leaf check denied ([upt_denied_walk_fault]) -- the access
+             page-faults with NO state change, feeding the trap arm of the
+             step obligation.
 
    This file currently holds the first pure bricks (the mode dispatch that
    every translateAddr reduction begins with); the per-access wrappers land
@@ -140,9 +143,9 @@ Proof.
   reflexivity.
 Qed.
 
-(* the walk FAULTS (invalid PTE / permission denied / A-bit needs update):
-   TLB lookup misses (given), the walk errs (given), the fetch page-faults
-   with NO state change.  [Hte] discharges per concrete PTW error by
+(* the walk FAULTS (invalid PTE / permission denied): TLB lookup misses
+   (given), the walk errs (given), the fetch page-faults with NO state
+   change.  [Hte] discharges per concrete PTW error by
    [unfold translationException; cbn match; apply exec_returnm]. *)
 Lemma exec_translateAddr_fetch_u_fault
     (vpn : mword 27) (root : mword 44) (f : PTW_Error)
@@ -635,228 +638,6 @@ Section UserTranslateIris2.
   Qed.
 
 End UserTranslateIris2.
-
-(* ===================================================================== *)
-(* §6 The NEEDS-UPDATE (Svade A/D) fault: a mapped page whose leaf passes  *)
-(* the permission check but needs an A(/D) bit set page-faults (this build *)
-(* has menvcfg.ADUE = 0, so the walker never writes PTEs back).  Both the  *)
-(* hit path (stored entry) and the walk path fault identically.            *)
-(* ===================================================================== *)
-
-Lemma exec_translate_TLB_hit_needs_update_u
-    (vpn vpn' : mword 27) (e : umap_ent)
-    (acc : MemoryAccessType mem_payload) (mxr do_sum : bool)
-    (pte' : mword 64) (idx : Z) s :
-  upte_check_ok acc mxr do_sum (um_pte0 e) ->
-  update_PTE_Bits (um_pte0 e) acc = Some pte' ->
-  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
-  exec (translate_TLB_hit 39 (mword_of_int 0) vpn' acc User mxr do_sum tt idx
-          (um_tlb_ent vpn e)) s
-    = Some (Err (PTW_PTE_Needs_Update tt, tt), s).
-Proof.
-  intros Hok Hupd Hmenv.
-  unfold translate_TLB_hit. cbn zeta.
-  match goal with |- context[tlb_get_pte ?sz ?ent] => change sz with 8 end.
-  rewrite um_tlb_ent_pte.
-  rewrite (exec_bind_Some _ _ _ _ _ (Hok s)). cbn match.
-  match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
-    assert (Hu : exec (update_and_write_pte a wd p ac) s
-                 = Some (Err (PTW_PTE_Needs_Update tt), s)) end.
-  { eapply exec_update_and_write_pte_needs_update; [ exact Hupd | exact Hmenv ]. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hu). cbn match.
-  apply exec_returnm.
-Qed.
-
-Lemma exec_translate_hit_needs_update_u
-    (vpn : mword 27) (e : umap_ent) (root : mword 44)
-    (acc : MemoryAccessType mem_payload) (mxr do_sum : bool)
-    (pte' : mword 64) (tlbvec : type_of_register tlb) s :
-  register_lookup tlb s.(sregs) = tlbvec ->
-  vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (um_tlb_ent vpn e) ->
-  upte_check_ok acc mxr do_sum (um_pte0 e) ->
-  update_PTE_Bits (um_pte0 e) acc = Some pte' ->
-  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
-  exec (translate 39 (mword_of_int 0) root vpn acc User mxr do_sum tt) s
-    = Some (Err (PTW_PTE_Needs_Update tt, tt), s).
-Proof.
-  intros Htlb Hvec Hok Hupd Hmenv.
-  unfold translate.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec (um_tlb_ent vpn e) s
-               Htlb Hvec (um_tlb_ent_match_self vpn e))).
-  cbn match.
-  eapply exec_translate_TLB_hit_needs_update_u; eassumption.
-Qed.
-
-(* the walk side: TLB miss (empty or colliding) -> structural walk succeeds
-   -> the A/D update is needed -> fault; NO state change (the fault fires
-   BEFORE add_to_TLB) *)
-Lemma exec_translate_walk_needs_update_u
-    (vpn : mword 27) (root : mword 44) (pte2 pte1 pte0 pte' : mword 64)
-    (acc : MemoryAccessType mem_payload) (mxr do_sum : bool) s :
-  (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte2 7 0))
-                     (ext_bits_of_PTE pte2)) s0 = Some (false, s0)) ->
-  pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte2 7 0)) = true ->
-  (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte1 7 0))
-                     (ext_bits_of_PTE pte1)) s0 = Some (false, s0)) ->
-  pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte1 7 0)) = true ->
-  (forall s0, exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
-                     (ext_bits_of_PTE pte0)) s0 = Some (false, s0)) ->
-  pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte0 7 0)) = false ->
-  (forall s0, exec (check_PTE_permission acc User mxr do_sum
-                     (Mk_PTE_Flags (subrange_vec_dec pte0 7 0))
-                     (ext_bits_of_PTE pte0) tt) s0 = Some (PTE_Check_Success tt, s0)) ->
-  eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE pte0)) ('b"1") = false ->
-  register_lookup misa s.(sregs) = MISA_C ->
-  exec (lookup_TLB 39 (mword_of_int 0) vpn) s = Some (None, s) ->
-  update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = Some pte' ->
-  exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s = Some (Ok pte2, s) ->
-  exec (read_pte (Physaddr (u_pte_addr (u_next_base pte2) (subrange_vec_dec vpn 17 9))) 8) s = Some (Ok pte1, s) ->
-  exec (read_pte (Physaddr (u_pte_addr (u_next_base pte1) (subrange_vec_dec vpn 8 0))) 8) s = Some (Ok pte0, s) ->
-  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
-  exec (translate 39 (mword_of_int 0) root vpn acc User mxr do_sum tt) s
-    = Some (Err (PTW_PTE_Needs_Update tt, tt), s).
-Proof.
-  intros H2i H2nl H1i H1nl H0i H0nl Hchk0 H0N Hmisa Hlk Hupd Hrd2 Hrd1 Hrd0 Hmenv.
-  unfold translate.
-  rewrite (exec_bind_Some _ _ _ _ _ Hlk).
-  cbn match.
-  exact (exec_translate_TLB_miss_user_needs_update vpn root pte2 pte1 pte0
-           acc User mxr do_sum H2i H2nl H1i H1nl H0i H0nl Hchk0 H0N
-           (mword_of_int 0) pte' s Hmisa Hupd Hrd2 Hrd1 Hrd0 Hmenv).
-Qed.
-
-(* translateAddr from a translate-level error (at the goal's concrete
-   mxr/do_sum mstatus expressions) *)
-Lemma exec_translateAddr_fetch_u_translate_err
-    (vpn : mword 27) (root : mword 44) (f : PTW_Error)
-    (va satp0 : mword 64) s :
-  register_lookup cur_privilege s.(sregs) = User ->
-  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
-  register_lookup satp s.(sregs) = satp0 ->
-  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-  zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
-  autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
-  exec (translate 39 (mword_of_int 0) root vpn (InstructionFetch tt) User
-          (eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"1"))
-          (eq_vec (_get_Mstatus_SUM (register_lookup mstatus s.(sregs))) ('b"1")) tt) s
-    = Some (Err (f, tt), s) ->
-  exec (translationException (InstructionFetch tt) f) s
-    = Some (E_Fetch_Page_Fault tt, s) ->
-  neq_vec (bits_of_virtaddr (Virtaddr va))
-     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-  autocast (T := mword) (subrange_vec_dec
-     (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-  exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
-    = Some (Err (E_Fetch_Page_Fault tt, tt), s).
-Proof.
-  intros Hcp HSXL Hsatp Hmode Hasid Hppn Htr Hte Hcanon Hvpn_def.
-  utr_head Hcp HSXL Hsatp Hmode.
-  rewrite Hcanon. cbn match.
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
-  match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
-    replace vpnx with vpn by (symmetry; exact Hvpn_def);
-    replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid);
-    replace bppn with root by (symmetry; exact Hppn) end.
-  rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-  cbn match.
-  rewrite (execR_liftR_seq _ _ _ _ _ Hte).
-  rewrite execR_returnR. cbn match.
-  reflexivity.
-Qed.
-
-(* ===================================================================== *)
-(* §7 The complete NEEDS-UPDATE composer, all slot cases.                  *)
-(* ===================================================================== *)
-Section UserTranslateIris3.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-
-  Lemma upt_translateAddr_fetch_needs_update_full (pt : upt) (vpn : mword 27)
-      (e : umap_ent) (pte' : mword 64)
-      (va usatp : mword 64) (tlbvec : type_of_register tlb) (σ : mstate) :
-    pt.(u_map) !! vpn = Some e ->
-    upt_map_spec pt ->
-    upt_tlb_ok pt.(u_map) tlbvec ->
-    (forall mxr do_sum, upte_check_ok (InstructionFetch tt) mxr do_sum (um_pte0 e)) ->
-    update_PTE_Bits (um_pte0 e) (InstructionFetch tt) = Some pte' ->
-    register_lookup cur_privilege σ.(sregs) = User ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    register_lookup satp σ.(sregs) = usatp ->
-    register_lookup tlb σ.(sregs) = tlbvec ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    upt_satp_ok pt usatp ->
-    neq_vec (bits_of_virtaddr (Virtaddr va))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
-    (forall regions, pma_allows_all regions -> pma_allows_pte_read regions) ->
-    hw_config -∗
-    mstate_interp σ -∗
-    upt_slots_own pt.(u_slots) -∗
-    ⌜exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
-       = Some (Err (E_Fetch_Page_Fault tt, tt), σ)⌝.
-  Proof.
-    iIntros (Hvpn Hspec Hok Hchk Hupd Lpriv LSXL Lsatp Ltlb Lmisa Lmenv
-             (Hmode & Hasid & Hppn) Hcanon Hvpn_def HA Hord HR Hcov Hpter)
-      "#Hhw Hint Hslots".
-    assert (Hte : exec (translationException (InstructionFetch tt) (PTW_PTE_Needs_Update tt)) σ
-                  = Some (E_Fetch_Page_Fault tt, σ)).
-    { unfold translationException. cbn match. apply exec_returnm. }
-    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
-    - destruct (Hok vpn ent Hslot) as (vpn0 & e0 & Hvpn0 & _ & ->).
-      destruct (decide (vpn0 = vpn)) as [-> | Hne].
-      + (* own entry resident: the hit needs the update and faults *)
-        rewrite Hvpn in Hvpn0. injection Hvpn0 as He0. subst e0.
-        iPureIntro.
-        apply (exec_translateAddr_fetch_u_translate_err vpn pt.(u_root)
-                 (PTW_PTE_Needs_Update tt) va usatp σ
-                 Lpriv LSXL Lsatp Hmode Hasid Hppn); [ | exact Hte | exact Hcanon | exact Hvpn_def ].
-        eapply exec_translate_hit_needs_update_u;
-          [ exact Ltlb | exact Hslot | apply Hchk | exact Hupd | exact Lmenv ].
-      + (* colliding entry: nomatch -> walk -> needs update *)
-        assert (Hnm : match_TLB_Entry (um_tlb_ent vpn0 e0) (mword_of_int 0)
-                        (sign_extend' (57 - 12) vpn) = false).
-        { rewrite um_tlb_ent_match_gen.
-          match goal with |- ?E = false =>
-            destruct E eqn:He'; [ exfalso | reflexivity ] end.
-          apply eq_vec_true_iff in He'. apply u_sext45_inj in He'. exact (Hne He'). }
-        iDestruct (upt_read_walk_ptes pt vpn e σ Hvpn Hspec HA Hord HR Hcov Hpter
-                     with "Hhw Hint Hslots")
-          as %(Hr2 & Hr1 & Hr0 & Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & Hn0 & HN0 & _).
-        iPureIntro.
-        apply (exec_translateAddr_fetch_u_translate_err vpn pt.(u_root)
-                 (PTW_PTE_Needs_Update tt) va usatp σ
-                 Lpriv LSXL Lsatp Hmode Hasid Hppn); [ | exact Hte | exact Hcanon | exact Hvpn_def ].
-        eapply (exec_translate_walk_needs_update_u vpn pt.(u_root)
-                  (um_pte2 e) (um_pte1 e) (um_pte0 e) pte');
-          try eassumption.
-        * apply Hchk.
-        * exact (exec_lookup_TLB_nomatch vpn (mword_of_int 0) (um_tlb_ent vpn0 e0)
-                   tlbvec σ Ltlb Hslot Hnm).
-    - (* empty slot: miss -> walk -> needs update *)
-      iDestruct (upt_read_walk_ptes pt vpn e σ Hvpn Hspec HA Hord HR Hcov Hpter
-                   with "Hhw Hint Hslots")
-        as %(Hr2 & Hr1 & Hr0 & Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & Hn0 & HN0 & _).
-      iPureIntro.
-      apply (exec_translateAddr_fetch_u_translate_err vpn pt.(u_root)
-               (PTW_PTE_Needs_Update tt) va usatp σ
-               Lpriv LSXL Lsatp Hmode Hasid Hppn); [ | exact Hte | exact Hcanon | exact Hvpn_def ].
-      eapply (exec_translate_walk_needs_update_u vpn pt.(u_root)
-                (um_pte2 e) (um_pte1 e) (um_pte0 e) pte');
-        try eassumption.
-      * apply Hchk.
-      * exact (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec σ Ltlb Hslot).
-  Qed.
-
-End UserTranslateIris3.
 
 (* ===================================================================== *)
 (* §8 The fetch-SUCCESS translateAddr wrappers.  The HIT outputs the SAME  *)

@@ -922,10 +922,10 @@ Section WpPushOffTop.
     iPoseProof (poi_16 with "Htext") as "Hi16".
     destruct (eq_vec (sign_extend' 64 noff) zero_reg) eqn:Hcond.
     - (* ===== TAKEN arm: noff == 0 ===== *)
-      iApply (wp_cbeqz_taken_s_scfg root_ppn γ Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
+      iApply (wp_cbeqz_taken_s_zca_scfg root_ppn γ Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) N5 (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rewrite Ha5; exact Hcond)
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
                 with "Hsm Htlbinv Hpc Hfile Hi16 [-]").
       iIntros "Hsm Htlbinv Hpc Hfile".
       assert (Htgt2c : add_vec (mword_of_int (PO + 0x16) : mword 64)

@@ -81,13 +81,20 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
 
 (* Concrete reference config values for the decode bridge (WpDecodeBridge).
    [MISA_C] is the platform misa (S/C/U/M/A/I/D/F set, MXL=2); read-only, never
-   written by the kernel.  [MENVCFG_S] is the S-mode menvcfg AFTER the M-mode
-   boot write ([start.c]: [menvcfg |= 1<<63]) legalizes from the all-zero reset
-   -- i.e. only the STCE bit (63) set; the kernel never writes menvcfg again, so
-   this value is constant throughout S-mode execution.  Both are consistent with
-   the bit-level facts pinned by [hw_config] / [smode_config]. *)
+   written by the kernel.  [MENVCFG_S] is the S-mode menvcfg AFTER the two M-mode
+   boot writes ([start.c]: [menvcfg |= MENVCFG_ADUE] then, in [timerinit],
+   [menvcfg |= MENVCFG_STCE]) legalize from the all-zero reset -- i.e. the ADUE
+   bit (61) and the STCE bit (63) set, 0xA000000000000000.  The kernel never
+   writes menvcfg again, so this value is constant throughout S-mode execution.
+   Both are consistent with the bit-level facts pinned by [hw_config] /
+   [smode_config] (which constrain PBMTE/PMM/LPE/FIOM -- none of them bit 61).
+   ADUE=1 is Svadu: an access that needs an A/D update has the bit written back
+   rather than page-faulting.  The kernel's page tables carry A/D preset, so no
+   live walk ever needs an update (every walk lemma takes [update_PTE_Bits = None]
+   and short-circuits before the ADUE gate), and the value of ADUE is invisible
+   to them -- it matters only to the boot proof that produces this constant. *)
 Definition MISA_C : mword 64 := mword_of_int 0x800000000014112D.
-Definition MENVCFG_S : mword 64 := mword_of_int 0x8000000000000000.
+Definition MENVCFG_S : mword 64 := mword_of_int 0xA000000000000000.
 
 (* [cfg_ok s]: the config precondition the fast concrete-state decode bridge
    (WpDecodeBridge) needs -- either a Machine state with mseccfg = 0, or a
