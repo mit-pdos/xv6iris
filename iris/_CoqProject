@@ -114,6 +114,7 @@ UserTranslate.v
 UserMem.v
 UserFetch.v
 UserCompute.v
+UserStepFull.v
 WpIntrStep.v
 WpIntrInv.v
 WpPushOff.v
