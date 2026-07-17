@@ -719,3 +719,28 @@ Section UserRetireEngine.
   Qed.
 
 End UserRetireEngine.
+
+(* ===================================================================== *)
+(* §5 The decode-bridge agreement: the user frame's pins coincide with     *)
+(* the U-mode reference decode state on every register the decoder reads.  *)
+(* ===================================================================== *)
+Require Import WpDecodeBridge DecodeTotalU.
+
+Lemma agree_u (σ : mstate) :
+  register_lookup cur_privilege σ.(sregs) = User ->
+  register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+  register_lookup senvcfg σ.(sregs) = (mword_of_int 0 : mword 64) ->
+  register_lookup mstateen0 σ.(sregs) = (mword_of_int 0 : mword 64) ->
+  register_lookup sstateen0 σ.(sregs) = (mword_of_int 0 : mword 32) ->
+  register_lookup misa σ.(sregs) = MISA_C ->
+  agree_on D_u σ dstateU.
+Proof.
+  intros Hpriv Hmenv Hsenv Hms0 Hss0 Hmisa r Hr.
+  unfold D_u in Hr.
+  repeat (apply orb_prop in Hr; destruct Hr as [Hr | Hr]);
+    apply register_beq_true in Hr; subst r;
+    [ rewrite Hpriv | rewrite Hmenv | rewrite Hsenv
+    | rewrite Hms0 | rewrite Hss0 | rewrite Hmisa ];
+    first [ vm_compute; reflexivity
+          | apply bv_eq; vm_compute; reflexivity ].
+Qed.
