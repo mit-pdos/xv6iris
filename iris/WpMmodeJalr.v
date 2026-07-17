@@ -22,10 +22,9 @@ Section WpJalrGpr.
      [pc_is] is the JUMP TARGET.  JALR's execute reads mseccfg.MLPE (for the
      Zicfilp check) and cur_privilege; these cells are held separately from
      [mmode_config] (which [wp_instr] takes) and handed back to the caller. *)
-  Lemma wp_jalr_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
+  Lemma wp_jalr_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr (jalr_target (m !!! Regidx rs1) imm)) 4 = true ->
@@ -38,10 +37,10 @@ Section WpJalrGpr.
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pc_is (jalr_target (m !!! Regidx rs1) imm) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc (if is_rvc then 2 else 4))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd Halign) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (Hpmp Hrd Halign) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
     (* keep half of mmode_config to reason about cur_privilege / mseccfg.MLPE for
        the Zicfilp check (both come from mmode_config / its hw_config). *)
@@ -53,8 +52,8 @@ Section WpJalrGpr.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     (* wp_instr ties pmpcfg's fraction to mmode_config's, so split it too *)
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iApply (wp_instr E Φ pc is_rvc (JALR (imm, Regidx rs1, Regidx rd)) pmpcfg0
-              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr Φ pc is_rvc (JALR (imm, Regidx rs1, Regidx rd)) pmpcfg0
+              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
@@ -136,9 +135,8 @@ Section RvcRet.
   Definition cret_target (vra : mword 64) : mword 64 :=
     update_vec_dec (add_vec vra (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0").
 
-  Lemma wp_cret_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (ra : mword 5)
+  Lemma wp_cret_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (ra : mword 5)
       (m : gmap regidx (mword 64)) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint ra <> 0 ->
     is_aligned_paddr (Physaddr (cret_target (m !!! Regidx ra))) 4 = true ->
@@ -151,10 +149,10 @@ Section RvcRet.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (cret_target (m !!! Regidx ra)) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hra Halign) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (Hpmp Hra Halign) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
@@ -163,8 +161,8 @@ Section RvcRet.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iApply (wp_instr E Φ pc true (JALR (zeros' 12, Regidx ra, zreg)) pmpcfg0
-              HN Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+    iApply (wp_instr Φ pc true (JALR (zeros' 12, Regidx ra, zreg)) pmpcfg0
+              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx ra = Some (m !!! Regidx ra))

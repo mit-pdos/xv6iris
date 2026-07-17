@@ -418,6 +418,13 @@ Qed.
 
 (* the try_step wrapper on the Step_Pending_Interrupt arm: handle_interrupt,
    tick PC := nextPC, and NO minstret bump (the step did not retire). *)
+(* ********************************************************************* *)
+(* COMMENTED OUT -- pending the clock-tick rework of the interrupt stack.  *)
+(* [mip] now lives in [clock_inv] (every step may nondeterministically     *)
+(* rewrite MTIP/STIP via tick_clock), so the engines below -- which own    *)
+(* [mip ↦ᵣ{dq}] across steps and state [exec riscv_step] witnesses --      *)
+(* need a substantial redesign, not a mechanical port.                     *)
+(* >>> COMMENTED-OUT REGION BEGINS
 Section StepInterrupt.
   Context (s s_trap : mstate) (i : InterruptType) (p : Privilege) (b : bool).
 
@@ -495,12 +502,11 @@ Section WpIntrEngine.
   Qed.
 
 
-  Lemma wp_exec_step_interrupt_inv E Φ {dq : dfrac} :
-    ↑minstretN ⊆ E →
+  Lemma wp_exec_step_interrupt_inv Φ {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ,
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (i : InterruptType) (p : Privilege) (s_trap : mstate),
          ⌜ exec (run_hart_active 0) σ = Some (Step_Pending_Interrupt (i, p), σ) ⌝ ∗
          ⌜ exec (handle_interrupt i p) σ = Some (tt, s_trap) ⌝ ∗
@@ -508,11 +514,11 @@ Section WpIntrEngine.
          mstate_interp s_trap ∗
          ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
             PC ↦ᵣ (register_lookup nextPC s_trap.(sregs)) -∗
-            WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+            WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN) "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) Φ HN with "Hinv").
+    iIntros "#Hinv Hhs H".
+    iApply (wp_exec_step_minstret E (⊤ ∖ ↑minstretN) Φ with "Hinv").
     iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
@@ -642,11 +648,10 @@ Section WpInstrIntr.
 
 
   (* THE UNIFIED interrupt-layer engine over the consistency invariant. *)
-  Lemma wp_instr_s_intr_tlbinv (root_ppn : mword 44) E Φ
+  Lemma wp_instr_s_intr_tlbinv (root_ppn : mword 44) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 mip_v : mword 64) (meip seip : mword 1)
       {dq : dfrac} :
-    ↑minstretN ⊆ E →
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
@@ -684,7 +689,7 @@ Section WpInstrIntr.
        pmp_config root_ppn -∗
        tlb ↦ᵣ tlbvec_f -∗
        pte_super_bytes root_ppn (DfracOwn 1) -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -693,15 +698,15 @@ Section WpInstrIntr.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     (* Open [tlb_inv] ONCE and drive the UNIFIED fetch: each 2-byte chunk
        translates through its OWN vpn (0/1/2 slots filled), so a straddling
        non-RVC instruction no longer needs its two halves on one page.  The
        [s_dispatch = None] / dispatchInterrupt-not-taken obligation is threaded
        over the unified filled state [set_reg σ tlb tlbvec2] exactly as before. *)
-    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0)
+    iIntros (HSXL Hmm Hdnone HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -714,7 +719,7 @@ Section WpInstrIntr.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -791,11 +796,10 @@ Section WpInstrIntr.
   Qed.
 
   (* THE UNIFIED interrupt-layer engine over the consistency invariant. *)
-  Lemma wp_instr_s_intr_rvc2_tlbinv (root_ppn : mword 44) E Φ
+  Lemma wp_instr_s_intr_rvc2_tlbinv (root_ppn : mword 44) Φ
       (pc : mword 64) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 mip_v : mword 64) (meip seip : mword 1)
       {dq : dfrac} :
-    ↑minstretN ⊆ E →
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
@@ -833,7 +837,7 @@ Section WpInstrIntr.
        pmp_config root_ppn -∗
        tlb ↦ᵣ tlbvec_f -∗
        pte_super_bytes root_ppn (DfracOwn 1) -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
@@ -841,15 +845,15 @@ Section WpInstrIntr.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     (* The unified [wp_instr_s_intr_tlbinv] is [is_rvc]-polymorphic and, via the
        unified fetch, already covers the 2-aligned compressed case; this is now
        just its [is_rvc := true] specialisation ([if true then 2 else 4] = 2). *)
-    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0)
+    iIntros (HSXL Hmm Hdnone HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Htlbinv Hpc Hinstr H".
-    iApply (wp_instr_s_intr_tlbinv root_ppn E Φ pc true i
+    iApply (wp_instr_s_intr_tlbinv root_ppn Φ pc true i
               mstatus0 mie_v mdv0 menvcfg0 mip_v meip seip
               HN HSXL Hmm Hdnone HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hmipc Hmeipc Hseipc Htlbinv Hpc Hinstr H").
@@ -862,13 +866,12 @@ Section WpInstrIntr.
   (* [wp_rvc_gpr_write_s_intr]'s sibling for pc 2-aligned but NOT 4-aligned,
      over [wp_instr_s_intr_rvc2] instead of [wp_instr_s_intr]. *)
 
-  Lemma wp_rvc_gpr_write_s_intr_rvc2 (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_rvc_gpr_write_s_intr_rvc2 (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5)
       (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 mip_v : mword 64) (meip seip : mword 1)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
@@ -911,12 +914,12 @@ Section WpInstrIntr.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0 Hrd Hbexec)
+    iIntros (HSXL Hmm Hdnone HPBMTE Hmenvval0 Hrd Hbexec)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_intr_rvc2_tlbinv root_ppn E Φ pc base mstatus0 mie_v mdv0 menvcfg0 mip_v
+    iApply (wp_instr_s_intr_rvc2_tlbinv root_ppn Φ pc base mstatus0 mie_v mdv0 menvcfg0 mip_v
               meip seip HN HSXL Hmm Hdnone HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
@@ -968,11 +971,10 @@ Section WpInstrIntr.
 
   (* ---- the acquire instantiation: c.addi sp,-32, SIE symbolic ---- *)
 
-  Lemma wp_acq_caddi_intr (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_acq_caddi_intr (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 mip_v : mword 64) (meip seip : mword 1)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     s_dispatch mip_v meip seip mie_v mdv0 mstatus0 = None ->
@@ -1006,16 +1008,16 @@ Section WpInstrIntr.
       pc_is (mword_of_int (KernelSyms.acquire + 0x2) : mword 64) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 acq_i1)))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSXL Hmm Hdnone HPBMTE Hmenvval0)
+    iIntros (HSXL Hmm Hdnone HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hmip Hmeip Hseip Htlbinv Hpc Hfile #Htext Hcont".
     iPoseProof (acq_instr1 with "Htext") as "Hi1".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
     assert (Hpc2 : add_vec_int acq_pc1 2 = (mword_of_int (KernelSyms.acquire + 0x2) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
-    unshelve iApply (wp_rvc_gpr_write_s_intr_rvc2 root_ppn E Φ acq_pc1 csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_rvc_gpr_write_s_intr_rvc2 root_ppn Φ acq_pc1 csp_rs1 csp_rs1 csp_rs1
               (ITYPE (sign_extend' 12 acq_i1, Regidx csp_rs1, Regidx csp_rs1, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 acq_i1)))
               m mstatus0 mie_v mdv0 menvcfg0 mip_v meip seip
@@ -1031,6 +1033,8 @@ Section WpInstrIntr.
   Qed.
 
 End WpInstrIntr.
+
+********************************************************************* *)
 
 (* ===================================================================== *)
 (* §7 Small capstone helpers.                                            *)

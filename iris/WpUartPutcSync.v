@@ -293,25 +293,24 @@ Section WpUartPutcSync.
   (* Both go through the base gpr-write engine + the register-generic      *)
   (* execute facts from WpMmodeLeafBase.                                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_lui_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_lui_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rd rd
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ Φ pc rd rd rd
               (UTYPE (imm, Regidx rd, LUI))
               (luival imm)
               m (dq:=dq)
-              HN Hrd
+ Hrd
               _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc _ _.
@@ -320,10 +319,9 @@ Section WpUartPutcSync.
     reflexivity.
   Qed.
 
-  Lemma wp_andi_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_andi_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) -∗
@@ -331,15 +329,15 @@ Section WpUartPutcSync.
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ E Φ pc rd rs1 rs1
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg root_ppn γ Φ pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))
               (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
               m (dq:=dq)
-              HN Hrd
+ Hrd
               _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
@@ -359,10 +357,9 @@ Section WpUartPutcSync.
   Definition uart_lsr_ldval (u : uart_state) : mword 64 :=
     extend_value true (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) (uart_lsr u)).
 
-  Lemma wp_uart_lsr_read_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uart_lsr_read_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5)
       (m : gmap regidx (mword 64)) (u : uart_state) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     m !!! Regidx rs1 = uart_pa 5 ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
@@ -372,14 +369,14 @@ Section WpUartPutcSync.
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (uart_lsr_ldval u)]> m) -∗
       uart_frag u -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd Haddr)
+    iIntros (Hrd Haddr)
       "Hsm Htlbinv Hpc Hfile Hinstr Huf Hcont".
-    iApply (wp_lb_uart_s_kpt root_ppn γ 5 E Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
+    iApply (wp_lb_uart_s_kpt root_ppn γ 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
               (uart_lsr u) m u u (dq:=dq)
-              HN
+
               ltac:(unfold uart_size; lia) Hrd
               ltac:(unfold PTE_DEV; lia)
               ltac:(intros; vm_compute; reflexivity)
@@ -406,10 +403,9 @@ Section WpUartPutcSync.
     destruct (uart_rx_ready u); vm_compute; reflexivity.
   Qed.
 
-  Lemma wp_uart_thr_write_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uart_thr_write_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5)
       (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     m !!! Regidx rs1 = uart_pa 0 ->
     uart_write u 0 (autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = Some u' ->
     smode_config γ dq -∗ tlb_inv root_ppn -∗
@@ -418,14 +414,14 @@ Section WpUartPutcSync.
     ( smode_config γ dq -∗ tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
       uart_frag u' -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Haddr Hwrite)
+    iIntros (Haddr Hwrite)
       "Hsm Htlbinv Hpc Hfile Hinstr Huf Hcont".
-    iApply (wp_sb_uart_s_kpt root_ppn γ 0 E Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (wp_sb_uart_s_kpt root_ppn γ 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m u u' (dq:=dq)
-              HN
+
               ltac:(unfold uart_size; lia)
               ltac:(unfold PTE_DEV; lia)
               ltac:(intros; vm_compute; reflexivity)
@@ -507,9 +503,8 @@ Section WpUartPutcSync.
     unfold regval_into_reg. reflexivity.
   Qed.
 
-  Lemma wp_uartputc_devcore (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uartputc_devcore (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uart_thre u = true ->
     uart_write u 0 (autocast (T := mword)
        (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
@@ -522,10 +517,10 @@ Section WpUartPutcSync.
       pc_is (mword_of_int (UPS + 0x3c)) -∗
       gpr_file (ppc_f6 m u) -∗
       uart_frag u' -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hthre Hwrite)
+    iIntros (Hthre Hwrite)
       "Hsm Htlbinv #Ht Hpc Hfile Huf Hcont".
     assert (P24 : add_vec_int (mword_of_int (UPS + 0x20) : mword 64) 4 = mword_of_int (UPS + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     assert (P26 : add_vec_int (mword_of_int (UPS + 0x24) : mword 64) 2 = mword_of_int (UPS + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
@@ -544,61 +539,61 @@ Section WpUartPutcSync.
     iPoseProof (upi_34 with "Ht") as "Hi34".
     iPoseProof (upi_38 with "Ht") as "Hi38".
     (* 0x982  lui a4,0x10000 *)
-    iApply (wp_lui_s root_ppn γ E Φ (mword_of_int (UPS + 0x20)) (mword_of_int 14) (mword_of_int 0x10000 : mword 20)
+    iApply (wp_lui_s root_ppn γ Φ (mword_of_int (UPS + 0x20)) (mword_of_int 14) (mword_of_int 0x10000 : mword 20)
               m (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi20").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P24) in "Hpc".
     (* 0x986  c.addi a4,a4,5 *)
-    iApply (wp_caddi_gpr_s_config_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x24)) (mword_of_int 14) (mword_of_int 5 : mword 6)
+    iApply (wp_caddi_gpr_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x24)) (mword_of_int 14) (mword_of_int 5 : mword 6)
               (ppc_f1 m) (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi24").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P26) in "Hpc".
     (* 0x988  lbu a5,0(a4)  -- LSR read *)
-    iApply (wp_uart_lsr_read_s root_ppn γ E Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
+    iApply (wp_uart_lsr_read_s root_ppn γ Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
               (ppc_f2 m) u (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               (ppc_f2_a4 m)
               with "Hsm Htlbinv Hpc Hfile Hi26 Huf").
     iIntros "Hsm Htlbinv Hpc Hfile Huf".
     iEval (rewrite P2a) in "Hpc".
     (* 0x98c  andi a5,a5,32 *)
-    iApply (wp_andi_s root_ppn γ E Φ (mword_of_int (UPS + 0x2a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 32 : mword 12)
+    iApply (wp_andi_s root_ppn γ Φ (mword_of_int (UPS + 0x2a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 32 : mword 12)
               (ppc_f3 m u) (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi2a").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P2e) in "Hpc".
     (* 0x990  c.beqz a5,0x988  -- falls through (a5 = 32 != 0) *)
-    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x2e)) (mword_of_int 252 : mword 8)
+    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x2e)) (mword_of_int 252 : mword 8)
               (Cregidx (mword_of_int 7)) (mword_of_int 15) (ppc_f4 m u) (dq:=dq)
-              HN
+
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               (ppc_f4_a5 m u Hthre)
               with "Hsm Htlbinv Hpc Hfile Hi2e").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P30) in "Hpc".
     (* 0x992  zext.b a0,s1  (andi a0,s1,255) *)
-    iApply (wp_andi_s root_ppn γ E Φ (mword_of_int (UPS + 0x30)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 255 : mword 12)
+    iApply (wp_andi_s root_ppn γ Φ (mword_of_int (UPS + 0x30)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 255 : mword 12)
               (ppc_f4 m u) (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi30").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P34) in "Hpc".
     (* 0x996  lui a5,0x10000 *)
-    iApply (wp_lui_s root_ppn γ E Φ (mword_of_int (UPS + 0x34)) (mword_of_int 15) (mword_of_int 0x10000 : mword 20)
+    iApply (wp_lui_s root_ppn γ Φ (mword_of_int (UPS + 0x34)) (mword_of_int 15) (mword_of_int 0x10000 : mword 20)
               (ppc_f5 m u) (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi34").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P38) in "Hpc".
     (* 0x99a  sb a0,0(a5)  -- THR write *)
-    iApply (wp_uart_thr_write_s root_ppn γ E Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
+    iApply (wp_uart_thr_write_s root_ppn γ Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
               (ppc_f6 m u) u u' (dq:=dq)
-              HN
+
               (ppc_f6_a5 m u)
               ltac:(rewrite ppc_f6_a0; exact Hwrite)
               with "Hsm Htlbinv Hpc Hfile Hi38 Huf").
@@ -617,9 +612,8 @@ Section WpUartPutcSync.
   (*  the caller asserts `pv` sign-extends to a nonzero value (panicking!=0)*)
   (*  so the branch falls through to the panicked check.                    *)
   (* =================================================================== *)
-  Lemma wp_uartputc_panicking_check (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uartputc_panicking_check (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (pv : mword 32) {dq dqm : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗ kernel_text -∗
@@ -631,10 +625,10 @@ Section WpUartPutcSync.
       gpr_file (<[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pv)]>
                (<[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x0c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m)) -∗
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpv)
+    iIntros (Hpv)
       "Hsm Htlbinv #Ht Hpc Hfile Hsnap Hcont".
     assert (P10 : add_vec_int (mword_of_int (UPS + 0x0c) : mword 64) 4 = mword_of_int (UPS + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     assert (P14 : add_vec_int (mword_of_int (UPS + 0x10) : mword 64) 4 = mword_of_int (UPS + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -643,9 +637,9 @@ Section WpUartPutcSync.
     iPoseProof (upi_10 with "Ht") as "Hi10".
     iPoseProof (upi_14 with "Ht") as "Hi14".
     (* 0x96e auipc a5,0xa *)
-    iApply (wp_auipc_s_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x0c)) (mword_of_int 15) (mword_of_int 0xa : mword 20)
+    iApply (wp_auipc_s_scfg root_ppn γ Φ (mword_of_int (UPS + 0x0c)) (mword_of_int 15) (mword_of_int 0xa : mword 20)
               m (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi0c").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P10) in "Hpc".
@@ -655,19 +649,19 @@ Section WpUartPutcSync.
                   = (mword_of_int KernelSyms.panicking : mword 64)).
     { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
-    iApply (wp_lw_s_ram_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x10)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8b6 : mword 12)
+    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x10)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8b6 : mword 12)
               g1 pv (dq:=dq) (dqm:=dqm)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi10 Hsnap").
     iIntros "Hsm Htlbinv Hpc Hfile Hsnap".
     iEval (rewrite Hea) in "Hsnap".
     iEval (rewrite P14) in "Hpc".
     (* 0x976 c.beqz a5,0x9b2 : panicking != 0 -> falls through *)
-    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x14)) (mword_of_int 30 : mword 8)
+    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x14)) (mword_of_int 30 : mword 8)
               (Cregidx (mword_of_int 7)) (mword_of_int 15)
               (<[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pv)]> g1)
               (dq:=dq)
-              HN
+
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rewrite lookup_total_insert; exact Hpv)
               with "Hsm Htlbinv Hpc Hfile Hi14").
@@ -681,9 +675,8 @@ Section WpUartPutcSync.
   (*  On the panic path panicked = 0, so the [c.bnez] falls through to the  *)
   (*  device core.  [pkv] sign-extends to 0.                                *)
   (* =================================================================== *)
-  Lemma wp_uartputc_panicked_check (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uartputc_panicked_check (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (pkv : mword 32) {dq dqm : dfrac} :
-    ↑minstretN ⊆ E ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗ kernel_text -∗
@@ -695,10 +688,10 @@ Section WpUartPutcSync.
       gpr_file (<[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pkv)]>
                (<[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x16)) (auipc_off (mword_of_int 0xa : mword 20)))]> m)) -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm } pkv -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpkv)
+    iIntros (Hpkv)
       "Hsm Htlbinv #Ht Hpc Hfile Hsnap Hcont".
     assert (P1a : add_vec_int (mword_of_int (UPS + 0x16) : mword 64) 4 = mword_of_int (UPS + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     assert (P1e : add_vec_int (mword_of_int (UPS + 0x1a) : mword 64) 4 = mword_of_int (UPS + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -706,9 +699,9 @@ Section WpUartPutcSync.
     iPoseProof (upi_16 with "Ht") as "Hi16".
     iPoseProof (upi_1a with "Ht") as "Hi1a".
     iPoseProof (upi_1e with "Ht") as "Hi1e".
-    iApply (wp_auipc_s_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x16)) (mword_of_int 15) (mword_of_int 0xa : mword 20)
+    iApply (wp_auipc_s_scfg root_ppn γ Φ (mword_of_int (UPS + 0x16)) (mword_of_int 15) (mword_of_int 0xa : mword 20)
               m (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi16").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P1a) in "Hpc".
@@ -717,18 +710,18 @@ Section WpUartPutcSync.
                   = (mword_of_int KernelSyms.panicked : mword 64)).
     { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
-    iApply (wp_lw_s_ram_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x1a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8a8 : mword 12)
+    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x1a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8a8 : mword 12)
               g1 pkv (dq:=dq) (dqm:=dqm)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi1a Hsnap").
     iIntros "Hsm Htlbinv Hpc Hfile Hsnap".
     iEval (rewrite Hea) in "Hsnap".
     iEval (rewrite P1e) in "Hpc".
-    iApply (wp_cbnez_fall_s_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x1e)) (mword_of_int 28 : mword 8)
+    iApply (wp_cbnez_fall_s_scfg root_ppn γ Φ (mword_of_int (UPS + 0x1e)) (mword_of_int 28 : mword 8)
               (Cregidx (mword_of_int 7)) (mword_of_int 15)
               (<[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pkv)]> g1)
               (dq:=dq)
-              HN
+
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rewrite lookup_total_insert; exact Hpkv)
               with "Hsm Htlbinv Hpc Hfile Hi1e").
@@ -742,9 +735,8 @@ Section WpUartPutcSync.
   (*  Reads the same [panicking] global; on the panic path it is nonzero so  *)
   (*  the [c.beqz] falls through to the epilogue.                            *)
   (* =================================================================== *)
-  Lemma wp_uartputc_panicking_check2 (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uartputc_panicking_check2 (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (pv : mword 32) {dq dqm : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗ kernel_text -∗
@@ -756,10 +748,10 @@ Section WpUartPutcSync.
       gpr_file (<[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pv)]>
                (<[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x3c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m)) -∗
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpv)
+    iIntros (Hpv)
       "Hsm Htlbinv #Ht Hpc Hfile Hsnap Hcont".
     assert (P40 : add_vec_int (mword_of_int (UPS + 0x3c) : mword 64) 4 = mword_of_int (UPS + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
     assert (P44 : add_vec_int (mword_of_int (UPS + 0x40) : mword 64) 4 = mword_of_int (UPS + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
@@ -767,9 +759,9 @@ Section WpUartPutcSync.
     iPoseProof (upi_3c with "Ht") as "Hi3c".
     iPoseProof (upi_40 with "Ht") as "Hi40".
     iPoseProof (upi_44 with "Ht") as "Hi44".
-    iApply (wp_auipc_s_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x3c)) (mword_of_int 15) (mword_of_int 0xa : mword 20)
+    iApply (wp_auipc_s_scfg root_ppn γ Φ (mword_of_int (UPS + 0x3c)) (mword_of_int 15) (mword_of_int 0xa : mword 20)
               m (dq:=dq)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi3c").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P40) in "Hpc".
@@ -778,18 +770,18 @@ Section WpUartPutcSync.
                   = (mword_of_int KernelSyms.panicking : mword 64)).
     { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
-    iApply (wp_lw_s_ram_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x40)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x886 : mword 12)
+    iApply (wp_lw_s_ram_scfg root_ppn γ Φ (mword_of_int (UPS + 0x40)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x886 : mword 12)
               g1 pv (dq:=dq) (dqm:=dqm)
-              HN ltac:(vm_compute; discriminate)
+ ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi40 Hsnap").
     iIntros "Hsm Htlbinv Hpc Hfile Hsnap".
     iEval (rewrite Hea) in "Hsnap".
     iEval (rewrite P44) in "Hpc".
-    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ E Φ (mword_of_int (UPS + 0x44)) (mword_of_int 10 : mword 8)
+    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x44)) (mword_of_int 10 : mword 8)
               (Cregidx (mword_of_int 7)) (mword_of_int 15)
               (<[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pv)]> g1)
               (dq:=dq)
-              HN
+
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rewrite lookup_total_insert; exact Hpv)
               with "Hsm Htlbinv Hpc Hfile Hi44").
@@ -803,10 +795,9 @@ Section WpUartPutcSync.
   (*  on the panic path (panicking != 0, panicked = 0), THRE ready.         *)
   (*  Chains the four body chunks under one plain [tlb_inv].                 *)
   (* =================================================================== *)
-  Lemma wp_uartputc_body (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_uartputc_body (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (u u' : uart_state) (pv pkv : mword 32)
       {dq dqm dqm2 : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
     uart_thre u = true ->
@@ -828,21 +819,21 @@ Section WpUartPutcSync.
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
       uart_frag u' -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpv Hpkv Hthre Hwrite)
+    iIntros (Hpv Hpkv Hthre Hwrite)
       "Hsm Htlbinv #Ht Hpc Hfile Hpk Hpkd Huf Hcont".
     (* 0x96e -> 0x978 : panicking check (falls through) *)
-    iApply (wp_uartputc_panicking_check root_ppn γ E Φ m pv (dq:=dq) (dqm:=dqm)
-              HN Hpv
+    iApply (wp_uartputc_panicking_check root_ppn γ Φ m pv (dq:=dq) (dqm:=dqm)
+ Hpv
               with "Hsm Htlbinv Ht Hpc Hfile Hpk").
     iIntros "Hsm Htlbinv Hpc Hfile Hpk".
     set (f1 := <[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pv)]>
                (<[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x0c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m)).
     (* 0x978 -> 0x982 : panicked check (falls through) *)
-    iApply (wp_uartputc_panicked_check root_ppn γ E Φ f1 pkv (dq:=dq) (dqm:=dqm2)
-              HN Hpkv
+    iApply (wp_uartputc_panicked_check root_ppn γ Φ f1 pkv (dq:=dq) (dqm:=dqm2)
+ Hpkv
               with "Hsm Htlbinv Ht Hpc Hfile Hpkd").
     iIntros "Hsm Htlbinv Hpc Hfile Hpkd".
     set (f2 := <[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pkv)]>
@@ -850,14 +841,14 @@ Section WpUartPutcSync.
     assert (HR9 : f2 !!! Regidx (mword_of_int 9) = m !!! Regidx (mword_of_int 9)).
     { unfold f2, f1. do 4 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity. }
     (* 0x982 -> 0x99e : device core (LSR read + THR write) *)
-    iApply (wp_uartputc_devcore root_ppn γ E Φ f2 u u' (dq:=dq)
-              HN Hthre
+    iApply (wp_uartputc_devcore root_ppn γ Φ f2 u u' (dq:=dq)
+ Hthre
               ltac:(rewrite HR9; exact Hwrite)
               with "Hsm Htlbinv Ht Hpc Hfile Huf").
     iIntros "Hsm Htlbinv Hpc Hfile Huf".
     (* 0x99e -> 0x9a8 : 2nd panicking check (falls through) *)
-    iApply (wp_uartputc_panicking_check2 root_ppn γ E Φ (ppc_f6 f2 u) pv (dq:=dq) (dqm:=dqm)
-              HN Hpv
+    iApply (wp_uartputc_panicking_check2 root_ppn γ Φ (ppc_f6 f2 u) pv (dq:=dq) (dqm:=dqm)
+ Hpv
               with "Hsm Htlbinv Ht Hpc Hfile Hpk").
     iIntros "Hsm Htlbinv Hpc Hfile Hpk".
     iApply ("Hcont" with "Hsm Htlbinv Hpc [Hfile] Hpk Hpkd Huf").

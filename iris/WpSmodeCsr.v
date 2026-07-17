@@ -372,12 +372,11 @@ Section WpSmodeCsr.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_csrr_sstatus_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_sstatus_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -398,20 +397,20 @@ Section WpSmodeCsr.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sstatus_read mstatus0)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc false
               (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -460,10 +459,9 @@ Section WpSmodeCsr.
     iExact "Hfmap".
   Qed.
 
-  Lemma wp_csrr_sstatus_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_sstatus_scfg (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗
@@ -474,17 +472,17 @@ Section WpSmodeCsr.
       pc_is (add_vec_int pc 4) -∗
       (∃ ms : mword 64, ⌜ eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ⌝ ∗
          gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_csrr_sstatus_s root_ppn E Φ pc rd m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
+    iApply (wp_csrr_sstatus_s root_ppn Φ pc rd m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
@@ -494,12 +492,11 @@ Section WpSmodeCsr.
     iExists mstatus0. iFrame "Hfile". iPureIntro. exact HSIE.
   Qed.
 
-  Lemma wp_csrrci_sstatus_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_csrrci_sstatus_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd imm5 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -522,20 +519,20 @@ Section WpSmodeCsr.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sstatus_read mstatus0)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd Himm5 Hcollapse)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd Himm5 Hcollapse)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc false
               (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRC))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -592,10 +589,9 @@ Section WpSmodeCsr.
     iExact "Hfmap".
   Qed.
 
-  Lemma wp_csrrci_sstatus_scfg (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_csrrci_sstatus_scfg (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     smode_config γ dq -∗
     tlb_inv root_ppn -∗
@@ -606,17 +602,17 @@ Section WpSmodeCsr.
       pc_is (add_vec_int pc 4) -∗
       (∃ ms : mword 64, ⌜ eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ⌝ ∗
          gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
       "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_csrrci_sstatus_s root_ppn E Φ pc rd (mword_of_int 2) m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
+    iApply (wp_csrrci_sstatus_s root_ppn Φ pc rd (mword_of_int 2) m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
               ltac:(vm_compute; reflexivity) Hleg
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".

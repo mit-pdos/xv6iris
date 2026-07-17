@@ -77,7 +77,7 @@ Section WpUld.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_uld (uroot ul1 ul0 tfp : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_uld (uroot ul1 ul0 tfp : mword 44) (Φ : mval -> iProp Σ)
       (off immz : Z) (rd : mword 5) (is_rvc : bool)
       (m : gmap regidx (mword 64)) (v : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq dqm : dfrac} :
@@ -87,7 +87,6 @@ Section WpUld.
     let iva : mword 64 := mword_of_int (TRAPFRAME + immz) in
     let tfpa : mword 64 := zero_extend' 64 (concat_vec tfp
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr iva)) (Z.sub pagesize_bits 1) 0)) in
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -151,10 +150,10 @@ Section WpUld.
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       pte8 tfpa v dqm -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va pa imm iva tfpa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Ha0
+    intros va pa imm iva tfpa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Ha0
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
       Hram0 Hram1 Hram2b Hram3b
       Heva Hcanond Hvpnd Halignd Hmod8.
@@ -164,10 +163,10 @@ Section WpUld.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all tfpa 8) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
-    iApply (wp_instr_u uroot ul1 ul0 tfp E Φ va pa is_rvc
+    iApply (wp_instr_u uroot ul1 ul0 tfp Φ va pa is_rvc
               (LOAD (imm, Regidx (mword_of_int 10), Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
               Hram0 Hram1 Hram2b Hram3b
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hinstr").
@@ -507,14 +506,13 @@ Section WpUalu.
   (* Generic over the executed AST [ast] and its (state-dependent) result
      value [vf]: all three a0-arithmetic steps of userret instantiate this
      with the corresponding WpGpr* execute lemma and a pure value fact. *)
-  Lemma wp_ualu (uroot ul1 ul0 tfp : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_ualu (uroot ul1 ul0 tfp : mword 44) (Φ : mval -> iProp Σ)
       (off : Z) (is_rvc : bool) (ast : instruction)
       (m : gmap regidx (mword 64)) (a0v vnew : mword 64)
       (vf : mstate -> mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     let va := uva off in
     let pa := upa off in
-    ↑minstretN ⊆ E ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -576,16 +574,16 @@ Section WpUalu.
       utlb_inv uroot ul1 ul0 tfp -∗
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx (mword_of_int 10) := regval_into_reg vnew]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va pa HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hexec Hval Ha0
+    intros va pa HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hexec Hval Ha0
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
       Hram0 Hram1 Hram2b Hram3b.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_u uroot ul1 ul0 tfp E Φ va pa is_rvc ast
+    iApply (wp_instr_u uroot ul1 ul0 tfp Φ va pa is_rvc ast
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
               Hram0 Hram1 Hram2b Hram3b
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hinstr").
@@ -872,12 +870,11 @@ Section WpUsret.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_usret (uroot ul1 ul0 tfp : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_usret (uroot ul1 ul0 tfp : mword 44) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64) :
     let va := uva 0x11c in
     let pa := upa 0x11c in
-    ↑minstretN ⊆ E ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -914,10 +911,10 @@ Section WpUsret.
       utlb_inv uroot ul1 ul0 tfp -∗
       pc_is (sret_tgt sepc0) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va pa HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup.
+    intros va pa HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb
              [Hpc Hnpc] Hfile Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -925,9 +922,9 @@ Section WpUsret.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     pose proof (mword1_not_lp elp0 Help_np) as Help0.
-    iApply (wp_instr_u uroot ul1 ul0 tfp E Φ va pa false (SRET tt)
+    iApply (wp_instr_u uroot ul1 ul0 tfp Φ va pa false (SRET tt)
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

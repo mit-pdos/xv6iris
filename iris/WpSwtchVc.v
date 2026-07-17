@@ -520,13 +520,13 @@ Section WpSwtchVc.
   Qed.
 
   (* -------------------------------------------------------------------- *)
-  (* valid_context sc E Phi P c : the context saved at [c] admits a WP to     *)
+  (* valid_context sc Phi P c : the context saved at [c] admits a WP to     *)
   (* run.  It owns c's 14 saved-register cells and is the wand from (config    *)
   (* bundle [sc] + pc at c.ra + a gpr file whose callee-saved regs are c's    *)
   (* saved values, caller-saved arbitrary) to a whole-machine [WP Loop @ E    *)
   (* {{Phi}}].  On resumption the continuation is handed, for the             *)
   (* (existentially quantified) context [cret] that resumed c, both           *)
-  (* [▷ valid_context sc E Phi P cret] AND [P cret] -- a caller-chosen         *)
+  (* [▷ valid_context sc Phi P cret] AND [P cret] -- a caller-chosen         *)
   (* predicate about the resumer.  [P] is fixed along the whole chain; the    *)
   (* resumer stays existential (any context / any CPU may resume c), and      *)
   (* [P cret] is where a caller threads coupling info (e.g. CPU-locality for a *)
@@ -536,7 +536,7 @@ Section WpSwtchVc.
   (* defined Iris [fixpoint] because the recursive occurrence is under [▷].    *)
   (* -------------------------------------------------------------------- *)
   Local Definition valid_context_pre
-      (sc : iProp Σ) (E : coPset) (Phi : mval -> iProp Σ)
+      (sc : iProp Σ) (Phi : mval -> iProp Σ)
       (P : mword 64 -d> iPropO Σ)
       (rec : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ := fun c =>
     (∃ vs : list (mword 64),
@@ -547,26 +547,25 @@ Section WpSwtchVc.
          ⌜callee_img m = vs⌝ -∗ sc -∗
          pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
          (∃ cret : mword 64, ▷ rec cret ∗ P cret) -∗
-         WP (Loop : expr riscv_lang) @ E {{ Phi }}))%I.
+         WP (Loop : expr riscv_lang) {{ Phi }}))%I.
 
-  Local Instance valid_context_pre_contractive sc E Phi (P : mword 64 -d> iPropO Σ) :
-    Contractive (valid_context_pre sc E Phi P).
+  Local Instance valid_context_pre_contractive sc Phi (P : mword 64 -d> iPropO Σ) :
+    Contractive (valid_context_pre sc Phi P).
   Proof. solve_contractive. Qed.
 
-  Definition valid_context (sc : iProp Σ) (E : coPset) (Phi : mval -> iProp Σ)
+  Definition valid_context (sc : iProp Σ) (Phi : mval -> iProp Σ)
       (P : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ :=
-    fixpoint (valid_context_pre sc E Phi P).
+    fixpoint (valid_context_pre sc Phi P).
 
-  Lemma valid_context_unfold (sc : iProp Σ) (E : coPset) (Phi : mval -> iProp Σ)
+  Lemma valid_context_unfold (sc : iProp Σ) (Phi : mval -> iProp Σ)
       (P : mword 64 -d> iPropO Σ) (c : mword 64) :
-    valid_context sc E Phi P c ⊣⊢
-      valid_context_pre sc E Phi P (valid_context sc E Phi P) c.
-  Proof. apply (fixpoint_unfold (valid_context_pre sc E Phi P) c). Qed.
+    valid_context sc Phi P c ⊣⊢
+      valid_context_pre sc Phi P (valid_context sc Phi P) c.
+  Proof. apply (fixpoint_unfold (valid_context_pre sc Phi P) c). Qed.
 
   Section SwtchSpec.
-    Context (root_ppn : mword 44) (E : coPset) (Phi : mval -> iProp Σ).
+    Context (root_ppn : mword 44) (Phi : mval -> iProp Σ).
     Context (γc : gname) (bsie : mword 1) (dq : dfrac).
-    Hypothesis HN : ↑minstretN ⊆ E.
 
     (* the ambient S-mode machine configuration a running kernel thread holds:
        the config bundle [smode_config] (keyed by the SIE ghost name [γc], which
@@ -611,14 +610,14 @@ Section WpSwtchVc.
       kernel_text -∗
       sconf -∗ pc_is (mword_of_int KernelSyms.swtch) -∗ gpr_file m0 -∗
       ctx_cells oldc old_vs -∗
-      valid_context sconf E Phi P newc -∗
+      valid_context sconf Phi P newc -∗
       P oldc -∗
       (∀ (m : gmap regidx (mword 64)),
          ⌜callee_img m = callee_img m0⌝ -∗ sconf -∗
          pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
-         (∃ cret : mword 64, ▷ valid_context sconf E Phi P cret ∗ P cret) -∗
-         WP (Loop : expr riscv_lang) @ E {{ Phi }}) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Phi }}.
+         (∃ cret : mword 64, ▷ valid_context sconf Phi P cret ∗ P cret) -∗
+         WP (Loop : expr riscv_lang) {{ Phi }}) -∗
+      WP (Loop : expr riscv_lang) {{ Phi }}.
     Proof.
       iIntros (Hlen_old Holdc Hnewc Hal_old)
         "#Ht Hconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
@@ -632,7 +631,7 @@ Section WpSwtchVc.
       iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
       iDestruct "Hmenvb" as (menvcfg0)
         "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
-      iEval (rewrite (valid_context_unfold sconf E Phi P newc) /valid_context_pre) in "Hvalidnew".
+      iEval (rewrite (valid_context_unfold sconf Phi P newc) /valid_context_pre) in "Hvalidnew".
       iDestruct "Hvalidnew" as (new_vs)
         "(%Hlen_new & %Hal_new & Hnewcells & Hnewwand)".
       (* the symbolic environment: 0..31 = current file m0; 32..45 = new's saved
@@ -661,11 +660,11 @@ Section WpSwtchVc.
       iDestruct (swtch_code with "Ht") as "Hcode".
       iEval (rewrite -Hden) in "Hfile".
       (* ---- run the 28-instruction straight-line block ---- *)
-      iApply (wp_vc_block_s_den root_ppn swtch_prog E Phi
+      iApply (wp_vc_block_s_den root_ppn swtch_prog Phi
                 (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
                 (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
                 rho mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
+ HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                       Hpc Hfile Hcode [Holdcells Hnewcells] []").
       { rewrite /vheap_own /swtch_heap0 big_sepL_app.
@@ -689,8 +688,8 @@ Section WpSwtchVc.
       iDestruct "Hheap" as "[Holdpart Hnewpart]".
       (* ---- build [valid_context P oldc] from old's restored cells + the
              caller's own return continuation [Hwold] ---- *)
-      iAssert (valid_context sconf E Phi P oldc) with "[Holdpart Hwold]" as "Hvoldc".
-      { rewrite (valid_context_unfold sconf E Phi P oldc) /valid_context_pre.
+      iAssert (valid_context sconf Phi P oldc) with "[Holdpart Hwold]" as "Hvoldc".
+      { rewrite (valid_context_unfold sconf Phi P oldc) /valid_context_pre.
         iExists (callee_img m0).
         iSplit.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
@@ -720,11 +719,11 @@ Section WpSwtchVc.
           (erewrite vregs_den_lookup by (vm_compute; reflexivity);
            apply sval_den_SX0). }
       iDestruct (swi_ret with "Ht") as "Hret".
-      iApply (wp_cret_s_zca root_ppn E Phi
+      iApply (wp_cret_s_zca root_ppn Phi
                 (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
                 (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-                HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
                 ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe Hlow
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                       Hpc Hfile Hret [Hnewwand Hvoldc HP Hsie Hgc]").

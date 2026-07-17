@@ -85,10 +85,9 @@ Section Wp_slli.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
   Context {dqc : dfrac}.
-  Lemma wp_slli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
+  Lemma wp_slli_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
@@ -102,12 +101,12 @@ Section Wp_slli.
       gpr_file (<[Regidx rd :=
         regval_into_reg (shift_bits_left (m !!! Regidx rs1)
           (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) pmpcfg0
-              HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) pmpcfg0
+              Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
@@ -165,10 +164,9 @@ Section Wp_srli.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
   Context {dqc : dfrac}.
-  Lemma wp_srli_gpr E (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
+  Lemma wp_srli_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
@@ -182,12 +180,12 @@ Section Wp_srli.
       gpr_file (<[Regidx rd :=
         regval_into_reg (shift_bits_right (m !!! Regidx rs1)
           (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr E Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) pmpcfg0
-              HN Hpmp with "Hmm Hpmpc Hpc Hinstr").
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) pmpcfg0
+              Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))

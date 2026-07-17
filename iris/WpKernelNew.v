@@ -33,9 +33,9 @@ Section WpKernelNew.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_kernel E (Φ : mval -> iProp Σ)
+  Lemma wp_kernel (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (v_stack0 : bv 64) (mhartid_in : mword 64)
-      (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 : mword 64)
+      (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (n : nat) {dq : dfrac} :
@@ -43,7 +43,6 @@ Section WpKernelNew.
        (= v_stack0 + 4096 * (mhartid + 1)). *)
     let sp0 : mword 64 := m_jal m v_stack0 mhartid_in !!! Regidx csp_rs1 in
     (4 <= n)%nat ->
-    ↑minstretN ⊆ E ->
     (* boot pmp config: all entries OFF. *)
     pmp_all_off pmpcfg0 ->
     (* boot menvcfg has the Zicfilp landing-pad enable clear. *)
@@ -66,7 +65,6 @@ Section WpKernelNew.
     mie ↦ᵣ mie0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
     mcounteren ↦ᵣ mcounteren0 -∗
-    mtime ↦ᵣ mtime0 -∗
     stimecmp ↦ᵣ stimecmp0 -∗
     (* the per-CPU stack0 pointer word _entry loads *)
     entry_ld_ea ↦₈{ dq } v_stack0 -∗
@@ -74,7 +72,7 @@ Section WpKernelNew.
        bottom four slots of [stack_own sp0 n] (any depth n >= 4). *)
     stack_own sp0 n -∗
     kernel_text -∗
-    ( ∀ (ms0 : mword 64)
+    ( ∀ (tv : mword 64) (ms0 : mword 64)
         (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
         (HoPRV : eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false)
         (HoSXL : _get_Mstatus_SXL ms0 = ('b"10")),
@@ -85,7 +83,7 @@ Section WpKernelNew.
       pmpaddr_n ↦ᵣ st_pmpaddr1 pmpcfg0 pmpaddr00 -∗
       pc_is st_main -∗
       gpr_file (st_mout (m_jal m v_stack0 mhartid_in) sp0 ms0 mie0 mideleg0
-                  menvcfg0 mcounteren0 mtime0 mhartid_in) -∗
+                  menvcfg0 mcounteren0 tv mhartid_in) -∗
       mhartid ↦ᵣ mhartid_in -∗
       mepc ↦ᵣ st_main -∗
       satp ↦ᵣ satp_legalized satp0 (mword_of_int 0) -∗
@@ -94,18 +92,17 @@ Section WpKernelNew.
       mie ↦ᵣ st_mie1 mie0 mideleg0 -∗
       menvcfg ↦ᵣ menvcfg_legalized menvcfg0 (ti_menv1 menvcfg0) -∗
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
-      mtime ↦ᵣ mtime0 -∗
-      stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline mtime0) -∗
+      stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline tv) -∗
       entry_ld_ea ↦₈{ dq } v_stack0 -∗
       stack_own sp0 n -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros sp0 Hn4 HN Hpmp HlpeE Hbnd_ra Hbnd_s0.
+    intros sp0 Hn4 Hpmp HlpeE Hbnd_ra Hbnd_s0.
     iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
-             Hmtime Hstc Hstk Hstko #Htext Hcont".
+             Hstc Hstk Hstko #Htext Hcont".
     (* ---- _entry: reset -> jal start (PC = 0x80000058) ---- *)
-    iApply (wp_entry E Φ m v_stack0 mhartid_in pmpcfg0 (dq := dq) HN Hpmp
+    iApply (wp_entry Φ m v_stack0 mhartid_in pmpcfg0 (dq := dq) Hpmp
               with "Hmm Hpcf Hpc Hfile Hmh Hstk Htext").
     iIntros "Hmm Hpcf Hpc Hfile Hmh Hstk".
     iEval (change pc_start with st_pc30) in "Hpc".
@@ -121,20 +118,20 @@ Section WpKernelNew.
                   vm_compute in H; discriminate H ]).
       reflexivity. }
     (* ---- start(): jal-entry -> MRET (Supervisor mode at <main>) ---- *)
-    iApply (wp_start E Φ (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
+    iApply (wp_start Φ (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
               (m !!! Regidx ti_s0)
-              mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 mtime0 stimecmp0 mhartid_in
+              mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 mhartid_in
               mcounteren0 pmpcfg0 pmpaddr00 n
-              Hn4 HN Hpmp HlpeE eq_refl HEra HEs0
+              Hn4 Hpmp HlpeE eq_refl HEra HEs0
               Hbnd_ra Hbnd_s0
               with "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
-                    Hmcen Hmtime Hstc Hstko Htext [Hcont Hstk]").
-    iIntros (ms0 HoIE HoPRV HoSXL)
+                    Hmcen Hstc Hstko Htext [Hcont Hstk]").
+    iIntros (tv ms0 HoIE HoPRV HoSXL)
       "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
-       Hmenv Hmcen Hmtime Hstc Hstko".
-    iApply ("Hcont" $! ms0 HoIE HoPRV HoSXL
+       Hmenv Hmcen Hstc Hstko".
+    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL
               with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl
-                    Hmie Hmenv Hmcen Hmtime Hstc Hstk Hstko").
+                    Hmie Hmenv Hmcen Hstc Hstk Hstko").
   Qed.
 
 End WpKernelNew.

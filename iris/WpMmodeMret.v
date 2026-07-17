@@ -25,12 +25,11 @@ Section WpMretGpr.
      The continuation receives the RAW post-MRET cells: privilege [newpriv],
      mstatus [cms5 ms_cur], pc at the aligned mepc target [ctgt mepc0]; pmpcfg,
      mepc and the GPR file are unchanged. *)
-  Lemma wp_mret_gpr E (Φ : mval -> iProp Σ) (pc : mword 64)
+  Lemma wp_mret_gpr (Φ : mval -> iProp Σ) (pc : mword 64)
       (newpriv : Privilege)
       (ms_cur mepc0 menvcfg1 : mword 64)
       (m : gmap regidx (mword 64))
       (pmpcfg0 : type_of_register pmpcfg_n) :
-    ↑minstretN ⊆ E ->
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms_cur) ('b"1") = false ->
     privLevel_bits_forwards (_get_Mstatus_MPP (cms2 ms_cur), ('b"0"))
@@ -56,14 +55,14 @@ Section WpMretGpr.
       pc_is (ctgt mepc0) -∗
       gpr_file m -∗
       mepc ↦ᵣ mepc0 -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp HmIE Hnp Hsup Hlpe0)
+    iIntros (Hpmp HmIE Hnp Hsup Hlpe0)
       "#Hhw #Hinv Hhs Hpriv Hms Hpmpc Hmenv [Hpc Hnpc] Hfile Hmepc Hinstr Hcont".
     assert (Hnpm : generic_neq newpriv Machine = true)
       by (rewrite Hsup; vm_compute; reflexivity).
-    iApply (wp_instr_config E Φ pc false (MRET tt) pmpcfg0 ms_cur HN Hpmp HmIE
+    iApply (wp_instr_config Φ pc false (MRET tt) pmpcfg0 ms_cur Hpmp HmIE
               with "Hhw Hinv Hhs Hpriv Hms Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".

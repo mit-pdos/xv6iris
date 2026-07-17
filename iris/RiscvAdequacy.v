@@ -296,5 +296,5 @@ Proof.
     iApply (big_sepS_mono with "Hwires").
     intros c _. rewrite big_sepS_singleton. done. }
   iModIntro. iSplitR; [done|].
-  iApply (wp_dev_loop with "Hinv"). solve_ndisj.
+  iApply (wp_dev_loop with "Hinv").
 Qed.

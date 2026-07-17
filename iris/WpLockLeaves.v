@@ -1,7 +1,7 @@
 (* WpLockLeaves.v -- instruction leaves that access the 4-byte lock word
    THROUGH the CSL lock invariant [is_lock] (WpLock.v) instead of an owned
    byte window.  Each leaf opens [is_lock]'s [inv] INSIDE the step engine's
-   [E ∖ ↑minstretN] callback (the design hook documented in MinstretInv.v),
+   [⊤ ∖ ↑minstretN] callback (the design hook documented in MinstretInv.v),
    uses the timeless byte window for the single instruction step, and
    re-closes the invariant before the step commits:
 
@@ -59,7 +59,7 @@ Section WpLockLeaves.
   (* branch payload is handed VERBATIM to the continuation: if the lock   *)
   (* was free, that is [locked γ ∗ R] -- acquisition.                     *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_amoswap_lockinv (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_amoswap_lockinv (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs2 rs1 : mword 5)
       (m : gmap regidx (mword 64))
@@ -68,8 +68,6 @@ Section WpLockLeaves.
     let ea := add_vec (m !!! Regidx rs1) (zeros' 64) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
-    ↑lockN ⊆ E ->
     pa = lk ->
     (* the swapped-in word is NONZERO (re-closes the "held" disjunct) *)
     neq_vec (sign_extend' 64 (amoswap_stored (m !!! Regidx rs2))) zero_reg = true ->
@@ -118,10 +116,10 @@ Section WpLockLeaves.
       gpr_file (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) -∗
       (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked γ ∗ R
        ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ea a8 pa HN HNl Hpalk Hstz Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros ea a8 pa Hpalk Hstz Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -133,9 +131,9 @@ Section WpLockLeaves.
               ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
               AMOSWAP 4 = true)
       by (rewrite Hatomic_supp_amo; vm_compute; reflexivity).
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -144,7 +142,7 @@ Section WpLockLeaves.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     (* open the LOCK invariant for the duration of this instruction step *)
-    iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes Hbr]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
@@ -416,7 +414,7 @@ Section WpLockLeaves.
   (* the invariant is re-closed UNCHANGED.  holding()'s lock-word read.   *)
   (* Cloned from WpPushOffMem.wp_clw_s.                                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_clw_lockinv (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_clw_lockinv (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64))
@@ -425,8 +423,6 @@ Section WpLockLeaves.
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
-    ↑lockN ⊆ E ->
     pa = lk ->
     uint rd <> 0 ->
     (* S-mode config facts *)
@@ -467,10 +463,10 @@ Section WpLockLeaves.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ea a8 pa HN HNl Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros ea a8 pa Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -478,9 +474,9 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all pa 4) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -488,7 +484,7 @@ Section WpLockLeaves.
       "(Hpmpc & Hpmpa & %HA0 & %Hord0 & %Hpma_imp & %HX & %HW & %HR & %Hcov)".
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-    iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (v) "[>Hbytes Hbr]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
@@ -743,7 +739,7 @@ Section WpLockLeaves.
   (* disjunct would contain a second token, so it is refuted and the      *)
   (* loaded value is known NONZERO.  release()'s holding() check.         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_clw_lockinv_locked (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_clw_lockinv_locked (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64))
@@ -752,8 +748,6 @@ Section WpLockLeaves.
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
-    ↑lockN ⊆ E ->
     pa = lk ->
     uint rd <> 0 ->
     (* S-mode config facts *)
@@ -797,10 +791,10 @@ Section WpLockLeaves.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ea a8 pa HN HNl Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros ea a8 pa Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Htok Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -808,9 +802,9 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all pa 4) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -818,7 +812,7 @@ Section WpLockLeaves.
       "(Hpmpc & Hpmpa & %HA0 & %Hord0 & %Hpma_imp & %HX & %HW & %HR & %Hcov)".
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-    iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (v) "[>Hbytes Hbr]".
     iDestruct "Hbr" as "[(_ & >Htok2 & _) | >%Hvnz]".
@@ -1075,7 +1069,7 @@ Section WpLockLeaves.
   (* base register onto an OWNED window (release() zeroing lk->cpu).      *)
   (* Cloned from WpAcquireMem.wp_csd_s with rs2 := x0, is_rvc := false.   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sd_zero_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_sd_zero_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64)) (vold : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -1084,7 +1078,6 @@ Section WpLockLeaves.
     let a8 := ea in
     let pa := a8 in
     let storeval := (zero_reg : mword 64) in
-    ↑minstretN ⊆ E ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -1123,10 +1116,10 @@ Section WpLockLeaves.
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
       pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ea a8 pa storeval HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros ea a8 pa storeval HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
@@ -1153,9 +1146,9 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all pa 8) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8))
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -1356,7 +1349,7 @@ Section WpLockLeaves.
   (* the FREE state.  release()'s lock clear.  Cloned from                *)
   (* WpPushOffMem.wp_csw_s with rs2 := x0, is_rvc := false.               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sw_zero_lockinv (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_sw_zero_lockinv (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64))
@@ -1365,8 +1358,6 @@ Section WpLockLeaves.
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
-    ↑lockN ⊆ E ->
     pa = lk ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1407,10 +1398,10 @@ Section WpLockLeaves.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ea a8 pa HN HNl Hpalk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros ea a8 pa Hpalk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     set (storeval := (mword_of_int 0 : mword 32)).
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Htok HRes Hcont".
@@ -1419,9 +1410,9 @@ Section WpLockLeaves.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all pa 4) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -1429,7 +1420,7 @@ Section WpLockLeaves.
       "(Hpmpc & Hpmpa & %HA0 & %Hord0 & %Hpma_imp & %HX & %HW & %HR & %Hcov)".
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-    iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes _]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".

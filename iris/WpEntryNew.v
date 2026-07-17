@@ -366,10 +366,9 @@ Section WpEntryNew.
   (* ================================================================= *)
   (*  THE THEOREM: the whole [_entry] boot chain, one Qed.             *)
   (* ================================================================= *)
-  Lemma wp_entry E (Φ : mval -> iProp Σ)
+  Lemma wp_entry (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64)) (v_stack0 : bv 64) (mhartid_in : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     (* [pmp_all_off] (not just unlocked): the chain contains an 8-byte load
        (`ld sp, ..`), whose PMP check needs the all-OFF form -- see the note
        on [pmp_all_off] in RiscvFetchExec.v.  It holds of the boot-time
@@ -392,10 +391,10 @@ Section WpEntryNew.
       gpr_file (m_jal m v_stack0 mhartid_in) -∗
       mhartid ↦ᵣ mhartid_in -∗
       entry_ld_ea ↦₈{ dq } v_stack0 -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp)
+    iIntros (Hpmp)
       "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Htext Hcont".
     pose proof (pmp_all_off_allows_all _ Hpmp) as HpmpU.
     (* derive the eight [instr] facts off the (persistent) text image; MUL's
@@ -423,7 +422,7 @@ Section WpEntryNew.
     assert (Hrd7 : uint i_jal <> 0) by (vm_compute; discriminate).
 
     (* ---- 1. AUIPC @ pc_e0: sp := entry_sp1 ---- *)
-    iApply (wp_auipc_gpr E Φ pc_e0 i_auipc imm_auipc m pmpcfg0 1%Qp HN HpmpU Hrd0
+    iApply (wp_auipc_gpr Φ pc_e0 i_auipc imm_auipc m pmpcfg0 1%Qp HpmpU Hrd0
               with "Hmm Hpmpc Hpc Hfile Hi0").
     iEval (rewrite pc_e0_e1).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -439,8 +438,8 @@ Section WpEntryNew.
     { unfold entry_ld_ea, entry_sp1, m_auipc.
       rewrite reg_ld_auipc.
       rewrite lookup_total_insert. reflexivity. }
-    iApply (wp_ld_gpr E Φ pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
-              (dq := dq) HN Hpmp Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
+    iApply (wp_ld_gpr Φ pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
+              (dq := dq) Hpmp Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
     { rewrite Hea. iExact "Hbytes". }
     iEval (rewrite pc_e1_e2).
     iIntros "Hmm Hpmpc Hpc Hfile Hbytes".
@@ -449,8 +448,8 @@ Section WpEntryNew.
              with (m_ld m v_stack0)) in "Hfile".
 
     (* ---- 3. C.LUI @ pc_e2: a0 := 0x1000 ---- *)
-    iApply (wp_lui_gpr E Φ pc_e2 true (regidx_bits rd_clui) (sign_extend' 20 imm_clui)
-              (m_ld m v_stack0) pmpcfg0 1%Qp HN HpmpU Hrd2
+    iApply (wp_lui_gpr Φ pc_e2 true (regidx_bits rd_clui) (sign_extend' 20 imm_clui)
+              (m_ld m v_stack0) pmpcfg0 1%Qp HpmpU Hrd2
               with "Hmm Hpmpc Hpc Hfile Hi2").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e2_e3).
@@ -460,8 +459,8 @@ Section WpEntryNew.
              with (m_clui m v_stack0)) in "Hfile".
 
     (* ---- 4. CSRRS @ pc_e3 (2-aligned): a1 := mhartid ---- *)
-    iApply (wp_csrr_mhartid_gpr E Φ pc_e3 i_rd_csrr mhartid_in
-              (m_clui m v_stack0) pmpcfg0 1%Qp HN HpmpU Hrd3
+    iApply (wp_csrr_mhartid_gpr Φ pc_e3 i_rd_csrr mhartid_in
+              (m_clui m v_stack0) pmpcfg0 1%Qp HpmpU Hrd3
               with "Hmm Hpmpc Hpc Hfile Hmh Hi3").
     iEval (rewrite pc_e3_e4).
     iIntros "Hmm Hpmpc Hpc Hfile Hmh".
@@ -469,9 +468,9 @@ Section WpEntryNew.
              with (m_csrr m v_stack0 mhartid_in)) in "Hfile".
 
     (* ---- 5. C.ADDI @ pc_e4: a1 := a1 + 1 ---- *)
-    iApply (wp_addi_gpr E Φ pc_e4 true (regidx_bits rsd_caddi) (regidx_bits rsd_caddi)
+    iApply (wp_addi_gpr Φ pc_e4 true (regidx_bits rsd_caddi) (regidx_bits rsd_caddi)
               (sign_extend' 12 imm_caddi)
-              (m_csrr m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd4
+              (m_csrr m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU Hrd4
               with "Hmm Hpmpc Hpc Hfile Hi4").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e4_e5).
@@ -484,8 +483,8 @@ Section WpEntryNew.
              with (m_caddi m v_stack0 mhartid_in)) in "Hfile".
 
     (* ---- 6. MUL @ pc_e5: a0 := a0 * a1 ---- *)
-    iApply (wp_mul_gpr E Φ pc_e5 i_mul_rs2 i_mul_rs1 i_mul_rd
-              (m_caddi m v_stack0 mhartid_in) pmpcfg0 HN HpmpU Hrd5
+    iApply (wp_mul_gpr Φ pc_e5 i_mul_rs2 i_mul_rs1 i_mul_rd
+              (m_caddi m v_stack0 mhartid_in) pmpcfg0 HpmpU Hrd5
               with "Hmm Hpmpc Hpc Hfile Hi5").
     iEval (rewrite pc_e5_e6).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -499,9 +498,9 @@ Section WpEntryNew.
              with (m_mul m v_stack0 mhartid_in)) in "Hfile".
 
     (* ---- 7. C.ADD @ pc_e6: sp := sp + a0 ---- *)
-    iApply (wp_add_gpr E Φ pc_e6 true (regidx_bits rs2_cadd) (regidx_bits rsd_cadd)
+    iApply (wp_add_gpr Φ pc_e6 true (regidx_bits rs2_cadd) (regidx_bits rsd_cadd)
               (regidx_bits rsd_cadd)
-              (m_mul m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd6
+              (m_mul m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU Hrd6
               with "Hmm Hpmpc Hpc Hfile Hi6").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e6_e7).
@@ -514,8 +513,8 @@ Section WpEntryNew.
              with (m_cadd m v_stack0 mhartid_in)) in "Hfile".
 
     (* ---- 8. JAL @ pc_e7 (2-aligned): ra := pc+4; PC := start ---- *)
-    iApply (wp_jal_gpr E Φ pc_e7 i_jal imm_jal
-              (m_cadd m v_stack0 mhartid_in) pmpcfg0 1%Qp HN HpmpU Hrd7 jal_aligned
+    iApply (wp_jal_gpr Φ pc_e7 i_jal imm_jal
+              (m_cadd m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU Hrd7 jal_aligned
               with "Hmm Hpmpc Hpc Hfile Hi7").
     iEval (rewrite pc_e7_start).
     iIntros "Hmm Hpmpc Hpc Hfile".

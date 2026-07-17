@@ -155,13 +155,13 @@ Section WPExec.
      that hart's [mstate] view, and restore the global bridge afterwards.  Every
      leaf WP is written in terms of the single-hart [mstate_interp] and never
      sees [gregs]. *)
-  Lemma wp_exec_step E Φ :
-    (∀ σ, mstate_interp σ ={E,∅}=∗
+  Lemma wp_exec_step Φ :
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ σ' σ'', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
                  ⌜exec (riscv_step true)  σ = Some (tt, σ'')⌝ ∗
-          ▷ (∀ tick : bool, |={∅,E}=> mstate_interp (if tick then σ'' else σ') ∗
-                            WP (Loop : expr riscv_lang) @ E {{ Φ }}))
-    ⊢ WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ (∀ tick : bool, |={∅,⊤}=> mstate_interp (if tick then σ'' else σ') ∗
+                            WP (Loop : expr riscv_lang) {{ Φ }}))
+    ⊢ WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
@@ -207,12 +207,12 @@ Section WPDev.
      which needs its ghost-map fragment unless the written value is
      unchanged) and the device interpretation.  [gen_heap_interp] is framed:
      no device step touches the byte memory. *)
-  Lemma wp_dev_step E Φ :
-    (∀ gr d, gregs_interp gr ∗ dev_interp d ={E,∅}=∗
-       ▷ (∀ d' gr', ⌜dev_step d gr d' gr'⌝ ={∅,E}=∗
+  Lemma wp_dev_step Φ :
+    (∀ gr d, gregs_interp gr ∗ dev_interp d ={⊤,∅}=∗
+       ▷ (∀ d' gr', ⌜dev_step d gr d' gr'⌝ ={∅,⊤}=∗
             gregs_interp gr' ∗ dev_interp d' ∗
-            WP (DevLoop : expr riscv_lang) @ E {{ Φ }}))
-    ⊢ WP (DevLoop : expr riscv_lang) @ E {{ Φ }}.
+            WP (DevLoop : expr riscv_lang) {{ Φ }}))
+    ⊢ WP (DevLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.

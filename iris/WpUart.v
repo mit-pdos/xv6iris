@@ -420,11 +420,10 @@ Section DevLoop.
   Global Instance dev_inv_body_timeless : Timeless dev_inv_body.
   Proof. rewrite /dev_inv_body. apply _. Qed.
 
-  Lemma wp_dev_loop E Φ :
-    ↑devN ⊆ E ->
-    inv devN dev_inv_body ⊢ WP (DevLoop : expr riscv_lang) @ E {{ Φ }}.
+  Lemma wp_dev_loop Φ :
+    inv devN dev_inv_body ⊢ WP (DevLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN) "#Hinv".
+    iIntros "#Hinv".
     iLöb as "IH".
     iApply wp_dev_step.
     iIntros (gr d) "[Hgr Hdev]".

@@ -68,12 +68,11 @@ Section WpSmodeGen.
 
   (* The P-generalized gpr-write engine: clone of [wp_gpr_write_s_config]
      (WpSmodeLeafBase.v) over [tlb_inv_gen P] instead of the megapage [tlb_inv]. *)
-  Lemma wp_gpr_write_s_config_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_config_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -115,15 +114,15 @@ Section WpSmodeGen.
       tlb_inv_gen P root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd Hbexec)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd Hbexec)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_config_tlbinv_gen P root_ppn E Φ pc true base
+    iApply (wp_instr_s_config_tlbinv_gen P root_ppn Φ pc true base
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -173,12 +172,11 @@ Section WpSmodeGen.
 
   (* The base-width (4-byte) P-generalized gpr-write engine: clone of
      [wp_gpr_write_s_config_base] (WpSmodeLeafBase.v). *)
-  Lemma wp_gpr_write_s_config_base_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_config_base_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5) (i : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -211,15 +209,15 @@ Section WpSmodeGen.
       tlb_inv_gen P root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd Hbexec)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd Hbexec)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_config_tlbinv_gen P root_ppn E Φ pc false i
+    iApply (wp_instr_s_config_tlbinv_gen P root_ppn Φ pc false i
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -271,12 +269,11 @@ Section WpSmodeGen.
 
   (* c.lui / lui  (Utype LUI): clone of wp_clui_s (WpSmodeUtype.v).  Note: this is
      the RAW-cell form, matching the UART leaves' config-cell interface. *)
-  Lemma wp_clui_s_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_clui_s_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20) (wval : mword 64)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -301,14 +298,14 @@ Section WpSmodeGen.
       tlb_inv_gen P root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd Hwval)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd Hwval)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_tlbinv_gen P root_ppn E Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_config_tlbinv_gen P root_ppn Φ pc rd rd rd
               (UTYPE (imm, Regidx rd, LUI)) wval m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd
               _
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc _ _.
@@ -318,12 +315,11 @@ Section WpSmodeGen.
   Qed.
 
   (* andi (compressed/base ITYPE ANDI): clone of wp_candi_s (WpSmodeItype.v). *)
-  Lemma wp_candi_s_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_candi_s_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -348,16 +344,16 @@ Section WpSmodeGen.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (and_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_tlbinv_gen P root_ppn E Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_config_tlbinv_gen P root_ppn Φ pc rd rd rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ANDI))
               (and_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))
               m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrd
               _
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
@@ -369,12 +365,11 @@ Section WpSmodeGen.
   (* c.beqz fall-through (branch NOT taken): clone of wp_cbeqz_fall_s_config
      (WpSmodeBtype.v).  A branch writes only PC, so it uses the raw config engine
      directly rather than the gpr-write engine. *)
-  Lemma wp_cbeqz_fall_s_config_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_cbeqz_fall_s_config_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
       (m : gmap regidx (mword 64))
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -399,15 +394,15 @@ Section WpSmodeGen.
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv_gen P root_ppn -∗
       pc_is (add_vec_int pc 2) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrs Hrd1 Hcmp)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hrs Hrd1 Hcmp)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_config_tlbinv_gen P root_ppn E Φ pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ))
+    iApply (wp_instr_s_config_tlbinv_gen P root_ppn Φ pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".

@@ -2425,10 +2425,9 @@ Section WpInstrSConfig.
   (* caller can perform its own data-side lookup/fill and re-establish    *)
   (* [tlb_inv] in its continuation.                                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_instr_s_config_tlbinv (root_ppn : mword 44) E Φ
+  Lemma wp_instr_s_config_tlbinv (root_ppn : mword 44) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -2465,7 +2464,7 @@ Section WpInstrSConfig.
        pmp_config root_ppn -∗
        tlb ↦ᵣ tlbvec_f -∗
        pte_super_bytes root_ppn (DfracOwn 1) -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -2474,13 +2473,13 @@ Section WpInstrSConfig.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     (* Open [tlb_inv] ONCE, then drive the UNIFIED fetch (which translates each
        16-bit chunk through its own vpn and fills 0/1/2 slots as needed) -- no
        up-front hit/walk slot case-split, no same-page premise. *)
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -2493,7 +2492,7 @@ Section WpInstrSConfig.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -2567,10 +2566,9 @@ Section WpInstrSConfig.
   Qed.
 
   (* arbitrary-A/D raw-cell data engine *)
-  Lemma wp_instr_s_config_tlbinv_ad (adf : kpt_adf) (root_ppn : mword 44) E Φ
+  Lemma wp_instr_s_config_tlbinv_ad (adf : kpt_adf) (root_ppn : mword 44) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -2608,7 +2606,7 @@ Section WpInstrSConfig.
        pmp_config root_ppn -∗
        tlb ↦ᵣ tlbvec_f -∗
        kpt_bytes_ad adf root_ppn (DfracOwn 1) -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -2617,13 +2615,13 @@ Section WpInstrSConfig.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     (* Open [tlb_inv] ONCE, then drive the UNIFIED fetch (which translates each
        16-bit chunk through its own vpn and fills 0/1/2 slots as needed) -- no
        up-front hit/walk slot case-split, no same-page premise. *)
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hada)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hada)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_ad_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -2636,7 +2634,7 @@ Section WpInstrSConfig.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent_ad adf root_ppn σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -2717,10 +2715,9 @@ Section WpInstrSConfig.
   (* (which may install a foreign leaf, e.g. the UART leaf) and re-seal    *)
   (* [tlb_inv_gen P].  [HPsuper]/[Hdisc] are the fetch obligations.        *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_instr_s_config_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) E Φ
+  Lemma wp_instr_s_config_tlbinv_gen (P : TLB_Entry -> Prop) (root_ppn : mword 44) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -2757,7 +2754,7 @@ Section WpInstrSConfig.
        pmp_config root_ppn -∗
        tlb ↦ᵣ tlbvec_f -∗
        pte_super_bytes root_ppn (DfracOwn 1) -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -2766,10 +2763,10 @@ Section WpInstrSConfig.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_gen_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -2782,7 +2779,7 @@ Section WpInstrSConfig.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent_gen root_ppn P σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -2855,10 +2852,9 @@ Section WpInstrSConfig.
   Qed.
 
   (* arbitrary-A/D raw-cell P-generic data engine *)
-  Lemma wp_instr_s_config_tlbinv_gen_ad (adf : kpt_adf) (P : TLB_Entry -> Prop) (root_ppn : mword 44) E Φ
+  Lemma wp_instr_s_config_tlbinv_gen_ad (adf : kpt_adf) (P : TLB_Entry -> Prop) (root_ppn : mword 44) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -2896,7 +2892,7 @@ Section WpInstrSConfig.
        pmp_config root_ppn -∗
        tlb ↦ᵣ tlbvec_f -∗
        kpt_bytes_ad adf root_ppn (DfracOwn 1) -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -2905,10 +2901,10 @@ Section WpInstrSConfig.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hada)
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HPsuper Hdisc Hada)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbinv Hpc Hinstr H".
     iDestruct (tlb_inv_gen_ad_open with "Htlbinv") as (satp0 tlbvec)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hcons & Hpbytes & Hpmp)".
@@ -2921,7 +2917,7 @@ Section WpInstrSConfig.
     pose proof (Hpma_imp pmar0 Hpma_all) as Hpma_pte.
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (fetch_from_instr_bytes_s_consistent_gen_ad adf root_ppn P σ pc r
                  satp0 mstatus0 misa0 menvcfg0 pmpcfg0 pmpaddr00 pmar0 tlbvec
@@ -3055,12 +3051,11 @@ Section SmodeGprClients.
   (* above, with (tlb cell + slot facts) replaced by [tlb_inv root_ppn] + *)
   (* [pte_super_bytes] (the page-table fact's resource).                  *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_rvc_gpr_write_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_rvc_gpr_write_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5)
       (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
       (q : Qp) :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
@@ -3080,13 +3075,13 @@ Section SmodeGprClients.
       tlb_inv root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd Hbexec)
+    iIntros (Hrd Hbexec)
       "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_tlbinv root_ppn γ E Φ pc true base
-              HN
+    iApply (wp_instr_s_tlbinv root_ppn γ Φ pc true base
+
               with "Hsm Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -3134,11 +3129,10 @@ Section SmodeGprClients.
   Qed.
 
   (* ---- c.addi16sp imm6 (S-mode, unified) ---- *)
-  Lemma wp_caddi16sp_gpr_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_gpr_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm6 : mword 6)
       (m : gmap regidx (mword 64))
       (q : Qp) :
-    ↑minstretN ⊆ E ->
     smode_config γ (DfracOwn q) -∗
     tlb_inv root_ppn -∗
     pc_is pc -∗
@@ -3149,17 +3143,17 @@ Section SmodeGprClients.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN)
+    iIntros
       "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_rvc_gpr_write_s root_ppn γ E Φ pc csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_rvc_gpr_write_s root_ppn γ Φ pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
               m q
-              HN Hsp _
+ Hsp _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     change sp with (Regidx csp_rs1).
@@ -3171,11 +3165,10 @@ Section SmodeGprClients.
   (* ---- jal rd, imm (S-mode, unified; 2-aligned F_Base: the fetch may
      WALK -- the first halfword's translation fills slot 5, the second
      halfword hits it) ---- *)
-  Lemma wp_jal_gpr_s (root_ppn : mword 44) (γ : gname) E (Φ : mval -> iProp Σ)
+  Lemma wp_jal_gpr_s (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : gmap regidx (mword 64))
       (q : Qp) :
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
     smode_config γ (DfracOwn q) -∗
@@ -3187,15 +3180,15 @@ Section SmodeGprClients.
       tlb_inv root_ppn -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hrd Halign)
+    iIntros (Hrd Halign)
       "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iApply (wp_instr_s_tlbinv root_ppn γ E Φ pc false (JAL (imm, Regidx rd))
+    iApply (wp_instr_s_tlbinv root_ppn γ Φ pc false (JAL (imm, Regidx rd))
              
-              HN
+
               with "Hsm Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -3257,7 +3250,7 @@ Section SmodeGprClients.
   (* preserves the invariant).  ONE ident premise (the tlb_get_ppn form); *)
   (* the walk form is derived via [tlb_get_ppn_pw].                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_csdsp_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_csdsp_gpr_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5) (svpn : mword 27)
       (m : gmap regidx (mword 64)) (vold : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
@@ -3265,7 +3258,6 @@ Section SmodeGprClients.
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -3312,10 +3304,10 @@ Section SmodeGprClients.
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea a8 pa HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+    intros imm ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
       Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
@@ -3329,9 +3321,9 @@ Section SmodeGprClients.
     assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
               (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
     { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (STORE (imm, Regidx rs2, sp, 8))
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc true (STORE (imm, Regidx rs2, sp, 8))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -3550,7 +3542,7 @@ Section SmodeGprClients.
   (* data-address translation case-split on consistency at tlb_hash svpn  *)
   (* (hit: state-preserving; miss: LOAD page-walk + fill).                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cldsp_gpr_s (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_cldsp_gpr_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5) (svpn : mword 27)
       (m : gmap regidx (mword 64)) (v : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -3559,7 +3551,6 @@ Section SmodeGprClients.
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -3607,10 +3598,10 @@ Section SmodeGprClients.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+    intros imm ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
       Hcanon Hvpn_def Hident Hmask Hvpn2 Hmvpn Hmppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
@@ -3624,9 +3615,9 @@ Section SmodeGprClients.
     assert (Hident_walk : zero_extend' 64 (concat_vec (sdata_ppn_out svpn)
               (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
     { rewrite <- (tlb_get_ppn_pw root_ppn svpn). exact Hident. }
-    iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc true (LOAD (imm, sp, Regidx rd, false, 8))
+    iApply (wp_instr_s_config_tlbinv root_ppn Φ pc true (LOAD (imm, sp, Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
       "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -3880,7 +3871,7 @@ Section SmodeGprClients.
   (* carry the per-address translation preconditions.                      *)
   (* ==================================================================== *)
 
-  Lemma wp_csdsp_gpr_s_ram (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_csdsp_gpr_s_ram (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
       (m : gmap regidx (mword 64)) (vold : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
@@ -3888,7 +3879,6 @@ Section SmodeGprClients.
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -3920,10 +3910,10 @@ Section SmodeGprClients.
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea a8 pa HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros imm ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpcis Hfile Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Hpalign8 & Hbytes)".
     iAssert (⌜addr_is_ram pa⌝)%I as %Hr0.
@@ -3933,16 +3923,16 @@ Section SmodeGprClients.
     (* [pmpRangeMatch] and the PMP config are now discharged inside
        [wp_csdsp_gpr_s] from the folded [tlb_inv]; the wrapper only supplies
        the RAM-derived Sv39 geometry. *)
-    iApply (wp_csdsp_gpr_s root_ppn E Φ pc uimm rs2 (svpn_of a8) m vold
+    iApply (wp_csdsp_gpr_s root_ppn Φ pc uimm rs2 (svpn_of a8) m vold
               mstatus0 mie_v mdv0 menvcfg0
-              HN HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               (ram_canonical a8 Hr0) ltac:(reflexivity) (ram_ident root_ppn a8 Hr0)
               (ram_mask a8 Hr0) (ram_svpn2 a8 Hr0) (ram_mvpn a8 Hr0) (ram_mppn a8 Hr0)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpcis Hfile Hinstr [Hbytes] Hcont").
     rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign8.
   Qed.
 
-  Lemma wp_cldsp_gpr_s_ram (root_ppn : mword 44) E (Φ : mval -> iProp Σ)
+  Lemma wp_cldsp_gpr_s_ram (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)
       (m : gmap regidx (mword 64)) (v : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -3951,7 +3941,6 @@ Section SmodeGprClients.
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let a8 := ea in
     let pa := a8 in
-    ↑minstretN ⊆ E ->
     uint rd <> 0 ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -3984,10 +3973,10 @@ Section SmodeGprClients.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea a8 pa HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros imm ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpcis Hfile Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Hpalign8 & Hbytes)".
     iAssert (⌜addr_is_ram pa⌝)%I as %Hr0.
@@ -3997,9 +3986,9 @@ Section SmodeGprClients.
     (* [pmpRangeMatch] and the PMP config are now discharged inside
        [wp_cldsp_gpr_s] from the folded [tlb_inv]; the wrapper only supplies
        the RAM-derived Sv39 geometry. *)
-    iApply (wp_cldsp_gpr_s root_ppn E Φ pc uimm rd (svpn_of a8) m v
+    iApply (wp_cldsp_gpr_s root_ppn Φ pc uimm rd (svpn_of a8) m v
               mstatus0 mie_v mdv0 menvcfg0
-              HN Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+ Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               (ram_canonical a8 Hr0) ltac:(reflexivity) (ram_ident root_ppn a8 Hr0)
               (ram_mask a8 Hr0) (ram_svpn2 a8 Hr0) (ram_mvpn a8 Hr0) (ram_mppn a8 Hr0)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpcis Hfile Hinstr [Hbytes] Hcont").

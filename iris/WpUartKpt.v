@@ -171,7 +171,7 @@ Context `{!riscvGS Σ, !sieG Σ}.
 Context `{CID : CpuId}.
 Existing Instance riscv_memGS.
 
-Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval -> iProp Σ)
+Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -182,7 +182,6 @@ Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval
   let lppn := kpt_leaf_ppn uart_vpn in
   let lflags := PTE_DEV in
   let a0addr := pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) in
-  ↑minstretN ⊆ E ->
   (0 <= off < uart_size)%Z ->
   (* leaf-PTE facts (UART leaf: V set, R|W leaf, U/G clear, A/D preset) *)
   0 <= lflags < 256 ->
@@ -207,10 +206,10 @@ Lemma wp_sb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval
     tlb_inv root_ppn -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗ gpr_file m -∗
     uart_frag u' -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 storebyte p1 p0 lppn lflags a0addr HN Hoff
+  intros ea a8 storebyte p1 p0 lppn lflags a0addr Hoff
     Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hcanon Hvpn_def Hident Hpa Hwrite_u.
   iIntros "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
   iDestruct (smode_config_unbundle with "Hsm") as
@@ -218,9 +217,9 @@ Proof.
   iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
   iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
   iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-  iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc is_rvc
+  iApply (wp_instr_s_config_tlbinv root_ppn Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 1)) mstatus0 mie_v mdv0 menvcfg0
-            HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
             with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
   iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
     "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
@@ -387,7 +386,7 @@ Proof.
 Qed.
 
 (* The reworked S-mode UART LOAD (LB / LBU), mirror of the store. *)
-Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval -> iProp Σ)
+Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (b : bv 8)
     (m : gmap regidx (mword 64)) (u u' : uart_state) {dq : dfrac} :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -398,7 +397,6 @@ Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval
   let lppn := kpt_leaf_ppn uart_vpn in
   let lflags := PTE_DEV in
   let a0addr := pte_addr_at p0 (subrange_vec_dec uart_vpn 8 0) in
-  ↑minstretN ⊆ E ->
   (0 <= off < uart_size)%Z ->
   uint rd <> 0 ->
   0 <= lflags < 256 ->
@@ -421,10 +419,10 @@ Lemma wp_lb_uart_s_kpt (root_ppn : mword 44) (γ : gname) (off : Z) E (Φ : mval
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     gpr_file (<[Regidx rd := regval_into_reg ldval]> m) -∗
     uart_frag u' -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 ldval p1 p0 lppn lflags a0addr HN Hoff Hrd
+  intros ea a8 ldval p1 p0 lppn lflags a0addr Hoff Hrd
     Hlf Hinv0 Hnl0 Hchk0 HG0 Hupd0 Hcanon Hvpn_def Hident Hpa Hread_u.
   iIntros "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Huf Hcont".
   iDestruct (smode_config_unbundle with "Hsm") as
@@ -432,9 +430,9 @@ Proof.
   iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
   iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
   iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-  iApply (wp_instr_s_config_tlbinv root_ppn E Φ pc is_rvc
+  iApply (wp_instr_s_config_tlbinv root_ppn Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) mstatus0 mie_v mdv0 menvcfg0
-            HN HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
             with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
   iIntros (σ Hpceq satp0 tlbvec_f Hmode Hasid Hppn Hconsf)
     "Hpriv Hsatp Hms Hmie Hmdl Hmenv Hpmp Htlb Hpbytes Hsi".
