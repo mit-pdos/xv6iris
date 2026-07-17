@@ -19,6 +19,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - shared CLAUDE.md memory in repo
 - device model: DevLoop opcode, concurrent WP, shared access to CPU SEIP
 - user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
+- start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
 
 Big things that still need to be done/explored:
 
