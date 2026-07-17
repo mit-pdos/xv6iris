@@ -246,8 +246,8 @@ Section UserExec.
 
   (* the assumed kernel re-entry contract: the handler at stvec (uservec)
      handles ANY trapped-out-of-user machine *)
-  Definition stvec_handler_wp E (Φ : mval -> iProp Σ) : iProp Σ :=
-    (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I.
+  Definition stvec_handler_wp (Φ : mval -> iProp Σ) : iProp Σ :=
+    (user_trap_frame -∗ WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   (* ------------------------------------------------------------------- *)
   (* The step obligation: ONE machine step from the invariant, with both   *)
@@ -255,36 +255,36 @@ Section UserExec.
   (* after consuming one physical step).  The conjunction is ADDITIVE: the *)
   (* prover case-analyzes the machine first and selects exactly one arm.   *)
   (* ------------------------------------------------------------------- *)
-  Definition user_step_obligation E (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition user_step_obligation (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (user_inv -∗
-        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) ∧
-           (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-        WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I.
+        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
+           (user_trap_frame -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* the ACTIVE-hart residue of the step obligation: same contract, but the
      machine is handed over UNPACKED, with the hart pinned ACTIVE and the
      pc in lock-step ([user_step_obligation_holds], UserStep.v, discharges
      the WAITING case -- the WRS stay/wake steps -- so this is all that is
      left to prove) *)
-  Definition user_step_obligation_active E (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition user_step_obligation_active (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (∀ (ms_v sc_v stval_v sepc_v va : mword 64)
           (g : gmap regidx (mword 64)),
         ⌜user_mstatus_ok ms_v⌝ -∗
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         upt_inv pt -∗
         user_cfg -∗
-        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) ∧
-           (user_trap_frame -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-        WP (Loop : expr riscv_lang) @ E {{ Φ }}))%I.
+        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
+           (user_trap_frame -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The capstone: safety of arbitrary user-mode execution, by Löb.        *)
   (* ------------------------------------------------------------------- *)
-  Theorem wp_user_exec E (Φ : mval -> iProp Σ) :
-    user_step_obligation E Φ -∗
+  Theorem wp_user_exec (Φ : mval -> iProp Σ) :
+    user_step_obligation Φ -∗
     user_inv -∗
-    stvec_handler_wp E Φ -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+    stvec_handler_wp Φ -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "#Hstep".
     iLöb as "IH".

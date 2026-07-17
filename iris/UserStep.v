@@ -271,7 +271,7 @@ Section StepWaitStay.
   Hypothesis Hrhw :
     exec (run_hart_waiting 0 wr ib false) s_a = Some (Step_Waiting wr, s_a).
 
-  Lemma exec_riscv_step_wait_stay : exec riscv_step s = Some (tt, s_a).
+  Lemma exec_riscv_step_wait_stay : exec (riscv_step false) s = Some (tt, s_a).
   Proof using All.
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _
@@ -319,7 +319,7 @@ Section StepWaitWake.
                       (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
          else s_tick.
 
-  Lemma exec_riscv_step_wait_wake : exec riscv_step s = Some (tt, s_final).
+  Lemma exec_riscv_step_wait_wake : exec (riscv_step false) s = Some (tt, s_final).
   Proof using All.
     assert (Hhart_w : register_lookup hart_state s_w.(sregs) = HART_ACTIVE tt).
     { unfold s_w, set_reg; cbn [sregs]. apply register_lookup_set. }
@@ -425,9 +425,8 @@ Section UserStepIris.
   (* axiom -- both branches step, so the arm is total.  The continuation   *)
   (* is an ADDITIVE conjunction: stay / wake.                              *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_waiting E Φ (wr : WaitReason) (ib : mword 32)
+  Lemma wp_user_step_waiting Φ (wr : WaitReason) (ib : mword 32)
       (mip_v mie_v : mword 64) (va va' : mword 64) {dqp dqi : dfrac} :
-    ↑minstretN ⊆ E ->
     wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO ->
     minstret_inv -∗
     hart_state ↦ᵣ HART_WAITING (wr, ib) -∗
@@ -437,14 +436,14 @@ Section UserStepIris.
     mie ↦ᵣ{ dqi } mie_v -∗
     ▷ ((hart_state ↦ᵣ HART_WAITING (wr, ib) -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗
         mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang) @ E {{ Φ }})
+        WP (Loop : expr riscv_lang) {{ Φ }})
      ∧ (hart_state ↦ᵣ HART_ACTIVE tt -∗ PC ↦ᵣ va' -∗ nextPC ↦ᵣ va' -∗
         mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hwr) "#Hinv Hhs Hpc Hnpc Hmip Hmie Hcont".
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) Φ HN with "Hinv").
+    iIntros (Hwr) "#Hinv Hhs Hpc Hnpc Hmip Hmie Hcont".
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
     iIntros (σ) "[Hreg Hmd] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
@@ -581,13 +580,12 @@ Section UserStepObligation.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Theorem user_step_obligation_holds E (Φ : mval -> iProp Σ) :
-    ↑minstretN ⊆ E ->
+  Theorem user_step_obligation_holds (Φ : mval -> iProp Σ) :
     minstret_inv -∗
-    user_step_obligation_active C pt E Φ -∗
-    user_step_obligation C pt E Φ.
+    user_step_obligation_active C pt Φ -∗
+    user_step_obligation C pt Φ.
   Proof.
-    iIntros (HN) "#Hminstret #Hactive".
+    iIntros "#Hminstret #Hactive".
     iIntros "!> Hinv Hk".
     iDestruct "Hinv" as (hs ms_v sc_v stval_v sepc_v va va' g)
       "(%Hhs & %Hms & %Hlock & Hregs & Hupt & Hcfg)".
@@ -601,7 +599,7 @@ Section UserStepObligation.
       iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
                              Hpc & Hnpc & Hgpr)".
       iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
-      iApply (wp_user_step_waiting E Φ wr ib (uc_mip C) (uc_mie C) va va' HN Hhs
+      iApply (wp_user_step_waiting Φ wr ib (uc_mip C) (uc_mie C) va va' Hhs
                 with "Hminstret Hhs Hpc Hnpc Hmip Hmie [-]").
       iNext. iSplit.
       + (* STAY: re-enter [user_inv] with the same waiting machine *)
@@ -624,17 +622,16 @@ Section UserStepObligation.
 
   (* the capstone, over the ACTIVE residue only: what remains of the whole
      user-execution theorem is [user_step_obligation_active] *)
-  Corollary wp_user_exec_active E (Φ : mval -> iProp Σ) :
-    ↑minstretN ⊆ E ->
+  Corollary wp_user_exec_active (Φ : mval -> iProp Σ) :
     minstret_inv -∗
-    user_step_obligation_active C pt E Φ -∗
+    user_step_obligation_active C pt Φ -∗
     user_inv C pt -∗
-    stvec_handler_wp C pt E Φ -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+    stvec_handler_wp C pt Φ -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN) "#Hminstret #Hactive Hinv Htrap".
+    iIntros "#Hminstret #Hactive Hinv Htrap".
     iApply (wp_user_exec with "[] Hinv Htrap").
-    iApply (user_step_obligation_holds E Φ HN with "Hminstret Hactive").
+    iApply (user_step_obligation_holds Φ with "Hminstret Hactive").
   Qed.
 
 End UserStepObligation.
@@ -651,11 +648,10 @@ Section UserRetireEngine.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_user_step_retire E Φ {dq : dfrac} :
-    ↑minstretN ⊆ E ->
+  Lemma wp_user_step_retire Φ {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ, mstate_interp σ ={E ∖ ↑minstretN}=∗
+    (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (ib : mword 32) (s_x : mstate),
          ⌜exec (run_hart_active 0) σ = Some (Step_Execute (Retire_Success tt, ib), s_x)⌝ ∗
          ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
@@ -665,11 +661,11 @@ Section UserRetireEngine.
          mstate_interp s_x ∗
          ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
             PC ↦ᵣ (register_lookup nextPC s_x.(sregs)) -∗
-            WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+            WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN) "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) Φ HN with "Hinv").
+    iIntros "#Hinv Hhs H".
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
     iIntros (σ) "[Hreg Hmd] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.

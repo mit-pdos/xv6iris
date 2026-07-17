@@ -424,7 +424,6 @@ Qed.
 (* rewrite MTIP/STIP via tick_clock), so the engines below -- which own    *)
 (* [mip ↦ᵣ{dq}] across steps and state [exec riscv_step] witnesses --      *)
 (* need a substantial redesign, not a mechanical port.                     *)
-(* >>> COMMENTED-OUT REGION BEGINS
 Section StepInterrupt.
   Context (s s_trap : mstate) (i : InterruptType) (p : Privilege) (b : bool).
 
@@ -440,7 +439,7 @@ Section StepInterrupt.
 
   Let s_tick : mstate := set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)).
 
-  Lemma exec_riscv_step_interrupt : exec riscv_step s = Some (tt, s_tick).
+  Lemma exec_riscv_step_interrupt : exec (riscv_step false) s = Some (tt, s_tick).
   Proof using All.
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _
@@ -518,7 +517,7 @@ Section WpIntrEngine.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret E (⊤ ∖ ↑minstretN) Φ with "Hinv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
     iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
@@ -548,6 +547,8 @@ Section WpIntrEngine.
   Qed.
 
 End WpIntrEngine.
+
+(* >>> COMMENTED-OUT REGION BEGINS
 
 (* ===================================================================== *)
 (* §5b The dispatch-outcome bridge.  (The acquire-page fetch/instr-lift    *)

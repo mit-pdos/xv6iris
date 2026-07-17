@@ -41,7 +41,7 @@ Section UserStepFull.
   (* Produces the [wp_exec_step_minstret] payload (inlining the minstret   *)
   (* prelude + exec_riscv_step_interrupt + the trap tower + PC tick).      *)
   (* ------------------------------------------------------------------- *)
-  Lemma interrupt_branch (E Ei : coPset) (Φ : mval -> iProp Σ)
+  Lemma interrupt_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (i : InterruptType)
       (ms_v sc_v stval_v sepc_v va : mword 64) (g : gmap regidx (mword 64))
       (mst : mword 64) (mi : bool) (misa0 : type_of_register misa) (elpv : mword 1)
@@ -68,11 +68,11 @@ Section UserStepFull.
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
     gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
-    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
+    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     |={Ei}=> ∃ s' : mstate,
-      ⌜exec riscv_step σ = Some (tt, s')⌝ ∗
+      ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) @ E {{ Φ }}).
+         WP (Loop : expr riscv_lang) {{ Φ }}).
   Proof.
     iIntros (Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
              Lmip Lmeip Lseip Lmie Lmdl Hd)
@@ -118,7 +118,7 @@ Section UserStepFull.
       exact Lhs0. }
     (* the pure whole-step reduction (σ pre-increment; the lemma does the
        minstret_increment write itself, giving s_tick = tick over s_trap) *)
-    assert (Hstep : exec riscv_step σ
+    assert (Hstep : exec (riscv_step false) σ
               = Some (tt, set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)))).
     { eapply exec_riscv_step_interrupt;
         [ exact Hsi | exact Lhs | exact Hha | exact Hhi | exact Lhs_trap ]. }
@@ -196,7 +196,7 @@ Section UserStepFull.
      [user_trap_frame]).  It owns [interp σ] + [minstret_inv_body] + the
      unpacked mutable frame + [upt_inv] + [user_cfg] + the Löb continuation,
      and returns the [wp_exec_step_minstret] payload at the inner mask. *)
-  Definition active_class (E Ei : coPset) (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition active_class (Ei : coPset) (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (∀ (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
           (g : gmap regidx (mword 64)),
         ⌜user_mstatus_ok ms_v⌝ -∗
@@ -206,12 +206,12 @@ Section UserStepFull.
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         upt_inv pt -∗ user_cfg C -∗
         mstate_interp σ -∗ minstret_inv_body -∗
-        ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }}) ∧
-           (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
+        ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
+           (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
         |={Ei}=> ∃ s' : mstate,
-          ⌜exec riscv_step σ = Some (tt, s')⌝ ∗
+          ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
           ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-             WP (Loop : expr riscv_lang) @ E {{ Φ }})))%I.
+             WP (Loop : expr riscv_lang) {{ Φ }})))%I.
 
   (* ------------------------------------------------------------------- *)
   (* THE UNIFIED STEP WRAPPER: borrow the wires once, decide dispatch,     *)
@@ -223,18 +223,16 @@ Section UserStepFull.
   (* [reg_pointsto_at cpu_id] definitionally); the step only READS them,    *)
   (* so the invariant re-closes with the same witnesses.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_active E Φ :
-    ↑minstretN ⊆ E ->
-    ↑wireN ⊆ E ->
+  Lemma wp_user_step_active Φ :
     hw_config -∗
     minstret_inv -∗
     wire_inv -∗
-    active_class E (E ∖ ↑minstretN ∖ ↑wireN) Φ -∗
-    user_step_obligation_active C pt E Φ.
+    active_class (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ -∗
+    user_step_obligation_active C pt Φ.
   Proof.
-    iIntros (HN HwE) "#Hhw #Hmin #Hwinv #Hclass".
+    iIntros "#Hhw #Hmin #Hwinv #Hclass".
     iIntros "!>" (ms_v sc_v stval_v sepc_v va g) "%Hmsok Hregs Hupt Hcfg Hk".
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN ∖ ↑wireN) Φ HN with "Hmin").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ with "Hmin").
     iIntros (σ) "Hint Hbody".
     (* borrow the wires: open [wire_inv] (E∖minstretN -> E∖minstretN∖wireN)
        and peel the ambient hart's pin cells *)
@@ -276,7 +274,7 @@ Section UserStepFull.
     - (* pending interrupt: trap to stvec *)
       pose proof (u_dispatch_Supervisor _ _ _ _ _ _ _ Hd) as ->.
       iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-      iMod (interrupt_branch E (E ∖ ↑minstretN ∖ ↑wireN) Φ σ i
+      iMod (interrupt_branch (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ σ i
               ms_v sc_v stval_v sepc_v va g mst mi misa0 elp0 meip seip
               Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
               Lmip Lmeip Lseip Lmie Lmdl Hd

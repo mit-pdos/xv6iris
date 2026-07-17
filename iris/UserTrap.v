@@ -302,11 +302,10 @@ Section UserIntrArm.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Lemma wp_user_step_interrupt E Φ (i : InterruptType)
+  Lemma wp_user_step_interrupt Φ (i : InterruptType)
       (ms_v sc_v stval_v sepc_v va va' : mword 64)
       (g : gmap regidx (mword 64))
       (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
-    ↑minstretN ⊆ E ->
     user_mstatus_ok ms_v ->
     u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = Some (i, Supervisor) ->
     hw_config -∗
@@ -318,10 +317,10 @@ Section UserIntrArm.
     user_cfg C -∗
     ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
        user_trap_frame C pt -∗
-       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hmsok Hd) "#Hhw #Hminstret Hmeip Hseip Hregs Hupt Hcfg Hcont".
+    iIntros (Hmsok Hd) "#Hhw #Hminstret Hmeip Hseip Hregs Hupt Hcfg Hcont".
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
                            Hpc & Hnpc & Hgpr)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
@@ -331,7 +330,7 @@ Section UserIntrArm.
     (* elp is 1 bit and pinned ≠ LP_EXPECTED, so it already holds the value
        the trap's reset_elp writes *)
     pose proof (elp_no_lp elp0 Help_ne) as Help0.
-    iApply (wp_exec_step_interrupt_inv E Φ HN with "Hminstret Hhs").
+    iApply (wp_exec_step_interrupt_inv Φ with "Hminstret Hhs").
     iIntros (σ) "[Hreg Hmd]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms.
@@ -427,7 +426,7 @@ Section StepFetchFailure.
 
   Let s_tick : mstate := set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)).
 
-  Lemma exec_riscv_step_fetch_failure : exec riscv_step s = Some (tt, s_tick).
+  Lemma exec_riscv_step_fetch_failure : exec (riscv_step false) s = Some (tt, s_tick).
   Proof using All.
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _
@@ -479,7 +478,7 @@ Section StepExecuteTrap.
 
   Let s_tick : mstate := set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)).
 
-  Lemma exec_riscv_step_execute_trap : exec riscv_step s = Some (tt, s_tick).
+  Lemma exec_riscv_step_execute_trap : exec (riscv_step false) s = Some (tt, s_tick).
   Proof using All.
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _

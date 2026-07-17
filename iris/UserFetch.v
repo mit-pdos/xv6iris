@@ -172,11 +172,10 @@ Section UserFetchFaultArm.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Lemma wp_user_step_fetch_fault E Φ (ex : ExceptionType) (xv : mword 64)
+  Lemma wp_user_step_fetch_fault Φ (ex : ExceptionType) (xv : mword 64)
       (ms_v sc_v stval_v sepc_v va : mword 64)
       (g : gmap regidx (mword 64))
       (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
-    ↑minstretN ⊆ E ->
     user_mstatus_ok ms_v ->
     user_exc ex = true ->
     u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
@@ -212,10 +211,10 @@ Section UserFetchFaultArm.
        ⌜exec (fetch tt) σ = Some (F_Error (ex, xv), σ)⌝) -∗
     ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
        user_trap_frame C pt -∗
-       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hmsok Hexc Hd) "#Hhw #Hminstret Hmeip Hseip Hregs Hupt Hcfg Hfd Hcont".
+    iIntros (Hmsok Hexc Hd) "#Hhw #Hminstret Hmeip Hseip Hregs Hupt Hcfg Hfd Hcont".
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
                            Hpc & Hnpc & Hgpr)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hcfgrest)".
@@ -227,7 +226,7 @@ Section UserFetchFaultArm.
       "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ &
         %Help_ne & _ & %Hmisa_val & _)".
     pose proof (elp_no_lp elp0 Help_ne) as Help0.
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN) Φ HN with "Hminstret").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hminstret").
     iIntros (σ) "[Hreg Hmd] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
@@ -385,11 +384,10 @@ Section UserFetchFaultFlavors.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Lemma wp_user_step_fetch_align E Φ
+  Lemma wp_user_step_fetch_align Φ
       (ms_v sc_v stval_v sepc_v va : mword 64)
       (g : gmap regidx (mword 64))
       (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
-    ↑minstretN ⊆ E ->
     user_mstatus_ok ms_v ->
     u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
     neq_vec (access_vec_dec va 0) ('b"0") = true ->
@@ -402,12 +400,12 @@ Section UserFetchFaultFlavors.
     user_cfg C -∗
     ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
        user_trap_frame C pt -∗
-       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hmsok Hd Hodd) "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
-    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Addr_Align tt) va
-              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+    iIntros (Hmsok Hd Hodd) "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
+    iApply (wp_user_step_fetch_fault C pt Φ (E_Fetch_Addr_Align tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip Hmsok eq_refl Hd
               with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
     iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf %Lmisa2 %Lmenv2
                                %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
@@ -425,11 +423,10 @@ Section UserFetchFaultFlavors2.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Lemma wp_user_step_fetch_noncanonical E Φ
+  Lemma wp_user_step_fetch_noncanonical Φ
       (ms_v sc_v stval_v sepc_v va : mword 64)
       (g : gmap regidx (mword 64))
       (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
-    ↑minstretN ⊆ E ->
     user_mstatus_ok ms_v ->
     u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
@@ -444,12 +441,12 @@ Section UserFetchFaultFlavors2.
     user_cfg C -∗
     ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
        user_trap_frame C pt -∗
-       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hmsok Hd Hal Hcanon) "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
-    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Page_Fault tt) va
-              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+    iIntros (Hmsok Hd Hal Hcanon) "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
+    iApply (wp_user_step_fetch_fault C pt Φ (E_Fetch_Page_Fault tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip Hmsok eq_refl Hd
               with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
     iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf %Lmisa2 %Lmenv2
                                %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
@@ -472,11 +469,10 @@ Section UserFetchFaultFlavors3.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Lemma wp_user_step_fetch_unmapped E Φ (vpn : mword 27)
+  Lemma wp_user_step_fetch_unmapped Φ (vpn : mword 27)
       (ms_v sc_v stval_v sepc_v va : mword 64)
       (g : gmap regidx (mword 64))
       (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
-    ↑minstretN ⊆ E ->
     user_mstatus_ok ms_v ->
     u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
     pt.(u_map) !! vpn = None ->
@@ -494,13 +490,13 @@ Section UserFetchFaultFlavors3.
     user_cfg C -∗
     ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
        user_trap_frame C pt -∗
-       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hmsok Hd Hvpn Hal Hcanon Hvpn_def)
+    iIntros (Hmsok Hd Hvpn Hal Hcanon Hvpn_def)
       "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
-    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Page_Fault tt) va
-              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+    iApply (wp_user_step_fetch_fault C pt Φ (E_Fetch_Page_Fault tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip Hmsok eq_refl Hd
               with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
     iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf %Lmisa2 %Lmenv2
                                %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
@@ -526,11 +522,10 @@ Section UserFetchFaultFlavors4.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Lemma wp_user_step_fetch_denied E Φ (vpn : mword 27) (e : umap_ent)
+  Lemma wp_user_step_fetch_denied Φ (vpn : mword 27) (e : umap_ent)
       (ms_v sc_v stval_v sepc_v va : mword 64)
       (g : gmap regidx (mword 64))
       (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
-    ↑minstretN ⊆ E ->
     user_mstatus_ok ms_v ->
     u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
     pt.(u_map) !! vpn = Some e ->
@@ -549,13 +544,13 @@ Section UserFetchFaultFlavors4.
     user_cfg C -∗
     ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
        user_trap_frame C pt -∗
-       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hmsok Hd Hvpn Hden Hal Hcanon Hvpn_def)
+    iIntros (Hmsok Hd Hvpn Hden Hal Hcanon Hvpn_def)
       "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
-    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Page_Fault tt) va
-              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+    iApply (wp_user_step_fetch_fault C pt Φ (E_Fetch_Page_Fault tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip Hmsok eq_refl Hd
               with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
     iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf %Lmisa2 %Lmenv2
                                %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
@@ -580,12 +575,11 @@ Section UserFetchFaultFlavors5.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : upt).
 
-  Lemma wp_user_step_fetch_needs_update E Φ (vpn : mword 27) (e : umap_ent)
+  Lemma wp_user_step_fetch_needs_update Φ (vpn : mword 27) (e : umap_ent)
       (pte' : mword 64)
       (ms_v sc_v stval_v sepc_v va : mword 64)
       (g : gmap regidx (mword 64))
       (meip seip : mword 1) {dqe1 dqe2 : dfrac} :
-    ↑minstretN ⊆ E ->
     user_mstatus_ok ms_v ->
     u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = None ->
     pt.(u_map) !! vpn = Some e ->
@@ -605,13 +599,13 @@ Section UserFetchFaultFlavors5.
     user_cfg C -∗
     ▷ (sig_meip ↦ᵣ{ dqe1 } meip -∗ sig_seip ↦ᵣ{ dqe2 } seip -∗
        user_trap_frame C pt -∗
-       WP (Loop : expr riscv_lang) @ E {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hmsok Hd Hvpn Hchk Hupd Hal Hcanon Hvpn_def)
+    iIntros (Hmsok Hd Hvpn Hchk Hupd Hal Hcanon Hvpn_def)
       "#Hhw #Hmin Hmeip Hseip Hregs Hupt Hcfg Hcont".
-    iApply (wp_user_step_fetch_fault C pt E Φ (E_Fetch_Page_Fault tt) va
-              ms_v sc_v stval_v sepc_v va g meip seip HN Hmsok eq_refl Hd
+    iApply (wp_user_step_fetch_fault C pt Φ (E_Fetch_Page_Fault tt) va
+              ms_v sc_v stval_v sepc_v va g meip seip Hmsok eq_refl Hd
               with "Hhw Hmin Hmeip Hseip Hregs Hupt Hcfg [] Hcont").
     iIntros (σ usatp tlbvec) "%Lpriv %Lms %Lpc %Lsatp %Hsok %Ltlb %Htok %Hwf %Lmisa2 %Lmenv2
                                %HA %Hord %HR %Hcov %Hpter #Hhw' Hint Hslots".
