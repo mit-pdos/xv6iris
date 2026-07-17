@@ -36,7 +36,8 @@ Local Open Scope Z_scope.
 (* LAYER 1 (this file): the operational semantics.                         *)
 (*   - state  = the model's own [regstate] + a byte memory                 *)
 (*   - run    = interpreter over the real monad [M] / [Interface.outcome]  *)
-(*   - step   = [try_step 0 false] (one fetch-decode-execute cycle)        *)
+(*   - step   = [try_step 0 false] (one fetch-decode-execute cycle),       *)
+(*              optionally followed by [tick_clock] (see [riscv_step])     *)
 (*   - language instance (argument-free, like RiscvIrisFetch).             *)
 (* The Iris program-logic layer (gen_heap points-to over registers,        *)
 (* state_interp, WP) is deliberately deferred to a follow-up file.         *)
@@ -148,10 +149,17 @@ Fixpoint run {X} (m : M X) (s : mstate) (x : X) (s' : mstate) {struct m} : Prop 
 
 (* ---------------------------------------------------------------------- *)
 (* 3. The fixed loop body: ONE real fetch-decode-execute cycle.            *)
+(*    The model's [loop] additionally runs [tick_clock tt] after the step  *)
+(*    every [plat_insns_per_tick] retired instructions (advancing mtime    *)
+(*    and re-dispatching the CLINT).  [riscv_step] has no instruction      *)
+(*    counter, so the tick is a per-step parameter: [prim_step] chooses    *)
+(*    [tick] nondeterministically, the sound weakening of [loop]'s         *)
+(*    deterministic every-Nth tick.                                        *)
 (* ---------------------------------------------------------------------- *)
 
-Definition riscv_step : M unit :=
-  Defs.bind (try_step 0%Z false) (fun _ : bool => Defs.returnm tt).
+Definition riscv_step (tick : bool) : M unit :=
+  Defs.bind (try_step 0%Z false)
+    (fun _ : bool => if tick then tick_clock tt else Defs.returnm tt).
 
 (* ---------------------------------------------------------------------- *)
 (* 3b. Multi-hart global state.                                             *)
@@ -238,8 +246,8 @@ Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
     (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
   (exists cpu, e = LoopE cpu /\ e' = LoopE cpu /\ κ = [] /\ efs = [] /\
-    exists (u : unit) (s' : mstate),
-      run riscv_step (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
+    exists (tick : bool) (u : unit) (s' : mstate),
+      run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
       g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev))
   \/
   (e = DevLoopE /\ e' = DevLoopE /\ κ = [] /\ efs = [] /\

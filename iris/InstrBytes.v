@@ -621,11 +621,10 @@ Section InstrBytes.
      [ExecuteAs other] which is then run to [RETIRE_SUCCESS].  The pure
      [exec_hart_active_progress] / [exec_hart_active_progress_RVC] assemble the
      run_hart_active fact, forwarded to [wp_exec_step_hart_active_inv]. *)
-  Lemma wp_exec_step_decode_execute_inv E Φ {dq : dfrac} :
-    ↑minstretN ⊆ E →
+  Lemma wp_exec_step_decode_execute_inv Φ {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ, mstate_interp σ ={E ∖ ↑minstretN}=∗
+    (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (r : FetchResult) (i : instruction) (s_exec : mstate),
          ⌜ register_lookup cur_privilege σ.(sregs) = Machine ⌝ ∗
          ⌜ exec (dispatchInterrupt Machine) σ = Some (None, σ) ⌝ ∗
@@ -655,11 +654,11 @@ Section InstrBytes.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN) "Hinv Hhs H".
-    iApply (wp_exec_step_hart_active_inv E Φ HN with "Hinv Hhs").
+    iIntros "Hinv Hhs H".
+    iApply (wp_exec_step_hart_active_inv Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iMod ("H" $! σ with "Hsi") as (r i s_exec)
       "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
@@ -843,16 +842,15 @@ Section InstrBytes.
      never sees [ExecuteAs].  [PC] is owned here (read for the fetch, returned
      to the underlying WP), and [mmode_config] is handed back to the
      continuation. *)
-  Lemma wp_instr E Φ (pc : mword 64) (is_rvc : bool) (i : instruction)
+  Lemma wp_instr Φ (pc : mword 64) (is_rvc : bool) (i : instruction)
       (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
-    ↑minstretN ⊆ E →
     pmp_allows_all pmpcfg0 ->
     mmode_config dq -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -862,17 +860,17 @@ Section InstrBytes.
          (mmode_config dq -∗
           pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp) "Hmm Hpmpc Hpc Hinstr H".
+    iIntros (Hpmp) "Hmm Hpmpc Hpc Hinstr H".
     iDestruct "Hmm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
     iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
                  Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0
@@ -893,7 +891,7 @@ Section InstrBytes.
        lands on [▷ WP Loop] (the later exposed by the step rules below). *)
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang) {{ Φ }})%I
       with "[Hcont Hpriv Hmstatus Hpmpc]" as "Hcont'".
     { iIntros "Hhs' Hpc'". iApply ("Hcont" with "[- Hpc' Hpmpc] Hpmpc Hpc'").
       iFrame "Hhw Hinv Hhs' Hpriv".
@@ -949,9 +947,8 @@ Section InstrBytes.
          that re-establishes the invariant facts on its final mstatus value can
          rebuild [mmode_config (DfracOwn 1)] via [mmode_config_rebuild]
          (hw_config / minstret_inv are persistent, hence re-derivable). *)
-  Lemma wp_instr_config E Φ (pc : mword 64) (is_rvc : bool) (i : instruction)
+  Lemma wp_instr_config Φ (pc : mword 64) (is_rvc : bool) (i : instruction)
       (pmpcfg0 : type_of_register pmpcfg_n) (ms0 : mword 64) :
-    ↑minstretN ⊆ E →
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
     hw_config -∗
@@ -966,7 +963,7 @@ Section InstrBytes.
        cur_privilege ↦ᵣ Machine -∗
        mstatus ↦ᵣ ms0 -∗
        pmpcfg_n ↦ᵣ pmpcfg0 -∗
-       mstate_interp σ ={E ∖ ↑minstretN}=∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
                 (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
@@ -975,15 +972,15 @@ Section InstrBytes.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) @ E {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) @ E {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (HN Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv Hmstatus Hpmpc Hpc Hinstr H".
+    iIntros (Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv Hmstatus Hpmpc Hpc Hinstr H".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_exec_step_decode_execute_inv E Φ HN with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
                  Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0
