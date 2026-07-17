@@ -225,11 +225,12 @@ files or copy code from them; build fresh from the live tree.
     an arm.* `sig_meip`/`sig_seip` are written concurrently by the device
     loop, so a user arm must NOT take `sig_meip ↦ v` as a hypothesis (a held
     fragment would be contradicted the instant the device writes). They are
-    borrowed transiently through `wires_acc wN` (UserExec.v — a persistent,
-    namespace-parametric `inv_acc`-style accessor any wire-owning invariant
-    implements) inside ONE unified step wrapper, which reads the current
-    values, builds the pure dispatch fact, closes the accessor, then
-    case-splits `u_dispatch` and routes to a branch. Every branch
+    borrowed transiently by opening `wire_inv` (WireInv.v) across the step
+    inside ONE unified step wrapper: peel the ambient hart's two pin cells
+    off the invariant's `[∗ set]` (`reg_pointsto` IS `reg_pointsto_at cpu_id`
+    definitionally), read the current values, build the pure dispatch fact,
+    re-close with the same witnesses (the step only READS the wires), then
+    case-split `u_dispatch` and route to a branch. Every branch
     (retire / interrupt-trap / fetch-fault / …) therefore takes the wire
     VALUES + the pure dispatch fact, NOT the wire cells: see
     `retire_obligation` (UserCompute.v), which takes
@@ -254,12 +255,9 @@ files or copy code from them; build fresh from the live tree.
     via SIE=0). The device loop raises the `sig_seip` wire concurrently, so
     the wire cells are deliberately NOT in `user_cfg`: they live in the
     invariant shared with the device WP (`wire_inv`, WireInv.v — owns every
-    hart's `sig_seip`/`sig_meip` existentially), borrowed transiently via
-    `wires_acc` (bullet above). The `wire_inv -∗ wires_acc wireN` instance
-    is NOT yet written (open the invariant, peel the ambient hart's conjunct
-    off the `[∗ set]` — `reg_pointsto` IS `reg_pointsto_at cpu_id`
-    definitionally); the kernel-side S-mode proofs equally still pin the
-    wires and need the same rework. Every user step case-splits on the dispatch decision
+    hart's `sig_seip`/`sig_meip` existentially), borrowed transiently by
+    opening it (bullet above); the kernel-side S-mode proofs equally still
+    pin the wires and need the same rework. Every user step case-splits on the dispatch decision
     `u_dispatch` (UserStep.v): pending delegated interrupt → the interrupt
     trap to stvec, ANOTHER producer of `user_trap_frame`; None →
     fetch/execute.

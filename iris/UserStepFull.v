@@ -1,6 +1,6 @@
 (* UserStepFull.v -- the UNIFIED STEP WRAPPER: the single point where the
-   external-interrupt wires are borrowed (from the device-shared invariant,
-   via [wires_acc]) and the dispatch decision is made.
+   external-interrupt wires are borrowed (by opening the device-shared wire
+   invariant [wire_inv], WireInv.v) and the dispatch decision is made.
 
    Every user step is ONE atomic machine step.  Within it we borrow the
    wires, read their current values, decide [u_dispatch], and branch:
@@ -24,7 +24,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv InstrBytes WpGpr.
+Require Import MinstretInv WireInv InstrBytes WpGpr.
 Require Import WpDecode WpLeafCommon WpGprCsrwB WpIntrBits WpIntrCore.
 Require Import UserPt UserExec UserStep UserTrap.
 Local Open Scope Z_scope.
@@ -217,25 +217,32 @@ Section UserStepFull.
   (* THE UNIFIED STEP WRAPPER: borrow the wires once, decide dispatch,     *)
   (* branch.  Reduces [user_step_obligation_active] to [active_class]      *)
   (* (the no-interrupt fetch/execute classification -- the remaining       *)
-  (* work); the interrupt case is discharged here.                         *)
+  (* work); the interrupt case is discharged here.  The wires are borrowed *)
+  (* by opening [wire_inv] across the step and peeling the ambient hart's   *)
+  (* two pin cells off its [∗ set] ([reg_pointsto] IS                       *)
+  (* [reg_pointsto_at cpu_id] definitionally); the step only READS them,    *)
+  (* so the invariant re-closes with the same witnesses.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_active E Φ (wN : namespace) :
+  Lemma wp_user_step_active E Φ :
     ↑minstretN ⊆ E ->
-    ↑wN ⊆ E ->
-    minstretN ## wN ->
+    ↑wireN ⊆ E ->
     hw_config -∗
     minstret_inv -∗
-    wires_acc wN -∗
-    active_class E (E ∖ ↑minstretN ∖ ↑wN) Φ -∗
+    wire_inv -∗
+    active_class E (E ∖ ↑minstretN ∖ ↑wireN) Φ -∗
     user_step_obligation_active C pt E Φ.
   Proof.
-    iIntros (HN HwE Hdisj) "#Hhw #Hmin #Hwires #Hclass".
+    iIntros (HN HwE) "#Hhw #Hmin #Hwinv #Hclass".
     iIntros "!>" (ms_v sc_v stval_v sepc_v va g) "%Hmsok Hregs Hupt Hcfg Hk".
-    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN ∖ ↑wN) Φ HN with "Hmin").
+    iApply (wp_exec_step_minstret E (E ∖ ↑minstretN ∖ ↑wireN) Φ HN with "Hmin").
     iIntros (σ) "Hint Hbody".
-    (* borrow the wires: E∖minstretN -> E∖minstretN∖wN *)
-    iMod ("Hwires" $! (E ∖ ↑minstretN) with "[%]") as (meip seip) "(Hmeip & Hseip & Hclosew)".
-    { assert (↑wN ⊆ E ∖ ↑minstretN) by solve_ndisj. done. }
+    (* borrow the wires: open [wire_inv] (E∖minstretN -> E∖minstretN∖wireN)
+       and peel the ambient hart's pin cells *)
+    iInv "Hwinv" as ">Hwbody" "Hclosew".
+    iDestruct "Hwbody" as (seipf meipf) "Hwires".
+    iDestruct (big_sepS_delete _ _ cpu_id with "Hwires") as "[[Hseip Hmeip] Hwrest]";
+      [ apply elem_of_fin_to_set |].
+    set (meip := meipf cpu_id). set (seip := seipf cpu_id).
     iDestruct "Hint" as "[Hreg [Hmem Hdev]]".
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hnpc & Hgpr)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
@@ -269,7 +276,7 @@ Section UserStepFull.
     - (* pending interrupt: trap to stvec *)
       pose proof (u_dispatch_Supervisor _ _ _ _ _ _ _ Hd) as ->.
       iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-      iMod (interrupt_branch E (E ∖ ↑minstretN ∖ ↑wN) Φ σ i
+      iMod (interrupt_branch E (E ∖ ↑minstretN ∖ ↑wireN) Φ σ i
               ms_v sc_v stval_v sepc_v va g mst mi misa0 elp0 meip seip
               Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
               Lmip Lmeip Lseip Lmie Lmdl Hd
@@ -278,7 +285,10 @@ Section UserStepFull.
       { iNext. iDestruct "Hk" as "[_ $]". }
       iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }
       iNext. iDestruct "Hrest" as "(Hint & Hbody & HWP)".
-      iMod ("Hclosew" with "[$Hmeip $Hseip]") as "_".
+      iMod ("Hclosew" with "[Hseip Hmeip Hwrest]") as "_".
+      { iNext. iExists seipf, meipf.
+        iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
+        iFrame "Hseip Hmeip Hwrest". }
       iModIntro. iFrame "Hint Hbody HWP".
     - (* no interrupt: the classification *)
       iMod ("Hclass" $! σ ms_v sc_v stval_v sepc_v va g Hmsok Lpriv Lpc Hdisp
@@ -287,7 +297,10 @@ Section UserStepFull.
       { iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr". }
       iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }
       iNext. iDestruct "Hrest" as "(Hint & Hbody & HWP)".
-      iMod ("Hclosew" with "[$Hmeip $Hseip]") as "_".
+      iMod ("Hclosew" with "[Hseip Hmeip Hwrest]") as "_".
+      { iNext. iExists seipf, meipf.
+        iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
+        iFrame "Hseip Hmeip Hwrest". }
       iModIntro. iFrame "Hint Hbody HWP".
   Qed.
 
