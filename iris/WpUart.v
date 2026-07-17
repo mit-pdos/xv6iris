@@ -1,23 +1,23 @@
 (* WpUart.v -- reasoning about the UART + PLIC device fabric (DevModel.v).
 
    Contents:
-   §1  per-hart register ownership [reg_pointsto_at] (the [↦ᵣ]-analogue for a
-       NON-ambient hart) + its bridge lemmas + [gregs_interp_acc_at]: the
-       device thread's wire step writes ANOTHER hart's [sig_seip], so it needs
-       the per-hart bridge that the ambient-[CpuId] API hides.
-   §2  device-fabric ghost bridges: agreement/update of the [uart_frag]/
-       [plic_frag] halves against [dev_interp].
-   §3  MMIO transaction leaves: [dev_read]/[dev_write] reductions for the
+   §1  device-fabric ghost bridges: agreement/update of the [uart_frag]/
+       [plic_frag] halves against [dev_interp].  (The per-hart register
+       machinery [reg_pointsto_at]/[reg_valid_at]/[reg_update_at]/
+       [gregs_interp_acc_at] the wire step rides on lives in RiscvPtsto.v;
+       the invariant owning the wires themselves is [wire_inv], WireInv.v.)
+   §2  MMIO transaction leaves: [dev_read]/[dev_write] reductions for the
        UART registers xv6 touches, and the [exec]-level towers
        (read_ram/write_ram -> checked_mem_read/write -> mem_read/
        mem_write_value) for a 1-byte device access in Machine mode --
        the device twins of WpLoad.v / WpGprStore.v's RAM towers.
-   §4  the DEVICE THREAD: [wp_dev_loop] -- the [DevLoop] execution context
-       runs forever under an invariant owning the device halves and every
-       hart's [sig_seip] wire.  This is the shape of every future
+   §3  the DEVICE THREAD: [wp_dev_loop] -- the [DevLoop] execution context
+       runs forever under the device invariant [dev_inv_body] (the device
+       halves) plus the wire invariant [wire_inv] (every hart's [sig_seip]/
+       [sig_meip] pin, WireInv.v).  This is the shape of every future
        driver-vs-device proof: CPU-side WPs and the device loop share
-       [dev_inv]-style invariants.
-   §5  the interrupt chain, as pure facts: UART rx-avail raises the level
+       [dev_inv]/[wire_inv]-style invariants.
+   §4  the interrupt chain, as pure facts: UART rx-avail raises the level
        ([uart_irq]), the gateway latches it ([plic_latch]), the latched
        source drives the hart's EIP wire ([plic_eip_uart]), and a high
        [sig_seip] wire makes the S-mode dispatch fire
@@ -35,75 +35,13 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
    write_kind/...) win over SailStdpp's homonyms -- same order as WpLoad.v. *)
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import WireInv.
 Require Import WpIntrCore.
 Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* §1  per-hart register ownership.                                       *)
-(* ===================================================================== *)
-
-Section RegAt.
-  Context `{!riscvGS Σ}.
-
-  (* [r ↦ᵣ v] for an EXPLICIT hart [c] (the ambient-[CpuId] [reg_pointsto]
-     is [reg_pointsto_at cpu_id]). *)
-  Definition reg_pointsto_at (c : CPU) (r : register) (dq : dfrac)
-      (v : type_of_register r) : iProp Σ :=
-    ghost_map_elem (cpu_reg_name c) r dq (existT r v).
-
-  Lemma reg_valid_at (c : CPU) rs r dq v :
-    reg_interp_at (cpu_reg_name c) rs -∗ reg_pointsto_at c r dq v -∗
-    ⌜register_lookup r rs = v⌝.
-  Proof.
-    rewrite /reg_pointsto_at /reg_interp_at.
-    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
-    iDestruct (ghost_map_lookup with "Hm Hr") as %Hlk.
-    iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
-  Qed.
-
-  Lemma reg_update_at (c : CPU) rs r v v' :
-    reg_interp_at (cpu_reg_name c) rs -∗ reg_pointsto_at c r (DfracOwn 1) v ==∗
-      reg_interp_at (cpu_reg_name c) (register_set r v' rs) ∗
-      reg_pointsto_at c r (DfracOwn 1) v'.
-  Proof.
-    rewrite /reg_pointsto_at /reg_interp_at.
-    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
-    iMod (ghost_map_update (existT r v') with "Hm Hr") as "[Hm $]".
-    iModIntro. iExists (<[r := existT r v']> m). iFrame "Hm".
-    iPureIntro. intros k dv Hk.
-    destruct (decide (k = r)) as [->|Hne].
-    - rewrite lookup_insert in Hk. injection Hk as <-.
-      by rewrite register_lookup_set.
-    - rewrite lookup_insert_ne in Hk; [|done].
-      rewrite (Hag k dv Hk).
-      by rewrite (irrelevant_register_set k r rs v' (register_beq_false k r Hne)).
-  Qed.
-
-  (* focus an ARBITRARY hart [c]'s register bridge out of the global one
-     (the ambient [gregs_interp_acc] fixed [c := cpu_id]). *)
-  Lemma gregs_interp_acc_at (c : CPU) (gr : CPU -> regstate) :
-    gregs_interp gr ⊢ reg_interp_at (cpu_reg_name c) (gr c) ∗
-      (∀ rs', reg_interp_at (cpu_reg_name c) rs' -∗ gregs_interp (<[c := rs']> gr)).
-  Proof.
-    rewrite /gregs_interp.
-    iIntros "H".
-    iDestruct (big_sepS_delete _ _ c with "H") as "[Hcur Hrest]";
-      [ apply elem_of_fin_to_set |].
-    iFrame "Hcur".
-    iIntros (rs') "Hrs'".
-    iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
-    rewrite /insert /greg_insert decide_True //.
-    iFrame "Hrs'".
-    iApply (big_sepS_mono with "Hrest").
-    intros cpu Hcpu. apply elem_of_difference in Hcpu as [_ Hne].
-    rewrite decide_False; [ done | ].
-    intros ->. apply Hne, elem_of_singleton. reflexivity.
-  Qed.
-End RegAt.
-
-(* ===================================================================== *)
-(* §2  device-fabric ghost bridges.                                       *)
+(* §1  device-fabric ghost bridges.                                       *)
 (* ===================================================================== *)
 
 Section DevGhost.
@@ -147,7 +85,7 @@ Section DevGhost.
 End DevGhost.
 
 (* ===================================================================== *)
-(* §3  MMIO transaction leaves.                                           *)
+(* §2  MMIO transaction leaves.                                           *)
 (* ===================================================================== *)
 
 (* the UART registers live at [uart_base + off]; xv6 uses off 0..5 *)
@@ -392,8 +330,8 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §4  the device thread: [DevLoop] runs forever under the device          *)
-(*     invariant.                                                          *)
+(* §3  the device thread: [DevLoop] runs forever under the device          *)
+(*     invariant + the wire invariant.                                     *)
 (* ===================================================================== *)
 
 Section DevLoop.
@@ -401,35 +339,35 @@ Section DevLoop.
 
   Definition devN : namespace := nroot .@ "dev".
 
-  (* the device invariant: the device halves + every hart's [sig_seip] wire.
-     Owning the wires HERE is the design point: the PLIC may flip a hart's
-     external-interrupt pin at any time, so no CPU-side proof may pin it. *)
+  (* the device invariant: the user halves of the device state.  The
+     interrupt-pin wires the PLIC drives live in their own invariant
+     [wire_inv] (WireInv.v): the PLIC may flip a hart's external-interrupt
+     pin at any time, so no CPU-side proof may pin it. *)
   Definition dev_inv_body : iProp Σ :=
-    (∃ (u : uart_state) (p : plic_state) (line : CPU -> mword 1),
-       uart_frag u ∗ plic_frag p ∗
-       [∗ set] c ∈ (fin_to_set CPU : gset CPU),
-         reg_pointsto_at c sig_seip (DfracOwn 1) (line c))%I.
+    (∃ (u : uart_state) (p : plic_state),
+       uart_frag u ∗ plic_frag p)%I.
 
   Global Instance uart_frag_timeless u : Timeless (uart_frag u).
   Proof. rewrite /uart_frag. apply _. Qed.
   Global Instance plic_frag_timeless p : Timeless (plic_frag p).
   Proof. rewrite /plic_frag. apply _. Qed.
-  Global Instance reg_pointsto_at_timeless c r dq v :
-    Timeless (reg_pointsto_at c r dq v).
-  Proof. rewrite /reg_pointsto_at. apply _. Qed.
   Global Instance dev_inv_body_timeless : Timeless dev_inv_body.
   Proof. rewrite /dev_inv_body. apply _. Qed.
 
   Lemma wp_dev_loop E Φ :
     ↑devN ⊆ E ->
-    inv devN dev_inv_body ⊢ WP (DevLoop : expr riscv_lang) @ E {{ Φ }}.
+    ↑wireN ⊆ E ->
+    inv devN dev_inv_body -∗ wire_inv -∗
+    WP (DevLoop : expr riscv_lang) @ E {{ Φ }}.
   Proof.
-    iIntros (HN) "#Hinv".
+    iIntros (HN HNw) "#Hinv #Hwinv".
     iLöb as "IH".
     iApply wp_dev_step.
     iIntros (gr d) "[Hgr Hdev]".
     iInv "Hinv" as ">Hbody" "Hclose".
-    iDestruct "Hbody" as (u p line) "(Hu & Hp & Hwires)".
+    iInv "Hwinv" as ">Hwbody" "Hwclose".
+    iDestruct "Hbody" as (u p) "[Hu Hp]".
+    iDestruct "Hwbody" as (seip meip) "Hwires".
     iDestruct (dev_interp_agree with "Hdev Hu Hp") as %[Hu Hp].
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' gr' Hstep).
@@ -437,45 +375,53 @@ Section DevLoop.
     destruct Hstep as [b u' Htx | b u' Hrx | p' Hirq Hlatch | c].
     - (* a byte leaves the tx FIFO *)
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
-      iMod ("Hclose" with "[Hu' Hp Hwires]") as "_".
-      { iNext. iExists u', p, line. iFrame. }
+      iMod ("Hwclose" with "[Hwires]") as "_".
+      { iNext. iExists seip, meip. iFrame. }
+      iMod ("Hclose" with "[Hu' Hp]") as "_".
+      { iNext. iExists u', p. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* a byte arrives from the outside world *)
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
-      iMod ("Hclose" with "[Hu' Hp Hwires]") as "_".
-      { iNext. iExists u', p, line. iFrame. }
+      iMod ("Hwclose" with "[Hwires]") as "_".
+      { iNext. iExists seip, meip. iFrame. }
+      iMod ("Hclose" with "[Hu' Hp]") as "_".
+      { iNext. iExists u', p. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* the gateway latches the UART's interrupt level *)
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
-      iMod ("Hclose" with "[Hu Hp' Hwires]") as "_".
-      { iNext. iExists u, p', line. iFrame. }
+      iMod ("Hwclose" with "[Hwires]") as "_".
+      { iNext. iExists seip, meip. iFrame. }
+      iMod ("Hclose" with "[Hu Hp']") as "_".
+      { iNext. iExists u, p'. iFrame. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
-    - (* the PLIC drives hart [c]'s sig_seip wire *)
+    - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
       iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
-      iDestruct (big_sepS_delete _ _ c with "Hwires") as "[Hwc Hwrest]";
+      iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";
         [ apply elem_of_fin_to_set |].
-      iMod (reg_update_at c (gr c) sig_seip (line c)
+      iMod (reg_update_at c (gr c) sig_seip (seip c)
               (bool_to_bit (dev_seip d (fin_to_nat c))) with "Hrc Hwc")
         as "[Hrc' Hwc']".
       iDestruct ("Hback" with "Hrc'") as "Hgr'".
-      set (line' := fun c' : CPU =>
+      set (seip' := fun c' : CPU =>
              if decide (c' = c) then bool_to_bit (dev_seip d (fin_to_nat c))
-             else line c').
-      iMod ("Hclose" with "[Hu Hp Hwc' Hwrest]") as "_".
-      { iNext. iExists u, p, line'. iFrame "Hu Hp".
+             else seip c').
+      iMod ("Hwclose" with "[Hwc' Hmc Hwrest]") as "_".
+      { iNext. iExists seip', meip.
         iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
-        iSplitL "Hwc'".
-        { rewrite /line' decide_True //. }
+        iSplitL "Hwc' Hmc".
+        { rewrite /seip' decide_True //. iFrame. }
         iApply (big_sepS_mono with "Hwrest").
         intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
-        rewrite /line' decide_False; [ done | ].
+        rewrite /seip' decide_False; [ done | ].
         intros ->. apply Hne, elem_of_singleton. reflexivity. }
+      iMod ("Hclose" with "[Hu Hp]") as "_".
+      { iNext. iExists u, p. iFrame. }
       iModIntro. iFrame "Hgr' Hdev". iApply "IH".
   Qed.
 End DevLoop.
 
 (* ===================================================================== *)
-(* §5  the interrupt chain, end to end (pure facts).                       *)
+(* §4  the interrupt chain, end to end (pure facts).                       *)
 (* ===================================================================== *)
 
 (* (1) receive data + rx interrupts enabled => the UART raises its level *)

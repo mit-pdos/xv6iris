@@ -356,6 +356,79 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 3b. Per-hart register ownership for an EXPLICIT (non-ambient) hart:      *)
+(*     [reg_pointsto_at c r] is the [↦ᵣ]-analogue for hart [c], with its    *)
+(*     bridge lemmas against [reg_interp_at] and the explicit-hart focusing  *)
+(*     lemma [gregs_interp_acc_at].  Needed by any proof that touches        *)
+(*     ANOTHER hart's registers -- e.g. the device thread's wire step        *)
+(*     writes hart [c]'s [sig_seip] pin (WpUart.v), and the wire invariant   *)
+(*     (WireInv.v) owns every hart's interrupt pins.                          *)
+(* ---------------------------------------------------------------------- *)
+
+Section RegAt.
+  Context `{!riscvGS Σ}.
+
+  (* [r ↦ᵣ v] for an EXPLICIT hart [c] (the ambient-[CpuId] [reg_pointsto]
+     is [reg_pointsto_at cpu_id]). *)
+  Definition reg_pointsto_at (c : CPU) (r : register) (dq : dfrac)
+      (v : type_of_register r) : iProp Σ :=
+    ghost_map_elem (cpu_reg_name c) r dq (existT r v).
+
+  Global Instance reg_pointsto_at_timeless c r dq v :
+    Timeless (reg_pointsto_at c r dq v).
+  Proof. rewrite /reg_pointsto_at. apply _. Qed.
+
+  Lemma reg_valid_at (c : CPU) rs r dq v :
+    reg_interp_at (cpu_reg_name c) rs -∗ reg_pointsto_at c r dq v -∗
+    ⌜register_lookup r rs = v⌝.
+  Proof.
+    rewrite /reg_pointsto_at /reg_interp_at.
+    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
+    iDestruct (ghost_map_lookup with "Hm Hr") as %Hlk.
+    iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
+  Qed.
+
+  Lemma reg_update_at (c : CPU) rs r v v' :
+    reg_interp_at (cpu_reg_name c) rs -∗ reg_pointsto_at c r (DfracOwn 1) v ==∗
+      reg_interp_at (cpu_reg_name c) (register_set r v' rs) ∗
+      reg_pointsto_at c r (DfracOwn 1) v'.
+  Proof.
+    rewrite /reg_pointsto_at /reg_interp_at.
+    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
+    iMod (ghost_map_update (existT r v') with "Hm Hr") as "[Hm $]".
+    iModIntro. iExists (<[r := existT r v']> m). iFrame "Hm".
+    iPureIntro. intros k dv Hk.
+    destruct (decide (k = r)) as [->|Hne].
+    - rewrite lookup_insert in Hk. injection Hk as <-.
+      by rewrite register_lookup_set.
+    - rewrite lookup_insert_ne in Hk; [|done].
+      rewrite (Hag k dv Hk).
+      by rewrite (irrelevant_register_set k r rs v' (register_beq_false k r Hne)).
+  Qed.
+
+  (* focus an ARBITRARY hart [c]'s register bridge out of the global one
+     (the ambient [gregs_interp_acc] fixed [c := cpu_id]). *)
+  Lemma gregs_interp_acc_at (c : CPU) (gr : CPU -> regstate) :
+    gregs_interp gr ⊢ reg_interp_at (cpu_reg_name c) (gr c) ∗
+      (∀ rs', reg_interp_at (cpu_reg_name c) rs' -∗ gregs_interp (<[c := rs']> gr)).
+  Proof.
+    rewrite /gregs_interp.
+    iIntros "H".
+    iDestruct (big_sepS_delete _ _ c with "H") as "[Hcur Hrest]";
+      [ apply elem_of_fin_to_set |].
+    iFrame "Hcur".
+    iIntros (rs') "Hrs'".
+    iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
+    rewrite /insert /greg_insert decide_True //.
+    iFrame "Hrs'".
+    iApply (big_sepS_mono with "Hrest").
+    intros cpu Hcpu. apply elem_of_difference in Hcpu as [_ Hne].
+    rewrite decide_False; [ done | ].
+    intros ->. apply Hne, elem_of_singleton. reflexivity.
+  Qed.
+End RegAt.
+
+(* ---------------------------------------------------------------------- *)
 (* 4. Bridge lemmas.                                                       *)
 (* ---------------------------------------------------------------------- *)
 

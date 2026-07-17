@@ -13,6 +13,7 @@ RiscvLang.v
 RiscvPtsto.v
 RiscvExec.v
 MinstretInv.v
+WireInv.v
 RiscvExtras.v
 AlignBits.v
 RiscvTryStep.v

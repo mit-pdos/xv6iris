@@ -17,8 +17,9 @@
          * one [a ↦ₘ b] for every byte of the initial RAM image,
          * the user halves of the device state, [uart_frag]/[plic_frag],
        suffice -- after a [={⊤}=∗], under which the caller allocates whatever
-       invariants its proof needs (the device invariant [dev_inv_body], lock
-       invariants, [minstret_inv], ...) -- to prove
+       invariants its proof needs (the device invariant [dev_inv_body], the
+       wire invariant [wire_inv], lock invariants, [minstret_inv], ...) -- to
+       prove
          * [WP (LoopE c) {{ _, True }}] for every chosen hart [c], and
          * [WP DevLoop {{ _, True }}],
        then the META-level conclusion holds, with no Iris judgment in it:
@@ -37,8 +38,8 @@
 
    Registers not in [D c] are simply never owned by anyone (their ghost cells
    are not allocated); a typical instantiation puts every hart's [sig_seip]
-   into [D c] so the device invariant can own the interrupt wires
-   ([dev_inv_body], WpUart.v), and the boot-config registers of each hart
+   and [sig_meip] into [D c] so the wire invariant can own the interrupt
+   wires ([wire_inv], WireInv.v), and the boot-config registers of each hart
    into [D c] for the hart's own WP.
 
    Because [to_val] is constantly [None] (no [mexpr] is a value), the value /
@@ -52,6 +53,7 @@ From iris.program_logic Require Import weakestpre adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
+Require Import WireInv.
 Require Import WpUart.
 
 (* ---------------------------------------------------------------------- *)
@@ -272,8 +274,9 @@ Qed.
 (*    device-only system ([cs = []]; thread pool = just [DevLoop]) runs    *)
 (*    forever, from ANY initial state whose memory image is RAM: allocate  *)
 (*    the device invariant [dev_inv_body] from the initial [uart_frag]/    *)
-(*    [plic_frag] + every hart's [sig_seip] wire cell, and conclude with   *)
-(*    [wp_dev_loop].  This is the smallest genuine instantiation of        *)
+(*    [plic_frag] and the wire invariant [wire_inv] from every hart's       *)
+(*    [sig_seip]/[sig_meip] pin cells, and conclude with [wp_dev_loop].     *)
+(*    This is the smallest genuine instantiation of                         *)
 (*    [riscv_system_adequacy]; hart clients supply their [WP Loop]s the    *)
 (*    same way, with a richer [D].                                          *)
 (* ---------------------------------------------------------------------- *)
@@ -285,16 +288,21 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ} (g : gstate)
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
-  apply (riscv_system_adequacy Σ [] g (fun _ => {[ (sig_seip : register) ]}) Hram).
+  apply (riscv_system_adequacy Σ [] g
+           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
   iIntros "(Hwires & _ & Huf & Hpf)".
-  iMod (inv_alloc devN _ dev_inv_body with "[Hwires Huf Hpf]") as "#Hinv".
+  iMod (inv_alloc devN _ dev_inv_body with "[Huf Hpf]") as "#Hinv".
   { iNext. rewrite /dev_inv_body.
-    iExists g.(gdev).(duart), g.(gdev).(dplic),
-            (fun c => register_lookup sig_seip (g.(gregs) c)).
-    iFrame "Huf Hpf".
-    iApply (big_sepS_mono with "Hwires").
-    intros c _. rewrite big_sepS_singleton. done. }
+    iExists g.(gdev).(duart), g.(gdev).(dplic). iFrame "Huf Hpf". }
+  iMod (wire_inv_alloc _ (fun c => register_lookup sig_seip (g.(gregs) c))
+          (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hwires]")
+    as "#Hwinv".
+  { iApply (big_sepS_mono with "Hwires").
+    intros c _.
+    rewrite big_sepS_union; last first.
+    { apply disjoint_singleton_l, not_elem_of_singleton. discriminate. }
+    rewrite !big_sepS_singleton. done. }
   iModIntro. iSplitR; [done|].
-  iApply (wp_dev_loop with "Hinv"). solve_ndisj.
+  iApply (wp_dev_loop with "Hinv Hwinv"); solve_ndisj.
 Qed.
