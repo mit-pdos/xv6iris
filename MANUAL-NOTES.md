@@ -6,7 +6,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - ghost_var to track interesting config register bits (SIE)
 - instr predicate (instr memory points-to, abstract 2-byte vs 4-byte, decode)
 - tlb_inv
-- minstret_inv (invariant counting retired instructions in minstret register)
+- minstret_inv (invariant counting retired instructions in minstret register), clock_inv
 - fupd-style spec for stepping one cycle, which enables opening inv like minstret_inv
 - interrupt handling with a WP for the address in stvec (kernelvec)
 - swtch spec
@@ -36,3 +36,4 @@ Big things that still need to be done/explored:
 Don't know where else to put this:
 
 - seems like atomic interrupt masking in mstatus might simplify reasoning
+- rv64d does tick handling in [loop] outside of [try_step], had to add explicitly to [riscv_step]
