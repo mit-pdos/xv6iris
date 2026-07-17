@@ -52,6 +52,7 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import invariants.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -242,6 +243,24 @@ Section UserExec.
       gpr_file g ∗
       upt_inv pt ∗
       user_cfg)%I.
+
+  (* ------------------------------------------------------------------- *)
+  (* Per-step access to the external-interrupt WIRES: the device loop owns *)
+  (* and writes sig_meip / sig_seip concurrently, so the user loop can     *)
+  (* only BORROW their current values across a step's atomic instant.  Any *)
+  (* invariant owning the wire cells (e.g. the future device-shared        *)
+  (* invariant) implements this accessor via inv_acc; the cells come back  *)
+  (* timeless.  [wN] is the wire invariant's namespace -- disjoint from    *)
+  (* minstretN, so step engines can open both.                             *)
+  (* ------------------------------------------------------------------- *)
+  Definition wires_acc (wN : namespace) : iProp Σ :=
+    (□ (∀ E' : coPset, ⌜↑wN ⊆ E'⌝ →
+        |={E', E' ∖ ↑wN}=> ∃ (meip seip : mword 1),
+          sig_meip ↦ᵣ meip ∗ sig_seip ↦ᵣ seip ∗
+          (sig_meip ↦ᵣ meip ∗ sig_seip ↦ᵣ seip ={E' ∖ ↑wN, E'}=∗ True)))%I.
+
+  Global Instance wires_acc_persistent wN : Persistent (wires_acc wN).
+  Proof. apply _. Qed.
 
   (* the assumed kernel re-entry contract: the handler at stvec (uservec)
      handles ANY trapped-out-of-user machine *)
