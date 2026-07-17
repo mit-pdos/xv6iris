@@ -18,6 +18,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - user-mode exec: predicate for all possible decode results (4-byte and 2-byte), then proof for every instruction in that predicate
 - shared CLAUDE.md memory in repo
 - device model: DevLoop opcode, concurrent WP, shared access to CPU SEIP
+- UART ghost append-only log, includes FIFO (uartputc/uartwrite does not wait to flush), ownership proves no race between TX_IDLE check and THR write
 - user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
 - start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
 
