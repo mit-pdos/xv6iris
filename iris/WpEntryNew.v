@@ -105,217 +105,70 @@ Section WpEntryNew.
   Lemma reg_ld_auipc : (Regidx i_ld : regidx) = Regidx i_auipc.
   Proof. vm_compute. reflexivity. Qed.
 
-  (* [kernel_text], [kernel_window_pc], [instr_bytes_base/rvc4/rvc2] and
-     [pa_add_mword] now live in the lightweight [KernelText] base (imported
-     above); the _entry constructors below use them from there. *)
-
-  (* The two cross-boundary 4-byte RVC fetch windows (low 16 = the RVC instr,
-     high 16 = the next instruction's low 16 bits, as a 4-aligned fetch reads
-     them), taken literally from the image. *)
-  Definition w_lui4 : mword 32 := mword_of_int 0x25f36505.  (* c.lui | csrr-lo *)
-  Definition w_add4 : mword 32 := mword_of_int 0x00ef912a.  (* c.add | jal-lo  *)
+  (* [kernel_text], [kernel_window_pc], [pa_add_mword] and the [mk_base] /
+     [mk_rvc] constructors come from the lightweight [KernelText] base. *)
 
   (* ---- the eight [_entry] instructions, each recovered from the image.
-     Every constructor is [kernel_text -∗ instr ...]; only MUL's decoder
-     additionally needs misa.M = 1, which it reads off [hw_config]. *)
+     Every constructor is [kernel_text -∗ instr ...]. *)
 
   Lemma entry_instr_auipc :
     kernel_text -∗ instr pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (UTYPE (imm_auipc, Regidx i_auipc, AUIPC)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e0) 2 = true) by (vm_compute; reflexivity).
-    assert (Hnrvc : isRVC (subrange_vec_dec w_auipc 15 0) = false) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry) + Z.of_nat j)%Z = Some (nth_byte w_auipc j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_Base w_auipc).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_base pc_e0 w_auipc H2al Hnrvc).
-      iApply (kernel_window_pc (KernelSyms._entry) w_auipc 4 pc_e0 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros; apply decode_auipc; assumption.
+    mk_base KernelSyms._entry w_auipc pc_e0
+      (UTYPE (imm_auipc, Regidx i_auipc, AUIPC)) decode_auipc.
   Qed.
 
   Lemma entry_instr_ld :
     kernel_text -∗ instr pc_e1 false (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e1) 2 = true) by (vm_compute; reflexivity).
-    assert (Hnrvc : isRVC (subrange_vec_dec w_ld 15 0) = false) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x4) + Z.of_nat j)%Z = Some (nth_byte w_ld j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_Base w_ld).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_base pc_e1 w_ld H2al Hnrvc).
-      iApply (kernel_window_pc (KernelSyms._entry + 0x4) w_ld 4 pc_e1 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros; apply decode_ld; assumption.
+    mk_base (KernelSyms._entry + 0x4)%Z w_ld pc_e1
+      (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8)) decode_ld.
   Qed.
 
   Lemma entry_instr_clui :
     kernel_text -∗ instr pc_e2 true (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e2) 2 = true) by (vm_compute; reflexivity).
-    assert (H4al : is_aligned_vaddr (Virtaddr pc_e2) 4 = true) by (vm_compute; reflexivity).
-    assert (Hrvc : isRVC h_lui = true) by (vm_compute; reflexivity).
-    assert (Hsub : subrange_vec_dec w_lui4 15 0 = h_lui)
-      by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x8) + Z.of_nat j)%Z = Some (nth_byte w_lui4 j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_RVC h_lui).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_rvc4 pc_e2 h_lui w_lui4 H2al H4al Hrvc Hsub).
-      iApply (kernel_window_pc (KernelSyms._entry + 0x8) w_lui4 4 pc_e2 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
-      exists (C_LUI (imm_clui, rd_clui)).
-      split; [exact (decode_C_lui σ HmisaC) |].
-      split; [vm_compute; reflexivity |].
-      intro s. exact (exec_execute_C_LUI imm_clui rd_clui s).
+    mk_rvc (KernelSyms._entry + 0x8)%Z h_lui pc_e2
+      (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI)) decode_C_lui exec_execute_C_LUI.
   Qed.
 
   Lemma entry_instr_csrr :
     kernel_text -∗ instr pc_e3 false (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e3) 2 = true) by (vm_compute; reflexivity).
-    assert (Hnrvc : isRVC (subrange_vec_dec w_csrr 15 0) = false) by (vm_compute; reflexivity).
-    assert (Hz : zreg = Regidx i_rs1_csrr) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0xa) + Z.of_nat j)%Z = Some (nth_byte w_csrr j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_Base w_csrr).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_base pc_e3 w_csrr H2al Hnrvc).
-      iApply (kernel_window_pc (KernelSyms._entry + 0xa) w_csrr 4 pc_e3 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros; rewrite Hz; apply decode_csrr; assumption.
+    mk_base (KernelSyms._entry + 0xa)%Z w_csrr pc_e3
+      (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS)) decode_csrr.
   Qed.
 
   Lemma entry_instr_caddi :
     kernel_text -∗ instr pc_e4 true (ITYPE (sign_extend' 12 imm_caddi, rsd_caddi, rsd_caddi, ADDI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (ITYPE (sign_extend' 12 imm_caddi, rsd_caddi, rsd_caddi, ADDI)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e4) 2 = true) by (vm_compute; reflexivity).
-    assert (H4al : is_aligned_vaddr (Virtaddr pc_e4) 4 = false) by (vm_compute; reflexivity).
-    assert (Hrvc : isRVC h_addi = true) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0xe) + Z.of_nat j)%Z = Some (nth_byte h_addi j)).
-    { intros j Hj;
-        do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_RVC h_addi).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_rvc2 pc_e4 h_addi H2al H4al Hrvc).
-      iApply (kernel_window_pc (KernelSyms._entry + 0xe) h_addi 2 pc_e4 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
-      exists (C_ADDI (imm_caddi, rsd_caddi)).
-      split; [exact (decode_C_ADDI σ HmisaC) |].
-      split; [vm_compute; reflexivity |].
-      intro s. exact (exec_execute_C_ADDI imm_caddi rsd_caddi s).
+    mk_rvc (KernelSyms._entry + 0xe)%Z h_addi pc_e4
+      (ITYPE (sign_extend' 12 imm_caddi, rsd_caddi, rsd_caddi, ADDI)) decode_C_ADDI exec_execute_C_ADDI.
   Qed.
 
+  (* MUL's decoder wants misa.M; [close_dec] computes it from the [misa =
+     MISA_C] hypothesis [instr] already supplies, so no [hw_config] is
+     needed here. *)
   Lemma entry_instr_mul :
-    hw_config -∗ kernel_text -∗
+    kernel_text -∗
     instr pc_e5 false (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd, mulop_mul)).
   Proof.
-    assert (Hlpad : is_lpad_instruction
-        (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd, mulop_mul)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e5) 2 = true) by (vm_compute; reflexivity).
-    assert (Hnrvc : isRVC (subrange_vec_dec w_mul 15 0) = false) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x10) + Z.of_nat j)%Z = Some (nth_byte w_mul j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Hhw #Ht".
-    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC0 & %HmisaU & %HmisaM & _)".
-    rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_Base w_mul).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_base pc_e5 w_mul H2al Hnrvc).
-      iApply (kernel_window_pc (KernelSyms._entry + 0x10) w_mul 4 pc_e5 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "Hsi".
-      iDestruct (state_interp_reg_dq σ misa DfracDiscarded misa0
-                   with "Hsi Hmisa") as %Lmisa.
-      iPureIntro. intros Hpriv _ _ _ _.
-      assert (HmisaMs : eq_vec (_get_Misa_M (register_lookup misa σ.(sregs))) ('b"1") = true)
-        by (rewrite Lmisa; exact HmisaM).
-      exact (decode_mul σ Hpriv HmisaMs).
+    mk_base (KernelSyms._entry + 0x10)%Z w_mul pc_e5
+      (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd, mulop_mul)) decode_mul.
   Qed.
 
   Lemma entry_instr_cadd :
     kernel_text -∗ instr pc_e6 true (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e6) 2 = true) by (vm_compute; reflexivity).
-    assert (H4al : is_aligned_vaddr (Virtaddr pc_e6) 4 = true) by (vm_compute; reflexivity).
-    assert (Hrvc : isRVC h_add = true) by (vm_compute; reflexivity).
-    assert (Hsub : subrange_vec_dec w_add4 15 0 = h_add)
-      by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x14) + Z.of_nat j)%Z = Some (nth_byte w_add4 j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_RVC h_add).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_rvc4 pc_e6 h_add w_add4 H2al H4al Hrvc Hsub).
-      iApply (kernel_window_pc (KernelSyms._entry + 0x14) w_add4 4 pc_e6 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
-      exists (C_ADD (rsd_cadd, rs2_cadd)).
-      split; [exact (decode_C_ADD σ HmisaC) |].
-      split; [vm_compute; reflexivity |].
-      intro s. exact (exec_execute_C_ADD rsd_cadd rs2_cadd s).
+    mk_rvc (KernelSyms._entry + 0x14)%Z h_add pc_e6
+      (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD)) decode_C_ADD exec_execute_C_ADD.
   Qed.
 
   Lemma entry_instr_jal :
     kernel_text -∗ instr pc_e7 false (JAL (imm_jal, Regidx i_jal)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (JAL (imm_jal, Regidx i_jal)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_e7) 2 = true) by (vm_compute; reflexivity).
-    assert (Hnrvc : isRVC (subrange_vec_dec w_jal 15 0) = false) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms._entry + 0x16) + Z.of_nat j)%Z = Some (nth_byte w_jal j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_Base w_jal).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_base pc_e7 w_jal H2al Hnrvc).
-      iApply (kernel_window_pc (KernelSyms._entry + 0x16) w_jal 4 pc_e7 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros; apply decode_jal; assumption.
+    mk_base (KernelSyms._entry + 0x16)%Z w_jal pc_e7
+      (JAL (imm_jal, Regidx i_jal)) decode_jal.
   Qed.
 
   (* The final gpr_file after the eight writes, in terms of the abstract initial
@@ -397,20 +250,15 @@ Section WpEntryNew.
     iIntros (Hpmp)
       "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Htext Hcont".
     pose proof (pmp_all_off_allows_all _ Hpmp) as HpmpU.
-    (* derive the eight [instr] facts off the (persistent) text image; MUL's
-       decoder additionally needs misa.M = 1, read off [mmode_config]'s
-       persistent [hw_config], which is split out and put back. *)
-    iDestruct "Hmm" as "(#Hhw & Hmmrest)".
+    (* derive the eight [instr] facts off the (persistent) text image *)
     iPoseProof (entry_instr_auipc with "Htext") as "Hi0".
     iPoseProof (entry_instr_ld    with "Htext") as "Hi1".
     iPoseProof (entry_instr_clui  with "Htext") as "Hi2".
     iPoseProof (entry_instr_csrr  with "Htext") as "Hi3".
     iPoseProof (entry_instr_caddi with "Htext") as "Hi4".
-    iPoseProof (entry_instr_mul   with "Hhw Htext") as "Hi5".
+    iPoseProof (entry_instr_mul   with "Htext") as "Hi5".
     iPoseProof (entry_instr_cadd  with "Htext") as "Hi6".
     iPoseProof (entry_instr_jal   with "Htext") as "Hi7".
-    iAssert (mmode_config (DfracOwn 1)) with "[Hmmrest]" as "Hmm".
-    { rewrite /mmode_config. iFrame "Hhw". iExact "Hmmrest". }
     (* register-nonzero side conditions (all targets are sp/a0/a1/ra <> x0) *)
     assert (Hrd0 : uint i_auipc <> 0) by (vm_compute; discriminate).
     assert (Hrd1 : uint i_ld <> 0) by (vm_compute; discriminate).

@@ -3766,29 +3766,9 @@ Section SmodeDemo.
   Lemma kv_instr1 :
     kernel_text -∗ instr kv_pc1 true (ITYPE (caddi16sp_imm kv_imm1, sp, sp, ADDI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (ITYPE (caddi16sp_imm kv_imm1, sp, sp, ADDI)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr kv_pc1) 2 = true) by (vm_compute; reflexivity).
-    assert (H4al : is_aligned_vaddr (Virtaddr kv_pc1) 4 = true) by (vm_compute; reflexivity).
-    assert (Hrvc : isRVC kv_h1 = true) by (vm_compute; reflexivity).
-    assert (Hsub : subrange_vec_dec kv_w1 15 0 = kv_h1)
-      by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 4)%nat ->
-        KernelInstrs.kernel_bytes !! ((KernelSyms.kernelvec) + Z.of_nat j)%Z = Some (nth_byte kv_w1 j)).
-    { intros j Hj;
-        do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_RVC kv_h1).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_rvc4 kv_pc1 kv_h1 kv_w1 H2al H4al Hrvc Hsub).
-      iApply (kernel_window_pc (KernelSyms.kernelvec) kv_w1 4 kv_pc1 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
-      exists (C_ADDI16SP kv_imm1).
-      split; [exact (kv_decode1 σ HmisaC) |].
-      split; [vm_compute; reflexivity |].
-      intro s. exact (exec_execute_C_ADDI16SP kv_imm1 s).
+    mk_rvc KernelSyms.kernelvec kv_h1 kv_pc1
+      (ITYPE (caddi16sp_imm kv_imm1, sp, sp, ADDI))
+      kv_decode1 exec_execute_C_ADDI16SP.
   Qed.
 
 End SmodeDemo.

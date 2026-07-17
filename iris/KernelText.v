@@ -18,6 +18,8 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
+(* for [MISA_C], which [close_dec] reads misa bits out of *)
+Require Import RiscvFetchExec.
 From Kernel Require KernelInstrs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -187,7 +189,25 @@ End KernelText.
 (*  every later address -- leaves every call site untouched.  [mk_rvc]     *)
 (*  takes no window word: it computes the window from the image            *)
 (*  ([kb_word_at A]) and proves it against [kernel_bytes].                 *)
+(*                                                                        *)
+(*  [decname]'s side conditions are closed by [close_dec]: either straight *)
+(*  from the hypotheses [instr] supplies, or -- for a decoder that wants a *)
+(*  specific misa bit (MUL wants misa.M, and so on) -- by computing it out *)
+(*  of the [misa = MISA_C] hypothesis, which pins every bit.  So needing a *)
+(*  misa bit is NOT a reason to hand-roll a constructor or to take         *)
+(*  [hw_config] as a premise.                                             *)
 (* ===================================================================== *)
+
+Ltac close_dec decname :=
+  apply decname;
+  first [ assumption
+        | match goal with
+          (* Keyed on the RHS alone: this file does [Import Defs], so a pattern
+             mentioning [misa] would resolve it to a constant that is NOT the
+             one in a client file's hypothesis, and never match.  [MISA_C] is
+             unambiguous and appears only in this hypothesis. *)
+          | H : _ = MISA_C |- _ => rewrite H; vm_compute; reflexivity
+          end ].
 
 Ltac mk_rvc A h pc ast decname expname :=
   let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
@@ -210,7 +230,7 @@ Ltac mk_rvc A h pc ast decname expname :=
   [ iApply (instr_bytes_rvc_any pc h (kb_word_at A) H2al Hrvc Hsub);
     iApply (kernel_window_pc A (kb_word_at A) 4 pc eq_refl Hbytes with "Ht")
   | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
-    eexists; (split; [ apply decname; assumption
+    eexists; (split; [ close_dec decname
                      | split; [ vm_compute; reflexivity
                               | intro; apply expname ] ]) ].
 
@@ -231,4 +251,4 @@ Ltac mk_base A w pc ast decname :=
   iSplitL "";
   [ iApply (instr_bytes_base pc w H2al Hnrvc);
     iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-  | iIntros (?) "_"; iPureIntro; intros; apply decname; assumption ].
+  | iIntros (?) "_"; iPureIntro; intros; close_dec decname ].

@@ -77,33 +77,15 @@ Section WpMemsetS.
   intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
 
-  (* ---- the [instr] fact at [memset]'s entry (4-aligned RVC) ---- *)
-  (* Under the post-refactor [instr], the RVC arm carries the ExecuteAs-EXPANDED
-     base instruction: the entry c.addi16sp expands to [addi sp,sp,-16]. *)
+  (* ---- the [instr] fact at [memset]'s entry ---- *)
+  (* The RVC arm of [instr] carries the ExecuteAs-EXPANDED base instruction:
+     the entry c.addi16sp expands to [addi sp,sp,-16]. *)
   Lemma memset_instr0 :
     kernel_text -∗ instr pc_memset true (ITYPE (sign_extend' 12 imm_memset0, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (ITYPE (sign_extend' 12 imm_memset0, Regidx csp_rs1, Regidx csp_rs1, ADDI)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_memset) 2 = true) by (vm_compute; reflexivity).
-    (* memset now sits at a 2-aligned (mod 4 = 2) address, so the entry
-       c.addi16sp is recovered from a 2-byte (rvc2) fetch window. *)
-    assert (H4al : is_aligned_vaddr (Virtaddr pc_memset) 4 = false) by (vm_compute; reflexivity).
-    assert (Hrvc : isRVC h_memset0 = true) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (KernelSyms.memset + Z.of_nat j)%Z = Some (nth_byte h_memset0 j)).
-    { intros j Hj;
-        do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_RVC h_memset0).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_rvc2 pc_memset h_memset0 H2al H4al Hrvc).
-      iApply (kernel_window_pc KernelSyms.memset h_memset0 2 pc_memset eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
-      eexists. split; [ exact (decode_memset_addi σ HmisaC)
-                      | split; [ vm_compute; reflexivity | intro; apply exec_execute_C_ADDI ] ].
+    mk_rvc KernelSyms.memset h_memset0 pc_memset
+      (ITYPE (sign_extend' 12 imm_memset0, Regidx csp_rs1, Regidx csp_rs1, ADDI))
+      decode_memset_addi exec_execute_C_ADDI.
   Qed.
 
 

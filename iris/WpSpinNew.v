@@ -108,27 +108,8 @@ Qed.
   Lemma spin_instr :
     kernel_text -∗ instr pc_spin true (JAL (jimm_spin, zreg)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (JAL (jimm_spin, zreg)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr pc_spin) 2 = true) by (vm_compute; reflexivity).
-    assert (H4al : is_aligned_vaddr (Virtaddr pc_spin) 4 = false) by (vm_compute; reflexivity).
-    assert (Hrvc : isRVC h_spin = true) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (KernelSyms.spin + Z.of_nat j)%Z = Some (nth_byte h_spin j)).
-    { intros j Hj;
-        do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_RVC h_spin).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_rvc2 pc_spin h_spin H2al H4al Hrvc).
-      iApply (kernel_window_pc KernelSyms.spin h_spin 2 pc_spin eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
-      exists (C_J imm_spin).
-      split; [exact (decode_C_J σ HmisaC) |].
-      split; [vm_compute; reflexivity |].
-      intro s. exact (exec_execute_C_J imm_spin s).
+    mk_rvc KernelSyms.spin h_spin pc_spin (JAL (jimm_spin, zreg))
+      decode_C_J exec_execute_C_J.
   Qed.
 
   (* ================================================================= *)

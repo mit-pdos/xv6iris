@@ -594,7 +594,7 @@ Section AcqIris.
 End AcqIris.
 
 (* ===================================================================== *)
-(* §5c acquire's first instruction: c.addi sp,-32 (0x1101 @ 0x80000c04).  *)
+(* §5c acquire's first instruction: c.addi sp,-32 (0x1101).               *)
 (* ===================================================================== *)
 Definition acq_pc1 : mword 64 := mword_of_int KernelSyms.acquire.
 Definition acq_h1 : mword 16 := mword_of_int 0x1101.
@@ -614,27 +614,9 @@ Section AcqInstr.
   Lemma acq_instr1 :
     kernel_text -∗ instr acq_pc1 true (ITYPE (sign_extend' 12 acq_i1, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof.
-    assert (Hlpad : is_lpad_instruction (ITYPE (sign_extend' 12 acq_i1, Regidx csp_rs1, Regidx csp_rs1, ADDI)) = false)
-      by (vm_compute; reflexivity).
-    assert (H2al : is_aligned_vaddr (Virtaddr acq_pc1) 2 = true) by (vm_compute; reflexivity).
-    assert (H4al : is_aligned_vaddr (Virtaddr acq_pc1) 4 = false) by (vm_compute; reflexivity).
-    assert (Hrvc : isRVC acq_h1 = true) by (vm_compute; reflexivity).
-    assert (Hbytes : forall j, (j < 2)%nat ->
-        KernelInstrs.kernel_bytes !! (KernelSyms.acquire + Z.of_nat j)%Z = Some (nth_byte acq_h1 j)).
-    { intros j Hj;
-        do 2 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia. }
-    iIntros "#Ht". rewrite /instr.
-    iSplitR; [iPureIntro; exact Hlpad|].
-    iExists (F_RVC acq_h1).
-    iSplitR; [iPureIntro; reflexivity|].
-    iSplitL "".
-    - iApply (instr_bytes_rvc2 acq_pc1 acq_h1 H2al H4al Hrvc).
-      iApply (kernel_window_pc KernelSyms.acquire acq_h1 2 acq_pc1 eq_refl Hbytes with "Ht").
-    - iIntros (σ) "_". iPureIntro. intros _ HmisaC _ _ _. cbn [fetch_is_rvc].
-      exists (C_ADDI (acq_i1, Regidx csp_rs1)).
-      split; [exact (acq_decode1 σ HmisaC) |].
-      split; [vm_compute; reflexivity |].
-      intro s. exact (exec_execute_C_ADDI acq_i1 (Regidx csp_rs1) s).
+    mk_rvc KernelSyms.acquire acq_h1 acq_pc1
+      (ITYPE (sign_extend' 12 acq_i1, Regidx csp_rs1, Regidx csp_rs1, ADDI))
+      acq_decode1 exec_execute_C_ADDI.
   Qed.
 
 End AcqInstr.
