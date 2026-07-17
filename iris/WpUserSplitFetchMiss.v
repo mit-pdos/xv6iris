@@ -27,10 +27,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import MinstretInv InstrBytes WpGpr.
+Require Import MinstretInv InstrBytes.
 Require Import SmodeCore SmodePte WpIntrCore WpDecodeBridge.
 Require Import UmodeFetch UmodeFetchC UmodeEcall UmodeWalk CommonWalk.
-Require Import UptInv WpUserLoop.
+Require Import UptInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.

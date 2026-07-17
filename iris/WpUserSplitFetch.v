@@ -23,10 +23,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import MinstretInv InstrBytes WpGpr.
+Require Import MinstretInv InstrBytes.
 Require Import SmodeCore WpIntrCore WpDecodeBridge.
-Require Import UmodeFetch UmodeFetchC UmodeEcall UmodeWalk.
-Require Import UptInv WpUserLoop.
+Require Import UmodeFetch UmodeFetchC UmodeEcall.
+Require Import UptInv.
 Local Open Scope Z_scope.
 Import Defs.
 

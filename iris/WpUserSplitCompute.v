@@ -16,8 +16,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import WpDecodeBridge.
-Require Import UmodeFetch UmodeFetchC UmodeEcall.
-Require Import UptInv WpAuipc WpMmodeShiftiop.
+Require Import UmodeFetch UmodeEcall.
+Require Import UptInv.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeJal WpMemsetS.
 Local Open Scope Z_scope.

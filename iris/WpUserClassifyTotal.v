@@ -11,7 +11,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvExtras.
+Require Import RiscvLang RiscvExec RiscvExtras.
 Require Import UmodeFetch.
 Require Import UptInv WpUserBase.
 Require Import WpUserSteps.
