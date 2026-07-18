@@ -24,6 +24,7 @@ Require Import InstrBytes.
 Require Import WpRvcBridge KernelText StackOwn.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
+Require Import SRegime.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
 Require Import WpSmodeGpr.
@@ -280,7 +281,7 @@ Section WpUartPutcSyncFull.
     rewrite lookup_total_alt lookup_fmap Hr. reflexivity.
   Qed.
 
-  Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+  Lemma wp_uartputc_r (Rg : s_regime) (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (n : nat) (q : Qp)
       (l : list (bv 8)) (pv pkv : mword 32)
@@ -301,7 +302,7 @@ Section WpUartPutcSyncFull.
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
     smode_config γ (DfracOwn q) -∗
-    tlb_inv_pt root_ppn -∗ kernel_text -∗
+    sr_inv Rg -∗ kernel_text -∗
     pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
@@ -309,7 +310,7 @@ Section WpUartPutcSyncFull.
     dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ mf,
       smode_config γ (DfracOwn q) -∗
-      tlb_inv_pt root_ppn -∗
+      sr_inv Rg -∗
       pc_is ret_tgt -∗
       gpr_file mf -∗
       ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
@@ -394,7 +395,7 @@ Section WpUartPutcSyncFull.
     assert (Hvs1 : sval_den ρA (SX 35 0) = (s1old : mword 64)).
     { rewrite sval_den_SX0. unfold ρA. reflexivity. }
     iDestruct (ups_prologue_instrs with "Htext") as "Hbi".
-    iApply (wp_vc_block_s root_ppn ups_prologue Φ
+    iApply (wp_vc_block_s_r Rg ups_prologue Φ
               (VSt UPS vregs_init ups_pro_heap0 [])
               (VSt (UPS + 10) ups_pro_regs1 ups_pro_heap1 [])
               ρA m0 γ (dq:=DfracOwn q)
@@ -435,7 +436,7 @@ Section WpUartPutcSyncFull.
     (* c.mv s1,a0 at 0x96c: s1 := a0.                                       *)
     (* ------------------------------------------------------------------ *)
     iPoseProof (upi_0a with "Htext") as "Hi0a".
-    iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γ Φ (mword_of_int (UPS + 0x0a)) s1_idx a0_idx M1
+    iApply (wp_cmv_gpr_s_config_scfg_r Rg γ Φ (mword_of_int (UPS + 0x0a)) s1_idx a0_idx M1
               (dq:=DfracOwn q)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi0a [-]").
@@ -456,7 +457,7 @@ Section WpUartPutcSyncFull.
                       (subrange_vec_dec (and_vec (m3 !!! Regidx (mword_of_int 9))
                          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = sb).
     { unfold sb. rewrite HR9m3. reflexivity. }
-    iApply (wp_uartputc_body root_ppn γ γd Φ m3 l pv pkv
+    iApply (wp_uartputc_body_r Rg γ γd Φ m3 l pv pkv
               (dq:=DfracOwn q) (dqm:=dqm) (dqm2:=dqm2)
  Hpv Hpkv
               with "Hsm Htlbinv Htext Hpc Hfile Hpk Hpkd Hdinv Hown Hoff").
@@ -504,7 +505,7 @@ Section WpUartPutcSyncFull.
     assert (Hvs1B : sval_den ρB (SX 35 0) = s10).
     { rewrite sval_den_SX0. unfold ρB. reflexivity. }
     iDestruct (ups_epilogue_instrs with "Htext") as "Hbi2".
-    iApply (wp_vc_block_s root_ppn ups_epilogue Φ
+    iApply (wp_vc_block_s_r Rg ups_epilogue Φ
               (VSt (UPS + 0x46) vregs_init ups_epi_heap [])
               (VSt (UPS + 0x46 + 6) ups_epi_regs1 ups_epi_heap [])
               ρB mf γ (dq:=DfracOwn q)
@@ -538,7 +539,7 @@ Section WpUartPutcSyncFull.
                     = (mword_of_int (UPS + 0x4c) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4c) in "Hpc".
-    iApply (wp_caddi16sp_gpr_s_pt root_ppn γ Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) M2 q
+    iApply (wp_caddi16sp_gpr_s_r Rg γ Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) M2 q
               with "Hsm Htlbinv Hpc Hfile Hi4c [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     set (m_epi2 := <[Regidx csp_rs1 := regval_into_reg
@@ -557,7 +558,7 @@ Section WpUartPutcSyncFull.
                     = (mword_of_int (UPS + 0x4e) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4e) in "Hpc".
-    iApply (wp_cret_s_zca_scfg_pt root_ppn γ Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
+    iApply (wp_cret_s_zca_scfg_r Rg γ Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
               (dq:=DfracOwn q)
  ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra_final; exact Hal0)
@@ -631,6 +632,49 @@ Section WpUartPutcSyncFull.
       rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       etransitivity; [ apply (HmM2 _ (SX 35 0)); vm_compute; reflexivity |].
       exact Hvs1B.
+  Qed.
+
+  Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) (γd : uart_names)
+      (Φ : mval -> iProp Σ)
+      (m0 : gmap regidx (mword 64)) (n : nat) (q : Qp)
+      (l : list (bv 8)) (pv pkv : mword 32)
+      {dqm dqm2 : dfrac} :
+    let ra_idx : mword 5 := mword_of_int 1 in
+    let a0_idx : mword 5 := mword_of_int 10 in
+    let pcE := mword_of_int UPS in
+    let sp0 := m0 !!! Regidx csp_rs1 in
+    let ra0 := m0 !!! Regidx ra_idx in
+    let a00 := m0 !!! Regidx a0_idx in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (* the byte written to THR: the low 8 bits of the char in a0 *)
+    let sb : mword 8 := autocast (T := mword)
+       (subrange_vec_dec (and_vec (add_vec zero_reg a00)
+          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
+    (3 ≤ n)%nat ->
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    eq_vec (sign_extend' 64 pv) zero_reg = false ->
+    neq_vec (sign_extend' 64 pkv) zero_reg = false ->
+    smode_config γ (DfracOwn q) -∗
+    tlb_inv_pt root_ppn -∗ kernel_text -∗
+    pc_is pcE -∗ gpr_file m0 -∗
+    stack_own sp0 n -∗
+    (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+    (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    ( ∀ mf,
+      smode_config γ (DfracOwn q) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is ret_tgt -∗
+      gpr_file mf -∗
+      ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
+      stack_own sp0 n -∗
+      (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+      (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+      uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof.
+    exact (wp_uartputc_r (kpt_regime root_ppn) γ γd Φ m0 n q l pv pkv (dqm:=dqm) (dqm2:=dqm2)).
   Qed.
 
 End WpUartPutcSyncFull.
