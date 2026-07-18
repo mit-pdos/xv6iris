@@ -869,3 +869,158 @@ Proof.
   destruct acc; [ reflexivity | | ];
     vm_compute in EA; discriminate EA.
 Qed.
+
+(* ===================================================================== *)
+(* §3e read_CSR over the hpm shadow range.                                *)
+(* ===================================================================== *)
+
+(* priv bits from a matched subrange, extracted for reuse *)
+Lemma sub115_priv (csr : mword 12) (k : mword 7) :
+  eq_vec (subrange_vec_dec csr 11 5) k = true ->
+  (bv_unsigned csr / 256) mod 4 = (bv_unsigned k / 8) mod 4.
+Proof.
+  intros E.
+  apply eq_vec_true_iff in E.
+  apply (f_equal bv_unsigned) in E.
+  rewrite sub115_unsigned in E.
+  set (c := bv_unsigned csr) in *.
+  assert (Hdd : c / 256 = (c / 32) / 8).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 32) in *.
+  assert (Hh8 : q / 8 = 16 * (q / 128) + bv_unsigned k / 8).
+  { assert (Hq2 : q = 16 * (q / 128) * 8 + bv_unsigned k).
+    { pose proof (Z_div_mod_eq_full q 128) as Hd.
+      rewrite E in Hd.
+      replace (16 * (q / 128) * 8) with (128 * (q / 128)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia. reflexivity. }
+  rewrite Hdd, Hh8.
+  replace (16 * (q / 128) + bv_unsigned k / 8)
+    with (bv_unsigned k / 8 + (q / 128) * 4 * 4) by ring.
+  rewrite Z_mod_plus_full.
+  reflexivity.
+Qed.
+
+Lemma sub114_priv (csr : mword 12) (h : mword 8) :
+  eq_vec (subrange_vec_dec csr 11 4) h = true ->
+  (bv_unsigned csr / 256) mod 4 = (bv_unsigned h / 16) mod 4.
+Proof.
+  intros E.
+  apply eq_vec_true_iff in E.
+  apply (f_equal bv_unsigned) in E.
+  rewrite sub114_unsigned in E.
+  set (c := bv_unsigned csr) in *.
+  assert (Hdd : c / 256 = (c / 16) / 16).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 16) in *.
+  assert (Hh16 : q / 16 = 16 * (q / 256) + bv_unsigned h / 16).
+  { assert (Hq2 : q = 16 * (q / 256) * 16 + bv_unsigned h).
+    { pose proof (Z_div_mod_eq_full q 256) as Hd.
+      rewrite E in Hd.
+      replace (16 * (q / 256) * 16) with (256 * (q / 256)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia. reflexivity. }
+  rewrite Hdd, Hh16.
+  replace (16 * (q / 256) + bv_unsigned h / 16)
+    with (bv_unsigned h / 16 + (q / 256) * 4 * 4) by ring.
+  rewrite Z_mod_plus_full.
+  reflexivity.
+Qed.
+
+(* a PMP-file 11:4 guard cannot coexist with the hpm 11:5 range *)
+Lemma pmp_vs_hpm_dead (csr : mword 12) (h : mword 8) :
+  eq_vec (subrange_vec_dec csr 11 4) h = true ->
+  bv_unsigned h / 16 = 3 ->
+  eq_vec (subrange_vec_dec csr 11 5) ('b"1100000") = true -> False.
+Proof.
+  intros E4 Hh E5.
+  pose proof (sub114_priv csr h E4) as H4.
+  pose proof (sub115_priv csr ('b"1100000") E5) as H5.
+  rewrite Hh in H4.
+  change (bv_unsigned ('b"1100000" : mword 7) / 8) with 12 in H5.
+  rewrite H4 in H5.
+  vm_compute in H5. discriminate H5.
+Qed.
+
+(* one read_CSR guard, killed from the hpm range membership *)
+Ltac csr_read_step E1 :=
+  lazymatch goal with
+  | |- exists _, exec (if andb false ?g2 then _ else _) _ = Some _ =>
+      (* a prior [change] already exposed the closed-false conjunct *)
+      rewrite (andb_false_l g2); cbn match
+  | |- exists _, exec (if andb (Z.eqb xlen 32) ?g2 then _ else _) _ = Some _ =>
+      (* an RV32-only clause: the first conjunct is closed false *)
+      change (Z.eqb xlen 32) with false;
+      rewrite (andb_false_l g2);
+      cbn match
+  | |- exists _, exec (if andb (eq_vec (subrange_vec_dec ?c 11 4) ?h) ?g2 then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (andb (eq_vec (subrange_vec_dec c 11 4) h) g2) eqn:E;
+      [ apply andb_prop in E;
+        let Ea := fresh "Ea" in let Eb := fresh "Eb" in
+        destruct E as [Ea Eb];
+        exfalso;
+        exact (pmp_vs_hpm_dead c h Ea ltac:(vm_compute; reflexivity) E1)
+      | clear E ]
+  | |- exists _, exec (if andb (eq_vec (subrange_vec_dec ?c 11 5) ?k) ?g2 then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (andb (eq_vec (subrange_vec_dec c 11 5) k) g2) eqn:E;
+      [ apply andb_prop in E;
+        let Ea := fresh "Ea" in let Eb := fresh "Eb" in
+        destruct E as [Ea Eb];
+        exfalso;
+        apply eq_vec_true_iff in Ea;
+        let E1' := fresh "E1x" in
+        pose proof E1 as E1';
+        apply eq_vec_true_iff in E1';
+        rewrite E1' in Ea; vm_compute in Ea; discriminate Ea
+      | clear E ]
+  | |- exists _, exec (if eq_vec (subrange_vec_dec ?c 11 4) ?h then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (eq_vec (subrange_vec_dec c 11 4) h) eqn:E;
+      [ exfalso;
+        exact (pmp_vs_hpm_dead c h E ltac:(vm_compute; reflexivity) E1)
+      | clear E ]
+  | |- exists _, exec (if eq_vec ?c ?a then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (eq_vec c a) eqn:E;
+      [ exfalso; apply eq_vec_true_iff in E; subst c;
+        vm_compute in E1; discriminate E1
+      | clear E ]
+  end.
+
+Lemma exec_read_CSR_hpm (csr : mword 12) (s : mstate) :
+  u_hpm_range csr ('b"1100000") ->
+  exists v, exec (read_CSR csr) s = Some (v, s).
+Proof.
+  intros [E1 E2].
+  unfold read_CSR.
+  repeat csr_read_step E1.
+  (* the live hpm clause *)
+  cbv zeta.
+  match goal with
+  | |- exists _, exec (if ?g then _ else _) _ = Some _ =>
+      replace g with true
+        by (symmetry; apply andb_true_iff; split; [ exact E1 | exact E2 ])
+  end.
+  eexists.
+  erewrite exec_bind_Some.
+  2:{ unfold hpmidx_from_bits, Defs.assert_exp'. cbv zeta.
+      lazymatch goal with
+      | |- exec (Defs.bind (match ?g with true => _ | false => _ end) _) _ = _ =>
+          lazymatch type of E2 with
+          | ?g2 = true => change g2 with g in E2
+          end;
+          let E3 := fresh "E3" in
+          destruct g eqn:E3; [ | discriminate E2 ]
+      end.
+      cbn match.
+      erewrite exec_bind_Some; [ | apply exec_returnM ].
+      cbn beta. apply exec_returnM. }
+  cbn beta.
+  unfold read_mhpmcounter.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mhpmcounter s)). cbn beta.
+  apply exec_returnM.
+Qed.
