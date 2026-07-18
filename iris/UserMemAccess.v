@@ -1254,3 +1254,100 @@ Proof.
     unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
   rewrite Hfe. cbn match. reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* §5d The LR checked_mem_read RETIRE-OR-FAULT disjunction (widths 4, 8). *)
+(*    Ties the pieces together: on a user-mapped, aligned, readable,      *)
+(*    PMP-granted RAM address the reserved read either RETIRES with the   *)
+(*    bytes ([reservability<>RsrvNone]) or takes the delegated            *)
+(*    E_Load_Access_Fault ([reservability=RsrvNone]); a single [if] on    *)
+(*    the (unpinned) reservability captures both total outcomes.          *)
+(* ===================================================================== *)
+
+Lemma exec_checked_mem_read_lr_4 (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : mword 32) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 4 false false true false) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
+  unfold checked_mem_read.
+  assert (Hrk : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))
+    by (unfold read_kind_of_flags; apply exec_returnM).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s = Some (None, s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
+    rewrite (exec_bind_Some _ _ _ _ _ Hrk).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_4 addr w s Hdev Hbytes)).
+    apply exec_returnM.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s
+                   = Some (Some (E_Load_Access_Fault tt), s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    cbn match. apply exec_returnM.
+Qed.
+
+Lemma exec_checked_mem_read_lr_8 (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : mword 64) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
+  is_aligned_paddr (Physaddr addr) 8 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 8 false false true false) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
+  unfold checked_mem_read.
+  assert (Hrk : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))
+    by (unfold read_kind_of_flags; apply exec_returnM).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s = Some (None, s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
+    rewrite (exec_bind_Some _ _ _ _ _ Hrk).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_8 addr w s Hdev Hbytes)).
+    apply exec_returnM.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s
+                   = Some (Some (E_Load_Access_Fault tt), s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    cbn match. apply exec_returnM.
+Qed.
