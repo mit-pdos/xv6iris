@@ -138,6 +138,13 @@ Qed.
 Lemma pa_add_0 (a : Arch.pa) : pa_add a 0 = a.
 Proof. unfold pa_add. change (Z.of_nat 0) with 0%Z. apply avi0. Qed.
 
+(* [avi0] restated in the raw [add_vec … (mword_of_int 0)] form the whole-
+   function proofs rewrite with (they never spell the [add_vec_int] wrapper).
+   A pure identity, so it belongs here beside [avi0] — NOT in any one function's
+   proof file. *)
+Lemma kv_addv_zero (a : mword 64) : add_vec a (mword_of_int 0) = a.
+Proof. exact (avi0 a). Qed.
+
 (* the kernelvec/kerneltrap saved-register-slot address computation always
    writes its (always-zero) sub-word byte offset as the literal product
    "0 * 8" rather than a bare 0. *)

@@ -32,7 +32,7 @@ Require Import InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew.
+Require Import SmodeCore WpSmodeGpr WpMemsetS.
 Require Import WpMycpu WpAcquireTop KernelRvcDecode.
 Require Import WpSmodeBtype.
 Require Import WpSmodeItype.

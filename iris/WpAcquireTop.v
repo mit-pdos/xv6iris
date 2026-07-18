@@ -40,7 +40,6 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import InstrBytes.
 Require Import WpDecode WpLeafCommon KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpKernelvecNew.
 Require Import WpMycpu KernelRvcDecode.
 Require Import WpAmo.
 Require Import WpRvcBridge.

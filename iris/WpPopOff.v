@@ -39,7 +39,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpMemsetS WpKernelvecNew.
+Require Import SmodeCore WpMemsetS WpSmodeJal.
 Require Import WpSmodeBtype.
 Require Import WpSmodeCsr.
 Require Import WpSmodeItype.
@@ -590,7 +590,7 @@ Section WpPopOffTopSec.
     iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_jal_gpr_s2 root_ppn γc Φ P (mword_of_int 1) jimm m (1/2)%Qp
+    iApply (wp_jal_gpr_s_zca root_ppn γc Φ P (mword_of_int 1) jimm m (1/2)%Qp
  ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
               with "Hsm Htlbinv Hpc Hfile Hjal [-]").
