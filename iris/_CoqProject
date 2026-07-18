@@ -78,6 +78,7 @@ WpSmodePtUart.v
 UptTree.v
 UserPtTree.v
 UserFetchPt.v
+MemAmo4.v
 UserMemPt.v
 PtFetchGen.v
 TrampStepPt.v
