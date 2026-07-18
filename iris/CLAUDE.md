@@ -657,7 +657,14 @@ Where things landed (the stage descriptions below remain the design rationale):
   RVC-success / page-fault disjunction since the low halfword's bits are
   existential).  THE FETCH STORY IS NOW TOTAL over all pc alignments:
   odd -> align fault; 2-aligned -> rvc / base / fault composers;
-  4-aligned -> user_pt_fetch_instr / user_pt_fetch_fault.
+  4-aligned -> user_pt_fetch_instr / user_pt_fetch_fault.  The fault
+  flavor is now ACCESS-GENERIC (`u_fault_flavor acc` + the combined
+  dispatch `utlb_inv_pt_translateAddr_u_fault`, UserPtTree §5b;
+  `u_fetch_fault_flavor` is its fetch instance) -- the DATA-fault story
+  for the memory arms is this one lemma at Load Data / Store Data / the
+  AMO accs, with `exec_effectivePrivilege_mprv0` +
+  `exec_is_shadow_stack_u_acc` as the acc-specific ingredients and the
+  three translationException premises each a cbn-discharge.
 - *Stage 7*: `user_inv` and the whole obligation chain (UserExec / UserTrap /
   UserStep / UserStepFull / UserCompute / UserArms) close over `pt : uptd`
   and `user_pt_inv pt`.  UserPt.v DELETED; UserTranslate slimmed to §1;

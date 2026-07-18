@@ -237,19 +237,10 @@ End UserFetchPtOk.
 (*    [exec_fetch_align_fault], UserFetch §2, is PT-free.)                *)
 (* ===================================================================== *)
 
-(* the ways a 4-aligned user fetch can fault, as ONE flavor predicate *)
+(* the fetch instance of the access-generic fault flavor (UserPtTree §5b) *)
 Definition u_fetch_fault_flavor (tfp : mword 44)
     (um : gmap (mword 27) (mword 64)) (va : mword 64) : Prop :=
-  neq_vec (bits_of_virtaddr (Virtaddr va))
-    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true
-  \/ (neq_vec (bits_of_virtaddr (Virtaddr va))
-        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
-      um !! svpn_of va = None /\
-      svpn_of va <> tramp_vpn /\ svpn_of va <> tf_vpn)
-  \/ (neq_vec (bits_of_virtaddr (Virtaddr va))
-        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
-      exists w, upt_leaf_at tfp um (svpn_of va) w /\
-                uleaf_denied (InstructionFetch tt) w).
+  u_fault_flavor (InstructionFetch tt) tfp um va.
 
 Section UserFetchPtFault.
   Context `{!riscvGS Σ}.
@@ -271,28 +262,15 @@ Section UserFetchPtFault.
     iIntros "Hri Hgh Hinv".
     iAssert (⌜exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
               = Some (Err (E_Fetch_Page_Fault tt, tt), σ)⌝)%I as %Htr.
-    { destruct Hflavor as
-        [ Hnc | [ (Hcanon & Hnone & Hnt & Hntf) | (Hcanon & w & Hleaf & Hden) ] ].
-      - iApply (utlb_inv_pt_translateAddr_u_noncanon (InstructionFetch tt)
-                  uroot tfp um va (E_Fetch_Page_Fault tt) σ Hnc Hcp HSXL
-                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-                  (exec_is_shadow_stack_fetch σ)
-                  ltac:(unfold translationException; cbn match; apply exec_returnm)
-                  with "Hri Hinv").
-      - iApply (utlb_inv_pt_translateAddr_u_unmapped (InstructionFetch tt)
-                  uroot tfp um va (E_Fetch_Page_Fault tt) σ
-                  Hnone Hnt Hntf Hcanon Hhtif Hcp HSXL
-                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-                  (exec_is_shadow_stack_fetch σ) Hall
-                  ltac:(unfold translationException; cbn match; apply exec_returnm)
-                  with "Hri Hgh Hinv").
-      - iApply (utlb_inv_pt_translateAddr_u_denied (InstructionFetch tt)
-                  uroot tfp um w va (E_Fetch_Page_Fault tt) σ
-                  Hleaf Hden Hcanon Hhtif Hcp HSXL
-                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-                  (exec_is_shadow_stack_fetch σ) Hall
-                  ltac:(unfold translationException; cbn match; apply exec_returnm)
-                  with "Hri Hgh Hinv"). }
+    { iApply (utlb_inv_pt_translateAddr_u_fault (InstructionFetch tt)
+                uroot tfp um va (E_Fetch_Page_Fault tt) σ
+                Hflavor Hhtif Hcp HSXL
+                (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
+                (exec_is_shadow_stack_fetch σ) Hall
+                ltac:(unfold translationException; cbn match; apply exec_returnm)
+                ltac:(unfold translationException; cbn match; apply exec_returnm)
+                ltac:(unfold translationException; cbn match; apply exec_returnm)
+                with "Hri Hgh Hinv"). }
     iPureIntro.
     exact (exec_fetch_fault_4 σ va Lpc (E_Fetch_Page_Fault tt) Hal Htr).
   Qed.
@@ -534,28 +512,15 @@ Section UserFetchPtSplitFault.
     iIntros "Hri Hgh Hinv".
     iAssert (⌜exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
               = Some (Err (E_Fetch_Page_Fault tt, tt), σ)⌝)%I as %Htr.
-    { destruct Hflavor as
-        [ Hnc | [ (Hcanon & Hnone & Hnt & Hntf) | (Hcanon & w & Hleaf & Hden) ] ].
-      - iApply (utlb_inv_pt_translateAddr_u_noncanon (InstructionFetch tt)
-                  uroot tfp um va (E_Fetch_Page_Fault tt) σ Hnc Hcp HSXL
-                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-                  (exec_is_shadow_stack_fetch σ)
-                  ltac:(unfold translationException; cbn match; apply exec_returnm)
-                  with "Hri Hinv").
-      - iApply (utlb_inv_pt_translateAddr_u_unmapped (InstructionFetch tt)
-                  uroot tfp um va (E_Fetch_Page_Fault tt) σ
-                  Hnone Hnt Hntf Hcanon Hhtif Hcp HSXL
-                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-                  (exec_is_shadow_stack_fetch σ) Hall
-                  ltac:(unfold translationException; cbn match; apply exec_returnm)
-                  with "Hri Hgh Hinv").
-      - iApply (utlb_inv_pt_translateAddr_u_denied (InstructionFetch tt)
-                  uroot tfp um w va (E_Fetch_Page_Fault tt) σ
-                  Hleaf Hden Hcanon Hhtif Hcp HSXL
-                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-                  (exec_is_shadow_stack_fetch σ) Hall
-                  ltac:(unfold translationException; cbn match; apply exec_returnm)
-                  with "Hri Hgh Hinv"). }
+    { iApply (utlb_inv_pt_translateAddr_u_fault (InstructionFetch tt)
+                uroot tfp um va (E_Fetch_Page_Fault tt) σ
+                Hflavor Hhtif Hcp HSXL
+                (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
+                (exec_is_shadow_stack_fetch σ) Hall
+                ltac:(unfold translationException; cbn match; apply exec_returnm)
+                ltac:(unfold translationException; cbn match; apply exec_returnm)
+                ltac:(unfold translationException; cbn match; apply exec_returnm)
+                with "Hri Hgh Hinv"). }
     iPureIntro.
     exact (exec_fetch_fault_2_first σ va Lpc HmisaC Hbit0 Hbit1 Hnal4
              (E_Fetch_Page_Fault tt) Htr).
@@ -659,38 +624,19 @@ Section UserFetchPtSplitFault.
     - (* not compressed: the second halfword's translation faults at σ1 *)
       iAssert (⌜exec (translateAddr (Virtaddr (add_vec_int va 2)) (InstructionFetch tt)) σ1
                 = Some (Err (E_Fetch_Page_Fault tt, tt), σ1)⌝)%I as %Htr2.
-      { destruct Hflavor as
-          [ Hnc2 | [ (Hcanon2 & Hnone2 & Hnt2 & Hntf2) | (Hcanon2 & wh & Hleaf2 & Hden2) ] ].
-        - iApply (utlb_inv_pt_translateAddr_u_noncanon (InstructionFetch tt)
-                    uroot tfp um (add_vec_int va 2) (E_Fetch_Page_Fault tt) σ1 Hnc2
-                    (ltac:(rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
-                    (ltac:(rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact HSXL))
-                    (exec_effectivePrivilege_fetch (register_lookup mstatus σ1.(sregs)) User σ1)
-                    (exec_is_shadow_stack_fetch σ1)
-                    ltac:(unfold translationException; cbn match; apply exec_returnm)
-                    with "Hri Hinv").
-        - iApply (utlb_inv_pt_translateAddr_u_unmapped (InstructionFetch tt)
-                    uroot tfp um (add_vec_int va 2) (E_Fetch_Page_Fault tt) σ1
-                    Hnone2 Hnt2 Hntf2 Hcanon2
-                    (ltac:(rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif))
-                    (ltac:(rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
-                    (ltac:(rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact HSXL))
-                    (exec_effectivePrivilege_fetch (register_lookup mstatus σ1.(sregs)) User σ1)
-                    (exec_is_shadow_stack_fetch σ1)
-                    (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall))
-                    ltac:(unfold translationException; cbn match; apply exec_returnm)
-                    with "Hri Hgh Hinv").
-        - iApply (utlb_inv_pt_translateAddr_u_denied (InstructionFetch tt)
-                    uroot tfp um wh (add_vec_int va 2) (E_Fetch_Page_Fault tt) σ1
-                    Hleaf2 Hden2 Hcanon2
-                    (ltac:(rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif))
-                    (ltac:(rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
-                    (ltac:(rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact HSXL))
-                    (exec_effectivePrivilege_fetch (register_lookup mstatus σ1.(sregs)) User σ1)
-                    (exec_is_shadow_stack_fetch σ1)
-                    (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall))
-                    ltac:(unfold translationException; cbn match; apply exec_returnm)
-                    with "Hri Hgh Hinv"). }
+      { iApply (utlb_inv_pt_translateAddr_u_fault (InstructionFetch tt)
+                  uroot tfp um (add_vec_int va 2) (E_Fetch_Page_Fault tt) σ1
+                  Hflavor
+                  (ltac:(rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif))
+                  (ltac:(rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
+                  (ltac:(rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact HSXL))
+                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ1.(sregs)) User σ1)
+                  (exec_is_shadow_stack_fetch σ1)
+                  (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall))
+                  ltac:(unfold translationException; cbn match; apply exec_returnm)
+                  ltac:(unfold translationException; cbn match; apply exec_returnm)
+                  ltac:(unfold translationException; cbn match; apply exec_returnm)
+                  with "Hri Hgh Hinv"). }
       iModIntro. iExists σ1.
       iSplit; [ iPureIntro; right | ].
       { exact (exec_fetch_fault_2_second σ σ1 va (u_walk_pa w va)
