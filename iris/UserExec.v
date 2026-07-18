@@ -9,7 +9,7 @@
 
      [user_inv]        the loop invariant: privilege User, an ARBITRARY pc,
                        ARBITRARY registers, arbitrary trap CSRs, over the
-                       user page table invariant [upt_inv] (UserPt.v -- owns
+                       user page table bundle [user_pt_inv] (UserPtTree.v -- owns
                        the PT slots and every mapped page, contents
                        existential) and the loop-constant config [user_cfg].
      [user_trap_frame] the frame handed to the kernel re-entry continuation:
@@ -28,8 +28,8 @@
    totality [DecodeTotalU/DecodeSetU] x per-family execute outcomes).
    Everything a step can do falls in one of the two continuations:
      - retire: compute/branch/jump (register file changes), loads/stores/AMOs
-       to mapped pages (the page contents are existential in [upt_inv], so a
-       store trivially re-establishes it), TLB fills ([upt_tlb_ok_fill]);
+       to mapped pages (the page contents are existential in [user_pt_inv], so a
+       store trivially re-establishes it), TLB fills and Svadu A/D write-backs (absorbed by [utlb_inv_pt]);
      - trap TO STVEC: a pending delegated INTERRUPT (see below), ecall/ebreak,
        illegal (incl. all privileged instructions), fetch/load/store page
        faults (unmapped or permission-denied or A/D-update-needed pages),
@@ -60,7 +60,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpGpr.
 Require Import WpIntrCore.
-Require Import UserPt.
+Require Import UptTree UserPtTree.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -195,13 +195,13 @@ Definition trap_mstatus_ok (ms : mword 64) : Prop :=
 Section UserExec.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  Context (C : ucfg) (pt : upt).
+  Context (C : ucfg) (pt : uptd).
 
   Local Notation dqc := (uc_dqc C).
 
   (* the loop-constant config cells (fraction [dqc]: never written during
      user execution; the complementary fraction stays with the kernel).
-     satp / tlb / pmp cells live inside [upt_inv] (UserPt.v).  The
+     satp / tlb / pmp cells live inside [user_pt_inv] (UserPtTree.v).  The
      external-interrupt WIRES sig_meip / sig_seip are deliberately ABSENT:
      the device loop writes them concurrently, so they cannot be pinned
      here -- they will live in an invariant shared with the device WP,
@@ -224,7 +224,7 @@ Section UserExec.
   (* cell, so it is owned at full fraction), the pc (ANY value -- fetching *)
   (* from a non-canonical or unmapped address page-faults safely), the     *)
   (* register file, the trap CSRs (stale until the next trap writes them), *)
-  (* mstatus up to its pins, and -- inside [upt_inv] -- the TLB and the    *)
+  (* mstatus up to its pins, and -- inside [user_pt_inv] -- the TLB and the    *)
   (* mapped pages' contents.                                               *)
   (*                                                                       *)
   (* PC vs nextPC: while ACTIVE the two are in lock-step ([pc_is]-shaped:  *)
@@ -256,7 +256,7 @@ Section UserExec.
       ⌜user_mstatus_ok ms_v⌝ ∗
       ⌜forall u, hs = HART_ACTIVE u -> va' = va⌝ ∗
       user_regs hs ms_v sc_v stval_v sepc_v va va' g ∗
-      upt_inv pt ∗
+      user_pt_inv pt ∗
       user_cfg)%I.
 
   (* ------------------------------------------------------------------- *)
@@ -279,7 +279,7 @@ Section UserExec.
       sepc ↦ᵣ sepc_v ∗
       pc_is (stvec_base (uc_stvec C)) ∗
       gpr_file g ∗
-      upt_inv pt ∗
+      user_pt_inv pt ∗
       user_cfg)%I.
 
   (* assemble the trapped frame from the delivered cells (shared by every
@@ -291,7 +291,7 @@ Section UserExec.
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
     PC ↦ᵣ stvec_base (uc_stvec C) -∗ nextPC ↦ᵣ stvec_base (uc_stvec C) -∗
-    gpr_file g -∗ upt_inv pt -∗ user_cfg -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg -∗
     user_trap_frame.
   Proof.
     iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg".
@@ -328,7 +328,7 @@ Section UserExec.
           (g : gmap regidx (mword 64)),
         ⌜user_mstatus_ok ms_v⌝ -∗
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-        upt_inv pt -∗
+        user_pt_inv pt -∗
         user_cfg -∗
         ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
            (user_trap_frame -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗

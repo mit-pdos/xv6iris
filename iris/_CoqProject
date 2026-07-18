@@ -118,7 +118,6 @@ RiscvAdequacy.v
 CommonWalk.v
 DecodeTotalU.v
 DecodeSetU.v
-UserPt.v
 UserExec.v
 UserStep.v
 UserTrap.v

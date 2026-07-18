@@ -28,7 +28,7 @@
                             frame; the fetch never reaches execute, so the
                             gpr file and nextPC are untouched and stay with
                             the arm ([fetch_fault_obligation] hands over
-                            only interp + [upt_inv], the TLB may fill on a
+                            only interp + [user_pt_inv], the TLB may fill on a
                             partially-successful split fetch).
      [illegal_branch]       run_hart_active returns [Illegal_Instruction]
                             (every privileged instruction at User --
@@ -63,14 +63,14 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import WpLeafCommon WpIntrBits WpIntrCore.
-Require Import UserPt UserExec UserStep UserTrap UserCompute.
+Require Import UptTree UserPtTree UserExec UserStep UserTrap UserCompute.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UserArms.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  Context (C : ucfg) (pt : upt).
+  Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
   (* The RETIRE arm.  The caller supplies the per-family                   *)
@@ -95,7 +95,7 @@ Section UserArms.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
     (∀ b : bool,
        retire_obligation C pt Ei (set_reg σ (R_bool minstret_increment) b) va g) -∗
     ▷ (user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -166,7 +166,7 @@ Section UserArms.
   (* discharges when execute produces a synchronous trap (ecall / ebreak / *)
   (* illegal / memory page fault).  Same ownership discipline as            *)
   (* [retire_obligation]: it owns what fetch+execute mutate (interp, gpr    *)
-  (* file, nextPC, [upt_inv]; [user_cfg] borrowed for the decode reads)     *)
+  (* file, nextPC, [user_pt_inv]; [user_cfg] borrowed for the decode reads)     *)
   (* and returns them at the post-execute state [s_x], with the run         *)
   (* reduction ending in [Trap] at User with a DELEGATED user exception.    *)
   (* The post-execute nextPC [va'] is whatever execute left there (the      *)
@@ -178,7 +178,7 @@ Section UserArms.
      mstate_interp σ -∗
      gpr_file g -∗
      nextPC ↦ᵣ va -∗
-     upt_inv pt -∗
+     user_pt_inv pt -∗
      user_cfg C -∗
      |={E}=>
        ∃ (ib : mword 32) (s_x : mstate) (g' : gmap regidx (mword 64))
@@ -195,7 +195,7 @@ Section UserArms.
          mstate_interp s_x ∗
          gpr_file g' ∗
          nextPC ↦ᵣ va' ∗
-         upt_inv pt ∗
+         user_pt_inv pt ∗
          user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
@@ -219,7 +219,7 @@ Section UserArms.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
     (∀ b : bool,
        execute_trap_obligation Ei (set_reg σ (R_bool minstret_increment) b) va g) -∗
     ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -315,7 +315,7 @@ Section UserArms.
   (* (misaligned / non-canonical / unmapped / denied / needs-update pc),   *)
   (* with a DELEGATED user exception.  The fetch writes neither the gpr    *)
   (* file nor nextPC, so only the interp (a split fetch may fill the TLB   *)
-  (* on its successful half) and [upt_inv] change hands; [user_cfg] is     *)
+  (* on its successful half) and [user_pt_inv] change hands; [user_cfg] is     *)
   (* borrowed for the reads.  The ADUE-sensitive flavor corollaries        *)
   (* (UserFetch.v) are what discharge this; the arm below is cause-generic.*)
   (* ------------------------------------------------------------------- *)
@@ -323,7 +323,7 @@ Section UserArms.
       : iProp Σ :=
     (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
-     upt_inv pt -∗
+     user_pt_inv pt -∗
      user_cfg C -∗
      |={E}=>
        ∃ (s_f : mstate) (e : ExceptionType) (xv : mword 64),
@@ -334,7 +334,7 @@ Section UserArms.
          ⌜register_lookup (R_bool minstret_increment) s_f.(sregs)
             = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
          mstate_interp s_f ∗
-         upt_inv pt ∗
+         user_pt_inv pt ∗
          user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
@@ -359,7 +359,7 @@ Section UserArms.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
     (∀ b : bool,
        fetch_fault_obligation Ei (set_reg σ (R_bool minstret_increment) b) va) -∗
     ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -449,7 +449,7 @@ Section UserArms.
   (* The ILLEGAL obligation: execute found the instruction ILLEGAL         *)
   (* (privileged instruction at User).  The gpr file is untouched; nextPC  *)
   (* moved (the pre-execute write) and the fetch may have filled the TLB,  *)
-  (* so interp + the nextPC cell + [upt_inv] change hands.  The cause is   *)
+  (* so interp + the nextPC cell + [user_pt_inv] change hands.  The cause is   *)
   (* FIXED (E_Illegal_Instr, delegated by [uc_del]); the tval is the       *)
   (* instruction bits, supplied by try_step's dedicated arm.               *)
   (* ------------------------------------------------------------------- *)
@@ -458,7 +458,7 @@ Section UserArms.
     (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      nextPC ↦ᵣ va -∗
-     upt_inv pt -∗
+     user_pt_inv pt -∗
      user_cfg C -∗
      |={E}=>
        ∃ (ib : mword 32) (s_x : mstate) (va' : mword 64),
@@ -470,7 +470,7 @@ Section UserArms.
          ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
          mstate_interp s_x ∗
          nextPC ↦ᵣ va' ∗
-         upt_inv pt ∗
+         user_pt_inv pt ∗
          user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
@@ -495,7 +495,7 @@ Section UserArms.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
     (∀ b : bool,
        illegal_obligation Ei (set_reg σ (R_bool minstret_increment) b) va) -∗
     ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -594,7 +594,7 @@ Section UserArms.
     (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      nextPC ↦ᵣ va -∗
-     upt_inv pt -∗
+     user_pt_inv pt -∗
      user_cfg C -∗
      |={E}=>
        ∃ (wr : WaitReason) (ib : mword 32) (s_x : mstate) (va' : mword 64),
@@ -603,7 +603,7 @@ Section UserArms.
          ⌜wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO⌝ ∗
          mstate_interp s_x ∗
          nextPC ↦ᵣ va' ∗
-         upt_inv pt ∗
+         user_pt_inv pt ∗
          user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
@@ -627,7 +627,7 @@ Section UserArms.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
     (∀ b : bool,
        enter_wait_obligation Ei (set_reg σ (R_bool minstret_increment) b) va) -∗
     ▷ (user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗

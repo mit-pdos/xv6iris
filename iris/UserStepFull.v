@@ -26,14 +26,14 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv WireInv WpGpr.
 Require Import WpIntrCore.
-Require Import UserPt UserExec UserStep UserTrap.
+Require Import UptTree UserPtTree UserExec UserStep UserTrap.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UserStepFull.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  Context (C : ucfg) (pt : upt).
+  Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
   (* The interrupt branch: a pending delegated interrupt traps to stvec.  *)
@@ -67,7 +67,7 @@ Section UserStepFull.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
     ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
@@ -164,7 +164,7 @@ Section UserStepFull.
      fetch/decode/execute produces one whole [riscv_step] that either
      retires (re-establishing [user_inv]) or traps (producing
      [user_trap_frame]).  It owns [interp σ] + [minstret_inv_body] + the
-     unpacked mutable frame + [upt_inv] + [user_cfg] + the Löb continuation,
+     unpacked mutable frame + [user_pt_inv] + [user_cfg] + the Löb continuation,
      and returns the [wp_exec_step_minstret] payload at the inner mask.
      The dispatch fact is handed at the POST-minstret-increment states
      (∀ over the written bit): [run_hart_active] runs after [try_step]'s
@@ -183,7 +183,7 @@ Section UserStepFull.
            exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
              = Some (None, set_reg σ (R_bool minstret_increment) b)⌝ -∗
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-        upt_inv pt -∗ user_cfg C -∗
+        user_pt_inv pt -∗ user_cfg C -∗
         mstate_interp σ -∗ minstret_inv_body -∗
         ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
            (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗

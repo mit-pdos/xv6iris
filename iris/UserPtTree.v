@@ -127,6 +127,17 @@ Qed.
 Definition udata_cov (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa) : Prop :=
   forall vpn w va, um !! vpn = Some w -> u_walk_pa w va ∈ data.
 
+(* ONE pure description of a live user page table, so the whole
+   user-execution development closes over a single parameter (the
+   [upt]-record successor): the root and trapframe ppns, the abstract
+   user map, and the data-page footprint. *)
+Record uptd := UPTD {
+  ud_root : mword 44;
+  ud_tfp  : mword 44;
+  ud_um   : gmap (mword 27) (mword 64);
+  ud_data : gset Arch.pa
+}.
+
 Section UserPtInv.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -141,12 +152,11 @@ Section UserPtInv.
 
   (* THE USER-EXECUTION PT BUNDLE: the tree invariant + the data pages +
      the pure coverage and access-classification facts. *)
-  Definition user_pt_inv (uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa) : iProp Σ :=
-    (utlb_inv_pt uroot tfp um ∗
-     udata_own data ∗
-     ⌜udata_cov um data⌝ ∗
-     ⌜upt_acc_wf um⌝)%I.
+  Definition user_pt_inv (P : uptd) : iProp Σ :=
+    (utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗
+     udata_own P.(ud_data) ∗
+     ⌜udata_cov P.(ud_um) P.(ud_data)⌝ ∗
+     ⌜upt_acc_wf P.(ud_um)⌝)%I.
 
 End UserPtInv.
 

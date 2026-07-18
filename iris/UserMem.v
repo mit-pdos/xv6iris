@@ -225,7 +225,7 @@ Qed.
 (* ===================================================================== *)
 (* §3 Sourcing the fetched word from the OWNED pages.                      *)
 (* ===================================================================== *)
-Require Import CommonWalk UserBits UserPt.
+Require Import CommonWalk UserBits.
 
 (* bytes of a 4-byte-aligned access stay on the translated page *)
 Lemma u_walk_pa_window (pte0 : mword 64) (va : mword 64) (j : nat) :
@@ -238,135 +238,6 @@ Proof.
   exact (pa_window _ va j ltac:(lia)).
 Qed.
 
-Section UserMemIris.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-
-  (* borrow the data pages: the 4 bytes at the translated pc exist (with
-     SOME values -- the page contents are existential), assembled into the
-     fetched word, and the window is RAM *)
-  Lemma upt_fetch_word (pt : upt) (vpn : mword 27) (e : umap_ent)
-      (va : mword 64) (σ : mstate) :
-    pt.(u_map) !! vpn = Some e ->
-    upt_data_cov pt ->
-    is_aligned_vaddr (Virtaddr va) 4 = true ->
-    mstate_interp σ -∗
-    upt_data_own pt.(u_data) -∗
-    ⌜exists w : mword 32,
-       (forall j : nat, (N.of_nat j < 4)%N ->
-          σ.(mem) !! pa_add (u_walk_pa (um_pte0 e) va) j = Some (nth_byte w j))
-       /\ addr_is_ram (u_walk_pa (um_pte0 e) va)
-       /\ addr_is_ram (pa_add (u_walk_pa (um_pte0 e) va) 3)⌝.
-  Proof.
-    iIntros (Hvpn Hcov Hal) "[Hreg [Hmem Hdev]] Hdata".
-    iDestruct "Hdata" as (dm) "[%Hdom Hbytes]".
-    set (pa := u_walk_pa (um_pte0 e) va).
-    (* each window byte is covered, hence present in dm with SOME value *)
-    assert (Hin : forall j : nat, (j < 4)%nat -> pa_add pa j ∈ dom dm).
-    { intros j Hj. rewrite Hdom.
-      unfold pa. rewrite (u_walk_pa_window _ _ _ Hal Hj).
-      exact (Hcov vpn e (add_vec_int va (Z.of_nat j)) Hvpn). }
-    assert (H0 : is_Some (dm !! pa_add pa 0)) by (apply elem_of_dom, Hin; lia).
-    assert (H1 : is_Some (dm !! pa_add pa 1)) by (apply elem_of_dom, Hin; lia).
-    assert (H2 : is_Some (dm !! pa_add pa 2)) by (apply elem_of_dom, Hin; lia).
-    assert (H3 : is_Some (dm !! pa_add pa 3)) by (apply elem_of_dom, Hin; lia).
-    destruct H0 as [b0 Hb0]. destruct H1 as [b1 Hb1].
-    destruct H2 as [b2 Hb2]. destruct H3 as [b3 Hb3].
-    set (w := Z_to_bv 32 (assemble_bytes [b0; b1; b2; b3]) : mword 32).
-    assert (Hw : forall j : nat, (j < 4)%nat ->
-              nth_byte w j = [b0; b1; b2; b3] !!! j).
-    { intros j Hj. apply nth_byte_assemble4; [reflexivity | exact Hj]. }
-    (* the byte points-to give the physical-memory facts; each peel is
-       restored so the next one finds the map intact *)
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb0 with "Hbytes") as "[Hb0' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb0'") as %Hp0.
-    iDestruct (mem_ram with "Hb0'") as %Hram0.
-    iDestruct ("Hrest" with "Hb0'") as "Hbytes".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb1 with "Hbytes") as "[Hb1' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb1'") as %Hp1.
-    iDestruct ("Hrest" with "Hb1'") as "Hbytes".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb2 with "Hbytes") as "[Hb2' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb2'") as %Hp2.
-    iDestruct ("Hrest" with "Hb2'") as "Hbytes".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hb3 with "Hbytes") as "[Hb3' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb3'") as %Hp3.
-    iDestruct (mem_ram with "Hb3'") as %Hram3.
-    iDestruct ("Hrest" with "Hb3'") as "Hbytes".
-    iPureIntro.
-    exists w.
-    split; [ | split; [ rewrite <- (pa_add_0 pa); exact Hram0 | exact Hram3 ] ].
-    intros j HjN.
-    assert (Hj : (j < 4)%nat) by lia.
-    rewrite Hw; [ | exact Hj ].
-    destruct j as [ | [ | [ | [ | ] ] ] ]; try lia; cbn [lookup_total list_lookup_total];
-      [ exact Hp0 | exact Hp1 | exact Hp2 | exact Hp3 ].
-  Qed.
-
-
-  (* the COMPLETE physical fetch fact: at the translated pc, the owned
-     pages provide a word readable by the U-mode fetch.  The read runs at
-     [σ'] (the possibly TLB-filled post-translate state, same memory);
-     the bytes are borrowed at [σ]. *)
-  Lemma upt_fetch_mem_read (pt : upt) (vpn : mword 27) (e : umap_ent)
-      (va : mword 64) (σ σ' : mstate) :
-    pt.(u_map) !! vpn = Some e ->
-    upt_data_cov pt ->
-    is_aligned_vaddr (Virtaddr va) 4 = true ->
-    σ'.(mem) = σ.(mem) ->
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ->
-    register_lookup cur_privilege σ'.(sregs) = User ->
-    register_lookup pma_regions σ'.(sregs) = register_lookup pma_regions σ.(sregs) ->
-    register_lookup htif_tohost_base σ'.(sregs) = register_lookup htif_tohost_base σ.(sregs) ->
-    hw_config -∗
-    mstate_interp σ -∗
-    upt_data_own pt.(u_data) -∗
-    ⌜exists w : mword 32,
-       exec (mem_read (InstructionFetch tt) PBMT_PMA
-               (Physaddr (u_walk_pa (um_pte0 e) va)) 4 false false false) σ'
-         = Some (Ok w, σ')⌝.
-  Proof.
-    iIntros (Hvpn Hcov Hal Hmemeq HA Hord HX Hcovp Lpriv Lpma_eq Lhtif_eq)
-      "#Hhw Hint Hdata".
-    iDestruct (upt_fetch_word pt vpn e va σ Hvpn Hcov Hal with "Hint Hdata")
-      as %(w & Hbytes & Hram0 & Hram3).
-    iDestruct "Hint" as "[Hreg [Hmem Hdev]]".
-    iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(_ & _ & #Hpma & #Hhtif & _ & _ & _ & _ & _ & %Hpma_all & _)".
-    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
-    iPureIntro.
-    set (pa := u_walk_pa (um_pte0 e) va) in *.
-    destruct (Hpma_all pa 4) as (region & Hpmam & Hexec & _).
-    assert (Hpmam' : matching_pma_region (register_lookup pma_regions σ'.(sregs))
-              (Physaddr pa) 4 = Some region)
-      by (rewrite Lpma_eq; rewrite Lpma; exact Hpmam).
-    pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
-    pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
-    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
-              (uint pa) (uint (to_bits 64 4)) = PMP_Match).
-    { exact (ram_fetch_pmp pa _ 4 3 ltac:(lia) ltac:(lia)
-               ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-               Hram0 Hram3 Hcovp). }
-    assert (Halp : is_aligned_paddr (Physaddr pa) 4 = true).
-    { exact (pa4_aligned _ va Hal). }
-    assert (Hbytes' : forall j : nat, (N.of_nat j < 4)%N ->
-              σ'.(mem) !! pa_add pa j = Some (nth_byte w j))
-      by (rewrite Hmemeq; exact Hbytes).
-    assert (Lhtif' : register_lookup htif_tohost_base σ'.(sregs) = None)
-      by (rewrite Lhtif_eq; exact Lhtif).
-    exists w.
-    exact (exec_mem_read_fetch_4_U PBMT_PMA pa region w σ'
-             HA Hord Hrange HX Hpmam' Halp Hexec
-             (within_clint_false pa 4 σ' Hnc ltac:(lia))
-             (within_sig_false pa 4 σ' Hns ltac:(lia))
-             (within_htif_false pa 4 σ' Lhtif')
-             (addr_is_ram_not_dev _ Hram0)
-             Hbytes' Lpriv).
-  Qed.
-
-End UserMemIris.
+(* The upt-record word/mem-read layer that used to follow was superseded
+   by the ptree layer: [udata_fetch_word] / [udata_fetch_mem_read]
+   (UserFetchPt.v) source the fetched word from the [udata_own] pages.  *)

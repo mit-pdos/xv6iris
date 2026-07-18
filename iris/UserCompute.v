@@ -24,14 +24,14 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import MinstretInv WpGpr.
-Require Import UserPt UserExec.
+Require Import UptTree UserPtTree UserExec.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UserCompute.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  Context (C : ucfg) (pt : upt).
+  Context (C : ucfg) (pt : uptd).
 
   (* Peel the [rd] fragment out of an existential gpr file and hand back an
      insert-wand.  Value-agnostic: the caller reinserts whatever the
@@ -60,7 +60,7 @@ Section UserCompute.
   (* The abstract per-step RETIRE obligation the classification discharges
      per family.  It OWNS exactly what [run_hart_active] mutates on a
      retiring step -- the interp, the gpr file, the nextPC cell (the
-     dispatch reduction sets it), [upt_inv] (the fetch may fill the TLB)
+     dispatch reduction sets it), [user_pt_inv] (the fetch may fill the TLB)
      and [user_cfg] (borrowed: the decode-agreement reads its cells) --
      and returns them re-established at [s_x], value-agnostically
      (existential gpr file), plus the pure facts the try_step epilogue
@@ -78,7 +78,7 @@ Section UserCompute.
      mstate_interp σ -∗
      gpr_file g -∗
      nextPC ↦ᵣ va -∗
-     upt_inv pt -∗
+     user_pt_inv pt -∗
      user_cfg C -∗
      |={E}=>
        ∃ (ib : mword 32) (s_x : mstate) (g' : gmap regidx (mword 64))
@@ -91,7 +91,7 @@ Section UserCompute.
          mstate_interp s_x ∗
          gpr_file g' ∗
          nextPC ↦ᵣ va' ∗
-         upt_inv pt ∗
+         user_pt_inv pt ∗
          user_cfg C)%I.
 
 End UserCompute.
