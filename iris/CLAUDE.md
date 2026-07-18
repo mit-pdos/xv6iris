@@ -687,8 +687,16 @@ Where things landed (the stage descriptions below remain the design rationale):
   Supporting generics: `off_bound_div`/`pa_aligned_div`/
   `nth_byte_assemble_len`/`bytes_list_of_lookups` (UserBits.v),
   `u_walk_pa_window_div`, width-generic pma checks, `udata_read_word_g`/
-  `udata_own_store_g`.  STILL OPEN: AMO/LR/SC (reuse the R∧W grant +
-  reservation-axiom destructs), and the misaligned-access fault flavors
+  `udata_own_store_g`.  AMO is DONE at MemAmo4's kernel scope (width 4, AMOSWAP): UserMemPt §7
+  adds the U-mode R∧W PMP grant (`exec_pmpCheck_user_grant_amo`) and the
+  composer `user_pt_amo_data_4` -- ONE absorbed translation serving both
+  sides, returning the old value plus a ∀-value PURE write fact at the
+  moved state (the arm computes the stored value and absorbs the write
+  with `udata_own_store_4`); MemAmo4's mem-level chain was already
+  privilege-generic.  STILL OPEN: other AMO ops / width 8 (generalize
+  MemAmo4 over the op the way UserMemPt §5 generalized the width -- the
+  op is wildcarded everywhere except `pma_allows_atomic_op`), LR/SC
+  (reservation-axiom destructs), and the misaligned-access fault flavors
   (instruction-level, no translation).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
