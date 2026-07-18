@@ -920,13 +920,40 @@ Where things landed (the stage descriptions below remain the design rationale):
      NOT `PMA_reservability` -- and the LR/SC pma arms check
      `reservability <> RsrvNone`.  So on RAM, LR/SC either RETIRE (if the
      PMA reservability is set) or take an ACCESS FAULT (if RsrvNone) --
-     BOTH safe for totality.  Finishing the physical discharge therefore
-     needs a decision: either (a) pin `PMA_reservability <> RsrvNone` in
-     the bundle's pma facts (then LR/SC always retire, clone MemAmo4's
-     reserved read_kind / conditional write_kind chains at User), or
-     (b) leave it open and prove the retire-or-access-fault disjunction
-     (the fault side reuses the delegated-trap machinery).  The
-     control-flow reductions above are agnostic to this choice.
+     BOTH safe for totality.  DECISION MADE (per the user): route (b), the
+     retire-or-fault DISJUNCTION, no bundle change.  §5 PHYSICAL PIECES
+     DONE (UserMemAccess §5a-d, all green):
+       - §5a `exec_read_ram_resv_4/_8`: the reserved-RAM read atoms.
+         read_ram is AK-agnostic for RAM, so these clone the plain read
+         atoms verbatim; the reserved read_kind only swaps AV_plain ->
+         AV_exclusive.  (The earlier "No primitive equality" blocker was
+         the UNUSED AK_arch strong-acquire variant, not the plain reserved
+         kind that LR/SC-with-default-flags actually use.)
+       - §5b `exec_pmaCheck_ram_lr_g` / `_sc_g`: the reserved pma arm
+         `andb R/W (reservability<>RsrvNone)` reduced to a single `if` on
+         reservability -- <>None allows (None), =None yields the delegated
+         E_Load/E_SAMO access fault.  THE branch point of the disjunction.
+       - §5c `exec_pmpCheck_user_grant_lr` / `_sc`: pmpCheckRWX treats
+         LoadReserved/StoreConditional exactly as Load/Store, so verbatim
+         load/store grants with the access swapped.  (Only compiles in the
+         full import context -- a minimal probe misses the reduction
+         setup that makes cbn resolve the foreach guard; add such lemmas
+         directly to the real file, not a probe.)
+       - §5d `exec_checked_mem_read_lr_4/_8`: the LR retire-or-fault
+         disjunction at the checked_mem_read layer -- one `if` on the
+         unpinned reservability gives Ok(bytes) [retire] or
+         Err E_Load_Access_Fault [fault].  Composes §5a+§5b+§5c.
+     REMAINING for LR/SC (mechanical layering on the §5 pieces):
+       - SC conditional-write disjunction at checked_mem_write (mirror of
+         §5d; the write lands via the reserved write_kind when reservable,
+         else E_SAMO fault) -- needs a reserved write_ram atom (clone the
+         plain write atoms as §5a cloned the reads);
+       - mem_read/mem_write_value wrap (add mstatus/cur_privilege/
+         effectivePrivilege_mprv0 -- see UserMemPt `exec_mem_read_data_U`);
+       - vmem retire (`exec_vmem_read_addr_aligned` is already res-generic)
+         + vmem aligned FAULT path (translate Ok, mem_read/write Err ->
+         memory_exception Trap) -> the vmem-level LR/SC disjunction;
+       - the iris bundle composers over user_pt_inv.
   4. AMO EXECUTE reduction (execute_AMO): its own pre-translation alignment
      check (misaligned -> E_SAMO_Access_Fault via GlobalMisalignedExceptions_
      amo = AccessFault), then translate + mem_write_ea + mem_read +
@@ -941,13 +968,48 @@ Where things landed (the stage descriptions below remain the design rationale):
      the trivial derivations.  The STORE composer threads the model's own
      subrange write-value (udata_own absorbs it, contents existential), so
      no per-width subrange-identity is needed.
-  6. plain LOAD/STORE MISALIGNED split (n>1): plat_misaligned_access.
-     load_store = None, so a misaligned plain load/store does NOT fault --
-     the hardware splits it into aligned sub-accesses, each translated
-     independently through the absorption.  REQUIRED for totality over
-     arbitrary user code (whether xv6 itself misaligns is irrelevant --
-     the classification must handle every decodable access), so this is
-     NOT optional; the split loop runs with n = width/bytes_per_access.
+  6. plain LOAD/STORE MISALIGNED split (n>1) -- DONE at the exec level
+     (UserMemAccess §4a-c, all green).  plat_misaligned_access.load_store
+     = None, so a misaligned plain load/store does NOT fault -- the model
+     splits it into n = width/2^ctz aligned sub-accesses, each translated
+     independently, via an `untilMT` loop with a CONSTANT measure.  REQUIRED
+     for totality over arbitrary user code (whether xv6 itself misaligns is
+     irrelevant -- the classification must handle every decodable access).
+     Pieces:
+       - §4a the generic untilMT' loop reductions: `execR_untilMT'_last`
+         (cond true -> return), `_step` (cond false -> recurse at limit-1;
+         both via destructing the `Acc (Zwf 0)` witness -- axiom-free, no
+         proof-irrelevance), `_chain` (compose N iterations by induction).
+         The CONSTANT measure means untilMT' starts at limit n and just
+         decrements once per chunk; termination is driven by the `finished`
+         flag reached exactly at the last chunk.
+       - §4b `exec_vmem_read_addr_misaligned_split` (general N): the loop
+         state `split_var k = (data_seq k, k=?N, offset)` with `data_seq`
+         the running byte-assembly; `split_body_step` reduces ONE iteration
+         (translate+read+update_subrange) generically in k; `split_loop`
+         composes N via `_chain`; the top lemma glues the align-guard
+         (`exec_plat_misaligned_loadstore_none`: plat delivers None for a
+         plain load/store, so the guard returns tt -- no fault) and the
+         split.  Premise-shaped over per-chunk translate+read facts.  res=
+         false only (the split never fires for LR, which access-faults on
+         misalign).
+       - §4c `exec_vmem_write_addr_misaligned_split` (general N): same shape
+         with loop var `(finished, offset, write_success)`; `ws_seq`
+         accumulates `andb` of the per-chunk store outcomes; each chunk
+         threads the post-translate state `stt k` then mem_write_ea +
+         mem_write_value; the write-value is the model's own subrange slice.
+     Reduction gotchas kept: the `if false ... else returnR tt` (res
+     substituted) is convertible to `returnR tt`, so write it directly in
+     the body definition (the dependent-if hits a notation-scope parse
+     error in this file's import context); the CONSTANT-measure `untilMT`
+     needs `set`/`clearbody`/`rewrite` to reduce `measure (v 0)` to n
+     without breaking the Acc-dependent type; the initial loop var
+     `(zeros', false, 0)` must be `replace`d with `split_var 0` (the
+     `Nat.eqb 0 N` flag is not definitionally false for abstract N).
+     REMAINING: the iris bundle composer threading the N absorptions
+     through user_pt_inv (each chunk's translate goes through the
+     utlb_inv_pt_translateAddr_u absorption; the abstract byte-heap owns the
+     bytes across the possibly-straddling chunks).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process
