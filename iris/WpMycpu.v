@@ -39,7 +39,7 @@ Require Import WpSmodeJalr.
 Require Import WpSmodeRtype.
 Require Import WpSmodeShiftiop.
 Require Import WpSmodeUtype.
-Require Import WpMemsetInstr.
+Require Import KernelRvcDecode.
 Require Import WpRvcBridge.
 Require Import StackOwn.
 From Kernel Require KernelInstrs.
