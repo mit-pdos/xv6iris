@@ -513,3 +513,63 @@ Section UserPtFault.
   Qed.
 
 End UserPtFault.
+
+(* ===================================================================== *)
+(* §5b The COMBINED fault wrapper: the three fault flavors, as ONE        *)
+(*     access-generic predicate and one dispatch lemma.  (For every       *)
+(*     access user execution issues, translationException maps all three  *)
+(*     PTW errors to the same page-fault exception -- the caller passes   *)
+(*     the three concrete mappings, each a [cbn]-discharge.)              *)
+(* ===================================================================== *)
+
+(* the ways a user access at [va] can fault in translation *)
+Definition u_fault_flavor (acc : MemoryAccessType mem_payload)
+    (tfp : mword 44) (um : gmap (mword 27) (mword 64)) (va : mword 64) : Prop :=
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true
+  \/ (neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+      um !! svpn_of va = None /\
+      svpn_of va <> tramp_vpn /\ svpn_of va <> tf_vpn)
+  \/ (neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+      exists w, upt_leaf_at tfp um (svpn_of va) w /\
+                uleaf_denied acc w).
+
+Section UserPtFaultCombined.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (acc : MemoryAccessType mem_payload).
+
+  Lemma utlb_inv_pt_translateAddr_u_fault (uroot tfp : mword 44)
+      (um : gmap (mword 27) (mword 64)) (va : mword 64) (e : ExceptionType) (σ : mstate) :
+    u_fault_flavor acc tfp um va ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) User) σ
+      = Some (User, σ) ->
+    exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    exec (translationException acc (PTW_Invalid_Addr tt)) σ = Some (e, σ) ->
+    exec (translationException acc (PTW_Invalid_PTE tt)) σ = Some (e, σ) ->
+    exec (translationException acc (PTW_No_Permission tt)) σ = Some (e, σ) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um -∗
+    ⌜exec (translateAddr (Virtaddr va) acc) σ = Some (Err (e, tt), σ)⌝.
+  Proof.
+    intros Hflavor Hhtif Hcp HSXL Heff Hss Hall Hte1 Hte2 Hte3.
+    iIntros "Hri Hgh Hinv".
+    destruct Hflavor as
+      [ Hnc | [ (Hcanon & Hnone & Hnt & Hntf) | (Hcanon & w & Hleaf & Hden) ] ].
+    - iApply (utlb_inv_pt_translateAddr_u_noncanon acc uroot tfp um va e σ
+                Hnc Hcp HSXL Heff Hss Hte1 with "Hri Hinv").
+    - iApply (utlb_inv_pt_translateAddr_u_unmapped acc uroot tfp um va e σ
+                Hnone Hnt Hntf Hcanon Hhtif Hcp HSXL Heff Hss Hall Hte2
+                with "Hri Hgh Hinv").
+    - iApply (utlb_inv_pt_translateAddr_u_denied acc uroot tfp um w va e σ
+                Hleaf Hden Hcanon Hhtif Hcp HSXL Heff Hss Hall Hte3
+                with "Hri Hgh Hinv").
+  Qed.
+
+End UserPtFaultCombined.
+

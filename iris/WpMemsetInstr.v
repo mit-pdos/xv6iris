@@ -20,6 +20,7 @@ Require Import InstrBytes.
 Require Import WpDecode WpLeafCommon.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
+Require Import SRegime.
 Require Import SmodeCore KernelText WpMemsetS.
 Require Import StackOwn.
 Require Import WpRvcBridge.
@@ -216,7 +217,7 @@ Section WpMemsetInstr.
   (*  is derived at the [wp_sb_s_pt] leaf, so no svpn side conditions appear.   *)
   (* =================================================================== *)
 
-  Lemma wp_memset_s_full_kt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_memset_s_full_kt_r (R : s_regime) (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (N : nat) (wval_add : mword 64)
       (olds : nat -> bv 8) (n : nat)
       (γ : gname) {dq : dfrac} :
@@ -255,13 +256,13 @@ Section WpMemsetInstr.
     (* the end pointer couples to the buffer: [wval_add = ms_addr p N] *)
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    sr_inv R -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( ∀ mfin,
       smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
+      sr_inv R -∗
       pc_is ret_tgt -∗
       stack_own sp0 n -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
@@ -303,7 +304,7 @@ Section WpMemsetInstr.
       iPoseProof (minstr_cdc with "Htext") as "HiL4".
       iPoseProof (minstr_cde with "Htext") as "HiL6".
       (* prologue (0xccc..0xcd2) + taken c.beqz -> epilogue entry, map m2 *)
-      iApply (wp_memset_empty root_ppn Φ m0 imm_entry nzimm_s0 imm8_beqz vra vs0
+      iApply (wp_memset_empty_r R Φ m0 imm_entry nzimm_s0 imm8_beqz vra vs0
                 γ (dq:=dq)
 
                 ltac:(rewrite Hcount0; reflexivity)
@@ -318,7 +319,7 @@ Section WpMemsetInstr.
       { unfold m2, m1. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         unfold ra0; reflexivity. }
-      iApply (wp_memset_suffix root_ppn Φ sp' ra0 s00 ra_idx s0_idx imm_dealloc m2
+      iApply (wp_memset_suffix_r R Φ sp' ra0 s00 ra_idx s0_idx imm_dealloc m2
                 γ (dq:=dq)(dqm:=DfracOwn 1)
  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -405,7 +406,7 @@ Section WpMemsetInstr.
     assert (Hpc1 : add_vec_int pcE 20 = pc0L) by (vm_compute; reflexivity).
     assert (Hpc2 : add_vec_int (add_vec_int pc0L 6) 4 = pcLS) by (vm_compute; reflexivity).
     (* --- PREFIX: 0xccc..0xcdc --- *)
-    iApply (wp_memset_prefix root_ppn Φ m0 imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
+    iApply (wp_memset_prefix_r R Φ m0 imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
               wval_add vra vs0 γ (dq:=dq)
  Hn0 Hvalue_add
               with "Hsm Htlbinv Hpc Hfile
@@ -413,7 +414,7 @@ Section WpMemsetInstr.
     iIntros "Hsm Htlbinv Hpc Hfile Hbra Hbs0".
     iEval (rewrite Hpc1) in "Hpc".
     (* --- LOOP: 0xce0..0xce6 --- *)
-    iApply (wp_memset_loop root_ppn γ Φ (S N') p e cval a1_idx a4_idx a5_idx imm_bne
+    iApply (wp_memset_loop_r R γ Φ (S N') p e cval a1_idx a4_idx a5_idx imm_bne
               olds (dq:=dq)
  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -425,7 +426,7 @@ Section WpMemsetInstr.
     iIntros "Hsm Htlbinv Hpc Hfile Hbuf".
     iEval (rewrite Hpc2) in "Hpc".
     (* --- SUFFIX: 0xcea..ret --- *)
-    iApply (wp_memset_suffix root_ppn Φ sp' ra0 s00 ra_idx s0_idx imm_dealloc
+    iApply (wp_memset_suffix_r R Φ sp' ra0 s00 ra_idx s0_idx imm_dealloc
               (<[Regidx a5_idx := regval_into_reg (ms_addr p (S N'))]> m6)
               γ (dq:=dq)(dqm:=DfracOwn 1)
  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -473,6 +474,63 @@ Section WpMemsetInstr.
     - (* x25 s9 *) apply Hcatch; vm_compute; discriminate.
     - (* x26 s10 *) apply Hcatch; vm_compute; discriminate.
     - (* x27 s11 *) apply Hcatch; vm_compute; discriminate.
+  Qed.
+
+  Lemma wp_memset_s_full_kt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (m0 : gmap regidx (mword 64)) (N : nat) (wval_add : mword 64)
+      (olds : nat -> bv 8) (n : nat)
+      (γ : gname) {dq : dfrac} :
+    let ra_idx : mword 5 := mword_of_int 1 in
+    let s0_idx : mword 5 := mword_of_int 8 in
+    let a0_idx : mword 5 := mword_of_int 10 in
+    let a1_idx : mword 5 := mword_of_int 11 in
+    let a2_idx : mword 5 := mword_of_int 12 in
+    let a5_idx : mword 5 := mword_of_int 15 in
+    let pcE := mword_of_int KernelSyms.memset in
+    let imm_entry : mword 6 := mword_of_int 48 in
+    let shamt_l : mword 6 := mword_of_int 32 in
+    let shamt_r : mword 6 := mword_of_int 32 in
+    let nzimm_s0 : mword 8 := mword_of_int 4 in
+    let sp0 := m0 !!! Regidx csp_rs1 in
+    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
+    let ra0 := m0 !!! Regidx ra_idx in
+    let p := m0 !!! Regidx a0_idx in
+    let e := wval_add in
+    let cval := m0 !!! Regidx a1_idx in
+    let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
+    let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
+    let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2 in
+    let m4 := <[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3 in
+    let m5 := <[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4 in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+    (2 <= n)%nat ->
+    (* the ADD computing the loop end pointer [a4 := a2 + a0 = wval_add] *)
+    add_vec (m5 !!! Regidx a2_idx) (m5 !!! Regidx a0_idx) = wval_add ->
+    (* the entry [beqz a2] is taken exactly when the byte count [N] is zero:
+       count register is zero iff N = 0 (a 0-byte memset skips the loop) *)
+    eq_vec (m0 !!! Regidx a2_idx) zero_reg = Nat.eqb N 0 ->
+    (* caller's return target's low bit is clear (2-aligned Zca return) *)
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    (* the end pointer couples to the buffer: [wval_add = ms_addr p N] *)
+    (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
+    smode_config γ dq -∗
+    tlb_inv_pt root_ppn -∗
+    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
+    stack_own sp0 n -∗
+    ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
+    ( ∀ mfin,
+      smode_config γ dq -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is ret_tgt -∗
+      stack_own sp0 n -∗
+      ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m0 mfin ⌝ -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof.
+    exact (wp_memset_s_full_kt_r (kpt_regime root_ppn) Φ m0 N wval_add olds n γ (dq:=dq)).
   Qed.
 
 End WpMemsetInstr.

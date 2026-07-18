@@ -45,6 +45,7 @@ Require Import UserMem.
 Require Import KallocInv.
 Require Import WpLoad.
 Require Import WpMmodeLeafBase.
+Require Import MemAmo4.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -1070,3 +1071,168 @@ Section UserMemPtInstances.
   Qed.
 
 End UserMemPtInstances.
+
+(* ===================================================================== *)
+(* §7 AMO (width 4, AMOSWAP -- MemAmo4's kernel scope): the U-mode PMP    *)
+(*    grant and the bundle composer.  The AMO's single translation serves *)
+(*    both the read and the write, so the composer returns the old value  *)
+(*    plus a ∀-value PURE write fact at the moved state; the arm computes *)
+(*    the stored value from the old one and absorbs the write into        *)
+(*    [udata_own] with [udata_own_store_4].                               *)
+(* ===================================================================== *)
+
+Lemma exec_pmpCheck_user_grant_amo (a : mword 64) (width : Z) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  exec (pmpCheck (Physaddr a) width (Atomic (AMOSWAP, Data, Data)) User) s = Some (None, s).
+Proof.
+  intros HA Hord Hrange HR HW.
+  unfold pmpCheck. rewrite exec_catch_early_return.
+  replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity). cbn zeta.
+  rewrite execR_bind0.
+  match goal with |- context[foreach_ZM_up ?F ?T ?S ?V ?B] =>
+    assert (Hfe : execR (foreach_ZM_up F T S V B) s = Some (inl None, s)) end.
+  { unfold foreach_ZM_up. cbn [foreach_ZM_up'].
+    rewrite execR_bind.
+    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpReadAddrReg_val 0 s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (exec_pmpMatchAddr_TOR_match a (to_bits 64 width)
+                  (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                  (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)
+                  (zeros' 64) s HA Hord Hrange)). cbn beta.
+    cbn match.
+    unfold or_boolM.
+    rewrite execR_bind.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (_ : exec (pmpCheckRWX (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                            (Atomic (AMOSWAP, Data, Data))) s = Some (true, s))).
+    2:{ unfold pmpCheckRWX. cbn match. rewrite HR HW. apply exec_returnm. }
+    cbn match. rewrite execR_returnR. cbn beta.
+    cbn match. rewrite execR_bind. rewrite execR_returnR. cbn match.
+    unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+  rewrite Hfe. cbn match. reflexivity.
+Qed.
+
+Section UserMemPtAmo.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma user_pt_amo_data_4 (uroot tfp : mword 44)
+      (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
+      (w va : mword 64) (σ : mstate) :
+    um !! svpn_of va = Some w ->
+    uleaf_ok (Atomic (AMOSWAP, Data, Data)) w ->
+    udata_cov um data ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1") = false ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ∃ (dv : bv 32) (σ' : mstate),
+      ⌜exec (translateAddr (Virtaddr va) (Atomic (AMOSWAP, Data, Data))) σ
+        = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw), σ')⌝ ∗
+      ⌜exec (mem_read (Atomic (AMOSWAP, Data, Data)) PBMT_PMA
+               (Physaddr (u_walk_pa w va)) 4 true false true) σ'
+        = Some (Ok dv, σ')⌝ ∗
+      ⌜forall v : bv 32,
+         exec (mem_write_value (Physaddr (u_walk_pa w va)) 4 v
+                 (Atomic (AMOSWAP, Data, Data)) PBMT_PMA false false true) σ'
+         = Some (Ok true,
+                 MState σ'.(sregs) (write_bytes σ'.(mem) (u_walk_pa w va) 4 v) σ'.(mdev))⌝ ∗
+      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
+      ⌜(σ'.(sregs) = σ.(sregs) \/
+        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      utlb_inv_pt uroot tfp um ∗ udata_own data.
+  Proof.
+    intros Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
+    iIntros "Hri Hgh Hinv Hdata".
+    iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
+      as %(HA & Hord & HX & HR & HW & Hcovp).
+    iMod (utlb_inv_pt_translateAddr_u (Atomic (AMOSWAP, Data, Data)) uroot tfp um w va
+            (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
+            Hmisa Hmenv Hhtif Hcp HSXL
+            (exec_effectivePrivilege_amo_nm (register_lookup mstatus σ.(sregs)) User σ Hmprv)
+            (exec_is_shadow_stack_u_acc (Atomic (AMOSWAP, Data, Data)) σ
+               (or_intror (or_intror (or_intror (or_intror (or_intror
+                  (ex_intro _ AMOSWAP eq_refl))))))) Hall
+            with "Hri Hgh Hinv")
+      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
+    assert (Tr : forall r : register, register_beq r tlb = false ->
+              register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
+    { intros r Hne.
+      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
+        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+    iDestruct (udata_read_word_g 4 ltac:(lia) ltac:(exists 1024; reflexivity)
+                 um data w va σ' Hl Hcov Hal with "Hgh Hdata")
+      as %(dv & Hbytes & Hram0 & Hram3).
+    set (pa := u_walk_pa w va) in *.
+    destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 4)
+      as (region & Hpmam & _ & Hrd & Hwrat).
+    assert (Hamo : pma_allows_atomic_op
+              ((override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_atomic_support))
+              AMOSWAP 4 = true).
+    { rewrite (proj2 Hwrat). vm_compute. reflexivity. }
+    pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
+    pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
+    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
+              (uint pa) (uint (to_bits 64 4)) = PMP_Match).
+    { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact (ram_fetch_pmp pa _ 4 3 ltac:(lia) ltac:(lia)
+               ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+               Hram0 Hram3 Hcovp). }
+    assert (Hpmp : exec (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, Data, Data)) User) σ'
+                   = Some (None, σ')).
+    { apply exec_pmpCheck_user_grant_amo; [ .. | exact Hrange | | ];
+        first [ rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); assumption
+              | rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); assumption ]. }
+    iModIntro.
+    iExists dv, σ'.
+    iSplit; [ iPureIntro; exact Htr | ].
+    iSplit; [ iPureIntro | ].
+    { exact (exec_mem_read_amo_4 User PBMT_PMA pa region dv
+               (register_lookup mstatus σ'.(sregs)) σ'
+               Hpmp Hpmam (pa4_aligned _ va Hal) Hrd (proj1 Hwrat) Hamo
+               (within_clint_false pa 4 σ' Hnc ltac:(lia))
+               (within_sig_false pa 4 σ' Hns ltac:(lia))
+               (within_htif_false pa 4 σ'
+                  (ltac:(rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif)))
+               (addr_is_ram_not_dev _ Hram0)
+               Hbytes eq_refl
+               (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
+               (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
+    iSplit; [ iPureIntro; intros v | ].
+    { exact (exec_mem_write_value_amo_4 User PBMT_PMA pa region v
+               (register_lookup mstatus σ'.(sregs)) σ'
+               Hpmp Hpmam (pa4_aligned _ va Hal) Hrd (proj1 Hwrat) Hamo
+               (within_clint_false pa 4 σ' Hnc ltac:(lia))
+               (within_sig_false pa 4 σ' Hns ltac:(lia))
+               (within_htif_writable_false pa 4 σ'
+                  (ltac:(rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif)))
+               (addr_is_ram_not_dev _ Hram0)
+               eq_refl
+               (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
+               (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
+    iSplit; [ iPureIntro; exact Hmdev | ].
+    iSplit; [ iPureIntro; exact Hsregs | ].
+    iFrame "Hri Hgh Hinv Hdata".
+  Qed.
+
+End UserMemPtAmo.

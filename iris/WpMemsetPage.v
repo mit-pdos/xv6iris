@@ -21,6 +21,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
+Require Import SRegime.
 Require Import SmodeCore WpSmodeGpr KernelText WpMemsetS.
 Require Import WpMemsetInstr.
 Require Import CalleeSaved.
@@ -172,7 +173,7 @@ Section WpMemsetPage.
   (*  wp_memset_s_full_kt's ~30 per-byte side conditions are DERIVED from   *)
   (*  [page_valid p]; the ~15 standard S-mode config facts are kept.        *)
   (* =================================================================== *)
-  Lemma wp_memset_page (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_memset_page_r (R : s_regime) (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (cval : mword 64) (n : nat)
       (γ : gname) {dq : dfrac} :
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -193,13 +194,13 @@ Section WpMemsetPage.
     (* the caller's return target's low bit is clear (2-aligned target OK: Zca return) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    sr_inv R -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     page_own p -∗
     ( ∀ mfin,
       smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
+      sr_inv R -∗
       pc_is ret_tgt -∗
       stack_own sp0 n -∗
       page_own p -∗
@@ -222,7 +223,7 @@ Section WpMemsetPage.
     (* --- apply the whole-function memset WP.  The Sv39 geometry is now
        derived inside the memset proof (at the [wp_sb_s_pt] leaf); only the
        argument-setup couplings [Hbexec_add / Hcount0 / Hret0 / Hcmp] remain. --- *)
-    iApply (wp_memset_s_full_kt root_ppn Φ m0 4096
+    iApply (wp_memset_s_full_kt_r R Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) olds n
               γ (dq:=dq)
               Hn2
@@ -267,6 +268,45 @@ Section WpMemsetPage.
       iEval (rewrite ms_pa_ms_addr) in "H". iExists _. iExact "H".
     - (* the final register file: callee_saved passes straight through *)
       exact Hcs.
+  Qed.
+
+  Lemma wp_memset_page (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (m0 : gmap regidx (mword 64)) (cval : mword 64) (n : nat)
+      (γ : gname) {dq : dfrac} :
+    let a0_idx : mword 5 := mword_of_int 10 in
+    let a1_idx : mword 5 := mword_of_int 11 in
+    let a2_idx : mword 5 := mword_of_int 12 in
+    let pcE := mword_of_int KernelSyms.memset in
+    let sp0 := m0 !!! Regidx csp_rs1 in
+    let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
+    let p := m0 !!! Regidx a0_idx in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (* memset's 2-slot save frame [sp0-16, sp0) is a single [stack_own sp0 n] (n >= 2) *)
+    (2 <= n)%nat ->
+    (* the page being filled: RAM-resident, 4096-aligned, in [end, PHYSTOP) *)
+    page_valid p ->
+    (* argument setup by the caller before the [jal memset] *)
+    m0 !!! Regidx a1_idx = cval ->
+    m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
+    (* the caller's return target's low bit is clear (2-aligned target OK: Zca return) *)
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    smode_config γ dq -∗
+    tlb_inv_pt root_ppn -∗
+    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
+    stack_own sp0 n -∗
+    page_own p -∗
+    ( ∀ mfin,
+      smode_config γ dq -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is ret_tgt -∗
+      stack_own sp0 n -∗
+      page_own p -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m0 mfin ⌝ -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof.
+    exact (wp_memset_page_r (kpt_regime root_ppn) Φ m0 cval n γ (dq:=dq)).
   Qed.
 
 End WpMemsetPage.
