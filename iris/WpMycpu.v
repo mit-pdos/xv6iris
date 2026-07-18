@@ -45,8 +45,7 @@ Require Import CalleeSaved.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtAlu WpSmodePtCtl.
 Import Defs.
 
 (* mycpu's balanced frame: entry [addi sp,sp,-16] (imm 48 = -16 in 6-bit) and

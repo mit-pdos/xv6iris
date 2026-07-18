@@ -97,11 +97,7 @@ Section WpKernelvecSpec.
     iIntros (elp_v ms pc0 mie_v mdv0 m Φ)
       "%Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hpc Hfile HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
-    iDestruct "HF" as "(Hmenv & Htlbinv & Hstkx)".
-    iDestruct "Hstkx" as (nstk) "[%Hn Hstk]".
-    (* peel the handler's 32 slots off the top; the deeper remainder rides *)
-    iDestruct (stack_own_split_1 (m !!! Regidx csp_rs1) kv_frame_slots nstk Hn
-                 with "Hstk") as "[Hstk Hdeep]".
+    iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
     (* re-address kernelvec's 17 sparse save windows as [pa_stk] slots *)
     pose proof (kv_slot_addr0 m) as Hb32.
     assert (Hb30 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 30)
@@ -218,12 +214,9 @@ Section WpKernelvecSpec.
       with "[S1 S6 S7 S8 S9 S10 S11 S12 S13 S14 S15 S24 S25 S29 S31
             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17]"
       as "Hstk".
-    2:{ iDestruct (stack_own_split_2 (m !!! Regidx csp_rs1) kv_frame_slots nstk Hn
-                     with "[$Hstk $Hdeep]") as "Hstk".
-        iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hpc Hfile [Hmenv Htlbinv Hstk]").
+    2:{ iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hpc Hfile [Hmenv Htlbinv Hstk]").
         { iExists pc0. iFrame "Hsepc". }
-        iFrame "Hmenv Htlbinv".
-        iExists nstk. iSplitR; [iPureIntro; exact Hn |]. iExact "Hstk". }
+        iFrame "Hmenv Htlbinv". iExact "Hstk". }
     rewrite /kv_frame_slots stack_own_slots. cbn [seq].
     iSplitL "S1"; [iExact "S1" |].
     iSplitL "Hw17"; [by iExists _ |].
