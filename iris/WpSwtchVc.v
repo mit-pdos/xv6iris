@@ -38,6 +38,7 @@ Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
+Require Import SRegime.
 Require Import SmodeCore KernelRvcDecode.
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
@@ -498,7 +499,7 @@ Section WpSwtchVc.
   Proof. apply (fixpoint_unfold (valid_context_pre sc Phi P) c). Qed.
 
   Section SwtchSpec.
-    Context (root_ppn : mword 44) (Phi : mval -> iProp Σ).
+    Context (R : s_regime) (Phi : mval -> iProp Σ).
     Context (γc : gname) (bsie : mword 1) (dq : dfrac).
 
     (* the ambient S-mode machine configuration a running kernel thread holds:
@@ -507,7 +508,7 @@ Section WpSwtchVc.
        and the page-table invariant.  This is exactly what the cleaned-up
        acquire/release consume and return; a resumed context receives it too. *)
     Definition sconf : iProp Σ :=
-      (smode_config γc dq ∗ ghost_var γc (1/2) bsie ∗ tlb_inv_pt root_ppn)%I.
+      (smode_config γc dq ∗ ghost_var γc (1/2) bsie ∗ sr_inv R)%I.
 
     (* -------------------------------------------------------------------- *)
     (* valid_context P c : "the context saved at [c] admits a WP to run".  It  *)
@@ -594,7 +595,7 @@ Section WpSwtchVc.
       iDestruct (swtch_code with "Ht") as "Hcode".
       iEval (rewrite -Hden) in "Hfile".
       (* ---- run the 28-instruction straight-line block ---- *)
-      iApply (wp_vc_block_s_den root_ppn swtch_prog Phi
+      iApply (wp_vc_block_s_den_r R swtch_prog Phi
                 (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
                 (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
                 rho mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
@@ -653,7 +654,7 @@ Section WpSwtchVc.
           (erewrite vregs_den_lookup by (vm_compute; reflexivity);
            apply sval_den_SX0). }
       iDestruct (swi_ret with "Ht") as "Hret".
-      iApply (wp_cret_s_zca_pt root_ppn Phi
+      iApply (wp_cret_s_zca_r R Phi
                 (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
                 (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)

@@ -477,6 +477,30 @@ Section WpSmodePtItype.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
+  Lemma wp_addi_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    uint rd <> 0 ->
+    add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = wval ->
+    smode_config γ dq -∗ sr_inv R -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
+    ( smode_config γ dq -∗ sr_inv R -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg_regime R γ Φ pc rd rs1 rs1
+              (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) wval m (dq:=dq)
+ Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_addi_val. rewrite Hva Hwval. reflexivity.
+  Qed.
+
   Lemma wp_addi_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
@@ -489,16 +513,37 @@ Section WpSmodePtItype.
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof.
+    exact (wp_addi_s_r (kpt_regime root_ppn) γ Φ pc rd rs1 imm wval m (dq:=dq)).
+  Qed.
+
+  Lemma wp_cli_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 6) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    uint rd <> 0 ->
+    add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) = wval ->
+    smode_config γ dq -∗ sr_inv R -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) -∗
+    ( smode_config γ dq -∗ sr_inv R -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg_pt root_ppn γ Φ pc rd rs1 rs1
-              (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) wval m (dq:=dq)
+    unshelve iApply (wp_gpr_write_s_config_scfg_regime R γ Φ pc rd
+              (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
+              (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m (dq:=dq)
  Hrd _
               with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
     intros s_pc Hnpc Hva _.
-    rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s_pc).
+    change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
+    rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) rd (sign_extend' 12 imm) s_pc).
     replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_addi_val. rewrite Hva Hwval. reflexivity.
+    unfold gpr_addi_val.
+    replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
+      by (vm_compute; reflexivity).
+    rewrite Hwval. reflexivity.
   Qed.
 
   Lemma wp_cli_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
@@ -513,21 +558,8 @@ Section WpSmodePtItype.
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_scfg_pt root_ppn γ Φ pc rd
-              (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
-              (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m (dq:=dq)
- Hrd _
-              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
-    rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) rd (sign_extend' 12 imm) s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_addi_val.
-    replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
-      by (vm_compute; reflexivity).
-    rewrite Hwval. reflexivity.
+    Proof.
+    exact (wp_cli_s_r (kpt_regime root_ppn) γ Φ pc rd imm wval m (dq:=dq)).
   Qed.
 
 End WpSmodePtItype.
@@ -1609,7 +1641,7 @@ Section WpSmodePtGprGamma.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_rvc_gpr_write_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_rvc_gpr_write_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5)
       (base : instruction) (wval : mword 64)
       (m : gmap regidx (mword 64))
@@ -1625,12 +1657,12 @@ Section WpSmodePtGprGamma.
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
     smode_config γ (DfracOwn q) -∗
-    tlb_inv_pt root_ppn -∗
+    sr_inv R -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true base -∗
     ( smode_config γ (DfracOwn q) -∗
-      tlb_inv_pt root_ppn -∗
+      sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1638,7 +1670,7 @@ Section WpSmodePtGprGamma.
   Proof.
     iIntros (Hrd Hbexec)
       "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_s_tlbinv_pt root_ppn γ Φ pc true base
+    iApply (wp_instr_s_regime R γ Φ pc true base
 
               with "Hsm Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
@@ -1686,6 +1718,69 @@ Section WpSmodePtGprGamma.
     iExact "Hfmap".
   Qed.
 
+  Lemma wp_rvc_gpr_write_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rsa rsb : mword 5)
+      (base : instruction) (wval : mword 64)
+      (m : gmap regidx (mword 64))
+      (q : Qp) :
+    uint rd <> 0 ->
+    (forall s_pc : mstate,
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
+       (if Z.eqb (uint rsa) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = m !!! Regidx rsa ->
+       (if Z.eqb (uint rsb) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = m !!! Regidx rsb ->
+       exec (execute base) s_pc
+       = Some (RETIRE_SUCCESS,
+               set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
+    smode_config γ (DfracOwn q) -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true base -∗
+    ( smode_config γ (DfracOwn q) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof.
+    exact (wp_rvc_gpr_write_s_r (kpt_regime root_ppn) γ Φ pc rd rsa rsb base wval m q).
+  Qed.
+
+  Lemma wp_caddi16sp_gpr_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm6 : mword 6)
+      (m : gmap regidx (mword 64))
+      (q : Qp) :
+    smode_config γ (DfracOwn q) -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
+    ( smode_config γ (DfracOwn q) -∗
+      sr_inv R -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx csp_rs1 := regval_into_reg
+        (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros
+      "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
+    unshelve iApply (wp_rvc_gpr_write_s_r R γ Φ pc csp_rs1 csp_rs1 csp_rs1
+              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
+              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
+              m q
+ Hsp _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    change sp with (Regidx csp_rs1).
+    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (caddi16sp_imm imm6) s_pc).
+    replace (Z.eqb (uint csp_rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hsp).
+    unfold gpr_addi_val. rewrite Hva. reflexivity.
+  Qed.
+
   Lemma wp_caddi16sp_gpr_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm6 : mword 6)
       (m : gmap regidx (mword 64))
@@ -1702,36 +1797,23 @@ Section WpSmodePtGprGamma.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros
-      "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_rvc_gpr_write_s_pt root_ppn γ Φ pc csp_rs1 csp_rs1 csp_rs1
-              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
-              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
-              m q
- Hsp _
-              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    change sp with (Regidx csp_rs1).
-    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (caddi16sp_imm imm6) s_pc).
-    replace (Z.eqb (uint csp_rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hsp).
-    unfold gpr_addi_val. rewrite Hva. reflexivity.
+    Proof.
+    exact (wp_caddi16sp_gpr_s_r (kpt_regime root_ppn) γ Φ pc imm6 m q).
   Qed.
 
-  Lemma wp_jal_gpr_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_jal_gpr_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : gmap regidx (mword 64))
       (q : Qp) :
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
     smode_config γ (DfracOwn q) -∗
-    tlb_inv_pt root_ppn -∗
+    sr_inv R -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc false (JAL (imm, Regidx rd)) -∗
     ( smode_config γ (DfracOwn q) -∗
-      tlb_inv_pt root_ppn -∗
+      sr_inv R -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1740,7 +1822,7 @@ Section WpSmodePtGprGamma.
     iIntros (Hrd Halign)
       "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iApply (wp_instr_s_tlbinv_pt root_ppn γ Φ pc false (JAL (imm, Regidx rd))
+    iApply (wp_instr_s_regime R γ Φ pc false (JAL (imm, Regidx rd))
              
 
               with "Hsm Htlbinv Hpc Hinstr").
@@ -1795,6 +1877,27 @@ Section WpSmodePtGprGamma.
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
+  Qed.
+
+  Lemma wp_jal_gpr_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 21)
+      (m : gmap regidx (mword 64))
+      (q : Qp) :
+    uint rd <> 0 ->
+    is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
+    smode_config γ (DfracOwn q) -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc false (JAL (imm, Regidx rd)) -∗
+    ( smode_config γ (DfracOwn q) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof.
+    exact (wp_jal_gpr_s_r (kpt_regime root_ppn) γ Φ pc rd imm m q).
   Qed.
 
 End WpSmodePtGprGamma.
