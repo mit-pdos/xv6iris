@@ -294,4 +294,61 @@ Section WpSconfMycpu.
       unfold mycpu_ret, mycpu_a5. reflexivity.
   Qed.
 
+
+  (* jal-callable form: writes ra := P+4, runs mycpu, returns to P+4.
+     The deep-slot custody is keyed at the CALLER's sp (the jal moves
+     no sp), and callee_saved composes across the ra write. *)
+  Lemma wp_call_mycpu_sconf_cs (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (P : mword 64) (jimm : mword 21)
+      (m : gmap regidx (mword 64)) :
+    let ra_idx : mword 5 := mword_of_int 1 in
+    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
+    let pcE := mword_of_int KernelSyms.mycpu in
+    let ra0 := m0 !!! Regidx ra_idx in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    add_vec P (sign_extend' 64 jimm) = pcE ->
+    eq_vec (access_vec_dec (pcE : mword 64) 0) ('b"0") = true ->
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    kernel_text -∗ pc_is P -∗ gpr_file m -∗
+    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
+    stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) 2 -∗
+    ( ∀ mo,
+      hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap γ root_ppn mo -∗ tlb_inv_pt root_ppn -∗
+      pc_is ret_tgt -∗ gpr_file mo -∗
+      ⌜ callee_saved m mo /\
+        mo !!! Regidx (mword_of_int 10 : mword 5)
+          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
+      stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) 2 -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros ra_idx m0 pcE ra0 ret_tgt Htarget Halpce Hal0.
+    iIntros "Hsc Hhs Hcap Htlbinv #Htext Hpc Hfile Hjal Hdeep Hcont".
+    iApply (wp_jal_s_sconf γ root_ppn Φ P (mword_of_int 1) jimm m
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              ltac:(rewrite Htarget; exact Halpce)
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hjal [-]").
+    iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+    iEval (rewrite Htarget) in "Hpc".
+    assert (Hsp0 : m0 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
+      by (unfold m0; rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]).
+    iEval (rewrite -Hsp0) in "Hdeep".
+    iApply (wp_mycpu_sconf γ root_ppn Φ m0 Hal0
+              with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile Hdeep [-]").
+    iIntros (m') "Hhs Hsc Hcap Htlbinv Hpc Hfile %Hcs Hdeep".
+    iEval (rewrite Hsp0) in "Hdeep".
+    iApply ("Hcont" $! m' with "Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Hdeep").
+    destruct Hcs as [Hcs Ha0].
+    split.
+    - eapply callee_saved_trans; [ | exact Hcs ].
+      assert (Hm0w : m0 = apply_writes
+        [ ((mword_of_int 1 : mword 5), regval_into_reg (add_vec_int P 4)) ] m) by reflexivity.
+      rewrite Hm0w. apply callee_saved_apply_writes. repeat constructor.
+    - rewrite Ha0. f_equal. unfold m0.
+      rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate].
+  Qed.
+
 End WpSconfMycpu.
