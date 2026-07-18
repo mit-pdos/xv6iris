@@ -225,6 +225,43 @@ Proof.
 Qed.
 End ExecLoadGSwalkPtPa.
 
+(* the kernel TLB's trampoline slot after any kernel-consistent history:
+   empty, a non-matching (hash-63, non-trampoline) entry, or the kernel
+   table's own trampoline entry (an A/D variant of [pte_tramp], with the
+   cached walk path = the kernel tree's).  Feeds the userret satp-switch:
+   the stale hit after [csrw satp] lands on the SAME physical page. *)
+Lemma ktramp_slot63_pt (kroot : mword 44) (ktree : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  kpt_tree_spec kroot ktree ->
+  tlb_ok_pt (mword_of_int 0) ktree tlbvec ->
+  vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn) = None \/
+  (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn) = Some ent /\
+               match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) tramp_vpn) = false) \/
+  (exists p2 p1 p0 (a d : mword 1),
+     vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn)
+       = Some (u_walk_entry tramp_vpn p2 p1 (pte_set_ad p0 a d) (mword_of_int 0)) /\
+     ptree_maps ktree tramp_vpn p2 p1 p0 /\
+     (exists a0 d0 : mword 1, p0 = pte_set_ad pte_tramp a0 d0)).
+Proof.
+  intros Hspec Hok.
+  destruct (vec_access_dec tlbvec (tlb_hash (__id 39) tramp_vpn)) as [ent|] eqn:Hslot;
+    [| left; reflexivity].
+  destruct (Hok tramp_vpn ent Hslot) as (vpn0 & q2 & q1 & qp0 & a & d & Hmaps & Hh & ->).
+  destruct (decide (vpn0 = tramp_vpn)) as [-> | Hne].
+  - right; right.
+    destruct Hspec as (_ & _ & (p2' & p1' & a0 & d0 & Hmaps') & _).
+    destruct (ptree_maps_det ktree tramp_vpn q2 q1 qp0 p2' p1'
+                (pte_set_ad pte_tramp a0 d0) Hmaps Hmaps') as (-> & -> & ->).
+    exists p2', p1', (pte_set_ad pte_tramp a0 d0), a, d.
+    split; [reflexivity |].
+    split; [exact Hmaps' |].
+    exists a0, d0. reflexivity.
+  - right; left.
+    eexists. split; [reflexivity |].
+    exact (uwe_match_other vpn0 tramp_vpn q2 q1 (pte_set_ad qp0 a d)
+             (mword_of_int 0) Hne).
+Qed.
+
 Section WpUldPt.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
