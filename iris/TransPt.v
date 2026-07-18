@@ -780,6 +780,35 @@ Section Pt2TrampInst.
 
 End Pt2TrampInst.
 
+(* ---- the two concrete spec instances: both page-table specs carry a
+   trampoline clause and survive the trampoline A/D write-back ---------- *)
+
+Lemma kpt_pt2_tramp_spec (kroot : mword 44) : pt2_tramp_spec (kpt_tree_spec kroot).
+Proof.
+  split.
+  - intros t Hspec. exact (proj1 (proj2 (proj2 Hspec))).
+  - intros t a1 d1 Hspec.
+    destruct (proj1 (proj2 (proj2 Hspec))) as (p2 & p1 & a0 & d0 & Hmaps).
+    rewrite <- (pte_set_ad_absorb pte_tramp a0 d0 a1 d1).
+    exact (kpt_tree_spec_set_leaf_tramp kroot t p2 p1 _ a1 d1 Hspec Hmaps
+             (ex_intro _ a0 (ex_intro _ d0 eq_refl))).
+Qed.
+
+Lemma upt_pt2_tramp_spec (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
+  upt_map_wf um -> pt2_tramp_spec (upt_tree_spec uroot tfp um).
+Proof.
+  intros Hwf. split.
+  - intros t Hspec. exact (proj1 (proj2 Hspec)).
+  - intros t a1 d1 Hspec.
+    destruct (proj1 (proj2 Hspec)) as (p2 & p1 & a0 & d0 & Hmaps).
+    exact (upt_tree_spec_set_leaf uroot tfp um t tramp_vpn pte_tramp p2 p1 a0 d0 a1 d1
+             Hwf Hspec (or_introl (conj eq_refl eq_refl)) Hmaps).
+Qed.
+
+Lemma upt_pt2_base (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
+  forall t, upt_tree_spec uroot tfp um t -> pt_base t = uroot.
+Proof. intros t Hspec. exact (proj1 Hspec). Qed.
+
 (* the instantiated switch-window trampoline fetch + step engine *)
 Section Pt2TrampEngines.
   Context `{!riscvGS Σ, !sieG Σ}.
