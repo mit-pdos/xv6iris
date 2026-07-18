@@ -144,6 +144,7 @@ WpSconfBtype.v
 WpSconfCtl.v
 WpSconfLock.v
 WpSconfUart.v
+WpSconfMycpu.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
