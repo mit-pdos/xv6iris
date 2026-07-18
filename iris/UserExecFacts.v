@@ -201,3 +201,291 @@ Lemma exec_execute_WRS (op : wrsop) (s : mstate) :
                         | WRS_NTO => WAIT_WRS_NTO
                         end), s).
 Proof. destruct op; apply exec_returnm. Qed.
+
+(* ===================================================================== *)
+(* RETIRING compute-family TOTALITY facts: for EVERY operand assignment    *)
+(* (including rd = x0), execute retires with a single (possibly vacuous)   *)
+(* gpr write -- the shape [retire_obligation]'s dischargers need.  The     *)
+(* written VALUE is existential: safety never tracks it.                   *)
+(* [gpr_write_state] is [exec_wX_bits_gpr]'s post-state, packaged.         *)
+(* ===================================================================== *)
+
+Definition gpr_write_state (rd : mword 5) (v : mword 64) (s : mstate) : mstate :=
+  if Z.eqb (uint rd) 0 then s
+  else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) v.
+
+Lemma exec_execute_ITYPE_total (imm : mword 12) (i1 ird : mword 5)
+    (op : iop) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (ITYPE (imm, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (ITYPE (imm, Regidx i1, Regidx ird, op)))
+    with (execute_ITYPE imm (Regidx i1) (Regidx ird) op).
+  unfold execute_ITYPE, gpr_write_state. cbv zeta.
+  destruct op; eexists;
+    (erewrite exec_bind_Some;
+      [ | erewrite exec_bind_Some; [ apply exec_returnm | apply (exec_rX_bits_gpr i1 s) ] ]);
+    cbn beta;
+    (erewrite exec_bind0_Some;
+      [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ]).
+Qed.
+
+Lemma exec_execute_RTYPE_total (i2 i1 ird : mword 5) (op : rop) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (RTYPE (Regidx i2, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (RTYPE (Regidx i2, Regidx i1, Regidx ird, op)))
+    with (execute_RTYPE (Regidx i2) (Regidx i1) (Regidx ird) op).
+  unfold execute_RTYPE, gpr_write_state.
+  destruct op; eexists;
+    (erewrite exec_bind_Some;
+      [ | erewrite exec_bind_Some;
+          [ cbn beta;
+            erewrite exec_bind_Some;
+            [ apply exec_returnm | apply (exec_rX_bits_gpr i2 s) ]
+          | apply (exec_rX_bits_gpr i1 s) ] ]);
+    cbn beta;
+    (erewrite exec_bind0_Some;
+      [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ]).
+Qed.
+
+Lemma exec_execute_RTYPEW_total (i2 i1 ird : mword 5) (op : ropw) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (RTYPEW (Regidx i2, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (RTYPEW (Regidx i2, Regidx i1, Regidx ird, op)))
+    with (execute_RTYPEW (Regidx i2) (Regidx i1) (Regidx ird) op).
+  unfold execute_RTYPEW, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_SHIFTIOP_total (shamt : mword 6) (i1 ird : mword 5)
+    (op : sop) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (SHIFTIOP (shamt, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (SHIFTIOP (shamt, Regidx i1, Regidx ird, op)))
+    with (execute_SHIFTIOP shamt (Regidx i1) (Regidx ird) op).
+  unfold execute_SHIFTIOP, gpr_write_state. cbv zeta.
+  destruct op; eexists;
+    (erewrite exec_bind_Some;
+      [ | erewrite exec_bind_Some; [ apply exec_returnm | apply (exec_rX_bits_gpr i1 s) ] ]);
+    cbn beta;
+    (erewrite exec_bind0_Some;
+      [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ]).
+Qed.
+
+Lemma exec_execute_SHIFTIWOP_total (shamt : mword 5) (i1 ird : mword 5)
+    (op : sopw) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (SHIFTIWOP (shamt, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (SHIFTIWOP (shamt, Regidx i1, Regidx ird, op)))
+    with (execute_SHIFTIWOP shamt (Regidx i1) (Regidx ird) op).
+  unfold execute_SHIFTIWOP, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_ADDIW_total (imm : mword 12) (i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (ADDIW (imm, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (ADDIW (imm, Regidx i1, Regidx ird)))
+    with (execute_ADDIW imm (Regidx i1) (Regidx ird)).
+  unfold execute_ADDIW, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_MUL_total (i2 i1 ird : mword 5) (op : mul_op) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (MUL (Regidx i2, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (MUL (Regidx i2, Regidx i1, Regidx ird, op)))
+    with (execute_MUL (Regidx i2) (Regidx i1) (Regidx ird) op).
+  unfold execute_MUL, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_MULW_total (i2 i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (MULW (Regidx i2, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (MULW (Regidx i2, Regidx i1, Regidx ird)))
+    with (execute_MULW (Regidx i2) (Regidx i1) (Regidx ird)).
+  unfold execute_MULW, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_DIV_total (i2 i1 ird : mword 5) (u : bool) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (DIV (Regidx i2, Regidx i1, Regidx ird, u))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (DIV (Regidx i2, Regidx i1, Regidx ird, u)))
+    with (execute_DIV (Regidx i2) (Regidx i1) (Regidx ird) u).
+  unfold execute_DIV, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_DIVW_total (i2 i1 ird : mword 5) (u : bool) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (DIVW (Regidx i2, Regidx i1, Regidx ird, u))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (DIVW (Regidx i2, Regidx i1, Regidx ird, u)))
+    with (execute_DIVW (Regidx i2) (Regidx i1) (Regidx ird) u).
+  unfold execute_DIVW, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_REM_total (i2 i1 ird : mword 5) (u : bool) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (REM (Regidx i2, Regidx i1, Regidx ird, u))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (REM (Regidx i2, Regidx i1, Regidx ird, u)))
+    with (execute_REM (Regidx i2) (Regidx i1) (Regidx ird) u).
+  unfold execute_REM, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_REMW_total (i2 i1 ird : mword 5) (u : bool) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (REMW (Regidx i2, Regidx i1, Regidx ird, u))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (REMW (Regidx i2, Regidx i1, Regidx ird, u)))
+    with (execute_REMW (Regidx i2) (Regidx i1) (Regidx ird) u).
+  unfold execute_REMW, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+(* PAUSE / NTL: pure RETIRE_SUCCESS no-ops. *)
+Lemma exec_execute_PAUSE (s : mstate) :
+  exec (execute (PAUSE tt)) s = Some (RETIRE_SUCCESS, s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_UTYPE_total (imm : mword 20) (ird : mword 5)
+    (op : uop) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (UTYPE (imm, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (UTYPE (imm, Regidx ird, op)))
+    with (execute_UTYPE imm (Regidx ird) op).
+  unfold execute_UTYPE, gpr_write_state. cbv zeta.
+  destruct op; eexists.
+  - (* LUI: pure *)
+    erewrite exec_bind_Some; [ | apply exec_returnm ]. cbn beta.
+    erewrite exec_bind0_Some;
+      [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+  - (* AUIPC: reads PC *)
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind_Some; [ apply exec_returnm | ].
+        unfold get_arch_pc. apply (exec_read_reg PC s). }
+    cbn beta.
+    erewrite exec_bind0_Some;
+      [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+(* the fence family: state-preserving retires (a barrier is a no-op in the
+   functional interpreter).  FENCE's pred/succ dispatch is a pure if-tree
+   over the effective sets; at User [is_fiom_active] reads menvcfg and
+   senvcfg (values irrelevant -- every branch is a barrier-or-nothing). *)
+Local Lemma exec_sail_barrier' (b : Arch.barrier) s :
+  exec (sail_barrier b) s = Some (tt, s).
+Proof. reflexivity. Qed.
+
+Lemma exec_execute_NTL (g : ntl_type) (s : mstate) :
+  exec (execute (NTL g)) s = Some (RETIRE_SUCCESS, s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_FENCE_TSO_U (s : mstate) :
+  exec (execute (FENCE_TSO tt)) s = Some (RETIRE_SUCCESS, s).
+Proof.
+  change (execute (FENCE_TSO tt)) with (execute_FENCE_TSO tt).
+  unfold execute_FENCE_TSO.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier' _ s)).
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_FENCEI_U (imm : mword 12) (i1 ird : mword 5) (s : mstate) :
+  exec (execute (FENCEI (imm, Regidx i1, Regidx ird))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  change (execute (FENCEI (imm, Regidx i1, Regidx ird)))
+    with (execute_FENCEI imm (Regidx i1) (Regidx ird)).
+  unfold execute_FENCEI.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier' _ s)).
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_FENCE_total_U (fm pred succ : mword 4) (i1 ird : mword 5)
+    (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (FENCE (fm, pred, succ, Regidx i1, Regidx ird))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intros Hpriv.
+  change (execute (FENCE (fm, pred, succ, Regidx i1, Regidx ird)))
+    with (execute_FENCE fm pred succ (Regidx i1) (Regidx ird)).
+  unfold execute_FENCE.
+  erewrite exec_bind_Some.
+  2:{ unfold is_fiom_active.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+      rewrite Hpriv. cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn beta.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg s)). cbn beta.
+      apply exec_returnm. }
+  cbn beta. cbv zeta.
+  cbn match.
+  erewrite exec_bind0_Some.
+  2:{ repeat match goal with
+             | |- exec (if ?b then _ else _) _ = _ => destruct b
+             | |- exec (returnM (if ?b then _ else _)) _ = _ => destruct b
+             end;
+      first [ apply (exec_sail_barrier' _ s) | apply exec_returnm ]. }
+  apply exec_returnm.
+Qed.

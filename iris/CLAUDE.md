@@ -415,11 +415,26 @@ files or copy code from them; build fresh from the live tree.
      `exec_execute_{SFENCE_VMA,SFENCE_W_INVAL,SFENCE_INVAL_IR}_U` (also
      illegal; SFENCE_VMA harmlessly reads rs1/rs2 first via the total
      `exec_rX_bits_gpr`). `exec_execute_SINVAL_VMA` is the pure
-     `ExecuteAs (SFENCE_VMA …)` redirection — composing it needs a BASE
-     one-redirection progress composer (the existing `_RVC_gen` handles
-     redirection only on the compressed path; `_base_gen` forbids
-     ExecuteAs). Still to add there: Zicbo* (senvcfg=0-gated), CSR-at-U
-     dispatch, SSAMOSWAP.
+     `ExecuteAs (SFENCE_VMA …)` redirection, composed through the BASE
+     one-redirection progress composer
+     `exec_hart_active_progress_base_redirect_gen` (UserStep.v §6).
+     RETIRING TOTALITY facts (same file): `gpr_write_state rd v s` (=
+     `exec_wX_bits_gpr`'s post-state: identity at rd=x0) and
+     `exec_execute_<F>_total : ∃ v, exec (execute (F …)) s =
+     Some (RETIRE_SUCCESS, gpr_write_state rd v s)` for EVERY operand
+     (value existential — safety never tracks it) — F ∈ {ITYPE, RTYPE,
+     RTYPEW, SHIFTIOP, SHIFTIWOP, ADDIW, MUL, MULW, DIV, DIVW, REM, REMW,
+     UTYPE}; plus the state-preserving retires `exec_execute_{PAUSE,NTL,
+     FENCE_TSO_U,FENCEI_U,FENCE_total_U}` (FENCE's pred/succ if-tree is
+     destructed wholesale; at User `is_fiom_active` reads menvcfg+senvcfg,
+     values irrelevant). Proof pattern: `destruct op; eexists;` then
+     erewrite `exec_bind_Some`/`exec_bind0_Some` chains ending
+     `apply (exec_wX_bits_gpr ird _ s)` — the existential value unifies
+     with whatever the op computes. Still to add there: JAL/JALR/BTYPE
+     (misaligned-target check needs a misa.C premise), the
+     currentlyEnabled-gated families (ZBB*/ZICOND/CLMUL*/REV8/RORI(W)/
+     ZIMOP — need misa/mstateen pins), Zicbo* (senvcfg=0-gated), CSR-at-U
+     dispatch, SSAMOSWAP, and the C_* ExecuteAs expansion facts.
      Iris trap-arm recipe (used by all three tower arms): ghost-update
      EVERY physical write in tower order (repeated writes to the same CSR
      each get their own reg_update — the interp goal is the literal
