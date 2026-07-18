@@ -556,3 +556,798 @@ Section MisalignedFaults.
 
   Local Transparent plat_misaligned_exception memory_exception.
 End MisalignedFaults.
+
+(* ===================================================================== *)
+(* §4 The MISALIGNED plain load/store SPLIT.  When the address is not     *)
+(*     aligned to [width] the model does not fault (plat_misaligned_      *)
+(*     access.load_store = None); instead it splits the access into       *)
+(*     [n = width / 2^ctz(addr)] chunks of [bytes = 2^ctz(addr)] each and *)
+(*     runs an [untilMT] loop, translating+accessing each chunk           *)
+(*     independently.  We must handle this for TOTALITY: arbitrary user   *)
+(*     code can issue any misaligned plain load/store.                    *)
+(*                                                                        *)
+(* §4a The generic [untilMT'] loop reductions.  The split loop uses a     *)
+(*     CONSTANT measure [fun _ => n], so the accessibility limit starts   *)
+(*     at [n] and decrements once per iteration; termination is driven    *)
+(*     by the [finished] flag in [cond], reached exactly at the last      *)
+(*     chunk.  We destruct the [Acc] witness to unfold one loop step      *)
+(*     (axiom-free, no proof-irrelevance), giving [_step] (cond false ->  *)
+(*     recurse at [limit-1]) and [_last] (cond true -> return); [_chain]  *)
+(*     composes [N] iterations by induction.                              *)
+(* ===================================================================== *)
+
+Lemma execR_untilMT'_last {R Vars} (limit : Z) (vars vars' : Vars)
+   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars)
+   s s' (acc : Acc (Zwf 0) limit) :
+  (limit >= 0)%Z ->
+  execR (body vars) s = Some (inr vars', s') ->
+  execR (cond vars') s' = Some (inr true, s') ->
+  execR (Defs.untilMT' limit vars cond body acc) s = Some (inr vars', s').
+Proof.
+  intros Hlim Hb Hc. destruct acc as [acc_fn]. cbn [Defs.untilMT'].
+  destruct (Z_ge_dec limit 0) as [Hge|Hge]; [| lia].
+  rewrite (execR_bind_Some _ _ _ _ _ Hb).
+  rewrite (execR_bind_Some _ _ _ _ _ Hc). cbn match. apply execR_returnR_fwd.
+Qed.
+
+Lemma execR_untilMT'_step {R Vars} (limit : Z) (vars vars' : Vars)
+   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars)
+   s s' (acc : Acc (Zwf 0) limit) :
+  (limit >= 0)%Z ->
+  execR (body vars) s = Some (inr vars', s') ->
+  execR (cond vars') s' = Some (inr false, s') ->
+  exists acc' : Acc (Zwf 0) (limit-1),
+    execR (Defs.untilMT' limit vars cond body acc) s
+    = execR (Defs.untilMT' (limit-1) vars' cond body acc') s'.
+Proof.
+  intros Hlim Hb Hc. destruct acc as [acc_fn]. cbn [Defs.untilMT'].
+  destruct (Z_ge_dec limit 0) as [Hge|Hge]; [| lia].
+  rewrite (execR_bind_Some _ _ _ _ _ Hb).
+  rewrite (execR_bind_Some _ _ _ _ _ Hc). cbn match. eexists. reflexivity.
+Qed.
+
+Lemma execR_untilMT'_chain {R Vars}
+   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars) :
+   forall (N : nat) (v : nat -> Vars) (st : nat -> mstate) (limit0 : Z) (acc : Acc (Zwf 0) limit0),
+   (1 <= N)%nat ->
+   (limit0 >= Z.of_nat N - 1)%Z ->
+   (forall k, (k < N)%nat -> execR (body (v k)) (st k) = Some (inr (v (S k)), st (S k))) ->
+   (forall k, (S k < N)%nat -> execR (cond (v (S k))) (st (S k)) = Some (inr false, st (S k))) ->
+   execR (cond (v N)) (st N) = Some (inr true, st N) ->
+   execR (Defs.untilMT' limit0 (v 0%nat) cond body acc) (st 0%nat) = Some (inr (v N), st N).
+Proof.
+  intros N. induction N as [|N' IH]; [ lia | ].
+  intros v st limit0 acc HN Hlim Hbody Hcondf Hcondt.
+  destruct (Nat.eq_dec N' 0) as [->|Hn0].
+  - apply (execR_untilMT'_last limit0 (v 0%nat) (v 1%nat) cond body (st 0%nat) (st 1%nat) acc).
+    + lia.
+    + apply (Hbody 0%nat). lia.
+    + apply Hcondt.
+  - edestruct (execR_untilMT'_step limit0 (v 0%nat) (v 1%nat) cond body (st 0%nat) (st 1%nat) acc)
+      as [acc' Hstep].
+    + lia.
+    + apply (Hbody 0%nat). lia.
+    + apply (Hcondf 0%nat). lia.
+    + rewrite Hstep.
+      apply (IH (fun k => v (S k)) (fun k => st (S k)) (limit0 - 1) acc').
+      * lia.
+      * lia.
+      * intros k Hk. apply (Hbody (S k)). lia.
+      * intros k Hk. apply (Hcondf (S k)). lia.
+      * apply Hcondt.
+Qed.
+
+(* ===================================================================== *)
+(* §4b The MISALIGNED plain-LOAD split reduction, generic in the chunk    *)
+(*     count N.  [split_var k] is the loop state after k chunks:          *)
+(*     [(data_seq k, finished?, offset)] with [data_seq] the running      *)
+(*     byte-assembly.  [split_body_step] reduces one loop iteration       *)
+(*     (translate+read+assemble) generically in k; [split_loop] composes  *)
+(*     N of them via [execR_untilMT'_chain]; the top lemma glues on the   *)
+(*     align-guard (plat load_store = None -> no fault) and the split.    *)
+(*     res=false: the split fires only for plain load/store, never LR.    *)
+(* ===================================================================== *)
+
+Lemma misaligned_order_split (n : Z) : misaligned_order n = (0, n - 1, 1).
+Proof. reflexivity. Qed.
+
+Lemma exec_plat_misaligned_loadstore_none (acc : MemoryAccessType mem_payload) (s : mstate) :
+  is_amo_access acc = false ->
+  is_vector_access acc = false ->
+  exec (plat_misaligned_exception acc false) s = Some (None, s).
+Proof.
+  intros Hamo Hvec. unfold plat_misaligned_exception.
+  assert (Ha : exec (assert_exp (Riscv.rv64d.not (is_amo_access acc)) "sys/vmem_utils.sail:85.35-85.36") s = Some (tt, s)).
+  { rewrite Hamo. reflexivity. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Ha). rewrite Hvec. apply exec_returnm.
+Qed.
+
+Section MisalignedSplitRead.
+  Context (width bytes : Z) (va : mword 64) (acc : MemoryAccessType mem_payload) (aq rl : bool).
+  Context (N : nat) (pa : nat -> mword 64) (val : nat -> mword (8*bytes)) (st : nat -> mstate).
+  Context (HN : (1 <= N)%nat) (Hbytes : 0 < bytes) (Hwidth : Z.of_nat N * bytes = width).
+
+  Notation n := (Z.of_nat N).
+  Notation vbits := (bits_of_virtaddr (Virtaddr va)).
+  Notation RES := (result (mword (8*width)) ExecutionResult).
+
+  Fixpoint data_seq (k : nat) : mword (8 * n * bytes) :=
+    match k with
+    | O => zeros' (8 * n * bytes)
+    | S k' => update_subrange_vec_dec (data_seq k')
+                (8*(Z.of_nat k'+1)*bytes-1) (8*Z.of_nat k'*bytes)
+                (autocast (T:=mword) (val k'))
+    end.
+
+  Definition split_var (k : nat) : (mword (8 * n * bytes) * bool * Z) :=
+    (data_seq k, Nat.eqb k N, Z.of_nat (Nat.min k (N-1))).
+
+  Definition split_body : (mword (8*n*bytes) * bool * Z) -> Defs.monadR RES exception (mword (8*n*bytes) * bool * Z) :=
+    (fun '(data, finished, i) =>
+       (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
+        let offset := i in
+        let vaddr := add_vec_int vbits (Z.mul offset bytes) in
+        liftR (translateAddr (Virtaddr vaddr) acc) >>= fun w__3 =>
+        match w__3 with
+        | Err (e, _) =>
+           liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__4 =>
+           (early_return (Err w__4 : RES)) >> returnR RES data
+        | Ok (paddr, pbmt, _) =>
+           liftR (mem_read acc pbmt paddr bytes aq rl false) >>= fun w__5 =>
+           match w__5 with
+           | Err e =>
+              liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__6 =>
+              (early_return (Err w__6 : RES)) >> returnR RES data
+           | Ok v =>
+              returnR RES tt >>
+              let data := update_subrange_vec_dec data
+                            (Z.sub (Z.mul (Z.mul 8 (Z.add offset 1)) bytes) 1)
+                            (Z.mul (Z.mul 8 offset) bytes) (autocast (T:=mword) v) in
+              returnR RES data
+           end
+        end >>= fun data =>
+        let '(finished, i) :=
+          (if Z.eqb offset (n-1) then (true, i) else (finished, Z.add offset 1)) in
+        returnR RES (data, finished, i))).
+
+  Hypothesis Htr : forall k, (k < N)%nat ->
+    exec (translateAddr (Virtaddr (add_vec_int vbits (Z.of_nat k * bytes))) acc) (st k)
+      = Some (Ok (Physaddr (pa k), PBMT_PMA, init_ext_ptw), st (S k)).
+  Hypothesis Hmr : forall k, (k < N)%nat ->
+    exec (mem_read acc PBMT_PMA (Physaddr (pa k)) bytes aq rl false) (st (S k))
+      = Some (Ok (val k), st (S k)).
+
+  Lemma split_body_step (k : nat) : (k < N)%nat ->
+    execR (split_body (split_var k)) (st k) = Some (inr (split_var (S k)), st (S k)).
+  Proof.
+    intros Hk. unfold split_body, split_var.
+    replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    replace (Nat.min k (N-1)) with k by lia.
+    cbn match.
+    assert (Hass : exec (assert_exp' true "loop dummy assert") (st k) = Some (@eq_refl bool true, st k)) by reflexivity.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Htr k Hk)).
+    cbn match.
+    match goal with
+    | |- execR (Defs.bind ?mrm ?post) (st (S k)) = _ =>
+      assert (Hmrm : execR mrm (st (S k)) = Some (inr (data_seq (S k)), st (S k)))
+    end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (Hmr k Hk)). cbn match.
+      rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt (st (S k)))).
+      cbn [data_seq]. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
+    destruct (Z.eqb (Z.of_nat k) (n-1)) eqn:Eq; cbn match;
+      rewrite execR_returnR_fwd; do 3 f_equal; unfold split_var.
+    - apply Z.eqb_eq in Eq.
+      replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+      replace (Nat.min (S k) (N-1)) with k by lia. reflexivity.
+    - apply Z.eqb_neq in Eq.
+      replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+      replace (Nat.min (S k) (N-1)) with (S k) by lia.
+      replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+  Qed.
+
+  Lemma split_cond_false (k : nat) : (S k < N)%nat ->
+    execR ((fun '(data, finished, i) => returnR RES finished) (split_var (S k))) (st (S k))
+      = Some (inr false, st (S k)).
+  Proof.
+    intros Hk. unfold split_var. cbn match.
+    replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    apply execR_returnR_fwd.
+  Qed.
+
+  Lemma split_cond_true :
+    execR ((fun '(data, finished, i) => returnR RES finished) (split_var N)) (st N)
+      = Some (inr true, st N).
+  Proof.
+    unfold split_var. cbn match. rewrite Nat.eqb_refl. apply execR_returnR_fwd.
+  Qed.
+
+  Lemma split_var0 : split_var 0%nat = (zeros' (8 * n * bytes), false, 0%Z).
+  Proof.
+    unfold split_var. cbn [data_seq].
+    replace (Nat.eqb 0 N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    replace (Nat.min 0 (N-1)) with 0%nat by lia. reflexivity.
+  Qed.
+
+  Lemma split_loop :
+    execR (Defs.untilMT (zeros' (8 * n * bytes), false, 0%Z) (fun '(data, finished, i) => n)
+             (fun '(data, finished, i) => returnR RES finished) split_body) (st 0%nat)
+      = Some (inr (split_var N), st N).
+  Proof.
+    rewrite <- split_var0.
+    unfold Defs.untilMT.
+    set (L := (fun '(data, finished, i) => n) (split_var 0%nat)).
+    assert (HL : L = n) by (unfold L; rewrite split_var0; reflexivity).
+    clearbody L. rewrite HL.
+    apply (execR_untilMT'_chain (fun '(data, finished, i) => returnR RES finished)
+                                split_body N split_var st n).
+    - exact HN.
+    - lia.
+    - intros k Hk. apply split_body_step; assumption.
+    - intros k Hk. apply split_cond_false; assumption.
+    - apply split_cond_true.
+  Qed.
+
+  Lemma exec_vmem_read_addr_misaligned_split :
+    is_aligned_vaddr (Virtaddr va) width = false ->
+    is_amo_access acc = false ->
+    is_vector_access acc = false ->
+    exec (split_misaligned (Virtaddr va) width) (st 0%nat) = Some ((n, bytes), st 0%nat) ->
+    exists dvv : mword (8 * width),
+      exec (vmem_read_addr (Virtaddr va) width acc aq rl false) (st 0%nat) = Some (Ok dvv, st N).
+  Proof.
+    intros Hnal Hamo Hvec Hsplit. eexists.
+    unfold vmem_read_addr. rewrite exec_catch_early_return.
+    rewrite Hnal. cbn [Riscv.rv64d.not negb].
+    match goal with
+    | |- context [ Defs.bind0 ?g (Defs.liftR (split_misaligned (Virtaddr va) width)) ] =>
+        set (GRD := g)
+    end.
+    assert (Hg : execR GRD (st 0%nat) = Some (inr tt, st 0%nat)).
+    { unfold GRD.
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_plat_misaligned_loadstore_none acc (st 0%nat) Hamo Hvec)).
+      cbn match. apply execR_returnR_fwd. }
+    assert (Hinner : execR (Defs.bind0 GRD (liftR (split_misaligned (Virtaddr va) width))) (st 0%nat)
+                     = Some (inr (n, bytes), st 0%nat)).
+    { rewrite (execR_bind0_Some _ _ _ _ Hg).
+      rewrite execR_liftR. rewrite Hsplit. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+    rewrite misaligned_order_split. cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ split_loop).
+    cbn match. reflexivity.
+  Qed.
+
+End MisalignedSplitRead.
+
+(* ===================================================================== *)
+(* §4c The MISALIGNED plain-STORE split reduction, generic in N.  Same    *)
+(*     shape as §4b: the loop var is [(finished, offset, write_success)]  *)
+(*     and [write_success] accumulates [andb] of the per-chunk store      *)
+(*     outcomes ([ws_seq]).  Each chunk threads state through translate    *)
+(*     ([stt k]) then mem_write_ea + mem_write_value ([st (S k)]); the     *)
+(*     write-value is the model's own [subrange_vec_dec dat] slice.        *)
+(* ===================================================================== *)
+
+Section MisalignedSplitWrite.
+  Context (width bytes : Z) (va : mword 64) (dat : mword (8*width)) (aq rl : bool).
+  Context (N : nat) (pa : nat -> mword 64) (sk : nat -> bool)
+          (stt : nat -> mstate) (st : nat -> mstate).
+  Context (HN : (1 <= N)%nat) (Hbytes : 0 < bytes) (Hwidth : Z.of_nat N * bytes = width).
+
+  Notation n := (Z.of_nat N).
+  Notation vbits := (bits_of_virtaddr (Virtaddr va)).
+  Notation RES := (result bool ExecutionResult).
+
+  Fixpoint ws_seq (k : nat) : bool :=
+    match k with O => true | S k' => andb (ws_seq k') (sk k') end.
+
+  Definition wv (k : nat) : mword (8*bytes) :=
+    autocast (T:=mword) (subrange_vec_dec dat (8*(Z.of_nat k+1)*bytes-1) (8*Z.of_nat k*bytes)).
+
+  Definition write_var (k : nat) : (bool * Z * bool) :=
+    (Nat.eqb k N, Z.of_nat (Nat.min k (N-1)), ws_seq k).
+
+  Definition write_body : (bool * Z * bool) -> Defs.monadR RES exception (bool * Z * bool) :=
+    (fun '(finished, i, write_success) =>
+       (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
+        let offset := i in
+        let vaddr := add_vec_int vbits (Z.mul offset bytes) in
+        liftR (translateAddr (Virtaddr vaddr) (Store Data)) >>= fun w__3 =>
+        match w__3 with
+        | Err (e, _) =>
+           liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__4 =>
+           (early_return (Err w__4 : RES)) >> returnR RES write_success
+        | Ok (paddr, pbmt, _) =>
+           liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") >>
+           (liftR (mem_write_ea paddr bytes false false false) >>= fun w__9 =>
+            match w__9 with
+            | Err e =>
+               liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__10 =>
+               (early_return (Err w__10 : RES)) >> returnR RES write_success
+            | Ok tt =>
+               let write_value := subrange_vec_dec dat
+                     (Z.sub (Z.mul (Z.mul 8 (Z.add offset 1)) bytes) 1)
+                     (Z.mul (Z.mul 8 offset) bytes) in
+               liftR (mem_write_value paddr bytes (autocast (T:=mword) write_value)
+                        (Store Data) pbmt false false false) >>= fun w__11 =>
+               match w__11 with
+               | Err e =>
+                  liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__12 =>
+                  (early_return (Err w__12 : RES)) >> returnR RES write_success
+               | Ok s => returnR RES (andb write_success s)
+               end
+            end)
+        end >>= fun write_success =>
+        let '(finished, i) :=
+          (if Z.eqb offset (n-1) then (true, i) else (finished, Z.add offset 1)) in
+        returnR RES (finished, i, write_success))).
+
+  Hypothesis Htr : forall k, (k < N)%nat ->
+    exec (translateAddr (Virtaddr (add_vec_int vbits (Z.of_nat k * bytes))) (Store Data)) (st k)
+      = Some (Ok (Physaddr (pa k), PBMT_PMA, init_ext_ptw), stt k).
+  Hypothesis Hea : forall k, (k < N)%nat ->
+    exec (mem_write_ea (Physaddr (pa k)) bytes false false false) (stt k) = Some (Ok tt, stt k).
+  Hypothesis Hwv : forall k, (k < N)%nat ->
+    exec (mem_write_value (Physaddr (pa k)) bytes (wv k) (Store Data) PBMT_PMA false false false) (stt k)
+      = Some (Ok (sk k), st (S k)).
+
+  Lemma write_body_step (k : nat) : (k < N)%nat ->
+    execR (write_body (write_var k)) (st k) = Some (inr (write_var (S k)), st (S k)).
+  Proof.
+    intros Hk. unfold write_body, write_var.
+    replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    replace (Nat.min k (N-1)) with k by lia.
+    cbn match.
+    assert (Hass : exec (assert_exp' true "loop dummy assert") (st k) = Some (@eq_refl bool true, st k)) by reflexivity.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Htr k Hk)).
+    cbn match.
+    match goal with
+    | |- execR (Defs.bind ?mrm ?post) (stt k) = _ =>
+      assert (Hmrm : execR mrm (stt k) = Some (inr (ws_seq (S k)), st (S k)))
+    end.
+    { assert (Hsc : exec (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") (stt k) = Some (tt, stt k)) by reflexivity.
+      assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") : Defs.monadR RES exception unit) (stt k) = Some (inr tt, stt k))
+        by (rewrite execR_liftR; rewrite Hsc; reflexivity).
+      rewrite (execR_bind0_Some _ _ _ _ Hscm).
+      rewrite (execR_liftR_seq _ _ _ _ _ (Hea k Hk)). cbn match.
+      rewrite (execR_liftR_seq _ _ _ _ _ (Hwv k Hk)). cbn match.
+      cbn [ws_seq]. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
+    destruct (Z.eqb (Z.of_nat k) (n-1)) eqn:Eq; cbn match;
+      rewrite execR_returnR_fwd; do 3 f_equal; unfold write_var.
+    - apply Z.eqb_eq in Eq.
+      replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+      replace (Nat.min (S k) (N-1)) with k by lia. reflexivity.
+    - apply Z.eqb_neq in Eq.
+      replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+      replace (Nat.min (S k) (N-1)) with (S k) by lia.
+      replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+  Qed.
+
+  Lemma write_cond_false (k : nat) : (S k < N)%nat ->
+    execR ((fun '(finished, i, write_success) => returnR RES finished) (write_var (S k))) (st (S k))
+      = Some (inr false, st (S k)).
+  Proof.
+    intros Hk. unfold write_var. cbn match.
+    replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    apply execR_returnR_fwd.
+  Qed.
+
+  Lemma write_cond_true :
+    execR ((fun '(finished, i, write_success) => returnR RES finished) (write_var N)) (st N)
+      = Some (inr true, st N).
+  Proof. unfold write_var. cbn match. rewrite Nat.eqb_refl. apply execR_returnR_fwd. Qed.
+
+  Lemma write_var0 : write_var 0%nat = (false, 0%Z, true).
+  Proof.
+    unfold write_var. cbn [ws_seq].
+    replace (Nat.eqb 0 N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    replace (Nat.min 0 (N-1)) with 0%nat by lia. reflexivity.
+  Qed.
+
+  Lemma write_loop :
+    execR (Defs.untilMT (false, 0%Z, true) (fun '(finished, i, write_success) => n)
+             (fun '(finished, i, write_success) => returnR RES finished) write_body) (st 0%nat)
+      = Some (inr (write_var N), st N).
+  Proof.
+    rewrite <- write_var0. unfold Defs.untilMT.
+    set (L := (fun '(finished, i, write_success) => n) (write_var 0%nat)).
+    assert (HL : L = n) by (unfold L; rewrite write_var0; reflexivity).
+    clearbody L. rewrite HL.
+    apply (execR_untilMT'_chain (fun '(finished, i, write_success) => returnR RES finished)
+                                write_body N write_var st n).
+    - exact HN.
+    - lia.
+    - intros k Hk. apply write_body_step; assumption.
+    - intros k Hk. apply write_cond_false; assumption.
+    - apply write_cond_true.
+  Qed.
+
+  Lemma exec_vmem_write_addr_misaligned_split :
+    is_aligned_vaddr (Virtaddr va) width = false ->
+    exec (split_misaligned (Virtaddr va) width) (st 0%nat) = Some ((n, bytes), st 0%nat) ->
+    exec (vmem_write_addr (Virtaddr va) width dat (Store Data) false false false) (st 0%nat)
+      = Some (Ok (ws_seq N), st N).
+  Proof.
+    intros Hnal Hsplit.
+    unfold vmem_write_addr. rewrite exec_catch_early_return.
+    rewrite Hnal. cbn [Riscv.rv64d.not negb].
+    match goal with
+    | |- context [ Defs.bind0 ?g (Defs.liftR (split_misaligned (Virtaddr va) width)) ] =>
+        set (GRD := g)
+    end.
+    assert (Hg : execR GRD (st 0%nat) = Some (inr tt, st 0%nat)).
+    { unfold GRD.
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_plat_misaligned_loadstore_none (Store Data) (st 0%nat) eq_refl eq_refl)).
+      cbn match. apply execR_returnR_fwd. }
+    assert (Hinner : execR (Defs.bind0 GRD (liftR (split_misaligned (Virtaddr va) width))) (st 0%nat)
+                     = Some (inr (n, bytes), st 0%nat)).
+    { rewrite (execR_bind0_Some _ _ _ _ Hg).
+      rewrite execR_liftR. rewrite Hsplit. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+    rewrite misaligned_order_split. cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ write_loop).
+    cbn match. reflexivity.
+  Qed.
+
+End MisalignedSplitWrite.
+
+(* ===================================================================== *)
+(* §5 The LR/SC RETIRE-OR-FAULT disjunction.  [pma_allows_all] pins       *)
+(*    readable/writable/atomic but NOT [PMA_reservability], and the       *)
+(*    LoadReserved/StoreConditional pma arms gate on                      *)
+(*    [reservability <> RsrvNone].  So on a user-mapped, aligned, R/W     *)
+(*    address LR/SC either RETIRE (reservability set: the reserved        *)
+(*    read/conditional write lands) or take a delegated ACCESS FAULT      *)
+(*    (reservability = RsrvNone: pma denies).  Both outcomes are total    *)
+(*    and safe; we prove the disjunction rather than assuming a value.    *)
+(*                                                                        *)
+(* §5a The reserved-RAM read atoms.  Identical to the plain read atoms    *)
+(*    (read_ram is AK-agnostic for RAM); the reserved read_kind only      *)
+(*    swaps the access-kind constructor (AV_exclusive vs AV_plain).       *)
+(* ===================================================================== *)
+
+Lemma run_read_ram_resv_4_pin (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  run (read_ram Read_RISCV_reserved (Physaddr addr) 4 false) s (w, default_meta) s.
+Proof.
+  intros Hdev Hbytes.
+  unfold read_ram. cbn match.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  eexists _, s. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
+    + intros j Hj. exact (Hbytes j Hj).
+    + apply run_returnM_fwd.
+  - cbn match beta. apply run_returnM_fwd.
+Qed.
+
+Lemma exec_read_ram_resv_4 (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram Read_RISCV_reserved (Physaddr addr) 4 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_resv_4_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 4) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
+Lemma run_read_ram_resv_8_pin (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  run (read_ram Read_RISCV_reserved (Physaddr addr) 8 false) s (w, default_meta) s.
+Proof.
+  intros Hdev Hbytes.
+  unfold read_ram. cbn match.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  eexists _, s. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
+    + intros j Hj. exact (Hbytes j Hj).
+    + apply run_returnM_fwd.
+  - cbn match beta. apply run_returnM_fwd.
+Qed.
+
+Lemma exec_read_ram_resv_8 (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram Read_RISCV_reserved (Physaddr addr) 8 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_resv_8_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 8) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
+(* ===================================================================== *)
+(* §5b The reserved pmaCheck, branching on reservability.  On the RAM     *)
+(*    region [pma_allows_all] gives readable/writable=true but leaves     *)
+(*    [PMA_reservability] free, so the LR/SC pma arm                       *)
+(*    [andb R/W (reservability<>RsrvNone)] resolves to the reservability  *)
+(*    bit: [<>None] -> allowed (None fault), [=None] -> the delegated      *)
+(*    access fault (E_Load/E_SAMO).  This is the branch point of the      *)
+(*    retire-or-fault disjunction.                                        *)
+(* ===================================================================== *)
+
+Lemma exec_pmaCheck_ram_lr_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (pmaCheck (Physaddr addr) k (LoadReserved Data) pbmt true) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then None else Some (E_Load_Access_Fault tt)), s).
+Proof.
+  intros Hmatch Halign Hread.
+  unfold pmaCheck.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
+  rewrite Hmatch.
+  destruct region as [rbase rsize rattr rdtree].
+  cbn [PMA_Region_attributes] in Hread |- *.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
+  cbn match beta.
+  change (assert_exp' true "sys/mem.sail:111.56-111.57" >>=
+          (fun _ : true = true => returnM (andb (PMA_readable (override_PMA rattr pbmt))
+                                             (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone))))
+    with (returnM (andb (PMA_readable (override_PMA rattr pbmt))
+                    (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone)) : M bool).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
+  rewrite Hread. cbn [andb].
+  destruct (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone) eqn:Hr.
+  - cbn match. apply exec_returnM.
+  - cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (E_Load_Access_Fault tt) s)).
+    apply exec_returnM.
+Qed.
+
+Lemma exec_pmaCheck_ram_sc_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+  exec (pmaCheck (Physaddr addr) k (StoreConditional Data) pbmt true) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then None else Some (E_SAMO_Access_Fault tt)), s).
+Proof.
+  intros Hmatch Halign Hwrite.
+  unfold pmaCheck.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
+  rewrite Hmatch.
+  destruct region as [rbase rsize rattr rdtree].
+  cbn [PMA_Region_attributes] in Hwrite |- *.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
+  cbn match beta.
+  change (assert_exp' true "sys/mem.sail:112.56-112.57" >>=
+          (fun _ : true = true => returnM (andb (PMA_writable (override_PMA rattr pbmt))
+                                             (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone))))
+    with (returnM (andb (PMA_writable (override_PMA rattr pbmt))
+                    (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone)) : M bool).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
+  rewrite Hwrite. cbn [andb].
+  destruct (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone) eqn:Hr.
+  - cbn match. apply exec_returnM.
+  - cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (E_SAMO_Access_Fault tt) s)).
+    apply exec_returnM.
+Qed.
+
+(* ===================================================================== *)
+(* §5c The reserved pmpCheck grants.  pmpCheckRWX treats LoadReserved/     *)
+(*    StoreConditional exactly like Load/Store (R resp. W), so these are   *)
+(*    the load/store grants verbatim with the access constructor swapped.  *)
+(* ===================================================================== *)
+
+Lemma exec_pmpCheck_user_grant_lr (a : mword 64) (width : Z) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  exec (pmpCheck (Physaddr a) width (LoadReserved Data) User) s = Some (None, s).
+Proof.
+  intros HA Hord Hrange HR.
+  unfold pmpCheck. rewrite exec_catch_early_return.
+  replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity). cbn zeta.
+  rewrite execR_bind0.
+  match goal with |- context[foreach_ZM_up ?F ?T ?S ?V ?B] =>
+    assert (Hfe : execR (foreach_ZM_up F T S V B) s = Some (inl None, s)) end.
+  { unfold foreach_ZM_up. cbn [foreach_ZM_up'].
+    rewrite execR_bind.
+    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpReadAddrReg_val 0 s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (exec_pmpMatchAddr_TOR_match a (to_bits 64 width)
+                  (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                  (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)
+                  (zeros' 64) s HA Hord Hrange)). cbn beta.
+    cbn match.
+    unfold or_boolM.
+    rewrite execR_bind.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (_ : exec (pmpCheckRWX (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                            (LoadReserved Data)) s = Some (true, s))).
+    2:{ unfold pmpCheckRWX. cbn match. rewrite HR. apply exec_returnm. }
+    cbn match. rewrite execR_returnR. cbn beta.
+    cbn match. rewrite execR_bind. rewrite execR_returnR. cbn match.
+    unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+  rewrite Hfe. cbn match. reflexivity.
+Qed.
+
+Lemma exec_pmpCheck_user_grant_sc (a : mword 64) (width : Z) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  exec (pmpCheck (Physaddr a) width (StoreConditional Data) User) s = Some (None, s).
+Proof.
+  intros HA Hord Hrange HW.
+  unfold pmpCheck. rewrite exec_catch_early_return.
+  replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity). cbn zeta.
+  rewrite execR_bind0.
+  match goal with |- context[foreach_ZM_up ?F ?T ?S ?V ?B] =>
+    assert (Hfe : execR (foreach_ZM_up F T S V B) s = Some (inl None, s)) end.
+  { unfold foreach_ZM_up. cbn [foreach_ZM_up'].
+    rewrite execR_bind.
+    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpReadAddrReg_val 0 s)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (exec_pmpMatchAddr_TOR_match a (to_bits 64 width)
+                  (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                  (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)
+                  (zeros' 64) s HA Hord Hrange)). cbn beta.
+    cbn match.
+    unfold or_boolM.
+    rewrite execR_bind.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (_ : exec (pmpCheckRWX (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
+                            (StoreConditional Data)) s = Some (true, s))).
+    2:{ unfold pmpCheckRWX. cbn match. rewrite HW. apply exec_returnm. }
+    cbn match. rewrite execR_returnR. cbn beta.
+    cbn match. rewrite execR_bind. rewrite execR_returnR. cbn match.
+    unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
+  rewrite Hfe. cbn match. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §5d The LR checked_mem_read RETIRE-OR-FAULT disjunction (widths 4, 8). *)
+(*    Ties the pieces together: on a user-mapped, aligned, readable,      *)
+(*    PMP-granted RAM address the reserved read either RETIRES with the   *)
+(*    bytes ([reservability<>RsrvNone]) or takes the delegated            *)
+(*    E_Load_Access_Fault ([reservability=RsrvNone]); a single [if] on    *)
+(*    the (unpinned) reservability captures both total outcomes.          *)
+(* ===================================================================== *)
+
+Lemma exec_checked_mem_read_lr_4 (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : mword 32) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 4 false false true false) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
+  unfold checked_mem_read.
+  assert (Hrk : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))
+    by (unfold read_kind_of_flags; apply exec_returnM).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s = Some (None, s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
+    rewrite (exec_bind_Some _ _ _ _ _ Hrk).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_4 addr w s Hdev Hbytes)).
+    apply exec_returnM.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s
+                   = Some (Some (E_Load_Access_Fault tt), s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    cbn match. apply exec_returnM.
+Qed.
+
+Lemma exec_checked_mem_read_lr_8 (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : mword 64) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
+  is_aligned_paddr (Physaddr addr) 8 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 8 false false true false) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
+  unfold checked_mem_read.
+  assert (Hrk : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))
+    by (unfold read_kind_of_flags; apply exec_returnM).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s = Some (None, s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
+    rewrite (exec_bind_Some _ _ _ _ _ Hrk).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_8 addr w s Hdev Hbytes)).
+    apply exec_returnM.
+  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s
+                   = Some (Some (E_Load_Access_Fault tt), s)).
+    { unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
+      rewrite Hr. cbn match. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
+    cbn match. apply exec_returnM.
+Qed.
