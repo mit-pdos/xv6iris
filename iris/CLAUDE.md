@@ -648,14 +648,37 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    leaves (`wp_srl_s_r` register-shift RTYPE — new
    `exec_execute_RTYPE_SRL{,_gpr}`/`gpr_srl_val` in WpMmodeLeafBase —
    plus `wp_andi_s_r`/`wp_ori_s_r`/`wp_cslli_s_r`/`wp_csrli_s_r`, all
-   with `_pt` wrappers, WpSmodePtAlu.v), and **WpWalkInstr.v** — the
-   decode-catalog skeleton whose header holds walk's FULL instruction
-   table (47 instructions, offsets/encodings/AST notes/leaf mapping,
-   extracted from kernel-rocq's KernelInstrs.v) and the path structure.
-   NEXT THERE: write the wdec_*/wi_* facts (copy WpWakeup's wkd_* AST
-   shapes for the frame bytes; rvc_oneshot + mk_rvc for the rest;
-   mk_base for the 4-byte words), then the address-arithmetic bridges,
-   then the body.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
+   with `_pt` wrappers, WpSmodePtAlu.v), and **WpWalkInstr.v — the
+   COMPLETE decode catalog** (header = the full 47-instruction table;
+   40 wdec_* decode facts + 47 wi_* instr lemmas, all compiled;
+   C_BEQZ/C_J ExecuteAs redirects are Local copies since they live in
+   WpKallocDecode, not WpMmodeLeafBase).
+   NEXT: the address-arithmetic BRIDGES (pure; put them in PtBuild §4,
+   which needs a `Riscv.riscv_extras` import for shift_bits_*; reduce
+   concrete shift amounts by WpKfree's `shift_bits_left52_zero` recipe —
+   `unfold shift_bits_left; f_equal; vm_compute` down to plain
+   shiftl/shiftr, then unsigned arithmetic).  In the body proof,
+   register values arrive as closed insert-chain terms (e.g. s4 =
+   add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 30
+   : mword 6)))) — normalize to `mword_of_int K` with `replace … by
+   (apply bv_eq; vm_compute; reflexivity)` BEFORE applying a bridge.
+   The three bridges:
+   (i) slot address, one lemma per level (sh 30/21/12 -> lvl 2/1/0):
+       uint va < 2^38 -> add_vec (shift_bits_left (and_vec
+       (shift_bits_right va (subrange_vec_dec (mword_of_int sh :
+       mword 64) (Z.sub log2_xlen 1) 0)) (sign_extend' 64 (mword_of_int
+       511 : mword 12))) (subrange_vec_dec (mword_of_int 3 : mword 6)
+       (Z.sub log2_xlen 1) 0)) (zero_extend' 64 (concat_vec b (zeros'
+       12))) = u_pte_addr b (vpn_idx lvl (svpn_of va));
+   (ii) descend base: pte_valid w -> pte_ptr w -> shift_bits_left
+       (shift_bits_right w (..10..)) (..12..) = zero_extend' 64
+       (concat_vec (u_next_base w) (zeros' 12)), via pte_valid_ptr_ext0;
+   (iii) alloc PTE: for a page_valid pa, or_vec (shift_bits_left
+       (shift_bits_right pa (..12..)) (..10..)) (sign_extend' 64
+       (mword_of_int 1 : mword 12)) = pt_ptr_pte (the subrange-55-12
+       ppn of pa), plus zero_extend' 64 (concat_vec that-ppn (zeros'
+       12)) = pa.
+   Then the BODY.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
    per iteration: srl/andi/slli/add address arithmetic, ld the slot
    (`ptree_own_slot2_ro`/`slot1_ro` cells through the regime-generic ld
    leaf), V-bit branch; invalid arm: kalloc (existing spec at the
