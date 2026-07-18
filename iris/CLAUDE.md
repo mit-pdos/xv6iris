@@ -695,7 +695,17 @@ files or copy code from them; build fresh from the live tree.
      dispatch (that's the 100×90 cross-product). The false-chain
      continues linearly (~100 guards for is_CSR_accessible + stateen).
      and_boolM short-circuits monadically: destruct the priv-bits compare
-     FIRST (kills all non-U-addressed csr in one split).
+     FIRST (kills all non-U-addressed csr in one split — and with it
+     every M/S-addressed clause's probe, which then never needs
+     reducing). VERIFIED probe details: `exec (currentlyEnabled
+     Ext_Zfinx) s = Some (false, s)` holds by plain `reflexivity`
+     (hartSupports constant false); `currentlyEnabled Ext_F` =
+     hartSupports(true) ∧ misa.F(true in MISA_C!) ∧ mstatus.FS ≠ 'b00 —
+     the FS=Off pin is what kills the F CSRs (fflags 0x001 / frm 0x002 /
+     fcsr 0x003 gate on `Ext_F ∨ Ext_Zfinx`), so the CSR facts need an
+     `_get_Mstatus_FS ms_v = 'b"00"` premise (consider adding the FS pin
+     to `user_mstatus_ok` — WpUserret already claims FS=Off
+     structurally).
      LEFT — discharging `active_class`: the total classification. Per
      machine case, produce the run_hart_active reduction and feed the
      matching arm: fetch outcome (fetchable → `upt_fetch_instr`; else a
