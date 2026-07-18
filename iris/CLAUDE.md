@@ -373,12 +373,32 @@ before any mechanical sweep.
      leaf's '1'-payload (trap CSRs + stack bound + intr_inv copy) to
      build the new sie_cap-'1'; the handler spec is already stored
      unconditionally in `intr_inv`, so flips never re-prove it.
-8. **Whole functions + boot:** re-derive the function specs' stack
-   accounting (below-CURRENT-sp free stack packs into the frame at every
-   instruction; the function's own saves above sp stay out — matches the
-   "below sp is volatile when SIE=1" semantics); wire γ-piece + `intr_inv`
-   allocation into wp_kernel/start at the stvec-install point; adequacy
-   plumbing last.
+8. **Whole functions + boot (IN PROGRESS):** groundwork DONE — the
+   exact-32 arm-factored `sie_cap` (see the v2-bundle bullet): sp-move
+   re-carving is deterministic via `sie_cap_move_down`/`_up`, so a
+   function's stack accounting is: precondition threads
+   `stack_own (pa_stk sp0 kv_frame_slots) k` (k = its frame depth, DEEP
+   slots adjacent below the cap's carve) + `sie_cap`; the prologue
+   sp-move trades them for the frame region above the new sp; the
+   epilogue trades back.  The csrci/csrsi leaves now return/consume a
+   WHOLE `sie_cap` (see the stage-7 NOTE), so an interrupts-off region
+   simply keeps threading the cap.  REMAINING, in order:
+   - `wp_mycpu` onto sconf (push_off's callee; convert first — the old
+     unbundle-island route is unusable at SIE=1).  Its 2-slot frame =
+     `sie_cap_move_down` k:=2.
+   - `wp_push_off_sconf`: prologue movers + csrr (save leaf; arm report
+     ties the stored intena to the payload) + csrci (whole-cap-back
+     continuation) + noff/intena stores + epilogue; post carries the
+     '1' payload iff the saved bit was 1 (the report disjunct is the
+     correlation).  Then `wp_pop_off_sconf` (csrsi dual; the
+     already-enabled branch refuted inside the leaf).
+   - the rest of the kalloc cone file-by-file (acquire/release/holding/
+     kalloc/kfree...), VCgen `_den` sconf wrapper with the first
+     converted function.
+   - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
+     stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
+     initial 32 slots); adequacy plumbing last; delete `smode_config`
+     at the very end.
 
 Robustness rails: axiom check (`Print Assumptions`, baseline + funext +
 kerneltrap_returns) and full `make proofs` per stage; stale-`.vo` resync

@@ -629,7 +629,7 @@ Section WpSconfAlu.
   (* ------------------------------------------------------------------- *)
   Lemma wp_gpr_write_s_sconf_cap (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (P : iProp Σ) :
     uint rd <> 0 ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
@@ -648,10 +648,11 @@ Section WpSconfAlu.
     gpr_file m -∗
     instr pc true base -∗
     ( sie_cap γ root_ppn m -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) ) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) ∗ P ) -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
       sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) -∗
+      P -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
@@ -697,8 +698,8 @@ Section WpSconfAlu.
              = add_vec_int pc 2)
       by (tmig; exact Lnpc0).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct ("Hrecap" with "Hcap") as "Hcap".
-    iApply ("Hcont" with "Hhs' Hsc Hcap Htlbinv [$Hpc' $Hnpc] [Hfmap]").
+    iDestruct ("Hrecap" with "Hcap") as "[Hcap HP]".
+    iApply ("Hcont" with "Hhs' Hsc Hcap HP Htlbinv [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
     { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
@@ -711,16 +712,17 @@ Section WpSconfAlu.
      exactly where function proofs already do their stack bookkeeping. *)
   Lemma wp_caddi_sp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 6)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (P : iProp Σ) :
     let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm)) in
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     ( sie_cap γ root_ppn m -∗
-      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) ) -∗
+      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) ∗ P ) -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
       sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
+      P -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
@@ -730,7 +732,7 @@ Section WpSconfAlu.
     intros wval.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_cap γ root_ppn Φ pc csp_rs1 csp_rs1 csp_rs1
-              (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) wval m
+              (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) wval m P
               ltac:(vm_compute; discriminate) _
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont").
     intros s_pc Hnpc Hva _.
@@ -741,16 +743,17 @@ Section WpSconfAlu.
 
   Lemma wp_caddi16sp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm6 : mword 6)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (P : iProp Σ) :
     let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)) in
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
     ( sie_cap γ root_ppn m -∗
-      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) ) -∗
+      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) ∗ P ) -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
       sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
+      P -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
@@ -760,7 +763,7 @@ Section WpSconfAlu.
     intros wval.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_cap γ root_ppn Φ pc csp_rs1 csp_rs1 csp_rs1
-              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) wval m
+              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) wval m P
               ltac:(vm_compute; discriminate) _
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont").
     intros s_pc Hnpc Hva _.
