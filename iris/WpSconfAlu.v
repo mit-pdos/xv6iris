@@ -620,4 +620,154 @@ Section WpSconfAlu.
     rewrite HPCpc. reflexivity.
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* SP-MOVERS: the cap engine takes a caller-supplied [sie_cap]          *)
+  (* TRANSFORMER instead of the rd <> sp retarget premise -- an sp-write  *)
+  (* re-carves the '1' arm's stack bound where the function proof does    *)
+  (* its stack bookkeeping ('0' arm: the transformer is trivial).         *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_gpr_write_s_sconf_cap (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
+      (m : gmap regidx (mword 64)) :
+    uint rd <> 0 ->
+    (forall s_pc : mstate,
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
+       (if Z.eqb (uint rsa) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = m !!! Regidx rsa ->
+       (if Z.eqb (uint rsb) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = m !!! Regidx rsb ->
+       exec (execute base) s_pc
+       = Some (RETIRE_SUCCESS,
+               set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
+    sconf γ -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true base -∗
+    ( sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) ) -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
+      sconf γ -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hbexec)
+      "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont".
+    iApply (wp_instr_s_sconf γ root_ppn m Φ pc true base
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmb : m !! Regidx rsb = Some (m !!! Regidx rsb))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
+    assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rsa (m !!! Regidx rsa) s_pc with "Hreg Hrac") as %Lva0.
+    iDestruct ("Hfba" with "Hrac") as "Hfmap".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rsb (m !!! Regidx rsb) s_pc with "Hreg Hrbc") as %Lvb0.
+    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg wval)
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" $! (regval_into_reg wval) with "[Hrdc]") as "Hfmap".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).(sregs)
+             = add_vec_int pc 2)
+      by (tmig; exact Lnpc0).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iDestruct ("Hrecap" with "Hcap") as "Hcap".
+    iApply ("Hcont" with "Hhs' Hsc Hcap Htlbinv [$Hpc' $Hnpc] [Hfmap]").
+    iSplitR.
+    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    iExact "Hfmap".
+  Qed.
+
+  (* the two real sp-movers over the cap engine: c.addi sp, imm and
+     c.addi16sp.  The caller supplies the capability transformer -- at
+     SIE=0 ('0' arm) it is [sie_cap_retarget]-free (iLeft is m-blind);
+     at SIE=1 it re-carves the >= 32-slot stack bound at the new sp,
+     exactly where function proofs already do their stack bookkeeping. *)
+  Lemma wp_caddi_sp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 6)
+      (m : gmap regidx (mword 64)) :
+    let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm)) in
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc true (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
+    ( sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) ) -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros wval.
+    iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_cap γ root_ppn Φ pc csp_rs1 csp_rs1 csp_rs1
+              (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) wval m
+              ltac:(vm_compute; discriminate) _
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (sign_extend' 12 imm) s_pc).
+    replace (Z.eqb (uint (csp_rs1 : mword 5)) 0) with false by (vm_compute; reflexivity).
+    unfold gpr_addi_val. rewrite Hva. reflexivity.
+  Qed.
+
+  Lemma wp_caddi16sp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm6 : mword 6)
+      (m : gmap regidx (mword 64)) :
+    let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)) in
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
+    ( sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) ) -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap γ root_ppn (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros wval.
+    iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_cap γ root_ppn Φ pc csp_rs1 csp_rs1 csp_rs1
+              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) wval m
+              ltac:(vm_compute; discriminate) _
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hrecap Hcont").
+    intros s_pc Hnpc Hva _.
+    change sp with (Regidx csp_rs1).
+    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (caddi16sp_imm imm6) s_pc).
+    replace (Z.eqb (uint (csp_rs1 : mword 5)) 0) with false by (vm_compute; reflexivity).
+    unfold gpr_addi_val. rewrite Hva. reflexivity.
+  Qed.
+
 End WpSconfAlu.
