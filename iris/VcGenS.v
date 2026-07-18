@@ -55,7 +55,8 @@ Inductive vop_s : Type :=
   | VScsw (imm : mword 12) (rs2 rs1 : mword 5)                (* sw rs2, imm(rs1)     *)
   | VScaddiw (imm : mword 6) (rd : mword 5)                   (* c.addiw rd, imm      *)
   | VSsd (rvc : bool) (imm : mword 12) (rs2 rs1 : mword 5)    (* [c.]sd rs2, imm(rs1) *)
-  | VSld (rvc : bool) (imm : mword 12) (rs1 rd : mword 5).    (* [c.]ld rd, imm(rs1)  *)
+  | VSld (rvc : bool) (imm : mword 12) (rs1 rd : mword 5)     (* [c.]ld rd, imm(rs1)  *)
+  | VScaddi16sp (imm6 : mword 6).                             (* c.addi16sp sp, imm6  *)
 
 (* the TARGET AST of each shape, exactly as the S-mode leaves state it. *)
 Definition vop_s_ast (op : vop_s) : instruction :=
@@ -78,6 +79,8 @@ Definition vop_s_ast (op : vop_s) : instruction :=
       STORE (imm, Regidx rs2, Regidx rs1, 8)
   | VSld _ imm rs1 rd =>
       LOAD (imm, Regidx rs1, Regidx rd, false, 8)
+  | VScaddi16sp imm6 =>
+      ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)
   end.
 
 (* per-op fetch width: all the RVC shapes are 2 bytes; the base [sd]/[ld]
@@ -213,6 +216,18 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
               Some (VSt pc' (<[Regidx rd := v]> st.(vregs)) st.(vheap) st.(vheap4))
           | None => None
           end
+      | None => None
+      end
+  | VScaddi16sp imm6 =>
+      (* rd is always sp (x2 <> 0), so no rd-zero guard. *)
+      match st.(vregs) !! Regidx csp_rs1 with
+      | Some v =>
+          if sval_is64 v then
+            Some (VSt pc'
+                    (<[Regidx csp_rs1 := sval_addZ v (zimm12 (caddi16sp_imm imm6))]>
+                       st.(vregs))
+                    st.(vheap) st.(vheap4))
+          else None
       | None => None
       end
   end.
@@ -374,7 +389,7 @@ Section VcGenSIris.
                Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hcont".
       destruct op as [imm rd|rdc nzimm rd|uimm rs2|uimm rd
                      |imm rs1 rd|imm rs2 rs1|imm rd
-                     |rvc imm rs2 rs1|rvc imm rs1 rd]; simpl in Hstep.
+                     |rvc imm rs2 rs1|rvc imm rs1 rd|imm6]; simpl in Hstep.
       + (* VScaddi *)
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
@@ -702,6 +717,31 @@ Section VcGenSIris.
           iEval (rewrite Egpr) in "Hgpr".
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                   Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+      + (* VScaddi16sp *)
+        destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; [|discriminate].
+        injection Hstep as <-.
+        iApply (wp_caddi16sp_gpr_s_config_pt root_ppn Φ (mword_of_int (vpc st)) imm6
+                  (vregs_den ρ (vregs st))
+                  mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                        Hpc Hgpr Hi").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
+        iEval (rewrite avi_mword) in "Hpc".
+        assert (Egpr : <[Regidx csp_rs1 := regval_into_reg
+                    (add_vec (vregs_den ρ (vregs st) !!! Regidx csp_rs1)
+                             (sign_extend' 64 (caddi16sp_imm imm6)))]>
+                    (vregs_den ρ (vregs st))
+                = vregs_den ρ
+                    (<[Regidx csp_rs1 := sval_addZ v1 (zimm12 (caddi16sp_imm imm6))]>
+                       (vregs st))).
+        { rewrite (vregs_den_lookup ρ _ _ _ Hrs1). unfold regval_into_reg.
+          rewrite -(sval_den_add_imm ρ v1 (caddi16sp_imm imm6) H64).
+          apply vregs_den_insert. }
+        iEval (rewrite Egpr) in "Hgpr".
+        iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                                Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
   Qed.
 
 
@@ -790,7 +830,7 @@ Section VcGenSIris.
                Hpc Hgpr [Hi Hbi] Hheap Hheap4 Hcont".
       destruct op as [imm rd|rdc nzimm rd|uimm rs2|uimm rd
                      |imm rs1 rd|imm rs2 rs1|imm rd
-                     |rvc imm rs2 rs1|rvc imm rs1 rd]; simpl in Hstep.
+                     |rvc imm rs2 rs1|rvc imm rs1 rd|imm6]; simpl in Hstep.
       + (* VScaddi *)
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
@@ -1099,6 +1139,27 @@ Section VcGenSIris.
           iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
+      + (* VScaddi16sp *)
+        destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (sval_is64 v1) eqn:H64; [|discriminate].
+        injection Hstep as <-.
+        pose proof (Hmatch _ _ Hrs1) as Hm1.
+        iApply (wp_caddi16sp_gpr_s_config_pt root_ppn Φ (mword_of_int (vpc st)) imm6 m
+                  mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                        Hpc Hgpr Hi").
+        iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
+        iEval (rewrite avi_mword) in "Hpc".
+        assert (Hval : regval_into_reg
+                    (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
+                = sval_den ρ (sval_addZ v1 (zimm12 (caddi16sp_imm imm6)))).
+        { unfold regval_into_reg.
+          rewrite Hm1 (sval_den_add_imm ρ v1 (caddi16sp_imm imm6) H64).
+          reflexivity. }
+        iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
+                  with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
+                        Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
   Qed.
 
   (* Thin wrapper over [wp_vc_block_s_aux]: instantiate the auxiliary

@@ -213,6 +213,53 @@ Section WpSmodePtAlu.
     unfold gpr_addi_val. rewrite Hva. reflexivity.
   Qed.
 
+  (* c.addi16sp sp, imm6: the frame alloc/dealloc.  Raw-config form for the
+     VCgen block executor (rd is always sp, so no rd<>0 arg); mirrors
+     [wp_caddi_gpr_s_config_pt] with [rd := csp_rs1] and [caddi16sp_imm imm6]. *)
+  Lemma wp_caddi16sp_gpr_s_config_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm6 : mword 6)
+      (m : gmap regidx (mword 64))
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx csp_rs1 := regval_into_reg
+        (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
+    assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
+    unshelve iApply (wp_gpr_write_s_config_pt root_ppn Φ pc csp_rs1 csp_rs1 csp_rs1
+              (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
+              (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
+              m mstatus0 mie_v mdv0 menvcfg0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsp
+              _
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    change sp with (Regidx csp_rs1).
+    rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (caddi16sp_imm imm6) s_pc).
+    replace (Z.eqb (uint csp_rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hsp).
+    unfold gpr_addi_val. rewrite Hva. reflexivity.
+  Qed.
+
   Lemma wp_caddi_gpr_s_config_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
