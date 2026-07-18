@@ -576,10 +576,21 @@ Where things landed (the stage descriptions below remain the design rationale):
   the ONE fetch-fault composer over the flavor predicate
   `u_fetch_fault_flavor` (non-canonical / unmapped / fetch-denied) —
   `F_Error (E_Fetch_Page_Fault, pc)`, σ unchanged, bundle borrowed; the
-  odd-pc align fault stays PT-free (`exec_fetch_align_fault`).  STILL
-  OPEN: the 2-aligned RVC / split / page-straddling fetch geometry (each
-  half translates independently through the absorption; UserFetch §1–§5's
-  premise-shaped heads survive and are the glue).
+  odd-pc align fault stays PT-free (`exec_fetch_align_fault`).  The
+  2-ALIGNED (split) geometry is DONE on the success side: UserFetch §6
+  holds the premise-shaped privilege-blind reductions
+  (`exec_fetch_rvc_2` / `exec_fetch_base_2` /
+  `exec_fetch_fault_2_{first,second}` -- the high halfword translates
+  INDEPENDENTLY at pc+2, possibly another page), and
+  `user_pt_fetch_instr_2` (UserFetchPt §5) composes them over the bundle
+  with TWO sequential absorptions; its conclusion has the same if-isRVC
+  shape as the 4-aligned composer (via UserBits' `subrange16_zext32` /
+  `subrange16_concat16` bridges), with the sregs shape reported as the
+  non-tlb lookup-transport property.  STILL OPEN: the 2-aligned FAULT
+  composers over the bundle (first-half flavor at pc -- mirror
+  user_pt_fetch_fault with the split head; second-half flavor at pc+2 --
+  conclusion is inherently a disjunction with the RVC-success case since
+  the low halfword is existential).
 - *Stage 7*: `user_inv` and the whole obligation chain (UserExec / UserTrap /
   UserStep / UserStepFull / UserCompute / UserArms) close over `pt : uptd`
   and `user_pt_inv pt`.  UserPt.v DELETED; UserTranslate slimmed to §1;

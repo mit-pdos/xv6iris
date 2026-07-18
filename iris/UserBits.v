@@ -689,3 +689,104 @@ Proof.
         reflexivity
     end.
 Qed.
+
+(* ---- 32-bit word surgery for the split fetch: the low halfword of a
+   zero-extended or concatenated 32-bit word ---- *)
+
+(* local clones of Pt4kWalk's lor/land bricks (importing Pt4kWalk here
+   would drag in the bitvector.tactics zify hook and poison lia) *)
+Local Lemma ub_Z_land_shift_low (a f k : Z) :
+  0 <= k -> 0 <= f < 2 ^ k ->
+  Z.land (a * 2 ^ k) f = 0.
+Proof.
+  intros Hk Hf.
+  apply Z.bits_inj_iff'; intros i Hi.
+  rewrite Z.land_spec, Z.bits_0.
+  destruct (Z.ltb_spec i k) as [Hlt | Hge].
+  - replace (Z.testbit (a * 2 ^ k) i) with false;
+      [ reflexivity
+      | symmetry; rewrite <- Z.shiftl_mul_pow2 by lia; apply Z.shiftl_spec_low; lia ].
+  - destruct (Z.ltb_spec 0 f) as [Hpos | Hnp].
+    + replace (Z.testbit f i) with false; [ apply andb_false_r |].
+      symmetry; apply Z.bits_above_log2; [lia |].
+      assert (Z.log2 f < k); [| lia].
+      apply Z.log2_lt_pow2; [exact Hpos | exact (proj2 Hf)].
+    + replace f with 0 by lia. rewrite Z.bits_0. apply andb_false_r.
+Qed.
+
+Local Lemma ub_Z_lor_disjoint_add (a b : Z) :
+  Z.land a b = 0 -> Z.lor a b = a + b.
+Proof.
+  intro Hd. rewrite <- (Z.lxor_lor _ _ Hd).
+  symmetry. apply Z.add_nocarry_lxor. exact Hd.
+Qed.
+
+Lemma concat16_16_unsigned (x y : mword 16) :
+  bv_unsigned (concat_vec x y : mword 32) = bv_unsigned x * 65536 + bv_unsigned y.
+Proof.
+  unfold concat_vec.
+  cbv [Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
+       SailStdpp.Values.with_word autocast].
+  cbn.
+  destruct (Z.eq_dec (Z.of_N (16 + 16)) (16 + 16)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
+  rewrite (TypeCasts.cast_Z_refl (H := e2)).
+  unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.concat, Values.to_word.
+  erewrite bv_concat_unsigned by (cbn; lia).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 16.
+  rewrite Z.shiftl_mul_pow2 by lia.
+  pose proof (bv_unsigned_in_range _ y) as Hy. unfold bv_modulus in Hy.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 65536 in Hy.
+  replace (bv_unsigned x * 2 ^ 16) with (bv_unsigned x * 65536) by lia.
+  apply ub_Z_lor_disjoint_add.
+  change 65536 with (2 ^ 16).
+  apply ub_Z_land_shift_low; [ lia | ].
+  change (2 ^ 16) with 65536. exact Hy.
+Qed.
+
+Lemma subrange16_concat16 (x y : mword 16) :
+  subrange_vec_dec (concat_vec x y : mword 32) 15 0 = y.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (15 - 0 + 1))) with 65536.
+  rewrite concat16_16_unsigned.
+  rewrite Z.add_comm, Z_mod_plus_full.
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ y) as Hy. unfold bv_modulus in Hy.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 65536 in Hy.
+  exact Hy.
+Qed.
+
+Lemma zext32_16_unsigned (h : mword 16) :
+  bv_unsigned (zero_extend' 32 h : mword 32) = bv_unsigned h.
+Proof.
+  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
+       to_word get_word MachineWord.MachineWord.zero_extend].
+  rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ].
+Qed.
+
+Lemma subrange16_zext32 (h : mword 16) :
+  subrange_vec_dec (zero_extend' 32 h : mword 32) 15 0 = h.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (15 - 0 + 1))) with 65536.
+  rewrite zext32_16_unsigned.
+  apply Z.mod_small.
+  pose proof (bv_unsigned_in_range _ h) as Hy. unfold bv_modulus in Hy.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 65536 in Hy.
+  exact Hy.
+Qed.

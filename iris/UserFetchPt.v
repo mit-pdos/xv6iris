@@ -35,6 +35,7 @@ Require Import UserPtTree.
 Require Import UserBits.
 Require Import UserMem.
 Require Import UserFetch.
+Require Import UserMemPt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -297,3 +298,204 @@ Section UserFetchPtFault.
   Qed.
 
 End UserFetchPtFault.
+
+(* ===================================================================== *)
+(* §5 The 2-ALIGNED (split) fetch composer: at a 2-aligned-not-4-aligned  *)
+(*    pc, the low halfword comes off the pc's page; if it is not RVC the  *)
+(*    high halfword translates INDEPENDENTLY at pc+2 -- possibly another  *)
+(*    page (the straddle) -- through the same absorption.  The conclusion *)
+(*    has the SAME if-isRVC shape as the 4-aligned composer, so the       *)
+(*    classification treats both alignments uniformly; the sregs shape    *)
+(*    after up to two absorbed moves is reported as the lookup-transport  *)
+(*    property (all non-tlb registers unchanged).                         *)
+(* ===================================================================== *)
+
+Section UserFetchPtSplit.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma user_pt_fetch_instr_2 (uroot tfp : mword 44)
+      (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
+      (w wh va : mword 64) (σ : mstate) :
+    um !! svpn_of va = Some w ->
+    uleaf_ok (InstructionFetch tt) w ->
+    um !! svpn_of (add_vec_int va 2) = Some wh ->
+    uleaf_ok (InstructionFetch tt) wh ->
+    udata_cov um data ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
+    is_aligned_vaddr (Virtaddr (add_vec_int va 2)) 2 = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    register_lookup PC σ.(sregs) = va ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ∃ (iw : mword 32) (σ' : mstate),
+      ⌜exec (fetch tt) σ
+        = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                 then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                 else F_Base (autocast (T := mword) iw)), σ')⌝ ∗
+      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
+      ⌜forall r : register, register_beq r tlb = false ->
+         register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      utlb_inv_pt uroot tfp um ∗ udata_own data.
+  Proof.
+    intros Hl Hchk Hlh Hchkh Hcov Hal2 Hal2h Hbit0 Hbit1 Hnal4 Lpc Hcanon Hcanonh
+           Hmisa Hmenv Hhtif Hcp HSXL Hall.
+    assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
+      by (rewrite Hmisa; vm_compute; reflexivity).
+    iIntros "Hri Hgh Hinv Hdata".
+    iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
+      as %(HA & Hord & HX & HR & HW & Hcovp).
+    (* first halfword: translate at va (absorbed) *)
+    iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt) uroot tfp um w va
+            (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
+            Hmisa Hmenv Hhtif Hcp HSXL
+            (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
+            (exec_is_shadow_stack_fetch σ) Hall
+            with "Hri Hgh Hinv")
+      as (σ1) "(%Htr1 & %Hmdev1 & %Hsregs1 & Hri & Hgh & Hinv)".
+    assert (Tr1 : forall r : register, register_beq r tlb = false ->
+              register_lookup r σ1.(sregs) = register_lookup r σ.(sregs)).
+    { intros r Hne.
+      destruct Hsregs1 as [Heq | (tv & Heq)]; rewrite Heq;
+        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+    (* the low halfword out of the data pages, read at σ1 *)
+    iDestruct (udata_read_word_g 2 ltac:(lia) ltac:(exists 2048; reflexivity)
+                 um data w va σ1 Hl Hcov Hal2 with "Hgh Hdata")
+      as %(ilo & Hbytes1 & Hram1a & Hram1b).
+    assert (Hmr1 : exec (mem_read (InstructionFetch tt) PBMT_PMA
+                     (Physaddr (u_walk_pa w va)) 2 false false false) σ1
+                   = Some (Ok ilo, σ1)).
+    { set (pa := u_walk_pa w va) in *.
+      destruct ((ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+                 : pma_allows_all (register_lookup pma_regions σ1.(sregs))) pa 2)
+        as (region & Hpmam & Hexec & _).
+      pose proof (addr_is_ram_not_in_clint _ Hram1a) as Hnc.
+      pose proof (addr_is_ram_not_in_sig _ Hram1a) as Hns.
+      assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+                (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ1.(sregs)) 0)) 4)
+                (uint pa) (uint (to_bits 64 2)) = PMP_Match).
+      { rewrite (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)).
+        exact (ram_fetch_pmp pa _ 2 1 ltac:(lia) ltac:(lia)
+                 ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                 Hram1a Hram1b Hcovp). }
+      exact (exec_mem_read_fetch_2_U PBMT_PMA pa region ilo σ1
+               (ltac:(rewrite (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+               (ltac:(rewrite (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+               Hrange
+               (ltac:(rewrite (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX))
+               Hpmam
+               (pa_aligned_div _ va 2 ltac:(lia) ltac:(exists 2048; reflexivity) Hal2)
+               Hexec
+               (within_clint_false pa 2 σ1 Hnc ltac:(lia))
+               (within_sig_false pa 2 σ1 Hns ltac:(lia))
+               (within_htif_false pa 2 σ1
+                  (ltac:(rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif)))
+               (addr_is_ram_not_dev _ Hram1a)
+               Hbytes1
+               (ltac:(rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
+    destruct (isRVC ilo) eqn:Hrvc.
+    - (* RVC: done at σ1 *)
+      iModIntro.
+      iExists (zero_extend' 32 ilo), σ1.
+      assert (Hsub : subrange_vec_dec (autocast (T := mword)
+                       (zero_extend' 32 ilo) : mword 32) 15 0 = ilo).
+      { rewrite autocast_mword_id. apply subrange16_zext32. }
+      iSplit; [ iPureIntro | ].
+      { rewrite Hsub. rewrite Hrvc.
+        exact (exec_fetch_rvc_2 σ σ1 va (u_walk_pa w va)
+                 Lpc HmisaC Hbit0 Hbit1 Hnal4 ilo Htr1 Hmr1 Hrvc). }
+      iSplit; [ iPureIntro; exact Hmdev1 | ].
+      iSplit; [ iPureIntro; exact Tr1 | ].
+      iFrame "Hri Hgh Hinv Hdata".
+    - (* not RVC: the high halfword at va+2, through a SECOND absorption *)
+      iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt) uroot tfp um wh
+              (add_vec_int va 2) (u_walk_pa wh (add_vec_int va 2)) σ1 Hlh Hchkh Hcanonh eq_refl
+              (ltac:(rewrite (Tr1 misa ltac:(vm_compute; reflexivity)); exact Hmisa))
+              (ltac:(rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv))
+              (ltac:(rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif))
+              (ltac:(rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
+              (ltac:(rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact HSXL))
+              (exec_effectivePrivilege_fetch (register_lookup mstatus σ1.(sregs)) User σ1)
+              (exec_is_shadow_stack_fetch σ1)
+              (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall))
+              with "Hri Hgh Hinv")
+        as (σ2) "(%Htr2 & %Hmdev2 & %Hsregs2 & Hri & Hgh & Hinv)".
+      assert (Tr2 : forall r : register, register_beq r tlb = false ->
+                register_lookup r σ2.(sregs) = register_lookup r σ1.(sregs)).
+      { intros r Hne.
+        destruct Hsregs2 as [Heq | (tv & Heq)]; rewrite Heq;
+          [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+      iDestruct (udata_read_word_g 2 ltac:(lia) ltac:(exists 2048; reflexivity)
+                   um data wh (add_vec_int va 2) σ2 Hlh Hcov Hal2h with "Hgh Hdata")
+        as %(ihi & Hbytes2 & Hram2a & Hram2b).
+      assert (Hmr2 : exec (mem_read (InstructionFetch tt) PBMT_PMA
+                       (Physaddr (u_walk_pa wh (add_vec_int va 2))) 2 false false false) σ2
+                     = Some (Ok ihi, σ2)).
+      { set (pah := u_walk_pa wh (add_vec_int va 2)) in *.
+        destruct ((ltac:(rewrite (Tr2 pma_regions ltac:(vm_compute; reflexivity))
+                                 (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+                   : pma_allows_all (register_lookup pma_regions σ2.(sregs))) pah 2)
+          as (region & Hpmam & Hexec & _).
+        pose proof (addr_is_ram_not_in_clint _ Hram2a) as Hnc.
+        pose proof (addr_is_ram_not_in_sig _ Hram2a) as Hns.
+        assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+                  (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ2.(sregs)) 0)) 4)
+                  (uint pah) (uint (to_bits 64 2)) = PMP_Match).
+        { rewrite (Tr2 pmpaddr_n ltac:(vm_compute; reflexivity))
+                  (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)).
+          exact (ram_fetch_pmp pah _ 2 1 ltac:(lia) ltac:(lia)
+                   ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+                   Hram2a Hram2b Hcovp). }
+        exact (exec_mem_read_fetch_2_U PBMT_PMA pah region ihi σ2
+                 (ltac:(rewrite (Tr2 pmpcfg_n ltac:(vm_compute; reflexivity))
+                                (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+                 (ltac:(rewrite (Tr2 pmpaddr_n ltac:(vm_compute; reflexivity))
+                                (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+                 Hrange
+                 (ltac:(rewrite (Tr2 pmpcfg_n ltac:(vm_compute; reflexivity))
+                                (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX))
+                 Hpmam
+                 (pa_aligned_div _ (add_vec_int va 2) 2 ltac:(lia)
+                    ltac:(exists 2048; reflexivity) Hal2h)
+                 Hexec
+                 (within_clint_false pah 2 σ2 Hnc ltac:(lia))
+                 (within_sig_false pah 2 σ2 Hns ltac:(lia))
+                 (within_htif_false pah 2 σ2
+                    (ltac:(rewrite (Tr2 htif_tohost_base ltac:(vm_compute; reflexivity))
+                                   (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif)))
+                 (addr_is_ram_not_dev _ Hram2a)
+                 Hbytes2
+                 (ltac:(rewrite (Tr2 cur_privilege ltac:(vm_compute; reflexivity))
+                                (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
+      iModIntro.
+      iExists (concat_vec ihi ilo), σ2.
+      assert (Hsub : subrange_vec_dec (autocast (T := mword)
+                       (concat_vec ihi ilo) : mword 32) 15 0 = ilo).
+      { rewrite autocast_mword_id. apply subrange16_concat16. }
+      iSplit; [ iPureIntro | ].
+      { rewrite Hsub. rewrite Hrvc. rewrite autocast_mword_id.
+        exact (exec_fetch_base_2 σ σ1 va (u_walk_pa w va)
+                 Lpc HmisaC Hbit0 Hbit1 Hnal4 ilo Htr1 Hmr1 σ2
+                 (u_walk_pa wh (add_vec_int va 2))
+                 (eq_trans (Tr1 PC ltac:(vm_compute; reflexivity)) Lpc)
+                 Hrvc ihi Htr2 Hmr2). }
+      iSplit; [ iPureIntro; rewrite Hmdev2; exact Hmdev1 | ].
+      iSplit; [ iPureIntro;
+                intros r Hne; rewrite (Tr2 r Hne); exact (Tr1 r Hne) | ].
+      iFrame "Hri Hgh Hinv Hdata".
+  Qed.
+
+End UserFetchPtSplit.

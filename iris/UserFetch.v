@@ -265,3 +265,202 @@ End UserFetchOk4.
 (* The upt-record fetch-success composer that used to follow (§6,
    [upt_fetch_instr]) was superseded by the ptree layer: the bundle-level
    composer is [user_pt_fetch_instr] (UserFetchPt.v).                    *)
+
+(* ===================================================================== *)
+(* §6 The 2-ALIGNED (split) fetch reductions, premise-shaped (the         *)
+(* translate and mem_read outcomes come in as facts, so the lemmas are    *)
+(* privilege-blind).  A pc with bit0 = 0 and bit1 = 1 takes the split     *)
+(* path: a halfword at pc (RVC if its low bits say so), else a SECOND     *)
+(* independently-translated halfword at pc+2 (possibly another page).     *)
+(* ===================================================================== *)
+
+Section UserFetchSplit.
+  Context (s s1 : mstate) (va pa : mword 64).
+  Hypothesis HpcPC : register_lookup PC s.(sregs) = va.
+  Hypothesis HmisaC : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true.
+  Hypothesis Hbit0 : neq_vec (access_vec_dec va 0) ('b"0") = false.
+  Hypothesis Hbit1 : neq_vec (access_vec_dec va 1) ('b"0") = true.
+  Hypothesis Hvalign4 : is_aligned_vaddr (Virtaddr va) 4 = false.
+
+  Let HrdPC : exec (Defs.read_reg PC) s = Some (va, s).
+  Proof. rewrite (exec_read_reg PC s). rewrite HpcPC. reflexivity. Qed.
+
+  (* the shared head: dispatch into the split path *)
+  Local Ltac split_head :=
+    unfold fetch;
+    rewrite exec_catch_early_return;
+    change (get_config_rvfi tt) with false; cbv iota beta;
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC);
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC);
+    change (ext_fetch_check_pc va va) with (@None unit); cbv iota beta;
+    rewrite (execR_bind_Some _ _ _ false s);
+    [ | rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s));
+        unfold or_boolM;
+        rewrite (execR_bind_Some _ _ _ false s);
+        [ | rewrite (execR_liftR_seq _ _ _ _ _ HrdPC); rewrite Hbit0; apply execR_returnR_fwd ];
+        cbv iota beta;
+        unfold and_boolM;
+        rewrite (execR_bind_Some _ _ _ true s);
+        [ | rewrite (execR_liftR_seq _ _ _ _ _ HrdPC); rewrite Hbit1; apply execR_returnR_fwd ];
+        cbv iota beta;
+        rewrite (execR_bind_Some _ _ _ true s);
+        [ | rewrite execR_liftR; rewrite (exec_currentlyEnabled_Zca s HmisaC); cbn match;
+            apply execR_returnR_fwd ];
+        cbv iota beta; reflexivity ];
+    cbv iota beta;
+    rewrite (execR_bind_Some _ _ _ false s);
+    [ | unfold and_boolM;
+        rewrite (execR_bind_Some _ _ _ false s);
+        [ | rewrite (execR_liftR_seq _ _ _ _ _ HrdPC); rewrite Hvalign4; apply execR_returnR_fwd ];
+        cbv iota beta; reflexivity ];
+    cbv iota beta;
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC);
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+
+  (* the first halfword's fetch_bytes, from its translate + read facts *)
+  Section FirstHalfOk.
+    Context (ilo : mword 16).
+    Hypothesis Htrl :
+      exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s1).
+    Hypothesis Hmrl :
+      exec (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2 false false false) s1
+        = Some (Ok ilo, s1).
+
+    Let Hfb2l : exec (fetch_bytes va va 2) s = Some (@FetchBytes_Success 2 ilo, s1).
+    Proof.
+      unfold fetch_bytes.
+      rewrite exec_catch_early_return.
+      change (ext_fetch_check_pc va va) with (@None unit). cbv iota beta.
+      rewrite (execR_bind_Some _ _ _ _ _
+        (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+                (Defs.liftR (translateAddr (Virtaddr va) (InstructionFetch tt)))) s
+             = Some (inr (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)), s1))).
+      2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+          rewrite execR_liftR. rewrite Htrl. cbn match. reflexivity. }
+      cbv iota beta.
+      rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s1)).
+      cbv iota beta.
+      rewrite (execR_bind_Some _ _ _ _ _
+        (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa)
+                                  2 false false false)) s1
+             = Some (inr (Ok ilo), s1))).
+      2:{ rewrite execR_liftR. rewrite Hmrl. cbn match. reflexivity. }
+      cbv iota beta. rewrite autocast_mword_id_16.
+      rewrite execR_returnR_fwd. cbn match. reflexivity.
+    Qed.
+
+    (* RVC: the low halfword is a compressed instruction *)
+    Lemma exec_fetch_rvc_2 :
+      isRVC ilo = true ->
+      exec (fetch tt) s = Some (F_RVC ilo, s1).
+    Proof using HpcPC HmisaC Hbit0 Hbit1 Hvalign4 Htrl Hmrl.
+      intros HisRVC.
+      split_head.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hfb2l).
+      cbv iota beta.
+      match goal with
+      | |- context [isRVC ?x] =>
+          replace (isRVC x) with true by (symmetry; exact HisRVC)
+      end.
+      cbv iota beta.
+      rewrite execR_returnR_fwd. cbn match. reflexivity.
+    Qed.
+
+    Section SecondHalf.
+      Context (s2 : mstate) (pah : mword 64).
+      Hypothesis HpcPC1 : register_lookup PC s1.(sregs) = va.
+      Hypothesis HnotRVC : isRVC ilo = false.
+
+      Let HrdPC1 : exec (Defs.read_reg PC) s1 = Some (va, s1).
+      Proof. rewrite (exec_read_reg PC s1). rewrite HpcPC1. reflexivity. Qed.
+
+      (* BASE: the second halfword translates (possibly onto ANOTHER page)
+         and reads at the moved state *)
+      Lemma exec_fetch_base_2 (ihi : mword 16) :
+        exec (translateAddr (Virtaddr (add_vec_int va 2)) (InstructionFetch tt)) s1
+          = Some (Ok (Physaddr pah, PBMT_PMA, init_ext_ptw), s2) ->
+        exec (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pah) 2 false false false) s2
+          = Some (Ok ihi, s2) ->
+        exec (fetch tt) s = Some (F_Base (concat_vec ihi ilo), s2).
+      Proof using HpcPC HpcPC1 HmisaC Hbit0 Hbit1 Hvalign4 Htrl Hmrl HnotRVC.
+        intros Htrh Hmrh.
+        assert (Hfb2h : exec (fetch_bytes va (add_vec_int va 2) 2) s1
+                        = Some (@FetchBytes_Success 2 ihi, s2)).
+        { unfold fetch_bytes.
+          rewrite exec_catch_early_return.
+          change (ext_fetch_check_pc va (add_vec_int va 2)) with (@None unit). cbv iota beta.
+          rewrite (execR_bind_Some _ _ _ _ _
+            (_ : execR (Defs.bind0 (Defs.returnR _ tt)
+                    (Defs.liftR (translateAddr (Virtaddr (add_vec_int va 2))
+                                   (InstructionFetch tt)))) s1
+                 = Some (inr (Ok (Physaddr pah, PBMT_PMA, init_ext_ptw)), s2))).
+          2:{ rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s1)).
+              rewrite execR_liftR. rewrite Htrh. cbn match. reflexivity. }
+          cbv iota beta.
+          rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pah, PBMT_PMA) s2)).
+          cbv iota beta.
+          rewrite (execR_bind_Some _ _ _ _ _
+            (_ : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pah)
+                                      2 false false false)) s2
+                 = Some (inr (Ok ihi), s2))).
+          2:{ rewrite execR_liftR. rewrite Hmrh. cbn match. reflexivity. }
+          cbv iota beta. rewrite autocast_mword_id_16.
+          rewrite execR_returnR_fwd. cbn match. reflexivity. }
+        split_head.
+        rewrite (execR_liftR_seq _ _ _ _ _ Hfb2l).
+        cbv iota beta.
+        match goal with
+        | |- context [isRVC ?x] =>
+            replace (isRVC x) with false by (symmetry; exact HnotRVC)
+        end.
+        cbv iota beta.
+        rewrite (execR_liftR_seq _ _ _ _ _ HrdPC1).
+        rewrite (execR_liftR_seq _ _ _ _ _ HrdPC1).
+        rewrite (execR_liftR_seq _ _ _ _ _ Hfb2h).
+        cbv iota beta. rewrite execR_returnR_fwd. cbn match. reflexivity.
+      Qed.
+
+      (* the SECOND halfword's translation faults: the reported va is pc+2 *)
+      Lemma exec_fetch_fault_2_second (ex : ExceptionType) :
+        exec (translateAddr (Virtaddr (add_vec_int va 2)) (InstructionFetch tt)) s1
+          = Some (Err (ex, tt), s1) ->
+        exec (fetch tt) s = Some (F_Error (ex, add_vec_int va 2), s1).
+      Proof using HpcPC HpcPC1 HmisaC Hbit0 Hbit1 Hvalign4 Htrl Hmrl HnotRVC.
+        intros Htrh.
+        split_head.
+        rewrite (execR_liftR_seq _ _ _ _ _ Hfb2l).
+        cbv iota beta.
+        match goal with
+        | |- context [isRVC ?x] =>
+            replace (isRVC x) with false by (symmetry; exact HnotRVC)
+        end.
+        cbv iota beta.
+        rewrite (execR_liftR_seq _ _ _ _ _ HrdPC1).
+        rewrite (execR_liftR_seq _ _ _ _ _ HrdPC1).
+        rewrite (execR_liftR_seq _ _ _ _ _
+                  (exec_fetch_bytes_fault 2 va (add_vec_int va 2) ex s1 s1 Htrh)).
+        cbv iota beta.
+        rewrite (execR_liftR_seq _ _ _ _ _ HrdPC1).
+        rewrite execR_returnR_fwd. cbn match. reflexivity.
+      Qed.
+
+    End SecondHalf.
+  End FirstHalfOk.
+
+  (* the FIRST halfword's translation faults: the reported va is pc *)
+  Lemma exec_fetch_fault_2_first (ex : ExceptionType) :
+    exec (translateAddr (Virtaddr va) (InstructionFetch tt)) s
+      = Some (Err (ex, tt), s) ->
+    exec (fetch tt) s = Some (F_Error (ex, va), s).
+  Proof using HpcPC HmisaC Hbit0 Hbit1 Hvalign4.
+    intros Htr.
+    split_head.
+    rewrite (execR_liftR_seq _ _ _ _ _
+              (exec_fetch_bytes_fault 2 va va ex s s Htr)).
+    cbv iota beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ HrdPC).
+    rewrite execR_returnR_fwd. cbn match. reflexivity.
+  Qed.
+
+End UserFetchSplit.
