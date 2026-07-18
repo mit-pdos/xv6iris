@@ -475,10 +475,18 @@ before any mechanical sweep.
      0) then emp else input-back` — destruct-with-eqn on the branch
      scrutinees reduces it per path (the intena `neq` needs an explicit
      unfold-rewrite: destructing `eq_vec` does not reduce a `neq_vec`
-     spelling).  REMAINING pure debt for the composition layer: the
-     intena-bit fact `po_intena_val ms = SIE-bit(ms)` (two case forms)
-     that converts push_off's ⌜SIE ms⌝-keyed payload into pop_off's
-     intenav-keyed input disjunct.
+     spelling).  The intena-bit fact is DONE:
+     `po_intena_val_sie` + case forms `po_intena_val_zero/_one`
+     (WpIntenaBits.v, iris-FREE — the testbit chase needs vanilla
+     rewrite scope; under the iris imports the ssr rewrite's
+     all-occurrences semantics breaks the capture-assert scripts).
+     Recipe used there (reusable): capture closed subterms FROM the
+     goal via match-assert + vm (never hand-spell deep MachineWord
+     terms — elaboration mismatch hangs); value-level wrap/swrap
+     removal via vm'd modulus literals + abstract b2z bounds (the
+     zify-hooked `lia` "Cannot find witness" trap applies — use
+     compute/congruence and explicit Z.le/lt_trans); `Z.land y 1` via
+     a local ones-based helper.
    - the rest of the kalloc cone file-by-file (acquire/release/holding/
      kalloc/kfree...), VCgen `_den` sconf wrapper with the first
      converted function.

@@ -19,7 +19,7 @@ Require Import KptTree SmodeCorePt WpSmodePtLeaves SRegime.
 Require Import StackOwn CalleeSaved WpSmodeSret AlignBits KernelText.
 Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
 Require Import WpAuipc VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu WpCallMycpu WpSconfMycpu WpPushOffTop WpPopOff.
+Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu WpCallMycpu WpSconfMycpu WpPushOffTop WpPopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
@@ -58,17 +58,6 @@ Proof.
 Qed.
 
 
-(* the value push_off stores into intena: bit 1 (SIE) of the saved
-   sstatus view, extracted by srli/andi -- spelled operationally, as the
-   instruction chain computes it. *)
-Definition po_intena_val (ms : mword 64) : mword 32 :=
-  (autocast (T := mword)
-     (subrange_vec_dec
-        (and_vec (shift_bits_right (sstatus_read ms)
-                    (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))
-                 (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
-        (Z.sub (Z.mul 4 8) 1) 0) : mword 32).
-
 Local Lemma addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
 Proof.
   assert (add_vec_unsigned : forall a b : mword 64,
@@ -93,6 +82,7 @@ Proof.
   change (add_vec X (mword_of_int 0)) with (add_vec_int X 0).
   apply avi0.
 Qed.
+
 
 Section WpSconfPushOff.
   Context `{!riscvGS Σ, !sieG Σ}.
