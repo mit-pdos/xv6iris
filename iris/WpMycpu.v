@@ -683,13 +683,43 @@ Section WpMycpu.
     (* mycpu's output register file [m11] is callee-saved w.r.t. [m0] and returns
        a0 = &cpus[cpuid] = mycpu_ret (m0's tp).  Proven once here, over the
        concrete let-chain, so callers never name the register file. *)
-    rewrite /m11 /m10 /m9 /m8 /m7 /m6 /m5 /m4 /m3 /m2 /m1 /s00 /ra0.
     split.
-    - unfold callee_saved. repeat split;
-        repeat first [ rewrite lookup_total_insert
-                     | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ];
-        first [ reflexivity | apply mycpu_frame_cancel ].
-    - repeat first [ rewrite lookup_total_insert
+    - (* callee_saved m0 m11 via the "outermost write wins" write-list view
+         (CalleeSaved.callee_saved_apply_writes): the 12 untouched registers are
+         [None] in the write-list (decided on keys alone), leaving only the two
+         restored frame registers (sp via [mycpu_frame_cancel], s0 = [s00]) as
+         value obligations -- no O(depth * 14) tower peel. *)
+      assert (Hm11w : m11 = apply_writes
+        [ (csp_rs1, regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc))));
+          (s0_idx,  regval_into_reg s00);
+          (ra_idx,  regval_into_reg ra0);
+          (a0_idx,  regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx)));
+          (a0_idx,  regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi)));
+          (a0_idx,  regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc)));
+          (a5_idx,  regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0)));
+          (a5_idx,  regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0)));
+          (a5_idx,  regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx)));
+          (s0_idx,  regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0))));
+          (csp_rs1, regval_into_reg sp') ] m0) by reflexivity.
+      rewrite Hm11w. apply callee_saved_apply_writes.
+      (* [repeat constructor] hnf-reduces each [Forall] entry (lazily, so the
+         heavy write VALUES are never forced): the 12 untouched registers reduce
+         to [True], and s0's restored write reduces to a reflexivity.  Only sp's
+         obligation survives -- its epilogue [+16] cancels the prologue [-16]. *)
+      repeat constructor.
+      rewrite (outer_write_cons_eq (mword_of_int 2) csp_rs1);
+        [ | vm_compute; reflexivity ].
+      unfold regval_into_reg.
+      assert (Hm10sp : m10 !!! Regidx csp_rs1 = sp').
+      { unfold m10, m9, m8, m7, m6, m5, m4, m3, m2;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
+        unfold m1; rewrite lookup_total_insert; reflexivity. }
+      rewrite Hm10sp.
+      change (m0 !!! Regidx (mword_of_int 2)) with (m0 !!! Regidx csp_rs1).
+      unfold sp', imm_dealloc, imm_entry.
+      apply mycpu_frame_cancel.
+    - rewrite /m11 /m10 /m9 /m8 /m7 /m6 /m5 /m4 /m3 /m2 /m1 /s00 /ra0.
+      repeat first [ rewrite lookup_total_insert
                    | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ].
       unfold mycpu_ret, mycpu_a5. reflexivity.
   Qed.
