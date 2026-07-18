@@ -32,7 +32,7 @@ Require Import KptTree SmodeCorePt WpSmodePtCtl.
    WpSmodePtCtl one is Local); the csr-write reduction chain
    (exec_write_CSR_sstatus & co.) is exported from WpPushOffCsr.v --
    relocate all of them down when the csr leaves get a shared base. *)
-Require Import WpPopOff WpPushOffCsr.
+Require Import WpPopOff WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
 Require Import StackOwn WpSmodeSret AlignBits.
 Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
@@ -230,7 +230,7 @@ Section WpSconfCsr.
   (* ------------------------------------------------------------------- *)
   (* THE '1'->'0' FLIP: csrci sstatus, 2 (push_off's intr_off).           *)
   (*                                                                      *)
-  (* The one still-open PURE ingredient is [csrci_sie_flip_ok] -- the     *)
+  (* The SIE=1 characterization of the write is PROVEN                    *)
   (* SIE=1 characterization of the legalized write (SIE cleared, the      *)
   (* sconf fact set preserved); it is taken as a premise so the ghost     *)
   (* choreography below is proven now and the bit lemma lands once,       *)
@@ -246,16 +246,9 @@ Section WpSconfCsr.
   (* (trap CSRs + stack bound + a persistent intr_inv copy).  The '0'     *)
   (* arm is the idempotent write, ghosts untouched.                       *)
   (* ------------------------------------------------------------------- *)
-  Definition csrci_sie_flip_ok : Prop :=
-    forall ms : mword 64, sconf_ms_facts ms ->
-      _get_Mstatus_SIE (legalize_sstatus_val ms (sstatus_write_val ms (mword_of_int 2)))
-        = ('b"0" : mword 1) /\
-      sconf_ms_facts (legalize_sstatus_val ms (sstatus_write_val ms (mword_of_int 2))).
-
   Lemma wp_csrci_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
       (m : gmap regidx (mword 64)) :
-    csrci_sie_flip_ok ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
@@ -286,7 +279,7 @@ Section WpSconfCsr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hflip Hrd Hrdsp) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd Hrdsp) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
@@ -358,7 +351,7 @@ Section WpSconfCsr.
       iLeft. iPureIntro. exact Hb0.
     - (* ---- '1' arm: the real flip ---- *)
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
-      destruct (Hflip ms0 Hmsf) as [Hsie' Hmsf'].
+      destruct (csrci_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
       (* the trap-vector invariant: open it for the quarter, flip, reseal *)
       iDestruct "Hhx" as (handler) "#Hintr".
@@ -444,9 +437,6 @@ Section WpSconfCsr.
     exact (irreflexivity (<)%Qp 1%Qp Hv).
   Qed.
 
-  Definition sstatus_write_set_val (ms : mword 64) (imm5 : mword 5) : mword 64 :=
-    or_vec (sstatus_read ms) (zero_extend' 64 imm5).
-
   Local Lemma exec_execute_csrsi_sstatus_gen (imm5 rd : mword 5) (m : mword 64) s :
     register_lookup cur_privilege s.(sregs) = Supervisor ->
     register_lookup mstatus s.(sregs) = m ->
@@ -502,19 +492,12 @@ Section WpSconfCsr.
     apply exec_returnm.
   Qed.
 
-  Definition csrsi_sie_flip_ok : Prop :=
-    forall ms : mword 64, sconf_ms_facts ms ->
-      _get_Mstatus_SIE (legalize_sstatus_val ms (sstatus_write_set_val ms (mword_of_int 2)))
-        = ('b"1" : mword 1) /\
-      sconf_ms_facts (legalize_sstatus_val ms (sstatus_write_set_val ms (mword_of_int 2))).
-
   (* pop_off's restore: consumes the saved payload to re-arm the
      capability.  The already-enabled branch of [sie_cap] is refuted by
      sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
   Lemma wp_csrsi_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
       (m : gmap regidx (mword 64)) :
-    csrsi_sie_flip_ok ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
@@ -542,7 +525,7 @@ Section WpSconfCsr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hflip Hrd Hrdsp)
+    iIntros (Hrd Hrdsp)
       "Hsc Hhs Hcap Hhx Hsepcx Hscausex Hstvalx Hstk Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRS))
@@ -580,7 +563,7 @@ Section WpSconfCsr.
         iDestruct "Hsepcx'" as (v2) "Hsepc2".
         iDestruct (reg_pointsto_excl sepc v1 v2 with "Hsepc1 Hsepc2") as %[]. }
     (* ---- the real restore ---- *)
-    destruct (Hflip ms0 Hmsf) as [Hsie' Hmsf'].
+    destruct (csrsi_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
     iDestruct "Hhx" as (handler) "[#Hintr #Hspec]".
     iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
