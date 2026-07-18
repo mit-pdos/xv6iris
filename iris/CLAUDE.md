@@ -383,32 +383,25 @@ before any mechanical sweep.
    epilogue trades back.  The csrci/csrsi leaves now return/consume a
    WHOLE `sie_cap` (see the stage-7 NOTE), so an interrupts-off region
    simply keeps threading the cap.  REMAINING, in order:
-   - `wp_mycpu` onto sconf (push_off's callee; convert first — the old
-     unbundle-island route is unusable at SIE=1).  Its 2-slot frame =
-     `sie_cap_move_down` k:=2.  RECIPE (leaf inventory verified, all
-     twins exist; go LEAF-BY-LEAF — the old proof's `wp_vc_block_s_den_r`
-     prologue/epilogue blocks contain the sp-moves, which
-     `wp_vc_block_s_sconf`'s `vblock_no_sp` guard forbids, and no den
-     sconf wrapper exists yet): new file WpSconfMycpu.v; statement =
-     wp_mycpu_r's ∀-continuation shape with sconf γ + hart_state +
-     sie_cap γ root m0 + tlb_inv_pt replacing the raw cells/facts, and
-     `stack_own (pa_stk sp0 kv_frame_slots) 2` (deep slots) replacing
-     `stack_own sp0 n`.  Instructions (myi_XX instr facts are PUBLIC in
-     WpMycpu.v; offsets 0x00..0x1e): 0x00 c.addi sp,-16 =
-     `wp_caddi_sp_s_sconf` with transformer from `sie_cap_move_down` 2
-     (P := the released `stack_own sp0 2`, split to cells via
-     `stack_own_2_elim`; slot addrs = old proof's Hpra/Hps0); 0x02/0x04
-     c.sdsp ra,8 / s0,0 = `wp_csdsp_s_sconf`; 0x06 c.addi4spn s0,sp,4 =
-     `wp_caddi4spn_s_sconf`; 0x08 c.mv a5,tp = `wp_cmv_s_sconf`; 0x0a
-     c.addiw a5,0 = `wp_caddiw_s_sconf`; 0x0c c.slli a5,7 =
-     `wp_cslli_s_sconf`; 0x0e auipc a0 = `wp_auipc_s_sconf`; 0x12
-     addi a0,a0,0xa86 = `wp_addi4_s_sconf` (NEW, WpSconfAlu.v); 0x16
-     c.add a0,a5 = `wp_cadd_s_sconf`; 0x18/0x1a c.ldsp restores =
-     `wp_cldsp_s_sconf`; 0x1c c.addi sp,16 = mover with
-     `sie_cap_move_up` 2 (frame via `stack_own_2_intro`); 0x1e c.ret =
-     `wp_cret_s_sconf` (WpSconfCtl.v).  callee_saved discharge: reuse
-     wp_mycpu_r's m1..m11 chain + `callee_saved_apply_writes` ending
-     verbatim.
+   - DONE — `wp_mycpu_sconf` (WpSconfMycpu.v): the first whole function
+     on the exact-32 accounting, leaf-by-leaf (the old den blocks
+     contain the sp-moves, which the sconf VCgen guard forbids).  Spec:
+     sconf + sie_cap thread end-to-end at either arm; the caller
+     supplies `stack_own (pa_stk sp0 kv_frame_slots) 2` (DEEP slots)
+     instead of a top-of-stack frame; prologue/epilogue movers trade
+     through `sie_cap_move_down`/`_up` 2 (transformer P := the released
+     frame / the returned deep custody); post = ∀m' with callee_saved +
+     a0 = mycpu_ret, cap and deep slots intact.  Axiom-clean, ~2s worst
+     sentence.  GOTCHAS for the next conversions: (a) keep frame-cell
+     ADDRESSES in `pa_stk` spelling between leaves — passing an
+     insert-chain-map spelling (mK !!! sp) into `stack_own_2_intro`
+     diverges in unification (re-spell with the HpaK bridges before the
+     epilogue mover); (b) spell value-chain constants exactly as the
+     final pure definition does (m6's auipc base = `add_vec_int
+     (mword_of_int mycpu) 14`, matching mycpu_ret) and respell the pc
+     with a closed bv_eq assert before that leaf — the final a0
+     conjunct then closes by plain reflexivity (NEVER vm_compute: the
+     value contains the symbolic m0!!!tp).
    - `wp_push_off_sconf`: prologue movers + csrr (save leaf; arm report
      ties the stored intena to the payload) + csrci (whole-cap-back
      continuation) + noff/intena stores + epilogue; post carries the
@@ -655,14 +648,37 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    leaves (`wp_srl_s_r` register-shift RTYPE — new
    `exec_execute_RTYPE_SRL{,_gpr}`/`gpr_srl_val` in WpMmodeLeafBase —
    plus `wp_andi_s_r`/`wp_ori_s_r`/`wp_cslli_s_r`/`wp_csrli_s_r`, all
-   with `_pt` wrappers, WpSmodePtAlu.v), and **WpWalkInstr.v** — the
-   decode-catalog skeleton whose header holds walk's FULL instruction
-   table (47 instructions, offsets/encodings/AST notes/leaf mapping,
-   extracted from kernel-rocq's KernelInstrs.v) and the path structure.
-   NEXT THERE: write the wdec_*/wi_* facts (copy WpWakeup's wkd_* AST
-   shapes for the frame bytes; rvc_oneshot + mk_rvc for the rest;
-   mk_base for the 4-byte words), then the address-arithmetic bridges,
-   then the body.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
+   with `_pt` wrappers, WpSmodePtAlu.v), and **WpWalkInstr.v — the
+   COMPLETE decode catalog** (header = the full 47-instruction table;
+   40 wdec_* decode facts + 47 wi_* instr lemmas, all compiled;
+   C_BEQZ/C_J ExecuteAs redirects are Local copies since they live in
+   WpKallocDecode, not WpMmodeLeafBase).
+   NEXT: the address-arithmetic BRIDGES (pure; put them in PtBuild §4,
+   which needs a `Riscv.riscv_extras` import for shift_bits_*; reduce
+   concrete shift amounts by WpKfree's `shift_bits_left52_zero` recipe —
+   `unfold shift_bits_left; f_equal; vm_compute` down to plain
+   shiftl/shiftr, then unsigned arithmetic).  In the body proof,
+   register values arrive as closed insert-chain terms (e.g. s4 =
+   add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 30
+   : mword 6)))) — normalize to `mword_of_int K` with `replace … by
+   (apply bv_eq; vm_compute; reflexivity)` BEFORE applying a bridge.
+   The three bridges:
+   (i) slot address, one lemma per level (sh 30/21/12 -> lvl 2/1/0):
+       uint va < 2^38 -> add_vec (shift_bits_left (and_vec
+       (shift_bits_right va (subrange_vec_dec (mword_of_int sh :
+       mword 64) (Z.sub log2_xlen 1) 0)) (sign_extend' 64 (mword_of_int
+       511 : mword 12))) (subrange_vec_dec (mword_of_int 3 : mword 6)
+       (Z.sub log2_xlen 1) 0)) (zero_extend' 64 (concat_vec b (zeros'
+       12))) = u_pte_addr b (vpn_idx lvl (svpn_of va));
+   (ii) descend base: pte_valid w -> pte_ptr w -> shift_bits_left
+       (shift_bits_right w (..10..)) (..12..) = zero_extend' 64
+       (concat_vec (u_next_base w) (zeros' 12)), via pte_valid_ptr_ext0;
+   (iii) alloc PTE: for a page_valid pa, or_vec (shift_bits_left
+       (shift_bits_right pa (..12..)) (..10..)) (sign_extend' 64
+       (mword_of_int 1 : mword 12)) = pt_ptr_pte (the subrange-55-12
+       ppn of pa), plus zero_extend' 64 (concat_vec that-ppn (zeros'
+       12)) = pa.
+   Then the BODY.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
    per iteration: srl/andi/slli/add address arithmetic, ld the slot
    (`ptree_own_slot2_ro`/`slot1_ro` cells through the regime-generic ld
    leaf), V-bit branch; invalid arm: kalloc (existing spec at the
