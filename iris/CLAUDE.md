@@ -240,13 +240,26 @@ before any mechanical sweep.
      reassembled in the continuation.  Spec deltas: the ea/a8/pa alias
      lets collapse to one `pa`; stores carry NO rd premises and no
      retarget.  Remaining Mem widths (4/1, base) are mechanical repeats.
-   - TODO, in rough order:
-     Btype (fall-through = funnel client; TAKEN branches must hand the
-     step's later out for Löb — mirror `wp_cbeqz_taken_s_config`'s
-     shape over the funnel); Ctl (Jal/Jalr need a pc-writing sconf
-     engine — also unblocks auipc; Csr/Sret are '0'-arm-only at first:
+   - DONE: **WpSconfBtype.v** — beq/bne/bge_x0/cbeqz/cbnez fall-throughs
+     (bundle passes through untouched — a fall leaf never opens `sconf`)
+     and beq/bne/cbeqz/cbnez taken.  Spec deltas: ALL taken leaves hand
+     the step's later out (uniform Löb-ready back-edge shape; the
+     base-width originals absorbed it) and go through the Zca jump
+     helper, so only bit-0 target alignment is demanded (the bit-1
+     premise is gone).  The BTYPE cmp/exec helpers are Local copies (as
+     in WpSmodePtBtype).
+   - DONE: WpSconfMem.v also has the width-8 base pair (`wp_ld/sd_s_sconf`,
+     text-transform of the RVC pair) and the width-4 quartet
+     (`wp_clw/csw/lw/sw_s_sconf`; towers LOAD_4/STORE_4, window identity
+     `data2_id_4`, storeval `trunc32`); Local helper copies as in
+     WpSmodePtMem.  DONE: the pc-reading engine
+     `wp_gpr_write_s_sconf_base_pc` + `wp_auipc_s_sconf` (WpSconfAlu.v).
+   - TODO, in rough order: sb (width-1 RAM byte store, no alignment premise);
+     Ctl (Jal/Jalr: register write + nextPC redirect over the funnel,
+     using the pc-reading pattern; Csr/Sret are '0'-arm-only at first:
      sret runs in kernelvec's body, csrci/csrsi are the stage-7 flips);
-     Lock/Uart (accessor-form device leaves).  sp-MOVING instructions
+     Lock/Uart (accessor-form device leaves); MemWrap's c.ldsp/c.sdsp
+     bridges.  sp-MOVING instructions
      (c.addi sp / c.addi16sp) get dedicated leaves that re-carve
      `sie_cap`'s stack bound explicitly.
    Watch the import direction: leaf files must import
