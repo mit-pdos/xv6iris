@@ -18,7 +18,7 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import WpGpr WpLeafCommon.
+Require Import RiscvExtras WpGpr WpLeafCommon UserBits.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -358,4 +358,76 @@ Proof.
       replace g with false by (vm_compute; reflexivity)
   end.
   reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §3 The traversal groundwork: address-bit arithmetic.                   *)
+(* ===================================================================== *)
+
+(* the two CSR-address subranges, as unsigned arithmetic *)
+Lemma sub114_unsigned (x : mword 12) :
+  bv_unsigned (subrange_vec_dec x 11 4) = (bv_unsigned x / 16) mod 256.
+Proof.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 4 + 1))) with 256.
+  rewrite Z.shiftr_div_pow2 by (vm_compute; congruence).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 4)) with 4.
+  change (2 ^ 4) with 16.
+  reflexivity.
+Qed.
+
+Lemma csrPriv_unsigned (x : mword 12) :
+  bv_unsigned (csrPriv x) = (bv_unsigned x / 256) mod 4.
+Proof.
+  unfold csrPriv, subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (9 - 8 + 1))) with 4.
+  rewrite Z.shiftr_div_pow2 by (vm_compute; congruence).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 8)) with 8.
+  change (2 ^ 8) with 256.
+  reflexivity.
+Qed.
+
+(* a PMP-file subrange guard contradicts the U priv gate: the address's
+   bits 9:8 sit inside the matched high byte (0x3A-0x3E all have bits
+   5:4 = 11, i.e. h / 16 = 3). *)
+Lemma pmp_subrange_dead (csr : mword 12) (h : mword 8) :
+  eq_vec (subrange_vec_dec csr 11 4) h = true ->
+  bv_unsigned h / 16 = 3 ->
+  zopz0zKzJ_u ('b"00") (csrPriv csr) = true -> False.
+Proof.
+  intros E Hh EP.
+  apply eq_vec_true_iff in E.
+  apply (f_equal bv_unsigned) in E.
+  rewrite sub114_unsigned in E.
+  unfold zopz0zKzJ_u in EP. apply Z.geb_le in EP.
+  rewrite !(uint_unsigned_n _) in EP.
+  rewrite csrPriv_unsigned in EP.
+  change (bv_unsigned ('b"00" : mword 2)) with 0 in EP.
+  set (c := bv_unsigned csr) in *.
+  pose proof (Z.mod_pos_bound (c / 256) 4 ltac:(lia)) as Hb.
+  assert (Hz : (c / 256) mod 4 = 0) by lia.
+  assert (Hdd : c / 256 = (c / 16) / 16).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 16) in *.
+  assert (Hh16 : q / 16 = 16 * (q / 256) + 3).
+  { assert (Hq2 : q = 16 * (q / 256) * 16 + bv_unsigned h).
+    { pose proof (Z_div_mod_eq_full q 256) as Hd.
+      rewrite E in Hd.
+      replace (16 * (q / 256) * 16) with (256 * (q / 256)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia.
+    rewrite Hh. reflexivity. }
+  rewrite Hdd, Hh16 in Hz.
+  replace (16 * (q / 256) + 3) with (3 + (q / 256) * 4 * 4) in Hz by lia.
+  rewrite Z_mod_plus_full in Hz.
+  vm_compute in Hz. discriminate Hz.
 Qed.
