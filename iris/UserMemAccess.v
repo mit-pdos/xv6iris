@@ -819,3 +819,177 @@ Section MisalignedSplitRead.
   Qed.
 
 End MisalignedSplitRead.
+
+(* ===================================================================== *)
+(* §4c The MISALIGNED plain-STORE split reduction, generic in N.  Same    *)
+(*     shape as §4b: the loop var is [(finished, offset, write_success)]  *)
+(*     and [write_success] accumulates [andb] of the per-chunk store      *)
+(*     outcomes ([ws_seq]).  Each chunk threads state through translate    *)
+(*     ([stt k]) then mem_write_ea + mem_write_value ([st (S k)]); the     *)
+(*     write-value is the model's own [subrange_vec_dec dat] slice.        *)
+(* ===================================================================== *)
+
+Section MisalignedSplitWrite.
+  Context (width bytes : Z) (va : mword 64) (dat : mword (8*width)) (aq rl : bool).
+  Context (N : nat) (pa : nat -> mword 64) (sk : nat -> bool)
+          (stt : nat -> mstate) (st : nat -> mstate).
+  Context (HN : (1 <= N)%nat) (Hbytes : 0 < bytes) (Hwidth : Z.of_nat N * bytes = width).
+
+  Notation n := (Z.of_nat N).
+  Notation vbits := (bits_of_virtaddr (Virtaddr va)).
+  Notation RES := (result bool ExecutionResult).
+
+  Fixpoint ws_seq (k : nat) : bool :=
+    match k with O => true | S k' => andb (ws_seq k') (sk k') end.
+
+  Definition wv (k : nat) : mword (8*bytes) :=
+    autocast (T:=mword) (subrange_vec_dec dat (8*(Z.of_nat k+1)*bytes-1) (8*Z.of_nat k*bytes)).
+
+  Definition write_var (k : nat) : (bool * Z * bool) :=
+    (Nat.eqb k N, Z.of_nat (Nat.min k (N-1)), ws_seq k).
+
+  Definition write_body : (bool * Z * bool) -> Defs.monadR RES exception (bool * Z * bool) :=
+    (fun '(finished, i, write_success) =>
+       (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
+        let offset := i in
+        let vaddr := add_vec_int vbits (Z.mul offset bytes) in
+        liftR (translateAddr (Virtaddr vaddr) (Store Data)) >>= fun w__3 =>
+        match w__3 with
+        | Err (e, _) =>
+           liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__4 =>
+           (early_return (Err w__4 : RES)) >> returnR RES write_success
+        | Ok (paddr, pbmt, _) =>
+           liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") >>
+           (liftR (mem_write_ea paddr bytes false false false) >>= fun w__9 =>
+            match w__9 with
+            | Err e =>
+               liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__10 =>
+               (early_return (Err w__10 : RES)) >> returnR RES write_success
+            | Ok tt =>
+               let write_value := subrange_vec_dec dat
+                     (Z.sub (Z.mul (Z.mul 8 (Z.add offset 1)) bytes) 1)
+                     (Z.mul (Z.mul 8 offset) bytes) in
+               liftR (mem_write_value paddr bytes (autocast (T:=mword) write_value)
+                        (Store Data) pbmt false false false) >>= fun w__11 =>
+               match w__11 with
+               | Err e =>
+                  liftR (memory_exception (Virtaddr vaddr) e) >>= fun w__12 =>
+                  (early_return (Err w__12 : RES)) >> returnR RES write_success
+               | Ok s => returnR RES (andb write_success s)
+               end
+            end)
+        end >>= fun write_success =>
+        let '(finished, i) :=
+          (if Z.eqb offset (n-1) then (true, i) else (finished, Z.add offset 1)) in
+        returnR RES (finished, i, write_success))).
+
+  Hypothesis Htr : forall k, (k < N)%nat ->
+    exec (translateAddr (Virtaddr (add_vec_int vbits (Z.of_nat k * bytes))) (Store Data)) (st k)
+      = Some (Ok (Physaddr (pa k), PBMT_PMA, init_ext_ptw), stt k).
+  Hypothesis Hea : forall k, (k < N)%nat ->
+    exec (mem_write_ea (Physaddr (pa k)) bytes false false false) (stt k) = Some (Ok tt, stt k).
+  Hypothesis Hwv : forall k, (k < N)%nat ->
+    exec (mem_write_value (Physaddr (pa k)) bytes (wv k) (Store Data) PBMT_PMA false false false) (stt k)
+      = Some (Ok (sk k), st (S k)).
+
+  Lemma write_body_step (k : nat) : (k < N)%nat ->
+    execR (write_body (write_var k)) (st k) = Some (inr (write_var (S k)), st (S k)).
+  Proof.
+    intros Hk. unfold write_body, write_var.
+    replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    replace (Nat.min k (N-1)) with k by lia.
+    cbn match.
+    assert (Hass : exec (assert_exp' true "loop dummy assert") (st k) = Some (@eq_refl bool true, st k)) by reflexivity.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+    rewrite (execR_liftR_seq _ _ _ _ _ (Htr k Hk)).
+    cbn match.
+    match goal with
+    | |- execR (Defs.bind ?mrm ?post) (stt k) = _ =>
+      assert (Hmrm : execR mrm (stt k) = Some (inr (ws_seq (S k)), st (S k)))
+    end.
+    { assert (Hsc : exec (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") (stt k) = Some (tt, stt k)) by reflexivity.
+      assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") : Defs.monadR RES exception unit) (stt k) = Some (inr tt, stt k))
+        by (rewrite execR_liftR; rewrite Hsc; reflexivity).
+      rewrite (execR_bind0_Some _ _ _ _ Hscm).
+      rewrite (execR_liftR_seq _ _ _ _ _ (Hea k Hk)). cbn match.
+      rewrite (execR_liftR_seq _ _ _ _ _ (Hwv k Hk)). cbn match.
+      cbn [ws_seq]. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
+    destruct (Z.eqb (Z.of_nat k) (n-1)) eqn:Eq; cbn match;
+      rewrite execR_returnR_fwd; do 3 f_equal; unfold write_var.
+    - apply Z.eqb_eq in Eq.
+      replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
+      replace (Nat.min (S k) (N-1)) with k by lia. reflexivity.
+    - apply Z.eqb_neq in Eq.
+      replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+      replace (Nat.min (S k) (N-1)) with (S k) by lia.
+      replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
+  Qed.
+
+  Lemma write_cond_false (k : nat) : (S k < N)%nat ->
+    execR ((fun '(finished, i, write_success) => returnR RES finished) (write_var (S k))) (st (S k))
+      = Some (inr false, st (S k)).
+  Proof.
+    intros Hk. unfold write_var. cbn match.
+    replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    apply execR_returnR_fwd.
+  Qed.
+
+  Lemma write_cond_true :
+    execR ((fun '(finished, i, write_success) => returnR RES finished) (write_var N)) (st N)
+      = Some (inr true, st N).
+  Proof. unfold write_var. cbn match. rewrite Nat.eqb_refl. apply execR_returnR_fwd. Qed.
+
+  Lemma write_var0 : write_var 0%nat = (false, 0%Z, true).
+  Proof.
+    unfold write_var. cbn [ws_seq].
+    replace (Nat.eqb 0 N) with false by (symmetry; apply Nat.eqb_neq; lia).
+    replace (Nat.min 0 (N-1)) with 0%nat by lia. reflexivity.
+  Qed.
+
+  Lemma write_loop :
+    execR (Defs.untilMT (false, 0%Z, true) (fun '(finished, i, write_success) => n)
+             (fun '(finished, i, write_success) => returnR RES finished) write_body) (st 0%nat)
+      = Some (inr (write_var N), st N).
+  Proof.
+    rewrite <- write_var0. unfold Defs.untilMT.
+    set (L := (fun '(finished, i, write_success) => n) (write_var 0%nat)).
+    assert (HL : L = n) by (unfold L; rewrite write_var0; reflexivity).
+    clearbody L. rewrite HL.
+    apply (execR_untilMT'_chain (fun '(finished, i, write_success) => returnR RES finished)
+                                write_body N write_var st n).
+    - exact HN.
+    - lia.
+    - intros k Hk. apply write_body_step; assumption.
+    - intros k Hk. apply write_cond_false; assumption.
+    - apply write_cond_true.
+  Qed.
+
+  Lemma exec_vmem_write_addr_misaligned_split :
+    is_aligned_vaddr (Virtaddr va) width = false ->
+    exec (split_misaligned (Virtaddr va) width) (st 0%nat) = Some ((n, bytes), st 0%nat) ->
+    exec (vmem_write_addr (Virtaddr va) width dat (Store Data) false false false) (st 0%nat)
+      = Some (Ok (ws_seq N), st N).
+  Proof.
+    intros Hnal Hsplit.
+    unfold vmem_write_addr. rewrite exec_catch_early_return.
+    rewrite Hnal. cbn [Riscv.rv64d.not negb].
+    match goal with
+    | |- context [ Defs.bind0 ?g (Defs.liftR (split_misaligned (Virtaddr va) width)) ] =>
+        set (GRD := g)
+    end.
+    assert (Hg : execR GRD (st 0%nat) = Some (inr tt, st 0%nat)).
+    { unfold GRD.
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_plat_misaligned_loadstore_none (Store Data) (st 0%nat) eq_refl eq_refl)).
+      cbn match. apply execR_returnR_fwd. }
+    assert (Hinner : execR (Defs.bind0 GRD (liftR (split_misaligned (Virtaddr va) width))) (st 0%nat)
+                     = Some (inr (n, bytes), st 0%nat)).
+    { rewrite (execR_bind0_Some _ _ _ _ Hg).
+      rewrite execR_liftR. rewrite Hsplit. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+    rewrite misaligned_order_split. cbn match.
+    rewrite (execR_bind_Some _ _ _ _ _ write_loop).
+    cbn match. reflexivity.
+  Qed.
+
+End MisalignedSplitWrite.
