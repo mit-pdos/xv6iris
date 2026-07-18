@@ -14,10 +14,15 @@ on:
     branches: [main]
   pull_request:
 
-# A new push to a branch cancels any in-flight run for that branch.
+# A new push does NOT cancel the in-flight run: it finishes, and the new push
+# waits as pending.  GitHub keeps at most one pending run per group, so a burst
+# of pushes coalesces -- each new push supersedes the previously-pending one --
+# and the latest commit is built as soon as the running build completes.  (With
+# cancel-in-progress, a push faster than the build time would starve CI: every
+# run cancelled before finishing, so nothing ever completes.)
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

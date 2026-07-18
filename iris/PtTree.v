@@ -844,6 +844,12 @@ Section PtTreeIris.
     iPureIntro. auto.
   Qed.
 
+  (* ---- a PARKED page table: full ownership of a spec-constrained tree
+     that is not currently installed in satp.  The satp-switch lemmas
+     convert between an installed table's invariant and this frame.     *)
+  Definition pt_frame (S : ptree -> Prop) : iProp Σ :=
+    (∃ t : ptree, ⌜ S t ⌝ ∗ ptree_own 2 (DfracOwn 1) t)%I.
+
 End PtTreeIris.
 
 (* ===================================================================== *)
@@ -856,14 +862,21 @@ End PtTreeIris.
 (*    shape).                                                             *)
 (* ===================================================================== *)
 
+(* the cache-provenance relation: [ent] is a legal resident of slot
+   [tlb_hash vpn'] with respect to tree [t] -- the walk entry of some
+   vpn [t] maps with the same hash, modulo A/D staleness of the leaf *)
+Definition tlb_cache_of (asid : mword 16) (t : ptree)
+    (vpn' : mword 27) (ent : TLB_Entry) : Prop :=
+  exists vpn p2 p1 p0 (a d : mword 1),
+    ptree_maps t vpn p2 p1 p0 /\
+    tlb_hash (__id 39) vpn = tlb_hash (__id 39) vpn' /\
+    ent = u_walk_entry vpn p2 p1 (pte_set_ad p0 a d) asid.
+
 Definition tlb_ok_pt (asid : mword 16) (t : ptree)
     (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
   forall (vpn' : mword 27) (ent : TLB_Entry),
     vec_access_dec tlbvec (tlb_hash (__id 39) vpn') = Some ent ->
-    exists vpn p2 p1 p0 (a d : mword 1),
-      ptree_maps t vpn p2 p1 p0 /\
-      tlb_hash (__id 39) vpn = tlb_hash (__id 39) vpn' /\
-      ent = u_walk_entry vpn p2 p1 (pte_set_ad p0 a d) asid.
+    tlb_cache_of asid t vpn' ent.
 
 (* an all-empty TLB is consistent with any tree *)
 Lemma tlb_ok_pt_empty (asid : mword 16) (t : ptree)
@@ -915,18 +928,17 @@ Qed.
 (* consistency survives the ADUE write-back itself: replacing the mapped
    leaf by an A/D variant keeps every resident entry a variant of the
    NEW tree's leaf ([pte_set_ad_absorb]) *)
-Lemma tlb_ok_pt_set_leaf (asid : mword 16) (t : ptree)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+Lemma tlb_cache_of_set_leaf (asid : mword 16) (t : ptree)
+    (vpn' : mword 27) (ent : TLB_Entry)
     (vpn : mword 27) (p2 p1 p0 : mword 64) (a d : mword 1) :
   ptree_maps t vpn p2 p1 p0 ->
   pte_valid (pte_set_ad p0 a d) -> pte_leaf (pte_set_ad p0 a d) ->
   pte_no_napot (pte_set_ad p0 a d) -> pte_pbmt0 (pte_set_ad p0 a d) ->
-  tlb_ok_pt asid t tlbvec ->
-  tlb_ok_pt asid (ptree_set_leaf t vpn (pte_set_ad p0 a d)) tlbvec.
+  tlb_cache_of asid t vpn' ent ->
+  tlb_cache_of asid (ptree_set_leaf t vpn (pte_set_ad p0 a d)) vpn' ent.
 Proof.
-  intros Hmaps Hv Hl Hnap Hpb Hok vpn' ent Hget.
-  destruct (Hok vpn' ent Hget)
-    as (vpn0 & q2 & q1 & q0 & a' & d' & Hm0 & Hh & Hent).
+  intros Hmaps Hv Hl Hnap Hpb
+    (vpn0 & q2 & q1 & q0 & a' & d' & Hm0 & Hh & Hent).
   destruct (decide (vpn0 = vpn)) as [-> | Hne].
   - destruct (ptree_maps_det t vpn q2 q1 q0 p2 p1 p0 Hm0 Hmaps)
       as (-> & -> & ->).
@@ -938,6 +950,121 @@ Proof.
   - exists vpn0, q2, q1, q0, a', d'.
     split; [exact (ptree_set_leaf_maps_other t vpn vpn0 q2 q1 q0 _ Hne Hm0)|].
     split; [exact Hh | exact Hent].
+Qed.
+
+Lemma tlb_ok_pt_set_leaf (asid : mword 16) (t : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+    (vpn : mword 27) (p2 p1 p0 : mword 64) (a d : mword 1) :
+  ptree_maps t vpn p2 p1 p0 ->
+  pte_valid (pte_set_ad p0 a d) -> pte_leaf (pte_set_ad p0 a d) ->
+  pte_no_napot (pte_set_ad p0 a d) -> pte_pbmt0 (pte_set_ad p0 a d) ->
+  tlb_ok_pt asid t tlbvec ->
+  tlb_ok_pt asid (ptree_set_leaf t vpn (pte_set_ad p0 a d)) tlbvec.
+Proof.
+  intros Hmaps Hv Hl Hnap Hpb Hok vpn' ent Hget.
+  exact (tlb_cache_of_set_leaf asid t vpn' ent vpn p2 p1 p0 a d
+           Hmaps Hv Hl Hnap Hpb (Hok vpn' ent Hget)).
+Qed.
+
+(* ===================================================================== *)
+(* §7b TWO-TABLE TLB consistency: the satp-switch window.  Between a      *)
+(*     [csrw satp] and the following [sfence.vma], resident entries may   *)
+(*     have been cached from EITHER the previous table [tp] or the        *)
+(*     current one [tc] -- and provenance matters beyond the leaf: a      *)
+(*     Svadu hit write-back goes to the pteAddr recorded by the           *)
+(*     INSTALLING walk, i.e. into the provenance tree's L0 slot.          *)
+(* ===================================================================== *)
+
+Definition tlb_ok_pt2 (asid : mword 16) (tp tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
+  forall (vpn' : mword 27) (ent : TLB_Entry),
+    vec_access_dec tlbvec (tlb_hash (__id 39) vpn') = Some ent ->
+    tlb_cache_of asid tp vpn' ent \/ tlb_cache_of asid tc vpn' ent.
+
+(* weakening injections: a single-table-consistent vector is two-table
+   consistent with anything on the other side *)
+Lemma tlb_ok_pt2_prev (asid : mword 16) (tp tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  tlb_ok_pt asid tp tlbvec -> tlb_ok_pt2 asid tp tc tlbvec.
+Proof. intros Hok vpn' ent Hget. left. exact (Hok vpn' ent Hget). Qed.
+
+Lemma tlb_ok_pt2_cur (asid : mword 16) (tp tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  tlb_ok_pt asid tc tlbvec -> tlb_ok_pt2 asid tp tc tlbvec.
+Proof. intros Hok vpn' ent Hget. right. exact (Hok vpn' ent Hget). Qed.
+
+(* walk-induced fills: the walker consults the CURRENT table, but the
+   hit-refresh path re-fills from the entry's own provenance, so both
+   sides are provided *)
+Lemma tlb_ok_pt2_fill_cur (asid : mword 16) (tp tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+    (vpn : mword 27) (p2 p1 p0 q0 : mword 64) :
+  ptree_maps tc vpn p2 p1 p0 ->
+  (exists a d : mword 1, q0 = pte_set_ad p0 a d) ->
+  tlb_ok_pt2 asid tp tc tlbvec ->
+  tlb_ok_pt2 asid tp tc (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                           (Some (u_walk_entry vpn p2 p1 q0 asid))).
+Proof.
+  intros Hmaps (a & d & Hq) Hok vpn' ent Hget.
+  rewrite (vec64_access_update _ _ _ _ (tlb_hash_range vpn)) in Hget.
+  destruct (Z.eqb (tlb_hash (__id 39) vpn') (tlb_hash (__id 39) vpn)) eqn:Hh.
+  - apply Z.eqb_eq in Hh. injection Hget as <-.
+    right. exists vpn, p2, p1, p0, a, d.
+    split; [exact Hmaps|]. split; [symmetry; exact Hh|].
+    rewrite Hq. reflexivity.
+  - exact (Hok vpn' ent Hget).
+Qed.
+
+Lemma tlb_ok_pt2_fill_prev (asid : mword 16) (tp tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+    (vpn : mword 27) (p2 p1 p0 q0 : mword 64) :
+  ptree_maps tp vpn p2 p1 p0 ->
+  (exists a d : mword 1, q0 = pte_set_ad p0 a d) ->
+  tlb_ok_pt2 asid tp tc tlbvec ->
+  tlb_ok_pt2 asid tp tc (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                           (Some (u_walk_entry vpn p2 p1 q0 asid))).
+Proof.
+  intros Hmaps (a & d & Hq) Hok vpn' ent Hget.
+  rewrite (vec64_access_update _ _ _ _ (tlb_hash_range vpn)) in Hget.
+  destruct (Z.eqb (tlb_hash (__id 39) vpn') (tlb_hash (__id 39) vpn)) eqn:Hh.
+  - apply Z.eqb_eq in Hh. injection Hget as <-.
+    left. exists vpn, p2, p1, p0, a, d.
+    split; [exact Hmaps|]. split; [symmetry; exact Hh|].
+    rewrite Hq. reflexivity.
+  - exact (Hok vpn' ent Hget).
+Qed.
+
+(* a Svadu write-back into EITHER side's tree preserves consistency *)
+Lemma tlb_ok_pt2_set_leaf_prev (asid : mword 16) (tp tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+    (vpn : mword 27) (p2 p1 p0 : mword 64) (a d : mword 1) :
+  ptree_maps tp vpn p2 p1 p0 ->
+  pte_valid (pte_set_ad p0 a d) -> pte_leaf (pte_set_ad p0 a d) ->
+  pte_no_napot (pte_set_ad p0 a d) -> pte_pbmt0 (pte_set_ad p0 a d) ->
+  tlb_ok_pt2 asid tp tc tlbvec ->
+  tlb_ok_pt2 asid (ptree_set_leaf tp vpn (pte_set_ad p0 a d)) tc tlbvec.
+Proof.
+  intros Hmaps Hv Hl Hnap Hpb Hok vpn' ent Hget.
+  destruct (Hok vpn' ent Hget) as [Hp | Hc].
+  - left. exact (tlb_cache_of_set_leaf asid tp vpn' ent vpn p2 p1 p0 a d
+                   Hmaps Hv Hl Hnap Hpb Hp).
+  - right. exact Hc.
+Qed.
+
+Lemma tlb_ok_pt2_set_leaf_cur (asid : mword 16) (tp tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
+    (vpn : mword 27) (p2 p1 p0 : mword 64) (a d : mword 1) :
+  ptree_maps tc vpn p2 p1 p0 ->
+  pte_valid (pte_set_ad p0 a d) -> pte_leaf (pte_set_ad p0 a d) ->
+  pte_no_napot (pte_set_ad p0 a d) -> pte_pbmt0 (pte_set_ad p0 a d) ->
+  tlb_ok_pt2 asid tp tc tlbvec ->
+  tlb_ok_pt2 asid tp (ptree_set_leaf tc vpn (pte_set_ad p0 a d)) tlbvec.
+Proof.
+  intros Hmaps Hv Hl Hnap Hpb Hok vpn' ent Hget.
+  destruct (Hok vpn' ent Hget) as [Hp | Hc].
+  - left. exact Hp.
+  - right. exact (tlb_cache_of_set_leaf asid tc vpn' ent vpn p2 p1 p0 a d
+                    Hmaps Hv Hl Hnap Hpb Hc).
 Qed.
 
 (* ===================================================================== *)
