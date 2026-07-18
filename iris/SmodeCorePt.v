@@ -45,6 +45,7 @@ Require Import KptPt.
 Require Import MinstretInv InstrBytes.
 Require Import SmodeCore.
 Require Import KptTree.
+Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -71,7 +72,7 @@ Section SmodeCorePt.
   (* from [smode_config]/[hw_config]'s cells); everything the walk needs  *)
   (* rides inside [tlb_inv_pt].                                           *)
   (* =================================================================== *)
-  Lemma tlb_inv_pt_fetch (root_ppn : mword 44) (σ : mstate)
+  Lemma s_regime_fetch (R : s_regime) (σ : mstate)
       (pc : mword 64) (r : FetchResult) :
     register_lookup PC σ.(sregs) = pc ->
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
@@ -81,7 +82,7 @@ Section SmodeCorePt.
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     mstate_interp σ -∗
-    tlb_inv_pt root_ppn -∗
+    sr_inv R -∗
     instr_bytes pc r ==∗
     ∃ σf : mstate,
       ⌜ exec (fetch tt) σ = Some (r, σf) ⌝ ∗
@@ -89,7 +90,7 @@ Section SmodeCorePt.
       ⌜ forall rr, register_beq rr tlb = false ->
           register_lookup rr σf.(sregs) = register_lookup rr σ.(sregs) ⌝ ∗
       mstate_interp σf ∗
-      tlb_inv_pt root_ppn.
+      sr_inv R.
   Proof.
     intros Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma.
     iIntros "[Hreg [Hmem Hdev]] Hinv Hbytes".
@@ -113,12 +114,12 @@ Section SmodeCorePt.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb3") as %Hr3. iPureIntro.
           unfold pa_add in Hr3 |- *. change (Z.of_nat 3) with 3 in Hr3 |- *. exact Hr3. }
-        iMod (tlb_inv_pt_translateAddr_fetch root_ppn pc σ
-                Hram Lmisa Lmenv Lhtif Lpriv LSXL
+        iMod (sr_absorb R (InstructionFetch tt) pc σ
+                (or_introl eq_refl) Hram Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & Hreg & Hmem & Hinv)".
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)".
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
                    s1.(mem) !! (pa_add pc j) = Some (nth_byte w j)⌝)%I as %Hbf.
@@ -129,30 +130,15 @@ Section SmodeCorePt.
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Lpma pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
-        iDestruct "Hinv" as (satp1 tlbvec1 t1)
-          "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
-        iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-          "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
-        iDestruct (reg_valid_dq with "Hreg Hpc0") as %L1pmpc.
-        iDestruct (reg_valid_dq with "Hreg Hpa0") as %L1pmpa.
-        iAssert (tlb_inv_pt root_ppn) with "[Hsatp Htlb Ht Hpc0 Hpa0]" as "Hinv".
-        { iExists satp1, tlbvec1, t1. iFrame "Hsatp Htlb Ht".
-          iSplit; [iPureIntro; exact Hmode |].
-          iSplit; [iPureIntro; exact Hasid |].
-          iSplit; [iPureIntro; exact Hppn |].
-          iSplit; [iPureIntro; exact Htlbok |].
-          iSplit; [iPureIntro; exact Hspec |].
-          iSplit; [iPureIntro; exact Hpmawimpl |].
-          iExists pmpcfg0, pmpaddr00. iFrame "Hpc0 Hpa0". iPureIntro. tauto. }
+        destruct Hgr1 as (HA & Hord & HX & HW & HR & Hcov).
         assert (Hfetch : exec (fetch tt) σ = Some (F_Base w, s1)).
         { apply (exec_fetch_F_Base_4_S_gen pc w σ s1 region Lpc Hal Htr1).
-          - rewrite L1pmpc. exact HA.
-          - rewrite L1pmpa. exact Hord.
-          - rewrite L1pmpa.
-            exact (ram_fetch_pmp pc (vec_access_dec pmpaddr00 0) 4 3
+          - exact HA.
+          - exact Hord.
+          - exact (ram_fetch_pmp pc (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0) 4 3
                      ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
                      ltac:(reflexivity) Hram Hram3 Hcov).
-          - rewrite L1pmpc. exact HX.
+          - exact HX.
           - rewrite (Hpres1 pma_regions ltac:(vm_compute; reflexivity)).
             exact Hmatch0.
           - exact Hal.
@@ -208,12 +194,12 @@ Section SmodeCorePt.
         destruct (Lpma pc 2) as (regl & Hml0 & Hxl & _ & _).
         destruct (Lpma (add_vec_int pc 2) 2) as (regh & Hmh0 & Hxh & _ & _).
         (* --- low chunk: σ -> s1 --- *)
-        iMod (tlb_inv_pt_translateAddr_fetch root_ppn pc σ
-                Hraml Lmisa Lmenv Lhtif Lpriv LSXL
+        iMod (sr_absorb R (InstructionFetch tt) pc σ
+                (or_introl eq_refl) Hraml Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & Hreg & Hmem & Hinv)".
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)".
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         (* config lookups at s1 *)
         assert (L1pc : register_lookup PC s1.(sregs) = pc)
@@ -239,12 +225,12 @@ Section SmodeCorePt.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         (* --- high chunk: s1 -> s2 --- *)
-        iMod (tlb_inv_pt_translateAddr_fetch root_ppn (add_vec_int pc 2) s1
-                Hramh L1misa L1menv L1htif L1priv L1SXL
+        iMod (sr_absorb R (InstructionFetch tt) (add_vec_int pc 2) s1
+                (or_introl eq_refl) Hramh L1misa L1menv L1htif L1priv L1SXL
                 (exec_effectivePrivilege_fetch _ _ s1)
                 (exec_is_shadow_stack_fetch s1)
                 L1pma with "Hreg Hmem Hinv")
-          as (s2) "(%Htr2 & %Hmdev2 & %Hsh2 & Hreg & Hmem & Hinv)".
+          as (s2) "(%Htr2 & %Hmdev2 & %Hsh2 & %Hgr2 & Hreg & Hmem & Hinv)".
         pose proof (pt_regs_preserved _ _ Hsh2) as Hpres2.
         assert (Hpres12 : forall rr, register_beq rr tlb = false ->
                   register_lookup rr s2.(sregs) = register_lookup rr σ.(sregs)).
@@ -259,35 +245,17 @@ Section SmodeCorePt.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         (* the s1/s2 PMP facts for the two instruction reads *)
-        iDestruct "Hinv" as (satp2 tlbvec2 t2)
-          "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
-        iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-          "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
-        iDestruct (reg_valid_dq with "Hreg Hpc0") as %L2pmpc.
-        iDestruct (reg_valid_dq with "Hreg Hpa0") as %L2pmpa.
-        assert (L1pmpc : register_lookup pmpcfg_n s1.(sregs) = pmpcfg0)
-          by (rewrite <- (Hpres2 pmpcfg_n ltac:(vm_compute; reflexivity)); exact L2pmpc).
-        assert (L1pmpa : register_lookup pmpaddr_n s1.(sregs) = pmpaddr00)
-          by (rewrite <- (Hpres2 pmpaddr_n ltac:(vm_compute; reflexivity)); exact L2pmpa).
-        iAssert (tlb_inv_pt root_ppn) with "[Hsatp Htlb Ht Hpc0 Hpa0]" as "Hinv".
-        { iExists satp2, tlbvec2, t2. iFrame "Hsatp Htlb Ht".
-          iSplit; [iPureIntro; exact Hmode |].
-          iSplit; [iPureIntro; exact Hasid |].
-          iSplit; [iPureIntro; exact Hppn |].
-          iSplit; [iPureIntro; exact Htlbok |].
-          iSplit; [iPureIntro; exact Hspec |].
-          iSplit; [iPureIntro; exact Hpmawimpl |].
-          iExists pmpcfg0, pmpaddr00. iFrame "Hpc0 Hpa0". iPureIntro. tauto. }
+        destruct Hgr1 as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
+        destruct Hgr2 as (HA2 & Hord2 & HX2 & HW2 & HR2 & Hcov2).
         assert (Hfetch : exec (fetch tt) σ = Some (F_Base w, s2)).
         { apply (exec_fetch_F_Base_2_S_gen pc w σ s1 s2 regl regh
                    Lpc L1pc HmisaC Hbit0 Hbit1 Hal Htr1 Htr2).
-          - rewrite L1pmpc. exact HA.
-          - rewrite L1pmpa. exact Hord.
-          - rewrite L1pmpa.
-            exact (ram_fetch_pmp pc (vec_access_dec pmpaddr00 0) 2 1
+          - exact HA1.
+          - exact Hord1.
+          - exact (ram_fetch_pmp pc (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0) 2 1
                      ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
-                     ltac:(reflexivity) Hraml Hraml1 Hcov).
-          - rewrite L1pmpc. exact HX.
+                     ltac:(reflexivity) Hraml Hraml1 Hcov1).
+          - exact HX1.
           - rewrite (Hpres1 pma_regions ltac:(vm_compute; reflexivity)). exact Hml0.
           - exact Halignl0.
           - exact Hxl.
@@ -297,13 +265,12 @@ Section SmodeCorePt.
           - apply addr_is_ram_not_dev. exact Hraml.
           - exact HblS1.
           - exact L1priv.
-          - rewrite L2pmpc. exact HA.
-          - rewrite L2pmpa. exact Hord.
-          - rewrite L2pmpa.
-            exact (ram_fetch_pmp (add_vec_int pc 2) (vec_access_dec pmpaddr00 0) 2 1
+          - exact HA2.
+          - exact Hord2.
+          - exact (ram_fetch_pmp (add_vec_int pc 2) (vec_access_dec (register_lookup pmpaddr_n s2.(sregs)) 0) 2 1
                      ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
-                     ltac:(reflexivity) Hramh Hramh1 Hcov).
-          - rewrite L2pmpc. exact HX.
+                     ltac:(reflexivity) Hramh Hramh1 Hcov2).
+          - exact HX2.
           - rewrite (Hpres12 pma_regions ltac:(vm_compute; reflexivity)). exact Hmh0.
           - exact Halignh0.
           - exact Hxh.
@@ -337,12 +304,12 @@ Section SmodeCorePt.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb3") as %Hr3. iPureIntro.
           unfold pa_add in Hr3 |- *. change (Z.of_nat 3) with 3 in Hr3 |- *. exact Hr3. }
-        iMod (tlb_inv_pt_translateAddr_fetch root_ppn pc σ
-                Hram Lmisa Lmenv Lhtif Lpriv LSXL
+        iMod (sr_absorb R (InstructionFetch tt) pc σ
+                (or_introl eq_refl) Hram Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & Hreg & Hmem & Hinv)".
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)".
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
                    s1.(mem) !! (pa_add pc j) = Some (nth_byte w j)⌝)%I as %Hbf.
@@ -353,31 +320,16 @@ Section SmodeCorePt.
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Lpma pc 4) as (region & Hmatch0 & Hexec0 & _ & _).
-        iDestruct "Hinv" as (satp1 tlbvec1 t1)
-          "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
-        iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-          "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
-        iDestruct (reg_valid_dq with "Hreg Hpc0") as %L1pmpc.
-        iDestruct (reg_valid_dq with "Hreg Hpa0") as %L1pmpa.
-        iAssert (tlb_inv_pt root_ppn) with "[Hsatp Htlb Ht Hpc0 Hpa0]" as "Hinv".
-        { iExists satp1, tlbvec1, t1. iFrame "Hsatp Htlb Ht".
-          iSplit; [iPureIntro; exact Hmode |].
-          iSplit; [iPureIntro; exact Hasid |].
-          iSplit; [iPureIntro; exact Hppn |].
-          iSplit; [iPureIntro; exact Htlbok |].
-          iSplit; [iPureIntro; exact Hspec |].
-          iSplit; [iPureIntro; exact Hpmawimpl |].
-          iExists pmpcfg0, pmpaddr00. iFrame "Hpc0 Hpa0". iPureIntro. tauto. }
+        destruct Hgr1 as (HA & Hord & HX & HW & HR & Hcov).
         assert (Hfetch : exec (fetch tt) σ = Some (F_RVC h, s1)).
         { rewrite <- Hsub.
           apply (exec_fetch_RVC_4_S_gen pc w σ s1 region Lpc Hal Htr1).
-          - rewrite L1pmpc. exact HA.
-          - rewrite L1pmpa. exact Hord.
-          - rewrite L1pmpa.
-            exact (ram_fetch_pmp pc (vec_access_dec pmpaddr00 0) 4 3
+          - exact HA.
+          - exact Hord.
+          - exact (ram_fetch_pmp pc (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0) 4 3
                      ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
                      ltac:(reflexivity) Hram Hram3 Hcov).
-          - rewrite L1pmpc. exact HX.
+          - exact HX.
           - rewrite (Hpres1 pma_regions ltac:(vm_compute; reflexivity)). exact Hmatch0.
           - exact Hal.
           - exact Hexec0.
@@ -409,12 +361,12 @@ Section SmodeCorePt.
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
           iDestruct (mem_ram with "Hb1") as %Hr1. iPureIntro.
           unfold pa_add in Hr1 |- *. change (Z.of_nat 1) with 1 in Hr1 |- *. exact Hr1. }
-        iMod (tlb_inv_pt_translateAddr_fetch root_ppn pc σ
-                Hram Lmisa Lmenv Lhtif Lpriv LSXL
+        iMod (sr_absorb R (InstructionFetch tt) pc σ
+                (or_introl eq_refl) Hram Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
-          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & Hreg & Hmem & Hinv)".
+          as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)".
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iAssert (⌜forall j : nat, (N.of_nat j < 2)%N ->
                    s1.(mem) !! (pa_add pc j) = Some (nth_byte h j)⌝)%I as %Hbf.
@@ -425,31 +377,16 @@ Section SmodeCorePt.
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Lpma pc 2) as (region & Hmatch0 & Hexec0 & _ & _).
-        iDestruct "Hinv" as (satp1 tlbvec1 t1)
-          "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
-        iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-          "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
-        iDestruct (reg_valid_dq with "Hreg Hpc0") as %L1pmpc.
-        iDestruct (reg_valid_dq with "Hreg Hpa0") as %L1pmpa.
-        iAssert (tlb_inv_pt root_ppn) with "[Hsatp Htlb Ht Hpc0 Hpa0]" as "Hinv".
-        { iExists satp1, tlbvec1, t1. iFrame "Hsatp Htlb Ht".
-          iSplit; [iPureIntro; exact Hmode |].
-          iSplit; [iPureIntro; exact Hasid |].
-          iSplit; [iPureIntro; exact Hppn |].
-          iSplit; [iPureIntro; exact Htlbok |].
-          iSplit; [iPureIntro; exact Hspec |].
-          iSplit; [iPureIntro; exact Hpmawimpl |].
-          iExists pmpcfg0, pmpaddr00. iFrame "Hpc0 Hpa0". iPureIntro. tauto. }
+        destruct Hgr1 as (HA & Hord & HX & HW & HR & Hcov).
         assert (Hfetch : exec (fetch tt) σ = Some (F_RVC h, s1)).
         { apply (exec_fetch_RVC_2_S_gen pc h σ s1 region Lpc HmisaC
                    Hbit0 Hbit1 Hal Htr1).
-          - rewrite L1pmpc. exact HA.
-          - rewrite L1pmpa. exact Hord.
-          - rewrite L1pmpa.
-            exact (ram_fetch_pmp pc (vec_access_dec pmpaddr00 0) 2 1
+          - exact HA.
+          - exact Hord.
+          - exact (ram_fetch_pmp pc (vec_access_dec (register_lookup pmpaddr_n s1.(sregs)) 0) 2 1
                      ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
                      ltac:(reflexivity) Hram Hram1 Hcov).
-          - rewrite L1pmpc. exact HX.
+          - exact HX.
           - rewrite (Hpres1 pma_regions ltac:(vm_compute; reflexivity)). exact Hmatch0.
           - exact Halignl0.
           - exact Hexec0.
@@ -475,10 +412,10 @@ Section SmodeCorePt.
   (* [wp_instr_s_tlbinv] with the tree invariant threaded, and NO A/D     *)
   (* premise -- the Svadu write-back is absorbed inside the fetch.        *)
   (* =================================================================== *)
-  Lemma wp_instr_s_tlbinv_pt (root_ppn : mword 44) (γ : gname) Φ
+  Lemma wp_instr_s_regime (R : s_regime) (γ : gname) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    sr_inv R -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
@@ -490,7 +427,7 @@ Section SmodeCorePt.
              = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
          mstate_interp s_exec ∗
          (smode_config γ dq -∗
-          tlb_inv_pt root_ppn -∗
+          sr_inv R -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
           ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -533,7 +470,7 @@ Section SmodeCorePt.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     (* the unified fetch through the tree invariant (may write A/D back) *)
-    iMod (tlb_inv_pt_fetch root_ppn σ pc r
+    iMod (s_regime_fetch R σ pc r
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
             with "[$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
@@ -602,7 +539,7 @@ Section SmodeCorePt.
   (* inside the fupd) and stashes the returned invariant in its           *)
   (* continuation.  No A/D premise anywhere.                              *)
   (* =================================================================== *)
-  Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44) Φ
+  Lemma wp_instr_s_config_regime (R : s_regime) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -619,7 +556,7 @@ Section SmodeCorePt.
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
+    sr_inv R -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
@@ -628,7 +565,7 @@ Section SmodeCorePt.
        mie ↦ᵣ{ dq } mie_v -∗
        mideleg ↦ᵣ{ dq } mdv0 -∗
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-       tlb_inv_pt root_ppn -∗
+       sr_inv R -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
@@ -673,7 +610,7 @@ Section SmodeCorePt.
       by (rewrite Lms; exact HSXL).
     assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
-    iMod (tlb_inv_pt_fetch root_ppn σ pc r
+    iMod (s_regime_fetch R σ pc r
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
             with "[$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
@@ -722,6 +659,97 @@ Section SmodeCorePt.
         { iPureIntro. apply exec_currentlyEnabled_Zca. rewrite Hmisa_σf. exact HmisaC. }
         iExists i. iSplit; iPureIntro; [apply Hexp | exact Hexec]. }
       rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont".
+  Qed.
+
+
+  (* =================================================================== *)
+  (* Sv39-kernel instances under the ORIGINAL names/signatures: nothing   *)
+  (* downstream moves.  [sr_inv (kpt_regime root_ppn)] is definitionally  *)
+  (* [tlb_inv_pt root_ppn], so [exact] closes each restatement.           *)
+  (* =================================================================== *)
+  Lemma tlb_inv_pt_fetch (root_ppn : mword 44) (σ : mstate)
+      (pc : mword 64) (r : FetchResult) :
+    register_lookup PC σ.(sregs) = pc ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    mstate_interp σ -∗
+    tlb_inv_pt root_ppn -∗
+    instr_bytes pc r ==∗
+    ∃ σf : mstate,
+      ⌜ exec (fetch tt) σ = Some (r, σf) ⌝ ∗
+      ⌜ σf.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ forall rr, register_beq rr tlb = false ->
+          register_lookup rr σf.(sregs) = register_lookup rr σ.(sregs) ⌝ ∗
+      mstate_interp σf ∗
+      tlb_inv_pt root_ppn.
+  Proof. exact (s_regime_fetch (kpt_regime root_ppn) σ pc r). Qed.
+
+  Lemma wp_instr_s_tlbinv_pt (root_ppn : mword 44) (γ : gname) Φ
+      (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
+    smode_config γ dq -∗
+    tlb_inv_pt root_ppn -∗
+    PC ↦ᵣ pc -∗
+    instr pc is_rvc i -∗
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
+       ∃ (s_exec : mstate),
+         ⌜ exec (execute i)
+                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
+                                     (if is_rvc then 2 else 4)))
+             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
+         mstate_interp s_exec ∗
+         (smode_config γ dq -∗
+          tlb_inv_pt root_ppn -∗
+          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof. exact (wp_instr_s_regime (kpt_regime root_ppn) γ Φ pc is_rvc i (dq:=dq)). Qed.
+
+  Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44) Φ
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_inv_pt root_ppn -∗
+    PC ↦ᵣ pc -∗
+    instr pc is_rvc i -∗
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       tlb_inv_pt root_ppn -∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
+       ∃ (s_exec : mstate),
+         ⌜ exec (execute i)
+                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
+                                     (if is_rvc then 2 else 4)))
+             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
+         mstate_interp s_exec ∗
+         (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    exact (wp_instr_s_config_regime (kpt_regime root_ppn) Φ pc is_rvc i
+             mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 
 End SmodeCorePt.

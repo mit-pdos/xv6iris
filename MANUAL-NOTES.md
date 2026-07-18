@@ -23,6 +23,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
 - start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
 - userret: tricky state at second sfence.vma: new page table but old TLB contents
+- kpt_regime: unified Bare + Sv39 page-table configurations
 
 Big things that still need to be done/explored:
 

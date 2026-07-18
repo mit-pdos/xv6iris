@@ -404,10 +404,39 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
         (`wp_instr_s_tlbinv_pt`, `wp_instr_s_config_tlbinv_pt`,
         `tlb_inv_pt_fetch`) become Definitions instantiating
         `kpt_regime` — zero downstream churn, sweep unaffected.
+     b'. STATUS: (a) and (b) are DONE (SRegime.v; SmodeCorePt.v now proves
+        the generic `s_regime_fetch` / `wp_instr_s_regime` /
+        `wp_instr_s_config_regime`, with the old names as restatement
+        Lemmas at `kpt_regime` closed by `exact` — conversion through the
+        record projection; full build green, zero downstream churn).  The
+        generic fetch proof got SHORTER: `sr_absorb`'s `pmp_grant_facts`
+        conjunct replaced every open-peel-reseal block and the
+        L1pmp*/L2pmp* backwards transports.
      c. Leaf sweep (script-assisted, file-by-file like previous sweeps):
         WpSmodePtLeaves/Alu/Ctl/Btype/Mem/MemWrap/Lock generalize over R;
         old names re-instantiated at `kpt_regime` so every current
-        consumer compiles untouched.  (WpSmodePtUart stays kpt-specific
+        consumer compiles untouched.  Wrapper recipe (validated on the
+        engines): the generic lemma gets the new name; the old name is a
+        RESTATEMENT Lemma (verbatim original statement) closed by `exact
+        (<generic> (kpt_regime root_ppn) <explicit binders>)` — never a
+        Definition (implicit `dq` would become positional and churn every
+        call site).  TWO REAL TECHNICAL POINTS found scoping the sweep,
+        both in the DATA leaves: (i) they peel the satp VALUE from
+        `tlb_inv_pt` and feed `Lsatp_pc`/`Hmode : Mode=Sv39` to the vmem
+        towers — an opaque `sr_inv` cannot be peeled, and Bare has a
+        different mode value.  The towers need those premises only to
+        drive `get_transformed_data_addr` (the pointer-masking effective-
+        address transform, which reads the satp mode but is the IDENTITY
+        whenever PMM is Disabled): generalize the towers to take the
+        transform's exec OUTCOME as a hypothesis (`Hgta : exec
+        (get_transformed_data_addr …) s = Some (ea, s)`), tower-style like
+        the translate outcome — then prove two tiny dischargers, Sv39 and
+        Bare, of that fact from PMM-off (mode-independent conclusion).
+        (ii) the post-translate PMP/PMA facts at `s_tr` currently come
+        from the same peel + `Hprestr` transports — they now come straight
+        from `sr_absorb`'s `pmp_grant_facts` at s_tr (same simplification
+        as the engines); the `matching_pma_region`/PMA-readable facts come
+        from `Hpma_all` at σ + `pt_regs_preserved` transport, unchanged.  (WpSmodePtUart stays kpt-specific
         for now — its DEV absorption needs kpt-shaped premises; add dev
         fields to the record only when a Bare device access is actually
         needed, i.e. when proving panic/printf rather than axiomatizing
