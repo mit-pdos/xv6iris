@@ -487,9 +487,20 @@ before any mechanical sweep.
      zify-hooked `lia` "Cannot find witness" trap applies — use
      compute/congruence and explicit Z.le/lt_trans); `Z.land y 1` via
      a local ones-based helper.
-   - the rest of the kalloc cone file-by-file (acquire/release/holding/
-     kalloc/kfree...), VCgen `_den` sconf wrapper with the first
-     converted function.
+   - NEXT — the spinlock layer over sconf, in dependency order:
+     `wp_holding_sconf` (mycpu + the lk->cpu read; no flips), then
+     `wp_release_sconf` (holding + the zero store + pop_off: its OLD
+     spec pinned intena=0 — the sconf spec instead threads the
+     push_off payload disjunct through and lets pop_off restore;
+     drop the old `ghost_var γc (1/2) b` rider — the arm knowledge now
+     travels as the off-token inside the payload), then
+     `wp_acquire_sconf` (push_off + holding-panic-check + the amoswap
+     Löb loop + fence; its post carries push_off's payload + the
+     locked token — the intr-off region begins here).  Composition
+     uses `po_intena_val_zero/_one` (WpIntenaBits.v) to convert the
+     payload keying.  THEN the rest of the kalloc cone file-by-file
+     (kalloc/kfree/wakeup...), VCgen `_den` sconf wrapper with the
+     first converted function.
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
      stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
      initial 32 slots); adequacy plumbing last; delete `smode_config`
