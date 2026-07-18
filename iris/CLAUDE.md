@@ -911,18 +911,32 @@ Where things landed (the stage descriptions below remain the design rationale):
      enclosing binds regardless of rest), proven at the RAW execR level
      rather than via the folded combinator lemmas; then the two misaligned
      lemmas are `exec_catch_early_return` + that reduction.
-  2. SC (StoreConditional res=true): the vmem_write_addr loop destructs the
-     opaque pure `match_reservation (bits_of_physaddr paddr)` -- true =>
-     write branch (Ok true -> wX rd:=0), false => SC-fail branch
-     (phys_access_check, no write, Ok false -> wX rd:=1).  Needs the
-     StoreConditional physical write chain at User (res=true: reserved
-     write_kind; MemAmo4 has the width-4 reserved primitives
-     `exec_write_ram_cond_4` to clone).
-  3. LR (LoadReserved res=true) aligned success: the physical read chain at
-     User for the reserved-acquire read_kind (MemAmo4's
+  2. SC control-flow -- DONE.  `exec_vmem_write_addr_sc` (width-generic,
+     premise-shaped): the aligned StoreConditional loop with the opaque
+     `match_reservation (bits_of_physaddr paddr)` destructed -- true =>
+     the write lands (Ok true), false => reservation lost, no write, access
+     still granted (Ok false), both re-establishing the invariant.
+     REMAINING for SC: discharge its physical premises (mem_write_ea /
+     mem_write_value with the reserved write_kind, and phys_access_check)
+     -- see the reservability note below.
+  3. LR (LoadReserved res=true): the vmem_read_addr reduction is DONE
+     (`exec_vmem_read_addr_aligned` is res-generic, handles the
+     load_reservation side effect via the axiom).  REMAINING: the physical
+     read chain at User for the reserved read_kind (MemAmo4's
      `run_read_ram_resacq_4_pin` is the width-4 reserved read primitive to
-     clone); the vmem_read_addr aligned lemma already handles the
-     load_reservation side effect via the axiom.
+     clone) -- see the reservability note.
+     RESERVABILITY NOTE (LR/SC physical discharge): `pma_allows_all`
+     guarantees executable/readable/writable/atomic_support=AMOSwap but
+     NOT `PMA_reservability` -- and the LR/SC pma arms check
+     `reservability <> RsrvNone`.  So on RAM, LR/SC either RETIRE (if the
+     PMA reservability is set) or take an ACCESS FAULT (if RsrvNone) --
+     BOTH safe for totality.  Finishing the physical discharge therefore
+     needs a decision: either (a) pin `PMA_reservability <> RsrvNone` in
+     the bundle's pma facts (then LR/SC always retire, clone MemAmo4's
+     reserved read_kind / conditional write_kind chains at User), or
+     (b) leave it open and prove the retire-or-access-fault disjunction
+     (the fault side reuses the delegated-trap machinery).  The
+     control-flow reductions above are agnostic to this choice.
   4. AMO EXECUTE reduction (execute_AMO): its own pre-translation alignment
      check (misaligned -> E_SAMO_Access_Fault via GlobalMisalignedExceptions_
      amo = AccessFault), then translate + mem_write_ea + mem_read +
