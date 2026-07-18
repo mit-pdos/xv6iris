@@ -289,14 +289,41 @@ before any mechanical sweep.
    smode_config at the END of the sweep, not before.  Keep per-file
    compile times within ~10% (the CLAUDE.md perf rules apply; sie_cap
    adds one iDestruct per instruction).
-6. **VCgen:** lift `wp_vc_block_s`/`_den` onto `sconf` (the block executor
-   steps through the same engines).
-7. **SIE flips (push_off/pop_off):** csrci/csrsi-sstatus leaves that open
-   `intr_inv` across their own step, `sie_ghost_flip` all three pieces, and
-   convert between the sconf disjuncts.  pop_off's restore arm must supply
-   `intr_frame` (its own below-sp stack) and the handler spec — store the
-   spec UNCONDITIONALLY in `intr_inv` at allocation (or carry the persistent
-   `intr_handler_spec` ambient) so flips need not re-prove it.
+6. **DONE (sp-free fragment) — VCgen over sconf (WpSconfVc.v):**
+   `wp_vc_block_s_sconf{,_aux}` re-derive the block-executor recursion
+   over the sconf leaves, guarded by `vblock_no_sp prog = true` (no
+   VScaddi16sp, no rd = sp write): an sp-move re-carves `sie_cap`'s
+   stack bound, so function proofs SPLIT their blocks at sp-moves and
+   use the WpSconfAlu sp-mover leaves between blocks (matching existing
+   prologue/epilogue composition).  The `_den` layer and the vheap/
+   `gpr_matches` plumbing are reused from VcGenS unchanged; a `_den`
+   sconf wrapper lands with the first converted function.
+7. **SIE flips (push_off/pop_off; STARTED — WpSconfCsr.v):**
+   - DONE: `wp_csrr_sstatus_s_sconf` (push_off's intr_get) — works at
+     either arm; the continuation receives the capability DESTRUCTED
+     into its arm PAIRED with ⌜SIE ms = arm-bit⌝ (ghost agreement taken
+     while the tied half is in hand — the `iAssert` in the proof is the
+     pattern).  `exec_execute_csrr_sstatus` is imported from WpPopOff
+     (the WpSmodePtCtl copy is Local) — relocate to a shared csr base
+     when convenient.
+   - TODO — the csrci ('1'→'0') and csrsi ('0'→'1') FLIP leaves.  The
+     missing ingredient is the SIE=1 characterization of the csr write:
+     for `ms' := legalize_sstatus_val ms (sstatus_write_val ms 2)` (and
+     the csrsi dual) prove (a) `SIE ms' = 0` (resp. 1), (b) every
+     `sconf_ms_facts` bit preserved ms→ms', (c) the general (non-collapse)
+     `exec_execute_csrrci_sstatus` variant whose post-state writes ms'
+     (the existing one takes the SIE=0 collapse premise).  WpGprCsrwC's
+     phase machinery + WpIntrBits' testbit toolkit are the ingredients.
+     Then the flip leaf: through the funnel; inside the σf-callback flip
+     mstatus via reg_update, open intrN (mask ⊤∖minstretN allows; intrN
+     is closed at callback time in BOTH arms), `sie_ghost_flip` all
+     three pieces (sconf half + sie_cap quarter + invariant quarter),
+     reseal `intr_inv` at the new bit ('0' reseal needs no handler
+     spec — the guard is vacuous; '1' reseal reuses the persistent spec
+     already in the invariant).  pop_off's csrsi restore consumes the
+     csrr leaf's '1'-payload (trap CSRs + stack bound + intr_inv copy)
+     to build the new sie_cap-'1'; the handler spec is already stored
+     unconditionally in `intr_inv`, so flips never re-prove it.
 8. **Whole functions + boot:** re-derive the function specs' stack
    accounting (below-CURRENT-sp free stack packs into the frame at every
    instruction; the function's own saves above sp stay out — matches the

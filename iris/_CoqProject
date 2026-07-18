@@ -140,6 +140,8 @@ WpSconfMem.v
 WpSconfBtype.v
 WpSconfCtl.v
 WpSconfLock.v
+WpSconfVc.v
+WpSconfCsr.v
 WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
