@@ -92,6 +92,8 @@ PtFetchGen.v
 TrampStepPt.v
 TransPt.v
 UserretPt.v
+UserretEntryPt.v
+UserretAllPt.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
