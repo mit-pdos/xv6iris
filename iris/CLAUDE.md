@@ -306,7 +306,18 @@ before any mechanical sweep.
      pattern).  `exec_execute_csrr_sstatus` is imported from WpPopOff
      (the WpSmodePtCtl copy is Local) — relocate to a shared csr base
      when convenient.
-   - TODO — the csrci ('1'→'0') and csrsi ('0'→'1') FLIP leaves.  The
+   - DONE — the csrci ('1'→'0') FLIP leaf `wp_csrci_sstatus_s_sconf`
+     (WpSconfCsr.v), modulo ONE named pure premise `csrci_sie_flip_ok`
+     (below): the funnel callback flips mstatus via the new
+     non-collapse `exec_execute_csrrci_sstatus_gen`, opens intrN,
+     `sie_ghost_flip`s all three pieces to '0', reseals `intr_inv` at
+     b:='0' (vacuous handler guard), and hands the caller the freed
+     '1'-arm payload; the '0' arm is the idempotent write via
+     `legalize_sie_clear_idem`.  The continuation returns the bare '0'
+     quarter + the old-bit report disjunct.
+   - TODO — the csrsi ('0'→'1') restore leaf (mirror choreography;
+     consumes the payload to rebuild sie_cap-'1'; needs the dual
+     `csrsi_sie_flip_ok` characterization) and the pure lemma:  The
      missing ingredient is the SIE=1 characterization of the csr write:
      for `ms' := legalize_sstatus_val ms (sstatus_write_val ms 2)` (and
      the csrsi dual) prove (a) `SIE ms' = 0` (resp. 1), (b) every
