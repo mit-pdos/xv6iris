@@ -284,3 +284,172 @@ Proof.
   rewrite Z_mod_mult.
   vm_compute; reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* Decode-wf TRANSPORT: turn the recorded JAL/BTYPE immediate-evenness    *)
+(* and the fetch alignment into [jump_to]'s target-bit-0 premise.         *)
+(*   wf_imm_even_{21,13}   : the decodable_u payload fact, as mod-2       *)
+(*   aligned_even          : a fetched pc is even (align check at 2 or 4) *)
+(*   add_sext_even_64_{21,13} : even pc + sign-extended even imm has      *)
+(*                              bit 0 clear -- exactly jump_to's assert.  *)
+(* ===================================================================== *)
+(* mod-2 helpers *)
+Lemma mod2_wrap (n : N) (z : Z) :
+  (1 <= Z.of_N n)%Z ->
+  bv_wrap n z mod 2 = z mod 2.
+Proof.
+  intro Hn. unfold bv_wrap, bv_modulus.
+  symmetry. apply Znumtheory.Zmod_div_mod; [lia | | ].
+  - apply Z.pow_pos_nonneg; lia.
+  - exists (2 ^ (Z.of_N n - 1)).
+    rewrite Z.mul_comm.
+    rewrite <- Z.pow_succ_r by lia. f_equal. lia.
+Qed.
+
+Lemma mod2_swrap (n : N) (z : Z) :
+  (2 <= Z.of_N n)%Z ->
+  bv_swrap n z mod 2 = z mod 2.
+Proof.
+  intro Hn. unfold bv_swrap.
+  set (E := bv_half_modulus n) in *.
+  assert (Hpow : 2 ^ Z.of_N n = 2 ^ (Z.of_N n - 1) * 2).
+  { rewrite Z.mul_comm. rewrite <- Z.pow_succ_r by lia. f_equal. lia. }
+  assert (HE : E mod 2 = 0).
+  { unfold E, bv_half_modulus, bv_modulus.
+    rewrite Hpow. rewrite Z_div_mult by lia.
+    apply Z.mod_divide; [lia|].
+    exists (2 ^ (Z.of_N n - 1 - 1)).
+    rewrite Z.mul_comm.
+    rewrite <- Z.pow_succ_r by lia. f_equal. lia. }
+  rewrite Zminus_mod.
+  rewrite mod2_wrap by lia.
+  rewrite HE. rewrite Z.sub_0_r.
+  rewrite Zmod_mod.
+  rewrite Zplus_mod, HE, Z.add_0_r.
+  rewrite !Zmod_mod.
+  reflexivity.
+Qed.
+
+(* bit 0 of a 64-bit word, as unsigned arithmetic *)
+Lemma access0_unsigned_64 (w : mword 64) :
+  bv_unsigned (access_vec_dec w 0) = bv_unsigned w mod 2.
+Proof.
+  unfold access_vec_dec, access_mword_dec.
+  unfold MachineWord.MachineWord.slice.
+  cbv [get_word].
+  rewrite bv_extract_unsigned.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap.
+  change (bv_modulus (MachineWord.MachineWord.Z_idx 1)) with 2.
+  reflexivity.
+Qed.
+
+Lemma access0_unsigned_21 (w : mword 21) :
+  bv_unsigned (access_vec_dec w 0) = bv_unsigned w mod 2.
+Proof.
+  unfold access_vec_dec, access_mword_dec.
+  unfold MachineWord.MachineWord.slice.
+  cbv [get_word].
+  rewrite bv_extract_unsigned.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap.
+  change (bv_modulus (MachineWord.MachineWord.Z_idx 1)) with 2.
+  reflexivity.
+Qed.
+
+Lemma access0_unsigned_13 (w : mword 13) :
+  bv_unsigned (access_vec_dec w 0) = bv_unsigned w mod 2.
+Proof.
+  unfold access_vec_dec, access_mword_dec.
+  unfold MachineWord.MachineWord.slice.
+  cbv [get_word].
+  rewrite bv_extract_unsigned.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap.
+  change (bv_modulus (MachineWord.MachineWord.Z_idx 1)) with 2.
+  reflexivity.
+Qed.
+
+(* the JAL/BTYPE decode-wf fact, read back as evenness *)
+Lemma wf_imm_even_21 (imm : mword 21) :
+  eq_vec (access_vec_dec imm 0) ('b"0") = true ->
+  bv_unsigned imm mod 2 = 0.
+Proof.
+  intro H. apply eq_vec_true_iff in H.
+  apply (f_equal bv_unsigned) in H.
+  rewrite access0_unsigned_21 in H. rewrite H.
+  vm_compute; reflexivity.
+Qed.
+
+Lemma wf_imm_even_13 (imm : mword 13) :
+  eq_vec (access_vec_dec imm 0) ('b"0") = true ->
+  bv_unsigned imm mod 2 = 0.
+Proof.
+  intro H. apply eq_vec_true_iff in H.
+  apply (f_equal bv_unsigned) in H.
+  rewrite access0_unsigned_13 in H. rewrite H.
+  vm_compute; reflexivity.
+Qed.
+
+(* an even 64-bit sum: pc + sign_extend' imm, both even *)
+Lemma add_sext_even_64_21 (pc : mword 64) (imm : mword 21) :
+  bv_unsigned pc mod 2 = 0 ->
+  bv_unsigned imm mod 2 = 0 ->
+  eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true.
+Proof.
+  intros Hpc Himm.
+  apply eq_vec_true_iff. apply bv_eq.
+  rewrite access0_unsigned_64.
+  unfold add_vec, word_binop, with_word', to_word, get_word.
+  unfold SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  rewrite mod2_wrap by (cbn; lia).
+  unfold sign_extend', Operators_mwords.sign_extend, exts_vec, to_word, get_word.
+  unfold MachineWord.MachineWord.sign_extend, Values.to_word.
+  rewrite bv_sign_extend_unsigned.
+  rewrite Zplus_mod.
+  rewrite mod2_wrap by (cbn; lia).
+  unfold bv_signed.
+  rewrite mod2_swrap by (cbn; lia).
+  rewrite Hpc, Himm.
+  vm_compute; reflexivity.
+Qed.
+
+Lemma add_sext_even_64_13 (pc : mword 64) (imm : mword 13) :
+  bv_unsigned pc mod 2 = 0 ->
+  bv_unsigned imm mod 2 = 0 ->
+  eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true.
+Proof.
+  intros Hpc Himm.
+  apply eq_vec_true_iff. apply bv_eq.
+  rewrite access0_unsigned_64.
+  unfold add_vec, word_binop, with_word', to_word, get_word.
+  unfold SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  rewrite mod2_wrap by (cbn; lia).
+  unfold sign_extend', Operators_mwords.sign_extend, exts_vec, to_word, get_word.
+  unfold MachineWord.MachineWord.sign_extend, Values.to_word.
+  rewrite bv_sign_extend_unsigned.
+  rewrite Zplus_mod.
+  rewrite mod2_wrap by (cbn; lia).
+  unfold bv_signed.
+  rewrite mod2_swrap by (cbn; lia).
+  rewrite Hpc, Himm.
+  vm_compute; reflexivity.
+Qed.
+
+(* a fetched pc is even: the fetch alignment check passed at width 2 or 4 *)
+Lemma aligned_even (va : mword 64) (w : Z) :
+  (2 | w) -> 0 < w ->
+  is_aligned_vaddr (Virtaddr va) w = true ->
+  bv_unsigned va mod 2 = 0.
+Proof.
+  intros Hdvd Hw Hal.
+  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
+  rewrite (uint_unsigned_n _) in Hal.
+  rewrite Z.rem_mod_nonneg in Hal; [ | apply bv_unsigned_in_range | lia ].
+  rewrite (Znumtheory.Zmod_div_mod 2 w) by (assumption || lia).
+  rewrite Hal. reflexivity.
+Qed.

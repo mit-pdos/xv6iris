@@ -538,10 +538,19 @@ files or copy code from them; build fresh from the live tree.
      `decodable_c` needs NO strengthening: the compressed control-flow
      expansions build their JAL/BTYPE immediates VISIBLY aligned
      (`sign_extend' 21 (concat_vec imm 'b"0")` inside execute_C_J etc.),
-     so the invariant is syntactic at the expansion site. USE-side still
-     to build (classification-time): bit0-of-`sign_extend'` and
-     bit0-of-`add_vec` transport lemmas to turn (pc even ∧ imm even) into
-     jump_to's target-bit0 premise. The Zbb/Zbc/Zicond/Zimop
+     so the invariant is syntactic at the expansion site. The USE-side
+     transport kit is DONE (UserBits.v): `wf_imm_even_{21,13}` (the
+     decodable_u payload fact as mod-2), `aligned_even` (a fetched pc is
+     even — the align check at width 2 or 4), and
+     `add_sext_even_64_{21,13}` (even pc + sign-extended even imm ⇒
+     target bit 0 clear — EXACTLY jump_to's assert, i.e. the Halign
+     premise of `exec_execute_{JAL,BTYPE}_total`). Supporting mod-2 kit
+     there: `mod2_wrap`/`mod2_swrap` (bv_wrap/bv_swrap preserve parity),
+     `access0_unsigned_{64,21,13}` (bit 0 as `mod 2`). Recipe for any
+     future mword-bit fact: go to `bv_unsigned` arithmetic (KptPt-style
+     unfolding: access_vec_dec = `bv_extract i 1` under casts,
+     concat/add/sext = `bv_concat/bv_add/bv_sign_extend`), then plain Z
+     mod arithmetic — never bit-blast at word level. The Zbb/Zbc/Zicond/Zimop
      families are covered too (`exec_execute_{ZBB_RTYPE,ZBB_RTYPEW,CLMUL,
      CLMULH,CLMULR,REV8,RORI,RORIW,ZIMOP_MOP_R,ZIMOP_MOP_RR,
      ZICOND_RTYPE}_total`) — their extension gates live at DECODE time,
@@ -582,6 +591,23 @@ files or copy code from them; build fresh from the live tree.
      `exec_mem_read_fetch_{4,2}_U`; UserBits.v: page-window arithmetic —
      GOTCHA: do bv-level steps by etransitivity/exact, goal rewrites of
      width-carrying bv lemmas miss on implicit-width spellings).
+     CHECKPOINT (resume here): every prerequisite for the non-memory
+     classification is now in place — the six payload arms (UserArms.v +
+     the wrapper's inlined interrupt arm), per-family execute facts for
+     every non-memory `decodable_u` family (UserExecFacts.v), the
+     decode-wf payload invariant + transport kit (DecodeSetU.v /
+     UserBits.v), the progress composers (base/base-redirect/RVC), and
+     `upt_fetch_instr`. The natural next file is `UserClassify.v`: per
+     family, discharge the arm's obligation at the post-increment state
+     (fetch via `upt_fetch_instr` → decode via `decode_total_u_set` +
+     `agree_u` → the family's execute fact → the matching progress
+     composer), then assemble `active_class` and with it
+     `user_step_obligation_active`. Still missing before FULL assembly:
+     Zicbo*/CSR-at-U/SSAMOSWAP execute facts, ~24 C_* expansion facts
+     (3-line pure-returnM each), the JALR bit0-of-`update_vec_dec`
+     premise discharge, the memory arms (LOAD/STORE/AMO/LR/SC — WAIT for
+     the Svadu/ADUE page-table rework), and the fetch-fault flavor
+     corollaries' payload wiring (also ADUE-coupled).
      LEFT — discharging `active_class`: the total classification. Per
      machine case, produce the run_hart_active reduction and feed the
      matching arm: fetch outcome (fetchable → `upt_fetch_instr`; else a
