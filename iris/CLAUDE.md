@@ -538,11 +538,14 @@ Where things landed (the stage descriptions below remain the design rationale):
   PtTreeAdue §5 gained the Err + non-canonical fronts.
 - *Stage 6*: **UserFetchPt.v** — `user_pt_fetch_instr` (4-aligned fetch over
   the bundle, absorbed-outcome shape, no A/D-preset premises) +
-  `udata_fetch_word`/`udata_fetch_mem_read`.  STILL OPEN: the 2-aligned
-  RVC / split / page-straddling fetch geometry (each half translates
-  independently through the absorption), and composing the fault wrappers
-  into fetch-level `F_Error` facts (UserFetch §1–§5's premise-shaped heads
-  survive and are the glue).
+  `udata_fetch_word`/`udata_fetch_mem_read`, and §4 `user_pt_fetch_fault`:
+  the ONE fetch-fault composer over the flavor predicate
+  `u_fetch_fault_flavor` (non-canonical / unmapped / fetch-denied) —
+  `F_Error (E_Fetch_Page_Fault, pc)`, σ unchanged, bundle borrowed; the
+  odd-pc align fault stays PT-free (`exec_fetch_align_fault`).  STILL
+  OPEN: the 2-aligned RVC / split / page-straddling fetch geometry (each
+  half translates independently through the absorption; UserFetch §1–§5's
+  premise-shaped heads survive and are the glue).
 - *Stage 7*: `user_inv` and the whole obligation chain (UserExec / UserTrap /
   UserStep / UserStepFull / UserCompute / UserArms) close over `pt : uptd`
   and `user_pt_inv pt`.  UserPt.v DELETED; UserTranslate slimmed to §1;
@@ -554,10 +557,12 @@ Where things landed (the stage descriptions below remain the design rationale):
   `udata_own_store_8`), and the composers `user_pt_load_data_8` /
   `user_pt_store_data_8` (translate absorbed + physical access + bundle
   re-established; a store just re-picks the existential byte map).
-  STILL OPEN: widths 4/2/1 (mechanical clones — need width-matched
-  pma/read/write-plain bricks, some exist in WpLoad/RiscvFetchExec/
-  WpMmodeLeafBase, the rest are 10-line clones), AMO/LR/SC, and the
-  misaligned-access fault flavors (instruction-level, no translation).
+  Width 4 (LW/SW) is DONE the same way (§7: local width-4 pma/write-plain
+  bricks + the transformed chains and composers `user_pt_{load,store}_data_4`).
+  STILL OPEN: widths 2/1 (same mechanical transform; need read_ram_plain_1
+  + write_ram_plain_2/1 clones and off2 bounds; width-1 alignment is
+  trivial), AMO/LR/SC, and the misaligned-access fault flavors
+  (instruction-level, no translation).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process
