@@ -227,3 +227,73 @@ Section UserFetchPtOk.
   Qed.
 
 End UserFetchPtOk.
+
+(* ===================================================================== *)
+(* §4 THE FETCH-FAULT COMPOSER: at a 4-aligned pc whose translation        *)
+(*    faults (non-canonical / unmapped / fetch-denied), the fetch raises  *)
+(*    E_Fetch_Page_Fault with the state UNCHANGED, the bundle merely      *)
+(*    borrowed.  (The odd-pc E_Fetch_Addr_Align case never translates --  *)
+(*    [exec_fetch_align_fault], UserFetch §2, is PT-free.)                *)
+(* ===================================================================== *)
+
+(* the ways a 4-aligned user fetch can fault, as ONE flavor predicate *)
+Definition u_fetch_fault_flavor (tfp : mword 44)
+    (um : gmap (mword 27) (mword 64)) (va : mword 64) : Prop :=
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true
+  \/ (neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+      um !! svpn_of va = None /\
+      svpn_of va <> tramp_vpn /\ svpn_of va <> tf_vpn)
+  \/ (neq_vec (bits_of_virtaddr (Virtaddr va))
+        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false /\
+      exists w, upt_leaf_at tfp um (svpn_of va) w /\
+                uleaf_denied (InstructionFetch tt) w).
+
+Section UserFetchPtFault.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma user_pt_fetch_fault (uroot tfp : mword 44)
+      (um : gmap (mword 27) (mword 64)) (va : mword 64) (σ : mstate) :
+    u_fetch_fault_flavor tfp um va ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    register_lookup PC σ.(sregs) = va ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um -∗
+    ⌜exec (fetch tt) σ = Some (F_Error (E_Fetch_Page_Fault tt, va), σ)⌝.
+  Proof.
+    intros Hflavor Hal Lpc Hhtif Hcp HSXL Hall.
+    iIntros "Hri Hgh Hinv".
+    iAssert (⌜exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+              = Some (Err (E_Fetch_Page_Fault tt, tt), σ)⌝)%I as %Htr.
+    { destruct Hflavor as
+        [ Hnc | [ (Hcanon & Hnone & Hnt & Hntf) | (Hcanon & w & Hleaf & Hden) ] ].
+      - iApply (utlb_inv_pt_translateAddr_u_noncanon (InstructionFetch tt)
+                  uroot tfp um va (E_Fetch_Page_Fault tt) σ Hnc Hcp HSXL
+                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
+                  (exec_is_shadow_stack_fetch σ)
+                  ltac:(unfold translationException; cbn match; apply exec_returnm)
+                  with "Hri Hinv").
+      - iApply (utlb_inv_pt_translateAddr_u_unmapped (InstructionFetch tt)
+                  uroot tfp um va (E_Fetch_Page_Fault tt) σ
+                  Hnone Hnt Hntf Hcanon Hhtif Hcp HSXL
+                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
+                  (exec_is_shadow_stack_fetch σ) Hall
+                  ltac:(unfold translationException; cbn match; apply exec_returnm)
+                  with "Hri Hgh Hinv").
+      - iApply (utlb_inv_pt_translateAddr_u_denied (InstructionFetch tt)
+                  uroot tfp um w va (E_Fetch_Page_Fault tt) σ
+                  Hleaf Hden Hcanon Hhtif Hcp HSXL
+                  (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
+                  (exec_is_shadow_stack_fetch σ) Hall
+                  ltac:(unfold translationException; cbn match; apply exec_returnm)
+                  with "Hri Hgh Hinv"). }
+    iPureIntro.
+    exact (exec_fetch_fault_4 σ va Lpc (E_Fetch_Page_Fault tt) Hal Htr).
+  Qed.
+
+End UserFetchPtFault.
