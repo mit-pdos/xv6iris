@@ -344,12 +344,17 @@ End UptTreeInv.
 Section UptTranslateIris.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  Context (acc : MemoryAccessType mem_payload).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
+  (* PRIVILEGE-GENERIC: the mode dispatch comes in as a callback premise
+     ([Htmk] -- the satp value lives inside the invariant, so the caller
+     cannot supply the closed [translationMode] fact directly); Supervisor
+     callers pass [exec_translationMode_S_sv39], User callers
+     [exec_translationMode_U_sv39]. *)
   Lemma utlb_inv_pt_translateAddr (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (w va pa : mword 64) (σ : mstate) :
     (forall (a d : mword 1) (mxr do_sum : bool),
-       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad w a d)) ->
+       pte_check_ok acc p mxr do_sum (pte_set_ad w a d)) ->
     upt_leaf_at tfp um (svpn_of va) w ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -359,10 +364,13 @@ Section UptTranslateIris.
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = Supervisor ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-      = Some (Supervisor, σ) ->
+    register_lookup cur_privilege σ.(sregs) = p ->
+    (forall satp0 : mword 64,
+       register_lookup satp σ.(sregs) = satp0 ->
+       _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+       exec (translationMode p) σ = Some (Sv39, σ)) ->
+    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) p) σ
+      = Some (p, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ==∗
@@ -374,7 +382,7 @@ Section UptTranslateIris.
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
-    intros Hchk Hleaf Hcanon Hout Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    intros Hchk Hleaf Hcanon Hout Hmisa Hmenv Hhtif Hcp Htmk Heff Hss Hall.
     iIntros "Hri Hgh Hinv".
     iDestruct "Hinv" as (usatp tlbvec t)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hwf & %Hpmawimpl & Ht & Hpmp)".
@@ -404,9 +412,9 @@ Section UptTranslateIris.
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
     pose proof (Hpmarimpl _ Hall) as Hpmar.
-    assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
-      by exact (exec_translationMode_S_sv39 usatp σ HSXL Hsatpv Hmode).
-    iMod (ptree_translateAddr_own acc Supervisor uroot t w va pa usatp
+    assert (Htm : exec (translationMode p) σ = Some (Sv39, σ))
+      by exact (Htmk usatp Hsatpv Hmode).
+    iMod (ptree_translateAddr_own acc p uroot t w va pa usatp
             tlbvec p2 p1 a0 d0 σ
             Hchk (upt_variant tfp um (svpn_of va) w Hwf Hleaf) Hcanon Hout Hbase Hmaps Htlbok
             Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
@@ -462,17 +470,19 @@ Section UptTranslateIrisAcc.
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
-    intros Hvpn Hcanon Hid.
+    intros Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
     { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    apply (utlb_inv_pt_translateAddr (InstructionFetch tt) uroot tfp um pte_tramp va pa σ
+    apply (utlb_inv_pt_translateAddr (InstructionFetch tt) Supervisor uroot tfp um pte_tramp va pa σ
              (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum)
              (or_introl (conj Hvpn eq_refl))
-             Hcanon Hout).
+             Hcanon Hout Hmisa Hmenv Hhtif Hcp
+             (fun satp0 Hs Hm => exec_translationMode_S_sv39 satp0 σ HSXL Hs Hm)
+             Heff Hss Hall).
   Qed.
 
   Lemma utlb_inv_pt_translateAddr_tf_load (uroot tfp : mword 44)
@@ -500,17 +510,19 @@ Section UptTranslateIrisAcc.
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
-    intros Hvpn Hcanon Hid.
+    intros Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (pte_tf tfp : mword 64))) : mword 44)) : mword 44)
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
     { rewrite <- (tf_variant_ppn tfp ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    apply (utlb_inv_pt_translateAddr (Load Data) uroot tfp um (pte_tf tfp) va pa σ
+    apply (utlb_inv_pt_translateAddr (Load Data) Supervisor uroot tfp um (pte_tf tfp) va pa σ
              (fun a d mxr do_sum => tf_variant_check_load tfp a d mxr do_sum)
              (or_intror (or_introl (conj Hvpn eq_refl)))
-             Hcanon Hout).
+             Hcanon Hout Hmisa Hmenv Hhtif Hcp
+             (fun satp0 Hs Hm => exec_translationMode_S_sv39 satp0 σ HSXL Hs Hm)
+             Heff Hss Hall).
   Qed.
 
   Lemma utlb_inv_pt_translateAddr_tf_store (uroot tfp : mword 44)
@@ -538,17 +550,19 @@ Section UptTranslateIrisAcc.
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
   Proof.
-    intros Hvpn Hcanon Hid.
+    intros Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (pte_tf tfp : mword 64))) : mword 44)) : mword 44)
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
     { rewrite <- (tf_variant_ppn tfp ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    apply (utlb_inv_pt_translateAddr (Store Data) uroot tfp um (pte_tf tfp) va pa σ
+    apply (utlb_inv_pt_translateAddr (Store Data) Supervisor uroot tfp um (pte_tf tfp) va pa σ
              (fun a d mxr do_sum => tf_variant_check_store tfp a d mxr do_sum)
              (or_intror (or_introl (conj Hvpn eq_refl)))
-             Hcanon Hout).
+             Hcanon Hout Hmisa Hmenv Hhtif Hcp
+             (fun satp0 Hs Hm => exec_translationMode_S_sv39 satp0 σ HSXL Hs Hm)
+             Heff Hss Hall).
   Qed.
 
 End UptTranslateIrisAcc.

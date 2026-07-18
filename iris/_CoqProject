@@ -76,6 +76,7 @@ WpSmodePtMemWrap.v
 WpSmodePtLock.v
 WpSmodePtUart.v
 UptTree.v
+UserPtTree.v
 PtFetchGen.v
 TrampStepPt.v
 TransPt.v
