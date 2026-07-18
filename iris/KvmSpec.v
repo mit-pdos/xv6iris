@@ -123,27 +123,29 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition walk_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (lkA fl : mword 64) (m : gmap regidx (mword 64)) (t : ptree) (n : nat),
-      let va := m !!! Regidx (mword_of_int 11) in
+       (lkA fl : mword 64) (mm : gmap regidx (mword 64)) (t : ptree)
+       (m : gmap (mword 27) (mword 64)) (n : nat),
+      let va := mm !!! Regidx (mword_of_int 11) in
       let vpn := svpn_of va in
       ⌜(22 <= n)%nat⌝ -∗
-      ⌜m !!! Regidx (mword_of_int 10)
+      ⌜mm !!! Regidx (mword_of_int 10)
          = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
-      ⌜m !!! Regidx (mword_of_int 12) = mword_of_int 1⌝ -∗
+      ⌜mm !!! Regidx (mword_of_int 12) = mword_of_int 1⌝ -∗
       ⌜(uint va < 2 ^ 38)%Z⌝ -∗          (* below MAXVA: no panic arm *)
+      ⌜pt_rep0 t m⌝ -∗   (* the xv6 table shape: V=1 slots really descend *)
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
       sr_inv R -∗ kernel_text -∗
       pc_is (mword_of_int KernelSyms.walk) -∗
-      gpr_file m -∗ stack_own (m !!! Regidx csp_rs1) n -∗
+      gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ lkA fl -∗
       ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
-        pc_is (update_vec_dec (m !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
-        gpr_file mr -∗ stack_own (m !!! Regidx csp_rs1) n -∗
+        pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
+        gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
-        ⌜callee_saved m mr⌝ -∗
+        ⌜callee_saved mm mr⌝ -∗
         ⌜ptree_same_rep0 t t'⌝ -∗
         ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)   (* alloc failed *)
           \/ (exists p2 p1 w0,

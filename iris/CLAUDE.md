@@ -620,33 +620,75 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    sfence zeroes it anyway, so after the `csrw satp` the proof builds
    `tlb_inv_pt` directly from `pt_rep t kvm_map` + `tlb_ok_pt_empty`,
    and the second sfence is an ordinary Sv39 step.
-2. **The pure construction layer** (PtBuild.v, no regime dependence):
-   `pt_empty_node ppn` (all-zero ents, no kids; every idx blocks —
-   `pte_invalid_zero`), `pt_graft t path c` via `pt_upd_kid`/`pt_upd_ent`
-   (write a pointer PTE into an invalid slot + attach a zeroed child):
-   preserves maps/blocks for ALL vpns (`ptree_same_rep`) and makes
-   `ptree_level0` progress for the target vpn; `ptree_set_leaf0` (leaf
-   write through a `ptree_level0` path — `ptree_set_leaf` generalized to
-   not require the old word to be a valid leaf) with maps_self /
-   maps_other / blocks_other; `pt_rep` insertion:
-   `pt_rep t m → ptree_level0 t vpn … → classify(w') → pt_rep (set_leaf0
-   t vpn w') (<[vpn:=w']>m)`.  Iris side: `zero_page_to_node` (4096 ↦ₘ 0
-   bytes at a page_valid base ⇒ `ptree_own 0` of the empty node — the
-   byte-to-↦₈ regroup), `ptree_own_graft` (own t + own child ⇒ own of the
-   grafted tree), `ptree_own_level0_upd` (peel/restore the L0 slot cell
-   through a level0 path).
-3. **wp_walk**: fuel-free (the loop is 2 iterations, unrolled); per
-   iteration: srl/andi/slli/add address arithmetic, ld the slot (through
-   the regime + the slot's ↦₈ from `ptree_own_path`-style accessors),
-   V-bit branch; invalid arm: kalloc (existing spec at the regime) +
-   memset + `zero_page_to_node` + graft + sd of the pointer PTE.  kalloc's
-   null return exits with a0=0 (the spec's left disjunct).
+2. **DONE — the pure construction layer + its Iris side (PtBuild.v).**
+   THE xv6 SHAPE STRENGTHENING: `ptree_blocks` demands only model-
+   invalidity (`pte_invalid`), but xv6's walk tests the V BIT alone — a
+   V=1 reserved-encoding stop word would make the C code descend
+   garbage.  PtBuild therefore works on `ptree_blocks0` (stop word =
+   LITERAL ZERO), `pt_rep0`, `ptree_same_rep0` (bridges
+   `pte_invalid_zero` / `ptree_blocks0_blocks` / `pt_rep0_rep`; KvmSpec
+   states everything on the 0-forms, and walk_spec carries a
+   `⌜pt_rep0 t m⌝` premise — without it a V=1 slot need not have an
+   owned kid and the descend is unprovable).  Contents: §1 pt_rep0/
+   same_rep0/level0/`ptree_maps_level0`/`mappages_pte`/`vpn_at`/
+   `pt_insert_run`; §2 `pt_empty_node` (+`ptree_blocks0_empty`/
+   `pt_rep0_empty`); §3 `ptree_set_leaf0_maps_self` (needs only the
+   level0 path, not a classified old leaf), `ptree_set_leaf0_blocks_
+   other`, `pt_rep0_insert` (the keystone: classified leaf through
+   walk's slot = one map insert); §4 grafting — ext transports
+   (`ptree_maps_ext`/`_ext1`, `ptree_blocks0_ext`/`_ext1`: a vpn's walk
+   facts depend only on its own path), `pt_ptr_pte b := mk_pte b
+   PTE_PTR` (+valid/ptr/`u_next_base` = b), `pt_graft2`/`pt_graft1`
+   (+`pt_graft1_kid`) with projection laws, `ptree_level0_intro`,
+   `pt_graft1_level0` (after the L1 graft the path reaches L0 with a
+   ZERO slot), `pt_graft2_same_rep0`/`pt_graft1_same_rep0`; §5 Iris —
+   `zero_page_to_node` (4096 ↦ₘ-zero bytes at ppn b's page ⇒
+   `ptree_own lvl` of `pt_empty_node b`, any level; via
+   `big_sepL_seq_chunk` + `word_pointsto_intro` + Pt4kWalk's new
+   `page_base_unsigned`/`pa_add_page_slot` address facts),
+   `pt_kids_own_ins` (insert a child under a kid-free index),
+   `ptree_own_slot2_ro`/`slot1_ro` (walk's descend reads),
+   `ptree_own_graft2`/`_graft1` (slot cell out; closing wand takes the
+   rewritten pointer-PTE cell + the zeroed child), and
+   `ptree_own_level0_upd` (mappages' remap-check read + leaf store).
+3. **wp_walk** (NEXT): fuel-free (the loop is 2 iterations, unrolled);
+   per iteration: srl/andi/slli/add address arithmetic, ld the slot
+   (`ptree_own_slot2_ro`/`slot1_ro` cells through the regime-generic ld
+   leaf), V-bit branch; invalid arm: kalloc (existing spec at the
+   regime) + memset (`wp_memset_s_full_kt_r` directly — its post keeps
+   the concrete zero bytes; `wp_memset_page`'s post forgets them) +
+   `zero_page_to_node` + graft + sd of the pointer PTE.  kalloc's null
+   return exits with a0=0 (the spec's left disjunct).  The V-bit
+   dichotomy against the description: prove `pte_invalid_bit0` (bit 0
+   clear ⇒ `pte_invalid`, by making the first `or_boolM` disjunct of
+   `pte_is_invalid` true — do NOT try to invert the opaque exec fact of
+   `pte_valid`); then in the V=1 branch blocks0-arm-1 (w=0) is refuted
+   by the bit, and in the V=0 branch maps/arm-2/3 are refuted by
+   `pte_valid_invalid_excl` — `pt_rep0`'s totality dispatches.  BOTH are
+   DONE (`pte_flags_V_bit0` PtAdBits.v, `pte_invalid_bit0` PtBuild.v).
+   STILL NEEDED (pure, wp_walk-stage): (i) `pte_valid w → pte_ptr w →
+   ext bits 63:54 = 0` — the C descend computes `(w>>10)<<12`, which is
+   `u_next_base w * 4096` ONLY with ext=0; this one DOES invert the
+   exec fact (specialize at `dstateM`, destruct each or/and_boolM
+   boolean with `exec_or_boolM_Some`; the third disjunct nonleaf∧(A∨D∨
+   U∨ext≠0) must be false, nonleaf is true by `pte_ptr` → ext=0);
+   (ii) the address-arithmetic bridges: srl/andi/slli/add computes
+   `u_pte_addr b (vpn_idx lvl (svpn_of va))` from the page-aligned base
+   and va (per level: shifts 30/21/12), and kalloc's page `(pa>>12)<<10
+   |1 = pt_ptr_pte (svpn-of-pa-style ppn)` — abstract bv lemmas, never
+   vm_compute on symbolic words.  NOTE the local xv6-riscv/kernel.asm
+   is 0xe bytes STALE vs kernel-rocq's regenerated dump — read walk's
+   real encodings from the kernel-rocq kinstr records at
+   KernelSyms.walk (function shape: 8-slot frame saving ra,s0..s6;
+   s1=table, s3=va, s6=alloc, s4=shift 30→21, s5=12 loop sentinel;
+   panic arm excluded by the va<2^38 premise; alloc=1 premise kills
+   the !alloc arm; kalloc-null exits through the epilogue with a0=0).
 4. **wp_mappages**: fuel induction over npages (NOT iLöb — bounded loop);
    the loop invariant is the spec's own post at k pages
-   (`pt_rep t_k (pt_insert_run m vpn0 ppn0 perm k)`), each iteration =
-   wp_walk + the remap-check ld (invalid by `pt_rep` + no-remap premise +
-   `ptree_blocks`→`pte_invalid` at the level0 slot) + the leaf sd through
-   `ptree_own_level0_upd`.  Mind `vpn_at`/`mappages_pte` bv-arithmetic:
+   (`pt_rep0 t_k (pt_insert_run m vpn0 ppn0 perm k)`), each iteration =
+   wp_walk + the remap-check ld (the level0 slot holds ZERO by `pt_rep0`
+   + the no-remap premise, so the panic branch falls through) + the leaf
+   sd through `ptree_own_level0_upd` + `pt_rep0_insert`.  Mind `vpn_at`/`mappages_pte` bv-arithmetic:
    prove the step identities (`vpn_at vpn0 (S k)` vs va+PGSIZE·k) as
    abstract bv lemmas, never vm_compute on symbolic words.
 5. **wp_kvmmap** = wp_mappages + the beqz on a0 + `panic_wp` for the -1

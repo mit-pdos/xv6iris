@@ -234,6 +234,89 @@ Proof.
   apply Z.rem_mul. lia.
 Qed.
 
+(* the 4KB page base of ppn [base], as walk/mappages arguments spell it *)
+Lemma page_base_unsigned (base : mword 44) :
+  bv_unsigned (zero_extend' 64 (concat_vec base (zeros' 12 : mword 12)))
+  = bv_unsigned base * 4096.
+Proof.
+  unfold zero_extend', concat_vec.
+  cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
+       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
+       SailStdpp.Values.with_word autocast].
+  cbn.
+  destruct (Z.eq_dec (Z.of_N (44 + 12)) (44 + 12)) as [e | ne]; [| exfalso; exact (ne eq_refl)].
+  rewrite (TypeCasts.cast_Z_refl (H := e)).
+  unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  erewrite bv_zero_extend_unsigned by (cbn; lia).
+  erewrite bv_concat_unsigned by (cbn; lia).
+  change (bv_unsigned (MachineWord.MachineWord.zeros _)) with 0.
+  rewrite Z.lor_0_r.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
+  rewrite Z.shiftl_mul_pow2 by lia.
+  change (2 ^ 12) with 4096. reflexivity.
+Qed.
+
+(* a non-wrapping 64-bit add, as unsigned arithmetic (pa_add's shape) *)
+Lemma pt_add_vec_int_small (a : mword 64) (j : Z) :
+  0 <= j ->
+  bv_unsigned a + j < 18446744073709551616 ->
+  bv_unsigned (add_vec_int a j) = bv_unsigned a + j.
+Proof.
+  intros Hj Hfit.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  assert (Hjv : bv_unsigned (mword_of_int j : mword 64) = j).
+  { unfold mword_of_int, Values.to_word, get_word.
+    cbn.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+    unfold bv_modulus. cbn.
+    pose proof (bv_unsigned_in_range _ a). lia. }
+  rewrite Hjv.
+  apply bv_wrap_small.
+  unfold bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616.
+  pose proof (bv_unsigned_in_range _ a) as Hr.
+  unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616 in Hr.
+  lia.
+Qed.
+
+(* the mword-9 slot index of a small nat *)
+Lemma pt_mword9_of_nat (i : nat) :
+  (i < 512)%nat ->
+  bv_unsigned (mword_of_int (Z.of_nat i) : mword 9) = Z.of_nat i.
+Proof.
+  intros Hi.
+  unfold mword_of_int, Values.to_word, get_word. cbn.
+  rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+  unfold bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 9)) with 512. lia.
+Qed.
+
+(* byte [j] of slot [i] of ppn [base]'s page = byte [i*8+j] of the page *)
+Lemma pa_add_page_slot (base : mword 44) (i j : nat) :
+  (i < 512)%nat -> (j < 8)%nat ->
+  pa_add (zero_extend' 64 (concat_vec base (zeros' 12 : mword 12))) (i * 8 + j)
+  = pa_add (pte_addr_at base (mword_of_int (Z.of_nat i))) j.
+Proof.
+  intros Hi Hj.
+  pose proof (bv_unsigned_in_range _ base) as Hb.
+  unfold bv_modulus in Hb.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 44)) with 17592186044416 in Hb.
+  apply bv_eq. unfold pa_add.
+  rewrite pt_add_vec_int_small;
+    [| lia | (rewrite page_base_unsigned; lia) ].
+  rewrite pt_add_vec_int_small;
+    [| lia
+     | (rewrite pte_addr_at_unsigned; rewrite pt_mword9_of_nat by lia; lia) ].
+  rewrite page_base_unsigned. rewrite pte_addr_at_unsigned.
+  rewrite pt_mword9_of_nat by lia.
+  lia.
+Qed.
+
 (* ===================================================================== *)
 (* 4. currentlyEnabled Ext_Svnapot (level-0 walks probe it; misa.S=1).    *)
 (* ===================================================================== *)
