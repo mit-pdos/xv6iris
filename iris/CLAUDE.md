@@ -268,10 +268,17 @@ before any mechanical sweep.
      old-word disjunct out, nonzero mark reseals).  The lock invariant
      opens around the funnel callback's own step — lockN is disjoint
      from minstretN AND intrN, so the open is arm-blind.
+   - DONE: the SP-MOVERS (WpSconfAlu.v): the cap engine
+     `wp_gpr_write_s_sconf_cap` takes a caller-supplied TRANSFORMER
+     `(sie_cap γ root m -∗ sie_cap γ root m')` instead of the rd ≠ sp
+     retarget premise; `wp_caddi_sp_s_sconf` / `wp_caddi16sp_s_sconf`
+     on top.  `sie_cap_recarve` (IntrDefs.v) builds the transformer
+     from pure stack splitting ('0' arm is m-blind, only the '1' arm's
+     ≥32-slot bound at the new sp is owed — where function proofs do
+     their stack bookkeeping anyway).
    - TODO, in rough order: sb (width-1 RAM byte store, no alignment
      premise); wp_clw_lockinv_locked (read while holding); Uart
-     accessor-form device leaves; dedicated sp-mover leaves (c.addi sp /
-     c.addi16sp re-carve the sie_cap stack bound); then VCgen (item 6:
+     accessor-form device leaves; then VCgen (item 6:
      wp_vc_block_s_aux re-derived over the funnel — a real recursion
      adaptation, not a wrapper swap) and the function proofs (item 8).  sp-MOVING instructions
      (c.addi sp / c.addi16sp) get dedicated leaves that re-carve

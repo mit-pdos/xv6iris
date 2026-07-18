@@ -345,6 +345,25 @@ Section IntrDefs.
       (∃ n : nat, ⌜ (kv_frame_slots <= n)%nat ⌝ ∗
                   stack_own (m !!! Regidx csp_rs1) n)))%I.
 
+  (* build an sp-MOVING transformer: the '0' arm is m-blind, so a
+     caller only re-carves the '1' arm's stack bound at the new sp
+     (pure [stack_own] splitting, where function proofs already do
+     their stack bookkeeping). *)
+  Lemma sie_cap_recarve (γ : gname) (root_ppn : mword 44)
+      (m m' : gmap regidx (mword 64)) :
+    ( ∀ n : nat, ⌜ (kv_frame_slots <= n)%nat ⌝ -∗
+      stack_own (m !!! Regidx csp_rs1) n -∗
+      ∃ n' : nat, ⌜ (kv_frame_slots <= n')%nat ⌝ ∗
+                  stack_own (m' !!! Regidx csp_rs1) n' ) -∗
+    sie_cap γ root_ppn m -∗ sie_cap γ root_ppn m'.
+  Proof.
+    iIntros "Hcarve [H0 | (Hq & Hinv & Hsepc & Hscause & Hstval & Hstk)]".
+    - iLeft. iExact "H0".
+    - iRight. iFrame "Hq Hinv Hsepc Hscause Hstval".
+      iDestruct "Hstk" as (n) "[%Hn Hstk]".
+      iApply ("Hcarve" $! n with "[%] Hstk"). exact Hn.
+  Qed.
+
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
   Lemma sie_cap_retarget (γ : gname) (root_ppn : mword 44)
       (m m' : gmap regidx (mword 64)) :
