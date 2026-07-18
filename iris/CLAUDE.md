@@ -461,6 +461,23 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
         (`wp_instr_s_tlbinv_pt`, `wp_instr_s_config_tlbinv_pt`,
         `tlb_inv_pt_fetch`) become Definitions instantiating
         `kpt_regime` — zero downstream churn, sweep unaffected.
+     b''. STATUS UPDATE (2026-07-18e): the DATA side of stage (c) is DONE —
+        sr_transform (the third regime field: the pointer-masking
+        effective-address transform is the identity at pmlen 0 in EITHER
+        mode; mode-generic exec_transform_effective_address_mode), every
+        vmem tower (widths 8/4/1 + AMO) takes the transform outcome as
+        the premise Htea instead of satp0/Sv39 hypotheses, and ALL data
+        leaves are regime-generic with kpt_regime restatement wrappers
+        under the old names: wp_{cld,csd}_s_r (Leaves), wp_{ld,sd,clw,lw,
+        csw,sw,sb}_s_r (Mem), wp_{sd_zero,clw_lockinv(+_locked),
+        sw_zero_lockinv,amoswap_lockinv}_..._r (Lock — regime binder Rg
+        there; R is the lock's resource).  The sconf files' tower call
+        sites discharge Htea inline from their own satp facts (interface
+        unchanged).  REMAINING in stage (c): the NON-memory files
+        WpSmodePtAlu/Btype/Ctl — pure renames now (statements swap
+        tlb_inv_pt->sr_inv R, engine calls already generic; use the
+        validated wrapper recipe), plus WpSmodePtMemWrap's _scfg
+        wrappers.  Then stage (d), the kalloc-cone flip.
      b'. STATUS: (a) and (b) are DONE (SRegime.v; SmodeCorePt.v now proves
         the generic `s_regime_fetch` / `wp_instr_s_regime` /
         `wp_instr_s_config_regime`, with the old names as restatement
