@@ -21,6 +21,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - UART ghost append-only log, includes FIFO (uartputc/uartwrite does not wait to flush), ownership proves no race between TX_IDLE check and THR write; should allow concurrent rx + tx
 - user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
 - start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
+- userret: tricky state at second sfence.vma: new page table but old TLB contents
 
 Big things that still need to be done/explored:
 
