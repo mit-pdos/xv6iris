@@ -1167,7 +1167,7 @@ Section UserMemPtAmo.
     iMod (utlb_inv_pt_translateAddr_u (Atomic (AMOSWAP, Data, Data)) uroot tfp um w va
             (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
             Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_amo_nm (register_lookup mstatus σ.(sregs)) User σ Hmprv)
+            (exec_effectivePrivilege_amo_nm AMOSWAP (register_lookup mstatus σ.(sregs)) User σ Hmprv)
             (exec_is_shadow_stack_u_acc (Atomic (AMOSWAP, Data, Data)) σ
                (or_intror (or_intror (or_intror (or_intror (or_intror
                   (ex_intro _ AMOSWAP eq_refl))))))) Hall
@@ -1207,7 +1207,7 @@ Section UserMemPtAmo.
     iExists dv, σ'.
     iSplit; [ iPureIntro; exact Htr | ].
     iSplit; [ iPureIntro | ].
-    { exact (exec_mem_read_amo_4 User PBMT_PMA pa region dv
+    { exact (exec_mem_read_amo_4 AMOSWAP User PBMT_PMA pa region dv
                (register_lookup mstatus σ'.(sregs)) σ'
                Hpmp Hpmam (pa4_aligned _ va Hal) Hrd (proj1 Hwrat) Hamo
                (within_clint_false pa 4 σ' Hnc ltac:(lia))
@@ -1219,7 +1219,7 @@ Section UserMemPtAmo.
                (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
                (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
     iSplit; [ iPureIntro; intros v | ].
-    { exact (exec_mem_write_value_amo_4 User PBMT_PMA pa region v
+    { exact (exec_mem_write_value_amo_4 AMOSWAP User PBMT_PMA pa region v
                (register_lookup mstatus σ'.(sregs)) σ'
                Hpmp Hpmam (pa4_aligned _ va Hal) Hrd (proj1 Hwrat) Hamo
                (within_clint_false pa 4 σ' Hnc ltac:(lia))
