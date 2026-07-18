@@ -234,9 +234,14 @@ before any mechanical sweep.
      `rd <> csp_rs1` everywhere; value-hyp discharges copy VERBATIM —
      use it as the family template).  Exemplars `wp_addi_s_sconf`/
      `wp_cli_s_sconf` live in WpSmodeIntr.v §4.
-   - TODO, in rough order: Mem (data leaves: destructure `sconf` INSIDE
-     the funnel's σf-callback for the translate side conditions, run
-     `tlb_inv_pt_translateAddr_load/store` as today, reassemble);
+   - DONE: **WpSconfMem.v** — the width-8 RVC LOAD/STORE twins
+     (`wp_cld_s_sconf`/`wp_csd_s_sconf`): `sconf` is destructured INSIDE
+     the funnel's σf-callback for the translate side conditions,
+     `tlb_inv_pt_translateAddr_load/store` runs as today, the bundle is
+     reassembled in the continuation.  Spec deltas: the ea/a8/pa alias
+     lets collapse to one `pa`; stores carry NO rd premises and no
+     retarget.  Remaining Mem widths (4/1, base) are mechanical repeats.
+   - TODO, in rough order:
      Btype (fall-through = funnel client; TAKEN branches must hand the
      step's later out for Löb — mirror `wp_cbeqz_taken_s_config`'s
      shape over the funnel); Ctl (Jal/Jalr need a pc-writing sconf
