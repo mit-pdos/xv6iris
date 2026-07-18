@@ -21,7 +21,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt TrampPt.
-Require Import WpGprCsrwB.
+Require Import WpGpr WpMmodeLeafBase WpGprCsrwB.
 Require Import SmodeCore KptTree.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -91,6 +91,55 @@ Section BareFront.
 End BareFront.
 
 (* ===================================================================== *)
+(* §1b The pointer-masking effective-address transform is the IDENTITY    *)
+(*     at pmlen 0, in EITHER translation mode -- the ONE fact the data    *)
+(*     towers need from the mode.                                         *)
+(* ===================================================================== *)
+
+Lemma pm_transform_VA_0 (ea : mword 64) :
+  pm_transform_VA (Virtaddr ea) 0 = Virtaddr ea.
+Proof.
+  unfold pm_transform_VA. f_equal.
+  change (xlen - 0 - 1) with (xlen - 0 - 1).
+  rewrite subrange_id. apply sign_extend'_id.
+Qed.
+
+Lemma pm_transform_PA_0 (ea : mword 64) :
+  pm_transform_PA (Virtaddr ea) 0 = Virtaddr ea.
+Proof.
+  unfold pm_transform_PA. f_equal.
+  rewrite subrange_id. apply zero_extend'_id.
+Qed.
+
+Section TransformFront.
+  Context (acc : MemoryAccessType mem_payload).
+
+  (* mode-GENERIC: with PMM off (pmlen 0) the transform is the identity
+     whatever [translationMode] returns *)
+  Lemma exec_transform_effective_address_mode (md : SATPMode) (ea : mword 64) (s : mstate) :
+    register_lookup cur_privilege s.(sregs) = Supervisor ->
+    exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) Supervisor) s
+      = Some (Supervisor, s) ->
+    exec (get_pmlen acc Supervisor) s = Some (0, s) ->
+    exec (translationMode Supervisor) s = Some (md, s) ->
+    exec (transform_effective_address (Virtaddr ea) acc) s = Some (Virtaddr ea, s).
+  Proof.
+    intros Hcp Heff Hpml Htm.
+    unfold transform_effective_address.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite Hcp.
+    rewrite (exec_bind_Some _ _ _ _ _ Heff).
+    rewrite (exec_bind_Some _ _ _ _ _ Hpml).
+    rewrite (exec_bind_Some _ _ _ _ _ Htm).
+    destruct (generic_eq md Bare);
+      [ rewrite pm_transform_PA_0 | rewrite pm_transform_VA_0 ];
+      apply exec_returnM.
+  Qed.
+
+End TransformFront.
+
+(* ===================================================================== *)
 (* §2 The regime record + the two instances.                              *)
 (* ===================================================================== *)
 
@@ -136,7 +185,16 @@ Section SRegimeDef.
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv;
+    sr_transform : forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
+      s_acc_ok acc ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
+      ⊢ reg_interp σ.(sregs) -∗ sr_inv -∗
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝
   }.
 
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
@@ -213,8 +271,29 @@ Section SRegimeDef.
     iModIntro. iExists σ'. iFrame "Hri Hgh Hinv". iPureIntro. tauto.
   Qed.
 
+  Lemma kpt_transform (root_ppn : mword 44) :
+    forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
+      s_acc_ok acc ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
+      ⊢ reg_interp σ.(sregs) -∗ tlb_inv_pt root_ppn -∗
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝.
+  Proof.
+    intros acc ea σ Hacc Hcp HSXL Heff Hpml.
+    iIntros "Hri Hinv".
+    iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & _)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iPureIntro.
+    exact (exec_transform_effective_address_mode acc Sv39 ea σ Hcp Heff Hpml
+             (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode)).
+  Qed.
+
   Definition kpt_regime (root_ppn : mword 44) : s_regime :=
-    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn).
+    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn) (kpt_transform root_ppn).
 
   (* ------------------------------------------------------------------- *)
   (* The BARE instance (boot: satp Mode = Bare, translation = identity).   *)
@@ -264,6 +343,26 @@ Section SRegimeDef.
     iExists satp0. iFrame "Hsatp Hpmp". iPureIntro. exact Hmode.
   Qed.
 
-  Definition bare_regime : s_regime := SRegime bare_inv bare_absorb.
+  Lemma bare_transform :
+    forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
+      s_acc_ok acc ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
+      ⊢ reg_interp σ.(sregs) -∗ bare_inv -∗
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝.
+  Proof.
+    intros acc ea σ Hacc Hcp HSXL Heff Hpml.
+    iIntros "Hri Hinv".
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iPureIntro.
+    exact (exec_transform_effective_address_mode acc Bare ea σ Hcp Heff Hpml
+             (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode)).
+  Qed.
+
+  Definition bare_regime : s_regime := SRegime bare_inv bare_absorb bare_transform.
 
 End SRegimeDef.
