@@ -260,11 +260,16 @@ before any mechanical sweep.
      LPE/priv/misa side conditions).  Csr/Sret deliberately NOT here:
      sret runs in kernelvec's SIE=0 body, csrci/csrsi ARE the stage-7
      flips.
+   - DONE: the c.ldsp/c.sdsp sp-relative bridges and release's
+     `wp_sd_zero_s_sconf` (WpSconfMem.v).
    - TODO, in rough order: sb (width-1 RAM byte store, no alignment
-     premise); Lock/Uart (accessor-form device leaves); MemWrap's
-     c.ldsp/c.sdsp bridges; dedicated sp-mover leaves (c.addi sp /
-     c.addi16sp re-carve the sie_cap stack bound); then VCgen (item 6)
-     and the function proofs (item 8).  sp-MOVING instructions
+     premise); the three lockinv-coupled Lock leaves + the AMO tower
+     (wp_clw_lockinv/wp_sw_zero_lockinv/wp_amoswap_lockinv — same
+     data-leaf transform, plus the lock-invariant opening); Uart
+     accessor-form device leaves; dedicated sp-mover leaves (c.addi sp /
+     c.addi16sp re-carve the sie_cap stack bound); then VCgen (item 6:
+     wp_vc_block_s_aux re-derived over the funnel — a real recursion
+     adaptation, not a wrapper swap) and the function proofs (item 8).  sp-MOVING instructions
      (c.addi sp / c.addi16sp) get dedicated leaves that re-carve
      `sie_cap`'s stack bound explicitly.
    Watch the import direction: leaf files must import
