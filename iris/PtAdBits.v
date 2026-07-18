@@ -214,6 +214,21 @@ Proof.
   reflexivity.
 Qed.
 
+(* the V flag reads bit 0 of the word: bit 0 clear means V = 0 (what
+   makes the C walk's raw V-bit test agree with the model's classifier) *)
+Lemma pte_flags_V_bit0 (w : mword 64) :
+  Z.testbit (bv_unsigned w) 0 = false ->
+  _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"0" : mword 1).
+Proof.
+  intros Hb.
+  unfold _get_PTE_Flags_V, Mk_PTE_Flags.
+  mw_prep.
+  apply (bv_eq_testbit 1). intros k Hk.
+  assert (k = 0) as -> by lia.
+  zn_norm. repeat tbk_step.
+  replace (0 + 0 + 0) with 0 by lia. exact Hb.
+Qed.
+
 (* a 1-bit machine word is 0 or 1 *)
 Lemma mword1_cases (x : mword 1) :
   x = mword_of_int 0 \/ x = mword_of_int 1.
