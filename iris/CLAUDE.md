@@ -289,8 +289,15 @@ before any mechanical sweep.
    smode_config at the END of the sweep, not before.  Keep per-file
    compile times within ~10% (the CLAUDE.md perf rules apply; sie_cap
    adds one iDestruct per instruction).
-6. **VCgen:** lift `wp_vc_block_s`/`_den` onto `sconf` (the block executor
-   steps through the same engines).
+6. **DONE (sp-free fragment) — VCgen over sconf (WpSconfVc.v):**
+   `wp_vc_block_s_sconf{,_aux}` re-derive the block-executor recursion
+   over the sconf leaves, guarded by `vblock_no_sp prog = true` (no
+   VScaddi16sp, no rd = sp write): an sp-move re-carves `sie_cap`'s
+   stack bound, so function proofs SPLIT their blocks at sp-moves and
+   use the WpSconfAlu sp-mover leaves between blocks (matching existing
+   prologue/epilogue composition).  The `_den` layer and the vheap/
+   `gpr_matches` plumbing are reused from VcGenS unchanged; a `_den`
+   sconf wrapper lands with the first converted function.
 7. **SIE flips (push_off/pop_off):** csrci/csrsi-sstatus leaves that open
    `intr_inv` across their own step, `sie_ghost_flip` all three pieces, and
    convert between the sconf disjuncts.  pop_off's restore arm must supply
