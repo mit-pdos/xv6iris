@@ -42,7 +42,7 @@ Require Import SmodeCore WpSmodeGpr.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Export WpSmodeLeafBase.
 Local Open Scope Z_scope.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.

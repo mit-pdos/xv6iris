@@ -32,7 +32,6 @@ Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Export WpSmodeLoad WpSmodeStore WpSmodeBtype.
 Local Open Scope Z_scope.
 Import Defs.
 

@@ -33,12 +33,6 @@ Require Import WpDecode WpLeafCommon KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import WpSmodeAddiw.
-Require Import WpSmodeItype.
-Require Import WpSmodeJalr.
-Require Import WpSmodeRtype.
-Require Import WpSmodeShiftiop.
-Require Import WpSmodeUtype.
 Require Import KernelRvcDecode.
 Require Import WpRvcBridge.
 Require Import StackOwn.

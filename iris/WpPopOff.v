@@ -39,15 +39,8 @@ Require Import MinstretInv InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpMemsetS WpSmodeJal.
-Require Import WpSmodeBtype.
-Require Import WpSmodeCsr.
-Require Import WpSmodeItype.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
+Require Import SmodeCore WpMemsetS.
 Require Import WpPushOffCsr WpMycpu WpMemsetInstr.
-Require Import WpSmodeBtype.
-Require Import WpSmodeLoad.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpRvcBridge KernelRvcDecode.
@@ -55,8 +48,7 @@ Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
-Require Export WpSmodeFence.
+Require Export WpSmodeLeafBase.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.

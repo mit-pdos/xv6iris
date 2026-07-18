@@ -20,7 +20,7 @@ Require Import MinstretInv InstrBytes.
 Require Import SmodePte Pt4kWalk KptPt SmodeCore.
 Require Import WpLoad WpLeafCommon WpGpr.
 Require Import WpMmodeLeafBase WpSmodeGpr.
-Require Import WpUart WpSmodeUart WpUartKpt.
+Require Import WpUart WpSmodeUart.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Local Open Scope Z_scope.
 Import Defs.

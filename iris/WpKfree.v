@@ -28,24 +28,9 @@ Require Import KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeJal.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
-Require Import WpSmodeShiftiop.
-Require Import WpSmodeStore.
-Require Import WpSmodeUtype.
 Require Import WpMycpu.
-Require Import WpSmodeBtype.
-Require Import WpSmodeLoad.
-Require Import WpSmodeStore.
 Require Import WpLock.
 Require Import WpAcquireLock WpRelease WpMemsetPage.
-Require Import WpSmodeBtype.
-Require Import WpSmodeLoad.
-Require Import WpSmodeStore.
 Require Import WpHoldingInv.
 Require Import StackOwn.
 Require Import CalleeSaved.

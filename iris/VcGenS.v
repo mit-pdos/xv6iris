@@ -34,12 +34,10 @@ Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr.
-Require Import WpSmodeItype WpSmodeAddiw.
 Require Import VcGen.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
 Require Import WpSmodePtMem WpSmodePtMemWrap.
-Require Export WpSmodeLoad WpSmodeStore WpSmodeBtype.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 

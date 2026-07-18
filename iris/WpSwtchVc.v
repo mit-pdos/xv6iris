@@ -38,7 +38,7 @@ Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
-Require Import SmodeCore KernelRvcDecode WpSmodeJalr.
+Require Import SmodeCore KernelRvcDecode.
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
