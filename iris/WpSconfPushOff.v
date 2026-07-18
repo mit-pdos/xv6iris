@@ -19,11 +19,29 @@ Require Import KptTree SmodeCorePt WpSmodePtLeaves SRegime.
 Require Import StackOwn CalleeSaved WpSmodeSret AlignBits KernelText.
 Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
 Require Import WpAuipc VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon KernelRvcDecode WpMycpu WpCallMycpu WpSconfMycpu WpPushOffTop.
+Require Import WpGprCsrwCommon KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu WpCallMycpu WpSconfMycpu WpPushOffTop.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 Notation PO := KernelSyms.push_off.
+Notation PP := KernelSyms.pop_off.
+
+(* +0x24  0x10016073  csrsi sstatus,2 (rd = x0) -- pop_off's intr_on,
+   never reached by the old SIE=0-only proof, so its facts are new. *)
+Local Ltac psx_ast :=
+  first [ reflexivity
+        | repeat f_equal;
+          first [ reflexivity | apply bv_eq; vm_compute; reflexivity ] ].
+Local Ltac psx_dbase s Hpriv :=
+  decode_pause_prefix s Hpriv;
+  match goal with |- ?lhs = ?rhs =>
+    let l := eval vm_compute in lhs in change_no_check (l = rhs) end;
+  psx_ast.
+
+Lemma ppdec_24 (s : mstate) : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x10016073 : mword 32)) s
+  = Some (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS), s).
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; psx_dbase s Hpriv ]. Qed.
 
 (* the epilogue +32 cancels a pa_stk 4 re-anchor (closed offsets). *)
 Local Lemma po_up_cancel (X : mword 64) :
@@ -66,6 +84,12 @@ Qed.
 Section WpSconfPushOff.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
+
+  Lemma ppi_24 : kernel_text -∗ instr (mword_of_int (PP + 0x24) : mword 64) false
+      (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)).
+  Proof. mk_base (PP + 0x24)%Z (mword_of_int 0x10016073 : mword 32)
+    (mword_of_int (PP + 0x24) : mword 64)
+    (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) ppdec_24. Qed.
 
   Lemma wp_push_off_suffix_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (ms : gmap regidx (mword 64))
