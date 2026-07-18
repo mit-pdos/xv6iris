@@ -37,8 +37,13 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ********************************************************************* *)
-(* ENTIRE FILE COMMENTED OUT -- pending the clock-tick rework of the      *)
-(* interrupt stack (see WpIntrCore.v).                                    *)
+(* ENTIRE FILE COMMENTED OUT -- this was the OLD pinned-cell example      *)
+(* (mip / sig_meip / sig_seip owned as cells), invalidated by the clock   *)
+(* tick.  The GENERAL tick-aware mechanism now lives in WpIntrInv.v       *)
+(* ([intr_inv] + [wp_exec_step_intr]); [acq_ms_facts] was reborn there as *)
+(* [intr_ms_facts].  Porting this single-instruction capstone onto the    *)
+(* new engine needs the SIE=1 per-instruction engines (parked WpIntrCore  *)
+(* §6) first.                                                             *)
 (* >>> COMMENTED-OUT REGION BEGINS
 
 Section WpIntrStep.
