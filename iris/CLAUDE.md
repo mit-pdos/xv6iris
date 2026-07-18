@@ -474,6 +474,60 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
 
 ## PLAN: porting user-mode execution onto the ptree page-table layer (UserPt → utlb_inv_pt)
 
+**STATUS (2026-07-18e): stages 1–7 DONE and green; stage 8 done at width 8.**
+Where things landed (the stage descriptions below remain the design rationale):
+
+- *Stage 1*: the deep core (PtTreeAdue §5 front + KptTree §5–§6
+  miss_core/cases/own) is privilege-generic (`p` parameter; cur_privilege /
+  effectivePrivilege / `translationMode p = Sv39` are premises).  S wrappers
+  instantiate `p := Supervisor` + `exec_translationMode_S_sv39` — signatures
+  unchanged.  UptTree's absorption wrapper takes the mode dispatch as a
+  CALLBACK premise (`Htmk` — satp lives inside the invariant).
+- *Stage 2*: subsumed — no separate U front; `exec_translationMode_U_sv39`
+  (UserTranslate §1, the only surviving part of that file) is the U
+  instantiation.
+- *Stages 3–5* live in **UserPtTree.v**: `uleaf_ok`/`uleaf_denied`/`u_acc`/
+  `upt_acc_wf` (per-leaf ∀-variant classification; tramp/tf DENIED for every
+  user access), the `uptd` record + `user_pt_inv` bundle
+  (= `utlb_inv_pt ∗ udata_own ∗ ⌜udata_cov⌝ ∗ ⌜upt_acc_wf⌝`), the Ok
+  absorption instance `utlb_inv_pt_translateAddr_u`, the pmp-fact borrow
+  `utlb_inv_pt_pmp_facts`, and the THREE fault wrappers
+  `utlb_inv_pt_translateAddr_u_{noncanon,unmapped,denied}` (Err, σ
+  unchanged, invariant borrowed).  Their exec substrate: PtTree gained
+  `ptree_maps_blocks_excl`, `ptree_own_blocked_mem`,
+  `exec_translate_pt_denied`, `exec_translate_TLB_hit_denied_pt`,
+  `tlb_ok_pt_lookup_blocked` (the unmapped-never-resident keystone);
+  PtTreeAdue §5 gained the Err + non-canonical fronts.
+- *Stage 6*: **UserFetchPt.v** — `user_pt_fetch_instr` (4-aligned fetch over
+  the bundle, absorbed-outcome shape, no A/D-preset premises) +
+  `udata_fetch_word`/`udata_fetch_mem_read`.  STILL OPEN: the 2-aligned
+  RVC / split / page-straddling fetch geometry (each half translates
+  independently through the absorption), and composing the fault wrappers
+  into fetch-level `F_Error` facts (UserFetch §1–§5's premise-shaped heads
+  survive and are the glue).
+- *Stage 7*: `user_inv` and the whole obligation chain (UserExec / UserTrap /
+  UserStep / UserStepFull / UserCompute / UserArms) close over `pt : uptd`
+  and `user_pt_inv pt`.  UserPt.v DELETED; UserTranslate slimmed to §1;
+  UserFetch §6 and UserMem's upt Iris layer deleted.
+- *Stage 8*: **UserMemPt.v** — width-8 LOAD/STORE end-to-end: U-mode PMP
+  R/W grants, `exec_{checked_mem_read,mem_read_data}_8_U`,
+  `exec_{checked_mem_write,mem_write_value}_8_U`, the ghost side
+  (`udata_read_word_8`, `udata_own_upd` list-inductive window update +
+  `udata_own_store_8`), and the composers `user_pt_load_data_8` /
+  `user_pt_store_data_8` (translate absorbed + physical access + bundle
+  re-established; a store just re-picks the existential byte map).
+  STILL OPEN: widths 4/2/1 (mechanical clones — need width-matched
+  pma/read/write-plain bricks, some exist in WpLoad/RiscvFetchExec/
+  WpMmodeLeafBase, the rest are 10-line clones), AMO/LR/SC, and the
+  misaligned-access fault flavors (instruction-level, no translation).
+- NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
+  the memory-trap arms, then the UserClassify assembly (see the HANDOFF
+  CHECKPOINT's item A), then the concrete-witness stage (a real process
+  table satisfying `upt_tree_spec`/`upt_acc_wf` — meets KvmSpec.v).
+- Post-deletion sweep now unblocked: UserPt was the last consumer of
+  several KptPt P_kpt iris-side instances and SmodePte's `tlb_consistent`
+  — verify and delete.
+
 GOAL: replace UserPt.v's `upt` record (`u_root`/`u_slots`/`u_map`/`u_data` +
 `upt_wf` + `upt_inv`) with the ptree layer, so arbitrary U-mode execution runs
 over **`utlb_inv_pt uroot tfp um` (UptTree.v) ∗ a separate data-page resource**,

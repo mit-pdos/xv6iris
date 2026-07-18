@@ -39,39 +39,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* ===================================================================== *)
-(* §1 Pure-fact extraction: the PMP entry-0 facts, borrowed from the       *)
-(*    bundle (used both before the translation move and, transported,     *)
-(*    after it).                                                           *)
-(* ===================================================================== *)
-
-Section UserFetchPtFacts.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-
-  Lemma utlb_inv_pt_pmp_facts (uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (σ : mstate) :
-    reg_interp σ.(sregs) -∗ utlb_inv_pt uroot tfp um -∗
-    ⌜(pmpAddrMatchType_encdec_backwards
-        (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR /\
-      zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false /\
-      eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true /\
-      eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true /\
-      eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true /\
-      (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)%type⌝.
-  Proof.
-    iIntros "Hri Hinv".
-    iDestruct "Hinv" as (usatp tlbvec t)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hpmp)".
-    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
-    iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
-    iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
-    iPureIntro.
-    rewrite Hpcv Hpav. auto 8.
-  Qed.
-
-End UserFetchPtFacts.
+(* (the PMP-fact extraction helper [utlb_inv_pt_pmp_facts] lives in
+   UserPtTree.v §4b -- shared with the data-memory layer)                 *)
 
 (* ===================================================================== *)
 (* §2 Sourcing the fetched word from the owned data pages.                 *)
