@@ -228,3 +228,59 @@ Proof.
   rewrite <- Znumtheory.Zmod_div_mod; [ | lia | lia | exists 1024; reflexivity ].
   exact Hal.
 Qed.
+
+(* ===================================================================== *)
+(* Decode-wf bit facts: the JAL / BTYPE decoders build their immediates   *)
+(* as [concat_vec imm ('b"0")], so bit 0 is the literal low bit.  These   *)
+(* discharge the strengthened [decodable_u] leaf checks (DecodeSetU.v).   *)
+(* ===================================================================== *)
+
+Lemma bit0_concat0_20 (x : mword 20) :
+  eq_vec (access_vec_dec (concat_vec x ('b"0" : mword 1)) 0) ('b"0") = true.
+Proof.
+  apply eq_vec_true_iff.
+  apply bv_eq.
+  unfold access_vec_dec, access_mword_dec, concat_vec.
+  cbv [to_word get_word autocast].
+  cbn.
+  destruct (Z.eq_dec (Z.of_N (20 + 1)) (20 + 1)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
+  rewrite (TypeCasts.cast_Z_refl (H := e2)).
+  unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat, Values.to_word.
+  rewrite bv_extract_unsigned.
+  erewrite bv_concat_unsigned by (cbn; lia).
+  cbn.
+  rewrite Z.shiftr_0_r.
+  rewrite Z.lor_0_r.
+  rewrite Z.shiftl_mul_pow2 by lia.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ 1) with 2.
+  change (2 ^ Z.of_N 1) with 2.
+  rewrite Z_mod_mult.
+  vm_compute; reflexivity.
+Qed.
+
+Lemma bit0_concat0_12 (x : mword 12) :
+  eq_vec (access_vec_dec (concat_vec x ('b"0" : mword 1)) 0) ('b"0") = true.
+Proof.
+  apply eq_vec_true_iff.
+  apply bv_eq.
+  unfold access_vec_dec, access_mword_dec, concat_vec.
+  cbv [to_word get_word autocast].
+  cbn.
+  destruct (Z.eq_dec (Z.of_N (12 + 1)) (12 + 1)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
+  rewrite (TypeCasts.cast_Z_refl (H := e2)).
+  unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat, Values.to_word.
+  rewrite bv_extract_unsigned.
+  erewrite bv_concat_unsigned by (cbn; lia).
+  cbn.
+  rewrite Z.shiftr_0_r.
+  rewrite Z.lor_0_r.
+  rewrite Z.shiftl_mul_pow2 by lia.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ 1) with 2.
+  change (2 ^ Z.of_N 1) with 2.
+  rewrite Z_mod_mult.
+  vm_compute; reflexivity.
+Qed.

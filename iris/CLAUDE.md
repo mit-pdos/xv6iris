@@ -525,12 +525,23 @@ files or copy code from them; build fresh from the live tree.
      Some (true, s)` (from the misa pin); JALR additionally the Zicfilp-off
      reduction (for `update_elp_state`) and a ∀-quantified bit0-of-
      `update_vec_dec _ 0 'b0` premise (generically true; the mw_prep/tb1
-     scripts hang on it — discharge pending). CRITICAL GAP for JAL/BTYPE:
-     their bit-0 target premise is a DECODER invariant (encdec appends '0'
-     to the immediate) and `jump_to` ASSERTS it (false assert = STUCK, not
-     a trap) — `decode_total_{u,c}_set` must be strengthened to a
-     decode-wf set that records payload invariants (JAL/BTYPE imm bit0=0)
-     before those arms can be classified. The Zbb/Zbc/Zicond/Zimop
+     scripts hang on it — discharge pending). The decode-wf gap for
+     JAL/BTYPE is CLOSED: `decodable_u`'s JAL/BTYPE arms now RECORD the
+     payload invariant `eq_vec (access_vec_dec imm 0) ('b"0")` (the
+     decoder builds both immediates as `concat_vec imm₀ 'b"0"`;
+     `jump_to` ASSERTS target bit-0 — false assert = STUCK, not a trap —
+     so the classification needs this fact). Dischargers
+     `bit0_concat0_{20,12}` (UserBits.v; the KptPt
+     bv_concat/bv_extract-unsigned unfolding recipe — access_vec_dec is
+     `bv_extract i 1` under the casts) are wired into `dtp_pure`, and the
+     `repeat dtp_core` traversal re-proves `goodbP_encdec_u` unchanged.
+     `decodable_c` needs NO strengthening: the compressed control-flow
+     expansions build their JAL/BTYPE immediates VISIBLY aligned
+     (`sign_extend' 21 (concat_vec imm 'b"0")` inside execute_C_J etc.),
+     so the invariant is syntactic at the expansion site. USE-side still
+     to build (classification-time): bit0-of-`sign_extend'` and
+     bit0-of-`add_vec` transport lemmas to turn (pc even ∧ imm even) into
+     jump_to's target-bit0 premise. The Zbb/Zbc/Zicond/Zimop
      families are covered too (`exec_execute_{ZBB_RTYPE,ZBB_RTYPEW,CLMUL,
      CLMULH,CLMULR,REV8,RORI,RORIW,ZIMOP_MOP_R,ZIMOP_MOP_RR,
      ZICOND_RTYPE}_total`) — their extension gates live at DECODE time,

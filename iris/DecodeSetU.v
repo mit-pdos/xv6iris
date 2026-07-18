@@ -26,7 +26,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvExec.
-Require Import WpDecodeBridge DecodeTotalU.
+Require Import WpDecodeBridge DecodeTotalU UserBits.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -406,6 +406,8 @@ Ltac dtp_pure :=
   | |- goodbP _ _ _ _ = true => fail
   | |- _ = true =>
       first [ reflexivity
+            | apply bit0_concat0_20
+            | apply bit0_concat0_12
             | match goal with |- context[if ?g then _ else _] =>
                 let E := fresh "E" in destruct g eqn:E end
             | match goal with |- context[match ?x with _ => _ end] =>
@@ -430,14 +432,20 @@ Ltac dtp_core :=
 
 Definition decodable_u (i : instruction) : bool :=
   match i with
-  | ADDIW _ => true | AMO _ => true | BTYPE _ => true
+  | ADDIW _ => true | AMO _ => true
+  (* JAL / BTYPE record the PAYLOAD invariant the decoder guarantees:
+     the immediate's bit 0 is 0 (encdec appends '0').  [jump_to] ASSERTS
+     target bit-0 (a false assert is STUCK, not a trap), so the
+     classification needs this to run the control-flow arms. *)
+  | BTYPE (imm, _, _, _) => eq_vec (access_vec_dec imm 0) ('b"0")
   | CLMUL _ => true | CLMULH _ => true | CLMULR _ => true
   | CSRImm _ => true | CSRReg _ => true
   | DIV _ => true | DIVW _ => true
   | EBREAK _ => true | ECALL _ => true
   | FENCE _ => true | FENCEI _ => true | FENCE_TSO _ => true
   | ILLEGAL _ => true | ITYPE _ => true
-  | JAL _ => true | JALR _ => true
+  | JAL (imm, _) => eq_vec (access_vec_dec imm 0) ('b"0")
+  | JALR _ => true
   | LOAD _ => true | LOADRES _ => true
   | MRET _ => true | MUL _ => true | MULW _ => true
   | NTL _ => true | PAUSE _ => true
