@@ -60,33 +60,42 @@ Section UserCompute.
 
   (* The abstract per-step RETIRE obligation the classification discharges
      per family.  It OWNS exactly what [run_hart_active] mutates on a
-     register-only retire -- the interp, the gpr file, the nextPC cell (the
-     dispatch reduction sets it), and [upt_inv] (the fetch may fill the
-     TLB) -- and returns them re-established at [s_x], value-agnostically
-     (existential gpr file), plus the pure facts the try_step epilogue and
-     the [user_inv] rebuild need: the run reduction, the hart still ACTIVE
-     and User, minstret_increment/PC/mem untouched, mstatus still pinned,
-     and PC/nextPC in lock-step at [va + 4].  The arm keeps PC and the
+     retiring step -- the interp, the gpr file, the nextPC cell (the
+     dispatch reduction sets it), [upt_inv] (the fetch may fill the TLB)
+     and [user_cfg] (borrowed: the decode-agreement reads its cells) --
+     and returns them re-established at [s_x], value-agnostically
+     (existential gpr file), plus the pure facts the try_step epilogue
+     needs: the run reduction, the hart still ACTIVE, and
+     minstret_increment untouched.  The post-retire pc [va'] is
+     EXISTENTIAL -- va+4 for base compute, va+2 for RVC, the target for
+     jumps and taken branches -- the epilogue's tick lands PC := va'
+     either way and [user_inv] rebinds the pc existentially.  The pure
+     premises are engine-supplied (transported to the post-increment
+     state the engine instantiates [σ] at); the arm keeps PC and the
      untouched CSR fragments.  [E] is the ambient mask. *)
   Definition retire_obligation (E : coPset) (σ : mstate) (va : mword 64)
       (g : gmap regidx (mword 64)) : iProp Σ :=
     (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
+     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
+     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
+     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
      mstate_interp σ -∗
      gpr_file g -∗
      nextPC ↦ᵣ va -∗
      upt_inv pt -∗
-     |={E ∖ ↑minstretN}=>
-       ∃ (ib : mword 32) (s_x : mstate) (g' : gmap regidx (mword 64)),
+     user_cfg C -∗
+     |={E}=>
+       ∃ (ib : mword 32) (s_x : mstate) (g' : gmap regidx (mword 64))
+         (va' : mword 64),
          ⌜exec (run_hart_active 0) σ = Some (Step_Execute (Retire_Success tt, ib), s_x)⌝ ∗
          ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
-         ⌜register_lookup cur_privilege s_x.(sregs) = User⌝ ∗
          ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
             = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
-         ⌜register_lookup PC s_x.(sregs) = va⌝ ∗
-         ⌜register_lookup nextPC s_x.(sregs) = add_vec_int va 4⌝ ∗
+         ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
          mstate_interp s_x ∗
          gpr_file g' ∗
-         nextPC ↦ᵣ (add_vec_int va 4) ∗
-         upt_inv pt)%I.
+         nextPC ↦ᵣ va' ∗
+         upt_inv pt ∗
+         user_cfg C)%I.
 
 End UserCompute.

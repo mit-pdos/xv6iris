@@ -272,25 +272,27 @@ files or copy code from them; build fresh from the live tree.
     definitionally), read the current values, build the pure dispatch fact,
     re-close with the same witnesses (the step only READS the wires), then
     case-split `u_dispatch` and route to a branch. Every branch
-    (retire / interrupt-trap / fetch-fault / …) therefore takes the wire
-    VALUES + the pure dispatch fact, NOT the wire cells: see
-    `retire_obligation` (UserCompute.v), which takes
-    `⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝` as a hypothesis.
-    KNOWN DEBT: `wp_user_step_interrupt` (UserTrap.v), the fetch-fault arms
-    (UserFetch.v) and the WRS wait arm (UserStep.v) were built EARLY and
-    still own the wire cells + each open their own `wp_exec_step` — they must
-    be refactored into payload-BRANCH form (fupd producing the step payload,
-    taking wire values + dispatch fact) so the unified wrapper can dispatch
-    them within a SINGLE step. Their PURE reductions (trap tower, fetch
-    faults, wait steps) are unaffected and reused verbatim.
+    (retire / interrupt-trap / execute-trap / fetch-fault) therefore takes
+    the pure dispatch fact, NOT the wire cells — stated at the
+    post-minstret-increment states, ∀ over the written bit (no dispatch
+    read is minstret_increment), which is what lets each arm do its own
+    minstret prelude. This debt is CLEARED: the interrupt arm is
+    `interrupt_branch` (inlined in UserStepFull.v), and the retire /
+    execute-trap / fetch-fault arms are the payload-form branches in
+    UserArms.v. The WRS WAITING arm (`wp_user_step_waiting`, UserStep.v)
+    legitimately opens its own step: the WAITING case is dispatched at the
+    obligation level (`user_step_obligation_holds`), before the wrapper's
+    step, and touches no wires (wake reads the raw mip/mie only).
   - *Register/memory CONTENTS are never tracked — only safety.* `user_inv`
     binds the gpr file existentially, so a compute step re-establishes SOME
     `gpr_file g'` (the written fragment set to whatever the post-state holds,
     via `gpr_file_acc` — no value threading). `retire_obligation`
     (UserCompute.v) is the value-agnostic, TLB-fill-tolerant per-step retire
-    interface the classification discharges per integer-compute family
-    (owns exactly what run_hart_active mutates: interp + gpr file + nextPC +
-    upt_inv; returns them re-established at s_x, existential gpr file).
+    interface the classification discharges per RETIRING family — compute,
+    control flow, fences, nops (owns exactly what run_hart_active mutates:
+    interp + gpr file + nextPC + upt_inv, `user_cfg` borrowed; returns them
+    re-established at s_x with an EXISTENTIAL retired pc va' — +4 base, +2
+    RVC, the target for jumps/taken branches — and existential gpr file).
   - *Interrupts are UNMASKABLE at User* (effective mIE/sIE are architecturally
     true below the current privilege — unlike the kernel proofs, which mask
     via SIE=0). The device loop raises the `sig_seip` wire concurrently, so
@@ -351,71 +353,78 @@ files or copy code from them; build fresh from the live tree.
      hypotheses that mention them and state those hypotheses via the FOLDED
      names — a raw-spelled RHS makes every derived epilogue term raw and
      the folded `replace`/rewrite patterns miss syntactically.
-     The INTERRUPT arm is DONE (UserTrap.v, axiom-clean):
-     `wp_user_step_interrupt` — a pending delegated interrupt
-     (`u_dispatch = Some (i, Supervisor)`) traps the ACTIVE user hart to
-     stvec, producing `user_trap_frame`; wire cells are borrowed
-     dfrac-generic and handed back. Pure layer: `utrap_ms` (trap-from-U
-     mstatus transform, SPP:=0) + bit facts (WpIntrBits mw_prep/tb1/tb2
-     scripts) discharging `trap_mstatus_ok` from `user_mstatus_ok`;
-     `exec_trap_handler_U_intr` / `exec_handle_interrupt_U` (TrapReduce
-     clone at cur_priv=User, SPP literal 'b"0"');
-     `exec_run_hart_active_pending_U`. Rides the LIVE privilege-agnostic
-     `wp_exec_step_interrupt_inv` engine. Iris arm recipe: ghost-update
+     THE UNIFIED STEP WRAPPER IS DONE (UserStepFull.v, axiom-clean):
+     `wp_user_step_active` reduces `user_step_obligation_active` to
+     `active_class` — it opens `wire_inv`, peels the ambient hart's pin
+     cells, reads every dispatch input, case-splits `u_dispatch`, and
+     either runs the inlined `interrupt_branch` (pending delegated
+     interrupt → trap tower → `user_trap_frame`) or hands the whole step
+     to the classification. `active_class` receives the frame + interp +
+     `minstret_inv_body` + the pure dispatch-None fact stated at the
+     POST-minstret-increment states (∀ over the written bit — no dispatch
+     read is minstret_increment) and must return the
+     `wp_exec_step_minstret` payload (`∃ s', ⌜riscv_step false σ = s'⌝ ∗
+     ▷(interp ∗ body ∗ WP)`).
+     STEP-SHAPE ARMS ALL DONE (UserArms.v, payload form, axiom-clean) —
+     every arm does its own minstret prelude and takes a per-family
+     obligation ∀-quantified over the increment bit at the post-increment
+     state:
+     - `retire_branch` + `retire_obligation` (UserCompute.v): retiring
+       steps (compute/control/fence/nop). The obligation owns exactly what
+       fetch+execute mutate (interp, gpr file, nextPC cell, `upt_inv`;
+       `user_cfg` borrowed for the decode reads) and returns them at the
+       post-execute state with an EXISTENTIAL retired pc `va'` (+4 base,
+       +2 RVC, target for jumps/taken branches); the arm ticks PC := va',
+       bumps minstret when due, re-enters `user_inv`.
+     - `execute_trap_branch` + `execute_trap_obligation` (UserArms.v):
+       execute-produced sync traps (ecall/ebreak/illegal/memory page
+       fault) — run outcome `Trap (User, make_sync_exception e xv, pcx)`
+       with `user_exc e`; the arm runs the delegated tower at the
+       post-execute state (sepc := pcx), no bump, produces
+       `user_trap_frame`.
+     - `fetch_fault_branch` + `fetch_fault_obligation` (UserArms.v):
+       failed fetches — run outcome `Step_Fetch_Failure (Virtaddr xv, e)`;
+       gpr/nextPC never move (only interp + `upt_inv` change hands — a
+       split fetch may fill the TLB on its successful half); sepc := the
+       faulting pc read from PC; produces `user_trap_frame`.
+     Iris trap-arm recipe (used by all three tower arms): ghost-update
      EVERY physical write in tower order (repeated writes to the same CSR
      each get their own reg_update — the interp goal is the literal
      set_reg tower); elp's reset write is same-value (`elp_no_lp`: 1-bit
      elp pinned ≠ LP_EXPECTED already holds NO_LP_EXPECTED) absorbed by
-     `reg_interp_set_same`; all iMods happen BEFORE the callback's
-     iModIntro. NOTE this arm still OWNS the wires — KNOWN DEBT, see the
-     wire-ownership bullet above; refactor to payload-branch form.
-     ACTIVE-RESIDUE ENGINES DONE (all axiom-clean): fetch-success composer
+     `reg_interp_set_same`; ALL iMods happen BEFORE the payload's
+     iModIntro (the payload has no fupd under its ▷). Values the tower
+     needs at an existential post-execute state are READ there via
+     `reg_valid_dq` against the withheld cells (priv/mstatus/scause/PC)
+     and the persistent `hw_config` cells (misa/elp) and `user_cfg`
+     fractional cells (stvec/medeleg).
+     OTHER ENGINES DONE (axiom-clean): fetch-success composer
      `upt_fetch_instr` (UserFetch §6, word from the existential pages via
-     `upt_fetch_word`/`upt_fetch_mem_read`, UserMem.v); RETIRING engine
-     `wp_user_step_retire` (UserStep, tick+bump, returns hart_state);
+     `upt_fetch_word`/`upt_fetch_mem_read`, UserMem.v);
      decode-agreement `agree_u` + `decodable_{u,c}_not_lpad` (UserStep);
-     register-only retire interface `retire_obligation`/`gpr_file_acc`
-     (UserCompute). LEFT — the assembly: the UNIFIED STEP WRAPPER (one
-     `wp_exec_step` + `wires_acc`, read wires, case-split `u_dispatch`) and,
-     under None, the total classification (fetch → `decode_total_{u,c}_set`
-     → destruct → per-family discharge `retire_obligation` / route to
-     data-memory / execute-trap via `exec_riscv_step_execute_trap` + tower /
-     WRS-enter). Branches must be payload form.
-     FETCH-FAULT ARMS ALL DONE (UserFetch.v, axiom-clean): the generic
-     callback arm `wp_user_step_fetch_fault` + five flavor corollaries
-     (align / noncanonical / unmapped / denied / needs-update) — every way
-     a 4-aligned-or-odd user pc can fail to fetch produces
-     `user_trap_frame`. Supporting layers: UserTrap.v (ONE cause-generic
-     trap tower `exec_trap_handler_U` over `c : TrapCause` + tval payload,
-     with handle_interrupt / exception_handler / handle_exception as
-     equational instances in the same section; trapish riscv_step wrappers
-     for the fetch-failure and execute-trap step shapes; delegation
-     `exec_exception_delegatee_U`); UserTranslate.v (the COMPLETE fetch
-     translateAddr trichotomy: success via hit `exec_translateAddr_fetch_u_hit`
-     — pa uniformly `u_walk_pa (um_pte0 e) va` — or walk/nomatch fill; Err
-     via noncanonical/unmapped/denied/needs-update with all-slot-case
-     composers `upt_translateAddr_fetch_{unmapped,denied_full,needs_update_full}`);
-     UserFetch.v §1-5 (fetch reductions: align fault, translate-fault,
-     fetch_bytes ok/fault state-generic, `exec_fetch_ok_4` with the
-     F_RVC/F_Base dispatch in ONE lemma over the existential word);
-     UserMem.v (U-mode PMP grant + `exec_mem_read_fetch_{4,2}_U` cloned
-     from the S layer; `upt_fetch_word` — the fetched word conjured from
-     `upt_data_own`'s existential bytes, peel/restore per byte;
-     `upt_fetch_mem_read` — the complete physical fetch fact); UserBits.v
-     (minimal-import page-window arithmetic: `pa_window`, `off4_bound`,
-     `pa4_aligned`, `bv_subrange11`, `nth_byte_assemble4/2`; GOTCHA: do
-     bv-level steps by etransitivity/exact — goal rewrites of
+     `gpr_file_acc` (UserCompute); the pure fetch-fault layers (UserTrap.v:
+     cause-generic tower `exec_trap_handler_U` + handle_interrupt /
+     exception_handler / handle_exception instances + the trapish
+     riscv_step wrappers `exec_riscv_step_{fetch_failure,execute_trap}` +
+     delegation `exec_exception_delegatee_U`; UserTranslate.v: the
+     COMPLETE fetch translateAddr trichotomy with all-slot-case composers
+     `upt_translateAddr_fetch_{unmapped,denied_full,needs_update_full}`;
+     UserFetch.v §1-5: align fault, translate-fault, fetch_bytes ok/fault,
+     `exec_fetch_ok_4`; UserMem.v: U-mode PMP grant +
+     `exec_mem_read_fetch_{4,2}_U`; UserBits.v: page-window arithmetic —
+     GOTCHA: do bv-level steps by etransitivity/exact, goal rewrites of
      width-carrying bv lemmas miss on implicit-width spellings).
-     REMAINING for the ACTIVE residue: the Iris fetch-success composer
-     over `upt_inv` (hit: σ unchanged / walk: `set_reg σ tlb filled`, the
-     arm destructs — upt_inv's existential tlbvec makes term-level
-     hit/walk uniformity unnecessary), the RETIRING step engine
-     (wp_exec_step_minstret + tick/bump bookkeeping, callback =
-     `exec_hart_active_progress_base_gen/_RVC_gen`), decode dispatch
-     (`decode_total_u_set`/`decode_total_c_set`), and the execute families
-     (register-only engine + `_gpr` facts; ecall/ebreak/illegal via the
-     proven execute-trap wrapper + tower; WRS enter-wait; memory arms;
-     LR/SC always-fault), then assemble `user_step_obligation_active`.
+     LEFT — discharging `active_class`: the total classification. Per
+     machine case, produce the run_hart_active reduction and feed the
+     matching arm: fetch outcome (fetchable → `upt_fetch_instr`; else a
+     fetch-fault flavor → `fetch_fault_obligation`), decode
+     (`decode_total_{u,c}_set` + `agree_u`), destruct the decodable set,
+     per-family discharge `retire_obligation` (compute/control via
+     `exec_hart_active_progress_base_gen/_RVC_gen` + `_gpr` facts) /
+     `execute_trap_obligation` (ecall/ebreak/illegal + memory faults) /
+     data-memory arms / WRS-enter (needs its own arm: enter-wait writes
+     hart_state and skips the tick — the one step shape without an arm
+     yet) / LR/SC always-fault.
   2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
      `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
      `update_PTE_Bits` None-vs-Some by the A(/D) bits.

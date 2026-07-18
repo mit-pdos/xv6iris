@@ -195,14 +195,23 @@ Section UserStepFull.
      retires (re-establishing [user_inv]) or traps (producing
      [user_trap_frame]).  It owns [interp σ] + [minstret_inv_body] + the
      unpacked mutable frame + [upt_inv] + [user_cfg] + the Löb continuation,
-     and returns the [wp_exec_step_minstret] payload at the inner mask. *)
+     and returns the [wp_exec_step_minstret] payload at the inner mask.
+     The dispatch fact is handed at the POST-minstret-increment states
+     (∀ over the written bit): [run_hart_active] runs after [try_step]'s
+     minstret_increment write, and none of the dispatch reads is
+     minstret_increment, so the wrapper proves it uniformly.  This is the
+     shape the payload arms ([retire_branch] / [execute_trap_branch] /
+     the fetch-fault arms, UserArms.v) consume. *)
   Definition active_class (Ei : coPset) (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (∀ (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
           (g : gmap regidx (mword 64)),
         ⌜user_mstatus_ok ms_v⌝ -∗
         ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
+        ⌜register_lookup mstatus σ.(sregs) = ms_v⌝ -∗
         ⌜register_lookup PC σ.(sregs) = va⌝ -∗
-        ⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
+        ⌜forall b : bool,
+           exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
+             = Some (None, set_reg σ (R_bool minstret_increment) b)⌝ -∗
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         upt_inv pt -∗ user_cfg C -∗
         mstate_interp σ -∗ minstret_inv_body -∗
@@ -259,12 +268,6 @@ Section UserStepFull.
     iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
     iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hpc") as %Lpc.
-    assert (Hdisp : exec (dispatchInterrupt User) σ
-              = Some (u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C), σ)).
-    { apply (exec_dispatchInterrupt_U_reduce σ (uc_mip C) (uc_mie C) (uc_mideleg C) meip seip);
-        try assumption.
-      - rewrite exec_currentlyEnabled_S; rewrite Lmisa; rewrite HmisaS; reflexivity.
-      - exact (uc_mm C). }
     (* re-bundle interp + cfg for the branches *)
     iAssert (mstate_interp σ) with "[Hreg Hmem Hdev]" as "Hint".
     { iFrame "Hreg Hmem Hdev". }
@@ -288,8 +291,29 @@ Section UserStepFull.
         iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
         iFrame "Hseip Hmeip Hwrest". }
       iModIntro. iFrame "Hint Hbody HWP".
-    - (* no interrupt: the classification *)
-      iMod ("Hclass" $! σ ms_v sc_v stval_v sepc_v va g Hmsok Lpriv Lpc Hdisp
+    - (* no interrupt: the classification.  The dispatch fact is handed at
+         the post-minstret-increment states (∀ over the written bit): the
+         wire/config values were read at σ, and no dispatch read is
+         minstret_increment, so each lookup transports. *)
+      assert (Hdisp_ab : forall b : bool,
+                exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
+                  = Some (None, set_reg σ (R_bool minstret_increment) b)).
+      { intro b.
+        assert (Tb : forall (r : register) (v : type_of_register r),
+                  register_lookup r σ.(sregs) = v ->
+                  register_beq r (R_bool minstret_increment) = false ->
+                  register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v).
+        { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+          rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
+        rewrite (exec_dispatchInterrupt_U_reduce (set_reg σ (R_bool minstret_increment) b)
+                   (uc_mip C) (uc_mie C) (uc_mideleg C) meip seip
+                   ltac:(rewrite exec_currentlyEnabled_S; rewrite (Tb misa _ Lmisa eq_refl);
+                         rewrite HmisaS; reflexivity)
+                   (Tb mip _ Lmip eq_refl) (Tb sig_meip _ Lmeip eq_refl)
+                   (Tb sig_seip _ Lseip eq_refl) (Tb mie _ Lmie eq_refl)
+                   (Tb mideleg _ Lmdl eq_refl) (uc_mm C)).
+        rewrite Hd. reflexivity. }
+      iMod ("Hclass" $! σ ms_v sc_v stval_v sepc_v va g Hmsok Lpriv Lms Lpc Hdisp_ab
               with "[Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr] Hupt Hcfg Hint Hbody Hk")
         as (s') "[%Hexec Hrest]".
       { iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr". }

@@ -636,86 +636,10 @@ Section UserStepObligation.
 
 End UserStepObligation.
 
-(* ===================================================================== *)
-(* §4 The RETIRING step engine: one riscv_step whose run_hart_active       *)
-(* outcome is Retire_Success.  The callback supplies the fetch/decode/     *)
-(* execute reduction (at the post-minstret-increment state s_a) and the    *)
-(* ghost updates for everything execute wrote, handing back                *)
-(* mstate_interp s_x; the engine does the try_step bookkeeping: the PC     *)
-(* tick to nextPC and the conditional minstret bump.                       *)
-(* ===================================================================== *)
-Section UserRetireEngine.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-
-  Lemma wp_user_step_retire Φ {dq : dfrac} :
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (ib : mword 32) (s_x : mstate),
-         ⌜exec (run_hart_active 0) σ = Some (Step_Execute (Retire_Success tt, ib), s_x)⌝ ∗
-         ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
-         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
-            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
-         PC ↦ᵣ (register_lookup PC s_x.(sregs)) ∗
-         mstate_interp s_x ∗
-         ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-            PC ↦ᵣ (register_lookup nextPC s_x.(sregs)) -∗
-            WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
-    iIntros (σ) "[Hreg Hmd] Hbody".
-    iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    iDestruct (reg_valid_dq with "Hreg Hmst") as %Lmst.
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    set (s_a := set_reg σ (R_bool minstret_increment) b).
-    assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt).
-    { unfold s_a, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-    iMod ("H" $! s_a with "[Hreg Hmd]") as (ib s_x)
-      "(%Hha & %Hhart_x & %Hmi_x & Hpc & [Hreg Hmd] & Hcont)".
-    { unfold s_a, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd". }
-    assert (Hmi_x' : register_lookup (R_bool minstret_increment) s_x.(sregs) = b).
-    { rewrite Hmi_x. unfold s_a, set_reg; cbn [sregs].
-      rewrite register_lookup_set. reflexivity. }
-    pose proof (exec_riscv_step_hart_active σ s_x ib b
-                  Hsi Hhart_a Hha Hhart_x Hmi_x') as Hstep.
-    iDestruct (reg_valid_dq with "Hreg Hmst") as %Lmst_x.
-    set (s_tick := set_reg s_x PC (register_lookup nextPC s_x.(sregs))) in *.
-    assert (Lmst_t : register_lookup minstret s_tick.(sregs) = mst).
-    { unfold s_tick, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Lmst_x | reflexivity]. }
-    rewrite Lmst_t in Hstep.
-    destruct b.
-    - iModIntro. iExists (set_reg s_tick minstret (add_vec_int mst 1)).
-      iSplitR. { iPureIntro. exact Hstep. }
-      iNext.
-      iMod (reg_update _ PC _ (register_lookup nextPC s_x.(sregs))
-              with "Hreg Hpc") as "[Hreg Hpc]".
-      iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
-      iModIntro.
-      unfold s_tick, set_reg; cbn [sregs mem mdev].
-      iFrame "Hreg Hmd".
-      iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
-      iApply ("Hcont" with "Hhs Hpc").
-    - iModIntro. iExists s_tick.
-      iSplitR. { iPureIntro. exact Hstep. }
-      iNext.
-      iMod (reg_update _ PC _ (register_lookup nextPC s_x.(sregs))
-              with "Hreg Hpc") as "[Hreg Hpc]".
-      iModIntro.
-      unfold s_tick, set_reg; cbn [sregs mem mdev].
-      iFrame "Hreg Hmd".
-      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-      iApply ("Hcont" with "Hhs Hpc").
-  Qed.
-
-End UserRetireEngine.
+(* (The old §4 full-WP RETIRING step engine [wp_user_step_retire] is gone:
+   the payload-form [retire_branch] (UserArms.v) supersedes it -- the
+   unified step wrapper owns the single step, so the retire arm produces
+   the [wp_exec_step_minstret] payload instead of opening its own step.)   *)
 
 (* ===================================================================== *)
 (* §5 The decode-bridge agreement: the user frame's pins coincide with     *)
