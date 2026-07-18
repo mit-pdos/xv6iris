@@ -203,3 +203,159 @@ Proof.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_rec_cE_Zimop_1 s _)).
   apply exec_rec_cE_Zaamo_1. exact Hmisa.
 Qed.
+
+(* Zve32x: hart-SUPPORTED here, but the gate reads mstatus.VS -- the
+   VS = Off pin turns it false (parallel to the FS pin for F). *)
+Lemma exec_hartSupports_Zve32x (s : mstate) :
+  exec (hartSupports Ext_Zve32x) s = Some (true, s).
+Proof.
+  unfold hartSupports. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
+  change (Z.geb (hartSupports_measure Ext_Zve32x) 0) with true. cbn match.
+  erewrite exec_bind_Some. 2:{ apply exec_returnM. }
+  cbn beta.
+  match goal with
+  | |- exec (returnM ?v) _ = _ =>
+      replace v with true by (vm_compute; reflexivity)
+  end.
+  apply exec_returnM.
+Qed.
+
+Lemma exec_rec_cE_Zvl32b_0 (s : mstate) (acc : Acc (Zwf 0) 0) :
+  exec (_rec_currentlyEnabled Ext_Zvl32b 0 acc) s = Some (true, s).
+Proof.
+  destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb 0 0) with true. cbn match.
+  erewrite exec_bind_Some. 2:{ apply exec_returnM. }
+  cbn beta.
+  match goal with
+  | |- exec ?m _ = _ =>
+      first [ apply exec_returnM
+            | match m with
+              | returnM ?v =>
+                  replace v with true by (vm_compute; reflexivity)
+              end; apply exec_returnM ]
+  end.
+Qed.
+
+Lemma exec_currentlyEnabled_Zve32x_off (s : mstate) (ms_v : mword 64) :
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  exec (currentlyEnabled Ext_Zve32x) s = Some (false, s).
+Proof.
+  intros Hms Hvs.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb (currentlyEnabled_measure Ext_Zve32x) 0) with true. cbn match.
+  erewrite exec_bind_Some. 2:{ apply exec_returnM. }
+  cbn beta. cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zve32x s)).
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_rec_cE_Zvl32b_0 s _)).
+  erewrite exec_and_boolM_Some.
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+      rewrite Hms. apply exec_returnM. }
+  assert (Hneq : neq_vec (_get_Mstatus_VS ms_v) ('b"00") = false).
+  { unfold neq_vec. rewrite Hvs. reflexivity. }
+  rewrite Hneq.
+  reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §2 The check-chain component reductions.                               *)
+(* ===================================================================== *)
+
+(* the privilege gate at User: pure in the ADDRESS bits -- 'b00 ≥u
+   csrPriv csr, i.e. true iff bits 9:8 are 00 *)
+Lemma exec_check_CSR_priv_U (csr : mword 12) (s : mstate) :
+  exec (check_CSR_priv csr User) s
+    = Some (zopz0zKzJ_u ('b"00") (csrPriv csr), s).
+Proof.
+  unfold check_CSR_priv, privLevel_to_CSR_privbits. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM ('b"00" : mword 2) s)). cbn beta.
+  apply exec_returnM.
+Qed.
+
+(* feature_enabled_for_priv at U, totality: SOME result comes out
+   whatever the enable bits are (all booleans destructed up front). *)
+Lemma exec_feature_U_total (m sb h : mword 1) (s : mstate) :
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists r, exec (feature_enabled_for_priv User m sb h) s = Some (r, s).
+Proof.
+  intro HES.
+  unfold feature_enabled_for_priv. cbn match.
+  unfold and_boolM, or_boolM.
+  destruct (eq_vec m ('b"1")) eqn:E1.
+  - (* m-bit set: the S/senv disjunct decides *)
+    destruct (eq_vec sb ('b"1")) eqn:E2.
+    + eexists.
+      erewrite exec_bind_Some.
+      2:{ erewrite exec_bind_Some; [ | apply exec_returnM ].
+          cbn beta. cbn match.
+          erewrite exec_bind_Some.
+          2:{ rewrite (exec_bind_Some _ _ _ _ _ HES). cbn beta.
+              apply exec_returnM. }
+          cbn beta. cbn [not negb]. cbn match.
+          apply exec_returnM. }
+      cbn beta. cbv zeta.
+      apply exec_returnM.
+    + eexists.
+      erewrite exec_bind_Some.
+      2:{ erewrite exec_bind_Some; [ | apply exec_returnM ].
+          cbn beta. cbn match.
+          erewrite exec_bind_Some.
+          2:{ rewrite (exec_bind_Some _ _ _ _ _ HES). cbn beta.
+              apply exec_returnM. }
+          cbn beta. cbn [not negb]. cbn match.
+          apply exec_returnM. }
+      cbn beta. cbv zeta.
+      apply exec_returnM.
+  - (* m-bit clear: short-circuit false *)
+    eexists.
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind_Some; [ | apply exec_returnM ].
+        cbn beta. cbn match.
+        apply exec_returnM. }
+    cbn beta. cbv zeta.
+    apply exec_returnM.
+Qed.
+
+(* counter enables at U: SOME boolean comes out (values never matter) *)
+Lemma exec_counter_enabled_U_total (i : Z) (s : mstate) :
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists en : bool, exec (counter_enabled i User) s = Some (en, s).
+Proof.
+  intro HES.
+  unfold counter_enabled.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcounteren s)). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg scounteren s)). cbn beta.
+  unfold feature_enabled_for_priv_bool.
+  destruct (exec_feature_U_total
+              (access_vec_dec (register_lookup mcounteren s.(sregs)) i)
+              (access_vec_dec (register_lookup scounteren s.(sregs)) i)
+              ('b"0") s HES) as [r Hr].
+  eexists.
+  rewrite (exec_bind_Some _ _ _ _ _ Hr). cbn beta.
+  apply exec_returnM.
+Qed.
+
+(* ssp (0x011) is inaccessible: Zicfiss is enabled, but MENVCFG_S has SSE
+   clear, so the User arm's menvcfg conjunct is false (and_boolM
+   short-circuits before senvcfg is consulted). *)
+Lemma exec_is_ssp_accessible_U_off (s : mstate) :
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (is_ssp_accessible User) s = Some (false, s).
+Proof.
+  intros Hmisa Hmenv.
+  unfold is_ssp_accessible.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zicfiss s Hmisa)).
+  cbn match.
+  erewrite exec_and_boolM_Some.
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn beta.
+      rewrite Hmenv. apply exec_returnM. }
+  match goal with
+  | |- context [ if ?g then _ else _ ] =>
+      replace g with false by (vm_compute; reflexivity)
+  end.
+  reflexivity.
+Qed.
