@@ -135,6 +135,37 @@ Section IntrDefs.
     iModIntro. iFrame.
   Qed.
 
+  (* '1'->'0' (csrci): gather 1/2 + 1/4 + 1/4, come back 1/2 + 1/8(cap)
+     + 1/8(token) + 1/4(invariant). *)
+  Lemma sie_ghost_flip_off (γ : gname) (v1 v2 v3 : mword 1) :
+    ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4) v2 -∗ ghost_var γ (1/4) v3 ==∗
+    ghost_var γ (1/2) ('b"0" : mword 1) ∗ ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ ghost_var γ (1/4) ('b"0" : mword 1).
+  Proof.
+    iIntros "H1 H2 H3".
+    iMod (sie_ghost_flip γ v1 v2 v3 ('b"0") with "H1 H2 H3") as "(H1 & H2 & H3)".
+    iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
+    { iPureIntro. apply (bool_decide_unpack _). by compute. }
+    iEval (rewrite Hq) in "H2".
+    iDestruct (ghost_var_split with "H2") as "[H2a H2b]".
+    iModIntro. iFrame.
+  Qed.
+
+  (* '0'->'1' (csrsi): gather 1/2 + 1/8 + 1/8 + 1/4, come back
+     1/2 + 1/4(cap) + 1/4(invariant). *)
+  Lemma sie_ghost_flip_on (γ : gname) (v1 v2a v2b v3 : mword 1) :
+    ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4/2)%Qp v2a -∗ ghost_var γ (1/4/2)%Qp v2b -∗
+    ghost_var γ (1/4) v3 ==∗
+    ghost_var γ (1/2) ('b"1" : mword 1) ∗ ghost_var γ (1/4) ('b"1" : mword 1) ∗
+    ghost_var γ (1/4) ('b"1" : mword 1).
+  Proof.
+    iIntros "H1 H2a H2b H3".
+    iCombine "H2a H2b" as "H2".
+    iMod (sie_ghost_flip γ v1 v2a v3 ('b"1") with "H1 H2 H3") as "(H1 & H2 & H3)".
+    iModIntro. iFrame.
+  Qed.
+
+
   (* =================================================================== *)
   (* §3 [intr_config] -- the interrupts-ENABLED ambient configuration:    *)
   (* the SIE=1 mirror of [smode_config] (whose SIE=0 fact makes it        *)
@@ -339,8 +370,17 @@ Section IntrDefs.
      interrupt invariant (handler existential -- no client names the
      handler) and the trap-scratch CSRs (any trap scribbles them, so
      enabled code cannot pin their values). *)
+  (* the kernel-code interrupts-OFF token: between a csrci flip and the
+     matching csrsi restore, kernel code holds this eighth; agreement
+     with the capability's eighth (or the bundle's tied half) pins the
+     arm at '0' wherever the token travels -- pop_off-style code needs
+     exactly this to refute its own panic checks.  At the '1' arm the
+     capability holds the FULL quarter (no token outstanding). *)
+  Definition intr_off_tok (γ : gname) : iProp Σ :=
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1).
+
   Definition sie_arm (γ : gname) (root_ppn : mword 44) : iProp Σ :=
-    (ghost_var γ (1/4) ('b"0" : mword 1) ∨
+    (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∨
      (ghost_var γ (1/4) ('b"1" : mword 1) ∗
       (∃ handler : mword 64, intr_inv γ handler root_ppn MENVCFG_S) ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗

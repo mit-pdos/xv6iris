@@ -439,6 +439,7 @@ Section WpSconfPushOff.
                    then po_intena_val ms else intena_old) -∗
       ( ⌜ _get_Mstatus_SIE ms = ('b"0" : mword 1) ⌝
       ∨ (⌜ _get_Mstatus_SIE ms = ('b"1" : mword 1) ⌝ ∗
+         intr_off_tok γ ∗
          (∃ handler : mword 64,
             intr_inv γ handler root_ppn MENVCFG_S ∗
             ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
@@ -869,9 +870,9 @@ Section WpSconfPushOff.
           rewrite /N0 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
       { first [ iExact "Hintena" | (iEval (rewrite -Hsv32); iExact "Hintena") ]. }
       { (* the taken arm's iNext stripped the payload's later; re-introduce *)
-        iDestruct "Hpayload" as "[%Hpb0 | (%Hpb1 & Hhx & Hsepcx & Hscausex & Hstvalx)]".
+        iDestruct "Hpayload" as "[%Hpb0 | (%Hpb1 & Htok & Hhx & Hsepcx & Hscausex & Hstvalx)]".
         - iLeft. iPureIntro. exact Hpb0.
-        - iRight. iFrame "Hsepcx Hscausex Hstvalx".
+        - iRight. iFrame "Htok Hsepcx Hscausex Hstvalx".
           iSplitR; [iPureIntro; exact Hpb1 |].
           iDestruct "Hhx" as (h) "[Hi Hs]". iExists h. iFrame "Hi". iNext. iExact "Hs". }
     - (* ===== FALL arm: noff <> 0 ===== *)

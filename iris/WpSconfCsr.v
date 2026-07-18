@@ -67,7 +67,7 @@ Section WpSconfCsr.
       ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m
                      !!! Regidx csp_rs1) kv_frame_slots ∗
         ( (⌜ _get_Mstatus_SIE ms = ('b"0" : mword 1) ⌝ ∗
-           ghost_var γ (1/4) ('b"0" : mword 1))
+           ghost_var γ (1/4/2)%Qp ('b"0" : mword 1))
         ∨ (⌜ _get_Mstatus_SIE ms = ('b"1" : mword 1) ⌝ ∗
            ghost_var γ (1/4) ('b"1" : mword 1) ∗
            (∃ handler : mword 64, intr_inv γ handler root_ppn MENVCFG_S) ∗
@@ -136,7 +136,7 @@ Section WpSconfCsr.
               ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
                              !!! Regidx csp_rs1) kv_frame_slots ∗
                 ( (⌜ _get_Mstatus_SIE ms0 = ('b"0" : mword 1) ⌝ ∗
-                   ghost_var γ (1/4) ('b"0" : mword 1))
+                   ghost_var γ (1/4/2)%Qp ('b"0" : mword 1))
                 ∨ (⌜ _get_Mstatus_SIE ms0 = ('b"1" : mword 1) ⌝ ∗
                    ghost_var γ (1/4) ('b"1" : mword 1) ∗
                    (∃ handler : mword 64, intr_inv γ handler root_ppn MENVCFG_S) ∗
@@ -263,6 +263,7 @@ Section WpSconfCsr.
       gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
       ( ⌜ _get_Mstatus_SIE ms = ('b"0" : mword 1) ⌝
       ∨ (⌜ _get_Mstatus_SIE ms = ('b"1" : mword 1) ⌝ ∗
+         intr_off_tok γ ∗
          (∃ handler : mword 64,
             intr_inv γ handler root_ppn MENVCFG_S ∗
             ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
@@ -357,7 +358,7 @@ Section WpSconfCsr.
       iDestruct (ghost_var_agree with "Hq1 Hqi") as %Hbq.
       iAssert (▷ intr_handler_spec handler root_ppn MENVCFG_S)%I as "#Hspec".
       { iNext. iApply "Hguard". iPureIntro. symmetry. exact Hbq. }
-      iMod (sie_ghost_flip γ _ _ _ ('b"0") with "Hhalf Hq1 Hqi") as "(Hhalf & Hq & Hqi)".
+      iMod (sie_ghost_flip_off γ _ _ _ with "Hhalf Hq1 Hqi") as "(Hhalf & Hq & Htok & Hqi)".
       iMod ("Hclose" with "[Hqi Hstv]") as "_".
       { iNext. iExists ('b"0" : mword 1). iFrame "Hqi Hstv".
         iModIntro. iIntros "%Hb".
@@ -396,7 +397,7 @@ Section WpSconfCsr.
       iEval (rewrite Lnpc) in "Hpc'".
       iEval (rewrite -Hsie') in "Hhalf".
       iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] [Hstk Hq] Htlbinv
-                            [$Hpc' $Hnpc] [Hfmap] [Hsepcx Hscausex Hstvalx]").
+                            [$Hpc' $Hnpc] [Hfmap] [Htok Hsepcx Hscausex Hstvalx]").
       { exact Hmsf. }
       { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
         iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
@@ -405,7 +406,7 @@ Section WpSconfCsr.
       { iSplitR.
         { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
         iExact "Hfmap". }
-      iRight. iFrame "Hsepcx Hscausex Hstvalx".
+      iRight. iFrame "Htok Hsepcx Hscausex Hstvalx".
       iSplitR; [iPureIntro; exact Hb1 |].
       iExists handler.
       iSplitR; [| iExact "Hspec"].
@@ -496,6 +497,7 @@ Section WpSconfCsr.
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m -∗
+    intr_off_tok γ -∗
     (∃ handler : mword 64,
        intr_inv γ handler root_ppn MENVCFG_S ∗
        ▷ intr_handler_spec handler root_ppn MENVCFG_S) -∗
@@ -517,7 +519,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdsp)
-      "Hsc Hhs Hcap Hhx Hsepcx Hscausex Hstvalx Htlbinv Hpc Hfile Hinstr Hcont".
+      "Hsc Hhs Hcap Htok Hhx Hsepcx Hscausex Hstvalx Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
@@ -561,7 +563,7 @@ Section WpSconfCsr.
     iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (b) "(>Hqi & >Hstv & _)".
-    iMod (sie_ghost_flip γ _ _ _ ('b"1") with "Hhalf Hq0 Hqi") as "(Hhalf & Hq & Hqi)".
+    iMod (sie_ghost_flip_on γ _ _ _ _ with "Hhalf Hq0 Htok Hqi") as "(Hhalf & Hq & Hqi)".
     iMod ("Hclose" with "[Hqi Hstv]") as "_".
     { iNext. iExists ('b"1" : mword 1). iFrame "Hqi Hstv".
       iModIntro. iIntros "%Hb". iExact "Hspec". }
