@@ -1236,9 +1236,12 @@ Section WpSmodePtLock.
                                 (zeros' 64)) (xlen - 0 - 1) 0) = pa)
       by (rewrite Hea_pc subrange_id sign_extend'_id; reflexivity).
     iMod (tlb_inv_pt_translateAddr (Atomic (AMOSWAP, Data, Data))
-            (fun vpn a d mxr do_sum _ => kpt_variant_check_amo vpn a d mxr do_sum)
             root_ppn a8 s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            (fun a d mxr do_sum => kpt_variant_check_amo (svpn_of a8) a d mxr do_sum)
+            (or_introl (ram_svpn_range a8 Hrampa))
+            (RiscvExtras.ram_canonical a8 Hrampa)
+            (ram_ident_4k a8 Hrampa)
+            Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_amo s_pc)

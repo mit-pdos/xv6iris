@@ -29,6 +29,9 @@ From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 Require Import CalleeSaved.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* ===================================================================== *)
@@ -210,7 +213,7 @@ Section WpMemsetInstr.
   (*  with the sixteen instruction decodings discharged from [kernel_text]  *)
   (*  and the 2-slot save frame carried as a single [stack_own sp0 n]       *)
   (*  (n >= 2).  The Sv39 superpage-identity geometry (svpn := svpn_of a8)  *)
-  (*  is derived at the [wp_sb_s] leaf, so no svpn side conditions appear.   *)
+  (*  is derived at the [wp_sb_s_pt] leaf, so no svpn side conditions appear.   *)
   (* =================================================================== *)
 
   Lemma wp_memset_s_full_kt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
@@ -252,13 +255,13 @@ Section WpMemsetInstr.
     (* the end pointer couples to the buffer: [wval_add = ms_addr p N] *)
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
     smode_config γ dq -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( ∀ mfin,
       smode_config γ dq -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       stack_own sp0 n -∗
       ([∗ list] j ∈ seq 0 N, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗

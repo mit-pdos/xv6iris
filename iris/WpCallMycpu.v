@@ -16,6 +16,9 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelText WpGprCsrwCommon WpSmodeJal StackOwn CalleeSaved WpMycpu.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 From Kernel Require KernelSyms.
 
 Section WpCallMycpu.
@@ -51,7 +54,7 @@ Section WpCallMycpu.
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
     ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
     stack_own (m0 !!! Regidx csp_rs1) 2 -∗
@@ -60,7 +63,7 @@ Section WpCallMycpu.
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mo -∗
       ⌜ callee_saved m mo /\
@@ -75,7 +78,7 @@ Section WpCallMycpu.
     iDestruct (kv_cfg_split γ mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_jal_gpr_s_zca root_ppn γ Φ P (mword_of_int 1) jimm m (1/2)%Qp
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γ Φ P (mword_of_int 1) jimm m (1/2)%Qp
   ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
               with "Hsm Htlbinv Hpc Hfile Hjal [-]").
@@ -115,13 +118,13 @@ Section WpCallMycpu.
     eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γ (DfracOwn 1) -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
     stack_own (m0 !!! Regidx csp_rs1) 2 -∗
     ( ∀ mo,
       smode_config γ (DfracOwn 1) -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mo -∗
       ⌜ callee_saved m mo /\

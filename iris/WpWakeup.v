@@ -61,6 +61,9 @@ From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeLoad WpSmodeStore WpSmodeBtype.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* ======================================================================= *)
@@ -313,8 +316,8 @@ Section WkLeaves.
   Context `{CID : CpuId}.
 
   (* c.li rd, imm  ==  addi rd, x0, sext(imm) : writes sext(imm) into rd.
-     Mirrors wp_caddi_gpr_s_config but with rs1 = x0 (so the value is the
-     immediate, not rd+imm).  Discharged through wp_gpr_write_s_config. *)
+     Mirrors wp_caddi_gpr_s_config_pt but with rs1 = x0 (so the value is the
+     immediate, not rd+imm).  Discharged through wp_gpr_write_s_config_pt. *)
 
   (* ---- instruction fact builders (verbatim from WpSwtchVc) ---- *)
   Local Notation WKI off rvc ast :=
@@ -418,7 +421,7 @@ End WkLeaves.
 (* proc[] table.  We assume a jal-callable whole-function WP that: returns   *)
 (* a0 = proc_addr j for some j < NPROC; preserves the callee-saved registers *)
 (* (sp, s0..s11); and preserves the ambient config [smode_config γc], its    *)
-(* SIE ghost half, and [tlb_inv] -- exactly the resources acquire/release     *)
+(* SIE ghost half, and [tlb_inv_pt] -- exactly the resources acquire/release     *)
 (* thread -- with myproc managing its own stack frame internally.  (For now,  *)
 (* it just returns some proc.)                                                *)
 (* ======================================================================= *)
@@ -431,7 +434,7 @@ Axiom wp_myproc :
       update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
                         (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.myproc) -∗ gpr_file m -∗
     (∀ (j : nat) (mret : gmap regidx (mword 64)),
        ⌜(j < NPROC)%nat⌝ -∗
@@ -443,7 +446,7 @@ Axiom wp_myproc :
                mword_of_int 24; mword_of_int 25; mword_of_int 26;
                mword_of_int 27] ->
           mret !!! Regidx r = m !!! Regidx r⌝ -∗
-       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
        pc_is ret_tgt -∗ gpr_file mret -∗
        WP (Loop : expr riscv_lang) {{ Phi }}) -∗
     WP (Loop : expr riscv_lang) {{ Phi }}.
@@ -456,13 +459,13 @@ Section WkScfgLeaves.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_auipc_s_scfg (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_auipc_s_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
     uint rd <> 0 ->
-    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (UTYPE (imm, Regidx rd, AUIPC)) -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec pc (auipc_off imm))]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -474,7 +477,7 @@ Section WkScfgLeaves.
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_auipc_s root_ppn Φ pc rd imm m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+    iApply (wp_auipc_s_pt root_ppn Φ pc rd imm m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
@@ -484,13 +487,13 @@ Section WkScfgLeaves.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-  Lemma wp_addi4_s_scfg (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_addi4_s_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64)) {dq : dfrac} :
     uint rd <> 0 ->
-    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg
         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))]> m) -∗
@@ -503,7 +506,7 @@ Section WkScfgLeaves.
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_addi4_s root_ppn Φ pc rd rs1 imm m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+    iApply (wp_addi4_s_pt root_ppn Φ pc rd rs1 imm m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
@@ -515,16 +518,16 @@ Section WkScfgLeaves.
 
 
 
-  Lemma wp_cld_s_ram_scfg (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cld_s_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : gmap regidx (mword 64)) (v : bv 64) {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
-    smode_config γ dq -∗ tlb_inv root_ppn -∗
+    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
     ea ↦₈{ dqm } v -∗
-    ( smode_config γ dq -∗ tlb_inv root_ppn -∗
+    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ea ↦₈{ dqm } v -∗
@@ -538,7 +541,7 @@ Section WkScfgLeaves.
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_cld_s_ram root_ppn Φ pc rd rs1 imm m v mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=dqm)
+    iApply (wp_cld_s_pt root_ppn Φ pc rd rs1 imm m v mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=dqm)
  Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hbw").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
@@ -554,7 +557,7 @@ Section ProcInv.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
   (* the ambient S-mode config a running/resumed kernel thread holds -- the same
-     [sconf] (smode_config γc + the SIE ghost half + tlb_inv) that wp_swtch is
+     [sconf] (smode_config γc + the SIE ghost half + tlb_inv_pt) that wp_swtch is
      now stated against, so a proc's saved context interoperates with swtch. *)
   Context (root_ppn : mword 44) (Phi : mval -> iProp Σ).
   Context (γc : gname) (bsie : mword 1) (dq : dfrac).
@@ -741,7 +744,7 @@ Section ProcInv.
     (forall r : regidx, r ∈ dom m) ->
     let spF := add_vec (m !!! Regidx (mword_of_int 2 : mword 5))
                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
-    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.wakeup) -∗ gpr_file m -∗
     wk_fcell spF 7 ↦₈ f7 -∗ wk_fcell spF 6 ↦₈ f6 -∗ wk_fcell spF 5 ↦₈ f5 -∗
@@ -754,7 +757,7 @@ Section ProcInv.
             (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5))
             (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
             (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) 0 ⌝ -∗
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗ gpr_file M -∗
         wk_frame spF (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
           (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
@@ -768,7 +771,7 @@ Section ProcInv.
     iPoseProof (wki_00 with "Htext") as "Hi00".
     iPoseProof (wki_02 with "Htext") as "Hi02".
     (* ---- f44: c.addi16sp sp,-64 (bundled) ---- *)
-    iApply (wp_caddi16sp_gpr_s root_ppn γc Phi (mword_of_int KernelSyms.wakeup)
+    iApply (wp_caddi16sp_gpr_s_pt root_ppn γc Phi (mword_of_int KernelSyms.wakeup)
               (mword_of_int 60 : mword 6) m 1
               with "Hsm Htlb Hpc Hfile Hi00 [-]").
     iIntros "Hsm Htlb Hpc Hfile".
@@ -784,7 +787,7 @@ Section ProcInv.
     iEval (rewrite Hpp02) in "Hpc".
     (* ---- f46: c.sdsp ra,56(sp) ---- *)
     iEval (rewrite /wk_fcell -HM1sp) in "Hc7".
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x02))
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x02))
               (mword_of_int 7 : mword 6) (mword_of_int 1 : mword 5) M1 f7
               (dq:=DfracOwn 1)
 
@@ -802,7 +805,7 @@ Section ProcInv.
     assert (Hs0v : M1 !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5)).
     { subst M1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     iEval (rewrite /wk_fcell -HM1sp) in "Hc6".
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x04))
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x04))
               (mword_of_int 6 : mword 6) (mword_of_int 8 : mword 5) M1 f6
               (dq:=DfracOwn 1)
 
@@ -817,7 +820,7 @@ Section ProcInv.
     assert (Hs1v : M1 !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5)).
     { subst M1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     iEval (rewrite /wk_fcell -HM1sp) in "Hc5".
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x06))
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x06))
               (mword_of_int 5 : mword 6) (mword_of_int 9 : mword 5) M1 f5
               (dq:=DfracOwn 1)
 
@@ -832,7 +835,7 @@ Section ProcInv.
     assert (Hs2v : M1 !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5)).
     { subst M1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     iEval (rewrite /wk_fcell -HM1sp) in "Hc4".
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x08))
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x08))
               (mword_of_int 4 : mword 6) (mword_of_int 18 : mword 5) M1 f4
               (dq:=DfracOwn 1)
 
@@ -847,7 +850,7 @@ Section ProcInv.
     assert (Hs3v : M1 !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5)).
     { subst M1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     iEval (rewrite /wk_fcell -HM1sp) in "Hc3".
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x0a))
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x0a))
               (mword_of_int 3 : mword 6) (mword_of_int 19 : mword 5) M1 f3
               (dq:=DfracOwn 1)
 
@@ -862,7 +865,7 @@ Section ProcInv.
     assert (Hs4v : M1 !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5)).
     { subst M1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     iEval (rewrite /wk_fcell -HM1sp) in "Hc2".
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x0c))
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x0c))
               (mword_of_int 2 : mword 6) (mword_of_int 20 : mword 5) M1 f2
               (dq:=DfracOwn 1)
 
@@ -877,7 +880,7 @@ Section ProcInv.
     assert (Hs5v : M1 !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5)).
     { subst M1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
     iEval (rewrite /wk_fcell -HM1sp) in "Hc1".
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x0e))
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x0e))
               (mword_of_int 1 : mword 6) (mword_of_int 21 : mword 5) M1 f1
               (dq:=DfracOwn 1)
 
@@ -889,7 +892,7 @@ Section ProcInv.
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x0e) : mword 64) 2
                     = mword_of_int (KernelSyms.wakeup + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_caddi4spn_gpr_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x10))
+    iApply (wp_caddi4spn_gpr_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x10))
               (Cregidx (mword_of_int 0)) (mword_of_int 16 : mword 8) (mword_of_int 8 : mword 5) M1
               (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -900,7 +903,7 @@ Section ProcInv.
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x10) : mword 64) 2
                     = mword_of_int (KernelSyms.wakeup + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
-    iApply (wp_cmv_gpr_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x12))
+    iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x12))
               (mword_of_int 20 : mword 5) (mword_of_int 10 : mword 5) _
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -911,7 +914,7 @@ Section ProcInv.
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x12) : mword 64) 2
                     = mword_of_int (KernelSyms.wakeup + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
-    iApply (wp_auipc_s_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x14))
+    iApply (wp_auipc_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x14))
               (mword_of_int 9 : mword 5) (mword_of_int 0x11 : mword 20) _
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -922,7 +925,7 @@ Section ProcInv.
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x14) : mword 64) 4
                     = mword_of_int (KernelSyms.wakeup + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
-    iApply (wp_addi4_s_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x18))
+    iApply (wp_addi4_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x18))
               (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 2066 : mword 12) _
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -933,7 +936,7 @@ Section ProcInv.
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x18) : mword 64) 4
                     = mword_of_int (KernelSyms.wakeup + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
-    iApply (wp_cli_gpr_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x1c))
+    iApply (wp_cli_gpr_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x1c))
               (mword_of_int 19 : mword 5) (mword_of_int 2 : mword 6) _
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -944,7 +947,7 @@ Section ProcInv.
     assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x1c) : mword 64) 2
                     = mword_of_int (KernelSyms.wakeup + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1e) in "Hpc".
-    iApply (wp_cli_gpr_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x1e))
+    iApply (wp_cli_gpr_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x1e))
               (mword_of_int 21 : mword 5) (mword_of_int 3 : mword 6) _
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -955,7 +958,7 @@ Section ProcInv.
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x1e) : mword 64) 2
                     = mword_of_int (KernelSyms.wakeup + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp20) in "Hpc".
-    iApply (wp_auipc_s_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x20))
+    iApply (wp_auipc_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x20))
               (mword_of_int 18 : mword 5) (mword_of_int 0x16 : mword 20) _
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -966,7 +969,7 @@ Section ProcInv.
     assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x20) : mword 64) 4
                     = mword_of_int (KernelSyms.wakeup + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp24) in "Hpc".
-    iApply (wp_addi4_s_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x24))
+    iApply (wp_addi4_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x24))
               (mword_of_int 18 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 518 : mword 12) _
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -980,7 +983,7 @@ Section ProcInv.
     assert (Hjtgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x28) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.wakeup + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_cj_s_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x28))
+    iApply (wp_cj_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x28))
               (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))) _
               (dq:=DfracOwn 1)
  ltac:(rewrite Hjtgt; vm_compute; reflexivity)
@@ -1044,7 +1047,7 @@ Section ProcInv.
     (forall r : regidx, r ∈ dom M) ->
     let rettgt := update_vec_dec (add_vec vra (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     eq_vec (access_vec_dec rettgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗ gpr_file M -∗
     wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
     ( ∀ Mf : gmap regidx (mword 64),
@@ -1065,7 +1068,7 @@ Section ProcInv.
         /\ Mf !!! Regidx (mword_of_int 26) = M !!! Regidx (mword_of_int 26)
         /\ Mf !!! Regidx (mword_of_int 27) = M !!! Regidx (mword_of_int 27)
         /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
         kernel_text -∗ pc_is rettgt -∗ gpr_file Mf -∗
         wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
         WP (Loop : expr riscv_lang) {{ Phi }}) -∗
@@ -1078,7 +1081,7 @@ Section ProcInv.
     (* ---- f9c: c.ldsp ra,56(sp) ---- *)
     iPoseProof (wki_58 with "Htext") as "Hi58".
     iEval (rewrite /wk_fcell -HspF) in "Hc7".
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x58))
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x58))
               (mword_of_int 7 : mword 6) (mword_of_int 1 : mword 5) M vra
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1094,7 +1097,7 @@ Section ProcInv.
     (* ---- f9e: c.ldsp s0,48(sp) ---- *)
     iPoseProof (wki_5a with "Htext") as "Hi5a".
     iEval (rewrite /wk_fcell -Hsp1) in "Hc6".
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x5a))
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x5a))
               (mword_of_int 6 : mword 6) (mword_of_int 8 : mword 5) M1 vs0
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1110,7 +1113,7 @@ Section ProcInv.
     (* ---- fa0: c.ldsp s1,40(sp) ---- *)
     iPoseProof (wki_5c with "Htext") as "Hi5c".
     iEval (rewrite /wk_fcell -Hsp2) in "Hc5".
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x5c))
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x5c))
               (mword_of_int 5 : mword 6) (mword_of_int 9 : mword 5) M2 vs1
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1126,7 +1129,7 @@ Section ProcInv.
     (* ---- fa2: c.ldsp s2,32(sp) ---- *)
     iPoseProof (wki_5e with "Htext") as "Hi5e".
     iEval (rewrite /wk_fcell -Hsp3) in "Hc4".
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x5e))
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x5e))
               (mword_of_int 4 : mword 6) (mword_of_int 18 : mword 5) M3 vs2
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1142,7 +1145,7 @@ Section ProcInv.
     (* ---- fa4: c.ldsp s3,24(sp) ---- *)
     iPoseProof (wki_60 with "Htext") as "Hi60".
     iEval (rewrite /wk_fcell -Hsp4) in "Hc3".
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x60))
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x60))
               (mword_of_int 3 : mword 6) (mword_of_int 19 : mword 5) M4 vs3
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1158,7 +1161,7 @@ Section ProcInv.
     (* ---- fa6: c.ldsp s4,16(sp) ---- *)
     iPoseProof (wki_62 with "Htext") as "Hi62".
     iEval (rewrite /wk_fcell -Hsp5) in "Hc2".
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x62))
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x62))
               (mword_of_int 2 : mword 6) (mword_of_int 20 : mword 5) M5 vs4
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1174,7 +1177,7 @@ Section ProcInv.
     (* ---- fa8: c.ldsp s5,8(sp) ---- *)
     iPoseProof (wki_64 with "Htext") as "Hi64".
     iEval (rewrite /wk_fcell -Hsp6) in "Hc1".
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x64))
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x64))
               (mword_of_int 1 : mword 6) (mword_of_int 21 : mword 5) M6 vs5
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1189,7 +1192,7 @@ Section ProcInv.
     iEval (rewrite Hpp66) in "Hpc".
     (* ---- faa: c.addi16sp sp,+64 (bundled) ---- *)
     iPoseProof (wki_66 with "Htext") as "Hi66".
-    iApply (wp_caddi16sp_gpr_s root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x66))
+    iApply (wp_caddi16sp_gpr_s_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x66))
               (mword_of_int 4 : mword 6) M7 1
               with "Hsm Htlb Hpc Hfile Hi66 [-]").
     iIntros "Hsm Htlb Hpc Hfile".
@@ -1203,7 +1206,7 @@ Section ProcInv.
     (* the c.ret target computed by the leaf from [M8 !!! ra] is [rettgt]. *)
     assert (HM8ra : M8 !!! Regidx (mword_of_int 1 : mword 5) = vra).
     { rewrite /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1. wk_peel. reflexivity. }
-    iApply (wp_cret_s_zca_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x68))
+    iApply (wp_cret_s_zca_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x68))
               (mword_of_int 1 : mword 5) M8
               (dq:=DfracOwn 1)
 
@@ -1337,13 +1340,13 @@ Section ProcInv.
           /\ Mexit !!! Regidx (mword_of_int 26) = vs10
           /\ Mexit !!! Regidx (mword_of_int 27) = vs11
           /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗ gpr_file Mexit -∗
         wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
         WP (Loop : expr riscv_lang) {{ Phi }}) -∗
     ∀ (k : nat) (M : gmap regidx (mword 64)),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜wk_loop_regs M spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗ gpr_file M -∗
       wk_res γs spF a0f noffv n -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
       WP (Loop : expr riscv_lang) {{ Phi }}.
@@ -1366,11 +1369,11 @@ Section ProcInv.
           /\ Mexit !!! Regidx (mword_of_int 26) = vs10
           /\ Mexit !!! Regidx (mword_of_int 27) = vs11
           /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
-                   smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+                   smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗ gpr_file Mexit -∗
                    wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                    WP (Loop : expr riscv_lang) {{ Phi }}) -∗
-               smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+               smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
                kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗ gpr_file M -∗
                wk_res γs spF a0f noffv n -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                WP (Loop : expr riscv_lang) {{ Phi }})%I with "[]" as "Hloop".
@@ -1387,7 +1390,7 @@ Section ProcInv.
        (0x3c taken) and the release-return path (0x2c). ---- *)
     iAssert (∀ Mt : gmap regidx (mword 64),
                ⌜ wk_loop_regs Mt spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
-               smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+               smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
                pc_is (mword_of_int (KernelSyms.wakeup + 0x30)) -∗ gpr_file Mt -∗
                wk_res γs spF a0f noffv n -∗ wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                WP (Loop : expr riscv_lang) {{ Phi }})%I
@@ -1397,7 +1400,7 @@ Section ProcInv.
       iPoseProof (wki_30 with "Htext") as "Hi30".
       iPoseProof (wki_34 with "Htext") as "Hi34".
       (* 0x30 addi s1,s1,360 : s1 := &proc[k+1] *)
-      iApply (wp_addi_s root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x30))
+      iApply (wp_addi_s_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x30))
                 (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 360 : mword 12)
                 (proc_addr (S k)) Mt (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1417,7 +1420,7 @@ Section ProcInv.
       destruct (eq_vec (Mt30 !!! Regidx (mword_of_int 9 : mword 5))
                        (Mt30 !!! Regidx (mword_of_int 18 : mword 5))) eqn:Hcmp.
       + (* TAKEN: p reached &proc[NPROC]; exit to epilogue at wakeup+0x58 *)
-        iApply (wp_beq_taken_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x34))
+        iApply (wp_beq_taken_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x34))
                   (mword_of_int 36 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5)
                   Mt30 (dq:=DfracOwn 1)
 
@@ -1441,7 +1444,7 @@ Section ProcInv.
         split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht27 | vm_compute; discriminate]|].
         intro r. rewrite /Mt30 dom_insert_L. apply elem_of_union_r. apply Htdom.
       + (* FALL: p < &proc[NPROC]; recurse into iteration k+1 *)
-        iApply (wp_beq_fall_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x34))
+        iApply (wp_beq_fall_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x34))
                   (mword_of_int 36 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5)
                   Mt30 (dq:=DfracOwn 1)
 
@@ -1482,7 +1485,7 @@ Section ProcInv.
     (* extract the persistent hw_config/minstret_inv for the (2-aligned-target)
        zca jal leaves used by the myproc/acquire/release calls. *)
     (* ---- 0x38: jal ra, myproc (base JAL, 2-aligned target) ---- *)
-    iApply (wp_jal_gpr_s_zca root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x38))
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x38))
               (mword_of_int 1 : mword 5) (mword_of_int 2095482 : mword 21) M 1%Qp
  ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
               with "Hsm Htlb Hpc Hfile Hi38 [-]").
@@ -1516,7 +1519,7 @@ Section ProcInv.
     destruct (eq_vec (mret !!! Regidx (mword_of_int 10 : mword 5))
                      (mret !!! Regidx (mword_of_int 9 : mword 5))) eqn:Hcmp3.
     - (* TAKEN: a0 = s1 (current proc is myproc): skip to 0x30 (p++) *)
-      iApply (wp_beq_taken_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x3c))
+      iApply (wp_beq_taken_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x3c))
                 (mword_of_int 8180 : mword 13) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
                 mret (dq:=DfracOwn 1)
 
@@ -1558,7 +1561,7 @@ Section ProcInv.
               rewrite /Mj lookup_total_insert_ne; [exact Hs11 | vm_compute; discriminate]|].
       exact Hdommret.
     - (* FALL: a0 <> s1: acquire proc[k], check state/chan, maybe wake, release *)
-      iApply (wp_beq_fall_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x3c))
+      iApply (wp_beq_fall_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x3c))
                 (mword_of_int 8180 : mword 13) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
                 mret (dq:=DfracOwn 1)
 
@@ -1587,7 +1590,7 @@ Section ProcInv.
         rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Htp. }
       iPoseProof (wki_40 with "Htext") as "Hi40".
       (* 0x40 c.mv a0,s1 : a0 := &proc[k] *)
-      iApply (wp_cmv_gpr_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x40))
+      iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x40))
                 (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                 mret (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1600,7 +1603,7 @@ Section ProcInv.
       iEval (rewrite Hpp42) in "Hpc".
       iPoseProof (wki_42 with "Htext") as "Hi42".
       (* 0x42 jal ra,acquire *)
-      iApply (wp_jal_gpr_s_zca root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x42))
+      iApply (wp_jal_gpr_s_zca_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x42))
                 (mword_of_int 1 : mword 5) (mword_of_int 2092148 : mword 21) M40 1%Qp
  ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
                 with "Hsm Htlb Hpc Hfile Hi42 [-]").
@@ -1744,7 +1747,7 @@ Section ProcInv.
                    Mr !!! Regidx (mword_of_int 27 : mword 5) = vs11 /\
                    (forall r : regidx, r ∈ dom Mr) ⌝ -∗
                  smode_config γc (DfracOwn 1) -∗
-                 tlb_inv root_ppn -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
+                 tlb_inv_pt root_ppn -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
                  gpr_file Mr -∗ locked γk -∗ proc_lock_res γk (proc_addr k) -∗
                  WP (Loop : expr riscv_lang) {{ Phi }})%I
         with "[Hgc Hstk Hnoff2 Hint2 Hcpu2 Hlockback Hframe Htail]"
@@ -1754,7 +1757,7 @@ Section ProcInv.
         iPoseProof (wki_2a with "Htext") as "Hi2a".
         iPoseProof (wki_2c with "Htext") as "Hi2c".
         (* 0x2a c.mv a0,s1 : a0 := &proc[k] *)
-        iApply (wp_cmv_gpr_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x2a))
+        iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x2a))
                   (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                   Mr (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -1766,7 +1769,7 @@ Section ProcInv.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp2c) in "Hpc".
         (* 0x2c jal ra,release *)
-        iApply (wp_jal_gpr_s_zca root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x2c))
+        iApply (wp_jal_gpr_s_zca_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x2c))
                   (mword_of_int 1 : mword 5) (mword_of_int 2092306 : mword 21) Mr2a 1%Qp
  ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
                   with "Hsm Htlb Hpc Hfile Hi2c [-]").
@@ -1889,7 +1892,7 @@ Section ProcInv.
         replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00"))))
            with (mword_of_int 24 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         reflexivity. }
-      iApply (wp_clw_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x46))
+      iApply (wp_clw_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x46))
                 (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")))
                 Macq st (dq:=DfracOwn 1)
@@ -1939,7 +1942,7 @@ Section ProcInv.
       destruct (neq_vec (M48 !!! Regidx (mword_of_int 15 : mword 5))
                         (M48 !!! Regidx (mword_of_int 19 : mword 5))) eqn:Hcmp48.
       + (* TAKEN: state != SLEEPING -> reassemble proc_lock_res, release *)
-        iApply (wp_bne_taken_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x48))
+        iApply (wp_bne_taken_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x48))
                   (mword_of_int 8162 : mword 13) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
                   M48 (dq:=DfracOwn 1)
 
@@ -1958,7 +1961,7 @@ Section ProcInv.
                       | exact HM48_22 | exact HM48_23 | exact HM48_24
                       | exact HM48_25 | exact HM48_26 | exact HM48_27 | exact HdomM48].
       + (* FALL: state == SLEEPING -> load chan ---- *)
-        iApply (wp_bne_fall_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x48))
+        iApply (wp_bne_fall_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x48))
                   (mword_of_int 8162 : mword 13) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
                   M48 (dq:=DfracOwn 1)
 
@@ -1983,7 +1986,7 @@ Section ProcInv.
           replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 5) ('b"000")))) with (mword_of_int 32 : mword 64)
             by (apply bv_eq; vm_compute; reflexivity).
           reflexivity. }
-        iApply (wp_cld_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x4c))
+        iApply (wp_cld_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x4c))
                   (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 5) ('b"000")))
                   M48 ch (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -2030,7 +2033,7 @@ Section ProcInv.
         destruct (neq_vec (M4e !!! Regidx (mword_of_int 15 : mword 5))
                           (M4e !!! Regidx (mword_of_int 20 : mword 5))) eqn:Hcmp4e.
         * (* TAKEN: chan mismatch -> release *)
-          iApply (wp_bne_taken_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x4e))
+          iApply (wp_bne_taken_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x4e))
                     (mword_of_int 8156 : mword 13) (mword_of_int 20 : mword 5) (mword_of_int 15 : mword 5)
                     M4e (dq:=DfracOwn 1)
 
@@ -2049,7 +2052,7 @@ Section ProcInv.
                         | exact HM4e_22 | exact HM4e_23 | exact HM4e_24
                         | exact HM4e_25 | exact HM4e_26 | exact HM4e_27 | exact HdomM4e].
         * (* FALL: chan matches -> wake (state := RUNNABLE) *)
-          iApply (wp_bne_fall_s_config_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x4e))
+          iApply (wp_bne_fall_s_config_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x4e))
                     (mword_of_int 8156 : mword 13) (mword_of_int 20 : mword 5) (mword_of_int 15 : mword 5)
                     M4e (dq:=DfracOwn 1)
 
@@ -2068,7 +2071,7 @@ Section ProcInv.
             replace (sign_extend' 64 (mword_of_int 24 : mword 12)) with (mword_of_int 24 : mword 64)
               by (apply bv_eq; vm_compute; reflexivity).
             reflexivity. }
-          iApply (wp_sw_s_ram_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x52))
+          iApply (wp_sw_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x52))
                     (mword_of_int 21 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
                     M4e st (dq:=DfracOwn 1)
 
@@ -2092,7 +2095,7 @@ Section ProcInv.
           assert (H56tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64)
                             (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0"))))
                           = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
-          iApply (wp_cj_s_scfg root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x56))
+          iApply (wp_cj_s_scfg_pt root_ppn γc Phi (mword_of_int (KernelSyms.wakeup + 0x56))
                     (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0"))) _
                     (dq:=DfracOwn 1)
  ltac:(rewrite H56tgt; vm_compute; reflexivity)
@@ -2167,7 +2170,7 @@ Section ProcInv.
     wk_noff_rel (wk_noff_acq noffv) = noffv ->
     eq_vec (access_vec_dec (update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
               (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+    smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗ gpr_file m -∗
     wk_fcell spF 7 ↦₈ f7 -∗ wk_fcell spF 6 ↦₈ f6 -∗ wk_fcell spF 5 ↦₈ f5 -∗
     wk_fcell spF 4 ↦₈ f4 -∗ wk_fcell spF 3 ↦₈ f3 -∗ wk_fcell spF 2 ↦₈ f2 -∗
@@ -2175,7 +2178,7 @@ Section ProcInv.
     wk_res γs spF a0f noffv n -∗ procs_inv γs -∗
     ( ∀ Mf : gmap regidx (mword 64),
         ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv root_ppn -∗
+        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ tlb_inv_pt root_ppn -∗
         kernel_text -∗
         pc_is (update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
                  (sign_extend' 64 (zeros' 12))) 0 ('b"0")) -∗ gpr_file Mf -∗

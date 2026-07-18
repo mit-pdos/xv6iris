@@ -45,7 +45,7 @@
    The per-trap frame is the CONCRETE [intr_frame]: [stack_own] of depth AT
    LEAST [kv_frame_slots] below the interrupted sp -- the kernel must
    maintain that much free stack at every interrupts-enabled instruction --
-   plus menvcfg and tlb_inv.  [kernelvec_handler_spec] proves the real
+   plus menvcfg and tlb_inv_pt.  [kernelvec_handler_spec] proves the real
    kernelvec ([wp_kernelvec], WpKernelvecNew.v) satisfies the contract. *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
@@ -66,6 +66,9 @@ Require Import WpIntrBits WpIntrCore.
 Require WpGprCsrwCommon WpGprCsrwC.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* ===================================================================== *)
@@ -235,7 +238,7 @@ Section WpIntrInv.
   (* LEAST [kv_frame_slots] (32 slots = 256 bytes, kernelvec's c.addi16sp  *)
   (* frame) BELOW SP AT EVERY INTERRUPTS-ENABLED INSTRUCTION -- the trap   *)
   (* saves its 17 caller-saved registers into the top of that region --    *)
-  (* plus the allocation-fixed menvcfg cell and tlb_inv.  The depth is a   *)
+  (* plus the allocation-fixed menvcfg cell and tlb_inv_pt.  The depth is a   *)
   (* BOUND (existential), so a client simply packs in however much free    *)
   (* stack it currently owns below sp.  The frame exists because the       *)
   (* handler genuinely USES m-dependent resources beyond the register      *)
@@ -260,7 +263,7 @@ Section WpIntrInv.
   Definition intr_frame (root_ppn : mword 44) (menvcfg0 : mword 64)
       (m : gmap regidx (mword 64)) : iProp Σ :=
     (menvcfg ↦ᵣ menvcfg0 ∗
-     tlb_inv root_ppn ∗
+     tlb_inv_pt root_ppn ∗
      (∃ n : nat, ⌜ (kv_frame_slots <= n)%nat ⌝ ∗
                  stack_own (m !!! Regidx csp_rs1) n))%I.
 

@@ -86,6 +86,7 @@ WpSmodePtCtl.v
 WpSmodePtMem.v
 WpSmodePtMemWrap.v
 WpSmodePtLock.v
+WpSmodePtUart.v
 InstrBytes.v
 KernelText.v
 StackOwn.v

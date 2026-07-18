@@ -8,10 +8,10 @@
    its prologue/epilogue.  The three instructions that are neither ordinary
    value-ALU ops nor stack-slot VCgen ops are handled by dedicated [_scfg]
    leaves (each threads the same [smode_config] bundle):
-     - c.mv  s1,a0     (0x96c) : [wp_cmv_gpr_s_config_scfg] (WpSmodeRtype)
-     - c.addi16sp sp,32 (0x9ae): [wp_caddi16sp_gpr_s]       (WpSmodeGpr; +32
+     - c.mv  s1,a0     (0x96c) : [wp_cmv_gpr_s_config_scfg_pt] (WpSmodeRtype)
+     - c.addi16sp sp,32 (0x9ae): [wp_caddi16sp_gpr_s_pt]       (WpSmodeGpr; +32
        is out of c.addi's range so it cannot be folded into the VCgen block)
-     - c.ret           (0x9b0) : [wp_cret_s_zca_scfg]       (WpSmodeJalr) *)
+     - c.ret           (0x9b0) : [wp_cret_s_zca_scfg_pt]       (WpSmodeJalr) *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -34,6 +34,9 @@ Require Import WpUart.
 Require Import WpUartPutcSync.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 Notation UPS := KernelSyms.uartputc_sync.
@@ -167,7 +170,7 @@ Section WpUartPutcSyncFull.
 
   (* ------------------------------------------------------------------- *)
   (* Prologue 0x962..0x96a as a VCgen block (the c.mv s1,a0 at 0x96c is    *)
-  (* NOT a vop_s -- handled by [wp_cmv_gpr_s_config] after the block):     *)
+  (* NOT a vop_s -- handled by [wp_cmv_gpr_s_config_pt] after the block):     *)
   (*   c.addi  sp,-32   ·  sd ra,24(sp) · sd s0,16(sp) · sd s1,8(sp)       *)
   (*   · c.addi4spn s0,sp,32                                                *)
   (* ------------------------------------------------------------------- *)
@@ -298,7 +301,7 @@ Section WpUartPutcSyncFull.
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
     smode_config γ (DfracOwn q) -∗
-    tlb_inv root_ppn -∗ kernel_text -∗
+    tlb_inv_pt root_ppn -∗ kernel_text -∗
     pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
@@ -306,7 +309,7 @@ Section WpUartPutcSyncFull.
     dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ mf,
       smode_config γ (DfracOwn q) -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mf -∗
       ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
@@ -432,7 +435,7 @@ Section WpUartPutcSyncFull.
     (* c.mv s1,a0 at 0x96c: s1 := a0.                                       *)
     (* ------------------------------------------------------------------ *)
     iPoseProof (upi_0a with "Htext") as "Hi0a".
-    iApply (wp_cmv_gpr_s_config_scfg root_ppn γ Φ (mword_of_int (UPS + 0x0a)) s1_idx a0_idx M1
+    iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γ Φ (mword_of_int (UPS + 0x0a)) s1_idx a0_idx M1
               (dq:=DfracOwn q)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi0a [-]").
@@ -535,7 +538,7 @@ Section WpUartPutcSyncFull.
                     = (mword_of_int (UPS + 0x4c) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4c) in "Hpc".
-    iApply (wp_caddi16sp_gpr_s root_ppn γ Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) M2 q
+    iApply (wp_caddi16sp_gpr_s_pt root_ppn γ Φ (mword_of_int (UPS + 0x4c)) (mword_of_int 2) M2 q
               with "Hsm Htlbinv Hpc Hfile Hi4c [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     set (m_epi2 := <[Regidx csp_rs1 := regval_into_reg
@@ -554,7 +557,7 @@ Section WpUartPutcSyncFull.
                     = (mword_of_int (UPS + 0x4e) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4e) in "Hpc".
-    iApply (wp_cret_s_zca_scfg root_ppn γ Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
+    iApply (wp_cret_s_zca_scfg_pt root_ppn γ Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1) m_epi2
               (dq:=DfracOwn q)
  ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra_final; exact Hal0)

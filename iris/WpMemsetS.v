@@ -14,8 +14,8 @@
    funct3 = 000 -- an ordinary C.ADDI to x2, NOT c.addi16sp).  It is register-
    only (it writes just [sp]; no memory access), so it needs no data-page Sv39
    geometry -- only the FETCH side conditions of the S-mode step engine.  We
-   run it on [wp_rvc_gpr_write_s] (the generic S-mode RVC gpr-write engine, the
-   same one [wp_caddi16sp_gpr_s] is built on), specialising the ExecuteAs base
+   run it on [wp_rvc_gpr_write_s_pt] (the generic S-mode RVC gpr-write engine, the
+   same one [wp_caddi16sp_gpr_s_pt] is built on), specialising the ExecuteAs base
    to the [ITYPE ADDI] expansion.
 
    THE THEOREM ([wp_memset_s]): from [memset]'s entry PC in S-mode -- with the
@@ -44,6 +44,9 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 Section WpMemsetS.
@@ -277,7 +280,7 @@ Qed.
 
   (* =================================================================== *)
   (*  Base (4-byte) register-write S-mode engine -- the [is_rvc = false]   *)
-  (*  analogue of [wp_rvc_gpr_write_s]: any base instruction [i] that       *)
+  (*  analogue of [wp_rvc_gpr_write_s_pt]: any base instruction [i] that       *)
   (*  writes ONE gpr [rd := wval].  Used for memset's [add a4,a2,a0].       *)
   (*  Extra premise: the SECOND fetch half also has fetch geometry.         *)
   (* =================================================================== *)
@@ -939,12 +942,12 @@ Qed.
   (* =================================================================== *)
   (*  UNBUNDLED register-write engine (RVC), on wp_instr_s_config: reads   *)
   (*  cur_privilege..tlb as separate cells (not the smode_config bundle),  *)
-  (*  so it composes with wp_sb_s without a bundle round-trip losing the   *)
-  (*  MXR/PMM facts the store needs.  Payload mirrors wp_rvc_gpr_write_s.   *)
+  (*  so it composes with wp_sb_s_pt without a bundle round-trip losing the   *)
+  (*  MXR/PMM facts the store needs.  Payload mirrors wp_rvc_gpr_write_s_pt.   *)
   (* =================================================================== *)
 
 
-  (* ---- unbundled c.addi rd,imm (on wp_gpr_write_s_config) ---- *)
+  (* ---- unbundled c.addi rd,imm (on wp_gpr_write_s_config_pt) ---- *)
 
 
   (* ---- unbundled bne rs1,rs2 NOT taken (rs1=rs2): fall to pc+4 ---- *)
@@ -1001,7 +1004,7 @@ Qed.
   (*  Runs [rem] iterations, filling the [rem] pending bytes at a5..a4-1   *)
   (*  with a1's low byte, ending (bne falls through) at 0xcea with a5=a4.  *)
   (*  Proved by induction on [rem]; the whole body runs on the unbundled   *)
-  (*  cell interface (wp_sb_s ; wp_caddi_gpr_s_config ; wp_bne_*_s_config) *)
+  (*  cell interface (wp_sb_s_pt ; wp_caddi_gpr_s_config_pt ; wp_bne_*_s_config) *)
   (*  so no smode_config round-trip loses the store's MXR/PMM facts.       *)
   (*  The per-byte Sv39/PMP geometry and the pointer arithmetic (byte j's  *)
   (*  address, a5+1 vs a4) are provided as hypotheses quantified over the  *)
@@ -1072,7 +1075,7 @@ Qed.
   Proof. reflexivity. Qed.
 
   (* ---- c.addi rd,rd,imm on the [smode_config] bundle: thin wrapper over the
-     unbundled [wp_caddi_gpr_s_config] (the add preserves every config cell). *)
+     unbundled [wp_caddi_gpr_s_config_pt] (the add preserves every config cell). *)
 
   (* ---- c.mv rd,rs2 (== add rd,x0,rs2) on the [smode_config] bundle. *)
 
@@ -1100,7 +1103,7 @@ Qed.
        legalizes the bit1 = 1 target in the relocated image). *)
     add_vec pc6 (sign_extend' 64 imm_bne) = pc0 ->
     eq_vec (access_vec_dec pc0 0) ('b"0") = true ->
-    (* store geometry (svpn := svpn_of a8) is derived internally at [wp_sb_s]. *)
+    (* store geometry (svpn := svpn_of a8) is derived internally at [wp_sb_s_pt]. *)
     (* pointer arithmetic: c.addi advances offset; bne compares a5+1 vs a4=e *)
     (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
     (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
@@ -1116,12 +1119,12 @@ Qed.
     m !!! Regidx ra4 = e ->
     m !!! Regidx ra1 = cval ->
     smode_config γ dq -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗
     pc_is pc0 -∗ gpr_file m -∗
     ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
     ( smode_config γ dq -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc6 4) -∗
       gpr_file (<[Regidx ra5 := regval_into_reg (ms_addr p N)]> m) -∗
       ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
@@ -1144,14 +1147,14 @@ Qed.
     rewrite big_sepL_cons.
     iDestruct "Hbuf" as "[Hb0 Hbuf]".
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
-    iApply (wp_sb_s root_ppn γ Φ pc0 ra1 ra5 (mword_of_int 0) m (olds off) (dq:=dq)
+    iApply (wp_sb_s_pt root_ppn γ Φ pc0 ra1 ra5 (mword_of_int 0) m (olds off) (dq:=dq)
 
               with "Hsm Htlbinv Hpc Hfile Hi0 [Hb0]").
     { (* the byte points-to at ms_pa (m!!!ra5) = ms_pa (ms_addr p off) *)
       unfold ms_pa, ms_a8. rewrite Hcur. iExact "Hb0". }
     iIntros "Hsm Htlbinv Hpc Hfile Hb0".
     (* --- 0xce4: c.addi a5, a5, 1 : a5 := a5 + 1 --- *)
-    iApply (wp_caddi_gpr_s root_ppn γ Φ pc4 ra5 (mword_of_int 1) m (dq:=dq)
+    iApply (wp_caddi_gpr_s_pt root_ppn γ Φ pc4 ra5 (mword_of_int 1) m (dq:=dq)
  Hra5
               with "Hsm Htlbinv [Hpc] Hfile Hi4 [-]").
     { unfold pc4. iExact "Hpc". }
@@ -1171,7 +1174,7 @@ Qed.
     destruct rem' as [|rem''].
     - (* last iteration: S off = N, bne falls through to 0xcea *)
       assert (HSN : (S off = N)%nat) by lia.
-      iApply (wp_bne_fall_s root_ppn γ Φ pc6 imm_bne ra4 ra5 m' (dq:=dq)
+      iApply (wp_bne_fall_s_pt root_ppn γ Φ pc6 imm_bne ra4 ra5 m' (dq:=dq)
  Hra5 Hra4
                 ltac:(rewrite Hm'a5 Hm'a4; rewrite (Hcmp off HoffN); rewrite HSN Nat.eqb_refl; reflexivity)
                 with "Hsm Htlbinv [Hpc] Hfile Hi6 [-]").
@@ -1190,7 +1193,7 @@ Qed.
         iSplitL "Hb0"; [ iEval (rewrite Hcur; rewrite Hm1) in "Hb0"; iExact "Hb0" | done ].
     - (* more iterations: S off < N, bne taken back to the loop head pc0 *)
       assert (HSN : (S off < N)%nat) by lia.
-      iApply (wp_bne_taken_s root_ppn γ Φ pc6 imm_bne ra4 ra5 m' (dq:=dq)
+      iApply (wp_bne_taken_s_pt root_ppn γ Φ pc6 imm_bne ra4 ra5 m' (dq:=dq)
  Hra5 Hra4
                 ltac:(rewrite Hm'a5 Hm'a4; rewrite (Hcmp off HoffN);
                       replace (Nat.eqb (S off) N) with false by (symmetry; apply Nat.eqb_neq; lia); reflexivity)
@@ -1261,7 +1264,7 @@ Qed.
     (* load geometry for the two frame slots: just the one "PMP TOR entry 0 covers all
        of RAM" fact -- the _ram wrappers derive the rest from the owned points-to. *)
     smode_config γ dq -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     pc_is pcL -∗ gpr_file m -∗
     instr pcL true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx ra_idx, false, 8)) -∗
     instr (add_vec_int pcL 2) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx s0_idx, false, 8)) -∗
@@ -1270,7 +1273,7 @@ Qed.
     pa_ra ↦₈{ dqm } ra0 -∗
     pa_s0 ↦₈{ dqm } s00 -∗
     ( smode_config γ dq -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       pa_ra ↦₈{ dqm } ra0 -∗
       pa_s0 ↦₈{ dqm } s00 -∗
@@ -1288,7 +1291,7 @@ Qed.
     iIntros "Hsm Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hbra Hbs0 Hcont".
     (* cea: c.ldsp ra,8(sp) : ra := ra0 *)
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γ Φ pcL (mword_of_int 1) ra_idx m ra0
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γ Φ pcL (mword_of_int 1) ra_idx m ra0
               (dq:=dq)(dqm:=dqm)
  Hrai
              
@@ -1299,7 +1302,7 @@ Qed.
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp')
       by (unfold m1; rewrite lookup_total_insert_ne; [ exact Hsp | exact Hrasp ]).
     (* cec: c.ldsp s0,0(sp) : s0 := s00 *)
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γ Φ (add_vec_int pcL 2) (mword_of_int 0) s0_idx
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γ Φ (add_vec_int pcL 2) (mword_of_int 0) s0_idx
               m1 s00
               (dq:=dq)(dqm:=dqm)
  Hs0i
@@ -1309,7 +1312,7 @@ Qed.
     iIntros "Hsm Htlbinv Hpc Hfile Hbs0".
     set (m2 := <[Regidx s0_idx := regval_into_reg s00]> m1).
     (* cee: c.addi sp,16 : sp := sp'+16 *)
-    iApply (wp_caddi_gpr_s_config_scfg root_ppn γ Φ (add_vec_int pcL 4) csp_rs1 imm_dealloc
+    iApply (wp_caddi_gpr_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcL 4) csp_rs1 imm_dealloc
               m2
               (dq:=dq)
  ltac:(vm_compute; discriminate)
@@ -1323,7 +1326,7 @@ Qed.
       rewrite lookup_total_insert. reflexivity. }
     (* cf0: ret (c.jr ra) : PC := ra0 (low bit cleared).  Uses the Zca return
        so a 2-aligned target (bit1 = 1) is fine; only bit0 = 0 is required. *)
-    iApply (wp_cret_s_zca_scfg root_ppn γ Φ (add_vec_int pcL 6) ra_idx
+    iApply (wp_cret_s_zca_scfg_pt root_ppn γ Φ (add_vec_int pcL 6) ra_idx
               m3
               (dq:=dq)
 
@@ -1398,7 +1401,7 @@ Qed.
        rest (canonicality, identity translation, the gigapage masks, PMP match) from
        the owned points-to (addr_is_ram) themselves. *)
     smode_config γ dq -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     pc_is pcE -∗ gpr_file m0 -∗
     instr pcE true (ITYPE (sign_extend' 12 imm_entry, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     instr (add_vec_int pcE 2) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx ra_idx, sp, 8)) -∗
@@ -1412,7 +1415,7 @@ Qed.
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
     ( smode_config γ dq -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pcE 20) -∗ gpr_file m6 -∗
       pa_ra ↦₈ (m0 !!! Regidx ra_idx) -∗
       pa_s0 ↦₈ (m0 !!! Regidx s0_idx) -∗
@@ -1426,7 +1429,7 @@ Qed.
     iIntros "Hsm Htlbinv
              Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 Hbra Hbs0 Hcont".
     (* ccc: c.addi sp,-16 : sp := sp' *)
-    iApply (wp_caddi_gpr_s_config_scfg root_ppn γ Φ pcE csp_rs1 imm_entry m0
+    iApply (wp_caddi_gpr_s_config_scfg_pt root_ppn γ Φ pcE csp_rs1 imm_entry m0
               (dq:=dq)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi0 [-]").
@@ -1434,7 +1437,7 @@ Qed.
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)))]> m0)
       with m1.
     (* cce: c.sdsp ra,8(sp) : store ra0 to 8(sp') *)
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γ Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 vra
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γ Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 vra
               (dq:=dq)
 
              
@@ -1442,7 +1445,7 @@ Qed.
     { rewrite Hsp1. iExact "Hbra". }
     iIntros "Hsm Htlbinv Hpc Hfile Hbra".
     (* cd0: c.sdsp s0,0(sp) : store s00 to 0(sp') *)
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γ Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 vs0
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γ Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 vs0
               (dq:=dq)
 
              
@@ -1450,7 +1453,7 @@ Qed.
     { rewrite Hsp1. iExact "Hbs0". }
     iIntros "Hsm Htlbinv Hpc Hfile Hbs0".
     (* cd2: c.addi4spn s0,sp,16 : s0 := sp'+16 *)
-    iApply (wp_caddi4spn_gpr_s_config_scfg root_ppn γ Φ (add_vec_int pcE 6) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1
+    iApply (wp_caddi4spn_gpr_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcE 6) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1
               (dq:=dq)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi6 [-]").
@@ -1458,14 +1461,14 @@ Qed.
     change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1)
       with m2.
     (* cd4: c.beqz a2,cea : n<>0, fall through *)
-    iApply (wp_cbeqz_fall_s_config_scfg root_ppn γ Φ (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx m2
+    iApply (wp_cbeqz_fall_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx m2
               (dq:=dq)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(unfold m2, m1; rewrite lookup_total_insert_ne; [ rewrite lookup_total_insert_ne; [ exact Hn0 | vm_compute; discriminate ] | vm_compute; discriminate ])
               with "Hsm Htlbinv Hpc Hfile Hi8 [-]").
     iIntros "Hsm Htlbinv Hpc Hfile".
     (* cd6: c.mv a5,a0 : a5 := a0 *)
-    iApply (wp_cmv_gpr_s_config_scfg root_ppn γ Φ (add_vec_int pcE 10) a5_idx a0_idx m2
+    iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcE 10) a5_idx a0_idx m2
               (dq:=dq)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi10 [-]").
@@ -1473,7 +1476,7 @@ Qed.
     change (<[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2)
       with m3.
     (* cd8: c.slli a2,32 : a2 := a2 << shamt_l *)
-    iApply (wp_cslli_gpr_s_config_scfg root_ppn γ Φ (add_vec_int pcE 12) (Regidx a2_idx) a2_idx shamt_l m3
+    iApply (wp_cslli_gpr_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcE 12) (Regidx a2_idx) a2_idx shamt_l m3
               (dq:=dq)
  ltac:(reflexivity) ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi12 [-]").
@@ -1481,7 +1484,7 @@ Qed.
     change (<[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3)
       with m4.
     (* cda: c.srli a2,32 : a2 := a2 >> shamt_r *)
-    iApply (wp_csrli_gpr_s_config_scfg root_ppn γ Φ (add_vec_int pcE 14) (Cregidx (mword_of_int 4)) a2_idx shamt_r m4
+    iApply (wp_csrli_gpr_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcE 14) (Cregidx (mword_of_int 4)) a2_idx shamt_r m4
               (dq:=dq)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi14 [-]").
@@ -1489,7 +1492,7 @@ Qed.
     change (<[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4)
       with m5.
     (* cdc: add a4,a2,a0 : a4 := a2 + a0 (end pointer) *)
-    iApply (wp_add_s root_ppn γ Φ (add_vec_int pcE 16) a4_idx a2_idx a0_idx wval_add m5
+    iApply (wp_add_s_pt root_ppn γ Φ (add_vec_int pcE 16) a4_idx a2_idx a0_idx wval_add m5
               (dq:=dq)
  ltac:(vm_compute; discriminate) Hvalue_add
               with "Hsm Htlbinv Hpc Hfile Hi16 [-]").
@@ -1533,7 +1536,7 @@ Qed.
     add_vec (add_vec_int pcE 8) (sign_extend' 64 (sign_extend' 13 (concat_vec imm8_beqz ('b"0")))) = pcL ->
     eq_vec (access_vec_dec pcL 0) ('b"0") = true ->
     smode_config γ dq -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     pc_is pcE -∗ gpr_file m0 -∗
     instr pcE true (ITYPE (sign_extend' 12 imm_entry, Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
     instr (add_vec_int pcE 2) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx ra_idx, sp, 8)) -∗
@@ -1543,7 +1546,7 @@ Qed.
     pa_ra ↦₈ vra -∗
     pa_s0 ↦₈ vs0 -∗
     ( smode_config γ dq -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is pcL -∗ gpr_file m2 -∗
       pa_ra ↦₈ (m0 !!! Regidx ra_idx) -∗
       pa_s0 ↦₈ (m0 !!! Regidx s0_idx) -∗
@@ -1555,7 +1558,7 @@ Qed.
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = sp') by (unfold m1; rewrite lookup_total_insert; reflexivity).
     iIntros "Hsm Htlbinv Hpc Hfile Hi0 Hi2 Hi4 Hi6 Hi8 Hbra Hbs0 Hcont".
     (* ccc: c.addi sp,-16 : sp := sp' *)
-    iApply (wp_caddi_gpr_s_config_scfg root_ppn γ Φ pcE csp_rs1 imm_entry m0
+    iApply (wp_caddi_gpr_s_config_scfg_pt root_ppn γ Φ pcE csp_rs1 imm_entry m0
               (dq:=dq)
  ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi0 [-]").
@@ -1563,21 +1566,21 @@ Qed.
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)))]> m0)
       with m1.
     (* cce: c.sdsp ra,8(sp) : store ra0 to 8(sp') *)
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γ Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 vra
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γ Φ (add_vec_int pcE 2) (mword_of_int 1) ra_idx m1 vra
               (dq:=dq)
 
               with "Hsm Htlbinv Hpc Hfile Hi2 [Hbra]").
     { rewrite Hsp1. iExact "Hbra". }
     iIntros "Hsm Htlbinv Hpc Hfile Hbra".
     (* cd0: c.sdsp s0,0(sp) : store s00 to 0(sp') *)
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γ Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 vs0
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γ Φ (add_vec_int pcE 4) (mword_of_int 0) s0_idx m1 vs0
               (dq:=dq)
 
               with "Hsm Htlbinv Hpc Hfile Hi4 [Hbs0]").
     { rewrite Hsp1. iExact "Hbs0". }
     iIntros "Hsm Htlbinv Hpc Hfile Hbs0".
     (* cd2: c.addi4spn s0,sp,16 : s0 := sp'+16 *)
-    iApply (wp_caddi4spn_gpr_s_config_scfg root_ppn γ Φ (add_vec_int pcE 6) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1
+    iApply (wp_caddi4spn_gpr_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcE 6) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1
               (dq:=dq)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               with "Hsm Htlbinv Hpc Hfile Hi6 [-]").
@@ -1585,7 +1588,7 @@ Qed.
     change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1)
       with m2.
     (* cd4: c.beqz a2,cea : n = 0, TAKEN -> jump to pcL *)
-    iApply (wp_cbeqz_taken_s_config_scfg root_ppn γ Φ (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx m2
+    iApply (wp_cbeqz_taken_s_config_scfg_pt root_ppn γ Φ (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx m2
               (dq:=dq)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(unfold m2, m1; rewrite lookup_total_insert_ne; [ rewrite lookup_total_insert_ne; [ exact Hn0 | vm_compute; discriminate ] | vm_compute; discriminate ])

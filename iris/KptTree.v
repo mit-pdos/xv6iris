@@ -331,12 +331,6 @@ Qed.
 Section KptTranslate.
   Context (acc : MemoryAccessType mem_payload).
 
-  (* per-access dispatch on any DRAM-leaf A/D variant (fetch/load/store
-     instantiate via [kpt_variant_check_*]) *)
-  Variable Hchk : forall (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool),
-    kpt_dram_vpn vpn ->
-    pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (kpt_leaf_pte vpn) a d).
-
   (* shared miss path: the TLB slot misses (empty or foreign), so the walk
      runs -- filling cleanly (O2) or writing the A/D update back (O3) *)
   Lemma kpt_translate_miss_core (root_ppn : mword 44) (va : mword 64)
@@ -344,7 +338,8 @@ Section KptTranslate.
         (p2 p1 : mword 64) (a0 d0 : mword 1) (σ : mstate) :
     let vpn := svpn_of va in
     let p0 := pte_set_ad (kpt_leaf_pte vpn) a0 d0 in
-    addr_is_ram va ->
+    (forall (a d : mword 1) (mxr do_sum : bool),
+       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (kpt_leaf_pte (svpn_of va)) a d)) ->
     pte_valid p2 -> pte_ptr p2 ->
     pte_valid p1 -> pte_ptr p1 ->
     pte_valid p0 -> pte_leaf p0 -> pte_no_napot p0 ->
@@ -380,10 +375,9 @@ Section KptTranslate.
                      tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                             (Some (u_walk_entry vpn p2 p1 (pte_set_ad p0 a1 d1) (mword_of_int 0)))))).
   Proof.
-    intros vpn p0 Hram Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
+    intros vpn p0 Hchk Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
            Hrd2 Hrd1 Hrd0 Hmisa Hmenv Hhtif Htlb Hlk
            HA Hord HW Hcov Hpmaw.
-    assert (Hdram : kpt_dram_vpn vpn) by exact (ram_svpn_range va Hram).
     assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
       by (vm_compute; reflexivity).
     assert (HADUE : eq_vec (_get_MEnvcfg_ADUE MENVCFG_S) ('b"1") = true)
@@ -408,7 +402,7 @@ Section KptTranslate.
         apply (exec_translate_TLB_miss_pt_upd acc Supervisor mxr do_sum
                  vpn root_ppn p2 p1 p0 p0' MENVCFG_S (mword_of_int 0) _ σ
                  Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap
-                 (Hchk vpn a0 d0 mxr do_sum Hdram) Hup
+                 (Hchk a0 d0 mxr do_sum) Hup
                  Hrd2 Hrd1 Hrd0 Hmisa Hmenv HPBMTE HADUE Hwr eq_refl).
       + right. exists a1, d1.
         rewrite <- Hq. rewrite Htlb. reflexivity.
@@ -422,7 +416,7 @@ Section KptTranslate.
         cbn match. rewrite <- Htlb.
         apply (exec_translate_TLB_miss_user vpn root_ppn p2 p1 p0 acc Supervisor mxr do_sum
                  Hv2 Hn2 Hv1 Hn1 Hv0 Hl0
-                 (Hchk vpn a0 d0 mxr do_sum Hdram) Hnap
+                 (Hchk a0 d0 mxr do_sum) Hnap
                  (mword_of_int 0) MENVCFG_S σ Hmisa Hupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE).
       + left. rewrite Htlb. reflexivity.
   Qed.
@@ -432,16 +426,17 @@ End KptTranslate.
 Section KptTranslateAddr.
   Context (acc : MemoryAccessType mem_payload).
 
-  Variable Hchk : forall (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool),
-    kpt_dram_vpn vpn ->
-    pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (kpt_leaf_pte vpn) a d).
-
   Lemma kpt_translateAddr_cases (root_ppn : mword 44) (va satp0 : mword 64)
         (t : ptree) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
         (p2 p1 : mword 64) (a0 d0 : mword 1) (σ : mstate) :
     let vpn := svpn_of va in
     let p0 := pte_set_ad (kpt_leaf_pte vpn) a0 d0 in
-    addr_is_ram va ->
+    (forall (a d : mword 1) (mxr do_sum : bool),
+       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (kpt_leaf_pte (svpn_of va)) a d)) ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
     kpt_tree_spec root_ppn t ->
     ptree_maps t vpn p2 p1 p0 ->
     tlb_ok_pt (mword_of_int 0) t tlbvec ->
@@ -483,10 +478,9 @@ Section KptTranslateAddr.
                      tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                             (Some (u_walk_entry vpn p2 p1 (pte_set_ad p0 a1 d1) (mword_of_int 0)))))).
   Proof.
-    intros vpn p0 Hram Hspec Hmaps Htlbok Hsm2 Hsm1 Hsm0
+    intros vpn p0 Hchk Hcanon Hid4k Hspec Hmaps Htlbok Hsm2 Hsm1 Hsm0
            Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatp Hmode Hppn Hasid Htlb
            HA Hord HR HW Hcov Hpmar Hpmaw.
-    assert (Hdram : kpt_dram_vpn vpn) by exact (ram_svpn_range va Hram).
     destruct Hspec as (Hbase & Hmapspec & Hblkspec).
     pose proof Hmaps as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ &
                          Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & Hl0 & Hnap & Hpb0).
@@ -512,7 +506,7 @@ Section KptTranslateAddr.
     assert (Hid : zero_extend' 64 (concat_vec
               ((autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (p0 : mword 64))) : mword 44)) : mword 44)
               (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va).
-    { unfold p0. rewrite kpt_variant_ppn. exact (ram_ident_4k va Hram). }
+    { unfold p0. rewrite kpt_variant_ppn. exact Hid4k. }
     assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
       by (vm_compute; reflexivity).
     assert (HADUE : eq_vec (_get_MEnvcfg_ADUE MENVCFG_S) ('b"1") = true)
@@ -528,7 +522,7 @@ Section KptTranslateAddr.
         { intros mxr do_sum.
           assert (Habs : pte_set_ad p0 a' d' = pte_set_ad (kpt_leaf_pte vpn) a' d')
             by exact (pte_set_ad_absorb (kpt_leaf_pte vpn) a0 d0 a' d').
-          rewrite Habs. exact (Hchk vpn a' d' mxr do_sum Hdram). }
+          rewrite Habs. exact (Hchk a' d' mxr do_sum). }
         assert (Hpbc : pte_pbmt0 (pte_set_ad p0 a' d')).
         { assert (Habs : pte_set_ad p0 a' d' = pte_set_ad (kpt_leaf_pte vpn) a' d')
             by exact (pte_set_ad_absorb (kpt_leaf_pte vpn) a0 d0 a' d').
@@ -558,7 +552,7 @@ Section KptTranslateAddr.
                         (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
                      satp0 va va σ _
                      Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
-                     (ram_canonical va Hram) eq_refl).
+                     Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
             unfold translate.
@@ -582,7 +576,7 @@ Section KptTranslateAddr.
                         (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
                      satp0 va va σ _
                      Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
-                     (ram_canonical va Hram) eq_refl).
+                     Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
             unfold translate.
@@ -600,8 +594,8 @@ Section KptTranslateAddr.
           by exact (exec_lookup_TLB_nomatch_s vpn (mword_of_int 0) _ tlbvec σ Htlb Hslot
                       (uwe_match_other vpn0 vpn q2 q1 (pte_set_ad qp0 a' d')
                          (mword_of_int 0) Hne)).
-        destruct (kpt_translate_miss_core acc Hchk root_ppn va tlbvec p2 p1 a0 d0 σ
-                    Hram Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
+        destruct (kpt_translate_miss_core acc root_ppn va tlbvec p2 p1 a0 d0 σ Hchk
+                    Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
                     Hrd2 Hrd1 Hrd0 Hmisa Hmenv Hhtif Htlb Hlk
                     HA Hord HW Hcov Hpmaw)
           as (σ' & Htr & Hshape).
@@ -611,13 +605,13 @@ Section KptTranslateAddr.
                       (PPN_of_PTE (p0 : mword 64))) : mword 44))
                    satp0 va va σ σ'
                    Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
-                   (ram_canonical va Hram) eq_refl Htr Hid). }
+                   Hcanon eq_refl Htr Hid). }
         destruct Hshape as [Ho2 | Ho3]; [right; left; exact Ho2 | right; right; exact Ho3].
     - (* empty slot: the walk runs *)
       assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ))
         by exact (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec σ Htlb Hslot).
-      destruct (kpt_translate_miss_core acc Hchk root_ppn va tlbvec p2 p1 a0 d0 σ
-                  Hram Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
+      destruct (kpt_translate_miss_core acc root_ppn va tlbvec p2 p1 a0 d0 σ Hchk
+                  Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
                   Hrd2 Hrd1 Hrd0 Hmisa Hmenv Hhtif Htlb Hlk
                   HA Hord HW Hcov Hpmaw)
         as (σ' & Htr & Hshape).
@@ -627,7 +621,7 @@ Section KptTranslateAddr.
                     (PPN_of_PTE (p0 : mword 64))) : mword 44))
                  satp0 va va σ σ'
                  Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
-                 (ram_canonical va Hram) eq_refl Htr Hid). }
+                 Hcanon eq_refl Htr Hid). }
       destruct Hshape as [Ho2 | Ho3]; [right; left; exact Ho2 | right; right; exact Ho3].
   Qed.
 
@@ -647,12 +641,14 @@ Section KptTranslateIris.
   Context `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
-  Variable Hchk : forall (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool),
-    kpt_dram_vpn vpn ->
-    pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (kpt_leaf_pte vpn) a d).
-
   Lemma tlb_inv_pt_translateAddr (root_ppn : mword 44) (va : mword 64) (σ : mstate) :
-    addr_is_ram va ->
+    (forall (a d : mword 1) (mxr do_sum : bool),
+       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (kpt_leaf_pte (svpn_of va)) a d)) ->
+    kpt_mapped (svpn_of va) ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -671,7 +667,7 @@ Section KptTranslateIris.
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
   Proof.
-    intros Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    intros Hchk Hmapd Hcanon Hid4k Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     iIntros "Hri Hgh Hinv".
     iDestruct "Hinv" as (satp0 tlbvec t)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
@@ -683,9 +679,8 @@ Section KptTranslateIris.
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     set (vpn := svpn_of va).
-    assert (Hdram : kpt_dram_vpn vpn) by exact (ram_svpn_range va Hram).
     pose proof Hspec as (Hbase & Hmapspec & Hblkspec).
-    destruct (Hmapspec vpn (or_introl Hdram)) as (p2 & p1 & a0 & d0 & Hmaps).
+    destruct (Hmapspec vpn Hmapd) as (p2 & p1 & a0 & d0 & Hmaps).
     iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn p2 p1 _ Hmaps with "Hgh Ht")
       as %(Hsm2 & Hsm1 & Hsm0).
     assert (HA' : pmpAddrMatchType_encdec_backwards
@@ -704,8 +699,8 @@ Section KptTranslateIris.
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
     pose proof (Hpmarimpl _ Hall) as Hpmar.
-    destruct (kpt_translateAddr_cases acc Hchk root_ppn va satp0 t tlbvec p2 p1 a0 d0 σ
-                Hram Hspec Hmaps Htlbok Hsm2 Hsm1 Hsm0
+    destruct (kpt_translateAddr_cases acc root_ppn va satp0 t tlbvec p2 p1 a0 d0 σ
+                Hchk Hcanon Hid4k Hspec Hmaps Htlbok Hsm2 Hsm1 Hsm0
                 Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatpv Hmode Hppn Hasid Htlbv
                 HA' Hord' HR' HW' Hcov' Hpmar Hpmaw)
       as (σ' & Htrans & Hshape).
@@ -777,7 +772,7 @@ Section KptTranslateIris.
                    (tlb_ok_pt_set_leaf (mword_of_int 0) t tlbvec vpn p2 p1 p0 a1 d1
                       Hmaps Hv' Hl' Hn' Hp' Htlbok))
                 (kpt_tree_spec_set_leaf root_ppn t vpn p2 p1 p0 a1 d1
-                   Hspec Hmaps (or_introl Hdram)
+                   Hspec Hmaps Hmapd
                    (ex_intro _ a0 (ex_intro _ d0 eq_refl)))
                 Hpmawimpl
                 with "Hsatp Htlb Ht").
@@ -794,21 +789,43 @@ Section KptTranslateIrisAcc.
   Context `{CID : CpuId}.
 
   Definition tlb_inv_pt_translateAddr_fetch :=
-    fun root_ppn va σ =>
-      tlb_inv_pt_translateAddr (InstructionFetch tt)
-        (fun vpn a d mxr do_sum Hdram => kpt_variant_check_fetch vpn a d mxr do_sum Hdram)
-        root_ppn va σ.
+    fun root_ppn va σ (Hram : addr_is_ram va) =>
+      tlb_inv_pt_translateAddr (InstructionFetch tt) root_ppn va σ
+        (fun a d mxr do_sum => kpt_variant_check_fetch (svpn_of va) a d mxr do_sum
+                                 (ram_svpn_range va Hram))
+        (or_introl (ram_svpn_range va Hram))
+        (RiscvExtras.ram_canonical va Hram)
+        (ram_ident_4k va Hram).
 
   Definition tlb_inv_pt_translateAddr_load :=
-    fun root_ppn va σ =>
-      tlb_inv_pt_translateAddr (Load Data)
-        (fun vpn a d mxr do_sum _ => kpt_variant_check_load vpn a d mxr do_sum)
-        root_ppn va σ.
+    fun root_ppn va σ (Hram : addr_is_ram va) =>
+      tlb_inv_pt_translateAddr (Load Data) root_ppn va σ
+        (fun a d mxr do_sum => kpt_variant_check_load (svpn_of va) a d mxr do_sum)
+        (or_introl (ram_svpn_range va Hram))
+        (RiscvExtras.ram_canonical va Hram)
+        (ram_ident_4k va Hram).
 
   Definition tlb_inv_pt_translateAddr_store :=
-    fun root_ppn va σ =>
-      tlb_inv_pt_translateAddr (Store Data)
-        (fun vpn a d mxr do_sum _ => kpt_variant_check_store vpn a d mxr do_sum)
-        root_ppn va σ.
+    fun root_ppn va σ (Hram : addr_is_ram va) =>
+      tlb_inv_pt_translateAddr (Store Data) root_ppn va σ
+        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum)
+        (or_introl (ram_svpn_range va Hram))
+        (RiscvExtras.ram_canonical va Hram)
+        (ram_ident_4k va Hram).
+
+  (* DEVICE-side instantiations: same absorption route for any kpt-mapped
+     device vpn (e.g. the UART page); membership/canonicality/identity are
+     supplied by the caller for the concrete device address. *)
+  Definition tlb_inv_pt_translateAddr_load_dev :=
+    fun root_ppn va σ (Hdev : kpt_dev_vpn (svpn_of va)) =>
+      tlb_inv_pt_translateAddr (Load Data) root_ppn va σ
+        (fun a d mxr do_sum => kpt_variant_check_load (svpn_of va) a d mxr do_sum)
+        (or_intror Hdev).
+
+  Definition tlb_inv_pt_translateAddr_store_dev :=
+    fun root_ppn va σ (Hdev : kpt_dev_vpn (svpn_of va)) =>
+      tlb_inv_pt_translateAddr (Store Data) root_ppn va σ
+        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum)
+        (or_intror Hdev).
 
 End KptTranslateIrisAcc.
