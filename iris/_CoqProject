@@ -136,6 +136,7 @@ UserArms.v
 UserExecFacts.v
 UserCsr.v
 WpIntrInv.v
+WpSmodeIntr.v
 WpPushOff.v
 WpPushOffMem.v
 WpPushOffCsr.v
