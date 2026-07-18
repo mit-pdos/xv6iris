@@ -233,6 +233,25 @@ Proof.
   rewrite Hv in Hi. discriminate.
 Qed.
 
+(* a vpn cannot both map and block: the description's slot and kid maps
+   are functions, so the two walks agree down to the stopping word,
+   which would have to be valid and invalid at once *)
+Lemma ptree_maps_blocks_excl (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
+  ptree_maps t vpn p2 p1 p0 -> ptree_blocks t vpn -> False.
+Proof.
+  intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 &
+          Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & _)
+         [ (Hk2n & _)
+         | [ (c1' & Hk2' & Hk1n & _)
+           | (c1' & c0' & Hk2' & Hk1' & _ & _ & _ & _ & _ & _ & Hinv0) ] ].
+  - congruence.
+  - assert (Hc : c1' = c1) by congruence. subst c1'. congruence.
+  - assert (Hc : c1' = c1) by congruence. subst c1'.
+    assert (Hc : c0' = c0) by congruence. subst c0'.
+    rewrite He0 in Hinv0.
+    exact (pte_valid_invalid_excl p0 Hv0 Hinv0).
+Qed.
+
 (* ===================================================================== *)
 (* §5 The leaf write-back on the description side: [ptree_set_leaf]       *)
 (*    replaces the LEAF word on [vpn]'s path (what the ADUE write-back    *)
@@ -844,6 +863,60 @@ Section PtTreeIris.
     iPureIntro. auto.
   Qed.
 
+  (* the stopping prefix of a BLOCKED vpn's walk, as pure memory facts:
+     the walk reads owned slots down to the invalid word *)
+  Lemma ptree_own_blocked_mem (sg : mstate) (dq : dfrac) (t : ptree)
+      (vpn : mword 27) :
+    ptree_blocks t vpn ->
+    gen_heap_interp sg.(mem) -∗ ptree_own 2 dq t -∗
+    ⌜ ((exists w2, pt_slot_mem sg (pt_addr2 t vpn) w2 /\ pte_invalid w2)
+       \/ (exists p2 w1,
+             pt_slot_mem sg (pt_addr2 t vpn) p2 /\ pte_valid p2 /\ pte_ptr p2 /\
+             pt_slot_mem sg (pt_addr1 p2 vpn) w1 /\ pte_invalid w1)
+       \/ (exists p2 p1 w0,
+             pt_slot_mem sg (pt_addr2 t vpn) p2 /\ pte_valid p2 /\ pte_ptr p2 /\
+             pt_slot_mem sg (pt_addr1 p2 vpn) p1 /\ pte_valid p1 /\ pte_ptr p1 /\
+             pt_slot_mem sg (pt_addr0 p1 vpn) w0 /\ pte_invalid w0))%type ⌝.
+  Proof.
+    intros Hblk.
+    iIntros "Hm [Hpg Hks]".
+    destruct Hblk as
+      [ (Hk2 & Hinv2)
+      | [ (c1 & Hk2 & Hk1 & Hv2 & Hn2 & Hb1 & Hinv1)
+        | (c1 & c0 & Hk2 & Hk1 & Hv2 & Hn2 & Hv1 & Hn1 & Hb1 & Hb0 & Hinv0) ] ].
+    - iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
+      iDestruct (slot_mem_of_own with "Hm Hs2") as %H2.
+      iPureIntro. left. eexists. exact (conj H2 Hinv2).
+    - iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
+      iDestruct (slot_mem_of_own with "Hm Hs2") as %H2.
+      iDestruct (pt_kids_own_acc_ro 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks")
+        as "[[Hpg1 _] _]".
+      iDestruct (pt_page_own_acc_ro dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 _]".
+      iDestruct (slot_mem_of_own with "Hm Hs1") as %H1.
+      iPureIntro. right; left.
+      exists (pt_ents t (vpn_idx 2 vpn)), (pt_ents c1 (vpn_idx 1 vpn)).
+      split; [exact H2 |]. split; [exact Hv2 |]. split; [exact Hn2 |].
+      split; [| exact Hinv1].
+      unfold pt_addr1. rewrite Hb1. exact H1.
+    - iDestruct (pt_page_own_acc_ro dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 _]".
+      iDestruct (slot_mem_of_own with "Hm Hs2") as %H2.
+      iDestruct (pt_kids_own_acc_ro 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks")
+        as "[[Hpg1 Hks1] _]".
+      iDestruct (pt_page_own_acc_ro dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 _]".
+      iDestruct (slot_mem_of_own with "Hm Hs1") as %H1.
+      iDestruct (pt_kids_own_acc_ro 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1")
+        as "[[Hpg0 _] _]".
+      iDestruct (pt_page_own_acc_ro dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 _]".
+      iDestruct (slot_mem_of_own with "Hm Hs0") as %H0.
+      iPureIntro. right; right.
+      exists (pt_ents t (vpn_idx 2 vpn)), (pt_ents c1 (vpn_idx 1 vpn)),
+             (pt_ents c0 (vpn_idx 0 vpn)).
+      split; [exact H2 |]. split; [exact Hv2 |]. split; [exact Hn2 |].
+      split; [unfold pt_addr1; rewrite Hb1; exact H1 |].
+      split; [exact Hv1 |]. split; [exact Hn1 |].
+      split; [unfold pt_addr0; rewrite Hb0; exact H0 | exact Hinv0].
+  Qed.
+
   (* ---- a PARKED page table: full ownership of a spec-constrained tree
      that is not currently installed in satp.  The satp-switch lemmas
      convert between an installed table's invariant and this frame.     *)
@@ -1229,6 +1302,25 @@ Section PtHit.
     apply exec_returnm.
   Qed.
 
+  (* the hit whose cached leaf word FAILS the check: the fault surfaces
+     before any A/D update or pbmt read -- state unchanged.  (The check
+     runs FIRST on the hit path, so a denied hit never write-backs.) *)
+  Lemma exec_translate_TLB_hit_denied_pt (vpn : mword 27) (p2 p1 q0 : mword 64)
+        (asid : mword 16) (idx : Z) s :
+    pte_check_denied acc p mxr do_sum (PTE_No_Permission tt) q0 ->
+    exec (translate_TLB_hit 39 asid vpn acc p mxr do_sum tt idx
+            (u_walk_entry vpn p2 p1 q0 asid)) s
+    = Some (Err (PTW_No_Permission tt, tt), s).
+  Proof.
+    intros Hden.
+    unfold translate_TLB_hit. cbn zeta.
+    match goal with |- context[tlb_get_pte ?sz ?e] => change sz with 8 end.
+    rewrite uwe_pte.
+    rewrite autocast_id.
+    rewrite (exec_bind_Some _ _ _ _ _ (Hden s)). cbn match.
+    apply exec_returnm.
+  Qed.
+
   (* ---- §8d THE three-way hit-or-walk translate over abstract words:    *)
   (*      the tree-generic successor of [exec_translate_tramp].  The      *)
   (*      walk path installs [u_walk_entry vpn p2 p1 p0]; a hit serves    *)
@@ -1466,6 +1558,56 @@ Section PtFault.
       apply (exec_rec_walk_l1_sub vpn acc p mxr do_sum (u_next_base p2) p1 g' _ a s Hrd1 Hv1 Hn1).
       intros g'' a'.
       exact (exec_rec_walk_leaf_invalid vpn acc p mxr do_sum (u_next_base p1) w0 g'' a' s Hrd0 Hi0).
+  Qed.
+
+  (* mapped but DENIED: the walk reaches the leaf and the permission check
+     fails -- no fill, no write-back, state unchanged *)
+  Lemma exec_translate_pt_denied (vpn : mword 27) (root : mword 44)
+        (p2 p1 p0 : mword 64) s :
+    pte_valid p2 -> pte_ptr p2 ->
+    pte_valid p1 -> pte_ptr p1 ->
+    pte_valid p0 -> pte_leaf p0 ->
+    pte_check_denied acc p mxr do_sum (PTE_No_Permission tt) p0 ->
+    exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s
+      = Some (Ok p2, s) ->
+    exec (read_pte (Physaddr (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9))) 8) s
+      = Some (Ok p1, s) ->
+    exec (read_pte (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok p0, s) ->
+    exec (lookup_TLB 39 (mword_of_int 0) vpn) s = Some (None, s) ->
+    exec (translate 39 (mword_of_int 0 : mword 16) root vpn acc p mxr do_sum tt) s
+    = Some (Err (PTW_No_Permission tt, tt), s).
+  Proof.
+    intros Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hden Hrd2 Hrd1 Hrd0 Hlk.
+    apply (exec_translate_walk_user_err vpn acc p mxr do_sum (mword_of_int 0) root _ s Hlk).
+    apply exec_translate_TLB_miss_user_walk_err.
+    apply (exec_pt_walk_user_sub vpn acc p mxr do_sum root p2 _ s Hrd2 Hv2 Hn2).
+    intros g' a.
+    apply (exec_rec_walk_l1_sub vpn acc p mxr do_sum (u_next_base p2) p1 g' _ a s Hrd1 Hv1 Hn1).
+    intros g'' a'.
+    change (PTW_No_Permission tt) with (ext_get_ptw_error (PTE_No_Permission tt)).
+    exact (exec_rec_walk_leaf_noperm vpn acc p mxr do_sum (u_next_base p1) p0 g''
+             (PTE_No_Permission tt) a' s Hrd0 Hv0 Hl0 (fun s0 => Hden s0)).
+  Qed.
+
+  (* the soundness KEYSTONE: under [tlb_ok_pt] a BLOCKED vpn is never
+     TLB-resident -- a resident entry is some MAPPED vpn's walk entry;
+     the blocked vpn cannot be that vpn ([ptree_maps_blocks_excl]), and
+     a foreign entry's tag rejects the lookup ([uwe_match_other]). *)
+  Lemma tlb_ok_pt_lookup_blocked (t : ptree) (vpn : mword 27)
+        (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
+    tlb_ok_pt (mword_of_int 0) t tlbvec ->
+    ptree_blocks t vpn ->
+    register_lookup tlb s.(sregs) = tlbvec ->
+    exec (lookup_TLB 39 (mword_of_int 0) vpn) s = Some (None, s).
+  Proof.
+    intros Hok Hblk Htlb.
+    destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
+    - destruct (Hok vpn ent Hslot) as (vpn0 & q2 & q1 & q0 & a' & d' & Hm0 & Hh & ->).
+      apply (exec_lookup_TLB_nomatch_s vpn (mword_of_int 0) _ tlbvec s Htlb Hslot).
+      apply (uwe_match_other vpn0 vpn q2 q1 (pte_set_ad q0 a' d') (mword_of_int 0)).
+      intros ->. exact (ptree_maps_blocks_excl t vpn q2 q1 q0 Hm0 Hblk).
+    - exact (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec s Htlb Hslot).
   Qed.
 
 End PtFault.
