@@ -415,7 +415,8 @@ before any mechanical sweep.
      EXPLICIT spellings, not let-bound names (a `rewrite -H` whose RHS
      is a let-local like `a8_p24` finds no occurrence — the round-trip
      through a leaf re-spells cells in the leaf's own let-forms).
-   - TODO — `wp_push_off_sconf` MAIN (same file): prologue mover k:=4
+   - DONE — `wp_push_off_sconf` MAIN (same file, axiom-clean at
+     baseline 5 + funext): prologue mover k:=4
      (deep-6 input: top 4 feed `sie_cap_move_down`, deeper 2 ride for
      the mycpu calls at `pa_stk sp' kv_frame_slots`) + 3 csdsp saves +
      caddi4spn + the FUSED `csrrci a5,sstatus,2` at 0x0a =
@@ -424,11 +425,20 @@ before any mechanical sweep.
      OPAQUELY through everything after) + c.mv s1,a5 + 1st mycpu call +
      clw noff + cbeqz (WpSconfBtype taken/fall) + intena arm (0x2c 3rd
      mycpu call, 0x30 srli4 a5,s1,1, 0x34 candi a5,1, 0x36 csw
-     124(a0), 0x38 c.j back — c.j hands the later out, absorb with
-     iNext) + `wp_push_off_suffix_sconf` on both arms.  Post: ∀ms mfin
-     with callee_saved + noff+1 + intena update + the flip payload
-     disjunct tied to ⌜SIE ms⌝; deep-6 custody back.  Then
-     `wp_pop_off_sconf` (csrsi dual; already-enabled refuted in-leaf).
+     124(a0), 0x38 c.j back) + `wp_push_off_suffix_sconf` on both arms.
+     Post: ∀ms mfin with callee_saved + noff+1 + intena :=
+     `po_intena_val ms` (the operational SIE-bit spelling) + the flip
+     payload disjunct tied to ⌜SIE ms⌝; deep-6 custody back (recombined
+     from the epilogue's deep-4 + mycpu's deep-2 via
+     `stack_own_split_2`).  GOTCHA: the branch/jump leaves hand the
+     step's ▷ out and the absorbing `iNext` strips a later from EVERY
+     hypothesis — the csrci payload's `▷ intr_handler_spec` loses its
+     later on the taken arm, so that arm re-introduces it (`iExists h;
+     iFrame; iNext`) when discharging the continuation's payload.
+   - TODO — `wp_pop_off_sconf` (csrsi dual; already-enabled refuted
+     in-leaf): convert WpPopOff.v's wp_pop_off_r the same way — the
+     csrsi restore consumes push_off's payload keyed on the loaded
+     intena; the beqz-on-intena arm skips the restore.
    - the rest of the kalloc cone file-by-file (acquire/release/holding/
      kalloc/kfree...), VCgen `_den` sconf wrapper with the first
      converted function.
