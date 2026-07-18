@@ -40,6 +40,26 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
+
+(* the +32/-32 c.addi16sp frame cancel (kalloc's frame; clone of
+   WpKfree's kfree_sp_cancel -- neither file imports the other) *)
+Lemma kalloc_sp_cancel (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
+Proof.
+  assert (add_vec_unsigned : forall x y : mword 64,
+            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned. reflexivity. }
+  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64) = 18446744073709551584) by (vm_compute; reflexivity).
+  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64) = 32) by (vm_compute; reflexivity).
+  rewrite HA HB. rewrite <- Z.add_assoc.
+  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
+  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+Qed.
+
 Section Kalloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
@@ -132,6 +152,12 @@ Section Kalloc.
         (add_vec (sign_extend' 64 qnoff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let q_noff_store := (autocast (T := mword) (subrange_vec_dec q_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let q_ret_tgt := update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let q_noff_ret := (autocast (T := mword) (subrange_vec_dec
+        (sign_extend' 64 (subrange_vec_dec
+           (add_vec (sign_extend' 64 q_noff_store)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
+        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    let q_int_ret := (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old) in
     (14 <= n)%nat ->
     eq_vec (qcpuold : mword 64) (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5))) = false ->
     eq_vec (access_vec_dec q_ret_tgt 0) ('b"0") = true ->
@@ -156,12 +182,16 @@ Section Kalloc.
       sr_inv R -∗
       pc_is ret_tgt -∗
       gpr_file mr -∗
+      ⌜ callee_saved m mr ⌝ -∗
       kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       stack_own sp0 n -∗
+      q_cpu ↦₈ (zero_reg : mword 64) -∗
+      q_noff ↦₄ q_noff_ret -∗
+      q_intena ↦₄ q_int_ret -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pcE sp0 ret_tgt R1 R2 R3 R4 mA lkA q_noff q_intena q_cpu q_storeval32 q_noff_a5 q_noff_store q_ret_tgt Hn Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0.
+    intros pcE sp0 ret_tgt R1 R2 R3 R4 mA lkA q_noff q_intena q_cpu q_storeval32 q_noff_a5 q_noff_store q_ret_tgt q_noff_ret q_int_ret Hn Hcpune Hret0 Hretm Hfl Ha0fcpu Hnoffpos Hintena0.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcfg Htoken Htlbinv #Htext Hpc Hfile Hstk Hnoff Hint #Hlock Hcpu Hcont".
     assert (HmAsp : mA !!! Regidx csp_rs1 = spr).
@@ -288,6 +318,7 @@ Section Kalloc.
     (* re-open the config for kalloc's own post-acquire leaves (fresh existential,
        rebound to the same names after clearing the consumed pre-acquire ones) *)
     (* ---- acquire returned: [locked γ ∗ kmem_res fl] held, pc = +0x16 ---- *)
+    pose proof Hpins as Hacqpins_cs.
     unfold callee_saved in Hpins.
     destruct Hpins as (Hmsp & Hmtp & Hms0 & Hms1 & Hms2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
     assert (Hmara : mA !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)
@@ -425,6 +456,7 @@ Section Kalloc.
       assert (Hpc58 : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x58)).
       { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc58) in "Hpc".
+      pose proof Hpins2 as Hrelpins_cs.
       unfold callee_saved in Hpins2.
       destruct Hpins2 as (Hmrcsp & Hmrtp & Hmrs0 & Hmrs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
       assert (HE3s1 : E3 !!! Regidx (mword_of_int 9 : mword 5) = nullp).
@@ -546,7 +578,47 @@ Section Kalloc.
         done. }
       iEval (rewrite -Hsprstk) in "Hdeep".
       iDestruct (stack_own_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-      iApply ("Hcont" $! P45 with "Hcfg Htoken Htlbinv Hpc Hfile [] Hstk").
+      iApply ("Hcont" $! P45 with "Hcfg Htoken Htlbinv Hpc Hfile [%] [] Hstk [Hcpu2] [Hnoff2] [Hint2]");
+        [ .. | iEval (rewrite <- Hacpu); iExact "Hcpu2"
+             | iEval (rewrite <- Hanoff); iExact "Hnoff2"
+             | iEval (rewrite <- Haint); iExact "Hint2" ].
+      { (* callee_saved m P45 *)
+        assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
+                  c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
+                  c <> mword_of_int 9 -> c <> mword_of_int 10 ->
+                  P45 !!! Regidx c = m !!! Regidx c).
+        { intros c Hcs N1 N2 N8 N9 N10.
+          let peel := (repeat (rewrite lookup_total_insert_ne; [ | congruence ])) in
+          rewrite /P45 /P44 /P43 /P42 /P41; peel;
+          rewrite (callee_saved_lookup Hrelpins_cs c Hcs);
+          rewrite /E3 /E2 /E1 /R7 /R6; peel;
+          rewrite (callee_saved_lookup Hacqpins_cs c Hcs);
+          rewrite /mA /R4 /R3 /R2 /R1; peel;
+          reflexivity. }
+        unfold callee_saved.
+        split.
+        { rewrite /P45 lookup_total_insert.
+          assert (HP44csp : P44 !!! Regidx csp_rs1 = spr).
+          { rewrite /P44 /P43 /P42 /P41.
+            repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+            rewrite (callee_saved_lookup Hrelpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
+            rewrite /E3 /E2 /E1 /R7 /R6.
+            repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+            rewrite (callee_saved_lookup Hacqpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
+            exact HmAsp. }
+          rewrite HP44csp. unfold regval_into_reg, spr. apply kalloc_sp_cancel. }
+        split.
+        { apply Hthread; vm_compute; first [reflexivity | discriminate]. }
+        split.
+        { rewrite /P45 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /P44 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /P43 lookup_total_insert.
+          rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+        split.
+        { rewrite /P45 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /P44 lookup_total_insert.
+          rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+        repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
       { rewrite /kalloc_post. iLeft. iPureIntro. exact HP45a0. }
     - (* ---- NONEMPTY: head = p, page_valid p, p <> nullp, fall through to +0x20 ---- *)
       iDestruct "Hchain" as "(-> & %Hpv & Hrun)".
@@ -741,6 +813,7 @@ Section Kalloc.
       assert (Hpp3c : add_vec_int (mword_of_int (AK + 0x3a) : mword 64) 2 = mword_of_int (AK + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3c) in "Hpc".
       set (M3a := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (Mli !!! Regidx (mword_of_int 9 : mword 5)))]> Mli).
+      pose proof Hpins2 as Hrelpins_cs.
       unfold callee_saved in Hpins2.
       destruct Hpins2 as (Hmrcsp & Hmrtp & Hmrs0 & Hmrs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
       assert (HR12s1 : R12 !!! Regidx (mword_of_int 9 : mword 5) = p).
@@ -809,6 +882,7 @@ Section Kalloc.
       iEval (rewrite HMmsa0) in "Hpage".
       iEval (rewrite HMmssp HmAsp) in "Hstk". iRename "Hstk" into "Hdeep".
       unfold callee_saved in Hpinsf.
+    pose proof Hpinsf as Hpinsf_cs.
     destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & _ & _ & _ & _ & _ & _ & _ & _ & _).
       assert (Hpc40 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x40)).
       { rewrite HMmsra. apply bv_eq; vm_compute; reflexivity. }
@@ -915,7 +989,54 @@ Section Kalloc.
         done. }
       iEval (rewrite -Hsprstk) in "Hdeep".
       iDestruct (stack_own_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-      iApply ("Hcont" $! Q45 with "Hcfg Htoken Htlbinv Hpc Hfile [Hpage] Hstk").
+      iApply ("Hcont" $! Q45 with "Hcfg Htoken Htlbinv Hpc Hfile [%] [Hpage] Hstk [Hcpu2] [Hnoff2] [Hint2]");
+        [ .. | iEval (rewrite <- Hacpu); iExact "Hcpu2"
+             | iEval (rewrite <- Hanoff); iExact "Hnoff2"
+             | iEval (rewrite <- Haint); iExact "Hint2" ].
+      { (* callee_saved m Q45 *)
+        assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
+                  c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
+                  c <> mword_of_int 9 -> c <> mword_of_int 10 ->
+                  c <> mword_of_int 11 -> c <> mword_of_int 12 ->
+                  c <> mword_of_int 14 -> c <> mword_of_int 15 ->
+                  Q45 !!! Regidx c = m !!! Regidx c).
+        { intros c Hcs N1 N2 N8 N9 N10 N11 N12 N14 N15.
+          let peel := (repeat (rewrite lookup_total_insert_ne; [ | congruence ])) in
+          rewrite /Q45 /Q44 /Q43 /Q42 /Q41; peel;
+          rewrite (callee_saved_lookup Hpinsf_cs c Hcs);
+          rewrite /Mms /M3a /Mli /Mlui; peel;
+          rewrite (callee_saved_lookup Hrelpins_cs c Hcs);
+          rewrite /R12 /R11 /R10 /R9 /R8 /R7 /R6; peel;
+          rewrite (callee_saved_lookup Hacqpins_cs c Hcs);
+          rewrite /mA /R4 /R3 /R2 /R1; peel;
+          reflexivity. }
+        unfold callee_saved.
+        split.
+        { rewrite /Q45 lookup_total_insert.
+          assert (HQ44csp : Q44 !!! Regidx csp_rs1 = spr).
+          { rewrite /Q44 /Q43 /Q42 /Q41.
+            repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+            rewrite (callee_saved_lookup Hpinsf_cs csp_rs1 ltac:(vm_compute; reflexivity)).
+            rewrite /Mms /M3a /Mli /Mlui.
+            repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+            rewrite (callee_saved_lookup Hrelpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
+            rewrite /R12 /R11 /R10 /R9 /R8 /R7 /R6.
+            repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+            rewrite (callee_saved_lookup Hacqpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
+            exact HmAsp. }
+          rewrite HQ44csp. unfold regval_into_reg, spr. apply kalloc_sp_cancel. }
+        split.
+        { apply Hthread; vm_compute; first [reflexivity | discriminate]. }
+        split.
+        { rewrite /Q45 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /Q44 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /Q43 lookup_total_insert.
+          rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+        split.
+        { rewrite /Q45 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /Q44 lookup_total_insert.
+          rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+        repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
       { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage". iPureIntro. exact Hpv. }
   Qed.
 
@@ -944,6 +1065,12 @@ Section Kalloc.
         (add_vec (sign_extend' 64 qnoff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let q_noff_store := (autocast (T := mword) (subrange_vec_dec q_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let q_ret_tgt := update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let q_noff_ret := (autocast (T := mword) (subrange_vec_dec
+        (sign_extend' 64 (subrange_vec_dec
+           (add_vec (sign_extend' 64 q_noff_store)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
+        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    let q_int_ret := (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old) in
     (14 <= n)%nat ->
     eq_vec (qcpuold : mword 64) (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5))) = false ->
     eq_vec (access_vec_dec q_ret_tgt 0) ('b"0") = true ->
@@ -968,8 +1095,12 @@ Section Kalloc.
       tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mr -∗
+      ⌜ callee_saved m mr ⌝ -∗
       kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       stack_own sp0 n -∗
+      q_cpu ↦₈ (zero_reg : mword 64) -∗
+      q_noff ↦₄ q_noff_ret -∗
+      q_intena ↦₄ q_int_ret -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.

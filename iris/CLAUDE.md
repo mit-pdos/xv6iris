@@ -415,7 +415,8 @@ before any mechanical sweep.
      EXPLICIT spellings, not let-bound names (a `rewrite -H` whose RHS
      is a let-local like `a8_p24` finds no occurrence — the round-trip
      through a leaf re-spells cells in the leaf's own let-forms).
-   - TODO — `wp_push_off_sconf` MAIN (same file): prologue mover k:=4
+   - DONE — `wp_push_off_sconf` MAIN (same file, axiom-clean at
+     baseline 5 + funext): prologue mover k:=4
      (deep-6 input: top 4 feed `sie_cap_move_down`, deeper 2 ride for
      the mycpu calls at `pa_stk sp' kv_frame_slots`) + 3 csdsp saves +
      caddi4spn + the FUSED `csrrci a5,sstatus,2` at 0x0a =
@@ -424,11 +425,60 @@ before any mechanical sweep.
      OPAQUELY through everything after) + c.mv s1,a5 + 1st mycpu call +
      clw noff + cbeqz (WpSconfBtype taken/fall) + intena arm (0x2c 3rd
      mycpu call, 0x30 srli4 a5,s1,1, 0x34 candi a5,1, 0x36 csw
-     124(a0), 0x38 c.j back — c.j hands the later out, absorb with
-     iNext) + `wp_push_off_suffix_sconf` on both arms.  Post: ∀ms mfin
-     with callee_saved + noff+1 + intena update + the flip payload
-     disjunct tied to ⌜SIE ms⌝; deep-6 custody back.  Then
-     `wp_pop_off_sconf` (csrsi dual; already-enabled refuted in-leaf).
+     124(a0), 0x38 c.j back) + `wp_push_off_suffix_sconf` on both arms.
+     Post: ∀ms mfin with callee_saved + noff+1 + intena :=
+     `po_intena_val ms` (the operational SIE-bit spelling) + the flip
+     payload disjunct tied to ⌜SIE ms⌝; deep-6 custody back (recombined
+     from the epilogue's deep-4 + mycpu's deep-2 via
+     `stack_own_split_2`).  GOTCHA: the branch/jump leaves hand the
+     step's ▷ out and the absorbing `iNext` strips a later from EVERY
+     hypothesis — the csrci payload's `▷ intr_handler_spec` loses its
+     later on the taken arm, so that arm re-introduces it (`iExists h;
+     iFrame; iNext`) when discharging the continuation's payload.
+   - DONE — the INTERRUPTS-OFF TOKEN (IntrDefs.v): `sie_cap`'s '0' arm
+     holds an EIGHTH (spelled `(1/4/2)%Qp` — a bare `1/8` literal does
+     not parse in Qp scope); the other eighth is `intr_off_tok γ`,
+     minted ONLY by the genuine csrci flip (`sie_ghost_flip_off`) into
+     the '1' payload and consumed by the csrsi restore
+     (`sie_ghost_flip_on`; NOTE iCombine auto-normalizes Qp sums, so no
+     fraction rewrite is needed on the combine side).  Any fraction of
+     '0' pins the arm by agreement — code holding the token or the
+     payload refutes interrupts-enabled cases WITHOUT a panic axiom.
+     push_off's payload carries the token through to its caller.
+   - DONE — `wp_pop_off_sconf` (WpSconfPushOff.v, axiom-clean): leaf-by-leaf (the old
+     wp_pop_off_r's VCgen blocks contain the sp-moves).  INPUT: the
+     paired push_off report/payload disjunct
+     `(⌜SIE ms=0⌝ ∗ intr_off_tok γ) ∨ (⌜SIE ms=1⌝ ∗ full payload)`
+     (nested callers BORROW the outer region's token for the left case)
+     with intenav = po_intena_val ms; deep-4 custody (2 frame + 2
+     mycpu).  Body: 2-slot prologue trade, mycpu, csrr sstatus + candi
+     2 + c.bnez (the intr-must-be-off check: LEFT case refuted by
+     token/half agreement, RIGHT by the payload's sepc vs the cap-'1'
+     sepc — both arms of the csrr report force the fall-through), clw
+     noff + bge-x0 fall (premise noff ≥ 1) + addiw -1 + csw, c.bnez
+     (noff-1 ≠ 0 → epilogue, payload returned) / c.lw intena + c.beqz
+     (intena = 0 → epilogue) / the RESTORE: csrsi consumes payload +
+     token (`wp_csrsi_sstatus_s_sconf`), cap re-arms '1'.  POST: plain
+     `sie_cap γ root mfin` (arm hidden covers both) ∗ (if the restore
+     ran — noffv=1 ∧ intena≠0, pure — then True else the input
+     disjunct back); noff-1 stored; callee_saved.  PREREQUISITES DONE:
+     `ppi_24`/`ppdec_24` (WpSconfPushOff.v; the csrsi at PP+0x24 is
+     0x10016073 = csrrsi x0,sstatus,2 — rd is X0) and the x0 leaf
+     `wp_csrsi_sstatus_x0_s_sconf` + `exec_execute_csrsi_sstatus_x0`
+     (WpSconfCsr.v; no register write, map unchanged, no rd premises).
+     ALL THREE runtime paths proven (early-noff / intena=0 / the
+     RESTORE, which consumes payload + token through the x0 leaf and
+     re-arms the cap); the shared epilogue is the factored
+     `wp_pop_off_epi_sconf` (returns the mf INSERT-CHAIN EQUATION so
+     each path does its own callee_saved pin-chase); the post's
+     conditional payload is `if (negb (neq nv1 0) && neq (sext intena)
+     0) then emp else input-back` — destruct-with-eqn on the branch
+     scrutinees reduces it per path (the intena `neq` needs an explicit
+     unfold-rewrite: destructing `eq_vec` does not reduce a `neq_vec`
+     spelling).  REMAINING pure debt for the composition layer: the
+     intena-bit fact `po_intena_val ms = SIE-bit(ms)` (two case forms)
+     that converts push_off's ⌜SIE ms⌝-keyed payload into pop_off's
+     intenav-keyed input disjunct.
    - the rest of the kalloc cone file-by-file (acquire/release/holding/
      kalloc/kfree...), VCgen `_den` sconf wrapper with the first
      converted function.

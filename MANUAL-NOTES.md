@@ -9,7 +9,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - minstret_inv (invariant counting retired instructions in minstret register), clock_inv
 - fupd-style spec for stepping one cycle, which enables opening inv like minstret_inv
 - interrupt handling with a WP for the address in stvec (kernelvec)
-- intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts
+- intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts; requires stack_own of at least 32 for kernelvec
 - swtch spec
 - acquire/release separation logic spec (standard, but does work)
 - kalloc/kfree separation-logic-style specs
@@ -22,8 +22,10 @@ Some high-level ideas that might be interesting for some eventual paper:
 - UART ghost append-only log, includes FIFO (uartputc/uartwrite does not wait to flush), ownership proves no race between TX_IDLE check and THR write; should allow concurrent rx + tx
 - user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
 - start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
-- userret: tricky state at second sfence.vma: new page table but old TLB contents
+- userret: tricky state at second sfence.vma: new page table but old TLB contents (TransPt.v)
 - kpt_regime: unified Bare + Sv39 page-table configurations
+- needed axioms about load_reservation and cancel_reservation, which aren't specified in Sail model
+- push_off returns intr_off_tok, which is needed to call pop_off to ensure no panic (probably need to revise this spec to have a push_off stack/count)
 
 Big things that still need to be done/explored:
 
@@ -36,7 +38,6 @@ Big things that still need to be done/explored:
     - https://people.mpi-sws.org/~haidang/publications/thesis.pdf
 - liveness, or at least deadlock avoidance
 - file system
-- virtual memory / page tables
 
 Don't know where else to put this:
 

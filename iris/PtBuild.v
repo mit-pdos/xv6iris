@@ -25,7 +25,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree WpDecodeBridge.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1076,3 +1076,488 @@ Section PtBuildIris.
   Qed.
 
 End PtBuildIris.
+
+(* ===================================================================== *)
+(* §6 Address-arithmetic bridges: walk's computed register values are     *)
+(*    the description's addresses.  Each bridge first reduces the         *)
+(*    [shift_bits_*] forms (concrete shift amounts) to plain              *)
+(*    [shiftl]/[shiftr], then works at [bv_unsigned].                     *)
+(* ===================================================================== *)
+
+(* the ext bits pin a classified pointer word below 2^54 *)
+Lemma pte_valid_ptr_lt54 (w : mword 64) :
+  pte_valid w -> pte_ptr w ->
+  bv_unsigned w < 18014398509481984.
+Proof.
+  intros Hv Hp.
+  pose proof (pte_valid_ptr_ext0 w Hv Hp) as Hext.
+  apply (f_equal bv_unsigned) in Hext.
+  rewrite (subrange64_unsigned_63_54 w) in Hext.
+  replace (bv_unsigned (zeros' 10 : mword 10)) with 0 in Hext
+    by (vm_compute; reflexivity).
+  pose proof (bv_unsigned_in_range _ w) as Hw.
+  unfold bv_modulus in Hw.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64))
+    with 18446744073709551616 in Hw.
+  rewrite Z.shiftr_div_pow2 in Hext; [| lia].
+  change (2 ^ 54) with 18014398509481984 in Hext.
+  change (2 ^ 10) with 1024 in Hext.
+  assert (Hd : 0 <= bv_unsigned w / 18014398509481984 < 1024)
+    by (split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]).
+  rewrite (Z.mod_small _ _ Hd) in Hext.
+  pose proof (Z.div_mod (bv_unsigned w) 18014398509481984 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound (bv_unsigned w) 18014398509481984 ltac:(lia)) as Hmb.
+  rewrite Hdm. rewrite Hext.
+  rewrite Z.mul_0_r. rewrite Z.add_0_l.
+  exact (proj2 Hmb).
+Qed.
+
+(* (ii) THE DESCEND BASE: (w >> 10) << 12 is the next-level page base *)
+Lemma walk_descend_base (w : mword 64) :
+  pte_valid w -> pte_ptr w ->
+  shift_bits_left
+    (shift_bits_right w (subrange_vec_dec (mword_of_int 10 : mword 6) (Z.sub log2_xlen 1) 0))
+    (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
+  = zero_extend' 64 (concat_vec (u_next_base w) (zeros' 12 : mword 12)).
+Proof.
+  intros Hv Hp.
+  pose proof (pte_valid_ptr_lt54 w Hv Hp) as Hlt.
+  assert (Hred : shift_bits_left
+      (shift_bits_right w (subrange_vec_dec (mword_of_int 10 : mword 6) (Z.sub log2_xlen 1) 0))
+      (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
+    = shiftl (shiftr w 10) 12).
+  { unfold shift_bits_left, shift_bits_right.
+    f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal; vm_compute; reflexivity. }
+  rewrite Hred.
+  assert (Hunb : bv_unsigned (u_next_base w) = (bv_unsigned w ≫ 10) `mod` 2 ^ 44).
+  { unfold u_next_base, PPN_of_PTE.
+    change (Z.eqb 64 32) with false. cbv beta iota.
+    rewrite !autocast_id. exact (subrange64_unsigned_53_10 w). }
+  apply bv_eq.
+  rewrite page_base_unsigned. rewrite Hunb.
+  unfold shiftl, shiftr, with_word, get_word,
+    MachineWord.MachineWord.logical_shift_left,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftl_unsigned. rewrite bv_shiftr_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12))) with 12
+    by (vm_compute; reflexivity).
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 10))) with 10
+    by (vm_compute; reflexivity).
+  rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 10) with 1024.
+  assert (Hq : 0 <= bv_unsigned w / 1024 < 2 ^ 44)
+    by (split; [apply Z.div_pos; pose proof (bv_unsigned_in_range _ w); lia
+               | apply Z.div_lt_upper_bound; lia]).
+  rewrite (Z.mod_small _ _ Hq).
+  replace (Z.shiftl (bv_unsigned w / 1024) 12) with (bv_unsigned w / 1024 * 4096)
+    by (rewrite Z.shiftl_mul_pow2; [reflexivity | lia]).
+  apply bv_wrap_small.
+  unfold bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616.
+  lia.
+Qed.
+
+(* (iii) THE ALLOC PTE: (pa >> 12) << 10 | 1 is the pointer PTE of pa's
+   ppn, and that ppn's page base is pa itself (pa page-aligned, < 2^56) *)
+Lemma walk_alloc_pte (pa : mword 64) :
+  uint pa `mod` 4096 = 0 ->
+  uint pa < 72057594037927936 ->
+  or_vec
+    (shift_bits_left
+       (shift_bits_right pa (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))
+       (subrange_vec_dec (mword_of_int 10 : mword 6) (Z.sub log2_xlen 1) 0))
+    (sign_extend' 64 (mword_of_int 1 : mword 12))
+  = pt_ptr_pte (autocast (T := mword) (subrange_vec_dec pa 55 12) : mword 44).
+Proof.
+  intros Hal Hlt.
+  rewrite uint_unsigned in Hal. rewrite uint_unsigned in Hlt.
+  assert (Hred : shift_bits_left
+      (shift_bits_right pa (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))
+      (subrange_vec_dec (mword_of_int 10 : mword 6) (Z.sub log2_xlen 1) 0)
+    = shiftl (shiftr pa 12) 10).
+  { unfold shift_bits_left, shift_bits_right.
+    f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal; vm_compute; reflexivity. }
+  rewrite Hred.
+  assert (Hppn : bv_unsigned (autocast (T := mword) (subrange_vec_dec pa 55 12) : mword 44)
+                 = bv_unsigned pa / 4096).
+  { rewrite autocast_id.
+    unfold subrange_vec_dec. rewrite autocast_id.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    rewrite bv_extract_unsigned.
+    change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
+    change (MachineWord.MachineWord.Z_idx (55 - 12 + 1)) with 44%N.
+    rewrite Z.shiftr_div_pow2; [| lia].
+    change (2 ^ 12) with 4096.
+    apply bv_wrap_small.
+    unfold bv_modulus.
+    change (2 ^ Z.of_N 44) with 17592186044416.
+    split.
+    - apply Z.div_pos; [exact (proj1 (bv_unsigned_in_range _ pa)) | reflexivity].
+    - apply Z.div_lt_upper_bound; [reflexivity |].
+      change (4096 * 17592186044416) with 72057594037927936.
+      exact Hlt. }
+  apply bv_eq.
+  rewrite (mk_pte_unsigned _ PTE_PTR ltac:(unfold PTE_PTR; lia)).
+  rewrite Hppn.
+  unfold or_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.or.
+  rewrite bv_or_unsigned.
+  replace (bv_unsigned (sign_extend' 64 (mword_of_int 1 : mword 12) : mword 64)) with 1
+    by (vm_compute; reflexivity).
+  unfold shiftl, shiftr, with_word, get_word,
+    MachineWord.MachineWord.logical_shift_left,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftl_unsigned. rewrite bv_shiftr_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 10))) with 10
+    by (vm_compute; reflexivity).
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12))) with 12
+    by (vm_compute; reflexivity).
+  rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096.
+  assert (Hq : 0 <= bv_unsigned pa / 4096 < 17592186044416)
+    by (split; [apply Z.div_pos; pose proof (bv_unsigned_in_range _ pa); lia
+               | apply Z.div_lt_upper_bound; lia]).
+  replace (Z.shiftl (bv_unsigned pa / 4096) 10) with (bv_unsigned pa / 4096 * 1024)
+    by (rewrite Z.shiftl_mul_pow2; [reflexivity | lia]).
+  rewrite bv_wrap_small.
+  2:{ unfold bv_modulus.
+      change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616.
+      lia. }
+  rewrite <- Z_lor_disjoint_add.
+  - reflexivity.
+  - change 1024 with (2 ^ 10).
+    apply Z_land_shift_low.
+    + apply Z.leb_le; reflexivity.
+    + change (2 ^ 10) with 1024.
+      split; [apply Z.leb_le; reflexivity | reflexivity].
+Qed.
+
+(* the ppn's page base is pa itself *)
+Lemma walk_alloc_page_base (pa : mword 64) :
+  uint pa `mod` 4096 = 0 ->
+  uint pa < 72057594037927936 ->
+  zero_extend' 64 (concat_vec
+    (autocast (T := mword) (subrange_vec_dec pa 55 12) : mword 44)
+    (zeros' 12 : mword 12)) = pa.
+Proof.
+  intros Hal Hlt.
+  rewrite uint_unsigned in Hal. rewrite uint_unsigned in Hlt.
+  apply bv_eq.
+  rewrite page_base_unsigned.
+  assert (Hppn : bv_unsigned (autocast (T := mword) (subrange_vec_dec pa 55 12) : mword 44)
+                 = bv_unsigned pa / 4096).
+  { rewrite autocast_id.
+    unfold subrange_vec_dec. rewrite autocast_id.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    rewrite bv_extract_unsigned.
+    change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
+    change (MachineWord.MachineWord.Z_idx (55 - 12 + 1)) with 44%N.
+    rewrite Z.shiftr_div_pow2; [| lia].
+    change (2 ^ 12) with 4096.
+    apply bv_wrap_small.
+    unfold bv_modulus.
+    change (2 ^ Z.of_N 44) with 17592186044416.
+    split.
+    - apply Z.div_pos; [exact (proj1 (bv_unsigned_in_range _ pa)) | reflexivity].
+    - apply Z.div_lt_upper_bound; [reflexivity |].
+      change (4096 * 17592186044416) with 72057594037927936.
+      exact Hlt. }
+  rewrite Hppn.
+  apply Z.mod_divide in Hal; [| lia]. destruct Hal as [q Hq].
+  rewrite Hq. rewrite Z.div_mul; [| lia]. lia.
+Qed.
+
+(* (i) THE SLOT ADDRESS, level 2 (shift 30): srl/andi/slli/add compute
+   the description's slot address from the page base and the va *)
+Lemma walk_slot_addr2 (b : mword 44) (va : mword 64) :
+  uint va < 274877906944 ->
+  add_vec
+    (shift_bits_left
+       (and_vec
+          (shift_bits_right va
+             (subrange_vec_dec (mword_of_int 30 : mword 64) (Z.sub log2_xlen 1) 0))
+          (sign_extend' 64 (mword_of_int 511 : mword 12)))
+       (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))
+    (zero_extend' 64 (concat_vec b (zeros' 12 : mword 12)))
+  = u_pte_addr b (vpn_idx 2 (svpn_of va)).
+Proof.
+  intros Hva. pose proof Hva as Hva'. rewrite uint_unsigned in Hva'.
+  assert (Hred : shift_bits_left
+      (and_vec
+         (shift_bits_right va
+            (subrange_vec_dec (mword_of_int 30 : mword 64) (Z.sub log2_xlen 1) 0))
+         (sign_extend' 64 (mword_of_int 511 : mword 12)))
+      (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0)
+    = shiftl (and_vec (shiftr va 30) (sign_extend' 64 (mword_of_int 511 : mword 12))) 3).
+  { unfold shift_bits_left, shift_bits_right.
+    f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal; vm_compute; reflexivity. }
+  rewrite Hred.
+  assert (Hidx : bv_unsigned (vpn_idx 2 (svpn_of va))
+                 = Z.shiftr (bv_unsigned va) 30 `mod` 512).
+  { cbn [vpn_idx].
+    rewrite (pt_sub27_26_18 (svpn_of va)).
+    rewrite (svpn_of_unsigned_lo va Hva).
+    rewrite uint_unsigned.
+    rewrite Z.shiftr_shiftr; [| apply Z.leb_le; reflexivity].
+    change (12 + 18) with 30. change (2 ^ 9) with 512. reflexivity.
+  }
+  apply bv_eq.
+  replace (bv_unsigned (u_pte_addr b (vpn_idx 2 (svpn_of va))))
+    with (bv_unsigned b * 4096 + bv_unsigned (vpn_idx 2 (svpn_of va)) * 8)
+    by (symmetry; exact (pte_addr_at_unsigned b (vpn_idx 2 (svpn_of va)))).
+  rewrite Hidx.
+  unfold add_vec, and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add, MachineWord.MachineWord.and.
+  unfold shiftl, shiftr, with_word,
+    MachineWord.MachineWord.logical_shift_left,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_add_unsigned. rewrite bv_shiftl_unsigned.
+  rewrite bv_and_unsigned. rewrite bv_shiftr_unsigned.
+  match goal with |- context [Z.shiftr (bv_unsigned va) (bv_unsigned ?am)] =>
+    replace (bv_unsigned am) with 30 by (vm_compute; reflexivity) end.
+  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+    replace (bv_unsigned mm) with 511 by (vm_compute; reflexivity) end.
+  match goal with |- context [Z.shiftl _ (bv_unsigned ?sm)] =>
+    replace (bv_unsigned sm) with 3 by (vm_compute; reflexivity) end.
+  match goal with |- context [_ + bv_unsigned ?pb] =>
+    replace (bv_unsigned pb) with (bv_unsigned b * 4096)
+      by (symmetry; exact (page_base_unsigned b)) end.
+  change 511 with (Z.ones 9).
+  rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
+  change (2 ^ 9) with 512.
+  replace (Z.shiftl (Z.shiftr (bv_unsigned va) 30 `mod` 512) 3)
+    with (Z.shiftr (bv_unsigned va) 30 `mod` 512 * 8)
+    by (rewrite Z.shiftl_mul_pow2; [reflexivity | apply Z.leb_le; reflexivity]).
+  pose proof (Z.mod_pos_bound (Z.shiftr (bv_unsigned va) 30) 512
+                ltac:(reflexivity)) as Hmb.
+  pose proof (bv_unsigned_in_range _ b) as Hbr.
+  unfold bv_modulus in Hbr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 44)) with 17592186044416 in Hbr.
+  match goal with |- context [bv_wrap ?n (?x * 8)] =>
+    replace (bv_wrap n (x * 8)) with (x * 8)
+      by (symmetry; apply bv_wrap_small;
+          unfold bv_modulus;
+          change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64))
+            with 18446744073709551616;
+          lia) end.
+  rewrite bv_wrap_small.
+  2:{ unfold bv_modulus.
+      change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64))
+        with 18446744073709551616.
+      lia. }
+  apply Z.add_comm.
+Qed.
+
+(* (i) THE SLOT ADDRESS, level 1 (shift 21): srl/andi/slli/add compute
+   the description's slot address from the page base and the va *)
+Lemma walk_slot_addr1 (b : mword 44) (va : mword 64) :
+  uint va < 274877906944 ->
+  add_vec
+    (shift_bits_left
+       (and_vec
+          (shift_bits_right va
+             (subrange_vec_dec (mword_of_int 21 : mword 64) (Z.sub log2_xlen 1) 0))
+          (sign_extend' 64 (mword_of_int 511 : mword 12)))
+       (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))
+    (zero_extend' 64 (concat_vec b (zeros' 12 : mword 12)))
+  = u_pte_addr b (vpn_idx 1 (svpn_of va)).
+Proof.
+  intros Hva. pose proof Hva as Hva'. rewrite uint_unsigned in Hva'.
+  assert (Hred : shift_bits_left
+      (and_vec
+         (shift_bits_right va
+            (subrange_vec_dec (mword_of_int 21 : mword 64) (Z.sub log2_xlen 1) 0))
+         (sign_extend' 64 (mword_of_int 511 : mword 12)))
+      (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0)
+    = shiftl (and_vec (shiftr va 21) (sign_extend' 64 (mword_of_int 511 : mword 12))) 3).
+  { unfold shift_bits_left, shift_bits_right.
+    f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal; vm_compute; reflexivity. }
+  rewrite Hred.
+  assert (Hidx : bv_unsigned (vpn_idx 1 (svpn_of va))
+                 = Z.shiftr (bv_unsigned va) 21 `mod` 512).
+  { cbn [vpn_idx].
+    rewrite (pt_sub27_17_9 (svpn_of va)).
+    rewrite (svpn_of_unsigned_lo va Hva).
+    rewrite uint_unsigned.
+    rewrite Z.shiftr_shiftr; [| apply Z.leb_le; reflexivity].
+    change (12 + 9) with 21. change (2 ^ 9) with 512. reflexivity.
+  }
+  apply bv_eq.
+  replace (bv_unsigned (u_pte_addr b (vpn_idx 1 (svpn_of va))))
+    with (bv_unsigned b * 4096 + bv_unsigned (vpn_idx 1 (svpn_of va)) * 8)
+    by (symmetry; exact (pte_addr_at_unsigned b (vpn_idx 1 (svpn_of va)))).
+  rewrite Hidx.
+  unfold add_vec, and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add, MachineWord.MachineWord.and.
+  unfold shiftl, shiftr, with_word,
+    MachineWord.MachineWord.logical_shift_left,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_add_unsigned. rewrite bv_shiftl_unsigned.
+  rewrite bv_and_unsigned. rewrite bv_shiftr_unsigned.
+  match goal with |- context [Z.shiftr (bv_unsigned va) (bv_unsigned ?am)] =>
+    replace (bv_unsigned am) with 21 by (vm_compute; reflexivity) end.
+  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+    replace (bv_unsigned mm) with 511 by (vm_compute; reflexivity) end.
+  match goal with |- context [Z.shiftl _ (bv_unsigned ?sm)] =>
+    replace (bv_unsigned sm) with 3 by (vm_compute; reflexivity) end.
+  match goal with |- context [_ + bv_unsigned ?pb] =>
+    replace (bv_unsigned pb) with (bv_unsigned b * 4096)
+      by (symmetry; exact (page_base_unsigned b)) end.
+  change 511 with (Z.ones 9).
+  rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
+  change (2 ^ 9) with 512.
+  replace (Z.shiftl (Z.shiftr (bv_unsigned va) 21 `mod` 512) 3)
+    with (Z.shiftr (bv_unsigned va) 21 `mod` 512 * 8)
+    by (rewrite Z.shiftl_mul_pow2; [reflexivity | apply Z.leb_le; reflexivity]).
+  pose proof (Z.mod_pos_bound (Z.shiftr (bv_unsigned va) 21) 512
+                ltac:(reflexivity)) as Hmb.
+  pose proof (bv_unsigned_in_range _ b) as Hbr.
+  unfold bv_modulus in Hbr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 44)) with 17592186044416 in Hbr.
+  match goal with |- context [bv_wrap ?n (?x * 8)] =>
+    replace (bv_wrap n (x * 8)) with (x * 8)
+      by (symmetry; apply bv_wrap_small;
+          unfold bv_modulus;
+          change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64))
+            with 18446744073709551616;
+          lia) end.
+  rewrite bv_wrap_small.
+  2:{ unfold bv_modulus.
+      change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64))
+        with 18446744073709551616.
+      lia. }
+  apply Z.add_comm.
+Qed.
+
+(* (i) THE SLOT ADDRESS, level 0 (shift 12): srl/andi/slli/add compute
+   the description's slot address from the page base and the va *)
+Lemma walk_slot_addr0 (b : mword 44) (va : mword 64) :
+  uint va < 274877906944 ->
+  add_vec
+    (shift_bits_left
+       (and_vec
+          (shift_bits_right va
+             (subrange_vec_dec (mword_of_int 12 : mword 64) (Z.sub log2_xlen 1) 0))
+          (sign_extend' 64 (mword_of_int 511 : mword 12)))
+       (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))
+    (zero_extend' 64 (concat_vec b (zeros' 12 : mword 12)))
+  = u_pte_addr b (vpn_idx 0 (svpn_of va)).
+Proof.
+  intros Hva. pose proof Hva as Hva'. rewrite uint_unsigned in Hva'.
+  assert (Hred : shift_bits_left
+      (and_vec
+         (shift_bits_right va
+            (subrange_vec_dec (mword_of_int 12 : mword 64) (Z.sub log2_xlen 1) 0))
+         (sign_extend' 64 (mword_of_int 511 : mword 12)))
+      (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0)
+    = shiftl (and_vec (shiftr va 12) (sign_extend' 64 (mword_of_int 511 : mword 12))) 3).
+  { unfold shift_bits_left, shift_bits_right.
+    f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal; vm_compute; reflexivity. }
+  rewrite Hred.
+  assert (Hidx : bv_unsigned (vpn_idx 0 (svpn_of va))
+                 = Z.shiftr (bv_unsigned va) 12 `mod` 512).
+  { cbn [vpn_idx].
+    rewrite (pt_sub27_8_0 (svpn_of va)).
+    rewrite (svpn_of_unsigned_lo va Hva).
+    rewrite uint_unsigned.
+    change (2 ^ 9) with 512. reflexivity.
+  }
+  apply bv_eq.
+  replace (bv_unsigned (u_pte_addr b (vpn_idx 0 (svpn_of va))))
+    with (bv_unsigned b * 4096 + bv_unsigned (vpn_idx 0 (svpn_of va)) * 8)
+    by (symmetry; exact (pte_addr_at_unsigned b (vpn_idx 0 (svpn_of va)))).
+  rewrite Hidx.
+  unfold add_vec, and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add, MachineWord.MachineWord.and.
+  unfold shiftl, shiftr, with_word,
+    MachineWord.MachineWord.logical_shift_left,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_add_unsigned. rewrite bv_shiftl_unsigned.
+  rewrite bv_and_unsigned. rewrite bv_shiftr_unsigned.
+  match goal with |- context [Z.shiftr (bv_unsigned va) (bv_unsigned ?am)] =>
+    replace (bv_unsigned am) with 12 by (vm_compute; reflexivity) end.
+  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+    replace (bv_unsigned mm) with 511 by (vm_compute; reflexivity) end.
+  match goal with |- context [Z.shiftl _ (bv_unsigned ?sm)] =>
+    replace (bv_unsigned sm) with 3 by (vm_compute; reflexivity) end.
+  match goal with |- context [_ + bv_unsigned ?pb] =>
+    replace (bv_unsigned pb) with (bv_unsigned b * 4096)
+      by (symmetry; exact (page_base_unsigned b)) end.
+  change 511 with (Z.ones 9).
+  rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
+  change (2 ^ 9) with 512.
+  replace (Z.shiftl (Z.shiftr (bv_unsigned va) 12 `mod` 512) 3)
+    with (Z.shiftr (bv_unsigned va) 12 `mod` 512 * 8)
+    by (rewrite Z.shiftl_mul_pow2; [reflexivity | apply Z.leb_le; reflexivity]).
+  pose proof (Z.mod_pos_bound (Z.shiftr (bv_unsigned va) 12) 512
+                ltac:(reflexivity)) as Hmb.
+  pose proof (bv_unsigned_in_range _ b) as Hbr.
+  unfold bv_modulus in Hbr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 44)) with 17592186044416 in Hbr.
+  match goal with |- context [bv_wrap ?n (?x * 8)] =>
+    replace (bv_wrap n (x * 8)) with (x * 8)
+      by (symmetry; apply bv_wrap_small;
+          unfold bv_modulus;
+          change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64))
+            with 18446744073709551616;
+          lia) end.
+  rewrite bv_wrap_small.
+  2:{ unfold bv_modulus.
+      change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64))
+        with 18446744073709551616.
+      lia. }
+  apply Z.add_comm.
+Qed.
+
+(* the C walk's V-bit test: [andi a5, w, 1; beqz a5] branches exactly on
+   bit 0 of the slot word *)
+Lemma walk_vbit_eq (w : mword 64) :
+  eq_vec (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12))) zero_reg
+  = negb (Z.testbit (bv_unsigned w) 0).
+Proof.
+  assert (Hand : bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)))
+                 = Z.b2z (Z.odd (bv_unsigned w))).
+  { unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      to_word, get_word, SailStdpp.Values.with_word.
+    unfold MachineWord.MachineWord.and.
+    rewrite bv_and_unsigned.
+    match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+      replace (bv_unsigned mm) with 1 by (vm_compute; reflexivity) end.
+    change 1 with (Z.ones 1) at 1.
+    rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
+    change (2 ^ 1) with 2.
+    apply Zmod_odd. }
+  rewrite Z.bit0_odd.
+  destruct (Z.odd (bv_unsigned w)) eqn:E; cbn [Z.b2z] in Hand.
+  - cbn [negb]. apply eq_vec_false_iff.
+    intro Hc. apply (f_equal bv_unsigned) in Hc.
+    rewrite Hand in Hc.
+    replace (bv_unsigned (zero_reg : mword 64)) with 0 in Hc
+      by (vm_compute; reflexivity).
+    discriminate Hc.
+  - cbn [negb]. apply eq_vec_true_iff.
+    apply bv_eq. rewrite Hand.
+    vm_compute. reflexivity.
+Qed.
