@@ -301,3 +301,45 @@ Section UserMemAccessStore.
   Qed.
 
 End UserMemAccessStore.
+
+(* ===================================================================== *)
+(* §3 Building blocks for the MISALIGNED-access faults.  A misaligned      *)
+(*    LR/SC faults BEFORE any access: the platform delivers AccessFault    *)
+(*    (plat_misaligned_access.lrsc), surfacing as E_Load_Access_Fault      *)
+(*    (LR) / E_SAMO_Access_Fault (SC), state unchanged.  (Plain load/store *)
+(*    misalignment does NOT fault -- the hardware splits it; AMO           *)
+(*    misalignment is checked inside execute_AMO.)                         *)
+(*    [exec_memory_exception] and [exec_plat_misaligned_lrsc] are the two  *)
+(*    exec bricks; the vmem_read_addr / vmem_write_addr misaligned         *)
+(*    reductions built on them are worklisted (see iris/CLAUDE.md) -- the  *)
+(*    open point is reducing the model's DEPENDENT align guard             *)
+(*    [if not is_aligned return MR ... then fault else tt] inside          *)
+(*    catch_early_return without cbn unfolding the bind/liftR structure    *)
+(*    the execR_* lemmas match on.                                         *)
+(* ===================================================================== *)
+
+Lemma exec_memory_exception (va pc : mword 64) (exc : ExceptionType)
+    (priv : Privilege) (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = priv ->
+  register_lookup PC s.(sregs) = pc ->
+  exec (memory_exception (Virtaddr va) exc) s
+    = Some (Trap (priv, make_sync_exception exc va, pc), s).
+Proof.
+  intros Hcp Hpc.
+  unfold memory_exception, trap.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+  rewrite Hpc. cbn [bits_of_virtaddr]. apply exec_returnm.
+Qed.
+
+Lemma exec_plat_misaligned_lrsc (acc : MemoryAccessType mem_payload) (s : mstate) :
+  is_amo_access acc = false ->
+  exec (plat_misaligned_exception acc true) s = Some (Some AccessFault, s).
+Proof.
+  intro Hamo.
+  unfold plat_misaligned_exception.
+  rewrite (exec_bind0_Some _ _ _ _ _ (_ : exec (assert_exp (not (is_amo_access acc)) _%string) s = Some (tt, s))).
+  2:{ rewrite Hamo. unfold assert_exp. cbn match. apply exec_returnm. }
+  apply exec_returnm.
+Qed.
