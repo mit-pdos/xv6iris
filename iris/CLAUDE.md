@@ -612,18 +612,107 @@ files or copy code from them; build fresh from the live tree.
      `exec_mem_read_fetch_{4,2}_U`; UserBits.v: page-window arithmetic —
      GOTCHA: do bv-level steps by etransitivity/exact, goal rewrites of
      width-carrying bv lemmas miss on implicit-width spellings).
-     CHECKPOINT (resume here): every prerequisite for the non-memory
-     classification is now in place — the six payload arms (UserArms.v +
-     the wrapper's inlined interrupt arm), per-family execute facts for
-     every non-memory `decodable_u` family (UserExecFacts.v), the
-     decode-wf payload invariant + transport kit (DecodeSetU.v /
-     UserBits.v), the progress composers (base/base-redirect/RVC), and
-     `upt_fetch_instr`. The natural next file is `UserClassify.v`: per
-     family, discharge the arm's obligation at the post-increment state
-     (fetch via `upt_fetch_instr` → decode via `decode_total_u_set` +
-     `agree_u` → the family's execute fact → the matching progress
-     composer), then assemble `active_class` and with it
-     `user_step_obligation_active`. The C_* expansion facts are COMPLETE
+     ============ HANDOFF CHECKPOINT (user-mode WP, July 2026) ============
+     For whoever picks this up (written for the agent finishing the
+     Svadu/ADUE page-table port). CURRENT STATE — everything below is
+     proven, committed, and full-build green; axiom budget: the 5
+     platform axioms everywhere, and UserCsr.v is axiom-FREE.
+     (1) THE FRAME AND THE STEP: `wp_user_exec` (Löb capstone, UserExec)
+     over `user_inv`/`user_trap_frame`; `user_step_obligation_holds`
+     dispatches WAITING (WRS stay/wake, UserStep) so only
+     `user_step_obligation_active` remains; the unified step wrapper
+     `wp_user_step_active` (UserStepFull) opens `wire_inv`, decides
+     `u_dispatch`, discharges the interrupt arm inline, and reduces
+     everything else to `active_class` — the fupd payload the
+     classification must produce.
+     (2) THE SIX PAYLOAD ARMS (UserArms; + the wrapper's interrupt arm):
+     retire / execute-trap / fetch-fault / illegal / enter-wait, all
+     wire-free, each consuming a per-family obligation ∀-quantified over
+     the minstret-increment bit at the post-increment state, with ONE
+     pure precondition `u_step_pre σ va` (built via `u_step_pre_intro`)
+     and ONE shared trap-delivery machinery (`utrap_state`/`utrap_ghost`/
+     `utrap_ms_ok`/`user_trap_frame_intro` — never hand-roll tower iMod
+     chains).
+     (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
+     UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
+     (`gpr_write_state`-shaped, value existential) for every compute /
+     control / fence family incl. JAL/JALR/BTYPE; illegal-at-U for every
+     privileged/config-gated instruction; ECALL/EBREAK traps; WRS
+     Enter_Wait; CSRReg/CSRImm total (Illegal ∨ retiring read — the
+     model excludes CSR writes at U).
+     (4) DECODE: `decode_total_{u,c}_set` with the JAL/BTYPE bit-0
+     payload invariant recorded in `decodable_u`, `agree_u`, and the
+     UserBits transport kit (`wf_imm_even_*`, `aligned_even`,
+     `add_sext_even_64_*`) turning it into jump_to's premise.
+     WHAT IS LEFT, IN SUGGESTED ORDER:
+     (A) UserClassify.v — THE ASSEMBLY (start here; mostly
+     ADUE-independent). Per family, discharge the arm's obligation at
+     the post-increment state s_a: fetch via `upt_fetch_instr` (or its
+     UptTree successor — see (B)) → decode via `decode_total_u_set` /
+     `decode_total_c_set` + `agree_u` (its lookups come from `user_cfg`
+     + hw_config via `reg_valid_dq` against the obligation's interp) →
+     destruct the decodable set (~54 base + ~44 compressed
+     constructors) → that family's execute fact → the matching progress
+     composer (`exec_hart_active_progress_base_gen` for base,
+     `_base_redirect_gen` in UserStep §6 for SINVAL/ExecuteAs-base,
+     `_RVC_gen` for compressed expansions) → the arm's obligation
+     shape. Control flow additionally: pc-evenness from the fetch
+     alignment (`aligned_even`) + `wf_imm_even_*` + `add_sext_even_64_*`
+     discharge jump_to's target-bit-0 premise (compressed control flow
+     carries its alignment SYNTACTICALLY in the expansion term:
+     `sign_extend' 21 (concat_vec imm 'b"0")` — prove the bit-0 fact
+     per-shape, the sext transport is `mod2_swrap`-based like
+     `add_sext_even_64_21`'s proof). Then assemble `active_class` (case
+     first on fetchability, then on the decoded constructor) and with
+     it `user_step_obligation_active`; `wp_user_exec_active` closes the
+     capstone. SUGGESTION: one file per concern — the per-family
+     discharge lemmas are independent and parallelize; keep each one
+     "obligation-in, obligation-out" so the final assembly is a bare
+     case tree.
+     (B) THE ADUE-COUPLED SEAM — yours to reshape as the UptTree port
+     lands. The classification's fetch step currently targets
+     `upt_fetch_instr` (UserFetch §6) whose premises are pre-ADUE
+     (`upte_check_ok`, `update_PTE_Bits … = None`, `upt_*` from
+     UserPt.v). If UptTree/PtFetchGen replaces the UserPt layer, port
+     `upt_fetch_instr` + the fetch-fault flavor corollaries
+     (UserTranslate/UserFetch §1-5) to it FIRST, then wire the flavor
+     corollaries into `fetch_fault_obligation` (the arm is
+     cause-generic and will not change). NOTE with hardware A/D setting
+     the needs-update fault flavor DISAPPEARS for enabled tables — the
+     flavor set shrinks; `user_exc` and `uc_del` already cover every
+     remaining cause.
+     (C) THE MEMORY ARMS (LOAD/STORE/AMO/LR/SC + ZICBOP) — after (B),
+     same pattern as the S-mode WpSmodePtMem port: a data access either
+     retires (store re-establishes `upt_inv`'s existential pages; load
+     writes rd existentially; AMO both; ZICBOP is a prefetch-retire) or
+     traps with a delegated data fault (align/unmapped/denied →
+     `execute_trap_obligation`; the Trap outcome carries
+     `make_sync_exception e xv` with xv the faulting va). LR/SC: SC
+     always-fails is NOT assumable — destruct the opaque
+     `match_reservation`/`valid_reservation` axioms like
+     `wp_user_step_waiting` does and handle both outcomes (success
+     writes memory + rd; fail writes rd:=1).
+     (D) SMALL CLEANUPS while integrating: thread the FS/VS pins into
+     `user_mstatus_ok` (UserCsr's facts take them as separate premises;
+     WpUserret already claims FS=Off structurally — check VS at boot,
+     else add a `uc` pin); consider folding `u_step_pre` into the arm
+     SIGNATURES (arms still take the 5 σ-level facts; the wrapper could
+     hand `∀ b, u_step_pre …` directly).
+     (E) KERNEL INTEGRATION (worklist item 5, meets your userret port):
+     massage `wp_userret`'s postcondition into `user_inv` at the
+     concrete upt (trampoline + trapframe + process pages — your
+     UserretPt/TransPt layer is exactly this bridge), and prove
+     uservec's spec to discharge `stvec_handler_wp`.
+     RECIPES YOU WILL NEED (all documented in this file): the arm/
+     obligation shapes and `u_step_pre` (payload-arms bullet); the
+     trap-delivery machinery (delivered-state bullet); the decode-wf
+     dischargers and the mword-bit-fact recipe (decode-wf bullets); the
+     guarded-fixpoint probe pattern and the MR-reduction gotchas
+     (CSR-plan bullets); the dependent-if/dependent-read traps
+     (`change`-the-scrutinee, destruct-with-eqn substitutes into
+     hypotheses, `exact`-bridge across Cast nodes, instantiate dependent
+     reads under plain rewrite).
+     ====================================================================== The C_* expansion facts are COMPLETE
      (UserExecFacts.v holds the 22 stragglers incl. the direct retires
      `exec_execute_C_{NOT,ZEXT_B}_total` — stated with an ∃-bound
      `creg2reg_idx c = Regidx i` witness — and the pure results
