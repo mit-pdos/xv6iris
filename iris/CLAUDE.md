@@ -445,7 +445,7 @@ before any mechanical sweep.
      '0' pins the arm by agreement — code holding the token or the
      payload refutes interrupts-enabled cases WITHOUT a panic axiom.
      push_off's payload carries the token through to its caller.
-   - TODO — `wp_pop_off_sconf`: leaf-by-leaf like push_off (the old
+   - DONE — `wp_pop_off_sconf` (WpSconfPushOff.v, axiom-clean): leaf-by-leaf (the old
      wp_pop_off_r's VCgen blocks contain the sp-moves).  INPUT: the
      paired push_off report/payload disjunct
      `(⌜SIE ms=0⌝ ∗ intr_off_tok γ) ∨ (⌜SIE ms=1⌝ ∗ full payload)`
@@ -466,7 +466,19 @@ before any mechanical sweep.
      0x10016073 = csrrsi x0,sstatus,2 — rd is X0) and the x0 leaf
      `wp_csrsi_sstatus_x0_s_sconf` + `exec_execute_csrsi_sstatus_x0`
      (WpSconfCsr.v; no register write, map unchanged, no rd premises).
-     Remaining: the main proof, leaf-by-leaf like push_off.
+     ALL THREE runtime paths proven (early-noff / intena=0 / the
+     RESTORE, which consumes payload + token through the x0 leaf and
+     re-arms the cap); the shared epilogue is the factored
+     `wp_pop_off_epi_sconf` (returns the mf INSERT-CHAIN EQUATION so
+     each path does its own callee_saved pin-chase); the post's
+     conditional payload is `if (negb (neq nv1 0) && neq (sext intena)
+     0) then emp else input-back` — destruct-with-eqn on the branch
+     scrutinees reduces it per path (the intena `neq` needs an explicit
+     unfold-rewrite: destructing `eq_vec` does not reduce a `neq_vec`
+     spelling).  REMAINING pure debt for the composition layer: the
+     intena-bit fact `po_intena_val ms = SIE-bit(ms)` (two case forms)
+     that converts push_off's ⌜SIE ms⌝-keyed payload into pop_off's
+     intenav-keyed input disjunct.
    - the rest of the kalloc cone file-by-file (acquire/release/holding/
      kalloc/kfree...), VCgen `_den` sconf wrapper with the first
      converted function.
