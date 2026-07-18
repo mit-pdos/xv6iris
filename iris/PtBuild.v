@@ -24,7 +24,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree.
+Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree WpDecodeBridge.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -458,6 +458,64 @@ Proof.
   unfold PPN_of_PTE. change (Z.eqb 64 32) with false. cbv iota beta.
   rewrite (mk_pte_ppn_field b PTE_PTR ltac:(unfold PTE_PTR; lia)).
   rewrite !autocast_id. reflexivity.
+Qed.
+
+(* the classification pins a POINTER word's extension bits (63:54) to
+   zero: [pte_is_invalid]'s nonleaf disjunct (A|D|U|ext<>0) must have
+   come out false.  This is what makes the C descend's (w>>10)<<12
+   compute the true next-level base ([u_next_base w] * 4096).  The
+   proof INVERTS the opaque exec fact at the concrete bridge state:
+   peel the or_boolM chain until the nonleaf disjunct's boolean is
+   forced false. *)
+Lemma pte_valid_ptr_ext0 (w : mword 64) :
+  pte_valid w -> pte_ptr w ->
+  subrange_vec_dec w 63 54 = (zeros' 10 : mword 10).
+Proof.
+  intros Hv Hp.
+  specialize (Hv dstateM).
+  unfold pte_is_invalid in Hv.
+  (* disjunct 1: V = 0 *)
+  rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)) in Hv.
+  match type of Hv with (if ?c then _ else _) = _ => destruct c end;
+    [discriminate Hv |].
+  (* disjunct 2: the shadow-stack and-chain (reads menvcfg) *)
+  match type of Hv with
+  | exec (or_boolM ?ac _) _ = _ =>
+      assert (HAC : exists d2 : bool, exec ac dstateM = Some (d2, dstateM))
+  end.
+  { rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)).
+    match goal with |- exists _, (if ?c then _ else _) = _ => destruct c end;
+      [| eexists; reflexivity].
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)).
+    match goal with |- exists _, (if ?c then _ else _) = _ => destruct c end;
+      [| eexists; reflexivity].
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)).
+    match goal with |- exists _, (if ?c then _ else _) = _ => destruct c end;
+      [| eexists; reflexivity].
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg dstateM)).
+    eexists. apply exec_returnM. }
+  destruct HAC as (d2 & HAC).
+  rewrite (exec_or_boolM_Some _ _ _ _ _ HAC) in Hv.
+  destruct d2; [discriminate Hv |].
+  (* disjunct 3: R=0 & W=1 & X=1 *)
+  rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)) in Hv.
+  match type of Hv with (if ?c then _ else _) = _ => destruct c end;
+    [discriminate Hv |].
+  (* disjunct 4: nonleaf & (A|D|U|ext<>0) -- the payload *)
+  rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)) in Hv.
+  match type of Hv with (if ?c then _ else _) = _ => destruct c eqn:E3 end;
+    [discriminate Hv |].
+  clear Hv.
+  unfold pte_ptr in Hp. rewrite Hp in E3.
+  rewrite andb_true_l in E3.
+  apply orb_false_iff in E3. destruct E3 as [_ E3].
+  apply orb_false_iff in E3. destruct E3 as [_ E3].
+  apply orb_false_iff in E3. destruct E3 as [_ E3].
+  unfold neq_vec in E3. apply negb_false_iff in E3.
+  apply eq_vec_true_iff in E3.
+  unfold ext_bits_of_PTE, Mk_PTE_Ext in E3.
+  change (Z.eqb 64 64) with true in E3. cbv beta iota in E3.
+  exact E3.
 Qed.
 
 (* ---- the two graft operations --------------------------------------- *)
