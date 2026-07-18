@@ -90,6 +90,7 @@ WpSmodePtUart.v
 UptTree.v
 PtFetchGen.v
 TrampStepPt.v
+UserretPt.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
@@ -133,6 +134,7 @@ UserCompute.v
 UserStepFull.v
 UserArms.v
 UserExecFacts.v
+UserCsr.v
 WpIntrInv.v
 WpSmodeIntr.v
 WpPushOff.v
