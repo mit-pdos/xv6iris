@@ -1024,3 +1024,47 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mhpmcounter s)). cbn beta.
   apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §3f Concretizing the hpm range: 29 addresses.                          *)
+(* ===================================================================== *)
+
+Lemma sub40_unsigned (x : mword 12) :
+  bv_unsigned (subrange_vec_dec x 4 0) = bv_unsigned x mod 32.
+Proof.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (4 - 0 + 1))) with 32.
+  reflexivity.
+Qed.
+
+Lemma u_hpm_unsigned (csr : mword 12) :
+  u_hpm_range csr ('b"1100000") ->
+  3072 + 3 <= bv_unsigned csr <= 3072 + 31.
+Proof.
+  intros [E1 E2].
+  apply eq_vec_true_iff in E1.
+  apply (f_equal bv_unsigned) in E1.
+  rewrite sub115_unsigned in E1.
+  change (bv_unsigned ('b"1100000" : mword 7)) with 96 in E1.
+  rewrite (uint_unsigned_n _) in E2.
+  rewrite sub40_unsigned in E2.
+  apply Z.geb_le in E2.
+  pose proof (bv_unsigned_in_range _ csr) as Hr.
+  unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 4096 in Hr.
+  set (c := bv_unsigned csr) in *.
+  assert (H32 : (0 < 32)%Z) by (vm_compute; constructor).
+  assert (Hd32 : c / 32 < 128).
+  { apply Z.div_lt_upper_bound; [ exact H32 | ].
+    change (32 * 128) with 4096. lia. }
+  assert (Hd0 : 0 <= c / 32) by (apply Z.div_pos; lia).
+  rewrite Z.mod_small in E1 by (split; [ exact Hd0 | exact Hd32 ]).
+  pose proof (Z_div_mod_eq_full c 32) as Hdm.
+  pose proof (Z.mod_pos_bound c 32 H32) as Hmb.
+  lia.
+Qed.
