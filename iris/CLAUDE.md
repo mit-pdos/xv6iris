@@ -387,6 +387,24 @@ files or copy code from them; build fresh from the live tree.
        gpr/nextPC never move (only interp + `upt_inv` change hands — a
        split fetch may fill the TLB on its successful half); sepc := the
        faulting pc read from PC; produces `user_trap_frame`.
+     - `illegal_branch` + `illegal_obligation` (UserArms.v): run outcome
+       `Illegal_Instruction tt` (every privileged instruction at User) —
+       try_step's DEDICATED arm (`exec_riscv_step_execute_illegal`,
+       UserTrap.v) delivers E_Illegal_Instr with the INSTRUCTION BITS as
+       tval; gpr untouched, nextPC moved (the pre-execute write); produces
+       `user_trap_frame`.
+     The only step shape without an arm is WRS ENTER-WAIT (`Enter_Wait`:
+     writes hart_state := WAITING, skips the tick, retired=false).
+     PURE U-MODE EXECUTE FACTS (UserExecFacts.v, iris-free, axiom-clean):
+     `exec_execute_{ECALL,EBREAK}_U` (→ `rv64d_types.Trap (User,
+     make_sync_exception e xv, pc)`, state unchanged — feed
+     `execute_trap_obligation`; EnvCall's xtval is None for ANY xv so the
+     make_sync_exception spelling matches) and
+     `exec_execute_{MRET,SRET,WFI}_U` (→ `Illegal_Instruction tt`, state
+     unchanged — feed `illegal_obligation`; WFI because
+     `plat_wfi_available_to_usermode = false`). Still to add there: the
+     sfence/sinval families (rX_bits reads via `exec_rX_bits_gpr`, then
+     priv → illegal), Zicbo* (senvcfg=0-gated), CSR-at-U dispatch.
      Iris trap-arm recipe (used by all three tower arms): ghost-update
      EVERY physical write in tower order (repeated writes to the same CSR
      each get their own reg_update — the interp goal is the literal

@@ -6,9 +6,8 @@
    to the classification [active_class], which must produce the
    [wp_exec_step_minstret] payload: ONE [riscv_step] reduction plus the
    re-established interp.  The classification's per-family case analysis
-   always ends in one of a small set of STEP SHAPES; this file provides the
-   two shapes an executed instruction can end in (the fetch-fault shapes are
-   separate):
+   always ends in one of a small set of STEP SHAPES; this file provides
+   them:
 
      [retire_branch]        run_hart_active retires ([Retire_Success]) --
                             compute, control flow, fences, nops.  The
@@ -31,12 +30,21 @@
                             the arm ([fetch_fault_obligation] hands over
                             only interp + [upt_inv], the TLB may fill on a
                             partially-successful split fetch).
+     [illegal_branch]       run_hart_active returns [Illegal_Instruction]
+                            (every privileged instruction at User --
+                            mret / sret / wfi / the sfence and sinval
+                            families; see UserExecFacts.v): try_step's
+                            dedicated arm delivers E_Illegal_Instr with
+                            the INSTRUCTION BITS as tval; the gpr file is
+                            untouched, but nextPC moved (the pre-execute
+                            write), so [illegal_obligation] hands it over.
 
-   Both arms are WIRE-FREE: the dispatch decision reaches them as a pure
+   All arms are WIRE-FREE: the dispatch decision reaches them as a pure
    fact at the post-minstret-increment states (∀ over the written bit), so
-   no arm ever owns the wire cells.  Both do their own minstret prelude
+   no arm ever owns the wire cells.  Each does its own minstret prelude
    (the write is the first thing [try_step] does, so it belongs to the
-   step shape, not to the classification).                                 *)
+   step shape, not to the classification).  The one step shape WITHOUT an
+   arm yet is WRS enter-wait (writes hart_state, skips the tick).          *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -509,6 +517,187 @@ Section UserArms.
       by (unfold utrap_ms, ms_b, ms_a, ms_e; reflexivity).
     iExists (update_subrange_vec_dec ms_b 8 8 ('b"0")), c2,
             (tval (xtval_exception_value e xv)), va, g.
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt".
+    iSplitR.
+    { iPureIntro. rewrite Hmc.
+      destruct Hmsok as (HSXL & HMPRV & HMXR).
+      split; [ rewrite utrap_ms_SXL; exact HSXL | ].
+      split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
+      split; [ rewrite utrap_ms_MXR; exact HMXR | ].
+      split; [ rewrite utrap_ms_SPP; reflexivity | ].
+      rewrite utrap_ms_SIE; reflexivity. }
+    iSplitL "Hpc Hnpc". { iFrame "Hpc Hnpc". }
+    iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* The ILLEGAL obligation: execute found the instruction ILLEGAL         *)
+  (* (privileged instruction at User).  The gpr file is untouched; nextPC  *)
+  (* moved (the pre-execute write) and the fetch may have filled the TLB,  *)
+  (* so interp + the nextPC cell + [upt_inv] change hands.  The cause is   *)
+  (* FIXED (E_Illegal_Instr, delegated by [uc_del]); the tval is the       *)
+  (* instruction bits, supplied by try_step's dedicated arm.               *)
+  (* ------------------------------------------------------------------- *)
+  Definition illegal_obligation (E : coPset) (σ : mstate) (va : mword 64)
+      : iProp Σ :=
+    (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
+     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
+     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
+     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
+     mstate_interp σ -∗
+     nextPC ↦ᵣ va -∗
+     upt_inv pt -∗
+     user_cfg C -∗
+     |={E}=>
+       ∃ (ib : mword 32) (s_x : mstate) (va' : mword 64),
+         ⌜exec (run_hart_active 0) σ
+            = Some (Step_Execute (Illegal_Instruction tt, ib), s_x)⌝ ∗
+         ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
+         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
+            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
+         ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
+         mstate_interp s_x ∗
+         nextPC ↦ᵣ va' ∗
+         upt_inv pt ∗
+         user_cfg C)%I.
+
+  (* ------------------------------------------------------------------- *)
+  (* The ILLEGAL arm: try_step's Illegal_Instruction arm runs the          *)
+  (* delegated tower at the post-execute state with tval = the             *)
+  (* INSTRUCTION BITS and sepc := the faulting pc (read from PC); PC       *)
+  (* ticks to the handler base, no bump -- [user_trap_frame].              *)
+  (* ------------------------------------------------------------------- *)
+  Lemma illegal_branch (Ei : coPset) (Φ : mval -> iProp Σ)
+      (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
+      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+    user_mstatus_ok ms_v ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    register_lookup mstatus σ.(sregs) = ms_v ->
+    register_lookup PC σ.(sregs) = va ->
+    (forall b : bool,
+       exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
+         = Some (None, set_reg σ (R_bool minstret_increment) b)) ->
+    hw_config -∗
+    mstate_interp σ -∗
+    (minstret ↦ᵣ mst) -∗ (R_bool minstret_increment ↦ᵣ mi) -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
+    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    (∀ b : bool,
+       illegal_obligation Ei (set_reg σ (R_bool minstret_increment) b) va) -∗
+    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    |={Ei}=> ∃ s' : mstate,
+      ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
+      ▷ (mstate_interp s' ∗ minstret_inv_body ∗
+         WP (Loop : expr riscv_lang) {{ Φ }}).
+  Proof.
+    iIntros (Hmsok Lpriv Lms Lpc Hdisp)
+      "#Hhw [Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hob Hcont".
+    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs0.
+    (* minstret prelude *)
+    destruct (exec_should_inc_minstret_Some
+                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
+    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
+    set (s_a := set_reg σ (R_bool minstret_increment) b).
+    assert (T : forall (r : register) (v : type_of_register r),
+              register_lookup r σ.(sregs) = v ->
+              register_beq r (R_bool minstret_increment) = false ->
+              register_lookup r s_a.(sregs) = v).
+    { intros r v Hv Hne. unfold s_a, set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
+    assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt)
+      by exact (T hart_state _ Lhs0 eq_refl).
+    assert (HprivA : register_lookup cur_privilege s_a.(sregs) = User)
+      by exact (T cur_privilege _ Lpriv eq_refl).
+    assert (HpcA : register_lookup PC s_a.(sregs) = va)
+      by exact (T PC _ Lpc eq_refl).
+    assert (HmsokA : user_mstatus_ok (register_lookup mstatus s_a.(sregs))).
+    { rewrite (T mstatus _ Lms eq_refl). exact Hmsok. }
+    (* the per-family obligation, at the post-increment state *)
+    iMod ("Hob" $! b (Hdisp b) HprivA HpcA HmsokA
+            with "[Hreg Hmd] Hnpc Hupt Hcfg")
+      as (ib s_x va')
+         "(%Hha & %Hhart_x & %Hmi_x & %Lnpc_x & [Hreg Hmd] & Hnpc & Hupt & Hcfg)".
+    { unfold s_a, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd". }
+    (* read everything the trap tower needs at the post-execute state s_x *)
+    iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
+    pose proof (elp_no_lp elp0 Help_ne) as Help0.
+    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv_x.
+    iDestruct (reg_valid_dq with "Hreg Hms") as %Lms_x.
+    iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc_x.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa_x.
+    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp_x.
+    iDestruct (reg_valid_dq with "Hreg Hpc") as %Lpc_x.
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
+    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec_x.
+    iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl_x.
+    assert (HmisaS_x : eq_vec (_get_Misa_S (register_lookup misa s_x.(sregs))) ('b"1") = true)
+      by (rewrite Lmisa_x; exact HmisaS).
+    assert (Hdel_x : bit_to_bool (access_vec_dec (register_lookup medeleg s_x.(sregs))
+                       (uint (exceptionType_bits_forwards (E_Illegal_Instr tt)))) = true)
+      by (rewrite Lmedl_x; exact (uc_del C (E_Illegal_Instr tt) eq_refl)).
+    (* the trap tower at s_x: tval = the instruction bits, sepc := PC = va *)
+    pose proof (exec_handle_exception_U s_x (rv64d_types.Exception (E_Illegal_Instr tt))
+                  (xtval_exception_value (E_Illegal_Instr tt) (zero_extend' 64 ib))
+                  va ms_v sc_v (uc_stvec C) elp0
+                  Lpriv_x Lms_x Lsc_x Lstvec_x Lelp_x HmisaS_x (uc_tvd C) Lpc_x
+                  (E_Illegal_Instr tt) (zero_extend' 64 ib) eq_refl eq_refl Hdel_x) as Hhe.
+    set (s_trap := set_reg _ nextPC (stvec_base (uc_stvec C))) in Hhe.
+    assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
+    { unfold s_trap, set_reg; cbn [sregs].
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      exact Hhart_x. }
+    (* the whole-step reduction: tick PC := nextPC = handler base, NO bump *)
+    assert (Hstep : exec (riscv_step false) σ
+              = Some (tt, set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)))).
+    { eapply exec_riscv_step_execute_illegal;
+        [ exact Hsi | exact Hhart_a | exact Hha | exact Hhe | exact Lhs_trap ]. }
+    assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
+    { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
+    rewrite Lnpc_trap in Hstep.
+    (* GHOST: mirror every physical write of the tower in order *)
+    pose (ms_e := update_subrange_vec_dec ms_v 23 23 elp0).
+    pose (c1 := update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
+                  (bool_to_bit (trapCause_is_interrupt
+                     (rv64d_types.Exception (E_Illegal_Instr tt))))).
+    pose (c2 := update_subrange_vec_dec c1 (64 - 2) 0
+                  (zero_extend' (64 - 1)
+                     (trapCause_bits_forwards
+                        (rv64d_types.Exception (E_Illegal_Instr tt))))).
+    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
+    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
+    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
+    iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
+                 with "Hreg") as "Hreg".
+    { unfold set_reg; cbn [sregs].
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      rewrite Lelp_x Help0. reflexivity. }
+    iMod (reg_update _ scause _ c1 with "Hreg Hsc") as "[Hreg Hsc]".
+    iMod (reg_update _ scause _ c2 with "Hreg Hsc") as "[Hreg Hsc]".
+    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _ (update_subrange_vec_dec ms_b 8 8 ('b"0"))
+            with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ stval _ (tval (xtval_exception_value (E_Illegal_Instr tt)
+            (zero_extend' 64 ib))) with "Hreg Hstval") as "[Hreg Hstval]".
+    iMod (reg_update _ sepc _ va with "Hreg Hsepc") as "[Hreg Hsepc]".
+    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
+    iMod (reg_update _ nextPC _ (stvec_base (uc_stvec C)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ PC _ (stvec_base (uc_stvec C)) with "Hreg Hpc") as "[Hreg Hpc]".
+    iModIntro. iExists _.
+    iSplitR. { iPureIntro. exact Hstep. }
+    iNext.
+    unfold s_trap, set_reg; cbn [sregs mem mdev].
+    iFrame "Hreg Hmd".
+    iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
+    iApply ("Hcont" with "[-]").
+    assert (Hmc : update_subrange_vec_dec ms_b 8 8 ('b"0") = utrap_ms elp0 ms_v)
+      by (unfold utrap_ms, ms_b, ms_a, ms_e; reflexivity).
+    iExists (update_subrange_vec_dec ms_b 8 8 ('b"0")), c2,
+            (tval (xtval_exception_value (E_Illegal_Instr tt) (zero_extend' 64 ib))),
+            va, g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt".
     iSplitR.
     { iPureIntro. rewrite Hmc.

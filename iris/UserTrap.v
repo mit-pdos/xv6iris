@@ -354,6 +354,60 @@ Section StepFetchFailure.
   Qed.
 End StepFetchFailure.
 
+Section StepExecuteIllegal.
+  Context (s s_x s_trap : mstate) (ib : mword 32) (b : bool).
+  Hypothesis Hsi :
+    exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
+      = Some (b, s).
+  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
+  Hypothesis Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hha :
+    exec (run_hart_active 0) s_a
+      = Some (Step_Execute (Illegal_Instruction tt, ib), s_x).
+  Hypothesis Hhe :
+    exec (handle_exception (zero_extend' 64 ib) (E_Illegal_Instr tt)) s_x
+      = Some (tt, s_trap).
+  Hypothesis Hhart_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt.
+
+  Let s_tick : mstate := set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)).
+
+  (* an executed instruction found ILLEGAL (every privileged instruction at
+     User: mret / sret / wfi / the sfence and sinval families): try_step's
+     dedicated arm delivers E_Illegal_Instr with the INSTRUCTION BITS as
+     tval; the step does not retire. *)
+  Lemma exec_riscv_step_execute_illegal : exec (riscv_step false) s = Some (tt, s_tick).
+  Proof using All.
+    unfold riscv_step.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (try_step 0 false) s = Some (false, s_tick))).
+    { reflexivity. }
+    unfold try_step.
+    cbn [ext_pre_step_hook].
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)). cbn beta.
+    rewrite Hhart_a. cbn beta iota.
+    rewrite (exec_bind_Some _ _ _ _ _ Hha). cbn beta.
+    cbn match.
+    (* Step_Execute (Illegal_Instruction ...) arm: handle_exception, epilogue *)
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind0_Some.
+        2:{ exact Hhe. }
+        apply (exec_read_reg hart_state s_trap). }
+    rewrite Hhart_trap. cbn beta iota.
+    erewrite exec_bind0_Some.
+    2:{ apply exec_tick_pc. }
+    erewrite exec_bind_Some.
+    2:{ unfold Defs.and_boolM.
+        erewrite exec_bind_Some.
+        2:{ apply (exec_returnM false s_tick). }
+        cbn beta iota. apply (exec_returnM false s_tick). }
+    cbn beta iota.
+    apply exec_returnm.
+  Qed.
+End StepExecuteIllegal.
+
 Section StepExecuteTrap.
   Context (s s_x s_trap : mstate) (p : Privilege) (exc : sync_exception)
           (pcx : mword 64) (ib : mword 32) (b : bool).
