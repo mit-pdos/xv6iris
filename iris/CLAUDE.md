@@ -705,7 +705,17 @@ files or copy code from them; build fresh from the live tree.
      fcsr 0x003 gate on `Ext_F ∨ Ext_Zfinx`), so the CSR facts need an
      `_get_Mstatus_FS ms_v = 'b"00"` premise (consider adding the FS pin
      to `user_mstatus_ok` — WpUserret already claims FS=Off
-     structurally).
+     structurally). STARTED (UserCsr.v §1, compiling): the probe
+     reductions `exec_currentlyEnabled_Zfinx` (plain reflexivity),
+     `exec_hartSupports_F`, `exec_currentlyEnabled_F_off` (FS pin).
+     Guarded-fixpoint gotcha for the probes: the recursion-limit assert
+     is a DEPENDENT if — `replace` on its scrutinee silently misses; use
+     `change (Z.geb (..._measure Ext_X) 0) with true. cbn match.` then
+     `erewrite exec_bind_Some. 2:{ apply exec_returnM. }` (the eq_refl's
+     implicit type blocks an instantiated rewrite). The decode-bridge
+     shortcut (`decode_state_bridge`, as in the Svnapot probe) does NOT
+     apply here: it needs WHOLE-value agreement on read registers, and
+     mstatus is abstract with only the FS bit pinned.
      LEFT — discharging `active_class`: the total classification. Per
      machine case, produce the run_hart_active reduction and feed the
      matching arm: fetch outcome (fetchable → `upt_fetch_instr`; else a
