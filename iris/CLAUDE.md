@@ -794,7 +794,37 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    (WpSmodePtBtype; rs2 = zreg, cmp from Ha2: s6 = 1).  PERF: one path
    ~4 min of leaf iApplys; keep new endings funneling into the sealed
    chunks; re-register WpWalk.v in _CoqProject only when Qed.
-   Original plan: fuel-free (the loop is 2 iterations, unrolled);
+   ARM-3 landed as a 3:{...} goal-selector block (a mechanical
+   transform of path 1's script: drop the maps destruct, use the arm-3
+   conjuncts directly -- no He2/He1 rewrites -- payload via
+   ptree_level0_intro with He0z rewriting w0 to zero).  DESIGN for the
+   ALLOC ARM (+0x72..+0x94, shared by arm 1 twice and arm 2 once --
+   seal it ONCE as wp_walk_alloc): parameterize over the slot cell
+   address [cellA] (premise Mf!!!18 = cellA), the OLD slot word (any),
+   a caller-provided CLOSE WAND (∀ b, cellA ↦₈ pt_ptr_pte b -∗
+   ptree_own clvl 1 (pt_empty_node b) -∗ ptree_own 2 1 (tG b)) with
+   tG : mword 44 -> ptree and child level clvl (1 for graft2, 0 for
+   graft1), the beqz-s6 fall fact (Mf!!!22 <> 0 from Ha2), and TWO
+   continuations: the null exit (funnel wp_walk_epilogue with LEFT
+   payload; callee-saved facts across kalloc via callee_saved_lookup
+   on its returned ⌜callee_saved⌝) and the success exit (∀ b, pc at
+   +0x40, s1 = page-base b, ptree_own 2 1 (tG b), map facts → WP).
+   Body: beqz-s6 fall (wp_beqz_x0_fall_s_scfg_r), jal (ra := +0x7a),
+   wp_kalloc_r fed from the kalloc_env destructure (qnoff := zeros' 32
+   → every noff/intena side condition vm-provable; lkA/fl equalities
+   closed vm; a0f := mycpu_ret of the tp value via peel), kalloc_post
+   destruct; success: cmv s1, cbeqz FALL (page_valid_ne_null →
+   eq_vec_false_iff), clui a2 (luival → 4096 vm), cli a1, jal,
+   wp_memset_page_zero_r, cbyte → zero byte (vm), zero_page_to_node
+   (address via walk_alloc_page_base from page_valid's alignment/range
+   projections), srli/cslli/ori → walk_alloc_pte, wp_sd_s_scfg_r
+   through the graft cell, close the wand, wp_cj_s_scfg_r to +0x40.
+   Then arm 2 = descend-iter1 (clone) + wp_walk_alloc at graft1 +
+   rejoin-iter2's addiw/bne-fall + tail (payload pt_graft1_level0);
+   arm 1 = wp_walk_alloc at graft2 (t2 := pt_graft2 t vpn b), then
+   iter-2 via pt_graft2_kid/_ent facts + wp_walk_alloc at graft1-on-t2
+   + tail; same_rep0 via pt_graft2_same_rep0/pt_graft1_same_rep0 +
+   trans.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
    per iteration: srl/andi/slli/add address arithmetic, ld the slot
    (`ptree_own_slot2_ro`/`slot1_ro` cells through the regime-generic ld
    leaf), V-bit branch; invalid arm: kalloc (existing spec at the
