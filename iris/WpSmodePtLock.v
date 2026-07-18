@@ -158,30 +158,6 @@ Section ExecAmoGS4walkPt.
   Qed.
 End ExecAmoGS4walkPt.
 
-(* AMO variants of KptPt's check lemmas (A/D-variant leaf passes the
-   check for amoswap.w at Supervisor). *)
-Local Lemma kpt_check_amo_ad (adf : kpt_adf) (vpn : mword 27) :
-  forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn)))
-          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof.
-  intros mxr do_sum s'.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; destruct a, d, mxr, do_sum; vm_compute; reflexivity.
-Qed.
-
-Local Lemma kpt_variant_check_amo (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
-  pte_check_ok (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
-    (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  intros s. unfold Mk_PTE_Flags.
-  rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_check_amo_ad.
-Qed.
-
 Section WpSmodePtLock.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
