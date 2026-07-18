@@ -18,12 +18,12 @@
      0x11c sret               (SPP=0: to USER mode, pc := sepc)
 
    This file provides:
-   - [utlb_inv]: the USER page table's TLB/PT invariant (the [tlb_inv] mirror
+   - [utlb_inv]: the USER page table's TLB/PT invariant (the [tlb_inv_pt] mirror
      for a user table): satp holds the user root, the TLB is slot-precise
      (63 = trampoline 4K entry or empty, 62 = trapframe 4K entry or empty,
      all others empty), and the four user PTEs are owned;
    - [ktramp_pte_bytes]: the KERNEL page table's trampoline-walk PTEs (the
-     kernel [tlb_inv] only speaks about the kernel-text superpage, so the
+     kernel [tlb_inv_pt] only speaks about the kernel-text superpage, so the
      TRAMPOLINE mapping's three PTEs ride separately);
    - the unified S-mode fetch over the trampoline mapping (kernel- and
      user-table phases) and the step engines;
@@ -47,6 +47,9 @@ Require Import TrampPt TrampTlb.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* ===================================================================== *)
@@ -98,7 +101,7 @@ Section UserretIris.
      pte8 (pte_addr_at ul0 idx0f) (pte_tf tfp) dq)%I.
 
   (* the KERNEL table's trampoline-walk PTEs (kroot[255] -> kl1 -> kl0[511]).
-     The kernel [tlb_inv] owns only the kernel-text superpage PTE; the
+     The kernel [tlb_inv_pt] owns only the kernel-text superpage PTE; the
      TRAMPOLINE mapping's PTEs ride separately in the userret WP. *)
   Definition ktramp_pte_bytes (kroot kl1 kl0 : mword 44) (dq : dfrac) : iProp Σ :=
     (pte8 (pte_addr_at kroot idx2t) (pte_ptr kl1) dq ∗
@@ -213,7 +216,7 @@ Section UserretIris.
        ⌜ (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ⌝)%I.
 
   (* ------------------------------------------------------------------- *)
-  (* THE USER-PAGE-TABLE INVARIANT: the [tlb_inv] mirror for a user table. *)
+  (* THE USER-PAGE-TABLE INVARIANT: the [tlb_inv_pt] mirror for a user table. *)
   (* satp holds the user root; the TLB is [utlb_consistent]; the walk's    *)
   (* PTEs and the PMP configuration ride inside at full fraction.          *)
   (* ------------------------------------------------------------------- *)
@@ -847,7 +850,7 @@ End UserretFetch2.
 
 (* ===================================================================== *)
 (* 5. wp_instr_u -- the step engine for USER-phase trampoline execution   *)
-(* (the [wp_instr_s_config_tlbinv] mirror over [utlb_inv], with the       *)
+(* (the [wp_instr_s_config_tlbinv_pt] mirror over [utlb_inv], with the       *)
 (* instruction's va/pa geometry as pure premises).                        *)
 (* ===================================================================== *)
 

@@ -2,10 +2,10 @@
    acquire() that RETURNS has taken the lock -- the caller's continuation
    receives the ownership token [locked γ] and the protected resource [R],
    both taken OUT of the lock invariant by the winning amoswap
-   (WpLockLeaves.wp_amoswap_lockinv).  If the lock stays held the amoswap
+   (WpLockLeaves.wp_amoswap_lockinv_pt).  If the lock stays held the amoswap
    loop spins forever -- proved by Löb induction in [wp_acquire_lock_loop],
    where EACH iteration opens the invariant: a nonzero read re-enters the
-   induction hypothesis (the c.bnez-taken step is [wp_cbnez_taken_s], which
+   induction hypothesis (the c.bnez-taken step is [wp_cbnez_taken_s_pt], which
    hands its step's later out so [iNext] can strip the IH's), a zero read
    exits with [locked γ ∗ R].
 
@@ -55,6 +55,9 @@ Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* The interrupt-enable byte that push_off (inside acquire) saves to
@@ -143,9 +146,9 @@ Section WpAcquireLock.
     menvcfg0 = MENVCFG_S ->
     (* fetch geometry over the loop body: a single X-bit fact + RAM coverage;
        the RAM/PMP fetch geometry is derived internally from instr_bytes *)
-    (* the lock word's data-slot geometry is DERIVED inside [wp_amoswap_lockinv]
+    (* the lock word's data-slot geometry is DERIVED inside [wp_amoswap_lockinv_pt]
        from the lock invariant -- no premise. *)
-    (* the amoswap.w PMA side-condition is DERIVED inside [wp_amoswap_lockinv]
+    (* the amoswap.w PMA side-condition is DERIVED inside [wp_amoswap_lockinv_pt]
        from [pma_allows_all] (which pins [PMA_atomic_support] to [AMOSwap]) --
        no premise. *)
     (* the loop-invariant register facts *)
@@ -155,14 +158,14 @@ Section WpAcquireLock.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int (AQ + 0x1a)) -∗
     gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) -∗
     is_lock γ lk R -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is (mword_of_int (AQ + 0x24)) -∗
       gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) -∗
       locked γ -∗ R -∗
@@ -197,7 +200,7 @@ Section WpAcquireLock.
     iLöb as "IH" forall (a5v).
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hcont".
     (* ---- +0x1a: c.mv a5,a4 ---- *)
-    iApply (wp_cmv_gpr_s_config root_ppn Φ (mword_of_int (AQ + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
+    iApply (wp_cmv_gpr_s_config_pt root_ppn Φ (mword_of_int (AQ + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0)
               mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
@@ -214,7 +217,7 @@ Section WpAcquireLock.
                      ((<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
                         !!! Regidx (mword_of_int 15 : mword 5)))) zero_reg = true)
       by (rewrite lookup_total_insert Hst1; vm_compute; reflexivity).
-    iApply (wp_amoswap_lockinv root_ppn Φ γ lk R (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
+    iApply (wp_amoswap_lockinv_pt root_ppn Φ γ lk R (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
               mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
  HPAlk
@@ -226,7 +229,7 @@ Section WpAcquireLock.
     assert (Hpp20 : add_vec_int (mword_of_int (AQ + 0x1c) : mword 64) 4 = mword_of_int (AQ + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp20) in "Hpc".
     (* ---- +0x20: sext.w a5 ---- *)
-    iApply (wp_caddiw_s root_ppn Φ (mword_of_int (AQ + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 6)
+    iApply (wp_caddiw_s_pt root_ppn Φ (mword_of_int (AQ + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 6)
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (amoswap_loaded w)]> M0)
               mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
@@ -242,7 +245,7 @@ Section WpAcquireLock.
     iDestruct "Hpay" as "[(%Hw0 & Htok & HRes) | %Hwnz]".
     - (* ---- w = 0: ACQUIRED -- c.bnez falls through; hand over token + R ---- *)
       subst w.
-      iApply (wp_cbnez_fall_s root_ppn Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbnez_fall_s_pt root_ppn Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0)
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -254,10 +257,10 @@ Section WpAcquireLock.
       iEval (rewrite Hpp24) in "Hpc".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Htok HRes").
     - (* ---- w <> 0: c.bnez TAKEN back to +0x1a; loop via the Löb IH ----
-         [wp_cbnez_taken_s] hands the step's later out precisely so this can run
+         [wp_cbnez_taken_s_pt] hands the step's later out precisely so this can run
          on the packaged leaf: [iNext] strips it against the Löb IH.  (This
          block used to drive the raw engine by hand for want of that later.) *)
-      iApply (wp_cbnez_taken_s_zca_later root_ppn Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbnez_taken_s_zca_later_pt root_ppn Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 w)]> M0)
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -283,12 +286,12 @@ Section WpAcquireLock.
     M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
     M0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk ->
     smode_config γc (DfracOwn 1) -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int (AQ + 0x1a)) -∗
     gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) -∗
     is_lock γ lk R -∗
     ( smode_config γc (DfracOwn 1) -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is (mword_of_int (AQ + 0x24)) -∗
       gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) -∗
       locked γ -∗ R -∗
@@ -347,7 +350,7 @@ Section WpAcquireLock.
     (10 <= n)%nat ->
     (* S-mode configuration is now folded into [smode_config γc] below. *)
     (* ---- the amoswap.w PMA side-condition is DERIVED inside
-       [wp_amoswap_lockinv] from [pma_allows_all] -- no premise. ---- *)
+       [wp_amoswap_lockinv_pt] from [pma_allows_all] -- no premise. ---- *)
     (* ---- push_off's mycpu calls return &cpus[cpuid]; the per-map a0f pins
        are DERIVED inside the proof from this single tp-only fact (the a0
        output of po_mycpu_out depends on x4 alone -- po_mycpu_out_a0). ---- *)
@@ -363,7 +366,7 @@ Section WpAcquireLock.
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γc (DfracOwn 1) -∗
     ghost_var γc (1/2) bsie -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is AQw -∗ gpr_file m -∗
     stack_own sp0 n -∗
     a_noff ↦₄ noff -∗
@@ -373,7 +376,7 @@ Section WpAcquireLock.
     ( ∀ mfin,
       smode_config γc (DfracOwn 1) -∗
       ghost_var γc (1/2) bsie -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       locked γ -∗ R -∗
       gpr_file mfin -∗
@@ -469,7 +472,7 @@ Section WpAcquireLock.
     iEval (rewrite /AQw Hpc00) in "Hpc".
     (* slot-align components *)
     (* ---- 0x00: c.addi sp,-32 ---- *)
-    iApply (wp_caddi_gpr_s_config_scfg root_ppn γc Φ (mword_of_int (AQ + 0x00)) csp_rs1 (mword_of_int 32 : mword 6) m (dq:=DfracOwn 1)
+    iApply (wp_caddi_gpr_s_config_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x00)) csp_rs1 (mword_of_int 32 : mword 6) m (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi00 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
@@ -478,7 +481,7 @@ Section WpAcquireLock.
     iEval (rewrite Hpp02) in "Hpc".
     assert (Hcsp0 : A0 !!! Regidx csp_rs1 = spd) by (rewrite /A0; apply lookup_total_insert).
     (* ---- 0x02: c.sdsp ra,24(sp) ---- *)
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Φ (mword_of_int (AQ + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               A0 vr24 (dq:=DfracOwn 1)
               with "Hcfg Htlbinv Hpc Hfile Hi02 [Hr24] [-]").
     { iEval (rewrite Hcsp0). iExact "Hr24". }
@@ -489,7 +492,7 @@ Section WpAcquireLock.
     assert (Hpp04 : add_vec_int (mword_of_int (AQ + 0x02) : mword 64) 2 = mword_of_int (AQ + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,16(sp) ---- *)
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Φ (mword_of_int (AQ + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               A0 vr16 (dq:=DfracOwn 1)
               with "Hcfg Htlbinv Hpc Hfile Hi04 [Hr16] [-]").
     { iEval (rewrite Hcsp0). iExact "Hr16". }
@@ -500,7 +503,7 @@ Section WpAcquireLock.
     assert (Hpp06 : add_vec_int (mword_of_int (AQ + 0x04) : mword 64) 2 = mword_of_int (AQ + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* ---- 0x06: c.sdsp s1,8(sp) ---- *)
-    iApply (wp_csdsp_gpr_s_ram_scfg root_ppn γc Φ (mword_of_int (AQ + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+    iApply (wp_csdsp_gpr_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               A0 vr8 (dq:=DfracOwn 1)
               with "Hcfg Htlbinv Hpc Hfile Hi06 [Hr8] [-]").
     { iEval (rewrite Hcsp0). iExact "Hr8". }
@@ -511,7 +514,7 @@ Section WpAcquireLock.
     assert (Hpp08 : add_vec_int (mword_of_int (AQ + 0x06) : mword 64) 2 = mword_of_int (AQ + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     (* ---- 0x08: c.addi4spn s0,sp,32 ---- *)
-    iApply (wp_caddi4spn_gpr_s_config_scfg root_ppn γc Φ (mword_of_int (AQ + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
+    iApply (wp_caddi4spn_gpr_s_config_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
               A0 (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi08 [-]").
@@ -520,7 +523,7 @@ Section WpAcquireLock.
     assert (Hpp0a : add_vec_int (mword_of_int (AQ + 0x08) : mword 64) 2 = mword_of_int (AQ + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* ---- 0x0a: c.mv s1,a0 ---- *)
-    iApply (wp_cmv_gpr_s_config_scfg root_ppn γc Φ (mword_of_int (AQ + 0x0a)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x0a)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
               A1 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi0a [-]").
@@ -531,7 +534,7 @@ Section WpAcquireLock.
     (* ---- 0x0c: jal ra,push_off ---- *)
     assert (EQ0e : add_vec_int (mword_of_int (AQ + 0x0c) : mword 64) 2 = mword_of_int (AQ + 0x0e))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s_zca root_ppn γc Φ (mword_of_int (AQ + 0x0c)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fffba : mword 21)
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γc Φ (mword_of_int (AQ + 0x0c)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fffba : mword 21)
               A2 1%Qp
  ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
@@ -661,7 +664,7 @@ Section WpAcquireLock.
     rewrite HP0s6 in Hfs6_. rewrite HP0s7 in Hfs7_. rewrite HP0s8 in Hfs8_.
     rewrite HP0s9 in Hfs9_. rewrite HP0s10 in Hfs10_. rewrite HP0s11 in Hfs11_.
     (* ---- 0x10: c.mv a0,s1 ---- *)
-    iApply (wp_cmv_gpr_s_config_scfg root_ppn γc Φ (mword_of_int (AQ + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_cmv_gpr_s_config_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               mfin (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi10 [-]").
@@ -672,7 +675,7 @@ Section WpAcquireLock.
     (* ---- 0x12: jal ra,holding ---- *)
     assert (EQ14 : add_vec_int (mword_of_int (AQ + 0x12) : mword 64) 2 = mword_of_int (AQ + 0x14))
       by (apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s_zca root_ppn γc Φ (mword_of_int (AQ + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff88 : mword 21)
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γc Φ (mword_of_int (AQ + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff88 : mword 21)
               B1 1%Qp
  ltac:(vm_compute; discriminate)
               ltac:(vm_compute; reflexivity)
@@ -780,7 +783,7 @@ Section WpAcquireLock.
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: c.li a4,1 ---- *)
-    iApply (wp_cli_s root_ppn γc Φ (mword_of_int (AQ + 0x16)) (mword_of_int 14 : mword 5)
+    iApply (wp_cli_s_pt root_ppn γc Φ (mword_of_int (AQ + 0x16)) (mword_of_int 14 : mword 5)
               (mword_of_int 1 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
               mh (dq:=DfracOwn 1)
@@ -796,7 +799,7 @@ Section WpAcquireLock.
     assert (HB5a0 : B5 !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)).
     { rewrite /B5. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       exact Hma0. }
-    iApply (wp_cbnez_fall_s_scfg root_ppn γc Φ (mword_of_int (AQ + 0x18)) (mword_of_int 14) (Cregidx (mword_of_int 2)) (mword_of_int 10)
+    iApply (wp_cbnez_fall_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x18)) (mword_of_int 14) (Cregidx (mword_of_int 2)) (mword_of_int 10)
               B5 (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rewrite HB5a0; vm_compute; reflexivity)
@@ -872,7 +875,7 @@ Section WpAcquireLock.
     { rewrite Hmc_s1. exact HB8s1. }
     assert (HAcpu : add_vec (C1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu).
     { rewrite HC1s1 aq_addv_zero_l. reflexivity. }
-    iApply (wp_csd_s_ram_scfg root_ppn γc Φ (mword_of_int (AQ + 0x28)) (mword_of_int 10) (mword_of_int 9)
+    iApply (wp_csd_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x28)) (mword_of_int 10) (mword_of_int 9)
               (mword_of_int 16) C1 cpuold (dq:=DfracOwn 1)
 
               with "Hcfg Htlbinv Hpc Hfile Hi28 [Hcpu] [-]").
@@ -932,7 +935,7 @@ Section WpAcquireLock.
     (* ---- 0x2a: c.ldsp ra,24(sp) ---- *)
     assert (HC1sp : C1 !!! Regidx csp_rs1 = spd).
     { rewrite Hmc_csp. exact HB8sp. }
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Φ (mword_of_int (AQ + 0x2a)) (mword_of_int 3) (mword_of_int 1 : mword 5)
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x2a)) (mword_of_int 3) (mword_of_int 1 : mword 5)
               C1 (m !!! Regidx (mword_of_int 1 : mword 5))
               (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -946,7 +949,7 @@ Section WpAcquireLock.
     assert (Hpp2c : add_vec_int (mword_of_int (AQ + 0x2a) : mword 64) 2 = mword_of_int (AQ + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2c) in "Hpc".
     (* ---- 0x2c: c.ldsp s0,16(sp) ---- *)
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Φ (mword_of_int (AQ + 0x2c)) (mword_of_int 2) (mword_of_int 8 : mword 5)
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x2c)) (mword_of_int 2) (mword_of_int 8 : mword 5)
               D1 (m !!! Regidx (mword_of_int 8 : mword 5))
               (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -960,7 +963,7 @@ Section WpAcquireLock.
     assert (Hpp2e : add_vec_int (mword_of_int (AQ + 0x2c) : mword 64) 2 = mword_of_int (AQ + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2e) in "Hpc".
     (* ---- 0x2e: c.ldsp s1,8(sp) ---- *)
-    iApply (wp_cldsp_gpr_s_ram_scfg root_ppn γc Φ (mword_of_int (AQ + 0x2e)) (mword_of_int 1) (mword_of_int 9 : mword 5)
+    iApply (wp_cldsp_gpr_s_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x2e)) (mword_of_int 1) (mword_of_int 9 : mword 5)
               D2 (m !!! Regidx (mword_of_int 9 : mword 5))
               (dq:=DfracOwn 1) (dqm:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
@@ -974,7 +977,7 @@ Section WpAcquireLock.
     assert (Hpp30 : add_vec_int (mword_of_int (AQ + 0x2e) : mword 64) 2 = mword_of_int (AQ + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp30) in "Hpc".
     (* ---- 0x30: c.addi16sp sp,32 ---- *)
-    iApply (wp_caddi16sp_gpr_s root_ppn γc Φ (mword_of_int (AQ + 0x30)) (mword_of_int 2 : mword 6) D3
+    iApply (wp_caddi16sp_gpr_s_pt root_ppn γc Φ (mword_of_int (AQ + 0x30)) (mword_of_int 2 : mword 6) D3
               1%Qp
               with "Hcfg Htlbinv Hpc Hfile Hi30 [-]").
     iIntros "Hcfg Htlbinv Hpc Hfile".
@@ -987,7 +990,7 @@ Section WpAcquireLock.
       rewrite /D3. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /D2. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /D1. apply lookup_total_insert. }
-    iApply (wp_cret_s_zca_scfg root_ppn γc Φ (mword_of_int (AQ + 0x32)) (mword_of_int 1 : mword 5) D4
+    iApply (wp_cret_s_zca_scfg_pt root_ppn γc Φ (mword_of_int (AQ + 0x32)) (mword_of_int 1 : mword 5) D4
               (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               ltac:(rewrite HD4ra; exact Hal0)

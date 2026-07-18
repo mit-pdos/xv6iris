@@ -49,6 +49,9 @@ Require Import VcGen VcGenS.
 Require Import CalleeSaved.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* mycpu's balanced frame: entry [addi sp,sp,-16] (imm 48 = -16 in 6-bit) and
@@ -355,7 +358,7 @@ Section WpMycpu.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     (* ∀-continuation form: the returned register file is abstract [m'],
@@ -366,7 +369,7 @@ Section WpMycpu.
       hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗ gpr_file m' -∗
       ⌜ callee_saved m0 m' /\
         m' !!! Regidx a0_idx = mycpu_ret (m0 !!! Regidx tp_idx) ⌝ -∗
@@ -538,28 +541,28 @@ Section WpMycpu.
     iPoseProof (myi_16 with "Htext") as "Hi16".
     iPoseProof (myi_1e with "Htext") as "Hi1e".
     (* +0x08 c.mv a5,tp : a5 := tp *)
-    iApply (wp_cmv_gpr_s_config root_ppn Φ (add_vec_int pcE 8) a5_idx tp_idx m2
+    iApply (wp_cmv_gpr_s_config_pt root_ppn Φ (add_vec_int pcE 8) a5_idx tp_idx m2
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi08 [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2) with m3.
     (* +0x0a c.addiw a5,0 : a5 := sext32(a5) *)
-    iApply (wp_caddiw_s root_ppn Φ (add_vec_int pcE 10) a5_idx imm_addiw m3
+    iApply (wp_caddiw_s_pt root_ppn Φ (add_vec_int pcE 10) a5_idx imm_addiw m3
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi0a [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3) with m4.
     (* +0x0c c.slli a5,7 : a5 := a5 << 7 *)
-    iApply (wp_cslli_gpr_s_config root_ppn Φ (add_vec_int pcE 12) (Regidx a5_idx) a5_idx shamt_slli m4
+    iApply (wp_cslli_gpr_s_config_pt root_ppn Φ (add_vec_int pcE 12) (Regidx a5_idx) a5_idx shamt_slli m4
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(reflexivity) ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi0c [-]").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
     change (<[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4) with m5.
     (* +0x0e auipc a0,0x11 : a0 := pc + off *)
-    iApply (wp_auipc_s root_ppn Φ (add_vec_int pcE 14) a0_idx imm_auipc m5
+    iApply (wp_auipc_s_pt root_ppn Φ (add_vec_int pcE 14) a0_idx imm_auipc m5
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi0e [-]").
@@ -567,7 +570,7 @@ Section WpMycpu.
     change (<[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5) with m6.
     replace (add_vec_int (add_vec_int pcE 14) 4) with (add_vec_int pcE 18) by (vm_compute; reflexivity).
     (* +0x12 addi a0,a0,-1388 : a0 := &cpus *)
-    iApply (wp_addi4_s root_ppn Φ (add_vec_int pcE 18) a0_idx a0_idx imm_addi m6
+    iApply (wp_addi4_s_pt root_ppn Φ (add_vec_int pcE 18) a0_idx a0_idx imm_addi m6
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi12 [-]").
@@ -575,7 +578,7 @@ Section WpMycpu.
     change (<[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6) with m7.
     replace (add_vec_int (add_vec_int pcE 18) 4) with (add_vec_int pcE 22) by (vm_compute; reflexivity).
     (* +0x16 c.add a0,a0,a5 : a0 := &cpus[cpuid] *)
-    iApply (wp_cadd_s root_ppn Φ (add_vec_int pcE 22) a0_idx a5_idx m7
+    iApply (wp_cadd_s_pt root_ppn Φ (add_vec_int pcE 22) a0_idx a5_idx m7
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hi16 [-]").
@@ -664,7 +667,7 @@ Section WpMycpu.
     { unfold m11. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       unfold m10. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
       unfold m9. rewrite lookup_total_insert. reflexivity. }
-    iApply (wp_cret_s_zca root_ppn Φ (mword_of_int (KernelSyms.mycpu + 30)) ra_idx m11
+    iApply (wp_cret_s_zca_pt root_ppn Φ (mword_of_int (KernelSyms.mycpu + 30)) ra_idx m11
               mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 ltac:(vm_compute; discriminate) Hlpe
               ltac:(rewrite Hra_final; exact Hal0)

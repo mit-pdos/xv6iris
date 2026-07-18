@@ -1785,7 +1785,7 @@ Section WpSmodePtMemLeaves.
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
-    let storeval := (autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    let storeval := trunc32 (m !!! Regidx rs2) in
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -1997,7 +1997,7 @@ Section WpSmodePtMemLeaves.
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
-    let storeval := (autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    let storeval := trunc32 (m !!! Regidx rs2) in
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->

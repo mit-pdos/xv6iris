@@ -19,9 +19,9 @@
        +0x22 c399      c.beqz a5,+0x6      taken (intena = 0)
        +0x28 60a2 / +0x2a 6402 / +0x2c 0141 / +0x2e 8082   epilogue
 
-   New leaves: [wp_cbeqz_fall_s_raw] (c.beqz fall-through), [wp_bge_x0_fall_s]
-   (32-bit blez not-taken), [wp_fence_s] (fence rw,w -- release() needs it;
-   defined here with the rest of the new leaf kit), [wp_csrr_sstatus_s]
+   New leaves: [wp_cbeqz_fall_s_raw_pt] (c.beqz fall-through), [wp_bge_x0_fall_s_pt]
+   (32-bit blez not-taken), [wp_fence_s_pt] (fence rw,w -- release() needs it;
+   defined here with the rest of the new leaf kit), [wp_csrr_sstatus_s_pt]
    (read-only csrr of sstatus). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -59,6 +59,9 @@ Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmode
 Require Export WpSmodeFence.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* ===================================================================== *)
@@ -566,7 +569,7 @@ Section WpPopOffTopSec.
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
     ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
     stack_own (m0 !!! Regidx csp_rs1) 2 -∗
@@ -575,7 +578,7 @@ Section WpPopOffTopSec.
       cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
       ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
       mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mo -∗
       ⌜ callee_saved m mo /\
@@ -590,7 +593,7 @@ Section WpPopOffTopSec.
     iDestruct (kv_cfg_split γc mstatus0 mie_v mdv0 menvcfg0 HSIE HMPRV HSXL HMXR Hlegal Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
                  with "Hhw Hinv Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv")
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
-    iApply (wp_jal_gpr_s_zca root_ppn γc Φ P (mword_of_int 1) jimm m (1/2)%Qp
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γc Φ P (mword_of_int 1) jimm m (1/2)%Qp
  ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halign_tgt)
               with "Hsm Htlbinv Hpc Hfile Hjal [-]").
@@ -616,7 +619,7 @@ Section WpPopOffTopSec.
   (* [smode_config] view of the pure sstatus read (csrrs rd,sstatus,x0): mstatus
      is untouched, and the value read into [rd] is exposed only through the ghost
      SIE flag as [sstatus_read ms] for SOME ms with SIE=0 (mirror of
-     [wp_csrrci_sstatus_scfg]). *)
+     [wp_csrrci_sstatus_scfg_pt]). *)
 
   (* ---- [smode_config] leaf wrappers used by [wp_pop_off]: each unbundles the
      bundle, calls the raw S-mode leaf, and rebundles.  The non-config side
@@ -628,7 +631,7 @@ Section WpPopOffTopSec.
 
 
 
-  (* [wp_cret_s_zca_scfg] (the c.ret S-mode leaf) lives in WpSmodeJalr; used
+  (* [wp_cret_s_zca_scfg_pt] (the c.ret S-mode leaf) lives in WpSmodeJalr; used
      here via that import.  (Formerly duplicated in this file.) *)
 
   (* [smode_config] view of the mycpu() VCgen callee: the raw callee needs full
@@ -647,13 +650,13 @@ Section WpPopOffTopSec.
     eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γc (DfracOwn 1) -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is P -∗ gpr_file m -∗
     instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
     stack_own (m0 !!! Regidx csp_rs1) 2 -∗
     ( ∀ mo,
       smode_config γc (DfracOwn 1) -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mo -∗
       ⌜ callee_saved m mo /\
@@ -705,7 +708,7 @@ Section WpPopOffTopSec.
     eq_vec (sign_extend' 64 intenav) zero_reg = true ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γc (DfracOwn 1) -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
     (* pop_off's whole 4-slot frame (2 own p8/p0 + 2 mycpu) as
        [stack_own (m!!!csp) n] (n>=4). *)
@@ -714,7 +717,7 @@ Section WpPopOffTopSec.
     a_int ↦₄{ dqi } intenav -∗
     ( ∀ mf,
       smode_config γc (DfracOwn 1) -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mf -∗
       ⌜ callee_saved m mf ⌝ -∗
@@ -861,7 +864,7 @@ Section WpPopOffTopSec.
     (* +0x0c csrr a5,sstatus: read via the SIE ghost.  Yields [sstatus_read msr]
        for SOME [msr] with SIE = 0 (the concrete mstatus stays hidden in the
        bundle).  [msr] is contained to +0x0c..+0x12: a5 is overwritten at +0x14. *)
-    iApply (wp_csrr_sstatus_scfg root_ppn γc Φ (mword_of_int (PP + 0x0c)) (mword_of_int 15) C (dq:=DfracOwn 1)
+    iApply (wp_csrr_sstatus_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x0c)) (mword_of_int 15) C (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi0c [-]").
     iIntros "Hcfg Htlbinv Hpc Hfileex".
@@ -873,7 +876,7 @@ Section WpPopOffTopSec.
     assert (Hpp10 : add_vec_int (mword_of_int (PP + 0x0c) : mword 64) 4 = mword_of_int (PP + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 c.andi a5,2 *)
-    iApply (wp_candi_s_scfg root_ppn γc Φ (mword_of_int (PP + 0x10)) (mword_of_int 15) (mword_of_int 2 : mword 6)
+    iApply (wp_candi_s_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x10)) (mword_of_int 15) (mword_of_int 2 : mword 6)
               P3 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               with "Hcfg Htlbinv Hpc Hfile Hi10 [-]").
@@ -888,7 +891,7 @@ Section WpPopOffTopSec.
     assert (Ha5P4 : P4 !!! Regidx (mword_of_int 15 : mword 5)
                     = and_vec (sstatus_read msr) (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))).
     { rewrite /P4. rewrite lookup_total_insert. rewrite Ha5P3. reflexivity. }
-    iApply (wp_cbnez_fall_s_scfg root_ppn γc Φ (mword_of_int (PP + 0x12)) (mword_of_int 15) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+    iApply (wp_cbnez_fall_s_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x12)) (mword_of_int 15) (Cregidx (mword_of_int 7)) (mword_of_int 15)
               P4 (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha5P4; exact Hsst2)
@@ -993,7 +996,7 @@ Section WpPopOffTopSec.
       replace (ρD 4%nat) with (P4 !!! Regidx (mword_of_int 4 : mword 5)) by reflexivity.
       exact HtpP4. }
     (* +0x16 blez a5 NOT taken (noff >= 1) *)
-    iApply (wp_bge_x0_fall_s_scfg root_ppn γc Φ (mword_of_int (PP + 0x16)) (mword_of_int 0x26 : mword 13) (mword_of_int 15)
+    iApply (wp_bge_x0_fall_s_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x16)) (mword_of_int 0x26 : mword 13) (mword_of_int 15)
               M2 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
               ltac:(rewrite Ha5M2; exact Hnoffpos)
@@ -1182,7 +1185,7 @@ Section WpPopOffTopSec.
     (* +0x1e c.bnez a5: both outcomes (noff-1 <> 0 / = 0) *)
     destruct (neq_vec nv1 zero_reg) eqn:Hnz.
     - (* taken: skip the intena check, straight to the epilogue at +0x28 *)
-      iApply (wp_cbnez_taken_s_zca_scfg root_ppn γc Φ (mword_of_int (PP + 0x1e)) (mword_of_int 5) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbnez_taken_s_zca_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x1e)) (mword_of_int 5) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 M3 (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Ha5M3; exact Hnz)
@@ -1303,7 +1306,7 @@ Section WpPopOffTopSec.
       assert (H27F : Mf !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5)).
       { rewrite (HaC1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)). exact H27M3. }
       (* +0x2e c.ret *)
-      iApply (wp_cret_s_zca_scfg root_ppn γc Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1) Mf
+      iApply (wp_cret_s_zca_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1) Mf
                 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
                 ltac:(rewrite HraF; exact Hal0)
@@ -1318,7 +1321,7 @@ Section WpPopOffTopSec.
       iApply ("Hcont" $! Mf with "Hcfg Htlbinv Hpc Hfile [%] Hnoff Hint Hpstkf").
       { unfold callee_saved. repeat split; assumption. }
     - (* fall: noff-1 = 0, read intena (= 0), c.beqz taken to +0x28 *)
-      iApply (wp_cbnez_fall_s_scfg root_ppn γc Φ (mword_of_int (PP + 0x1e)) (mword_of_int 5) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbnez_fall_s_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x1e)) (mword_of_int 5) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 M3 (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Ha5M3; exact Hnz)
@@ -1329,7 +1332,7 @@ Section WpPopOffTopSec.
       (* +0x20 c.lw a5,124(a0): a5 := sext64 intenav (fractional cell: leaf) *)
       assert (HAint : add_vec (M3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 124 : mword 12)) = a_int)
         by (rewrite Ha0M3; reflexivity).
-      iApply (wp_clw_s_ram_scfg root_ppn γc Φ (mword_of_int (PP + 0x20)) (mword_of_int 15) (mword_of_int 10)
+      iApply (wp_clw_s_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x20)) (mword_of_int 15) (mword_of_int 10)
                 (mword_of_int 124) M3 intenav
                 (dq:=DfracOwn 1) (dqm:=dqi)
  ltac:(vm_compute; discriminate)
@@ -1343,7 +1346,7 @@ Section WpPopOffTopSec.
       assert (Hpp22 : add_vec_int (mword_of_int (PP + 0x20) : mword 64) 2 = mword_of_int (PP + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp22) in "Hpc".
       (* +0x22 c.beqz a5 TAKEN (intena = 0) *)
-      iApply (wp_cbeqz_taken_s_zca_scfg root_ppn γc Φ (mword_of_int (PP + 0x22)) (mword_of_int 3) (Cregidx (mword_of_int 7)) (mword_of_int 15)
+      iApply (wp_cbeqz_taken_s_zca_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x22)) (mword_of_int 3) (Cregidx (mword_of_int 7)) (mword_of_int 15)
                 P7 (dq:=DfracOwn 1)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Ha5P7; exact Hint)
@@ -1487,7 +1490,7 @@ Section WpPopOffTopSec.
       { rewrite (HaC1 (Regidx (mword_of_int 27 : mword 5)) ltac:(vm_compute; reflexivity)).
         rewrite /P7. rewrite lookup_total_insert_ne; [| vm_compute; discriminate]. exact H27M3. }
       (* +0x2e c.ret *)
-      iApply (wp_cret_s_zca_scfg root_ppn γc Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1) Mf
+      iApply (wp_cret_s_zca_scfg_pt root_ppn γc Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1) Mf
                 (dq:=DfracOwn 1)
  ltac:(vm_compute; discriminate)
                 ltac:(rewrite HraF; exact Hal0)

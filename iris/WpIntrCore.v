@@ -48,6 +48,9 @@ Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock.
 Import Defs.
 
 (* ===================================================================== *)
@@ -648,7 +651,7 @@ Section WpInstrIntr.
     mip ↦ᵣ{ dq } mip_v -∗
     sig_meip ↦ᵣ{ dq } meip -∗
     sig_seip ↦ᵣ{ dq } seip -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc)
@@ -681,7 +684,7 @@ Section WpInstrIntr.
           WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    (* Open [tlb_inv] ONCE and drive the UNIFIED fetch: each 2-byte chunk
+    (* Open [tlb_inv_pt] ONCE and drive the UNIFIED fetch: each 2-byte chunk
        translates through its OWN vpn (0/1/2 slots filled), so a straddling
        non-RVC instruction no longer needs its two halves on one page.  The
        [s_dispatch = None] / dispatchInterrupt-not-taken obligation is threaded
@@ -796,7 +799,7 @@ Section WpInstrIntr.
     mip ↦ᵣ{ dq } mip_v -∗
     sig_meip ↦ᵣ{ dq } meip -∗
     sig_seip ↦ᵣ{ dq } seip -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc true i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc)
@@ -840,7 +843,7 @@ Section WpInstrIntr.
   Qed.
 
   (* the RVC gpr-write engine over [wp_instr_s_intr] (mirror of
-     WpSmodeGpr.wp_rvc_gpr_write_s, raw cells instead of smode_config). *)
+     WpSmodeGpr.wp_rvc_gpr_write_s_pt, raw cells instead of smode_config). *)
 
 
   (* [wp_rvc_gpr_write_s_intr]'s sibling for pc 2-aligned but NOT 4-aligned,
@@ -878,7 +881,7 @@ Section WpInstrIntr.
     mip ↦ᵣ{ dq } mip_v -∗
     sig_meip ↦ᵣ{ dq } meip -∗
     sig_seip ↦ᵣ{ dq } seip -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true base -∗
@@ -891,7 +894,7 @@ Section WpInstrIntr.
       mip ↦ᵣ{ dq } mip_v -∗
       sig_meip ↦ᵣ{ dq } meip -∗
       sig_seip ↦ᵣ{ dq } seip -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -971,7 +974,7 @@ Section WpInstrIntr.
     mip ↦ᵣ{ dq } mip_v -∗
     sig_meip ↦ᵣ{ dq } meip -∗
     sig_seip ↦ᵣ{ dq } seip -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     pc_is acq_pc1 -∗
     gpr_file m -∗
     kernel_text -∗
@@ -984,7 +987,7 @@ Section WpInstrIntr.
       mip ↦ᵣ{ dq } mip_v -∗
       sig_meip ↦ᵣ{ dq } meip -∗
       sig_seip ↦ᵣ{ dq } seip -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x2) : mword 64) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 acq_i1)))]> m) -∗

@@ -29,6 +29,9 @@ Require Import WpLock KallocInv.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* ===================================================================== *)
@@ -190,13 +193,13 @@ Section WpMemsetPage.
     (* the caller's return target's low bit is clear (2-aligned target OK: Zca return) *)
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γ dq -∗
-    tlb_inv root_ppn -∗
+    tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
     page_own p -∗
     ( ∀ mfin,
       smode_config γ dq -∗
-      tlb_inv root_ppn -∗
+      tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       stack_own sp0 n -∗
       page_own p -∗
@@ -217,7 +220,7 @@ Section WpMemsetPage.
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- apply the whole-function memset WP.  The Sv39 geometry is now
-       derived inside the memset proof (at the [wp_sb_s] leaf); only the
+       derived inside the memset proof (at the [wp_sb_s_pt] leaf); only the
        argument-setup couplings [Hbexec_add / Hcount0 / Hret0 / Hcmp] remain. --- *)
     iApply (wp_memset_s_full_kt root_ppn Φ m0 4096
               (add_vec (mword_of_int 4096 : mword 64) p) olds n

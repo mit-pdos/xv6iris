@@ -45,6 +45,9 @@ From Kernel Require KernelSyms.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
+Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
 Import Defs.
 
 (* ====================================================================== *)
@@ -417,7 +420,7 @@ Section WpSwtchVc.
     map (fun r => m !!! Regidx r) ctx_regs.
 
   (* the pc a [ret] to saved return address [ra] lands on (low bit cleared);
-     matches wp_cret_s_zca's target expression. *)
+     matches wp_cret_s_zca_pt's target expression. *)
   Definition ctx_pc (ra : mword 64) : mword 64 :=
     update_vec_dec (add_vec ra (sign_extend' 64 (zeros' 12))) 0 ('b"0").
 
@@ -504,7 +507,7 @@ Section WpSwtchVc.
        and the page-table invariant.  This is exactly what the cleaned-up
        acquire/release consume and return; a resumed context receives it too. *)
     Definition sconf : iProp Σ :=
-      (smode_config γc dq ∗ ghost_var γc (1/2) bsie ∗ tlb_inv root_ppn)%I.
+      (smode_config γc dq ∗ ghost_var γc (1/2) bsie ∗ tlb_inv_pt root_ppn)%I.
 
     (* -------------------------------------------------------------------- *)
     (* valid_context P c : "the context saved at [c] admits a WP to run".  It  *)
@@ -650,7 +653,7 @@ Section WpSwtchVc.
           (erewrite vregs_den_lookup by (vm_compute; reflexivity);
            apply sval_den_SX0). }
       iDestruct (swi_ret with "Ht") as "Hret".
-      iApply (wp_cret_s_zca root_ppn Phi
+      iApply (wp_cret_s_zca_pt root_ppn Phi
                 (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
                 (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
                 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
