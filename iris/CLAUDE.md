@@ -223,18 +223,34 @@ before any mechanical sweep.
    SIE-agnostic `wp_sconf_pilot3`.  The raw-cell
    `wp_instr_s_config_tlbinv_pt` STAYS (it is the '0' arm's body and the
    mycpu fraction-island's entry).
-5. **Leaf sweep (mechanical, file-by-file):** the live pt leaf layer —
-   WpSmodePtLeaves/Alu/Btype/Ctl/Mem/MemWrap/Lock/Uart — plus VCgen and
-   the whole-function proofs above them: swap `smode_config γ dq` +
-   `tlb_inv_pt` threading for `sconf γ` + hart_state + `sie_cap γ root m`
-   + `tlb_inv_pt` over the `wp_instr_s_sconf`/`wp_gpr_write_s_sconf*`
-   engines; `_scfg` wrappers keep their names (same bundle name, new
-   definition).  Watch the import direction: leaf files must import
+5. **Leaf sweep (mechanical, file-by-file; IN PROGRESS):** the live pt
+   leaf layer — WpSmodePtLeaves/Alu/Btype/Ctl/Mem/MemWrap/Lock/Uart —
+   plus VCgen and the whole-function proofs above them: swap
+   `smode_config γ dq` + `tlb_inv_pt` threading for `sconf γ` +
+   hart_state + `sie_cap γ root m` + `tlb_inv_pt` over the
+   `wp_instr_s_sconf`/`wp_gpr_write_s_sconf*` engines.
+   - DONE: **WpSconfAlu.v** (all of WpSmodePtAlu's ops except auipc; the
+     raw-cell/_scfg pair collapses to ONE lemma per op; new premise
+     `rd <> csp_rs1` everywhere; value-hyp discharges copy VERBATIM —
+     use it as the family template).  Exemplars `wp_addi_s_sconf`/
+     `wp_cli_s_sconf` live in WpSmodeIntr.v §4.
+   - TODO, in rough order: Mem (data leaves: destructure `sconf` INSIDE
+     the funnel's σf-callback for the translate side conditions, run
+     `tlb_inv_pt_translateAddr_load/store` as today, reassemble);
+     Btype (fall-through = funnel client; TAKEN branches must hand the
+     step's later out for Löb — mirror `wp_cbeqz_taken_s_config`'s
+     shape over the funnel); Ctl (Jal/Jalr need a pc-writing sconf
+     engine — also unblocks auipc; Csr/Sret are '0'-arm-only at first:
+     sret runs in kernelvec's body, csrci/csrsi are the stage-7 flips);
+     Lock/Uart (accessor-form device leaves).  sp-MOVING instructions
+     (c.addi sp / c.addi16sp) get dedicated leaves that re-carve
+     `sie_cap`'s stack bound explicitly.
+   Watch the import direction: leaf files must import
    IntrDefs/WpSmodeIntr — WpIntrInv no longer imports any leaf file, but
    WpKernelvecSpec does; keep the kernelvec cap on top.  Delete the old
    smode_config at the END of the sweep, not before.  Keep per-file
-   compile times within ~10% (the CLAUDE.md perf rules apply; sie_cap adds
-   one iDestruct per instruction).
+   compile times within ~10% (the CLAUDE.md perf rules apply; sie_cap
+   adds one iDestruct per instruction).
 6. **VCgen:** lift `wp_vc_block_s`/`_den` onto `sconf` (the block executor
    steps through the same engines).
 7. **SIE flips (push_off/pop_off):** csrci/csrsi-sstatus leaves that open
