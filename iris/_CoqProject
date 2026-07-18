@@ -92,6 +92,8 @@ PtFetchGen.v
 TrampStepPt.v
 TransPt.v
 UserretPt.v
+UserretEntryPt.v
+UserretAllPt.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
@@ -136,7 +138,9 @@ UserStepFull.v
 UserArms.v
 UserExecFacts.v
 UserCsr.v
+IntrDefs.v
 WpIntrInv.v
+WpKernelvecSpec.v
 WpSmodeIntr.v
 WpPushOff.v
 WpPushOffMem.v

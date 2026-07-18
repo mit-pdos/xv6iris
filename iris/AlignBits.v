@@ -47,3 +47,53 @@ Proof.
   rewrite Hq0, Hq1, <- Z.mul_assoc. change (2 * 2)%Z with 4%Z.
   apply Z.mod_mul. lia.
 Qed.
+
+(* A 2-aligned pc's bit 0 is already 0, so writing 0 there is the identity.
+   ([sret_tgt] = [update_vec_dec _ 0 'b"0"], WpSmodeSret.v: every
+   instruction-aligned pc is its own legal sret target -- lets the SIE=1
+   engines derive their sret-target premise from [instr_bytes]' alignment
+   fact instead of demanding it at every call site.) *)
+Lemma update_bit0_zero_of_aligned2 (pc : mword 64) :
+  is_aligned_vaddr (Virtaddr pc) 2 = true ->
+  update_vec_dec pc 0 ('b"0") = pc.
+Proof.
+  intros H2.
+  assert (Heven : Z.rem (bv_unsigned pc) 2 = 0).
+  { unfold is_aligned_vaddr in H2. apply Z.eqb_eq in H2.
+    rewrite uint_unsigned in H2. exact H2. }
+  pose proof (bv_unsigned_in_range _ pc) as [Hlo Hhi].
+  apply bv_eq.
+  unfold update_vec_dec, update_mword_dec, MachineWord.update_slice.
+  rewrite bv_concat_unsigned'.
+  rewrite bv_concat_unsigned'.
+  unfold MachineWord.slice.
+  rewrite !bv_extract_unsigned.
+  change (Z.of_N 0) with 0%Z.
+  rewrite Z.shiftr_0_r.
+  match goal with |- context [bv_wrap (MachineWord.Z_idx 0) ?z] =>
+    replace (bv_wrap (MachineWord.Z_idx 0) z) with 0%Z
+      by (unfold bv_wrap, bv_modulus;
+          change (2 ^ Z.of_N (MachineWord.Z_idx 0))%Z with 1%Z;
+          rewrite Z.mod_1_r; reflexivity) end.
+  match goal with |- context [Z.lor ?hi (bv_wrap ?w ?z)] =>
+    replace (bv_wrap w z) with 0%Z by (vm_compute; reflexivity) end.
+  rewrite Z.lor_0_r.
+  change (Z.of_N (MachineWord.Z_idx 0 + MachineWord.Z_idx 1)) with 1%Z.
+  change (MachineWord.Z_idx 64 - MachineWord.Z_idx 1 - MachineWord.Z_idx 0)%N with 63%N.
+  rewrite Z.shiftr_div_pow2 by lia.
+  change (2 ^ 1)%Z with 2%Z.
+  assert (Hm64 : bv_modulus (MachineWord.Z_idx 64) = (2 ^ 64)%Z)
+    by (vm_compute; reflexivity).
+  assert (Hpow : (2 ^ 64)%Z = (2 * 2 ^ 63)%Z) by (vm_compute; reflexivity).
+  rewrite Hm64 in Hhi.
+  assert (Hdiv : (0 <= bv_unsigned pc / 2 < 2 ^ 63)%Z).
+  { split; [ apply Z.div_pos; lia | ].
+    apply Z.div_lt_upper_bound; [ lia | ]. lia. }
+  rewrite (bv_wrap_small 63)
+    by (replace (bv_modulus 63) with (2 ^ 63)%Z by (vm_compute; reflexivity); lia).
+  rewrite Z.shiftl_mul_pow2 by lia.
+  change (2 ^ 1)%Z with 2%Z.
+  pose proof (Z.div_mod (bv_unsigned pc) 2 ltac:(lia)) as Hdm.
+  rewrite Z.rem_mod_nonneg in Heven by lia.
+  rewrite bv_wrap_small; [ lia | rewrite Hm64; lia ].
+Qed.
