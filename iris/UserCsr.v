@@ -654,3 +654,88 @@ Proof.
   eexists; split; [ apply exec_returnM | ].
   intro Hb; discriminate Hb.
 Qed.
+
+(* ===================================================================== *)
+(* §3c The assembled check at User.                                       *)
+(* ===================================================================== *)
+
+Lemma exec_check_CSR_U (csr : mword 12) (acc : CSRAccessType)
+    (s : mstate) (ms_v : mword 64) :
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists ok, exec (check_CSR csr User acc) s = Some (ok, s)
+    /\ (ok = true -> u_csr_readable csr /\ check_CSR_access csr acc = true).
+Proof.
+  intros Hms Hfs Hvs Hmisa Hmenv HES.
+  unfold check_CSR.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_check_CSR_priv_U csr s)).
+  destruct (zopz0zKzJ_u ('b"00") (csrPriv csr)) eqn:EP.
+  - (* priv gate passed *)
+    rewrite (exec_and_boolM_Some _ _ _ _ _
+               (exec_returnM (check_CSR_access csr acc) s)).
+    destruct (check_CSR_access csr acc) eqn:EA.
+    + (* access shape OK: the accessibility traversal decides *)
+      destruct (exec_is_CSR_accessible_U csr acc s ms_v
+                  Hms Hfs Hvs Hmisa Hmenv HES EP) as (b & Hb & Himp).
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hb).
+      destruct b.
+      * (* accessible: csr is a readable counter -- stateen is concrete *)
+        pose proof (Himp eq_refl) as Hr.
+        destruct Hr as [-> | [-> | [-> | Hhpm]]].
+        { eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if ?g then _ else _) _ = _ =>
+                replace g with false by (vm_compute; reflexivity)
+            end.
+            apply exec_returnM. }
+          intro; split; [ left; reflexivity | reflexivity ]. }
+        { eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if ?g then _ else _) _ = _ =>
+                replace g with false by (vm_compute; reflexivity)
+            end.
+            apply exec_returnM. }
+          intro; split; [ right; left; reflexivity | reflexivity ]. }
+        { eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if ?g then _ else _) _ = _ =>
+                replace g with false by (vm_compute; reflexivity)
+            end.
+            apply exec_returnM. }
+          intro; split; [ right; right; left; reflexivity | reflexivity ]. }
+        { (* the hpm range: stateen's guards are all concrete-address
+             mismatches EXCEPT none match the 0xCxx range -- every guard
+             is eq_vec csr ADDR with ADDR outside the range; kill each by
+             the range facts *)
+          destruct Hhpm as [E1 E2].
+          eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if eq_vec ?c ?a then _ else _) _ = _ =>
+                let EX := fresh "EX" in
+                destruct (eq_vec c a) eqn:EX;
+                [ exfalso;
+                  apply eq_vec_true_iff in EX; subst c;
+                  vm_compute in E1; discriminate E1
+                | clear EX ]
+            end.
+            apply exec_returnM. }
+          intro; split;
+            [ right; right; right; split; assumption | reflexivity ]. }
+      * (* inaccessible *)
+        eexists. split; [ apply exec_returnM | ].
+        intro Hb'; discriminate Hb'.
+    + (* wrong access shape (write to a read-only address) *)
+      eexists. split; [ apply exec_returnM | ].
+      intro Hb'; discriminate Hb'.
+  - (* priv gate failed *)
+    eexists. split; [ apply exec_returnM | ].
+    intro Hb'; discriminate Hb'.
+Qed.
