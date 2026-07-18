@@ -557,11 +557,13 @@ Where things landed (the stage descriptions below remain the design rationale):
   `udata_own_store_8`), and the composers `user_pt_load_data_8` /
   `user_pt_store_data_8` (translate absorbed + physical access + bundle
   re-established; a store just re-picks the existential byte map).
-  Width 4 (LW/SW) is DONE the same way (§7: local width-4 pma/write-plain
-  bricks + the transformed chains and composers `user_pt_{load,store}_data_4`).
-  STILL OPEN: widths 2/1 (same mechanical transform; need read_ram_plain_1
-  + write_ram_plain_2/1 clones and off2 bounds; width-1 alignment is
-  trivial), AMO/LR/SC, and the misaligned-access fault flavors
+  Widths 4 (LW/SW, §7) and 2 (LH/SH, §8) are DONE the same way (local
+  width-matched pma/write-plain bricks + the transformed chains and
+  composers `user_pt_{load,store}_data_{4,2}`; off2/pa2 bounds joined
+  UserBits).  STILL OPEN: width 1 (LB/SB -- needs a read_ram_plain_1
+  brick, i.e. a run_read_ram_plain_1_pin clone in RiscvFetchExec style;
+  everything else is the same transform, and width-1 alignment is
+  trivially true), AMO/LR/SC, and the misaligned-access fault flavors
   (instruction-level, no translation).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
