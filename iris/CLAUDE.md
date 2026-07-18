@@ -703,9 +703,14 @@ Where things landed (the stage descriptions below remain the design rationale):
   sides, returning the old value plus a ∀-value PURE write fact at the
   moved state (the arm computes the stored value and absorbs the write
   with `udata_own_store_4`); MemAmo4's mem-level chain was already
-  privilege-generic.  STILL OPEN: other AMO ops / width 8 (generalize
-  MemAmo4 over the op the way UserMemPt §5 generalized the width -- the
-  op is wildcarded everywhere except `pma_allows_atomic_op`), LR/SC
+  privilege-generic.  MemAmo4 §1 is now OP-GENERIC (the four chain lemmas +
+  `exec_pmaCheck_ram_amo_4` + `exec_effectivePrivilege_amo_nm` take an
+  `op : amoop`; the pma proof `destruct op`s the or-pattern the
+  Data/ShadowStack arms compile to, effectivePrivilege uses
+  `andb_false_r` instead of cbn so op stays abstract; NB WpAmo defines
+  its OWN same-named AMOSWAP-specialized copies and does not import
+  MemAmo4, so it is untouched).  `user_pt_amo_data_4` passes AMOSWAP;
+  other ops are now a bare instantiation.  STILL OPEN: AMO width 8, LR/SC
   (reservation-axiom destructs), and the misaligned-access fault flavors
   (instruction-level, no translation).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /

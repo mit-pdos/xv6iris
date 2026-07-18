@@ -77,77 +77,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes KernelText WpGpr WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
+Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt PtBuild.
 Require Import SmodeCore StackOwn CalleeSaved KallocInv WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
-
-(* ===================================================================== *)
-(* §1 Pure representation predicates.                                     *)
-(* ===================================================================== *)
-
-(* the tree represents EXACTLY the finite map [m] (vpn -> leaf word) *)
-Definition pt_rep (t : ptree) (m : gmap (mword 27) (mword 64)) : Prop :=
-  (forall vpn w, m !! vpn = Some w -> exists p2 p1, ptree_maps t vpn p2 p1 w) /\
-  (forall vpn, m !! vpn = None -> ptree_blocks t vpn).
-
-(* same represented map: what walk's tree-growing preserves *)
-Definition ptree_same_rep (t t' : ptree) : Prop :=
-  pt_base t' = pt_base t /\
-  (forall v p2 p1 p0, ptree_maps t v p2 p1 p0 <-> ptree_maps t' v p2 p1 p0) /\
-  (forall v, ptree_blocks t v <-> ptree_blocks t' v).
-
-Lemma pt_rep_same (t t' : ptree) (m : gmap (mword 27) (mword 64)) :
-  ptree_same_rep t t' -> pt_rep t m -> pt_rep t' m.
-Proof.
-  intros (Hb & Hm & Hbl) (Hmap & Hblk). split.
-  - intros vpn w Hl. destruct (Hmap vpn w Hl) as (p2 & p1 & Hp).
-    exists p2, p1. apply Hm. exact Hp.
-  - intros vpn Hl. apply Hbl. exact (Hblk vpn Hl).
-Qed.
-
-(* the pointer path down to [vpn]'s L0 slot, whose current word is [w0]
-   ([ptree_maps] minus the leaf classification -- walk's return value) *)
-Definition ptree_level0 (t : ptree) (vpn : mword 27) (p2 p1 w0 : mword 64) : Prop :=
-  exists c1 c0,
-    pt_kids t (vpn_idx 2 vpn) = Some c1 /\
-    pt_kids c1 (vpn_idx 1 vpn) = Some c0 /\
-    pt_ents t (vpn_idx 2 vpn) = p2 /\
-    pt_ents c1 (vpn_idx 1 vpn) = p1 /\
-    pt_ents c0 (vpn_idx 0 vpn) = w0 /\
-    u_next_base p2 = pt_base c1 /\
-    u_next_base p1 = pt_base c0 /\
-    pte_valid p2 /\ pte_ptr p2 /\
-    pte_valid p1 /\ pte_ptr p1.
-
-Lemma ptree_maps_level0 (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
-  ptree_maps t vpn p2 p1 p0 -> ptree_level0 t vpn p2 p1 p0.
-Proof.
-  intros (c1 & c0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & _).
-  exists c1, c0. tauto.
-Qed.
-
-(* the leaf word mappages writes for page [i] of a run starting at
-   physical page [ppn0] with permission bits [perm]: PA2PTE(pa)|perm|V,
-   A/D clear -- exactly the store at mappages+0x50 *)
-Definition mappages_pte (ppn0 : mword 44) (perm : Z) (i : nat) : mword 64 :=
-  mk_pte (add_vec_int ppn0 (Z.of_nat i)) (Z.lor perm 1).
-
-(* vpn arithmetic for the page run *)
-Definition vpn_at (vpn0 : mword 27) (i : nat) : mword 27 :=
-  add_vec_int vpn0 (Z.of_nat i).
-
-(* [m] extended with the first [k] pages of the run *)
-Fixpoint pt_insert_run (m : gmap (mword 27) (mword 64))
-    (vpn0 : mword 27) (ppn0 : mword 44) (perm : Z) (k : nat)
-    : gmap (mword 27) (mword 64) :=
-  match k with
-  | O => m
-  | S k' => <[vpn_at vpn0 k' := mappages_pte ppn0 perm k']>
-              (pt_insert_run m vpn0 ppn0 perm k')
-  end.
 
 (* ===================================================================== *)
 (* §2 The spec statements.  [SINV] is the ambient S-mode translation      *)

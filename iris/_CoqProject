@@ -88,6 +88,7 @@ UserretPt.v
 UserretEntryPt.v
 UserretAllPt.v
 SRegime.v
+PtBuild.v
 KvmSpec.v
 InstrBytes.v
 KernelText.v
