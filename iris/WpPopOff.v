@@ -602,8 +602,8 @@ Section WpPopOffTopSec.
     iApply (wp_mycpu root_ppn Φ m0 2 mstatus0 mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               ltac:(lia) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Htext Hpc Hfile Hstk [Hgc Hcont]").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmcs Hstk".
-    iApply ("Hcont" with
+    iIntros (mo) "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile %Hmcs Hstk".
+    iApply ("Hcont" $! mo with
               "Hhs Hpriv Hms Hgc Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
     destruct Hmcs as [Hcs Ha0]. split.
     - exact (callee_saved_insert_ra _ _ _ Hcs).
