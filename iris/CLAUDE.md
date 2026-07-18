@@ -295,7 +295,7 @@ imm 0x1fd244 → 0x1fd246) hid behind a stale `.vo` for a full commit cycle.
   - **Leaf-port STATUS (2026-07-18)**: nearly ALL S-mode leaves are ported to `tlb_inv_pt`, `make proofs` green.  New files (all in _CoqProject): `WpSmodePtAlu.v` (all Itype/Rtype/Utype/Addiw/Shiftiop leaves — pure engine-swap clones over the `wp_gpr_write_s_config*_pt` engines, incl. a new `wp_gpr_write_s_config_base_pc_pt` auipc engine in WpSmodePtLeaves.v), `WpSmodePtCtl.v` (Fence/Jal/Jalr/Csr/Sret over `wp_instr_s_config_tlbinv_pt` — the mechanical callback transform: `iIntros (σ Hpceq satp0 tlbvec_f ...)` → `iIntros (σ Hpceq)`, `[Hsatp Htlb Hpbytes Hpmp]` → `Htlbinv`, drop `tlb_inv_close` blocks; Local helpers copied since `Local Lemma`s don't export), `WpSmodePtBtype.v` (all 30 branch leaves, same transform), `WpSmodePtMem.v` (state-generic width-4 and width-1 pt towers cloned from WpSmodeLoad/Store — the clone rule: drop `tlbf`+`Let s'`, `Variable s s'`, bytes at `s'.(mem)`, `write_bytes s'.(mem)`, `_S_walk`→`_S_walk_pt` — plus leaves `wp_clw/lw/ld_s_pt`, `wp_csw/sw/sd_s_pt`, `wp_sb_s_pt`), `WpSmodePtMemWrap.v` (smode_config `_scfg_pt` wrappers — the old `_ram` indirection is VACUOUS under pt (no geometry premises), so `_ram_scfg` wrappers transform directly; c.ldsp/c.sdsp bridge via `sext9_12_64` + `change sp with (Regidx csp_rs1)`).
   - **Lock leaves DONE (2026-07-18)**: `WpSmodePtLock.v` ports all five WpLockLeaves leaves (`wp_clw_lockinv_pt(+_locked)`, `wp_sd_zero_s_pt`, `wp_sw_zero_lockinv_pt`, `wp_amoswap_lockinv_pt`) plus the state-generic AMO tower (`ExecAmoGS4walkPt`) and the AMO check-variant lemmas (`kpt_variant_check_amo`, used as the base absorption lemma's `Hchk` at `Atomic (AMOSWAP, Data, Data)`).  Gotchas hit: rs2 in the AMO tower is read at the TRANSLATE OUTPUT state, so read its `gpr_pt_value` fact at `s_tr` from the ghost cell (a pure `Hprestr` transport hits the gmap `!!!`-instance mismatch); x0-store data equalities close with `do 3 f_equal; first [reflexivity | f_equal; apply bv_eq; vm_compute; reflexivity]` (compose with `;` — the f_equal sometimes closes everything).
   - **USERRET / SWITCH-WINDOW STATUS (2026-07-18d, DONE)**: the whole userret path runs on the ptree layer.  `UserretDefs.v` (uva/upa, `pte8`, the 38-instruction catalog, the SFENCE.VMA-flush + csrw-satp execute reductions), `UserretPt.v` (pa-generic width-8 load towers, `wp_uld_pt`/`wp_ualu_pt`/`wp_usret_pt`, the SRET-at-User tower, `ktramp_slot63_pt`), `UserretEntryPt.v` (`wp_userret_entry_pt` — the 3-step satp switch over the pt2 window), `UserretAllPt.v` (`wp_userret_pt`, all 38 instructions; post returns `utlb_inv_pt uroot tfp um` + `pt_frame (kpt_tree_spec kroot)` for the uservec return trip).  THE SATP-SWITCH WINDOW (`TransPt.v`): between `csrw satp` and the closing `sfence.vma` the TLB holds MIXED-provenance entries, and provenance matters beyond the leaf word (a Svadu hit write-back goes to the pteAddr recorded by the INSTALLING walk — into the provenance tree's L0 slot).  `tlb_ok_pt2 tp tc v` (PtTree.v §7b, over the factored `tlb_cache_of`) says every resident entry is cached from either table; `tlb_inv_pt2 rc Sp Sc` owns BOTH trees (specs abstract as `ptree → Prop`), satp at the current root `rc`; `tlb_inv_pt2_translateAddr` absorbs any va both specs map to A/D-variants of the SAME canonical leaf `w` (4 outcomes: unchanged / cur-walk fill / write-back into cur / write-back into PREV through the cached pteAddr); `tlb_inv_pt2_enter`/`_exit` convert at the window edges against `pt_frame S := ∃ t, ⌜S t⌝ ∗ ptree_own 2 1 t` (a PARKED spec-constrained table); `pt2_tramp_spec` + `wp_instr_pt2_tramp` instantiate the shared trampoline engine for the switch-window instruction.  The same window (roles swapped) serves uservec's return switch.  `pmp_config` is root-index-phantom: `pmp_config_reindex` converts by `iExact`.
-  - **OLD-MACHINERY DELETION STATUS (2026-07-18d)**: DELETED — the old userret island (WpUserret/WpUserretTop/WpUserretEntry/WpUserretAll/TrampTlb), the old per-family S-mode leaf files (WpSmode{Itype,Rtype,Btype,Utype,Jal,Jalr,Load,Store,Shiftiop,Addiw,Csr,Fence,Gen}, WpLockLeaves, WpUartKpt, shards WpAcquireMem/WpFreelistMem/WpPushOff), SmodeCore's whole tlb_inv layer (tlb_pt_consistent*, kpt_bytes/pte_super_bytes, tlb_inv/_ad/_e/_gen bundles, translate_chunk_ram_gen*, the consistent fetch chains, wp_instr_s_tlbinv* engines), the old engines/leaves in WpSmodeLeafBase/WpSmodeGpr/WpSmodeSret, and WpSmodeUart's TLB/leaf machinery (its live residue: the §1 checked/mem device leaves, width-1 LOAD dev towers, uart_vpn/uart_pmp_match1/write helpers, consumed by WpSmodePtUart).  STILL TO DELETE (blocked on the UserPt→ptree port, worklist below): UserPt.v + WpUserret-era U-mode plumbing inside the User*.v chain; also KptPt's now-partly-dead P_kpt/_ad iris-side instances and SmodePte's tlb_consistent (KptPt §12's _ad CLASSIFICATION lemmas stay — they are the live A/D-variance bridge KptTree consumes).  REMAINING WORKLIST: (1) port UserPt.v onto ptree — generalize the absorption core over PRIVILEGE the way `w`/`pa` were generalized (`pte_check_ok acc User` dispatch from `um`'s per-leaf flags; per-access ok/denied/needs-update trichotomy incl. FAULT arms), then flip UserTranslate/UserFetch/UserMem/UserStep(Full)/UserArms/UserExec/UserTrap/UserCompute onto `utlb_inv_pt`; (2) the concrete kvmmake WITNESS tree + `kpt_tree_spec` proof + boot introduction (also discharge `tlb_inv_pt`'s pma_allows_pte_write implication from the boot PMA table); (3) the blocked-vpn S-mode translateAddr FAULT head (translate-level `exec_translate_pt_blocks` is done).
+  - **OLD-MACHINERY DELETION STATUS (2026-07-18d)**: DELETED — the old userret island (WpUserret/WpUserretTop/WpUserretEntry/WpUserretAll/TrampTlb), the old per-family S-mode leaf files (WpSmode{Itype,Rtype,Btype,Utype,Jal,Jalr,Load,Store,Shiftiop,Addiw,Csr,Fence,Gen}, WpLockLeaves, WpUartKpt, shards WpAcquireMem/WpFreelistMem/WpPushOff), SmodeCore's whole tlb_inv layer (tlb_pt_consistent*, kpt_bytes/pte_super_bytes, tlb_inv/_ad/_e/_gen bundles, translate_chunk_ram_gen*, the consistent fetch chains, wp_instr_s_tlbinv* engines), the old engines/leaves in WpSmodeLeafBase/WpSmodeGpr/WpSmodeSret, and WpSmodeUart's TLB/leaf machinery (its live residue: the §1 checked/mem device leaves, width-1 LOAD dev towers, uart_vpn/uart_pmp_match1/write helpers, consumed by WpSmodePtUart).  STILL TO DELETE (blocked on the UserPt→ptree port, worklist below): UserPt.v + WpUserret-era U-mode plumbing inside the User*.v chain; also KptPt's now-partly-dead P_kpt/_ad iris-side instances and SmodePte's tlb_consistent (KptPt §12's _ad CLASSIFICATION lemmas stay — they are the live A/D-variance bridge KptTree consumes).  REMAINING WORKLIST: (1) port UserPt.v onto ptree — SEE THE DEDICATED PLAN SECTION "PLAN: porting user-mode execution onto the ptree page-table layer" below; (2) the concrete kvmmake WITNESS tree + `kpt_tree_spec` proof + boot introduction (also discharge `tlb_inv_pt`'s pma_allows_pte_write implication from the boot PMA table); (3) the blocked-vpn S-mode translateAddr FAULT head (translate-level `exec_translate_pt_blocks` is done).
 
 - Iris-layer gotchas for big-sepL PT footprints (from the kpt_bytes era, still apply to any large slot list): big-sepL lists use `Z.to_nat 65536`-style lengths (large nat literals parse as `of_num_uint`, which lia can't see; bridge indices with `Z2Nat.inj_lt` with EXPLICIT args). NEVER `change (Z_idx n) with n%N in H` when H shares `bv_unsigned` atoms with the goal — it splits the atom and lia dies with "Cannot find witness"; rewrite only the `bv_modulus` bound via a vm_computed equation.
 - **Derive vaddr/PMP geometry from an owned RAM byte** (the key labour-saver): from `addr_is_ram pa` the `ram_*` family gives every walk fact — `ram_canonical`, `ram_pmp_match`, `svpn_of`, `ram_svpn2`, `ram_svpn_range`, `ram_ident_4k` (the 4KB identity: leaf ppn re-concatenated with the page offset = the va; KptPt.v), `kpt_slot_ram`/`ram_pte_pmp8` for the walk's three PTE reads. (The megapage-era `ram_mask/mvpn/mppn/ram_ident` still exist for legacy leaf SIGNATURES that carry superpage-geometry premises — those premises are still true bv facts and callers still discharge them the old way, but new proofs should not consume them.) Only ALIGNMENT (`Halv`) is not derivable and stays a premise. Prefer the `_ram` wrapper leaves (`wp_c{sdsp,ldsp,lw,ld}_s_ram`, `wp_sw_s_ram`, `wp_c{sd,ld}_s_ram`) which take just the 8 config facts + raw cells + instr + `pa↦₈vold` and discharge all geometry — never edit leaf signatures (avoids a ~40-site cascade). A page-STRADDLING 4-byte fetch works because the unified fetch applies `translate_chunk_ram` to each half's own `svpn_of` (one kernel instr, `jal walk` @0x80000ffe, straddles).
@@ -328,6 +328,214 @@ imm 0x1fd244 → 0x1fd246) hid behind a stale `.vo` for a full commit cycle.
 
 - `lockG Σ = exclR unitO`; `locked γ := own γ (Excl ())`; `lock_inv γ lk R := ∃ v, lock_word lk v ∗ (⌜v=0⌝ ∗ locked γ ∗ R ∨ ⌜v≠0⌝)`; `is_lock := inv lockN lock_inv` (`lockN` disjoint from `minstretN`). Core: `newlock`, `locked_exclusive`. Leaves in `WpSmodePtLock.v` (`wp_amoswap_lockinv_pt`, `wp_clw_lockinv_pt{,_locked}` — the `_locked` twin refutes the free branch via `locked_exclusive`, `wp_sw_zero_lockinv_pt`, `wp_sd_zero_s_pt`); higher levels in `WpHoldingInv.v`/`WpAcquireLock.v`/`WpRelease.v`.
 - **Invariant-opening leaf technique** (reusable): inside the σ-callback (mask `E ∖ ↑minstretN`) do `iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]"; [solve_ndisj|]`, strip the timeless window `iDestruct … as (w) "[>Hbytes Hbr]"`, use/update bytes for the exec witness, RE-CLOSE before the final `iModIntro`, and hand the `▷`-ed payload to the continuation (the engine's `▷ WP` strips it). pop_off preconditions (constrain callers): SIE=0, `noff>0` signed, `intena=0`.
+
+## PLAN: porting user-mode execution onto the ptree page-table layer (UserPt → utlb_inv_pt)
+
+GOAL: replace UserPt.v's `upt` record (`u_root`/`u_slots`/`u_map`/`u_data` +
+`upt_wf` + `upt_inv`) with the ptree layer, so arbitrary U-mode execution runs
+over **`utlb_inv_pt uroot tfp um` (UptTree.v) ∗ a separate data-page resource**,
+with the Svadu A/D write-back ABSORBED by the invariant (the current U-mode
+chain assumes A/D preset in every user leaf — "update_PTE_Bits = None always";
+that assumption is DROPPED by this port, exactly as it was on the kernel side).
+The S-mode side is fully done and is the template throughout: the generic
+absorption core (KptTree.v §5-§6: `ptree_translate_miss_core` /
+`ptree_translateAddr_cases` / `ptree_translateAddr_own`), its kernel/user
+S-mode instances, the pt2 switch window (TransPt.v), and the userret proof
+(UserretAllPt.v).  This port also UNBLOCKS the deferred U-mode memory arms
+(LOAD/STORE/AMO) and the fetch-fault payload wiring, which were parked
+"waiting for the Svadu/ADUE page-table rework" — the ptree layer IS that
+rework.
+
+### Target architecture
+
+- The user bundle becomes `user_pt_inv uroot tfp um data :=
+  utlb_inv_pt uroot tfp um ∗ upt_data_own data ∗ ⌜upt_data_cov um data⌝`
+  (names indicative).  KEEP the old `upt_data_own : gset Arch.pa → iProp`
+  shape (flat pa-set, existential byte contents) — owning "one page per
+  mapped vpn" instead is an ALIASING TRAP (two vpns may map one ppn; a gset
+  dedups).  The coverage fact says every mapped leaf's output page
+  (`PPN_of_PTE w` ++ offset) lands in `data`; it replaces `upt_data_cov` on
+  the old record.  PT-slot ownership, satp/tlb cells, `tlb_ok_pt`, spec and
+  `pmp_config uroot` all live inside `utlb_inv_pt` already — nothing else
+  rides outside.
+- Translation outcomes at User, per access at a va (the ONE caller-facing
+  trichotomy, mirroring the old UserTranslate GOAL comment):
+  - **Ok** — `um !! svpn = Some w` and w's flag byte passes the check at
+    User for this access: pa = leaf page + offset, and the state moves in
+    one of the ABSORBED ways (unchanged hit / TLB fill / Svadu A/D
+    write-back into the owned tree) — the invariant re-establishes, callers
+    never see hit-vs-miss or the write-back.
+  - **Err (page fault, σ unchanged)** — non-canonical va, unmapped vpn
+    (`ptree_blocks`), flag byte denies the access, or the vpn is
+    `tramp_vpn`/`tf_vpn` (mapped U=0 ⇒ denied at User).
+- uservec's return page-table switch reuses TransPt's pt2 window with the
+  roles swapped (`Sp := upt_tree_spec uroot tfp um`,
+  `Sc := kpt_tree_spec kroot`); `wp_userret_pt`'s post already hands back
+  `pt_frame (kpt_tree_spec kroot)` for exactly this.
+
+### Stage plan (each stage compiles + commits green on its own)
+
+1. **Privilege-generalize the DEEP core** (KptTree.v §5-§6).  Add a Section
+   `Context (p : Privilege)` to `KptTranslate`/`KptTranslateAddr`/
+   `PtTranslateOwn` and replace the literal `Supervisor` in
+   `ptree_translate_miss_core`, `ptree_translateAddr_cases`,
+   `ptree_translateAddr_own` (the `pte_check_ok acc Supervisor …` premises,
+   the `translate … Supervisor …` calls, the `effectivePrivilege` /
+   `is_shadow_stack` facts → at `p`).  The underlying CommonWalk core and
+   PtTreeAdue's hit/miss/write-back lemmas are ALREADY privilege-generic;
+   this is mechanical.  Keep every existing kernel/S-mode wrapper unchanged
+   by instantiating `p := Supervisor` — zero downstream churn.  Do NOT try
+   to abstract `exec_translateAddr_pt_front` over privilege (next stage).
+2. **The User translateAddr FRONT.**  The S front
+   (`exec_translateAddr_pt_front`, PtTreeAdue.v) reads
+   `cur_privilege = Supervisor` + `mstatus.SXL`; the U front has genuinely
+   different register reads (cur_priv = User, effectivePrivilege at MPRV=0,
+   the satp-mode dispatch of UserTranslate §1).  CLONE a small
+   `exec_translateAddr_pt_front_u` from UserTranslate §1's pure bricks
+   (`exec_get_satp_39` / `exec_satp_mode_width_39` / `exec_assert_vmem431` /
+   `exec_translationMode_U_sv39` — all live, reuse verbatim) composing any
+   ∀-mxr/do_sum `translate` outcome, mirroring the S front's statement.
+3. **Per-leaf flag dispatch.**  `upt_map_wf` currently records only the
+   STRUCTURAL classification (valid/leaf/no-napot/pbmt0 variants).  Add the
+   permission story: a pure dichotomy lemma family "for a structurally-wf
+   leaf w and each access type at User (mxr abstract, ∀-quantified as
+   usual): `pte_check_ok acc User mxr do_sum (pte_set_ad w a d)` for all
+   a/d, OR check_PTE_permission returns denied" — by case analysis on the
+   flag byte (`check_PTE_permission` ignores A/D entirely, so the dichotomy
+   is a fact about w alone; push through variants with the PtAdBits laws,
+   mirroring `kpt_variant_check_{fetch,load,store}`).  Options: strengthen
+   `upt_map_wf` to classify the flag byte into a closed set (simplest,
+   matches how KptPt §12 dispatches), or prove the dichotomy for an
+   arbitrary flag byte (more general; the old UserPt "worklist item 2" shape).
+   Also needed: `pte_check_ok acc User … (pte_set_ad pte_tramp a d)` and
+   `(pte_tf tfp)` are DENIED (U=0) — concrete vm_compute facts.
+4. **U-mode Ok absorption instances** (extend UptTree.v or a new file):
+   `utlb_inv_pt_translateAddr_u` (+ `_fetch/_load/_store` instances) =
+   stage-1's generalized `ptree_translateAddr_own` at `p := User` + stage-2's
+   front + stage-3's check facts, opened/resealed against `utlb_inv_pt`
+   exactly like the existing S-mode instances (`_tramp_fetch`/`_tf_load`/
+   `_tf_store` in UptTree.v are the worked examples — same peel of satp/tlb/
+   pmp facts, same spec-preservation via `upt_tree_spec_set_leaf`).  The
+   output-pa premise (`Hout`) is the leaf-page form: derive
+   `pa = zero_extend' 64 (concat_vec (PPN-of-w) offset)` and record the
+   data-coverage corollary (pa ∈ data) from the bundle's coverage fact.
+5. **The FAULT head** (new exec layer + Iris wrapper).  Pieces:
+   (a) blocked-vpn walk fault: `exec_translate_pt_blocks` (PtTree.v, done at
+   `translate` level) + the U front's Err propagation (UserTranslate's
+   `exec_translateAddr_fetch_u_noncanonical` / `exec_translateAddr_fetch_u_fault`
+   heads are live and reusable);
+   (b) denied-walk fault: clone the blocks lemma with CommonWalk
+   UserWalkFault's no-permission piece (walk reads the leaf, check fails →
+   `PTW_No_Permission`, NO fill, NO write-back);
+   (c) HIT-denied fault: a resident `u_walk_entry` A/D-VARIANT of a mapped
+   vpn whose check fails at User (restate UserTranslate's
+   `exec_translate_TLB_hit_denied_u` on uwe-shaped entries; the entry's
+   leaf is `pte_set_ad w a d` — absorb with `pte_set_ad_absorb`).  VERIFY
+   THE MODEL ORDER first: on a hit, `check_PTE_permission` runs BEFORE
+   `update_PTE_Bits`, so a denied hit never write-backs and the fault
+   leaves σ unchanged — if the order were reversed the statement changes;
+   (d) the soundness keystone, from `tlb_ok_pt`: an UNMAPPED vpn is never
+   TLB-resident (resident ⇒ some mapped vpn's entry; same-slot foreign
+   entries are rejected by `uwe_match_other`) — spell this as its own
+   lemma; it is what makes the fault case analysis total.
+   Then ONE Iris wrapper `utlb_inv_pt_translateAddr_u_fault`: Err, σ
+   unchanged, invariant handed back whole.
+6. **Rebuild the fetch interface.**  `upt_fetch_instr` (UserFetch §6) and
+   its word/mem-read layers move onto the new bundle: bytes come from
+   `upt_data_own` at the leaf-page pa; the four fetch-geometry compositors
+   in PtFetchGen.v (`exec_fetch_{F_Base_4,F_Base_2,RVC_4,RVC_2}_S_gen_pa`)
+   take the translate outcome AS A PREMISE, so they are privilege-blind —
+   reuse them verbatim at U (despite the `_S_` in the name), feeding the
+   PMP X-grant facts from UserMem's U-mode grant.  A SPLIT fetch translates
+   each half independently — each half may independently fill or
+   write-back; thread `pt_regs_preserved`-style transport as the S engines
+   do (SmodeCorePt is the worked example).
+7. **Flip the User chain, file by file** (mechanical once 1-6 are in):
+   UserExec (`user_inv` bundles the new user_pt_inv), UserTranslate (the
+   trichotomy wrappers), UserFetch, UserMem, then the PT-blind threaders
+   UserStep / UserStepFull / UserArms / UserCompute (they touch the PT only
+   through the fetch/translate interfaces and the bundle name), UserTrap
+   (PT-free, unchanged).  UserCsr / UserExecFacts / UserBits / DecodeSetU
+   are PT-free — untouched.
+8. **Then build the deferred pieces on top**: the U-mode data-memory arms
+   (LOAD/STORE/AMO/LR/SC against `upt_data_own`, width-generic — a user
+   STORE re-establishes the bundle trivially since contents are
+   existential), and the fetch-fault flavor payload wiring.
+
+### Tricky cases / gotchas for this port
+
+- **The A/D-preset assumption is gone, so `upt_tlb_ok`-style EXACT-entry
+  reasoning dies with it**: resident entries are now A/D VARIANTS
+  (`tlb_ok_pt` / `tlb_cache_of`); anything that pattern-matched a concrete
+  `um_tlb_ent` must switch to variant reasoning (`pte_set_ad_absorb`
+  collapses variant-of-variant; `uwe_match_self` holds for any global bit).
+- **A U-mode access can dirty the page table**: the write-back arm writes
+  the provenance L0 slot through `ptree_own_path_upd` + `word_pointsto_write`
+  and refreshes the TLB slot — memory changes MID-FETCH on a split fetch,
+  and a "read-only" user load can change σ.  Every U-mode step lemma must
+  carry the absorbed-outcome shape (`σ' = σ ∨ tlb register_set ∨ the
+  MState-with-write-bytes form), not σ'=σ.
+- **mxr/do_sum**: the model computes them as concrete mstatus expressions
+  right before `translate` — keep the ∀-mxr/do_sum quantification in every
+  check hypothesis and `match goal` to capture the concrete forms (same
+  gotcha as the S-mode data leaves).  `user_mstatus_ok` pins MXR=0/MPRV=0;
+  SUM is irrelevant at effective-User.
+- **tramp/tf entries CAN be TLB-resident when U-mode runs**: the S-phase
+  uservec/userret fetches cache them.  A user access to those vas takes the
+  HIT-denied path (stage 5c), not the walk-denied path — this is the
+  realistic hit-denied case, don't skip it.
+- **asid is 0 everywhere** (`mword_of_int 0`); user vas below TRAPFRAME are
+  canonical-low, tramp/tf vas canonical-high — both pass the canonicality
+  check; only genuinely non-canonical vas take the early fault.
+- **Do not confuse `wp_instr_u_pt` (TrampStepPt.v)** — that is the S-MODE
+  step engine over the user TABLE (the userret/uservec trampoline phase),
+  not a U-mode engine.  The U-mode engine is the UserStep/UserStepFull
+  obligation machinery, which is PT-agnostic above the fetch interface.
+- `pmp_config`'s root index is phantom (`pmp_config_reindex` converts by
+  `iExact`); the U bundle keeps `pmp_config uroot`.
+- PT slots and data pages are separately owned under one gen_heap —
+  separation gives PT/data disjointness for free, and the write-back's
+  slot write composes with a user store's data write without any aliasing
+  side condition.
+
+### What to DELETE once superseded (the old user-mode PT machinery)
+
+Delete only at the END of stage 7, after the flip is green — until then the
+old and new layers coexist:
+
+- **UserPt.v — the whole file**: the `upt` record + `umap_ent`/`umap_ent_wf`
+  + `upt_wf` (`upt_map_spec`/`upt_unmapped_spec`/`upt_data_cov`),
+  `um_tlb_ent`, `upt_tlb_ok`(+`_empty`/`_fill`), `upt_satp_ok`,
+  `upt_slots_own`, `upt_inv`(+intro/open), and the slot-read layer
+  (`upt_slot_read_pte`, `upt_read_walk_ptes`, `upt_unmapped_walk_fault`,
+  `upt_denied_walk_fault`) — replaced by `ptree_own`/`ptree_maps`/
+  `ptree_blocks` + `ptree_own_path_mem` + `pt_read_pte_slot` + `tlb_ok_pt`
+  + `utlb_inv_pt`.  RELOCATE first: `upt_data_own` (+ its access lemmas)
+  and the old `upte_check_ok`/`upte_check_denied` dichotomy content (dies
+  as stated, but its flag-byte case analysis is the seed for stage 3).
+- **UserTranslate.v — the upt-keyed parts**: the Iris wrappers
+  (`upt_translateAddr_fetch_{unmapped,denied,denied_full,needs_update_full}`)
+  and the `umap_ent`-keyed walk/hit lemmas
+  (`exec_translateAddr_fetch_u_walk`/`_walk_nomatch`/`_hit`/`_hit_denied`,
+  `exec_translate_hit_{ok,denied}_u`, `um_tlb_ent_match_self`).  KEEP the
+  pure §1 mode-dispatch bricks and the Err-propagation heads
+  (`exec_translateAddr_fetch_u_noncanonical`/`_u_fault`) — stages 2 and 5
+  reuse them.
+- **There is NO needs-update fault arm to port**: the Svade needs-update
+  fault chain was already deleted tree-wide as dead+false (ADUE is pinned
+  1); under the ptree absorption an A/D-insufficient access takes the
+  write-back path.  If any residual needs-update spelling surfaces, delete
+  it rather than porting it.
+- **UserMem.v / UserFetch.v**: the `upt_*` fetch layers (`upt_fetch_word` /
+  `upt_fetch_mem_read` in UserMem.v, `upt_fetch_instr` in UserFetch.v) are
+  REBUILT (stage 6); the pure fault layers and the U-mode PMP grant stay.
+- After UserPt.v is gone, also sweep the now-dead residue flagged in the
+  deletion-status bullet: KptPt's P_kpt/_ad IRIS-side instances and
+  SmodePte's `tlb_consistent` — but KEEP KptPt §12's `_ad` CLASSIFICATION
+  lemmas (they are the live A/D-variance bridge KptTree consumes), and note
+  UserPt is currently the last consumer of several of them.
+- WpIntrCore's commented-out U-side region (§5b/§6 porting stock) can be
+  retired once the flipped chain covers its intent.
 
 ## Arbitrary user-mode execution (v2: UserPt.v / UserExec.v)
 
