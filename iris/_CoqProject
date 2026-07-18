@@ -78,6 +78,7 @@ WpSmodePtUart.v
 UptTree.v
 UserPtTree.v
 UserFetchPt.v
+MemAmo4.v
 UserMemPt.v
 PtFetchGen.v
 TrampStepPt.v
@@ -141,6 +142,7 @@ WpSconfBtype.v
 WpSconfCtl.v
 WpSconfLock.v
 WpSconfVc.v
+WpSieFlipBits.v
 WpSconfCsr.v
 WpPushOffMem.v
 WpPushOffCsr.v

@@ -312,7 +312,6 @@ Variable offset : mword 64.
 Variable v : bv 8.
 Variable d' : dev_state.
 Variable region : PMA_Region.
-Variable satp0 : mword 64.
 Variable s s' : mstate.
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
@@ -320,13 +319,8 @@ Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
 Let pa := zero_extend' 64 (add_vec_int a8 (0 * 1)).
 Let data2 : mword (1*1*8) :=
   update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) v.
-Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Supervisor.
-Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
-Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
-Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
-Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
-Hypothesis Hmxr : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true.
-Hypothesis Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg s.(sregs))) = PMM_Disabled.
+Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Load Data)) s
+                  = Some (Virtaddr ea, s).
 Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 1 = true.
 Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Load Data)) s
                  = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
@@ -351,13 +345,14 @@ Lemma exec_vmem_read_1_gpr_S_walk_dev :
   exec (vmem_read (Regidx rs1) offset 1 (Load Data) false false false) s = Some (Ok data2, MState s'.(sregs) s'.(mem) d').
 Proof.
   unfold vmem_read. rewrite exec_catch_early_return.
+  assert (Ha8ea : a8 = ea) by (unfold a8; rewrite subrange_id; apply sign_extend'_id).
   assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Load Data) 1) s
                  = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
   { unfold get_transformed_data_addr.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Load Data) 1 s)).
     cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_load_S ea satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm)).
-    apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Htea).
+    rewrite Ha8ea. apply exec_returnM. }
   rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
   cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
@@ -374,7 +369,6 @@ Variable is_unsigned : bool.
 Variable v : bv 8.
 Variable d' : dev_state.
 Variable region : PMA_Region.
-Variable satp0 : mword 64.
 Variable s s' : mstate.
 Let offset := sign_extend' 64 imm.
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
@@ -384,13 +378,8 @@ Let pa := zero_extend' 64 (add_vec_int a8 (0 * 1)).
 Let data2 : mword (1*1*8) :=
   update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) v.
 Hypothesis Hrd : uint rd <> 0.
-Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Supervisor.
-Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
-Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
-Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
-Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
-Hypothesis Hmxr : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true.
-Hypothesis Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg s.(sregs))) = PMM_Disabled.
+Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Load Data)) s
+                  = Some (Virtaddr ea, s).
 Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 1 = true.
 Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 8))) (Load Data)) s
                  = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
@@ -423,7 +412,7 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (exec_bind_Some _ _ _ _ _ Hass).
   rewrite (exec_bind_Some _ _ _ _ _
-    (exec_vmem_read_1_gpr_S_walk_dev rs1 offset v d' region satp0 s s' Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hread Hc Hsig Hh Hdev Hdrd)).
+    (exec_vmem_read_1_gpr_S_walk_dev rs1 offset v d' region s s' Htea Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hread Hc Hsig Hh Hdev Hdrd)).
   cbn match.
   assert (Hw : exec (wX_bits (Regidx rd) (extend_value is_unsigned data2)) (MState s'.(sregs) s'.(mem) d')
                = Some (tt, set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd)))

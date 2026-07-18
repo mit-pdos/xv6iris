@@ -194,7 +194,32 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
       ⊢ reg_interp σ.(sregs) -∗ sr_inv -∗
-        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝;
+    sr_absorb_dev : forall (acc : MemoryAccessType mem_payload) (va : mword 64) (σ : mstate),
+      (acc = Load Data \/ acc = Store Data) ->
+      kpt_dev_vpn (svpn_of va) ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ==∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv
   }.
 
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
@@ -292,8 +317,55 @@ Section SRegimeDef.
              (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode)).
   Qed.
 
+  Lemma kpt_absorb_dev (root_ppn : mword 44) :
+    forall acc va σ, (acc = Load Data \/ acc = Store Data) ->
+      kpt_dev_vpn (svpn_of va) ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
+  Proof.
+    intros acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iIntros "Hri Hgh Hinv".
+    iAssert (|==> ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) acc) σ
+        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn)%I
+      with "[Hri Hgh Hinv]" as ">H".
+    { destruct Hacc as [-> | ->].
+      - iApply (tlb_inv_pt_translateAddr_load_dev root_ppn va σ Hdev Hcanon Hident
+                  Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv").
+      - iApply (tlb_inv_pt_translateAddr_store_dev root_ppn va σ Hdev Hcanon Hident
+                  Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv"). }
+    iDestruct "H" as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
+    iDestruct (tlb_inv_pt_grant_facts root_ppn σ' with "Hri Hinv") as %Hpmp.
+    iModIntro. iExists σ'. iFrame "Hri Hgh Hinv". iPureIntro. tauto.
+  Qed.
+
   Definition kpt_regime (root_ppn : mword 44) : s_regime :=
-    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn) (kpt_transform root_ppn).
+    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn) (kpt_transform root_ppn)
+            (kpt_absorb_dev root_ppn).
 
   (* ------------------------------------------------------------------- *)
   (* The BARE instance (boot: satp Mode = Bare, translation = identity).   *)
@@ -363,6 +435,50 @@ Section SRegimeDef.
              (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode)).
   Qed.
 
-  Definition bare_regime : s_regime := SRegime bare_inv bare_absorb bare_transform.
+  Lemma bare_absorb_dev :
+    forall acc va σ, (acc = Load Data \/ acc = Store Data) ->
+      kpt_dev_vpn (svpn_of va) ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ==∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
+  Proof.
+    intros acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iIntros "Hri Hgh Hinv".
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iDestruct (pmp_config_grant_facts (mword_of_int 0) σ with "Hri Hpmp") as %Hpmp.
+    iModIntro. iExists σ.
+    iSplit.
+    { iPureIntro.
+      exact (exec_translateAddr_bare acc va σ Heff Hss Hcp
+               (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode)). }
+    iSplit; [iPureIntro; reflexivity |].
+    iSplit; [iPureIntro; left; reflexivity |].
+    iSplit; [iPureIntro; exact Hpmp |].
+    iFrame "Hri Hgh".
+    iExists satp0. iFrame "Hsatp Hpmp". iPureIntro. exact Hmode.
+  Qed.
+
+  Definition bare_regime : s_regime :=
+    SRegime bare_inv bare_absorb bare_transform bare_absorb_dev.
 
 End SRegimeDef.
