@@ -91,6 +91,7 @@ UserretAllPt.v
 SRegime.v
 PtBuild.v
 KvmSpec.v
+WpWalkInstr.v
 InstrBytes.v
 KernelText.v
 StackOwn.v

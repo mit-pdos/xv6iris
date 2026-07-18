@@ -651,7 +651,18 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    `ptree_own_graft2`/`_graft1` (slot cell out; closing wand takes the
    rewritten pointer-PTE cell + the zeroed child), and
    `ptree_own_level0_upd` (mappages' remap-check read + leaf store).
-3. **wp_walk** (NEXT): fuel-free (the loop is 2 iterations, unrolled);
+3. **wp_walk** (IN PROGRESS).  Landed so far: the five missing ALU
+   leaves (`wp_srl_s_r` register-shift RTYPE — new
+   `exec_execute_RTYPE_SRL{,_gpr}`/`gpr_srl_val` in WpMmodeLeafBase —
+   plus `wp_andi_s_r`/`wp_ori_s_r`/`wp_cslli_s_r`/`wp_csrli_s_r`, all
+   with `_pt` wrappers, WpSmodePtAlu.v), and **WpWalkInstr.v** — the
+   decode-catalog skeleton whose header holds walk's FULL instruction
+   table (47 instructions, offsets/encodings/AST notes/leaf mapping,
+   extracted from kernel-rocq's KernelInstrs.v) and the path structure.
+   NEXT THERE: write the wdec_*/wi_* facts (copy WpWakeup's wkd_* AST
+   shapes for the frame bytes; rvc_oneshot + mk_rvc for the rest;
+   mk_base for the 4-byte words), then the address-arithmetic bridges,
+   then the body.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
    per iteration: srl/andi/slli/add address arithmetic, ld the slot
    (`ptree_own_slot2_ro`/`slot1_ro` cells through the regime-generic ld
    leaf), V-bit branch; invalid arm: kalloc (existing spec at the
