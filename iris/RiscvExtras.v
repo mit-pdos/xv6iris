@@ -201,6 +201,25 @@ Proof.
   change (bv_modulus 39) with 549755813888. lia.
 Qed.
 
+(* the same two facts for any LOW address (below MAXVA = 2^38 -- walk's
+   premise; covers device vas that are not RAM) *)
+Lemma lo_subrange_unsigned (a : mword 64) :
+  uint a < 274877906944 ->
+  bv_unsigned (subrange_vec_dec a (Z.sub 39 1) 0) = uint a.
+Proof.
+  intros Hlt. rewrite uint_unsigned in Hlt |- *.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  rewrite bv_extract_0_unsigned.
+  change (MachineWord.MachineWord.Z_idx (Z.sub 39 1 - 0 + 1)) with 39%N.
+  apply bv_wrap_small.
+  change (bv_modulus 39) with 549755813888.
+  split; [exact (proj1 (bv_unsigned_in_range _ a)) |].
+  eapply Z.lt_trans; [exact Hlt | reflexivity].
+Qed.
+
 (* Sv39 canonicality of any RAM address: since [uint a < 0x90000000 < 2^38],
    bit 38 (and every bit >= 39) is 0, so sign-extending the low 39 bits back
    to 64 returns [a] unchanged.  This is exactly the [neq_vec ... = false]
@@ -263,6 +282,34 @@ Proof.
     + apply Z.div_pos. lia. lia.
     + apply Z.div_lt_upper_bound. lia. lia.
 Qed.
+
+Lemma svpn_of_unsigned_lo (a : mword 64) :
+  uint a < 274877906944 ->
+  bv_unsigned (svpn_of a) = Z.shiftr (uint a) 12.
+Proof.
+  intros Hlt. pose proof Hlt as Hlt'. rewrite uint_unsigned in Hlt'.
+  unfold svpn_of. cbn [bits_of_virtaddr]. rewrite autocast_id.
+  unfold subrange_vec_dec at 1. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx pagesize_bits) with 12%N.
+  rewrite bv_extract_unsigned.
+  fold (subrange_vec_dec a (Z.sub 39 1) 0).
+  rewrite (lo_subrange_unsigned a Hlt).
+  change (MachineWord.MachineWord.Z_idx (Z.sub 39 1 - pagesize_bits + 1)) with 27%N.
+  rewrite bv_wrap_small.
+  - rewrite uint_unsigned. reflexivity.
+  - rewrite uint_unsigned.
+    assert (bv_modulus (MachineWord.MachineWord.Z_idx 27) = 134217728) as -> by (vm_compute; reflexivity).
+    rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 12 ltac:(lia)).
+    change (2 ^ 12) with 4096.
+    split.
+    + apply Z.div_pos; [exact (proj1 (bv_unsigned_in_range 64 a)) | reflexivity].
+    + apply Z.div_lt_upper_bound; [reflexivity |].
+      change (4096 * 134217728) with 549755813888.
+      eapply Z.lt_trans; [exact Hlt' | reflexivity].
+Qed.
+
 
 (* svpn[26:18] = 2 for a RAM address (a[38:30] = 2), i.e. it selects the
    level-2 gigapage PTE slot 2 for the identity map. *)

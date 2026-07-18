@@ -83,7 +83,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes KernelText WpGpr WpMmodeLeafBase.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt PtBuild.
-Require Import SmodeCore SRegime StackOwn CalleeSaved KallocInv WpLock.
+Require Import SmodeCore SRegime StackOwn CalleeSaved KallocInv WpLock WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -102,11 +102,27 @@ Section KvmSpecs.
   Context `{CID : CpuId}.
   Variable R : s_regime.
 
-  (* kalloc's ambient resources, bundled for readability: the kmem lock +
-     the per-cpu push_off/pop_off cells kalloc's acquire/release need
-     (exactly wp_kalloc's footprint minus config/stack/text) *)
-  Definition kalloc_env (γ : gname) (lkA fl : mword 64) : iProp Σ :=
-    (is_lock γ lkA (kmem_res fl))%I.
+  (* kalloc's ambient resources, bundled so callers can invoke kalloc
+     REPEATEDLY: the kmem lock, and THIS cpu's push_off/pop_off cells in
+     their quiescent interrupts-off state (noff = 0, which makes
+     pop_off's intena arm vacuous, so every kalloc call restores the
+     bundle: wp_kalloc's post returns the lock's cpu field zeroed, noff
+     decremented back to 0, intena at pop_off's zero write).  [tp] is
+     the caller's thread pointer (callee-saved, never written by the
+     kvm chain).  The 0-not-mycpu fact rides along so the bundle
+     re-establishes after kalloc zeroes the cpu field. *)
+  Definition kalloc_env (γ : gname) (tp : mword 64) : iProp Σ :=
+    (∃ (qint : mword 32) (qcpu : mword 64),
+      ⌜eq_vec qcpu (mycpu_ret tp) = false⌝ ∗
+      ⌜eq_vec (zero_reg : mword 64) (mycpu_ret tp) = false⌝ ∗
+      is_lock γ (mword_of_int KernelSyms.kmem)
+        (kmem_res (mword_of_int (KernelSyms.kmem + 24))) ∗
+      add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 120 : mword 12))
+        ↦₄ (zeros' 32 : mword 32) ∗
+      add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 124 : mword 12))
+        ↦₄ qint ∗
+      add_vec (mword_of_int KernelSyms.kmem : mword 64)
+        (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈ qcpu)%I.
 
   (* ------------------------------------------------------------------- *)
   (* walk(pagetable=a0, va=a1, alloc=a2=1).                                *)
@@ -123,7 +139,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition walk_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (lkA fl : mword 64) (mm : gmap regidx (mword 64)) (t : ptree)
+       (mm : gmap regidx (mword 64)) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let vpn := svpn_of va in
@@ -138,13 +154,14 @@ Section KvmSpecs.
       pc_is (mword_of_int KernelSyms.walk) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ lkA fl -∗
+      kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
       ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
+        kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜ptree_same_rep0 t t'⌝ -∗
         ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)   (* alloc failed *)
@@ -164,7 +181,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition mappages_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (lkA fl : mword 64) (mm : gmap regidx (mword 64)) (t : ptree)
+       (mm : gmap regidx (mword 64)) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let pa := mm !!! Regidx (mword_of_int 13) in
@@ -187,13 +204,14 @@ Section KvmSpecs.
       pc_is (mword_of_int KernelSyms.mappages) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ lkA fl -∗
+      kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
       ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree) (k : nat),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
+        kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
         ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
@@ -219,7 +237,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition kvmmap_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (lkA fl : mword 64) (mm : gmap regidx (mword 64)) (t : ptree)
+       (mm : gmap regidx (mword 64)) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let pa := mm !!! Regidx (mword_of_int 12) in
@@ -243,13 +261,14 @@ Section KvmSpecs.
       pc_is (mword_of_int KernelSyms.kvmmap) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ lkA fl -∗
+      kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
       ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
+        kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
         ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm npages)⌝ -∗
