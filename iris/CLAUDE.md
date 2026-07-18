@@ -564,14 +564,20 @@ Where things landed (the stage descriptions below remain the design rationale):
   `udata_own_store_8`), and the composers `user_pt_load_data_8` /
   `user_pt_store_data_8` (translate absorbed + physical access + bundle
   re-established; a store just re-picks the existential byte map).
-  ALL FOUR WIDTHS are DONE the same way (§7 width 4, §8 width 2, §9
-  width 1 -- local width-matched pma/read/write-plain bricks incl. the
-  previously-missing `exec_read_ram_plain_1` via a run-pin clone,
-  trivially-true width-1 alignment, and the transformed chains +
-  composers `user_pt_{load,store}_data_{8,4,2,1}`; off2/pa2 bounds
-  joined UserBits).  STILL OPEN: AMO/LR/SC (reuse the R∧W grant +
-  reservation-axiom destructs), and the misaligned-access fault
-  flavors (instruction-level, no translation).
+  The development is WIDTH-GENERIC: §5's Section closes over the access
+  width `k` (premises `0 < k <= 8`, `(k | 4096)`, `uint (to_bits 64 k) = k`)
+  plus the two width-TYPED plain-RAM bricks as parameters (`Hread_plain` /
+  `Hwrite_plain` -- the only places the dependent `mword (8*k)` resists
+  abstraction, because of the `cast_N` inside `sail_mem_read`); §6 derives
+  the four RV64 width instances `user_pt_{load,store}_data_{8,4,2,1}` in a
+  few lines each from the concrete bricks (read_2/4 RiscvFetchExec, read_8
+  WpLoad, write_8 WpMmodeLeafBase, read_1/write_1/2/4 local clones).
+  Supporting generics: `off_bound_div`/`pa_aligned_div`/
+  `nth_byte_assemble_len`/`bytes_list_of_lookups` (UserBits.v),
+  `u_walk_pa_window_div`, width-generic pma checks, `udata_read_word_g`/
+  `udata_own_store_g`.  STILL OPEN: AMO/LR/SC (reuse the R∧W grant +
+  reservation-axiom destructs), and the misaligned-access fault flavors
+  (instruction-level, no translation).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process

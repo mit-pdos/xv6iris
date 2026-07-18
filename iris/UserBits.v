@@ -8,7 +8,7 @@
    [upt_data_cov] (which covers every translated address) to the per-byte
    facts memory reads and writes need.                                    *)
 From Stdlib Require Import ZArith Bool Lia Znumtheory.
-From stdpp Require Import bitvector.definitions.
+From stdpp Require Import list bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -170,6 +170,49 @@ Qed.
 (* width-4/2 clones of KallocInv's width-8 [nth_byte_assemble8]) -- how a *)
 (* fetched word is conjured from the EXISTENTIAL page contents            *)
 (* ===================================================================== *)
+(* the WIDTH-GENERIC assemble fact: a word of ANY width at least as wide
+   as the byte list reproduces the bytes *)
+Lemma nth_byte_assemble_len (m : N) (bs : list (bv 8)) (j : nat) :
+  (8 * Z.of_nat (length bs) <= Z.of_N m) ->
+  (j < length bs)%nat ->
+  nth_byte (Z_to_bv m (assemble_bytes bs) : bv m) j = bs !!! j.
+Proof.
+  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
+  rewrite Z_to_bv_unsigned.
+  pose proof (assemble_bytes_bound bs) as [Hlo Hhi].
+  assert (Hws : bv_wrap m (assemble_bytes bs) = assemble_bytes bs).
+  { apply bv_wrap_small. unfold bv_modulus. split; [lia|].
+    eapply Z.lt_le_trans; [exact Hhi|].
+    apply Z.pow_le_mono_r; lia. }
+  rewrite Hws.
+  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
+    by (apply assemble_bytes_byte; lia).
+  rewrite <- Hab.
+  f_equal. f_equal. lia.
+Qed.
+
+(* gather n per-index byte witnesses into ONE list (instance-free: the
+   lookups come in as a plain function) *)
+Lemma bytes_list_of_lookups (f : nat -> option (bv 8)) (n : nat) :
+  (forall j : nat, (j < n)%nat -> exists b, f j = Some b) ->
+  exists bs : list (bv 8), length bs = n /\
+    forall j : nat, (j < n)%nat -> f j = Some (bs !!! j).
+Proof.
+  induction n as [|n IH]; intros Hex.
+  - exists nil. split; [reflexivity | intros j Hj; lia].
+  - destruct IH as (bs & Hlen & Hbs).
+    { intros j Hj. apply Hex. lia. }
+    destruct (Hex n ltac:(lia)) as (b & Hb).
+    exists (bs ++ [b]). split.
+    { rewrite length_app, Hlen. cbn. lia. }
+    intros j Hj.
+    destruct (Nat.lt_ge_cases j n) as [Hlt | Hge].
+    + rewrite lookup_total_app_l; [ exact (Hbs j Hlt) | lia ].
+    + assert (Hjn : j = n) by lia. subst j.
+      rewrite lookup_total_app_r; [ | lia ].
+      rewrite Hlen, Nat.sub_diag. cbn. exact Hb.
+Qed.
+
 Lemma nth_byte_assemble4 (bs : list (bv 8)) (j : nat) :
   length bs = 4%nat -> (j < 4)%nat ->
   nth_byte (Z_to_bv 32 (assemble_bytes bs) : mword 32) j = bs !!! j.
@@ -226,6 +269,55 @@ Proof.
       exists (bv_unsigned p * 1024). lia. }
   rewrite Z.add_0_l.
   rewrite <- Znumtheory.Zmod_div_mod; [ | lia | lia | exists 1024; reflexivity ].
+  exact Hal.
+Qed.
+
+(* ---- the WIDTH-GENERIC bounds: any positive width dividing the page
+   size (1/2/4/8/... are all instances).  The per-width lemmas below
+   remain as their concrete instances. ---- *)
+Lemma off_bound_div (va : mword 64) (k : Z) :
+  0 < k -> (k | 4096) ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  uint (subrange_vec_dec va 11 0) + k <= 4096.
+Proof.
+  intros Hk Hdvd Hal.
+  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
+  rewrite uint_subrange11.
+  rewrite !(uint_unsigned_n _) in Hal |- *.
+  pose proof (bv_unsigned_in_range _ va) as Hr.
+  rewrite Z.rem_mod_nonneg in Hal by lia.
+  assert (Hoff : (bv_unsigned va mod 4096) mod k = 0).
+  { rewrite <- Znumtheory.Zmod_div_mod; [ exact Hal | lia | lia | exact Hdvd ]. }
+  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
+  apply Z.mod_divide in Hoff; [ | lia ]. destruct Hoff as [q Hq].
+  destruct Hdvd as [p Hp].
+  assert (Hqp : q < p) by nia.
+  nia.
+Qed.
+
+Lemma pa_aligned_div (p : mword 44) (va : mword 64) (k : Z) :
+  0 < k -> (k | 4096) ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  is_aligned_paddr (Physaddr (zero_extend' 64
+    (concat_vec p (subrange_vec_dec va 11 0)))) k = true.
+Proof.
+  intros Hk Hdvd Hal.
+  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
+  unfold is_aligned_paddr. apply Z.eqb_eq.
+  rewrite !(uint_unsigned_n _) in Hal |- *.
+  pose proof (bv_unsigned_in_range _ va) as Hr.
+  rewrite Z.rem_mod_nonneg in Hal by lia.
+  rewrite zext64_concat44_12_unsigned.
+  rewrite bv_subrange11.
+  pose proof (bv_unsigned_in_range _ p) as Hp.
+  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
+  rewrite Z.rem_mod_nonneg by lia.
+  rewrite <- Z.add_mod_idemp_l by lia.
+  replace ((bv_unsigned p * 4096) mod k) with 0.
+  2:{ symmetry. apply Z.mod_divide; [ lia | ].
+      apply Z.divide_mul_r. exact Hdvd. }
+  rewrite Z.add_0_l.
+  rewrite <- Znumtheory.Zmod_div_mod; [ | lia | lia | exact Hdvd ].
   exact Hal.
 Qed.
 
