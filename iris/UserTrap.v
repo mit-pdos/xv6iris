@@ -25,7 +25,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 From iris.program_logic Require Import language lifting.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import UserPt UserExec.
 Require Import WpDecode WpLeafCommon WpIntrBits WpIntrCore.
 Local Open Scope Z_scope.
 Import Defs.
@@ -456,3 +457,104 @@ Section StepExecuteTrap.
     apply exec_returnm.
   Qed.
 End StepExecuteTrap.
+
+(* ===================================================================== *)
+(* §6 The SHARED delivered-state machinery: every trap arm (interrupt /   *)
+(* execute-trap / fetch-fault / illegal) delivers the SAME 12-write       *)
+(* machine state and does the SAME ghost bookkeeping; the arms differ     *)
+(* only in the cause/tval/sepc values and the riscv_step wrapper.         *)
+(* [utrap_state] spells the LITERAL tower (aligned by conversion with     *)
+(* what the step wrappers produce); [utrap_ghost] mirrors it in ghost     *)
+(* state in ONE bupd; [utrap_ms_ok] discharges the frame's mstatus pins.  *)
+(* ===================================================================== *)
+
+Definition utrap_scause (c : TrapCause) (sc_v : mword 64) : mword 64 :=
+  update_subrange_vec_dec
+    (update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
+       (bool_to_bit (trapCause_is_interrupt c)))
+    (64 - 2) 0 (zero_extend' (64 - 1) (trapCause_bits_forwards c)).
+
+Definition utrap_state (s_x : mstate) (c : TrapCause) (info : option (mword 64))
+    (pcx ms_v sc_v : mword 64) (elp0 : mword 1) (stvec_v : mword 64) : mstate :=
+  let ms_e := update_subrange_vec_dec ms_v 23 23 elp0 in
+  let ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e) in
+  let ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0") in
+  set_reg (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg
+    (set_reg (set_reg (set_reg (set_reg s_x
+      mstatus ms_e)
+      elp (landing_pad_bits_backwards NO_LP_EXPECTED))
+      scause (update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
+                (bool_to_bit (trapCause_is_interrupt c))))
+      scause (utrap_scause c sc_v))
+      mstatus ms_a)
+      mstatus ms_b)
+      mstatus (utrap_ms elp0 ms_v))
+      stval (tval info))
+      sepc pcx)
+      cur_privilege Supervisor)
+      nextPC (stvec_base stvec_v))
+      PC (stvec_base stvec_v).
+
+(* the frame's mstatus pins hold at the delivered mstatus *)
+Lemma utrap_ms_ok (elp0 : mword 1) (ms_v : mword 64) :
+  user_mstatus_ok ms_v -> trap_mstatus_ok (utrap_ms elp0 ms_v).
+Proof.
+  intros (HSXL & HMPRV & HMXR).
+  split; [ rewrite utrap_ms_SXL; exact HSXL | ].
+  split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
+  split; [ rewrite utrap_ms_MXR; exact HMXR | ].
+  split; [ rewrite utrap_ms_SPP; reflexivity | ].
+  rewrite utrap_ms_SIE; reflexivity.
+Qed.
+
+Section UTrapGhost.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma utrap_ghost (s_x : mstate) (c : TrapCause) (info : option (mword 64))
+      (pcx ms_v sc_v stval_v sepc_v va va' : mword 64)
+      (elp0 : mword 1) (stvec_v : mword 64) :
+    register_lookup elp s_x.(sregs) = elp0 ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    mstate_interp s_x -∗
+    mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗ stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗ cur_privilege ↦ᵣ User -∗
+    nextPC ↦ᵣ va' -∗ PC ↦ᵣ va -∗
+    |==> mstate_interp (utrap_state s_x c info pcx ms_v sc_v elp0 stvec_v) ∗
+         mstatus ↦ᵣ utrap_ms elp0 ms_v ∗
+         scause ↦ᵣ utrap_scause c sc_v ∗
+         stval ↦ᵣ tval info ∗
+         sepc ↦ᵣ pcx ∗
+         cur_privilege ↦ᵣ Supervisor ∗
+         nextPC ↦ᵣ stvec_base stvec_v ∗
+         PC ↦ᵣ stvec_base stvec_v.
+  Proof.
+    iIntros (Lelp Help_ne) "[Hreg Hmd] Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc".
+    pose proof (elp_no_lp elp0 Help_ne) as Help0.
+    pose (ms_e := update_subrange_vec_dec ms_v 23 23 elp0).
+    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
+    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
+    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
+    iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
+                 with "Hreg") as "Hreg".
+    { unfold set_reg; cbn [sregs].
+      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+      rewrite Lelp Help0. reflexivity. }
+    iMod (reg_update _ scause _
+            (update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
+               (bool_to_bit (trapCause_is_interrupt c))) with "Hreg Hsc") as "[Hreg Hsc]".
+    iMod (reg_update _ scause _ (utrap_scause c sc_v) with "Hreg Hsc") as "[Hreg Hsc]".
+    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ mstatus _ (utrap_ms elp0 ms_v) with "Hreg Hms") as "[Hreg Hms]".
+    iMod (reg_update _ stval _ (tval info) with "Hreg Hstval") as "[Hreg Hstval]".
+    iMod (reg_update _ sepc _ pcx with "Hreg Hsepc") as "[Hreg Hsepc]".
+    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
+    iMod (reg_update _ nextPC _ (stvec_base stvec_v) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ PC _ (stvec_base stvec_v) with "Hreg Hpc") as "[Hreg Hpc]".
+    iModIntro.
+    unfold utrap_state, set_reg; cbn [sregs mem mdev]. cbv zeta.
+    iFrame "Hreg Hmd Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc".
+  Qed.
+
+End UTrapGhost.

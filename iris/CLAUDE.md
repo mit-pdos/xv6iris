@@ -593,15 +593,21 @@ files or copy code from them; build fresh from the live tree.
      needs at an existential post-execute state are READ there via
      `reg_valid_dq` against the withheld cells (priv/mstatus/scause/PC)
      and the persistent `hw_config` cells (misa/elp) and `user_cfg`
-     fractional cells (stvec/medeleg). KNOWN CLEANUP DEBT: the three
-     sync-trap arms (execute-trap / fetch-fault / illegal) share their
-     ~60-line tower-ghost + `user_trap_frame`-rebuild block verbatim (they
-     differ only in the exception/tval/sepc values and the riscv_step
-     wrapper). The factoring: a `utrap_state s_x elp0 ms_v sc_v info pcx`
-     mstate definition spelling the LITERAL 12-write tower, a ghost lemma
-     `interp s_x ∗ cells ==∗ interp (utrap_state …) ∗ cells-at-final`, and
-     a frame-rebuild lemma — delicate only in keeping the definition
-     syntactically aligned with what the step wrappers produce.
+     fractional cells (stvec/medeleg). The DELIVERED-STATE machinery is
+     SHARED (UserTrap.v §6, used by ALL FOUR trap producers — interrupt /
+     execute-trap / fetch-fault / illegal): `utrap_state s_x c info pcx
+     ms_v sc_v elp0 stvec_v` spells the literal 12-write delivered state
+     (its mstatus/scause layers folded as `utrap_ms`/`utrap_scause`);
+     `utrap_ghost` mirrors it in ghost state in ONE bupd (interp s_x + 7
+     cells ==∗ interp (utrap_state …) + cells-at-final); `utrap_ms_ok`
+     turns `user_mstatus_ok` into the frame's `trap_mstatus_ok`;
+     `user_trap_frame_intro` (UserExec.v) assembles the frame. An arm's
+     whole delivery is now: pure step fact → `assert (Hs' : s' =
+     utrap_state …) by (unfold s_trap…; reflexivity)` (conversion aligns
+     the wrapper's tower with the definition) → `iMod utrap_ghost` →
+     payload (`iFrame "Hint"` — no cbn needed, the interp spellings match)
+     → `user_trap_frame_intro`. Do NOT hand-roll tower iMod chains in new
+     arms.
      OTHER ENGINES DONE (axiom-clean): fetch-success composer
      `upt_fetch_instr` (UserFetch §6, word from the existential pages via
      `upt_fetch_word`/`upt_fetch_mem_read`, UserMem.v);

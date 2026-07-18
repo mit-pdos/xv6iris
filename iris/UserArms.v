@@ -249,7 +249,6 @@ Section UserArms.
     (* read everything the trap tower needs at the post-execute state s_x *)
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
-    pose proof (elp_no_lp elp0 Help_ne) as Help0.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv_x.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms_x.
     iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc_x.
@@ -287,54 +286,27 @@ Section UserArms.
     assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
     { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
     rewrite Lnpc_trap in Hstep.
-    (* GHOST: mirror every physical write of the tower in order *)
-    pose (ms_e := update_subrange_vec_dec ms_v 23 23 elp0).
-    pose (c1 := update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
-                  (bool_to_bit (trapCause_is_interrupt (rv64d_types.Exception e)))).
-    pose (c2 := update_subrange_vec_dec c1 (64 - 2) 0
-                  (zero_extend' (64 - 1)
-                     (trapCause_bits_forwards (rv64d_types.Exception e)))).
-    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
-    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
-    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
-    iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
-                 with "Hreg") as "Hreg".
-    { unfold set_reg; cbn [sregs].
-      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      rewrite Lelp_x Help0. reflexivity. }
-    iMod (reg_update _ scause _ c1 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ scause _ c2 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ (update_subrange_vec_dec ms_b 8 8 ('b"0"))
-            with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ stval _ (tval (xtval_exception_value e xv))
-            with "Hreg Hstval") as "[Hreg Hstval]".
-    iMod (reg_update _ sepc _ pcx with "Hreg Hsepc") as "[Hreg Hsepc]".
-    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-    iMod (reg_update _ nextPC _ (stvec_base (uc_stvec C)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iMod (reg_update _ PC _ (stvec_base (uc_stvec C)) with "Hreg Hpc") as "[Hreg Hpc]".
+    (* the delivered state is the shared [utrap_state] (UserTrap.v §6) *)
+    assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
+                = utrap_state s_x (rv64d_types.Exception e)
+                    (xtval_exception_value e xv) pcx ms_v sc_v elp0 (uc_stvec C))
+      by (unfold s_trap, s9x; reflexivity).
+    rewrite Hs' in Hstep.
+    iMod (utrap_ghost s_x (rv64d_types.Exception e)
+            (xtval_exception_value e xv) pcx ms_v sc_v stval_v sepc_v va va' elp0
+            (uc_stvec C) Lelp_x Help_ne
+            with "[Hreg Hmd] Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc")
+      as "(Hint & Hms & Hsc & Hstval & Hsepc & Hpriv & Hnpc & Hpc)".
+    { iFrame "Hreg Hmd". }
     iModIntro. iExists _.
     iSplitR. { iPureIntro. exact Hstep. }
     iNext.
-    unfold s_trap, s9x, set_reg; cbn [sregs mem mdev].
-    iFrame "Hreg Hmd".
+    iFrame "Hint".
     iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
     iApply ("Hcont" with "[-]").
-    assert (Hmc : update_subrange_vec_dec ms_b 8 8 ('b"0") = utrap_ms elp0 ms_v)
-      by (unfold utrap_ms, ms_b, ms_a, ms_e; reflexivity).
-    iExists (update_subrange_vec_dec ms_b 8 8 ('b"0")), c2,
-            (tval (xtval_exception_value e xv)), pcx, g'.
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt".
-    iSplitR.
-    { iPureIntro. rewrite Hmc.
-      destruct Hmsok as (HSXL & HMPRV & HMXR).
-      split; [ rewrite utrap_ms_SXL; exact HSXL | ].
-      split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
-      split; [ rewrite utrap_ms_MXR; exact HMXR | ].
-      split; [ rewrite utrap_ms_SPP; reflexivity | ].
-      rewrite utrap_ms_SIE; reflexivity. }
-    iSplitL "Hpc Hnpc". { iFrame "Hpc Hnpc". }
+    iApply (user_trap_frame_intro C pt _ _ _ _ _ (utrap_ms_ok elp0 ms_v Hmsok)
+             with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt
+                   [Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest]").
     iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
   Qed.
 
@@ -417,7 +389,6 @@ Section UserArms.
     (* read everything the trap tower needs at the post-fetch state s_f *)
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
-    pose proof (elp_no_lp elp0 Help_ne) as Help0.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv_f.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms_f.
     iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc_f.
@@ -450,54 +421,27 @@ Section UserArms.
     assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
     { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
     rewrite Lnpc_trap in Hstep.
-    (* GHOST: mirror every physical write of the tower in order *)
-    pose (ms_e := update_subrange_vec_dec ms_v 23 23 elp0).
-    pose (c1 := update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
-                  (bool_to_bit (trapCause_is_interrupt (rv64d_types.Exception e)))).
-    pose (c2 := update_subrange_vec_dec c1 (64 - 2) 0
-                  (zero_extend' (64 - 1)
-                     (trapCause_bits_forwards (rv64d_types.Exception e)))).
-    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
-    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
-    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
-    iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
-                 with "Hreg") as "Hreg".
-    { unfold set_reg; cbn [sregs].
-      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      rewrite Lelp_f Help0. reflexivity. }
-    iMod (reg_update _ scause _ c1 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ scause _ c2 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ (update_subrange_vec_dec ms_b 8 8 ('b"0"))
-            with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ stval _ (tval (xtval_exception_value e xv))
-            with "Hreg Hstval") as "[Hreg Hstval]".
-    iMod (reg_update _ sepc _ va with "Hreg Hsepc") as "[Hreg Hsepc]".
-    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-    iMod (reg_update _ nextPC _ (stvec_base (uc_stvec C)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iMod (reg_update _ PC _ (stvec_base (uc_stvec C)) with "Hreg Hpc") as "[Hreg Hpc]".
+    (* the delivered state is the shared [utrap_state] (UserTrap.v §6) *)
+    assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
+                = utrap_state s_f (rv64d_types.Exception e)
+                    (xtval_exception_value e xv) va ms_v sc_v elp0 (uc_stvec C))
+      by (unfold s_trap; reflexivity).
+    rewrite Hs' in Hstep.
+    iMod (utrap_ghost s_f (rv64d_types.Exception e)
+            (xtval_exception_value e xv) va ms_v sc_v stval_v sepc_v va va elp0
+            (uc_stvec C) Lelp_f Help_ne
+            with "[Hreg Hmd] Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc")
+      as "(Hint & Hms & Hsc & Hstval & Hsepc & Hpriv & Hnpc & Hpc)".
+    { iFrame "Hreg Hmd". }
     iModIntro. iExists _.
     iSplitR. { iPureIntro. exact Hstep. }
     iNext.
-    unfold s_trap, set_reg; cbn [sregs mem mdev].
-    iFrame "Hreg Hmd".
+    iFrame "Hint".
     iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
     iApply ("Hcont" with "[-]").
-    assert (Hmc : update_subrange_vec_dec ms_b 8 8 ('b"0") = utrap_ms elp0 ms_v)
-      by (unfold utrap_ms, ms_b, ms_a, ms_e; reflexivity).
-    iExists (update_subrange_vec_dec ms_b 8 8 ('b"0")), c2,
-            (tval (xtval_exception_value e xv)), va, g.
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt".
-    iSplitR.
-    { iPureIntro. rewrite Hmc.
-      destruct Hmsok as (HSXL & HMPRV & HMXR).
-      split; [ rewrite utrap_ms_SXL; exact HSXL | ].
-      split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
-      split; [ rewrite utrap_ms_MXR; exact HMXR | ].
-      split; [ rewrite utrap_ms_SPP; reflexivity | ].
-      rewrite utrap_ms_SIE; reflexivity. }
-    iSplitL "Hpc Hnpc". { iFrame "Hpc Hnpc". }
+    iApply (user_trap_frame_intro C pt _ _ _ _ _ (utrap_ms_ok elp0 ms_v Hmsok)
+             with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt
+                   [Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest]").
     iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
   Qed.
 
@@ -581,7 +525,6 @@ Section UserArms.
     (* read everything the trap tower needs at the post-execute state s_x *)
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
-    pose proof (elp_no_lp elp0 Help_ne) as Help0.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv_x.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms_x.
     iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc_x.
@@ -615,57 +558,27 @@ Section UserArms.
     assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
     { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
     rewrite Lnpc_trap in Hstep.
-    (* GHOST: mirror every physical write of the tower in order *)
-    pose (ms_e := update_subrange_vec_dec ms_v 23 23 elp0).
-    pose (c1 := update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
-                  (bool_to_bit (trapCause_is_interrupt
-                     (rv64d_types.Exception (E_Illegal_Instr tt))))).
-    pose (c2 := update_subrange_vec_dec c1 (64 - 2) 0
-                  (zero_extend' (64 - 1)
-                     (trapCause_bits_forwards
-                        (rv64d_types.Exception (E_Illegal_Instr tt))))).
-    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
-    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
-    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
-    iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
-                 with "Hreg") as "Hreg".
-    { unfold set_reg; cbn [sregs].
-      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      rewrite Lelp_x Help0. reflexivity. }
-    iMod (reg_update _ scause _ c1 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ scause _ c2 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ (update_subrange_vec_dec ms_b 8 8 ('b"0"))
-            with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ stval _ (tval (xtval_exception_value (E_Illegal_Instr tt)
-            (zero_extend' 64 ib))) with "Hreg Hstval") as "[Hreg Hstval]".
-    iMod (reg_update _ sepc _ va with "Hreg Hsepc") as "[Hreg Hsepc]".
-    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-    iMod (reg_update _ nextPC _ (stvec_base (uc_stvec C)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iMod (reg_update _ PC _ (stvec_base (uc_stvec C)) with "Hreg Hpc") as "[Hreg Hpc]".
+    (* the delivered state is the shared [utrap_state] (UserTrap.v §6) *)
+    assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
+                = utrap_state s_x (rv64d_types.Exception (E_Illegal_Instr tt))
+                    (xtval_exception_value (E_Illegal_Instr tt) (zero_extend' 64 ib)) va ms_v sc_v elp0 (uc_stvec C))
+      by (unfold s_trap; reflexivity).
+    rewrite Hs' in Hstep.
+    iMod (utrap_ghost s_x (rv64d_types.Exception (E_Illegal_Instr tt))
+            (xtval_exception_value (E_Illegal_Instr tt) (zero_extend' 64 ib)) va ms_v sc_v stval_v sepc_v va va' elp0
+            (uc_stvec C) Lelp_x Help_ne
+            with "[Hreg Hmd] Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc")
+      as "(Hint & Hms & Hsc & Hstval & Hsepc & Hpriv & Hnpc & Hpc)".
+    { iFrame "Hreg Hmd". }
     iModIntro. iExists _.
     iSplitR. { iPureIntro. exact Hstep. }
     iNext.
-    unfold s_trap, set_reg; cbn [sregs mem mdev].
-    iFrame "Hreg Hmd".
+    iFrame "Hint".
     iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
     iApply ("Hcont" with "[-]").
-    assert (Hmc : update_subrange_vec_dec ms_b 8 8 ('b"0") = utrap_ms elp0 ms_v)
-      by (unfold utrap_ms, ms_b, ms_a, ms_e; reflexivity).
-    iExists (update_subrange_vec_dec ms_b 8 8 ('b"0")), c2,
-            (tval (xtval_exception_value (E_Illegal_Instr tt) (zero_extend' 64 ib))),
-            va, g.
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt".
-    iSplitR.
-    { iPureIntro. rewrite Hmc.
-      destruct Hmsok as (HSXL & HMPRV & HMXR).
-      split; [ rewrite utrap_ms_SXL; exact HSXL | ].
-      split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
-      split; [ rewrite utrap_ms_MXR; exact HMXR | ].
-      split; [ rewrite utrap_ms_SPP; reflexivity | ].
-      rewrite utrap_ms_SIE; reflexivity. }
-    iSplitL "Hpc Hnpc". { iFrame "Hpc Hnpc". }
+    iApply (user_trap_frame_intro C pt _ _ _ _ _ (utrap_ms_ok elp0 ms_v Hmsok)
+             with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt
+                   [Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest]").
     iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
   Qed.
 

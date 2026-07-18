@@ -77,7 +77,6 @@ Section UserStepFull.
     iIntros (Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
              Lmip Lmeip Lseip Lmie Lmdl Hd)
       "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont".
-    pose proof (elp_no_lp elpv Help_ne) as Help0.
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs0.
     (* minstret prelude: minstret_increment := should_inc *)
     destruct (exec_should_inc_minstret_Some
@@ -127,55 +126,26 @@ Section UserStepFull.
     assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
     { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
     rewrite Lnpc_trap in Hstep.
-    (* the exact tower values from UTrapReduce, so iFrame matches s'
-       (whose tower is fixed by exec_riscv_step_interrupt) with no evars *)
-    pose (ms_e := update_subrange_vec_dec ms_v 23 23 elpv).
-    pose (c1 := update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
-                  (bool_to_bit (trapCause_is_interrupt (Interrupt i)))).
-    pose (c2 := update_subrange_vec_dec c1 (64 - 2) 0
-                  (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i)))).
-    pose (ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e)).
-    pose (ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0")).
-    (* the trap tower, values spelled to match the fixed s' tower (the
-       minstret_increment ghost write already happened in the prelude) *)
-    iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
-    iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
-                 with "Hreg") as "Hreg".
-    { unfold set_reg; cbn [sregs].
-      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      rewrite Lelp Help0. reflexivity. }
-    iMod (reg_update _ scause _ c1 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ scause _ c2 with "Hreg Hsc") as "[Hreg Hsc]".
-    iMod (reg_update _ mstatus _ ms_a with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ ms_b with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ mstatus _ (update_subrange_vec_dec ms_b 8 8 ('b"0"))
-            with "Hreg Hms") as "[Hreg Hms]".
-    iMod (reg_update _ stval _ (tval None) with "Hreg Hstval") as "[Hreg Hstval]".
-    iMod (reg_update _ sepc _ va with "Hreg Hsepc") as "[Hreg Hsepc]".
-    iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
-    iMod (reg_update _ nextPC _ (stvec_base (uc_stvec C)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iMod (reg_update _ PC _ (stvec_base (uc_stvec C)) with "Hreg Hpc") as "[Hreg Hpc]".
+    (* the delivered state is the shared [utrap_state] (UserTrap.v §6) *)
+    assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
+                = utrap_state (set_reg σ (R_bool minstret_increment) b)
+                    (Interrupt i) None va ms_v sc_v elpv (uc_stvec C))
+      by (unfold s_trap; reflexivity).
+    rewrite Hs' in Hstep.
+    iMod (utrap_ghost (set_reg σ (R_bool minstret_increment) b) (Interrupt i) None
+            va ms_v sc_v stval_v sepc_v va va elpv (uc_stvec C)
+            (T elp _ Lelp eq_refl) Help_ne
+            with "[Hreg Hmd] Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc")
+      as "(Hint & Hms & Hsc & Hstval & Hsepc & Hpriv & Hnpc & Hpc)".
+    { iFrame "Hreg Hmd". }
     iModIntro. iExists _.
     iSplitR. { iPureIntro. exact Hstep. }
     iNext.
-    unfold set_reg; cbn [sregs mem mdev].
-    iFrame "Hreg Hmd".
+    iFrame "Hint".
     iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
     iApply ("Hcont" with "[-]").
-    assert (Hmc : update_subrange_vec_dec ms_b 8 8 ('b"0") = utrap_ms elpv ms_v)
-      by (unfold utrap_ms, ms_b, ms_a, ms_e; reflexivity).
-    iExists (update_subrange_vec_dec ms_b 8 8 ('b"0")), c2, (tval None), va, g.
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt".
-    iSplitR.
-    { iPureIntro. rewrite Hmc.
-      destruct Hmsok as (HSXL & HMPRV & HMXR).
-      split; [ rewrite utrap_ms_SXL; exact HSXL | ].
-      split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
-      split; [ rewrite utrap_ms_MXR; exact HMXR | ].
-      split; [ rewrite utrap_ms_SPP; reflexivity | ].
-      rewrite utrap_ms_SIE; reflexivity. }
-    iSplitL "Hpc Hnpc". { iFrame "Hpc Hnpc". }
-    iFrame "Hcfg".
+    iApply (user_trap_frame_intro C pt _ _ _ _ _ (utrap_ms_ok elpv ms_v Hmsok)
+             with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg").
   Qed.
 
   (* u_dispatch always delivers to Supervisor (uc_mm rules out M-destined). *)

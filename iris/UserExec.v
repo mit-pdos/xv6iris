@@ -282,6 +282,25 @@ Section UserExec.
       upt_inv pt ∗
       user_cfg)%I.
 
+  (* assemble the trapped frame from the delivered cells (shared by every
+     trap arm -- the values differ, the shape never does) *)
+  Lemma user_trap_frame_intro (ms' sc' stv' sep' : mword 64)
+      (g : gmap regidx (mword 64)) :
+    trap_mstatus_ok ms' ->
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
+    PC ↦ᵣ stvec_base (uc_stvec C) -∗ nextPC ↦ᵣ stvec_base (uc_stvec C) -∗
+    gpr_file g -∗ upt_inv pt -∗ user_cfg -∗
+    user_trap_frame.
+  Proof.
+    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg".
+    iExists ms', sc', stv', sep', g.
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg".
+    iSplitR; [ iPureIntro; exact Hok | ].
+    iFrame "Hpc Hnpc".
+  Qed.
+
   (* the assumed kernel re-entry contract: the handler at stvec (uservec)
      handles ANY trapped-out-of-user machine *)
   Definition stvec_handler_wp (Φ : mval -> iProp Σ) : iProp Σ :=
