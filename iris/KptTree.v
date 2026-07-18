@@ -457,7 +457,7 @@ Qed.
 (* ===================================================================== *)
 
 Section KptTranslate.
-  Context (acc : MemoryAccessType mem_payload).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   (* shared miss path: the TLB slot misses (empty or foreign), so the walk
      runs -- filling cleanly (O2) or writing the A/D update back (O3) *)
@@ -467,7 +467,7 @@ Section KptTranslate.
     let vpn := svpn_of va in
     let p0 := pte_set_ad w a0 d0 in
     (forall (a d : mword 1) (mxr do_sum : bool),
-       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad w a d)) ->
+       pte_check_ok acc p mxr do_sum (pte_set_ad w a d)) ->
     pte_valid p2 -> pte_ptr p2 ->
     pte_valid p1 -> pte_ptr p1 ->
     pte_valid p0 -> pte_leaf p0 -> pte_no_napot p0 ->
@@ -491,7 +491,7 @@ Section KptTranslate.
     pma_allows_pte_write (register_lookup pma_regions σ.(sregs)) ->
     exists σ',
       (forall mxr do_sum,
-         exec (translate 39 (mword_of_int 0 : mword 16) root_ppn vpn acc Supervisor mxr do_sum tt) σ
+         exec (translate 39 (mword_of_int 0 : mword 16) root_ppn vpn acc p mxr do_sum tt) σ
          = Some (Ok (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (p0 : mword 64))) : mword 44), PBMT_PMA, tt), σ'))
       /\ ( σ' = set_reg σ tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                                  (Some (u_walk_entry vpn p2 p1 p0 (mword_of_int 0))))
@@ -527,7 +527,7 @@ Section KptTranslate.
         unfold translate.
         rewrite (exec_bind_Some _ _ _ _ _ Hlk).
         cbn match. rewrite <- Htlb.
-        apply (exec_translate_TLB_miss_pt_upd acc Supervisor mxr do_sum
+        apply (exec_translate_TLB_miss_pt_upd acc p mxr do_sum
                  vpn root_ppn p2 p1 p0 p0' MENVCFG_S (mword_of_int 0) _ σ
                  Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap
                  (Hchk a0 d0 mxr do_sum) Hup
@@ -542,7 +542,7 @@ Section KptTranslate.
         unfold translate.
         rewrite (exec_bind_Some _ _ _ _ _ Hlk).
         cbn match. rewrite <- Htlb.
-        apply (exec_translate_TLB_miss_user vpn root_ppn p2 p1 p0 acc Supervisor mxr do_sum
+        apply (exec_translate_TLB_miss_user vpn root_ppn p2 p1 p0 acc p mxr do_sum
                  Hv2 Hn2 Hv1 Hn1 Hv0 Hl0
                  (Hchk a0 d0 mxr do_sum) Hnap
                  (mword_of_int 0) MENVCFG_S σ Hmisa Hupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE).
@@ -552,7 +552,7 @@ Section KptTranslate.
 End KptTranslate.
 
 Section KptTranslateAddr.
-  Context (acc : MemoryAccessType mem_payload).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   Lemma ptree_translateAddr_cases (root_ppn : mword 44) (va w pa satp0 : mword 64)
         (t : ptree) (tlbvec : vec (option TLB_Entry) (2 ^ 6))
@@ -560,7 +560,7 @@ Section KptTranslateAddr.
     let vpn := svpn_of va in
     let p0 := pte_set_ad w a0 d0 in
     (forall (a d : mword 1) (mxr do_sum : bool),
-       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad w a d)) ->
+       pte_check_ok acc p mxr do_sum (pte_set_ad w a d)) ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
     zero_extend' 64 (concat_vec
@@ -576,13 +576,12 @@ Section KptTranslateAddr.
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = Supervisor ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-      = Some (Supervisor, σ) ->
+    register_lookup cur_privilege σ.(sregs) = p ->
+    exec (translationMode p) σ = Some (Sv39, σ) ->
+    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) p) σ
+      = Some (p, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     register_lookup satp σ.(sregs) = satp0 ->
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     register_lookup tlb σ.(sregs) = tlbvec ->
@@ -609,7 +608,7 @@ Section KptTranslateAddr.
                             (Some (u_walk_entry vpn p2 p1 (pte_set_ad p0 a1 d1) (mword_of_int 0)))))).
   Proof.
     intros vpn p0 Hchk Hcanon Hout Hvarp Hbase Hmaps Htlbok Hsm2 Hsm1 Hsm0
-           Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatp Hmode Hppn Hasid Htlb
+           Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatp Hppn Hasid Htlb
            HA Hord HR HW Hcov Hpmar Hpmaw.
     pose proof Hmaps as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ &
                          Hv2 & Hn2 & Hv1 & Hn1 & Hv0 & Hl0 & Hnap & Hpb0).
@@ -647,7 +646,7 @@ Section KptTranslateAddr.
       + (* HIT on this vpn's own (A/D-variant) entry *)
         destruct (ptree_maps_det t vpn q2 q1 qp0 p2 p1 p0 Hm0 Hmaps) as (-> & -> & ->).
         assert (Hchkc : forall mxr do_sum,
-                  pte_check_ok acc Supervisor mxr do_sum (pte_set_ad p0 a' d')).
+                  pte_check_ok acc p mxr do_sum (pte_set_ad p0 a' d')).
         { intros mxr do_sum.
           assert (Habs : pte_set_ad p0 a' d' = pte_set_ad w a' d')
             by exact (pte_set_ad_absorb w a0 d0 a' d').
@@ -676,11 +675,11 @@ Section KptTranslateAddr.
           assert (Hq' : q0' = pte_set_ad p0 a1 d1)
             by exact (eq_trans Hq (pte_set_ad_absorb p0 a' d' a1 d1)).
           eexists. split.
-          { apply (exec_translateAddr_pt_front acc vpn root_ppn
+          { apply (exec_translateAddr_pt_front acc p vpn root_ppn
                      (autocast (T := mword) ((autocast (T := mword)
                         (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
                      satp0 va pa σ _
-                     Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                     Heff Hss Hcp Htm Hsatp Hppn Hasid
                      Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
@@ -689,7 +688,7 @@ Section KptTranslateAddr.
                        (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
                           (uwe_match_self vpn p2 p1 (pte_set_ad p0 a' d')))).
             cbn match.
-            apply (exec_translate_TLB_hit_pt_upd acc Supervisor mxr do_sum
+            apply (exec_translate_TLB_hit_pt_upd acc p mxr do_sum
                      vpn p2 p1 (pte_set_ad p0 a' d') q0' MENVCFG_S (mword_of_int 0)
                      (tlb_hash (__id 39) vpn) _ σ
                      (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE Hwr eq_refl). }
@@ -700,11 +699,11 @@ Section KptTranslateAddr.
                     (autocast (T := mword) (pte_set_ad p0 a' d') : mword 64) acc = None)
             by exact Hupq.
           eexists. split.
-          { apply (exec_translateAddr_pt_front acc vpn root_ppn
+          { apply (exec_translateAddr_pt_front acc p vpn root_ppn
                      (autocast (T := mword) ((autocast (T := mword)
                         (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
                      satp0 va pa σ _
-                     Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                     Heff Hss Hcp Htm Hsatp Hppn Hasid
                      Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
@@ -713,7 +712,7 @@ Section KptTranslateAddr.
                        (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
                           (uwe_match_self vpn p2 p1 (pte_set_ad p0 a' d')))).
             cbn match.
-            apply (exec_translate_TLB_hit_pt acc Supervisor mxr do_sum
+            apply (exec_translate_TLB_hit_pt acc p mxr do_sum
                      vpn p2 p1 (pte_set_ad p0 a' d') (mword_of_int 0)
                      (tlb_hash (__id 39) vpn) σ
                      (Hchkc mxr do_sum) Hupq' Hpbc). }
@@ -723,33 +722,33 @@ Section KptTranslateAddr.
           by exact (exec_lookup_TLB_nomatch_s vpn (mword_of_int 0) _ tlbvec σ Htlb Hslot
                       (uwe_match_other vpn0 vpn q2 q1 (pte_set_ad qp0 a' d')
                          (mword_of_int 0) Hne)).
-        destruct (ptree_translate_miss_core acc root_ppn va w tlbvec p2 p1 a0 d0 σ Hchk
+        destruct (ptree_translate_miss_core acc p root_ppn va w tlbvec p2 p1 a0 d0 σ Hchk
                     Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
                     Hrd2 Hrd1 Hrd0 Hmisa Hmenv Hhtif Htlb Hlk
                     HA Hord HW Hcov Hpmaw)
           as (σ' & Htr & Hshape).
         exists σ'. split.
-        { apply (exec_translateAddr_pt_front acc vpn root_ppn
+        { apply (exec_translateAddr_pt_front acc p vpn root_ppn
                    (autocast (T := mword) ((autocast (T := mword)
                       (PPN_of_PTE (p0 : mword 64))) : mword 44))
                    satp0 va pa σ σ'
-                   Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                   Heff Hss Hcp Htm Hsatp Hppn Hasid
                    Hcanon eq_refl Htr Hid). }
         destruct Hshape as [Ho2 | Ho3]; [right; left; exact Ho2 | right; right; exact Ho3].
     - (* empty slot: the walk runs *)
       assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ))
         by exact (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec σ Htlb Hslot).
-      destruct (ptree_translate_miss_core acc root_ppn va w tlbvec p2 p1 a0 d0 σ Hchk
+      destruct (ptree_translate_miss_core acc p root_ppn va w tlbvec p2 p1 a0 d0 σ Hchk
                   Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
                   Hrd2 Hrd1 Hrd0 Hmisa Hmenv Hhtif Htlb Hlk
                   HA Hord HW Hcov Hpmaw)
         as (σ' & Htr & Hshape).
       exists σ'. split.
-      { apply (exec_translateAddr_pt_front acc vpn root_ppn
+      { apply (exec_translateAddr_pt_front acc p vpn root_ppn
                  (autocast (T := mword) ((autocast (T := mword)
                     (PPN_of_PTE (p0 : mword 64))) : mword 44))
                  satp0 va pa σ σ'
-                 Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                 Heff Hss Hcp Htm Hsatp Hppn Hasid
                  Hcanon eq_refl Htr Hid). }
       destruct Hshape as [Ho2 | Ho3]; [right; left; exact Ho2 | right; right; exact Ho3].
   Qed.
@@ -768,7 +767,7 @@ End KptTranslateAddr.
 Section PtTranslateOwn.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
-  Context (acc : MemoryAccessType mem_payload).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   (* THE GENERIC ABSORPTION CORE, over the raw pieces: any owned tree, any
      canonical leaf [w] mapped at [va]'s vpn as an A/D variant, any output
@@ -781,7 +780,7 @@ Section PtTranslateOwn.
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       (p2 p1 : mword 64) (a0 d0 : mword 1) (σ : mstate) :
     (forall (a d : mword 1) (mxr do_sum : bool),
-       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad w a d)) ->
+       pte_check_ok acc p mxr do_sum (pte_set_ad w a d)) ->
     (forall a d : mword 1,
        pte_valid (pte_set_ad w a d) /\ pte_leaf (pte_set_ad w a d) /\
        pte_no_napot (pte_set_ad w a d) /\ pte_pbmt0 (pte_set_ad w a d)) ->
@@ -796,13 +795,12 @@ Section PtTranslateOwn.
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = Supervisor ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-      = Some (Supervisor, σ) ->
+    register_lookup cur_privilege σ.(sregs) = p ->
+    exec (translationMode p) σ = Some (Sv39, σ) ->
+    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) p) σ
+      = Some (p, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     register_lookup satp σ.(sregs) = satp0 ->
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     register_lookup tlb σ.(sregs) = tlbvec ->
@@ -829,7 +827,7 @@ Section PtTranslateOwn.
       tlb ↦ᵣ tlbvec' ∗ ptree_own 2 (DfracOwn 1) t'.
   Proof.
     intros Hchk Hvar Hcanon Hout Hbase Hmaps Htlbok
-           Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatpv Hmode Hppn Hasid Htlbv
+           Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
            HA' Hord' HR' HW' Hcov' Hpmar Hpmaw.
     iIntros "Hri Hgh Htlb Ht".
     set (vpn := svpn_of va) in *.
@@ -837,9 +835,9 @@ Section PtTranslateOwn.
       as %(Hsm2 & Hsm1 & Hsm0).
     assert (Hvarp : forall a d : mword 1, pte_pbmt0 (pte_set_ad w a d))
       by (intros a d; exact (proj2 (proj2 (proj2 (Hvar a d))))).
-    destruct (ptree_translateAddr_cases acc root_ppn va w pa satp0 t tlbvec p2 p1 a0 d0 σ
+    destruct (ptree_translateAddr_cases acc p root_ppn va w pa satp0 t tlbvec p2 p1 a0 d0 σ
                 Hchk Hcanon Hout Hvarp Hbase Hmaps Htlbok Hsm2 Hsm1 Hsm0
-                Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatpv Hmode Hppn Hasid Htlbv
+                Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
                 HA' Hord' HR' HW' Hcov' Hpmar Hpmaw)
       as (σ' & Htrans & Hshape).
     destruct Hshape as [-> | [ -> | (a1 & d1 & ->) ]].
@@ -991,10 +989,12 @@ Section KptTranslateIris.
       - apply kpt_variant_leaf.
       - apply kpt_variant_no_napot.
       - apply kpt_variant_pbmt0. }
-    iMod (ptree_translateAddr_own acc root_ppn t (kpt_leaf_pte vpn) va va satp0
+    assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
+      by exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode).
+    iMod (ptree_translateAddr_own acc Supervisor root_ppn t (kpt_leaf_pte vpn) va va satp0
             tlbvec p2 p1 a0 d0 σ
             Hchk Hvar Hcanon Hout Hbase Hmaps Htlbok
-            Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatpv Hmode Hppn Hasid Htlbv
+            Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
             with "Hri Hgh Htlb Ht")
       as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".
@@ -1082,10 +1082,12 @@ Section KptTranslateIris.
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
     { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    iMod (ptree_translateAddr_own acc root_ppn t pte_tramp va pa satp0
+    assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
+      by exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode).
+    iMod (ptree_translateAddr_own acc Supervisor root_ppn t pte_tramp va pa satp0
             tlbvec p2 p1 a0 d0 σ
             Hchk tramp_variant Hcanon Hout Hbase Hmaps Htlbok
-            Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatpv Hmode Hppn Hasid Htlbv
+            Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
             with "Hri Hgh Htlb Ht")
       as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".

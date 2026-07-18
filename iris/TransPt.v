@@ -134,6 +134,8 @@ Section Pt2Translate.
     pose proof (pt_read_pte_slot σ _ pc2 region2 Hsm2' HA Hord HR Hcov Hm2 Hs2 Hhtif) as Hrd2.
     pose proof (pt_read_pte_slot σ _ pc1 region1 Hsm1' HA Hord HR Hcov Hm1 Hs1 Hhtif) as Hrd1.
     pose proof (pt_read_pte_slot σ _ p0c region0 Hsm0' HA Hord HR Hcov Hm0r Hs0 Hhtif) as Hrd0.
+    assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
+      by exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatp Hmode).
     (* output geometry for the current tree's leaf *)
     assert (Hid : zero_extend' 64 (concat_vec
               ((autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (p0c : mword 64))) : mword 44)) : mword 44)
@@ -159,17 +161,17 @@ Section Pt2Translate.
                        tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                               (Some (u_walk_entry vpn pc2 pc1 (pte_set_ad p0c a1 d1) (mword_of_int 0))))))).
     { intros Hlk.
-      destruct (ptree_translate_miss_core acc rc va w tlbvec pc2 pc1 ac dc σ Hchk
+      destruct (ptree_translate_miss_core acc Supervisor rc va w tlbvec pc2 pc1 ac dc σ Hchk
                   Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
                   Hrd2 Hrd1 Hrd0 Hmisa Hmenv Hhtif Htlb Hlk
                   HA Hord HW Hcov Hpmaw)
         as (σ' & Htr & Hshape).
       exists σ'. split.
-      { apply (exec_translateAddr_pt_front acc vpn rc
+      { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
                  (autocast (T := mword) ((autocast (T := mword)
                     (PPN_of_PTE (p0c : mword 64))) : mword 44))
                  satp0 va pa σ σ'
-                 Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                 Heff Hss Hcp Htm Hsatp Hppn Hasid
                  Hcanon eq_refl Htr Hid). }
       exact Hshape. }
     destruct (vec_access_dec tlbvec (tlb_hash (__id 39) vpn)) as [ent|] eqn:Hslot.
@@ -219,11 +221,11 @@ Section Pt2Translate.
           assert (Hq' : q0' = pte_set_ad p0p a1 d1)
             by exact (eq_trans Hq (pte_set_ad_absorb p0p a' d' a1 d1)).
           eexists. split.
-          { apply (exec_translateAddr_pt_front acc vpn rc
+          { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
                      (autocast (T := mword) ((autocast (T := mword)
                         (PPN_of_PTE (pte_set_ad p0p a' d' : mword 64))) : mword 44))
                      satp0 va pa σ _
-                     Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                     Heff Hss Hcp Htm Hsatp Hppn Hasid
                      Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
@@ -243,11 +245,11 @@ Section Pt2Translate.
                     (autocast (T := mword) (pte_set_ad p0p a' d') : mword 64) acc = None)
             by exact Hupq.
           eexists. split.
-          { apply (exec_translateAddr_pt_front acc vpn rc
+          { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
                      (autocast (T := mword) ((autocast (T := mword)
                         (PPN_of_PTE (pte_set_ad p0p a' d' : mword 64))) : mword 44))
                      satp0 va pa σ _
-                     Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                     Heff Hss Hcp Htm Hsatp Hppn Hasid
                      Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
@@ -293,11 +295,11 @@ Section Pt2Translate.
           assert (Hq' : q0' = pte_set_ad p0c a1 d1)
             by exact (eq_trans Hq (pte_set_ad_absorb p0c a' d' a1 d1)).
           eexists. split.
-          { apply (exec_translateAddr_pt_front acc vpn rc
+          { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
                      (autocast (T := mword) ((autocast (T := mword)
                         (PPN_of_PTE (pte_set_ad p0c a' d' : mword 64))) : mword 44))
                      satp0 va pa σ _
-                     Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                     Heff Hss Hcp Htm Hsatp Hppn Hasid
                      Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
@@ -317,11 +319,11 @@ Section Pt2Translate.
                     (autocast (T := mword) (pte_set_ad p0c a' d') : mword 64) acc = None)
             by exact Hupq.
           eexists. split.
-          { apply (exec_translateAddr_pt_front acc vpn rc
+          { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
                      (autocast (T := mword) ((autocast (T := mword)
                         (PPN_of_PTE (pte_set_ad p0c a' d' : mword 64))) : mword 44))
                      satp0 va pa σ _
-                     Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
+                     Heff Hss Hcp Htm Hsatp Hppn Hasid
                      Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.

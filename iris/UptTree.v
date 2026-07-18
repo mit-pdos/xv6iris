@@ -404,10 +404,12 @@ Section UptTranslateIris.
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
     pose proof (Hpmarimpl _ Hall) as Hpmar.
-    iMod (ptree_translateAddr_own acc uroot t w va pa usatp
+    assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
+      by exact (exec_translationMode_S_sv39 usatp σ HSXL Hsatpv Hmode).
+    iMod (ptree_translateAddr_own acc Supervisor uroot t w va pa usatp
             tlbvec p2 p1 a0 d0 σ
             Hchk (upt_variant tfp um (svpn_of va) w Hwf Hleaf) Hcanon Hout Hbase Hmaps Htlbok
-            Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hsatpv Hmode Hppn Hasid Htlbv
+            Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
             with "Hri Hgh Htlb Ht")
       as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".

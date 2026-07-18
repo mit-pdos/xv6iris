@@ -432,22 +432,25 @@ End PtUpdHit.
 (* §5 The translateAddr FRONT MATTER, factored once over an arbitrary     *)
 (*    successful [translate] outcome: mstatus/priv reads, Sv39 dispatch,  *)
 (*    canonicality, satp -> root/asid, and the pa concatenation.  Every   *)
-(*    S-mode outcome arm (no-update / walk fill / write-back, PtTree §8e  *)
-(*    and this file) composes with this head.                             *)
+(*    outcome arm (no-update / walk fill / write-back, PtTree §8e and     *)
+(*    this file) composes with this head.  PRIVILEGE-GENERIC: the         *)
+(*    privilege-specific ingredients (cur_privilege read, effective       *)
+(*    privilege, the Sv39 mode dispatch) are premises -- Supervisor       *)
+(*    callers discharge [Htm] with [exec_translationMode_S_sv39], User    *)
+(*    callers with [exec_translationMode_U_sv39] (UserTranslate.v).       *)
 (* ===================================================================== *)
 
 Section PtFront.
-  Context (acc : MemoryAccessType mem_payload).
+  Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   Lemma exec_translateAddr_pt_front (vpn : mword 27) (root : mword 44)
         (ppnv : mword 44) (satp0 va pa : mword 64) (s s' : mstate) :
-    exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) Supervisor) s
-      = Some (Supervisor, s) ->
+    exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) p) s
+      = Some (p, s) ->
     exec (is_shadow_stack_access acc) s = Some (false, s) ->
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+    register_lookup cur_privilege s.(sregs) = p ->
+    exec (translationMode p) s = Some (Sv39, s) ->
     register_lookup satp s.(sregs) = satp0 ->
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -455,21 +458,21 @@ Section PtFront.
     autocast (T := mword) (subrange_vec_dec
       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
     (forall mxr do_sum,
-       exec (translate 39 (mword_of_int 0 : mword 16) root vpn acc Supervisor mxr do_sum tt) s
+       exec (translate 39 (mword_of_int 0 : mword 16) root vpn acc p mxr do_sum tt) s
        = Some (Ok (ppnv, PBMT_PMA, tt), s')) ->
     zero_extend' 64 (concat_vec ppnv
       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
     exec (translateAddr (Virtaddr va) acc) s
     = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
   Proof.
-    intros Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid Hcanon Hvpn_def Htr Hident.
+    intros Heff Hss Hcp Htm Hsatp Hppn Hasid Hcanon Hvpn_def Htr Hident.
     unfold translateAddr.
     rewrite exec_catch_early_return.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
     rewrite Hcp.
     rewrite (execR_liftR_seq _ _ _ _ _ Heff).
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_S_sv39 satp0 s HSXL Hsatp Hmode)).
+    rewrite (execR_liftR_seq _ _ _ _ _ Htm).
     rewrite (execR_liftR_seq _ _ _ _ _ Hss).
     unfold Defs.bind0.
     replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
