@@ -19,7 +19,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Section TrampFetchPt.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
   Variable INV : iProp Σ.
   Variable Habs : forall (va pa : mword 64) (σ : mstate),
@@ -382,6 +382,151 @@ Section TrampFetchPt.
     - (* F_Ext_Error *) done.
   Qed.
 
+
+  (* the trampoline-page STEP ENGINE over [INV]: one S-mode instruction at
+     virtual [pc] whose bytes live at physical [pa] on the trampoline page.
+     The invariant is threaded WHOLE into the σ-callback. *)
+  Lemma wp_instr_tramp_pt Φ
+      (pc pa : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    neq_vec (bits_of_virtaddr (Virtaddr pc))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub 39 1) 0)) = false ->
+    svpn_of pc = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub 39 1) 0)) = false ->
+    svpn_of (add_vec_int pc 2) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
+    is_aligned_paddr (Physaddr pa) 2 = true ->
+    is_aligned_paddr (Physaddr (add_vec_int pa 2)) 2 = true ->
+    (is_aligned_vaddr (Virtaddr pc) 4 = true -> is_aligned_paddr (Physaddr pa) 4 = true) ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    INV -∗
+    PC ↦ᵣ pc -∗
+    instr pa is_rvc i -∗
+    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       INV -∗
+       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
+       ∃ (s_exec : mstate),
+         ⌜ exec (execute i)
+                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
+                                     (if is_rvc then 2 else 4)))
+             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
+         mstate_interp s_exec ∗
+         (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
+          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+             Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2
+             Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al)
+      "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbinv Hpc Hinstr H".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+    iDestruct "Hinstr" as "[%Hnlpad Hr]".
+    iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
+    iAssert (⌜ match r with F_Base _ => True | F_RVC _ => True | _ => False end ⌝)%I as %Hrok.
+    { iEval (rewrite /instr_bytes) in "Hbytes".
+      iDestruct "Hbytes" as "[_ Hb]".
+      destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
+    iIntros (σ) "Hsi".
+    iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
+                 HmisaS Hmm HSIE with "Hsi Hmisa Hmstatus Hmiec Hmdlc") as %Hdisp.
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid    with "Hreg Hpc")     as %Lpc.
+    iDestruct (reg_valid_dq with "Hreg Hpriv")   as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hmstatus") as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmenvc")  as %Lmenv0.
+    iDestruct (reg_valid_dq with "Hreg Hhtif")   as %Lhtif.
+    iDestruct (reg_valid_dq with "Hreg Hmisa")   as %Lmisa0.
+    iDestruct (reg_valid_dq with "Hreg Hpma")    as %Lpma0.
+    assert (Lmisa : register_lookup misa σ.(sregs) = MISA_C)
+      by (rewrite Lmisa0; exact Hmisa_val0).
+    assert (Lmenv : register_lookup menvcfg σ.(sregs) = MENVCFG_S)
+      by (rewrite Lmenv0; exact Hmenvval0).
+    assert (LSXL : _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10")
+      by (rewrite Lms; exact HSXL).
+    assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
+      by (rewrite Lpma0; exact Hpma_all).
+    iMod (tramp_fetch_pt σ pc pa r
+            Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
+            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2
+            Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
+            with "[$Hreg $Hmem] Htlbinv Hbytes")
+      as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
+    iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iDestruct (reg_valid_dq with "Hreg Hpriv")  as %Hpriv_σf.
+    iDestruct (reg_valid_dq with "Hreg Help")   as %Help_σf.
+    iDestruct (reg_valid_dq with "Hreg Hmisa")  as %Hmisa_σf.
+    iDestruct (reg_valid_dq with "Hreg Hmenvc") as %Hmenv_σf.
+    specialize (Hdec0 ltac:(rewrite Hpriv_σf; reflexivity)
+                      ltac:(rewrite Hmisa_σf; exact HmisaC)
+                      ltac:(rewrite Hmisa_σf; exact HmisaA)
+                      ltac:(rewrite Hmisa_σf; exact Hmisa_val0)
+                      ltac:(unfold cfg_ok; right; split;
+                            [ exact Hpriv_σf | rewrite Hmenv_σf; exact Hmenvval0 ])).
+    assert (Lpc_σf : register_lookup PC σf.(sregs) = pc)
+      by (rewrite (Hpresf PC ltac:(vm_compute; reflexivity)); exact Lpc).
+    iMod ("H" $! σf Lpc_σf
+            with "Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbinv [$Hreg $Hmem]")
+      as (s_exec) "(Hexec & [Hreg' Hmem'] & Hcont)".
+    iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
+    iDestruct "Hexec" as %Hexec.
+    destruct r as [e | w | h | erx]; [ done | | | done ].
+    - (* F_Base w *)
+      cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc.
+      iModIntro. iExists (F_Base w), i, σf, s_exec.
+      iSplitR; [iPureIntro; exact Lpriv |].
+      iSplitR; [iPureIntro; exact Hdisp |].
+      iSplitR; [iPureIntro; exact Hfetcheq |].
+      iSplitR; [iPureIntro; exact Hdec0 |].
+      iSplitR; [iPureIntro; rewrite Help_σf; exact Help_np |].
+      iSplitR.
+      { iSplitR; [iPureIntro; exact Hnlpad |]. iPureIntro; exact Hexec. }
+      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont".
+    - (* F_RVC h *)
+      cbn [fetch_is_rvc] in Hrvc, Hdec0. subst is_rvc.
+      destruct Hdec0 as (i0 & Hdec & Hnlpad0 & Hexp).
+      iModIntro. iExists (F_RVC h), i0, σf, s_exec.
+      iSplitR; [iPureIntro; exact Lpriv |].
+      iSplitR; [iPureIntro; exact Hdisp |].
+      iSplitR; [iPureIntro; exact Hfetcheq |].
+      iSplitR; [iPureIntro; exact Hdec |].
+      iSplitR; [iPureIntro; rewrite Help_σf; exact Help_np |].
+      iSplitR.
+      { iSplitR.
+        { iPureIntro. apply exec_currentlyEnabled_Zca. rewrite Hmisa_σf. exact HmisaC. }
+        iExists i. iSplit; iPureIntro; [apply Hexp | exact Hexec]. }
+      rewrite Lpc_exec. iFrame "Hpc Hreg' Hmem'". iExact "Hcont".
+  Qed.
+
 End TrampFetchPt.
 
 Section TrampFetchInst.
@@ -508,5 +653,13 @@ Section TrampFetchInst.
     tramp_fetch_pt (tlb_inv_pt root_ppn) (ktramp_fetch_habs root_ppn).
   Definition utramp_fetch_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :=
     tramp_fetch_pt (utlb_inv_pt uroot tfp um) (utramp_fetch_habs uroot tfp um).
+
+  (* ... and the two instantiated step engines: the KERNEL-phase trampoline
+     step (userret's first two instructions) and the USER-phase step (the
+     rest of userret / uservec). *)
+  Definition wp_instr_ktramp_pt (root_ppn : mword 44) :=
+    wp_instr_tramp_pt (tlb_inv_pt root_ppn) (ktramp_fetch_habs root_ppn).
+  Definition wp_instr_u_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :=
+    wp_instr_tramp_pt (utlb_inv_pt uroot tfp um) (utramp_fetch_habs uroot tfp um).
 
 End TrampFetchInst.
