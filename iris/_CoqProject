@@ -145,6 +145,7 @@ WpKernelvecSpec.v
 WpSmodeIntr.v
 WpSconfAlu.v
 WpSconfMem.v
+WpSconfBtype.v
 WpPushOff.v
 WpPushOffMem.v
 WpPushOffCsr.v
