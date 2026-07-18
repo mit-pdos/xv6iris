@@ -315,9 +315,17 @@ before any mechanical sweep.
      '1'-arm payload; the '0' arm is the idempotent write via
      `legalize_sie_clear_idem`.  The continuation returns the bare '0'
      quarter + the old-bit report disjunct.
-   - TODO — the csrsi ('0'→'1') restore leaf (mirror choreography;
-     consumes the payload to rebuild sie_cap-'1'; needs the dual
-     `csrsi_sie_flip_ok` characterization) and the pure lemma:  The
+   - DONE — the csrsi ('0'→'1') restore leaf `wp_csrsi_sstatus_s_sconf`
+     (WpSconfCsr.v): consumes the saved payload (which now carries
+     `▷ intr_handler_spec`, extracted by the csrci flip from the
+     invariant's guard via quarter-quarter agreement) to re-arm
+     `sie_cap`-'1'; the invariant reseals at b:='1' with that spec; the
+     already-enabled `sie_cap` branch is refuted by sepc-cell
+     exclusivity (`reg_pointsto_excl`).  The dual exec fact
+     `exec_execute_csrsi_sstatus_gen` and `sstatus_write_set_val` are
+     local there.
+   - TODO — the two pure characterizations (`csrci_sie_flip_ok` /
+     `csrsi_sie_flip_ok`, WpSconfCsr.v), currently named premises:  The
      missing ingredient is the SIE=1 characterization of the csr write:
      for `ms' := legalize_sstatus_val ms (sstatus_write_val ms 2)` (and
      the csrsi dual) prove (a) `SIE ms' = 0` (resp. 1), (b) every
