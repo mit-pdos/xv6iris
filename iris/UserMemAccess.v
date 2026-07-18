@@ -993,3 +993,106 @@ Section MisalignedSplitWrite.
   Qed.
 
 End MisalignedSplitWrite.
+
+(* ===================================================================== *)
+(* §5 The LR/SC RETIRE-OR-FAULT disjunction.  [pma_allows_all] pins       *)
+(*    readable/writable/atomic but NOT [PMA_reservability], and the       *)
+(*    LoadReserved/StoreConditional pma arms gate on                      *)
+(*    [reservability <> RsrvNone].  So on a user-mapped, aligned, R/W     *)
+(*    address LR/SC either RETIRE (reservability set: the reserved        *)
+(*    read/conditional write lands) or take a delegated ACCESS FAULT      *)
+(*    (reservability = RsrvNone: pma denies).  Both outcomes are total    *)
+(*    and safe; we prove the disjunction rather than assuming a value.    *)
+(*                                                                        *)
+(* §5a The reserved-RAM read atoms.  Identical to the plain read atoms    *)
+(*    (read_ram is AK-agnostic for RAM); the reserved read_kind only      *)
+(*    swaps the access-kind constructor (AV_exclusive vs AV_plain).       *)
+(* ===================================================================== *)
+
+Lemma run_read_ram_resv_4_pin (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  run (read_ram Read_RISCV_reserved (Physaddr addr) 4 false) s (w, default_meta) s.
+Proof.
+  intros Hdev Hbytes.
+  unfold read_ram. cbn match.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  eexists _, s. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
+    + intros j Hj. exact (Hbytes j Hj).
+    + apply run_returnM_fwd.
+  - cbn match beta. apply run_returnM_fwd.
+Qed.
+
+Lemma exec_read_ram_resv_4 (addr : mword 64) (w : bv 32) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram Read_RISCV_reserved (Physaddr addr) 4 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_resv_4_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 4) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
+Lemma run_read_ram_resv_8_pin (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  run (read_ram Read_RISCV_reserved (Physaddr addr) 8 false) s (w, default_meta) s.
+Proof.
+  intros Hdev Hbytes.
+  unfold read_ram. cbn match.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
+  apply (proj2 (run_bind _ _ _ _ _)).
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  eexists _, s. split.
+  - eapply run_MemRead_ram_intro.
+    + exact Hdev.
+    + intros j Hj. exact (Hbytes j Hj).
+    + apply run_returnM_fwd.
+  - cbn match beta. apply run_returnM_fwd.
+Qed.
+
+Lemma exec_read_ram_resv_8 (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram Read_RISCV_reserved (Physaddr addr) 8 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_resv_8_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 8) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
