@@ -1530,3 +1530,34 @@ Proof.
       lia. }
   apply Z.add_comm.
 Qed.
+
+(* the C walk's V-bit test: [andi a5, w, 1; beqz a5] branches exactly on
+   bit 0 of the slot word *)
+Lemma walk_vbit_eq (w : mword 64) :
+  eq_vec (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12))) zero_reg
+  = negb (Z.testbit (bv_unsigned w) 0).
+Proof.
+  assert (Hand : bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)))
+                 = Z.b2z (Z.odd (bv_unsigned w))).
+  { unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      to_word, get_word, SailStdpp.Values.with_word.
+    unfold MachineWord.MachineWord.and.
+    rewrite bv_and_unsigned.
+    match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+      replace (bv_unsigned mm) with 1 by (vm_compute; reflexivity) end.
+    change 1 with (Z.ones 1) at 1.
+    rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
+    change (2 ^ 1) with 2.
+    apply Zmod_odd. }
+  rewrite Z.bit0_odd.
+  destruct (Z.odd (bv_unsigned w)) eqn:E; cbn [Z.b2z] in Hand.
+  - cbn [negb]. apply eq_vec_false_iff.
+    intro Hc. apply (f_equal bv_unsigned) in Hc.
+    rewrite Hand in Hc.
+    replace (bv_unsigned (zero_reg : mword 64)) with 0 in Hc
+      by (vm_compute; reflexivity).
+    discriminate Hc.
+  - cbn [negb]. apply eq_vec_true_iff.
+    apply bv_eq. rewrite Hand.
+    vm_compute. reflexivity.
+Qed.

@@ -270,6 +270,107 @@ Section WpMemsetPage.
       exact Hcs.
   Qed.
 
+  (* the same wrapper KEEPING the written bytes (walk's memset(page,0)
+     feeds them to [zero_page_to_node]; [wp_memset_page]'s post forgets
+     the contents) *)
+  Lemma wp_memset_page_zero_r (R : s_regime) (Φ : mval -> iProp Σ)
+      (m0 : gmap regidx (mword 64)) (cval : mword 64) (n : nat)
+      (γ : gname) {dq : dfrac} :
+    let a0_idx : mword 5 := mword_of_int 10 in
+    let a1_idx : mword 5 := mword_of_int 11 in
+    let a2_idx : mword 5 := mword_of_int 12 in
+    let pcE := mword_of_int KernelSyms.memset in
+    let sp0 := m0 !!! Regidx csp_rs1 in
+    let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
+    let p := m0 !!! Regidx a0_idx in
+    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+    (* memset's 2-slot save frame [sp0-16, sp0) is a single [stack_own sp0 n] (n >= 2) *)
+    (2 <= n)%nat ->
+    (* the page being filled: RAM-resident, 4096-aligned, in [end, PHYSTOP) *)
+    page_valid p ->
+    (* argument setup by the caller before the [jal memset] *)
+    m0 !!! Regidx a1_idx = cval ->
+    m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
+    (* the caller's return target's low bit is clear (2-aligned target OK: Zca return) *)
+    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    smode_config γ dq -∗
+    sr_inv R -∗
+    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
+    stack_own sp0 n -∗
+    page_own p -∗
+    ( ∀ mfin,
+      smode_config γ dq -∗
+      sr_inv R -∗
+      pc_is ret_tgt -∗
+      stack_own sp0 n -∗
+      ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ cbyte) -∗
+      gpr_file mfin -∗
+      ⌜ callee_saved m0 mfin ⌝ -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt cbyte Hn2 Hpv Hcval Ha2 Hret0.
+    iIntros "Hsm Htlbinv
+             #Htext Hpc Hfile Hstk Hpage Hcont".
+    (* --- bridge [page_own p] to memset's per-byte buffer --- *)
+    iEval (rewrite /page_own /byte_any) in "Hpage".
+    iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add p j) ↦ₘ b)%I) with "Hpage")
+      as (olds) "Hpage".
+    iAssert ([∗ list] j ∈ seq 0 4096, (ms_pa (ms_addr p j)) ↦ₘ olds j)%I
+      with "[Hpage]" as "Hbuf".
+    { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H".
+      rewrite ms_pa_ms_addr. iExact "H". }
+    (* --- apply the whole-function memset WP.  The Sv39 geometry is now
+       derived inside the memset proof (at the [wp_sb_s_pt] leaf); only the
+       argument-setup couplings [Hbexec_add / Hcount0 / Hret0 / Hcmp] remain. --- *)
+    iApply (wp_memset_s_full_kt_r R Φ m0 4096
+              (add_vec (mword_of_int 4096 : mword 64) p) olds n
+              γ (dq:=dq)
+              Hn2
+              (* Hvalue_add : the add computes a4 := 4096 + p (a4 := a2 + a0) *)
+              ltac:(match goal with
+                    | |- context [ ?mm !!! Regidx (mword_of_int 12) ] =>
+                        let HA := fresh "HA" in
+                        assert (HA : mm !!! Regidx (mword_of_int 12) = (mword_of_int 4096));
+                        [ rewrite lookup_total_insert; rewrite lookup_total_insert;
+                          rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          rewrite Ha2; apply bv_eq; vm_compute; reflexivity
+                        | rewrite HA ]
+                    end;
+                    match goal with
+                    | |- context [ ?mm !!! Regidx (mword_of_int 10) ] =>
+                        let HB := fresh "HB" in
+                        assert (HB : mm !!! Regidx (mword_of_int 10) = p);
+                        [ rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
+                          reflexivity
+                        | rewrite HB ]
+                    end;
+                    reflexivity)
+              (* Hcount0 : count register a2 = 4096, so [eq_vec a2 0 = Nat.eqb 4096 0 = false] *)
+              ltac:(rewrite Ha2; vm_compute; reflexivity)
+              Hret0
+              (* Hcmp : the end pointer [p + 4096] couples to the buffer *)
+              ltac:(intros j Hj; exact (ms_cmp_page p j Hpv Hj))
+              with "Hsm Htlbinv
+                    Htext Hpc Hfile Hstk Hbuf [Hcont]").
+    (* --- continuation: rebuild [page_own p] and re-expose gpr_file --- *)
+    iIntros (mfin) "Hsm Htlbinv Hpc Hstk Hbuf Hfile %Hcs".
+    iApply ("Hcont" $! mfin with "Hsm Htlbinv Hpc Hstk [Hbuf] Hfile [%]").
+    - (* the all-cbyte buffer, at the [pa_add] spelling *)
+      iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
+      iEval (rewrite ms_pa_ms_addr) in "H".
+      rewrite Hcval. iExact "H".
+    - (* the final register file: callee_saved passes straight through *)
+      exact Hcs.
+  Qed.
+
   Lemma wp_memset_page (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m0 : gmap regidx (mword 64)) (cval : mword 64) (n : nat)
       (γ : gname) {dq : dfrac} :
