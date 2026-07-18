@@ -650,11 +650,14 @@ Where things landed (the stage descriptions below remain the design rationale):
   with TWO sequential absorptions; its conclusion has the same if-isRVC
   shape as the 4-aligned composer (via UserBits' `subrange16_zext32` /
   `subrange16_concat16` bridges), with the sregs shape reported as the
-  non-tlb lookup-transport property.  STILL OPEN: the 2-aligned FAULT
-  composers over the bundle (first-half flavor at pc -- mirror
-  user_pt_fetch_fault with the split head; second-half flavor at pc+2 --
-  conclusion is inherently a disjunction with the RVC-success case since
-  the low halfword is existential).
+  non-tlb lookup-transport property.  The 2-aligned FAULT composers are
+  DONE too (UserFetchPt §6): `user_pt_fetch_fault_2_first` (flavor at pc,
+  σ unchanged, bundle borrowed) and `user_pt_fetch_fault_2_second`
+  (flavor at pc+2; ONE absorbed move; the conclusion is the inherent
+  RVC-success / page-fault disjunction since the low halfword's bits are
+  existential).  THE FETCH STORY IS NOW TOTAL over all pc alignments:
+  odd -> align fault; 2-aligned -> rvc / base / fault composers;
+  4-aligned -> user_pt_fetch_instr / user_pt_fetch_fault.
 - *Stage 7*: `user_inv` and the whole obligation chain (UserExec / UserTrap /
   UserStep / UserStepFull / UserCompute / UserArms) close over `pt : uptd`
   and `user_pt_inv pt`.  UserPt.v DELETED; UserTranslate slimmed to §1;
