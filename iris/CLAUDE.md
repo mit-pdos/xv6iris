@@ -768,7 +768,33 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
        (mword_of_int 1 : mword 12)) = pt_ptr_pte (the subrange-55-12
        ppn of pa), plus zero_extend' 64 (concat_vec that-ppn (zeros'
        12)) = pa.
-   Then the BODY.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
+   BODY STATUS: WpWalk.v (kept OUT of _CoqProject while WIP; compiles
+   standalone, ends in Abort) holds: walk_sp_cancel; the Qed-SEALED
+   shared chunks wp_walk_epilogue (+0x52..ret: the 8 cldsp restores fed
+   from pa_stk-form cells holding the ENTRY values, the ±64 cancel, the
+   Zca ret via bit0_update0_64, stack rebundle, callee_saved -- tp/s7-
+   s11 from six Mf!!!k = mm!!!k premises -- and the payload transport;
+   every exit path funnels here) and wp_walk_tail (+0x46..+0x50: a0 :=
+   u_pte_addr b0 (vpn_idx 0 vpn) via walk_slot_addr0, premises Mf!!!19 =
+   va and Mf!!!9 = page-base b0 + a level0-with-pt_addr0-eq payload,
+   then the epilogue); and wp_walk_r's script complete for PATH 1
+   (m !! vpn = Some w: prologue, both descend iterations, funnel).
+   REMAINING: the None-case destruct with arm 3 (descend/descend, w0=0
+   -- clone path 1's loop script with the blocks0-arm-3 facts, payload
+   via ptree_level0_intro), arm 2 (descend then graft1: kalloc via the
+   kalloc_env destructure feeding wp_kalloc_r -- qnoff := zeros' 32
+   makes every side condition vm-provable -- then wp_memset_page_zero_r,
+   zero_page_to_node, ptree_own_graft1, walk_alloc_pte/page_base for
+   the sd, wp_cj_s_scfg_r back to +0x40; the kalloc-null exit funnels
+   wp_walk_epilogue directly with the LEFT payload from the c.beqz-
+   taken at +0x7c), and arm 1 (graft2 then graft1 on t2 := pt_graft2,
+   using pt_graft2_kid/_ent path facts for iteration 2 and
+   pt_graft2_same_rep0 / trans for the same_rep0 premise).  The +0x72
+   beqz s6 gate falls through via the NEW wp_beqz_x0_fall_s_scfg_r
+   (WpSmodePtBtype; rs2 = zreg, cmp from Ha2: s6 = 1).  PERF: one path
+   ~4 min of leaf iApplys; keep new endings funneling into the sealed
+   chunks; re-register WpWalk.v in _CoqProject only when Qed.
+   Original plan: fuel-free (the loop is 2 iterations, unrolled);
    per iteration: srl/andi/slli/add address arithmetic, ld the slot
    (`ptree_own_slot2_ro`/`slot1_ro` cells through the regime-generic ld
    leaf), V-bit branch; invalid arm: kalloc (existing spec at the
