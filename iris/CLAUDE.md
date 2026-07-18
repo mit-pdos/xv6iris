@@ -616,11 +616,21 @@ files or copy code from them; build fresh from the live tree.
      (fetch via `upt_fetch_instr` → decode via `decode_total_u_set` +
      `agree_u` → the family's execute fact → the matching progress
      composer), then assemble `active_class` and with it
-     `user_step_obligation_active`. Still missing before FULL assembly:
-     Zicbo*/CSR-at-U/SSAMOSWAP execute facts, ~24 C_* expansion facts
-     (3-line pure-returnM each), the JALR bit0-of-`update_vec_dec`
-     premise discharge, the memory arms (LOAD/STORE/AMO/LR/SC — WAIT for
-     the Svadu/ADUE page-table rework), and the fetch-fault flavor
+     `user_step_obligation_active`. The C_* expansion facts are COMPLETE
+     (UserExecFacts.v holds the 22 stragglers incl. the direct retires
+     `exec_execute_C_{NOT,ZEXT_B}_total` — stated with an ∃-bound
+     `creg2reg_idx c = Regidx i` witness — and the pure results
+     C_NOP/C_NTL/ZCMOP/C_ILLEGAL; WpMmodeLeafBase.v has the other ~20).
+     `exec_execute_JALR_total` is premise-free now (`bit0_update0_64` in
+     UserBits.v: update_slice at bit 0 is a nested bv_concat whose low
+     limb is the written literal; parity by `even_lor`/`even_shiftl1`).
+     Still missing before FULL assembly: ZICBOM/ZICBOZ-at-U facts
+     (illegal under the pinned configs — MENVCFG_S has CBZE/CBCFE/CBIE
+     clear, so `feature_enabled_for_priv` short-circuits on the m-bit
+     alone; needs the catch_early_return/MR reduction like jump_to's),
+     ZICBOP (does TRANSLATION — ADUE-coupled, defer), CSR-at-U dispatch,
+     SSAMOSWAP, the memory arms (LOAD/STORE/AMO/LR/SC — WAIT for the
+     Svadu/ADUE page-table rework), and the fetch-fault flavor
      corollaries' payload wiring (also ADUE-coupled).
      LEFT — discharging `active_class`: the total classification. Per
      machine case, produce the run_hart_active reduction and feed the

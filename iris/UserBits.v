@@ -453,3 +453,58 @@ Proof.
   rewrite (Znumtheory.Zmod_div_mod 2 w) by (assumption || lia).
   rewrite Hal. reflexivity.
 Qed.
+
+(* JALR's cleared target: bit 0 of [update_vec_dec t 0 'b"0"] is 0 --
+   [update_slice] at bit 0 is a nested [bv_concat] whose low limb is the
+   written literal, so parity is the low limb's.                          *)
+Lemma even_lor (a b : Z) : a mod 2 = 0 -> b mod 2 = 0 -> Z.lor a b mod 2 = 0.
+Proof.
+  intros Ha Hb.
+  rewrite Zmod_odd in *.
+  destruct (Z.odd (Z.lor a b)) eqn:E; [ | reflexivity ].
+  rewrite <- Z.bit0_odd in E. rewrite Z.lor_spec in E.
+  rewrite !Z.bit0_odd in E.
+  destruct (Z.odd a); destruct (Z.odd b); simpl in E; congruence.
+Qed.
+
+Lemma even_shiftl1 (a : Z) : Z.shiftl a 1 mod 2 = 0.
+Proof.
+  rewrite Z.shiftl_mul_pow2 by lia.
+  change (2 ^ 1) with 2. apply Z_mod_mult.
+Qed.
+
+Lemma bit0_update0_64 (t : mword 64) :
+  eq_vec (access_vec_dec (update_vec_dec t 0 ('b"0")) 0) ('b"0") = true.
+Proof.
+  apply eq_vec_true_iff. apply bv_eq.
+  rewrite access0_unsigned_64.
+  unfold update_vec_dec, update_mword_dec.
+  unfold MachineWord.MachineWord.update_slice.
+  erewrite bv_concat_unsigned by (cbn; lia).
+  match goal with
+  | |- Z.lor (Z.shiftl _ ?w) _ mod 2 = _ =>
+      replace w with 1 by (vm_compute; reflexivity)
+  end.
+  match goal with
+  | |- Z.lor ?a ?b mod 2 = ?rhs =>
+      replace rhs with 0 by (vm_compute; reflexivity)
+  end.
+  apply even_lor; [ apply even_shiftl1 | ].
+  erewrite bv_concat_unsigned by (cbn; lia).
+  apply even_lor.
+  - rewrite Z.shiftl_mul_pow2 by lia.
+    match goal with
+    | |- (?a * ?b) mod 2 = 0 =>
+        replace a with 0 by (vm_compute; reflexivity)
+    end.
+    reflexivity.
+  - cbn.
+    match goal with
+    | |- bv_unsigned ?x mod 2 = 0 =>
+        pose proof (bv_unsigned_in_range _ x) as Hr;
+        unfold bv_modulus in Hr; cbn in Hr;
+        change (2 ^ 0) with 1 in Hr;
+        replace (bv_unsigned x) with 0 by lia;
+        reflexivity
+    end.
+Qed.

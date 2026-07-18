@@ -501,7 +501,7 @@ Qed.
 (* clears bit 0 explicitly, so it needs no such premise -- only the        *)
 (* Zicfilp-off reduction for [update_elp_state].                           *)
 (* ===================================================================== *)
-Require Import WpLeafCommon.
+Require Import WpLeafCommon UserBits.
 
 Lemma exec_execute_JAL_total (imm : mword 21) (ird : mword 5) (s : mstate) :
   exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
@@ -530,13 +530,12 @@ Qed.
 Lemma exec_execute_JALR_total (imm : mword 12) (i1 ird : mword 5) (s : mstate) :
   exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s) ->
   exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-  (forall t : mword 64,
-     eq_vec (access_vec_dec (update_vec_dec t 0 ('b"0")) 0) ('b"0") = true) ->
   exists (v tgt : mword 64),
     exec (execute (JALR (imm, Regidx i1, Regidx ird))) s
       = Some (RETIRE_SUCCESS, gpr_write_state ird v (set_reg s nextPC tgt)).
 Proof.
-  intros Hzic Hzca Hbit0.
+  intros Hzic Hzca.
+  pose proof bit0_update0_64 as Hbit0.
   change (execute (JALR (imm, Regidx i1, Regidx ird)))
     with (execute_JALR imm (Regidx i1) (Regidx ird)).
   unfold execute_JALR, gpr_write_state.
@@ -762,4 +761,167 @@ Proof.
     with (execute_ZICOND_RTYPE (Regidx i2) (Regidx i1) (Regidx ird) op).
   unfold gpr_write_state.
   apply exec_execute_ZICOND_RTYPE_gpr.
+Qed.
+
+(* ===================================================================== *)
+(* The remaining compressed EXPANSION facts (decodable_c stragglers --    *)
+(* WpMmodeLeafBase.v has the other ~20, operand-generic).  Each pure      *)
+(* expansion is [returnM (ExecuteAs base)]; conversion unfolds the        *)
+(* execute_C_* body and its lets, so [exec_returnm] closes them.          *)
+(* C_NOT / C_ZEXT_B are DIRECT retires (monadic read/write, no            *)
+(* redirection); C_NOP / C_NTL / ZCMOP / C_ILLEGAL are pure results.      *)
+(* ===================================================================== *)
+
+Lemma exec_execute_C_ADDW (rsd rs2 : cregidx) (s : mstate) :
+  exec (execute (C_ADDW (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPEW (creg2reg_idx rs2, creg2reg_idx rsd,
+                               creg2reg_idx rsd, ADDW)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_SUBW (rsd rs2 : cregidx) (s : mstate) :
+  exec (execute (C_SUBW (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPEW (creg2reg_idx rs2, creg2reg_idx rsd,
+                               creg2reg_idx rsd, SUBW)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_SUB (rsd rs2 : cregidx) (s : mstate) :
+  exec (execute (C_SUB (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPE (creg2reg_idx rs2, creg2reg_idx rsd,
+                              creg2reg_idx rsd, SUB)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_XOR (rsd rs2 : cregidx) (s : mstate) :
+  exec (execute (C_XOR (rsd, rs2))) s
+    = Some (ExecuteAs (RTYPE (creg2reg_idx rs2, creg2reg_idx rsd,
+                              creg2reg_idx rsd, XOR)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_ANDI (imm : mword 6) (rsd : cregidx) (s : mstate) :
+  exec (execute (C_ANDI (imm, rsd))) s
+    = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, creg2reg_idx rsd,
+                              creg2reg_idx rsd, ANDI)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_SRAI (shamt : mword 6) (rsd : cregidx) (s : mstate) :
+  exec (execute (C_SRAI (shamt, rsd))) s
+    = Some (ExecuteAs (SHIFTIOP (shamt, creg2reg_idx rsd,
+                                 creg2reg_idx rsd, SRAI)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_MUL (rsdc rsc2 : cregidx) (s : mstate) :
+  exists mop,
+    exec (execute (C_MUL (rsdc, rsc2))) s
+      = Some (ExecuteAs (MUL (creg2reg_idx rsc2, creg2reg_idx rsdc,
+                              creg2reg_idx rsdc, mop)), s).
+Proof. eexists. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_JALR (rs1 : regidx) (s : mstate) :
+  exec (execute (C_JALR rs1)) s
+    = Some (ExecuteAs (JALR (zeros' 12, rs1, ra)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_EBREAK_U (s : mstate) :
+  exec (execute (C_EBREAK tt)) s = Some (ExecuteAs (EBREAK tt), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_ILLEGAL (w : mword 16) (s : mstate) :
+  exec (execute (C_ILLEGAL w)) s = Some (Illegal_Instruction tt, s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_NOP (g : mword 6) (s : mstate) :
+  exec (execute (C_NOP g)) s = Some (RETIRE_SUCCESS, s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_NTL (g : ntl_type) (s : mstate) :
+  exec (execute (C_NTL g)) s = Some (RETIRE_SUCCESS, s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_ZCMOP (mop : mword 3) (s : mstate) :
+  exec (execute (ZCMOP mop)) s = Some (RETIRE_SUCCESS, s).
+Proof. apply exec_returnm. Qed.
+
+(* the compressed memory expansions *)
+Lemma exec_execute_C_LBU (uimm : mword 2) (rdc rsc1 : cregidx) (s : mstate) :
+  exec (execute (C_LBU (uimm, rdc, rsc1))) s
+    = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1,
+                             creg2reg_idx rdc, true, 1)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_LH (uimm : mword 2) (rdc rsc1 : cregidx) (s : mstate) :
+  exec (execute (C_LH (uimm, rdc, rsc1))) s
+    = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1,
+                             creg2reg_idx rdc, false, 2)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_LHU (uimm : mword 2) (rdc rsc1 : cregidx) (s : mstate) :
+  exec (execute (C_LHU (uimm, rdc, rsc1))) s
+    = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1,
+                             creg2reg_idx rdc, true, 2)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_LW (uimm : mword 5) (rsc rdc : cregidx) (s : mstate) :
+  exec (execute (C_LW (uimm, rsc, rdc))) s
+    = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
+                             creg2reg_idx rsc, creg2reg_idx rdc, false, 4)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_LWSP (uimm : mword 6) (rd : regidx) (s : mstate) :
+  exec (execute (C_LWSP (uimm, rd))) s
+    = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
+                             sp, rd, false, 4)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_SB (uimm : mword 2) (rsc1 rsc2 : cregidx) (s : mstate) :
+  exec (execute (C_SB (uimm, rsc1, rsc2))) s
+    = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx rsc2,
+                              creg2reg_idx rsc1, 1)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_SH (uimm : mword 2) (rsc1 rsc2 : cregidx) (s : mstate) :
+  exec (execute (C_SH (uimm, rsc1, rsc2))) s
+    = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx rsc2,
+                              creg2reg_idx rsc1, 2)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_SW (uimm : mword 5) (rsc1 rsc2 : cregidx) (s : mstate) :
+  exec (execute (C_SW (uimm, rsc1, rsc2))) s
+    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
+                              creg2reg_idx rsc2, creg2reg_idx rsc1, 4)), s).
+Proof. apply exec_returnm. Qed.
+
+Lemma exec_execute_C_SWSP (uimm : mword 6) (rs2 : regidx) (s : mstate) :
+  exec (execute (C_SWSP (uimm, rs2))) s
+    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
+                              rs2, sp, 4)), s).
+Proof. apply exec_returnm. Qed.
+
+(* C_NOT / C_ZEXT_B: DIRECT retires (read/write the same creg). *)
+Lemma exec_execute_C_NOT_total (c : cregidx) (s : mstate) :
+  exists (i : mword 5) (v : mword 64),
+    creg2reg_idx c = Regidx i /\
+    exec (execute (C_NOT c)) s = Some (RETIRE_SUCCESS, gpr_write_state i v s).
+Proof.
+  change (execute (C_NOT c)) with (execute_C_NOT c).
+  unfold execute_C_NOT. cbv zeta.
+  destruct (creg2reg_idx c) as [i] eqn:E.
+  exists i. eexists. split; [ reflexivity | ].
+  unfold gpr_write_state.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i s) ]. cbn beta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr i _ s) ].
+Qed.
+
+Lemma exec_execute_C_ZEXT_B_total (c : cregidx) (s : mstate) :
+  exists (i : mword 5) (v : mword 64),
+    creg2reg_idx c = Regidx i /\
+    exec (execute (C_ZEXT_B c)) s = Some (RETIRE_SUCCESS, gpr_write_state i v s).
+Proof.
+  change (execute (C_ZEXT_B c)) with (execute_C_ZEXT_B c).
+  unfold execute_C_ZEXT_B. cbv zeta.
+  destruct (creg2reg_idx c) as [i] eqn:E.
+  exists i. eexists. split; [ reflexivity | ].
+  unfold gpr_write_state.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i s) ]. cbn beta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr i _ s) ].
 Qed.
