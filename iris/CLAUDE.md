@@ -493,6 +493,19 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
         tlb_inv_pt->sr_inv R, engine calls already generic; use the
         validated wrapper recipe), plus WpSmodePtMemWrap's _scfg
         wrappers.  Then stage (d), the kalloc-cone flip.
+     b'''. STAGE (c) COMPLETE (2026-07-18f): the non-memory files
+        (Alu 34 / Btype 30 / Ctl 16 / MemWrap 13 lemmas) converted
+        wholesale (pattern: every `Lemma <x>_pt (root_ppn : mword 44)`
+        becomes `<x>_r (R : s_regime)` + a kpt_regime restatement
+        wrapper) — all four compiled first try; the ENTIRE WpSmodePt
+        leaf layer is now regime-generic.  ONLY stage (d) remains
+        before the Bare boot path opens: flip the kalloc cone's
+        whole-function statements (memset_page, mycpu,
+        push_off/pop_off(+Csr/Mem), holding, acquire(+Top), release,
+        kalloc) from `tlb_inv_pt root_ppn` to `sr_inv R` — bodies
+        change only leaf names `_pt`->`_r` applied at R — keeping
+        old-name kpt instances for the unconverted callers (kfree,
+        wakeup, ...).
      b'. STATUS: (a) and (b) are DONE (SRegime.v; SmodeCorePt.v now proves
         the generic `s_regime_fetch` / `wp_instr_s_regime` /
         `wp_instr_s_config_regime`, with the old names as restatement
