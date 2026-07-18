@@ -325,7 +325,22 @@ before any mechanical sweep.
      `exec_execute_csrsi_sstatus_gen` and `sstatus_write_set_val` are
      local there.
    - TODO — the two pure characterizations (`csrci_sie_flip_ok` /
-     `csrsi_sie_flip_ok`, WpSconfCsr.v), currently named premises:  The
+     `csrsi_sie_flip_ok`, WpSconfCsr.v), currently named premises.
+     PROBED: the MONOLITHIC route (unfold legalize/lift/lower + one
+     tb1-chase) does NOT terminate — the fully-unfolded tower (~18
+     `_update_Mstatus_*` × lift_sstatus × lower_mstatus) hits the known
+     super-linear rewrite blowup.  LAYER it, one small tower per lemma,
+     in WpIntrBits' per-field style (`mw_prep; tb1/tb2`, extending
+     tb_rw with `bv_and/or/not_unsigned`, `Z.land_spec`, `Z.lnot_spec`,
+     `bv_zero_extend_unsigned` for the and/or/zext in the write value):
+       L1 fields of `lower_mstatus m` (bit-i of S-view vs m);
+       L2 fields of the write value (bit 1 forced 0/1, others = L1);
+       L3 fields of `lift_sstatus m (Mk_Sstatus (zext v))` (S-view
+          fields from v, M-only fields from m);
+       L4 fields of `mstatus_legalized m L` (each getter vs L's field;
+          XS forced Off, SD from the dirty-orb — vm-computable once
+          XS/FS/VS are Off; MPP via the have_nom_val `if`, destructed);
+     then the two flip_ok lemmas assemble from L2-L4 per field.  Facts:  The
      missing ingredient is the SIE=1 characterization of the csr write:
      for `ms' := legalize_sstatus_val ms (sstatus_write_val ms 2)` (and
      the csrsi dual) prove (a) `SIE ms' = 0` (resp. 1), (b) every
