@@ -435,10 +435,36 @@ before any mechanical sweep.
      hypothesis — the csrci payload's `▷ intr_handler_spec` loses its
      later on the taken arm, so that arm re-introduces it (`iExists h;
      iFrame; iNext`) when discharging the continuation's payload.
-   - TODO — `wp_pop_off_sconf` (csrsi dual; already-enabled refuted
-     in-leaf): convert WpPopOff.v's wp_pop_off_r the same way — the
-     csrsi restore consumes push_off's payload keyed on the loaded
-     intena; the beqz-on-intena arm skips the restore.
+   - DONE — the INTERRUPTS-OFF TOKEN (IntrDefs.v): `sie_cap`'s '0' arm
+     holds an EIGHTH (spelled `(1/4/2)%Qp` — a bare `1/8` literal does
+     not parse in Qp scope); the other eighth is `intr_off_tok γ`,
+     minted ONLY by the genuine csrci flip (`sie_ghost_flip_off`) into
+     the '1' payload and consumed by the csrsi restore
+     (`sie_ghost_flip_on`; NOTE iCombine auto-normalizes Qp sums, so no
+     fraction rewrite is needed on the combine side).  Any fraction of
+     '0' pins the arm by agreement — code holding the token or the
+     payload refutes interrupts-enabled cases WITHOUT a panic axiom.
+     push_off's payload carries the token through to its caller.
+   - TODO — `wp_pop_off_sconf`: leaf-by-leaf like push_off (the old
+     wp_pop_off_r's VCgen blocks contain the sp-moves).  INPUT: the
+     paired push_off report/payload disjunct
+     `(⌜SIE ms=0⌝ ∗ intr_off_tok γ) ∨ (⌜SIE ms=1⌝ ∗ full payload)`
+     (nested callers BORROW the outer region's token for the left case)
+     with intenav = po_intena_val ms; deep-4 custody (2 frame + 2
+     mycpu).  Body: 2-slot prologue trade, mycpu, csrr sstatus + candi
+     2 + c.bnez (the intr-must-be-off check: LEFT case refuted by
+     token/half agreement, RIGHT by the payload's sepc vs the cap-'1'
+     sepc — both arms of the csrr report force the fall-through), clw
+     noff + bge-x0 fall (premise noff ≥ 1) + addiw -1 + csw, c.bnez
+     (noff-1 ≠ 0 → epilogue, payload returned) / c.lw intena + c.beqz
+     (intena = 0 → epilogue) / the RESTORE: csrsi consumes payload +
+     token (`wp_csrsi_sstatus_s_sconf`), cap re-arms '1'.  POST: plain
+     `sie_cap γ root mfin` (arm hidden covers both) ∗ (if the restore
+     ran — noffv=1 ∧ intena≠0, pure — then True else the input
+     disjunct back); noff-1 stored; callee_saved.  New instr fact
+     needed: ppi_24 (the csrsi at PP+0x24 — the old proof never took
+     the restore path, its fact is missing; derive the encoding from
+     kernel_bytes).
    - the rest of the kalloc cone file-by-file (acquire/release/holding/
      kalloc/kfree...), VCgen `_den` sconf wrapper with the first
      converted function.
