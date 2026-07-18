@@ -262,10 +262,14 @@ before any mechanical sweep.
      flips.
    - DONE: the c.ldsp/c.sdsp sp-relative bridges and release's
      `wp_sd_zero_s_sconf` (WpSconfMem.v).
+   - DONE: **WpSconfLock.v** — the acquire/release triple over the
+     funnel: `wp_clw_lockinv_s_sconf` (poll read), `wp_sw_zero_lockinv_
+     s_sconf` (unlock store), `wp_amoswap_lockinv_s_sconf` (the CAS;
+     old-word disjunct out, nonzero mark reseals).  The lock invariant
+     opens around the funnel callback's own step — lockN is disjoint
+     from minstretN AND intrN, so the open is arm-blind.
    - TODO, in rough order: sb (width-1 RAM byte store, no alignment
-     premise); the three lockinv-coupled Lock leaves + the AMO tower
-     (wp_clw_lockinv/wp_sw_zero_lockinv/wp_amoswap_lockinv — same
-     data-leaf transform, plus the lock-invariant opening); Uart
+     premise); wp_clw_lockinv_locked (read while holding); Uart
      accessor-form device leaves; dedicated sp-mover leaves (c.addi sp /
      c.addi16sp re-carve the sie_cap stack bound); then VCgen (item 6:
      wp_vc_block_s_aux re-derived over the funnel — a real recursion
