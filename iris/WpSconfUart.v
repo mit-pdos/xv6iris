@@ -1,0 +1,383 @@
+(* WpSconfUart.v: the UART device leaves over the SIE-agnostic v2 bundle
+   ([sconf] + [sie_cap], stage-5 straggler of the interrupt sweep).
+
+   These are the accessor-form device leaves of WpSmodePtUart rebased on
+   the funnel [wp_instr_s_sconf]: [dev_inv] is opened across the funnel
+   callback's own step (devN is disjoint from minstretN AND intrN, so
+   the open is arm-blind), the caller does its uart ghost step through
+   the accessor wand while the invariant is open, and the translate side
+   runs through the regime machinery instantiated at [kpt_regime]
+   ([sr_inv (kpt_regime root_ppn)] IS [tlb_inv_pt root_ppn]
+   definitionally, so the bundle's invariant threads straight through
+   [sr_transform]/[sr_absorb_dev]).  The store leaf carries no rd
+   premises and no retarget; the load leaf takes [rd <> csp_rs1] and
+   retargets the capability like every gpr-writing sconf leaf.          *)
+Require Import WpSmodeLeafBase.
+From Stdlib Require Import ZArith Bool Lia List.
+From stdpp Require Import gmap bitvector.definitions.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import invariants ghost_map ghost_var gen_heap.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvModelBytes DevModel RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import WpLoad WpLeafCommon WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
+Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
+Require Import SmodeCore WpSmodeGpr.
+Require Import KptTree SmodeCorePt WpSmodePtLeaves SRegime.
+Require Import WpUart WpSmodeUart WpSmodePtUart.
+Require Import IntrDefs WpIntrInv WpSmodeIntr.
+Require Import Riscv.rv64d_types Riscv.rv64d.
+Import Defs.
+
+Section WpSconfUart.
+Context `{!riscvGS Σ, !sieG Σ}.
+Context `{!uartGhostG Σ}.
+Context `{CID : CpuId}.
+
+Lemma wp_sb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+    (off : Z) (Φ : mval -> iProp Σ)
+    (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+    (m : gmap regidx (mword 64)) (R S : iProp Σ) :
+  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+  let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
+  let lppn := kpt_leaf_ppn uart_vpn in
+  (0 <= off < uart_size)%Z ->
+  (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
+     ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
+  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+  autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
+  zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
+  zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
+  sconf γ -∗
+  hart_state ↦ᵣ HART_ACTIVE tt -∗
+  sie_cap γ root_ppn m -∗
+  tlb_inv_pt root_ppn -∗
+  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
+  dev_inv γd -∗
+  R -∗
+  (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
+     uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
+  ( hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sconf γ -∗
+    sie_cap γ root_ppn m -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗ gpr_file m -∗
+    S -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+Proof.
+  intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hident Hpa.
+  iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hdinv HR Hacc Hcont".
+  assert (Ha8pa : a8 = uart_pa off).
+  { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry. apply zero_extend'_id. }
+  assert (Hdevvpn : kpt_dev_vpn (svpn_of a8)).
+  { unfold svpn_of. rewrite Hvpn_def. unfold kpt_dev_vpn.
+    assert (bv_unsigned uart_vpn = 65536) as -> by (vm_compute; reflexivity). lia. }
+  assert (Hident_pt : zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8))
+            (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
+  { unfold svpn_of. rewrite Hvpn_def. rewrite Hident. symmetry. exact Ha8pa. }
+  iApply (wp_instr_s_sconf γ root_ppn m Φ pc is_rvc
+            (STORE (imm, Regidx rs2, Regidx rs1, 1))
+            with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
+  iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
+  iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+  iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
+  pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+  iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+  iPoseProof "Hhw" as "#Hhwc".
+  iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+  destruct (Hpma_all (uart_pa off) 1) as (region_st & Hmatch_st & _ & _ & Hwrite_st & _).
+  iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+  iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+  iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
+  iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
+  iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
+  iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
+  iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+  assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1)) by (apply lookup_lookup_total_dom; apply Hdom).
+  assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2)) by (apply lookup_lookup_total_dom; apply Hdom).
+  iDestruct "Hdev" as "[Hua Hpldev]".
+  iInv "Hdinv" as ">Hdbody" "Hdclose".
+  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg)".
+  iDestruct (uart_agree with "Hua Huf") as %Hduart.
+  destruct (uart_write_total u off storebyte Hoff) as [u' Hwrite_u].
+  iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+  set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
+  iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
+  iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hspc") as %Lva.
+  iDestruct ("Hfb1" with "Hspc") as "Hfmap".
+  iDestruct (big_sepM_lookup_acc _ _ _ _ Hm2 with "Hfmap") as "[Hr2c Hfb2]".
+  iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hr2c") as %Lv2.
+  iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
+  assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor) by (unfold s_pc; tmig; exact Lpriv).
+  assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0) by (unfold s_pc; tmig; exact Lms).
+  assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0) by (unfold s_pc; tmig; exact Lmenv).
+  assert (Lpma_pc : register_lookup pma_regions s_pc.(sregs) = pmar0) by (unfold s_pc; tmig; exact Lpma).
+  assert (Lhtif_pc : register_lookup htif_tohost_base s_pc.(sregs) = None) by (unfold s_pc; tmig; exact Lhtif).
+  assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0) by (unfold s_pc; tmig; exact Lmisa).
+  assert (Lmisa_pc' : register_lookup misa s_pc.(sregs) = MISA_C) by (rewrite Lmisa_pc; exact Hmisa_val0).
+  assert (Lmenv_pc' : register_lookup menvcfg s_pc.(sregs) = MENVCFG_S) by (rewrite Lmenv_pc; exact Hmenvval0).
+  assert (LSXL_pc : _get_Mstatus_SXL (register_lookup mstatus s_pc.(sregs)) = 'b"10") by (rewrite Lms_pc; exact HSXL).
+  assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs))) by (rewrite Lpma_pc; exact Hpma_all).
+  iDestruct (sr_transform (kpt_regime root_ppn) (Store Data)
+               (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                         else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                        (sign_extend' 64 imm))
+               s_pc (or_intror (or_intror (or_introl eq_refl))) Lpriv_pc LSXL_pc
+               (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
+                  ltac:(rewrite Lms_pc; exact HMPRV))
+               (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
+                  ltac:(rewrite Lmenv_pc; exact Hpmm))
+               with "Hreg Htlbinv") as %Htea.
+  iMod (sr_absorb_dev (kpt_regime root_ppn) (Store Data) a8 s_pc
+          (or_intror eq_refl) Hdevvpn Hcanon Hident_pt
+          Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+          (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
+             ltac:(rewrite Lms_pc; exact HMPRV))
+          (exec_is_shadow_stack_store s_pc)
+          Lpma_pc' with "Hreg Hmem Htlbinv")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+  destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
+  pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
+  assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
+    by (rewrite (Hprestr cur_privilege ltac:(vm_compute; reflexivity)); exact Lpriv_pc).
+  assert (Lms_tr : register_lookup mstatus s_tr.(sregs) = mstatus0)
+    by (rewrite (Hprestr mstatus ltac:(vm_compute; reflexivity)); exact Lms_pc).
+  assert (Lpma_tr : register_lookup pma_regions s_tr.(sregs) = pmar0)
+    by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
+  assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
+    by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
+  assert (Hwr_uart : dev_write s_tr.(mdev) (uart_pa off) 1 storebyte = Some (set_duart σ.(mdev) u')).
+  { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+    apply (dev_write_uart σ.(mdev) off storebyte u' Hoff). rewrite <- Hduart. exact Hwrite_u. }
+  assert (Htr_uart : exec (translateAddr (Virtaddr a8) (Store Data)) s_pc
+                     = Some (Ok (Physaddr (uart_pa off), PBMT_PMA, init_ext_ptw), s_tr)).
+  { replace (uart_pa off) with a8 by exact Ha8pa. exact Htr0. }
+  pose (d' := set_duart σ.(mdev) u').
+  pose (s_x := MState s_tr.(sregs) s_tr.(mem) d').
+  assert (Hstore : exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 1))) s_pc = Some (RETIRE_SUCCESS, s_x)).
+  { rewrite (exec_execute_STORE_1_gpr_S_walk_dev_pt rs2 rs1 imm region_st s_pc s_tr d'
+               Htea
+               ltac:(unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity)
+               ltac:(cbn [bits_of_virtaddr]; rewrite !Lva Hpa; change (0 * 1)%Z with 0%Z; rewrite avi0; exact Htr_uart)
+               Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
+               HA1 Hord1
+               ltac:(rewrite !Lva Hpa; apply uart_pmp_match1; [exact Hoff | exact Hcov1])
+               HW1
+               ltac:(rewrite Lpma_tr !Lva Hpa; exact Hmatch_st)
+               Hwrite_st
+               ltac:(rewrite !Lva Hpa; apply within_clint_false; [apply uart_pa_not_in_clint; exact Hoff | lia])
+               ltac:(rewrite !Lva Hpa; apply within_sig_false; [apply uart_pa_not_in_sig; exact Hoff | lia])
+               ltac:(rewrite !Lva Hpa; apply within_htif_writable_false; exact Lhtif_tr)
+               ltac:(rewrite !Lva Hpa; apply dev_addr_uart; exact Hoff)
+               ltac:(rewrite !Lva !Lv2 Hpa; exact Hwr_uart)).
+    subst s_x d'. reflexivity. }
+  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev] Huf") as "[Hdev' Huf']".
+  iMod ("Hacc" $! u u' with "[//] Hg HR") as "[Hg' HS]".
+  iMod ("Hdclose" with "[Huf' Hplf Hg']") as "_".
+  { iNext. iExists u', p. iFrame. }
+  iModIntro. iExists s_x.
+  iSplitR.
+  { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hstore. }
+  iSplitL "Hreg Hmem Hdev'".
+  { unfold s_x; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev'". }
+  iIntros "Hhs' Hpc'".
+  assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
+  { unfold s_x; cbn [sregs].
+    rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
+    unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+  iEval (rewrite Lnpc) in "Hpc'".
+  iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
+                        [$Hpc' $Hnpc] [Hfmap] HS").
+  { iFrame "Hhw Hminv Hpriv Hmiex".
+    iSplitL "Hms Hhalf".
+    { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+    iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+  iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+Qed.
+
+Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+    (off : Z) (Φ : mval -> iProp Σ)
+    (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
+    (m : gmap regidx (mword 64)) (R : iProp Σ) (S : bv 8 -> iProp Σ) :
+  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+  let ldval := fun (b : bv 8) =>
+        (extend_value is_unsigned (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b) : mword 64) in
+  let lppn := kpt_leaf_ppn uart_vpn in
+  (0 <= off < uart_size)%Z ->
+  uint rd <> 0 ->
+  rd <> csp_rs1 ->
+  (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
+     ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
+  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+  autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
+  zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
+  zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
+  sconf γ -∗
+  hart_state ↦ᵣ HART_ACTIVE tt -∗
+  sie_cap γ root_ppn m -∗
+  tlb_inv_pt root_ppn -∗
+  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
+  dev_inv γd -∗
+  R -∗
+  (∀ u b u', ⌜ uart_read u off = Some (b, u') ⌝ -∗
+     uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S b) -∗
+  ( ∀ b : bv 8,
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sconf γ -∗
+    sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (ldval b)]> m) -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    gpr_file (<[Regidx rd := regval_into_reg (ldval b)]> m) -∗
+    S b -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+Proof.
+  intros ea a8 ldval lppn Hoff Hrd Hrdsp Hcanon Hvpn_def Hident Hpa.
+  iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hdinv HR Hacc Hcont".
+  assert (Ha8pa : a8 = uart_pa off).
+  { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry. apply zero_extend'_id. }
+  assert (Hdevvpn : kpt_dev_vpn (svpn_of a8)).
+  { unfold svpn_of. rewrite Hvpn_def. unfold kpt_dev_vpn.
+    assert (bv_unsigned uart_vpn = 65536) as -> by (vm_compute; reflexivity). lia. }
+  assert (Hident_pt : zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8))
+            (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
+  { unfold svpn_of. rewrite Hvpn_def. rewrite Hident. symmetry. exact Ha8pa. }
+  iApply (wp_instr_s_sconf γ root_ppn m Φ pc is_rvc
+            (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))
+            with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
+  iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
+  iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+  iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
+  pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+  iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+  iPoseProof "Hhw" as "#Hhwc".
+  iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+  destruct (Hpma_all (uart_pa off) 1) as (region_ld & Hmatch_ld & _ & Hread_ld & _ & _).
+  iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+  iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+  iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
+  iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
+  iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
+  iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
+  iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+  assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1)) by (apply lookup_lookup_total_dom; apply Hdom).
+  assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd)) by (apply lookup_lookup_total_dom; apply Hdom).
+  iDestruct "Hdev" as "[Hua Hpldev]".
+  iInv "Hdinv" as ">Hdbody" "Hdclose".
+  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg)".
+  iDestruct (uart_agree with "Hua Huf") as %Hduart.
+  destruct (uart_read_total u off Hoff) as (b & u' & Hread_u).
+  iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+  set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
+  iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
+  iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hspc") as %Lva.
+  iDestruct ("Hfb1" with "Hspc") as "Hfmap".
+  assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor) by (unfold s_pc; tmig; exact Lpriv).
+  assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0) by (unfold s_pc; tmig; exact Lms).
+  assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0) by (unfold s_pc; tmig; exact Lmenv).
+  assert (Lpma_pc : register_lookup pma_regions s_pc.(sregs) = pmar0) by (unfold s_pc; tmig; exact Lpma).
+  assert (Lhtif_pc : register_lookup htif_tohost_base s_pc.(sregs) = None) by (unfold s_pc; tmig; exact Lhtif).
+  assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0) by (unfold s_pc; tmig; exact Lmisa).
+  assert (Lmisa_pc' : register_lookup misa s_pc.(sregs) = MISA_C) by (rewrite Lmisa_pc; exact Hmisa_val0).
+  assert (Lmenv_pc' : register_lookup menvcfg s_pc.(sregs) = MENVCFG_S) by (rewrite Lmenv_pc; exact Hmenvval0).
+  assert (LSXL_pc : _get_Mstatus_SXL (register_lookup mstatus s_pc.(sregs)) = 'b"10") by (rewrite Lms_pc; exact HSXL).
+  assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs))) by (rewrite Lpma_pc; exact Hpma_all).
+  iDestruct (sr_transform (kpt_regime root_ppn) (Load Data)
+               (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                         else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                        (sign_extend' 64 imm))
+               s_pc (or_intror (or_introl eq_refl)) Lpriv_pc LSXL_pc
+               (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
+                  ltac:(rewrite Lms_pc; exact HMPRV))
+               (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
+                  ltac:(rewrite Lmenv_pc; exact Hpmm))
+               with "Hreg Htlbinv") as %Htea.
+  iMod (sr_absorb_dev (kpt_regime root_ppn) (Load Data) a8 s_pc
+          (or_introl eq_refl) Hdevvpn Hcanon Hident_pt
+          Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+          (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
+             ltac:(rewrite Lms_pc; exact HMPRV))
+          (exec_is_shadow_stack_load s_pc)
+          Lpma_pc' with "Hreg Hmem Htlbinv")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+  destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
+  pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
+  assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
+    by (rewrite (Hprestr cur_privilege ltac:(vm_compute; reflexivity)); exact Lpriv_pc).
+  assert (Lms_tr : register_lookup mstatus s_tr.(sregs) = mstatus0)
+    by (rewrite (Hprestr mstatus ltac:(vm_compute; reflexivity)); exact Lms_pc).
+  assert (Lpma_tr : register_lookup pma_regions s_tr.(sregs) = pmar0)
+    by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
+  assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
+    by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
+  assert (Hdrd_uart : dev_read s_tr.(mdev) (uart_pa off) 1 = Some (b, set_duart σ.(mdev) u')).
+  { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+    apply (dev_read_uart σ.(mdev) off b u' Hoff). rewrite <- Hduart. exact Hread_u. }
+  assert (Htr_uart : exec (translateAddr (Virtaddr a8) (Load Data)) s_pc
+                     = Some (Ok (Physaddr (uart_pa off), PBMT_PMA, init_ext_ptw), s_tr)).
+  { replace (uart_pa off) with a8 by exact Ha8pa. exact Htr0. }
+  pose (d' := set_duart σ.(mdev) u').
+  pose (s_x := set_reg (MState s_tr.(sregs) s_tr.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (ldval b))).
+  assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))) s_pc = Some (RETIRE_SUCCESS, s_x)).
+  { subst s_x. unfold ldval.
+    apply (exec_execute_LOAD_1_gpr_S_walk_dev rs1 rd imm is_unsigned b d' region_ld s_pc s_tr
+             Hrd Htea
+             ltac:(unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity)
+             ltac:(cbn [bits_of_virtaddr]; rewrite !Lva Hpa; change (0 * 1)%Z with 0%Z; rewrite avi0; exact Htr_uart)
+             Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
+             HA1 Hord1
+             ltac:(rewrite !Lva Hpa; apply uart_pmp_match1; [exact Hoff | exact Hcov1])
+             HR1
+             ltac:(rewrite Lpma_tr !Lva Hpa; exact Hmatch_ld)
+             Hread_ld
+             ltac:(rewrite !Lva Hpa; apply within_clint_false; [apply uart_pa_not_in_clint; exact Hoff | lia])
+             ltac:(rewrite !Lva Hpa; apply within_sig_false; [apply uart_pa_not_in_sig; exact Hoff | lia])
+             ltac:(rewrite !Lva Hpa; apply within_htif_false; exact Lhtif_tr)
+             ltac:(rewrite !Lva Hpa; apply dev_addr_uart; exact Hoff)
+             ltac:(rewrite !Lva Hpa; exact Hdrd_uart)). }
+  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev] Huf") as "[Hdev' Huf']".
+  iMod ("Hacc" $! u b u' with "[//] Hg HR") as "[Hg' HS]".
+  iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+  rewrite (gpr_pt_nz rd _ Hrd).
+  iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ldval b)) with "Hreg Hrdc") as "[Hreg Hrdc]".
+  iDestruct ("Hfins" $! (regval_into_reg (ldval b)) with "[Hrdc]") as "Hfmap".
+  { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+  iMod ("Hdclose" with "[Huf' Hplf Hg']") as "_".
+  { iNext. iExists u', p. iFrame. }
+  iModIntro. iExists s_x.
+  iSplitR.
+  { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hload. }
+  iSplitL "Hreg Hmem Hdev'".
+  { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev'". }
+  iIntros "Hhs' Hpc'".
+  assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
+  { unfold s_x, set_reg; cbn [sregs]. tmig.
+    rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
+    unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+  iEval (rewrite Lnpc) in "Hpc'".
+  assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+  assert (Hsp : m !!! Regidx csp_rs1
+                = <[Regidx rd := regval_into_reg (ldval b)]> m !!! Regidx csp_rs1)
+    by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+  iDestruct (sie_cap_retarget γ root_ppn m
+               (<[Regidx rd := regval_into_reg (ldval b)]> m) Hsp with "Hcap") as "Hcap".
+  iApply ("Hcont" $! b with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
+                        [$Hpc' $Hnpc] [Hfmap] HS").
+  { iFrame "Hhw Hminv Hpriv Hmiex".
+    iSplitL "Hms Hhalf".
+    { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+    iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+  iSplitR.
+  { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+  iExact "Hfmap".
+Qed.
+
+End WpSconfUart.

@@ -141,6 +141,7 @@ WpSconfMem.v
 WpSconfBtype.v
 WpSconfCtl.v
 WpSconfLock.v
+WpSconfUart.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
