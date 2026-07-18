@@ -72,6 +72,7 @@ WpSmodeAddiw.v
 WpSmodeShiftiop.v
 WpSmodeRtype.v
 WpSmodeItype.v
+WpSmodePtLeaves.v
 WpSmodeUtype.v
 WpSmodeJal.v
 WpSmodeJalr.v
@@ -79,6 +80,12 @@ WpSmodeCsr.v
 WpSmodeLoad.v
 WpSmodeStore.v
 WpSmodeBtype.v
+WpSmodePtAlu.v
+WpSmodePtBtype.v
+WpSmodePtCtl.v
+WpSmodePtMem.v
+WpSmodePtMemWrap.v
+WpSmodePtLock.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
@@ -86,10 +93,15 @@ CalleeSaved.v
 WpEntryNew.v
 WpSpinNew.v
 SmodePte.v
+PtAdBits.v
 Pt4kWalk.v
 KptPt.v
+PtTree.v
 UserBits.v
 SmodeCore.v
+PtTreeAdue.v
+KptTree.v
+SmodeCorePt.v
 WpSmodeGpr.v
 WpMemsetS.v
 WpSmodeSret.v
