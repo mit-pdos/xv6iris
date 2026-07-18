@@ -512,6 +512,131 @@ Section PtFront.
     reflexivity.
   Qed.
 
+  (* the same head over a FAILED [translate] outcome: the PTW error maps
+     through [translationException] and surfaces as the page-fault
+     exception, state unchanged (fault walks write nothing). *)
+  Lemma exec_translateAddr_pt_front_err (vpn : mword 27) (root : mword 44)
+        (f : PTW_Error) (e : ExceptionType) (satp0 va : mword 64) (s : mstate) :
+    exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) p) s
+      = Some (p, s) ->
+    exec (is_shadow_stack_access acc) s = Some (false, s) ->
+    register_lookup cur_privilege s.(sregs) = p ->
+    exec (translationMode p) s = Some (Sv39, s) ->
+    register_lookup satp s.(sregs) = satp0 ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    autocast (T := mword) (subrange_vec_dec
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
+    (forall mxr do_sum,
+       exec (translate 39 (mword_of_int 0 : mword 16) root vpn acc p mxr do_sum tt) s
+       = Some (Err (f, tt), s)) ->
+    exec (translationException acc f) s = Some (e, s) ->
+    exec (translateAddr (Virtaddr va) acc) s
+    = Some (Err (e, tt), s).
+  Proof.
+    intros Heff Hss Hcp Htm Hsatp Hppn Hasid Hcanon Hvpn_def Htr Hte.
+    unfold translateAddr.
+    rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite Hcp.
+    rewrite (execR_liftR_seq _ _ _ _ _ Heff).
+    rewrite (execR_liftR_seq _ _ _ _ _ Htm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hss).
+    unfold Defs.bind0.
+    replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
+    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
+      by (cbn; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
+    assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
+    { unfold get_satp.
+      assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
+                            "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
+      { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+        unfold assert_exp'. cbn match. apply exec_returnm. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hae).
+      change (Z.eqb 39 32) with false. cbn match.
+      unfold autocast_m.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+      rewrite Hsatp. apply exec_returnm. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgs).
+    assert (Hae2 : exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
+                          "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s)).
+    { replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+      unfold assert_exp'. cbn match. apply exec_returnm. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    rewrite Hcanon. cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
+      replace vpnx with vpn by (symmetry; exact Hvpn_def);
+      replace bppn with root by (symmetry; exact Hppn);
+      replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid) end.
+    rewrite (execR_liftR_seq _ _ _ _ _ (Htr _ _)).
+    cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hte).
+    rewrite execR_returnR. cbn match.
+    reflexivity.
+  Qed.
+
+  (* NON-CANONICAL va: the fault fires at the canonicality test, before
+     the TLB or any memory read -- no satp geometry needed beyond the
+     mode dispatch. *)
+  Lemma exec_translateAddr_pt_front_noncanon (f := PTW_Invalid_Addr tt)
+        (e : ExceptionType) (satp0 va : mword 64) (s : mstate) :
+    exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) p) s
+      = Some (p, s) ->
+    exec (is_shadow_stack_access acc) s = Some (false, s) ->
+    register_lookup cur_privilege s.(sregs) = p ->
+    exec (translationMode p) s = Some (Sv39, s) ->
+    register_lookup satp s.(sregs) = satp0 ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = true ->
+    exec (translationException acc (PTW_Invalid_Addr tt)) s = Some (e, s) ->
+    exec (translateAddr (Virtaddr va) acc) s
+    = Some (Err (e, tt), s).
+  Proof.
+    intros Heff Hss Hcp Htm Hsatp Hcanon Hte.
+    unfold translateAddr.
+    rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite Hcp.
+    rewrite (execR_liftR_seq _ _ _ _ _ Heff).
+    rewrite (execR_liftR_seq _ _ _ _ _ Htm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hss).
+    unfold Defs.bind0.
+    replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
+    rewrite execR_bind. rewrite execR_returnR. cbn match.
+    assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
+      by (cbn; apply exec_returnm).
+    rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
+    assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
+    { unfold get_satp.
+      assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
+                            "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
+      { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+        unfold assert_exp'. cbn match. apply exec_returnm. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hae).
+      change (Z.eqb 39 32) with false. cbn match.
+      unfold autocast_m.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
+      rewrite Hsatp. apply exec_returnm. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hgs).
+    assert (Hae2 : exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
+                          "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s)).
+    { replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
+      unfold assert_exp'. cbn match. apply exec_returnm. }
+    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
+    rewrite Hcanon. cbn match.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hte).
+    rewrite execR_returnR. cbn match.
+    reflexivity.
+  Qed.
+
 End PtFront.
 
 (* ===================================================================== *)
