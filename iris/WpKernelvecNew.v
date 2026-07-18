@@ -32,7 +32,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpLeafCommon.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeGpr WpSmodeSret KernelText WpKvInstr.
+Require Import SmodeCore WpSmodeGpr WpSmodeSret WpSmodeJal KernelText WpKvInstr.
 Require Import VcGen VcGenS.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -68,8 +68,6 @@ Proof.
   rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r Z.add_assoc. reflexivity.
 Qed.
 
-Lemma kv_addv_zero (a : mword 64) : add_vec a (mword_of_int 0) = a.
-Proof. exact (avi0 a). Qed.
 
 (* the -256/+256 immediate cancellation of the two c.addi16sp. *)
 Lemma kv_cancel :
@@ -143,24 +141,6 @@ Proof.
   cbn match.
   rewrite (exec_bind0_Some _ _ _ _ _ Hwx).
   apply exec_returnm.
-Qed.
-
-Lemma kv_exec_execute_JAL_gpr_zca (imm : mword 21) (rd : mword 5) s :
-  uint rd <> 0 ->
-  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-  exec (execute_JAL imm (Regidx rd)) s
-  = Some (RETIRE_SUCCESS,
-          set_reg (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
-                  (R_bitvector_64 (gpr_of_Z (uint rd)))
-                  (regval_into_reg (register_lookup nextPC s.(sregs)))).
-Proof.
-  intros Hrd Halign Hzca.
-  apply (kv_exec_execute_JAL_zca imm (Regidx rd) s _ Halign Hzca).
-  rewrite (exec_wX_bits_gpr rd (register_lookup nextPC s.(sregs))
-             (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))).
-  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-  reflexivity.
 Qed.
 
 
@@ -526,94 +506,6 @@ Section WpKernelvecNew.
     iApply (smode_config_rebuild γ dq ms0 mv dv menv0
               H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11
               with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv").
-  Qed.
-
-  (* wp_jal_gpr_s with a merely 2-ALIGNED target (Zca enabled discharges the
-     bit-1 misalignment check): mirror of WpSmodeGpr's [wp_jal_gpr_s], on
-     [kv_exec_execute_JAL_gpr_zca]; misa.C = 1 comes from the [hw_config]
-     bundled inside [smode_config]. *)
-  Lemma wp_jal_gpr_s2 (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 21)
-      (m : gmap regidx (mword 64))
-      (q : Qp) :
-    uint rd <> 0 ->
-    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    smode_config γ (DfracOwn q) -∗
-    tlb_inv root_ppn -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc false (JAL (imm, Regidx rd)) -∗
-    ( smode_config γ (DfracOwn q) -∗
-      tlb_inv root_ppn -∗
-      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Halign0)
-      "Hsm Htlbinv [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iDestruct (smode_config_hw with "Hsm") as "[#Hhw Hsm]".
-    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iApply (wp_instr_s_tlbinv root_ppn γ Φ pc false (JAL (imm, Regidx rd))
-
-              with "Hsm Htlbinv Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (Hpcv : register_lookup PC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { unfold set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    assert (Hlink : register_lookup nextPC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    assert (Lmisa_pc : register_lookup misa
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = misa0)
-      by (tmig; exact Lmisa).
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
-            with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec_int pc 4))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (add_vec_int pc 4))
-                 with "[Hrdc]") as "Hfmap".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                        nextPC (add_vec pc (sign_extend' 64 imm)))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec_int pc 4))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
-      rewrite (kv_exec_execute_JAL_gpr_zca imm rd (set_reg σ nextPC (add_vec_int pc 4))
-                 Hrd).
-      - rewrite Hpcv. rewrite Hlink. reflexivity.
-      - rewrite Hpcv. exact Halign0.
-      - apply exec_currentlyEnabled_Zca. rewrite Lmisa_pc. exact HmisaC. }
-    iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hsm' Htlbinv' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                         nextPC (add_vec pc (sign_extend' 64 imm)))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec_int pc 4))).(sregs)
-             = add_vec pc (sign_extend' 64 imm)).
-    { unfold set_reg; cbn [sregs].
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hsm' Htlbinv' [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
   Qed.
 
 
@@ -1216,7 +1108,7 @@ Section WpKernelvecNew.
     assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
                       (sign_extend' 64 (mword_of_int 0x1fd244 : mword 21))) 0) ('b"0") = true)
       by (vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s2 root_ppn γ Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd244)
+    iApply (wp_jal_gpr_s_zca root_ppn γ Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd244)
               (kv_m1 m) (1/2)%Qp
  Hrd19 Hal19
               with "Hsm Htlbinv Hpc Hfile Hi19").
