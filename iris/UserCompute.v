@@ -22,10 +22,9 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv InstrBytes WpGpr.
-Require Import SmodeCore WpIntrCore.
-Require Import UserPt UserExec UserStep.
+Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import MinstretInv WpGpr.
+Require Import UserPt UserExec.
 Local Open Scope Z_scope.
 Import Defs.
 

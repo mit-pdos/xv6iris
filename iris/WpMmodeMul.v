@@ -6,7 +6,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr.
-Require Import MinstretInv InstrBytes.
+Require Import InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 

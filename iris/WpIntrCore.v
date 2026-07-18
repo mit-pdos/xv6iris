@@ -39,19 +39,16 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
-Require Import WpDecode WpLeafCommon KernelText.
-Require Import WpGpr WpGprMret.
-Require Import WpMmodeLeafBase.
+Require Import MinstretInv.
+Require Import WpDecode WpLeafCommon.
+Require Import WpGprMret.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
-Require Import WpRvcBridge.
 
 (* ===================================================================== *)
 (* §2 dispatchInterrupt determinism in Supervisor mode.                   *)

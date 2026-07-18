@@ -42,7 +42,6 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras WpDecode WpGpr.
 Require Import WpMmodeShiftiop.
@@ -54,7 +53,7 @@ Require Import WpMmodeJalr.
 Require Import WpMmodeLoad.
 Require Import WpMmodeStore.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB.
-Require Import MinstretInv InstrBytes.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpRvcBridge.
 Require Import StackOwn.

@@ -26,7 +26,6 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
@@ -335,32 +334,10 @@ Section WpMycpu.
       {dq : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
     let tp_idx : mword 5 := mword_of_int 4 in
-    let s0_idx : mword 5 := mword_of_int 8 in
     let a0_idx : mword 5 := mword_of_int 10 in
-    let a5_idx : mword 5 := mword_of_int 15 in
     let pcE := mword_of_int KernelSyms.mycpu in
-    let imm_entry : mword 6 := mword_of_int 48 in
-    let imm_dealloc : mword 6 := mword_of_int 16 in
-    let nzimm_s0 : mword 8 := mword_of_int 4 in
-    let imm_auipc : mword 20 := mword_of_int 0x11 in
-    let imm_addi : mword 12 := mword_of_int 0xa86 in
-    let shamt_slli : mword 6 := mword_of_int 7 in
-    let imm_addiw : mword 6 := mword_of_int 0 in
     let sp0 := m0 !!! Regidx csp_rs1 in
-    let sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry)) in
     let ra0 := m0 !!! Regidx ra_idx in
-    let s00 := m0 !!! Regidx s0_idx in
-    let m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0 in
-    let m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1 in
-    let m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2 in
-    let m4 := <[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3 in
-    let m5 := <[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4 in
-    let m6 := <[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5 in
-    let m7 := <[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6 in
-    let m8 := <[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7 in
-    let m9 := <[Regidx ra_idx := regval_into_reg ra0]> m8 in
-    let m10 := <[Regidx s0_idx := regval_into_reg s00]> m9 in
-    let m11 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10 in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     (2 ≤ n)%nat ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -381,18 +358,50 @@ Section WpMycpu.
     tlb_inv root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
     stack_own sp0 n -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    (* ∀-continuation form: the returned register file is abstract [m'],
+       constrained only by [callee_saved] + the [a0] return value.  (The
+       concrete m1..m11 write-chain is a private detail of the proof below,
+       not part of this interface.) *)
+    ( ∀ m' : gmap regidx (mword 64),
+      hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       tlb_inv root_ppn -∗
-      pc_is ret_tgt -∗ gpr_file m11 -∗
-      ⌜ callee_saved m0 m11 /\
-        m11 !!! Regidx a0_idx = mycpu_ret (m0 !!! Regidx tp_idx) ⌝ -∗
+      pc_is ret_tgt -∗ gpr_file m' -∗
+      ⌜ callee_saved m0 m' /\
+        m' !!! Regidx a0_idx = mycpu_ret (m0 !!! Regidx tp_idx) ⌝ -∗
       stack_own sp0 n -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ra_idx tp_idx s0_idx a0_idx a5_idx pcE imm_entry imm_dealloc nzimm_s0 imm_auipc imm_addi shamt_slli imm_addiw sp0 sp' ra0 s00 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 ret_tgt Hn2 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
+    intros ra_idx tp_idx a0_idx pcE sp0 ra0 ret_tgt Hn2 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hlpe Hal0.
+    (* The per-instruction register-map chain and the immediates/indices that
+       used to be spelled as [let]s in the statement are kept here as LOCAL
+       definitions: the statement stays free of the m1..m11 tower, while the
+       body's [change ... with mK] / [unfold mK] steps still see them, and the
+       final [iApply ("Hcont" $! m11 …)] instantiates the abstract [m']. *)
+    set (s0_idx := (mword_of_int 8 : mword 5)).
+    set (a5_idx := (mword_of_int 15 : mword 5)).
+    set (imm_entry := (mword_of_int 48 : mword 6)).
+    set (imm_dealloc := (mword_of_int 16 : mword 6)).
+    set (nzimm_s0 := (mword_of_int 4 : mword 8)).
+    set (imm_auipc := (mword_of_int 0x11 : mword 20)).
+    set (imm_addi := (mword_of_int 0xa86 : mword 12)).
+    set (shamt_slli := (mword_of_int 7 : mword 6)).
+    set (imm_addiw := (mword_of_int 0 : mword 6)).
+    set (sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry))).
+    set (s00 := m0 !!! Regidx s0_idx).
+    set (m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0).
+    set (m2 := <[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1).
+    set (m3 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx tp_idx))]> m2).
+    set (m4 := <[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (m3 !!! Regidx a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3).
+    set (m5 := <[Regidx a5_idx := regval_into_reg (shift_bits_left (m4 !!! Regidx a5_idx) (subrange_vec_dec shamt_slli (Z.sub log2_xlen 1) 0))]> m4).
+    set (m6 := <[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int pcE 14) (auipc_off imm_auipc))]> m5).
+    set (m7 := <[Regidx a0_idx := regval_into_reg (add_vec (m6 !!! Regidx a0_idx) (sign_extend' 64 imm_addi))]> m6).
+    set (m8 := <[Regidx a0_idx := regval_into_reg (add_vec (m7 !!! Regidx a0_idx) (m7 !!! Regidx a5_idx))]> m7).
+    set (m9 := <[Regidx ra_idx := regval_into_reg ra0]> m8).
+    set (m10 := <[Regidx s0_idx := regval_into_reg s00]> m9).
+    set (m11 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10).
     set (ea_ra := add_vec sp' (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
     set (a8_ra := ea_ra).
     set (pa_ra := a8_ra).
@@ -670,7 +679,7 @@ Section WpMycpu.
     iEval (rewrite Hps0') in "Hbs0".
     iDestruct (stack_own_2_intro with "Hbra Hbs0") as "Htop".
     iDestruct (stack_own_split_2 sp0 2 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
+    iApply ("Hcont" $! m11 with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile [%] Hstk").
     (* mycpu's output register file [m11] is callee-saved w.r.t. [m0] and returns
        a0 = &cpus[cpuid] = mycpu_ret (m0's tp).  Proven once here, over the
        concrete let-chain, so callers never name the register file. *)

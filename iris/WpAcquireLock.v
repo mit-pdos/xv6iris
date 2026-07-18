@@ -25,7 +25,15 @@ Require Import MinstretInv InstrBytes.
 Require Import KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeGpr WpMemsetS WpKernelvecNew.
+Require Import SmodeCore WpSmodeGpr WpKernelvecNew.
+Require Import WpSmodeAddiw.
+Require Import WpSmodeBtype.
+Require Import WpSmodeItype.
+Require Import WpSmodeJal.
+Require Import WpSmodeJalr.
+Require Import WpSmodeLoad.
+Require Import WpSmodeRtype.
+Require Import WpSmodeStore.
 Require Import WpSmodeAddiw.
 Require Import WpSmodeBtype.
 Require Import WpSmodeItype.

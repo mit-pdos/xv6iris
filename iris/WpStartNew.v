@@ -70,7 +70,6 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import StackOwn.
 Require Import WpGprCsrwCommon.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode WpLeafCommon WpGpr.
 Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
@@ -85,7 +84,7 @@ Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB WpGprCsrwC.
 Require Import WpGprMretWp.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeMret.
-Require Import MinstretInv InstrBytes KernelText WpTimerinit.
+Require Import InstrBytes KernelText WpTimerinit.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
