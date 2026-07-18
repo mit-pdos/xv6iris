@@ -34,14 +34,7 @@ Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr WpMemsetS.
 Require Import WpMycpu WpAcquireTop KernelRvcDecode.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeJal.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
-Require Import WpSmodeStore.
-Require Import WpLock WpLockLeaves WpHoldingInv WpPopOff.
+Require Import WpLock WpHoldingInv WpPopOff.
 Require Import StackOwn.
 Require Import CalleeSaved.
 (* subrange_full / mSIE_lower / sie_bit for the sstatus-SIE bridge; kept
@@ -50,8 +43,6 @@ Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Export WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeLoad WpSmodeStore WpSmodeBtype.
-Require Export WpSmodeFence.
 Local Open Scope Z_scope.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.

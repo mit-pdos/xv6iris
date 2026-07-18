@@ -12,7 +12,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
 Require Import SmodeCore WpSmodeGpr WpSpinNew WpMmodeLeafBase.
-Require Import WpSmodeFence WpSmodeJal WpSmodeJalr WpSmodeCsr WpSmodeSret.
+Require Import WpSmodeSret.
 Require Import KptTree SmodeCorePt.
 Import Defs.
 
@@ -486,6 +486,51 @@ Proof.
   apply exec_returnM.
 Qed.
 
+
+(* pure FENCE helpers (relocated from the deleted WpSmodeFence.v) *)
+Lemma exec_sail_barrier (b : Arch.barrier) s :
+  exec (sail_barrier b) s = Some (tt, s).
+Proof. reflexivity. Qed.
+
+Lemma exec_is_fiom_active_S (menvcfg0 : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  register_lookup menvcfg s.(sregs) = menvcfg0 ->
+  exec (is_fiom_active tt) s
+    = Some (eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1"), s).
+Proof.
+  intros Hcp Hmenv. unfold is_fiom_active.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)).
+  rewrite Hmenv. apply exec_returnM.
+Qed.
+
+
+Lemma exec_execute_FENCE_rw_w (menvcfg0 : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  register_lookup menvcfg s.(sregs) = menvcfg0 ->
+  eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+  exec (execute (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                        Regidx (mword_of_int 0), Regidx (mword_of_int 0)))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intros Hcp Hmenv Hfiom.
+  change (execute (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                          Regidx (mword_of_int 0), Regidx (mword_of_int 0))))
+    with (execute_FENCE (mword_of_int 0) (mword_of_int 3) (mword_of_int 1)
+            (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0))).
+  unfold execute_FENCE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_is_fiom_active_S menvcfg0 s Hcp Hmenv)).
+  rewrite Hfiom.
+  unfold effective_fence_set.
+  cbn match beta zeta.
+  match goal with |- context[if ?g then _ else _] =>
+    replace g with true by (vm_compute; reflexivity)
+  end.
+  cbn match.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier _ s)).
+  apply exec_returnM.
+Qed.
 
 Section WpSmodePtCtl.
   Context `{!riscvGS Σ, !sieG Σ}.

@@ -16,7 +16,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep Riscv
 Require Import WpLoad WpLeafCommon.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
-Require Import SmodeCore WpSmodeGpr WpSmodeLoad WpSmodeStore WpPushOffMem WpAmo WpLock.
+Require Import SmodeCore WpSmodeGpr WpPushOffMem WpAmo WpLock.
 Require Import KptTree SmodeCorePt WpSmodePtLeaves WpSmodePtMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

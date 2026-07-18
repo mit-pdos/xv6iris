@@ -15,7 +15,6 @@ Require Import WpEntry.
 Require Import WpGpr.
 Require Import SmodeCore.
 Require Import WpGprCsrwCommon WpGprCsrwA.
-Require Export WpSmodeJal WpSmodeJalr WpSmodeCsr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -17,7 +17,6 @@ Require Import WpLoad.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpSmodeGpr.
-Require Export WpSmodeLoad WpSmodeStore WpSmodeBtype.
 Local Open Scope Z_scope.
 Import Defs.
 

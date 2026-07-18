@@ -27,8 +27,7 @@ Require Import WpMmodeLeafBase.
 Require Import KptPt SmodeCore.
 Require Import WpMmodeLeafBase WpSmodeLeafBase.
 Require Import WpAuipc.
-Require Import WpSmodeItype WpSmodeBtype WpSmodeUtype WpSmodeLoad.
-Require Import WpUart WpSmodeUart WpUartKpt.
+Require Import WpUart WpSmodeUart.
 Require Import CalleeSaved.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

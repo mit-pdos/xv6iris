@@ -26,7 +26,7 @@ Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
-Require Import WpSmodeRtype WpSmodeJalr WpSmodeGpr.
+Require Import WpSmodeGpr.
 Require Import WpMemsetInstr KernelRvcDecode.
 Require Import VcGen VcGenS.
 Require Import CalleeSaved.

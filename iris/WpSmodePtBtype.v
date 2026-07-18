@@ -12,7 +12,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
 Require Import SmodeCore WpSmodeGpr.
-Require Import WpSmodeBtype.
 Require Import KptTree SmodeCorePt.
 Import Defs.
 

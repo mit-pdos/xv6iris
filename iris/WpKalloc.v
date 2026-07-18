@@ -25,39 +25,16 @@ Require Import KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeJal.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
-Require Import WpSmodeStore.
-Require Import WpSmodeUtype.
 Require Import WpMycpu.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeJal.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
-Require Import WpSmodeStore.
 Require Import WpLock.
 Require Import WpAcquireLock WpRelease WpMemsetPage.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
-Require Import WpSmodeStore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.
-Require Import WpSmodeBtype.
-Require Import WpSmodeLoad.
-Require Import WpSmodeStore.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
 Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
-Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeUtype WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Export WpSmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

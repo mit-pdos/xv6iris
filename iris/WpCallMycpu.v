@@ -15,7 +15,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KernelText WpGprCsrwCommon WpSmodeJal StackOwn CalleeSaved WpMycpu.
+Require Import KernelText WpGprCsrwCommon StackOwn CalleeSaved WpMycpu.
 Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
 Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.

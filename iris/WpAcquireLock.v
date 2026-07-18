@@ -26,30 +26,11 @@ Require Import KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr.
-Require Import WpSmodeAddiw.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeJal.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
-Require Import WpSmodeStore.
-Require Import WpSmodeAddiw.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
-Require Import WpSmodeStore.
 Require Import WpMycpu WpCallMycpu WpPushOffTop WpAmo WpAcquireTop.
-Require Import WpSmodeBtype.
-Require Import WpSmodeLoad.
-Require Import WpSmodeStore.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved.
 Require Import StackOwn.
-Require Import WpLock WpLockLeaves WpHoldingInv WpSmodeJalr.
-Require Export WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Import WpLock WpHoldingInv.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for hiding mstatus0. *)
 Require WpGprCsrwC.
 From Kernel Require KernelInstrs.

@@ -29,19 +29,11 @@ Require Import KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeGpr.
-Require Import WpSmodeBtype.
-Require Import WpSmodeItype.
-Require Import WpSmodeJalr.
-Require Import WpSmodeLoad.
-Require Import WpSmodeRtype.
 Require Import WpMycpu WpCallMycpu.
-Require Import WpSmodeBtype.
-Require Import WpSmodeLoad.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved StackOwn.
-Require Import WpHolding WpLock WpLockLeaves.
-Require Import WpSmodeJalr.
-Require Export WpSmodeLeafBase WpSmodeAddiw WpSmodeShiftiop WpSmodeRtype WpSmodeItype WpSmodeLoad WpSmodeStore WpSmodeBtype.
+Require Import WpHolding WpLock.
+Require Export WpSmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
