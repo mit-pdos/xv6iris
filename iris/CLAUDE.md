@@ -530,10 +530,15 @@ files or copy code from them; build fresh from the live tree.
      to the immediate) and `jump_to` ASSERTS it (false assert = STUCK, not
      a trap) — `decode_total_{u,c}_set` must be strengthened to a
      decode-wf set that records payload invariants (JAL/BTYPE imm bit0=0)
-     before those arms can be classified. Still to add: the
-     currentlyEnabled-gated families (ZBB*/ZICOND/CLMUL*/REV8/RORI(W)/
-     ZIMOP — need misa/mstateen pins), Zicbo* (senvcfg=0-gated), CSR-at-U
-     dispatch, SSAMOSWAP, and the C_* ExecuteAs expansion facts.
+     before those arms can be classified. The Zbb/Zbc/Zicond/Zimop
+     families are covered too (`exec_execute_{ZBB_RTYPE,ZBB_RTYPEW,CLMUL,
+     CLMULH,CLMULR,REV8,RORI,RORIW,ZIMOP_MOP_R,ZIMOP_MOP_RR,
+     ZICOND_RTYPE}_total`) — their extension gates live at DECODE time,
+     so the execute bodies are gate-free (ZICOND's runtime condition is
+     absorbed by deriving from ZicondGpr's already-total
+     `exec_execute_ZICOND_RTYPE_gpr`). Still to add: Zicbo*
+     (senvcfg=0-gated), CSR-at-U dispatch, SSAMOSWAP, and the C_*
+     ExecuteAs expansion facts.
      Iris trap-arm recipe (used by all three tower arms): ghost-update
      EVERY physical write in tower order (repeated writes to the same CSR
      each get their own reg_update — the interp goal is the literal

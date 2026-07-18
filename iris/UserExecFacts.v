@@ -595,3 +595,171 @@ Proof.
       | (* fall-through *)
         eexists; split; [ apply exec_returnm | left; reflexivity ] ])).
 Qed.
+
+(* ===================================================================== *)
+(* The Zbb / Zbs-adjacent / Zicond / Zbc / Zimop retiring families.  Their *)
+(* extension gates live at DECODE time (the decoder only produces these    *)
+(* constructors when the extension is enabled), so the execute bodies are  *)
+(* gate-free plain read/compute/write shapes.                              *)
+(* ===================================================================== *)
+
+Lemma exec_execute_ZBB_RTYPE_total (i2 i1 ird : mword 5) (op : brop_zbb) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (ZBB_RTYPE (Regidx i2, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (ZBB_RTYPE (Regidx i2, Regidx i1, Regidx ird, op)))
+    with (execute_ZBB_RTYPE (Regidx i2) (Regidx i1) (Regidx ird) op).
+  unfold execute_ZBB_RTYPE, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_ZBB_RTYPEW_total (i2 i1 ird : mword 5) (op : bropw_zbb) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (ZBB_RTYPEW (Regidx i2, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (ZBB_RTYPEW (Regidx i2, Regidx i1, Regidx ird, op)))
+    with (execute_ZBB_RTYPEW (Regidx i2) (Regidx i1) (Regidx ird) op).
+  unfold execute_ZBB_RTYPEW, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_CLMUL_total (i2 i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (CLMUL (Regidx i2, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (CLMUL (Regidx i2, Regidx i1, Regidx ird)))
+    with (execute_CLMUL (Regidx i2) (Regidx i1) (Regidx ird)).
+  unfold execute_CLMUL, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_CLMULH_total (i2 i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (CLMULH (Regidx i2, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (CLMULH (Regidx i2, Regidx i1, Regidx ird)))
+    with (execute_CLMULH (Regidx i2) (Regidx i1) (Regidx ird)).
+  unfold execute_CLMULH, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_CLMULR_total (i2 i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (CLMULR (Regidx i2, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (CLMULR (Regidx i2, Regidx i1, Regidx ird)))
+    with (execute_CLMULR (Regidx i2) (Regidx i1) (Regidx ird)).
+  unfold execute_CLMULR, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i2 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_REV8_total (i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (REV8 (Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (REV8 (Regidx i1, Regidx ird)))
+    with (execute_REV8 (Regidx i1) (Regidx ird)).
+  unfold execute_REV8, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_RORI_total (shamt : mword 6) (i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (RORI (shamt, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (RORI (shamt, Regidx i1, Regidx ird)))
+    with (execute_RORI shamt (Regidx i1) (Regidx ird)).
+  unfold execute_RORI, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_RORIW_total (shamt : mword 5) (i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (RORIW (shamt, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (RORIW (shamt, Regidx i1, Regidx ird)))
+    with (execute_RORIW shamt (Regidx i1) (Regidx ird)).
+  unfold execute_RORIW, gpr_write_state.
+  eexists.
+  erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i1 s) ]. cbn beta. cbv zeta.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_ZIMOP_MOP_R_total (mop : mword 5) (i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (ZIMOP_MOP_R (mop, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (ZIMOP_MOP_R (mop, Regidx i1, Regidx ird)))
+    with (execute_ZIMOP_MOP_R mop (Regidx i1) (Regidx ird)).
+  unfold execute_ZIMOP_MOP_R, gpr_write_state.
+  eexists.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+Lemma exec_execute_ZIMOP_MOP_RR_total (mop : mword 3) (i2 i1 ird : mword 5) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (ZIMOP_MOP_RR (mop, Regidx i2, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  change (execute (ZIMOP_MOP_RR (mop, Regidx i2, Regidx i1, Regidx ird)))
+    with (execute_ZIMOP_MOP_RR mop (Regidx i2) (Regidx i1) (Regidx ird)).
+  unfold execute_ZIMOP_MOP_RR, gpr_write_state.
+  eexists.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ s) ].
+Qed.
+
+(* ZICOND: the write value depends on an abstract runtime condition;
+   [exec_execute_ZICOND_RTYPE_gpr] (ZicondGpr.v) is already total and
+   premise-free, so the totality form is a corollary. *)
+Require Import ZicondGpr.
+
+Lemma exec_execute_ZICOND_RTYPE_total (i2 i1 ird : mword 5)
+    (op : zicondop) (s : mstate) :
+  exists v : mword 64,
+    exec (execute (ZICOND_RTYPE (Regidx i2, Regidx i1, Regidx ird, op))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v s).
+Proof.
+  eexists.
+  change (execute (ZICOND_RTYPE (Regidx i2, Regidx i1, Regidx ird, op)))
+    with (execute_ZICOND_RTYPE (Regidx i2) (Regidx i1) (Regidx ird) op).
+  unfold gpr_write_state.
+  apply exec_execute_ZICOND_RTYPE_gpr.
+Qed.
