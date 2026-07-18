@@ -80,6 +80,7 @@ UserPtTree.v
 UserFetchPt.v
 MemAmo4.v
 UserMemPt.v
+UserMemAccess.v
 PtFetchGen.v
 TrampStepPt.v
 TransPt.v
