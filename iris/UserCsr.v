@@ -18,7 +18,7 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import RiscvExtras WpGpr WpLeafCommon WpGprCsrrCommon UserBits.
+Require Import RiscvExtras WpGpr WpLeafCommon WpGprCsrrCommon UserBits UserExecFacts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -1067,4 +1067,239 @@ Proof.
   pose proof (Z_div_mod_eq_full c 32) as Hdm.
   pose proof (Z.mod_pos_bound c 32 H32) as Hmb.
   lia.
+Qed.
+
+(* the 29 concrete hpm shadow addresses, as unsigned values *)
+Lemma u_hpm_cases (csr : mword 12) :
+  u_hpm_range csr ('b"1100000") ->
+  bv_unsigned csr = 3075 \/
+  bv_unsigned csr = 3076 \/
+  bv_unsigned csr = 3077 \/
+  bv_unsigned csr = 3078 \/
+  bv_unsigned csr = 3079 \/
+  bv_unsigned csr = 3080 \/
+  bv_unsigned csr = 3081 \/
+  bv_unsigned csr = 3082 \/
+  bv_unsigned csr = 3083 \/
+  bv_unsigned csr = 3084 \/
+  bv_unsigned csr = 3085 \/
+  bv_unsigned csr = 3086 \/
+  bv_unsigned csr = 3087 \/
+  bv_unsigned csr = 3088 \/
+  bv_unsigned csr = 3089 \/
+  bv_unsigned csr = 3090 \/
+  bv_unsigned csr = 3091 \/
+  bv_unsigned csr = 3092 \/
+  bv_unsigned csr = 3093 \/
+  bv_unsigned csr = 3094 \/
+  bv_unsigned csr = 3095 \/
+  bv_unsigned csr = 3096 \/
+  bv_unsigned csr = 3097 \/
+  bv_unsigned csr = 3098 \/
+  bv_unsigned csr = 3099 \/
+  bv_unsigned csr = 3100 \/
+  bv_unsigned csr = 3101 \/
+  bv_unsigned csr = 3102 \/
+  bv_unsigned csr = 3103.
+Proof.
+  intro H.
+  pose proof (u_hpm_unsigned csr H) as Hb.
+  lia.
+Qed.
+
+(* ===================================================================== *)
+(* §3g The assembled doCSR at User: Illegal, or a retiring read.          *)
+(* ===================================================================== *)
+
+(* the sip/mip special-case guards never match a readable csr *)
+Ltac docsr_specials :=
+  cbv zeta;
+  repeat match goal with
+  | |- exec (if ?g then _ else _) _ = _ =>
+      replace g with false by (vm_compute; reflexivity)
+  end;
+  cbn match.
+
+(* the common tail: callback + wX rd + RETIRE, from a callback fact *)
+Ltac docsr_retire_tail rd HCB :=
+  erewrite exec_bind0_Some;
+  [ apply exec_returnm
+  | erewrite exec_bind0_Some; [ | exact HCB ];
+    apply (exec_wX_bits_gpr rd _ _) ].
+
+Lemma exec_doCSR_U (csr : mword 12) (rs1v : mword 64) (rd : mword 5)
+    (op : csrop) (acc : CSRAccessType)
+    (s : mstate) (ms_v : mword 64) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists res s',
+    exec (doCSR csr rs1v (Regidx rd) op acc) s = Some (res, s')
+    /\ ((res = Illegal_Instruction tt /\ s' = s)
+        \/ (res = RETIRE_SUCCESS /\ exists v, s' = gpr_write_state rd v s)).
+Proof.
+  intros Hpriv Hms Hfs Hvs Hmisa Hmenv HES.
+  unfold doCSR.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite Hpriv.
+  destruct (exec_check_CSR_result_U csr acc s ms_v Hms Hfs Hvs Hmisa Hmenv HES)
+    as (res0 & Hres & Hcls & Himp).
+  rewrite (exec_bind_Some _ _ _ _ _ Hres). cbn beta.
+  destruct Hcls as [-> | ->].
+  - (* CSR_Check_OK: a readable counter, access is a read *)
+    cbn match.
+    destruct (Himp eq_refl) as [Hread EA].
+    pose proof (u_readable_acc_read csr acc Hread EA) as ->.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite Hpriv.
+    replace (not (ext_check_CSR csr User CSRRead)) with false
+      by (vm_compute; reflexivity).
+    cbn match.
+    replace (generic_neq CSRRead CSRWrite) with true by (vm_compute; reflexivity).
+    cbn match.
+    destruct Hread as [-> | [-> | [-> | Hrange]]].
+    + (* cycle *)
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_cycle_u s)). cbn beta.
+      erewrite exec_bind_Some.
+      2:{ docsr_specials. apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback (Ox"C00")
+                            (subrange_vec_dec (register_lookup mcycle s.(sregs))
+                               (Z.sub xlen 1) 0)) s
+                    = Some (tt, s)) by reflexivity.
+      do 2 eexists. split.
+      { docsr_retire_tail rd HCB. }
+      right. split; [ reflexivity | eexists; reflexivity ].
+    + (* time *)
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_time_u s)). cbn beta.
+      erewrite exec_bind_Some.
+      2:{ docsr_specials. apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback (Ox"C01")
+                            (subrange_vec_dec (register_lookup mtime s.(sregs))
+                               (Z.sub xlen 1) 0)) s
+                    = Some (tt, s)) by reflexivity.
+      do 2 eexists. split.
+      { docsr_retire_tail rd HCB. }
+      right. split; [ reflexivity | eexists; reflexivity ].
+    + (* instret *)
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_instret_u s)). cbn beta.
+      erewrite exec_bind_Some.
+      2:{ docsr_specials. apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback (Ox"C02")
+                            (subrange_vec_dec (register_lookup minstret s.(sregs))
+                               (Z.sub xlen 1) 0)) s
+                    = Some (tt, s)) by reflexivity.
+      do 2 eexists. split.
+      { docsr_retire_tail rd HCB. }
+      right. split; [ reflexivity | eexists; reflexivity ].
+    + (* the hpm shadow range: read range-generically; the special-case
+         guards die on the range key; the name-map callback needs the
+         29-way concretization *)
+      destruct (exec_read_CSR_hpm csr s Hrange) as (v & Hv).
+      rewrite (exec_bind_Some _ _ _ _ _ Hv). cbn beta.
+      destruct Hrange as [E1 E2].
+      erewrite exec_bind_Some.
+      2:{ cbv zeta.
+          repeat match goal with
+          | |- exec (if eq_vec ?c ?a then _ else _) _ = _ =>
+              let EX := fresh "EX" in
+              destruct (eq_vec c a) eqn:EX;
+              [ exfalso; apply eq_vec_true_iff in EX; subst c;
+                vm_compute in E1; discriminate E1
+              | clear EX ]
+          end.
+          apply exec_returnM. }
+      cbn beta.
+      replace (generic_eq CSRRead CSRRead) with true by (vm_compute; reflexivity).
+      cbn match.
+      assert (HCB : exec (csr_id_read_callback csr v) s = Some (tt, s)).
+      { pose proof (u_hpm_cases csr (conj E1 E2)) as Hc.
+        repeat (destruct Hc as [Hc | Hc]);
+          (assert (Hcsr : csr = Z_to_bv _ (bv_unsigned csr))
+             by (apply bv_eq; rewrite Z_to_bv_unsigned; symmetry;
+                 apply bv_wrap_small;
+                 pose proof (bv_unsigned_in_range _ csr);
+                 unfold bv_modulus in *; lia);
+           rewrite Hc in Hcsr; rewrite Hcsr;
+           reflexivity). }
+      do 2 eexists. split.
+      { docsr_retire_tail rd HCB. }
+      right. split; [ reflexivity | eexists; reflexivity ].
+  - (* CSR_Illegal *)
+    cbn match.
+    do 2 eexists. split; [ apply exec_returnm | ].
+    left. split; reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §4 The execute-level CSR totality at User.                             *)
+(* ===================================================================== *)
+
+Lemma exec_execute_CSRReg_total_U (csr : mword 12) (i1 rd : mword 5)
+    (op : csrop) (s : mstate) (ms_v : mword 64) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists res s',
+    exec (execute (CSRReg (csr, Regidx i1, Regidx rd, op))) s = Some (res, s')
+    /\ ((res = Illegal_Instruction tt /\ s' = s)
+        \/ (res = RETIRE_SUCCESS /\ exists v, s' = gpr_write_state rd v s)).
+Proof.
+  intros Hpriv Hms Hfs Hvs Hmisa Hmenv HES.
+  change (execute (CSRReg (csr, Regidx i1, Regidx rd, op)))
+    with (execute_CSRReg csr (Regidx i1) (Regidx rd) op).
+  unfold execute_CSRReg. cbv zeta.
+  destruct (exec_doCSR_U csr
+              (if Z.eqb (uint i1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint i1))) s.(sregs))
+              rd op
+              (csr_access_type op (generic_eq (Regidx rd) zreg)
+                 (generic_eq (Regidx i1) zreg))
+              s ms_v Hpriv Hms Hfs Hvs Hmisa Hmenv HES)
+    as (res & s' & Hdo & Hcls).
+  exists res, s'. split; [ | exact Hcls ].
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr i1 s)). cbn beta.
+  exact Hdo.
+Qed.
+
+Lemma exec_execute_CSRImm_total_U (csr : mword 12) (imm : mword 5) (rd : mword 5)
+    (op : csrop) (s : mstate) (ms_v : mword 64) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists res s',
+    exec (execute (CSRImm (csr, imm, Regidx rd, op))) s = Some (res, s')
+    /\ ((res = Illegal_Instruction tt /\ s' = s)
+        \/ (res = RETIRE_SUCCESS /\ exists v, s' = gpr_write_state rd v s)).
+Proof.
+  intros Hpriv Hms Hfs Hvs Hmisa Hmenv HES.
+  change (execute (CSRImm (csr, imm, Regidx rd, op)))
+    with (execute_CSRImm csr imm (Regidx rd) op).
+  unfold execute_CSRImm. cbv zeta.
+  destruct (exec_doCSR_U csr (zero_extend' 64 imm) rd op
+              (csr_access_type op (generic_eq (Regidx rd) zreg)
+                 (eq_vec imm (zeros' 5)))
+              s ms_v Hpriv Hms Hfs Hvs Hmisa Hmenv HES)
+    as (res & s' & Hdo & Hcls).
+  exists res, s'. split; [ exact Hdo | exact Hcls ].
 Qed.
