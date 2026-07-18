@@ -461,10 +461,12 @@ before any mechanical sweep.
      token (`wp_csrsi_sstatus_s_sconf`), cap re-arms '1'.  POST: plain
      `sie_cap γ root mfin` (arm hidden covers both) ∗ (if the restore
      ran — noffv=1 ∧ intena≠0, pure — then True else the input
-     disjunct back); noff-1 stored; callee_saved.  New instr fact
-     needed: ppi_24 (the csrsi at PP+0x24 — the old proof never took
-     the restore path, its fact is missing; derive the encoding from
-     kernel_bytes).
+     disjunct back); noff-1 stored; callee_saved.  PREREQUISITES DONE:
+     `ppi_24`/`ppdec_24` (WpSconfPushOff.v; the csrsi at PP+0x24 is
+     0x10016073 = csrrsi x0,sstatus,2 — rd is X0) and the x0 leaf
+     `wp_csrsi_sstatus_x0_s_sconf` + `exec_execute_csrsi_sstatus_x0`
+     (WpSconfCsr.v; no register write, map unchanged, no rd premises).
+     Remaining: the main proof, leaf-by-leaf like push_off.
    - the rest of the kalloc cone file-by-file (acquire/release/holding/
      kalloc/kfree...), VCgen `_den` sconf wrapper with the first
      converted function.
