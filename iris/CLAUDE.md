@@ -537,8 +537,13 @@ files or copy code from them; build fresh from the live tree.
      so the execute bodies are gate-free (ZICOND's runtime condition is
      absorbed by deriving from ZicondGpr's already-total
      `exec_execute_ZICOND_RTYPE_gpr`). Still to add: Zicbo*
-     (senvcfg=0-gated), CSR-at-U dispatch, SSAMOSWAP, and the C_*
-     ExecuteAs expansion facts.
+     (senvcfg=0-gated), CSR-at-U dispatch, SSAMOSWAP, and the missing
+     C_* ExecuteAs expansion facts — WpMmodeLeafBase.v §C_* already has
+     ~20 of them OPERAND-GENERIC (abstract regidx/imm, e.g.
+     `exec_execute_C_ADD`); the ~24 `decodable_c` stragglers (C_ADDW,
+     C_ANDI, C_EBREAK, C_ILLEGAL, C_JALR, the C loads/stores, C_MUL,
+     C_NOP, C_NOT, C_NTL, C_SRAI, C_SUB(W), C_XOR, C_ZEXT_B, ZCMOP) are
+     the same 3-line pure-returnM shape.
      Iris trap-arm recipe (used by all three tower arms): ghost-update
      EVERY physical write in tower order (repeated writes to the same CSR
      each get their own reg_update — the interp goal is the literal
