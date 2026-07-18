@@ -8,7 +8,8 @@
                              (E_U_EnvCall's tval is None for any xv, so
                              the [make_sync_exception] spelling matches
                              execute_ECALL's literal record).
-     MRET / SRET / WFI    -> [Illegal_Instruction tt] with the state
+     MRET / SRET / WFI /
+     the sfence family    -> [Illegal_Instruction tt] with the state
                              UNCHANGED (every privileged instruction is
                              illegal at User; WFI because
                              [plat_wfi_available_to_usermode = false]) --
@@ -16,7 +17,8 @@
                              shape delivers E_Illegal_Instr with the
                              INSTRUCTION BITS as tval
                              ([exec_riscv_step_execute_illegal],
-                             UserTrap.v).
+                             UserTrap.v).  SINVAL_VMA is an [ExecuteAs]
+                             redirection to SFENCE_VMA.
 
    All lemmas are stated at an ARBITRARY state with the two lookups the
    clauses read (cur_privilege = User, PC) -- no page-table or fetch
@@ -110,3 +112,82 @@ Proof.
   rewrite Hpriv. cbn match.
   apply exec_returnm.
 Qed.
+
+(* the sfence/sinval family: illegal at User.  SFENCE_VMA reads its two
+   source registers (harmlessly, via the total [exec_rX_bits_gpr]) before
+   the privilege check; the barrier sfences check privilege directly.
+   SINVAL_VMA is a pure [ExecuteAs] REDIRECTION to SFENCE_VMA -- the
+   classification composes it through the one-redirection path.           *)
+Require Import WpGpr.
+
+Lemma exec_execute_SFENCE_VMA_U (i1 i2 : mword 5) (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (SFENCE_VMA (Regidx i1, Regidx i2))) s
+    = Some (Illegal_Instruction tt, s).
+Proof.
+  intros Hpriv.
+  change (execute (SFENCE_VMA (Regidx i1, Regidx i2)))
+    with (execute_SFENCE_VMA (Regidx i1) (Regidx i2)).
+  unfold execute_SFENCE_VMA.
+  destruct (generic_neq (Regidx i1) zreg) eqn:E1;
+  destruct (generic_neq (Regidx i2) zreg) eqn:E2.
+  - erewrite exec_bind_Some.
+    2:{ erewrite exec_bind_Some; [ apply exec_returnm | apply (exec_rX_bits_gpr i1 s) ]. }
+    cbn beta.
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind_Some; [ apply exec_returnm | apply (exec_rX_bits_gpr i2 s) ]. }
+    cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite Hpriv. cbn match.
+    apply exec_returnm.
+  - erewrite exec_bind_Some.
+    2:{ erewrite exec_bind_Some; [ apply exec_returnm | apply (exec_rX_bits_gpr i1 s) ]. }
+    cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None (mword 16)) s)). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite Hpriv. cbn match.
+    apply exec_returnm.
+  - rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None (mword 64)) s)). cbn beta.
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind_Some; [ apply exec_returnm | apply (exec_rX_bits_gpr i2 s) ]. }
+    cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite Hpriv. cbn match.
+    apply exec_returnm.
+  - rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None (mword 64)) s)). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (@None (mword 16)) s)). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite Hpriv. cbn match.
+    apply exec_returnm.
+Qed.
+
+Lemma exec_execute_SFENCE_W_INVAL_U (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (SFENCE_W_INVAL tt)) s = Some (Illegal_Instruction tt, s).
+Proof.
+  intros Hpriv.
+  change (execute (SFENCE_W_INVAL tt)) with (execute_SFENCE_W_INVAL tt).
+  unfold execute_SFENCE_W_INVAL.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite Hpriv.
+  replace (generic_eq User User) with true by reflexivity. cbn match.
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_SFENCE_INVAL_IR_U (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (execute (SFENCE_INVAL_IR tt)) s = Some (Illegal_Instruction tt, s).
+Proof.
+  intros Hpriv.
+  change (execute (SFENCE_INVAL_IR tt)) with (execute_SFENCE_INVAL_IR tt).
+  unfold execute_SFENCE_INVAL_IR.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite Hpriv.
+  replace (generic_eq User User) with true by reflexivity. cbn match.
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_SINVAL_VMA (rs1 rs2 : regidx) (s : mstate) :
+  exec (execute (SINVAL_VMA (rs1, rs2))) s
+    = Some (ExecuteAs (SFENCE_VMA (rs1, rs2)), s).
+Proof. apply exec_returnm. Qed.

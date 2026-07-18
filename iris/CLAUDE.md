@@ -402,9 +402,15 @@ files or copy code from them; build fresh from the live tree.
      make_sync_exception spelling matches) and
      `exec_execute_{MRET,SRET,WFI}_U` (→ `Illegal_Instruction tt`, state
      unchanged — feed `illegal_obligation`; WFI because
-     `plat_wfi_available_to_usermode = false`). Still to add there: the
-     sfence/sinval families (rX_bits reads via `exec_rX_bits_gpr`, then
-     priv → illegal), Zicbo* (senvcfg=0-gated), CSR-at-U dispatch.
+     `plat_wfi_available_to_usermode = false`), and the sfence family
+     `exec_execute_{SFENCE_VMA,SFENCE_W_INVAL,SFENCE_INVAL_IR}_U` (also
+     illegal; SFENCE_VMA harmlessly reads rs1/rs2 first via the total
+     `exec_rX_bits_gpr`). `exec_execute_SINVAL_VMA` is the pure
+     `ExecuteAs (SFENCE_VMA …)` redirection — composing it needs a BASE
+     one-redirection progress composer (the existing `_RVC_gen` handles
+     redirection only on the compressed path; `_base_gen` forbids
+     ExecuteAs). Still to add there: Zicbo* (senvcfg=0-gated), CSR-at-U
+     dispatch, SSAMOSWAP.
      Iris trap-arm recipe (used by all three tower arms): ghost-update
      EVERY physical write in tower order (repeated writes to the same CSR
      each get their own reg_update — the interp goal is the literal
