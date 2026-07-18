@@ -831,9 +831,22 @@ Where things landed (the stage descriptions below remain the design rationale):
     `exec_plat_misaligned_lrsc` (the platform delivers AccessFault for a
     misaligned reservation access).
   STILL OPEN (the memory tail, in rough order):
-  1. The MISALIGNED LR/SC fault reductions on top of the two bricks
+  1. DONE -- the MISALIGNED LR/SC fault reductions
      (`exec_vmem_read_addr_misaligned_lr` -> E_Load_Access_Fault,
-     `_write_addr_misaligned_sc` -> E_SAMO_Access_Fault).  BLOCKER: reducing
+     `exec_vmem_write_addr_misaligned_sc` -> E_SAMO_Access_Fault), width-
+     generic, state unchanged.  The reduction recipe that finally worked:
+     make plat_misaligned_exception / memory_exception Opaque so
+     `cbn [Riscv.rv64d.not negb]` takes the fault branch without evaluating
+     plat's computable body; the fault block is `bind (bind0 FAULT split)
+     loop`, so PEEL outer-to-inner with execR_bind / execR_bind0 /
+     execR_liftR (a `repeat (peel_b0 || peel_b || peel_l)`), rewrite
+     exec_plat_misaligned_lrsc, cbn match to select the AccessFault arm,
+     a SECOND peel round for the memory_exception bind, rewrite
+     exec_memory_exception, then execR_early_ret (early_return short-
+     circuits inl through the enclosing binds).  The earlier blocker was
+     applying execR_liftR_seq before peeling the enclosing binds -- the
+     fault block is nested, not at the execR head.  Former blocker text
+     kept below for reference.  BLOCKER (historical): reducing
      the model's align guard `(if not is_aligned then FAULT else returnR tt)
      >> split >>= loop` inside catch_early_return.  Findings:
      `rewrite Hnal` DOES fire (guard becomes `if not false`), but the guard

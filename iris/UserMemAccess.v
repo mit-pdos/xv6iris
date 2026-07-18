@@ -402,3 +402,61 @@ Proof.
   2:{ rewrite Hamo. unfold assert_exp. cbn match. apply exec_returnm. }
   apply exec_returnm.
 Qed.
+
+(* ===================================================================== *)
+(* §3c The MISALIGNED LR/SC fault reductions.  plat/memory_exception       *)
+(*     Opaque; [cbn [not negb]] takes the fault branch (leaving plat       *)
+(*     folded); then peel the enclosing bind / bind0 (the fault block is   *)
+(*     [bind (bind0 FAULT split) loop]) down to the fault block, whose     *)
+(*     early_return short-circuits.                                        *)
+(* ===================================================================== *)
+
+Lemma execR_early_ret {R X} (r : R) (s : mstate) :
+  execR (Defs.early_return r : Defs.monadR R exception X) s = Some (inl r, s).
+Proof. reflexivity. Qed.
+
+Section MisalignedFaults.
+  Local Opaque plat_misaligned_exception memory_exception.
+
+  Ltac peel_b := match goal with |- context [execR (Defs.bind ?m ?f) ?st] => rewrite (execR_bind m f st) end.
+  Ltac peel_b0 := match goal with |- context [execR (Defs.bind0 ?m ?n) ?st] => rewrite (execR_bind0 m n st) end.
+  Ltac peel_l := match goal with |- context [execR (Defs.liftR ?m) ?st] => rewrite (execR_liftR m st) end.
+
+  Lemma exec_vmem_read_addr_misaligned_lr (va pc : mword 64) (width : Z)
+      (aq rl : bool) (priv : Privilege) (s : mstate) :
+    is_aligned_vaddr (Virtaddr va) width = false ->
+    register_lookup cur_privilege s.(sregs) = priv ->
+    register_lookup PC s.(sregs) = pc ->
+    exec (vmem_read_addr (Virtaddr va) width (LoadReserved Data) aq rl true) s
+      = Some (Err (Trap (priv, make_sync_exception (E_Load_Access_Fault tt) va, pc)), s).
+  Proof.
+    intros Hnal Hcp Hpc.
+    unfold vmem_read_addr. rewrite exec_catch_early_return.
+    rewrite Hnal. cbn [Riscv.rv64d.not negb].
+    repeat (peel_b0 || peel_b || peel_l).
+    rewrite (exec_plat_misaligned_lrsc (LoadReserved Data) s eq_refl). cbn match.
+    repeat (peel_b0 || peel_b || peel_l).
+    rewrite (exec_memory_exception va pc (E_Load_Access_Fault tt) priv s Hcp Hpc). cbn match.
+    rewrite execR_early_ret. cbn match. reflexivity.
+  Qed.
+
+  Lemma exec_vmem_write_addr_misaligned_sc (va pc : mword 64) (width : Z)
+      (dat : mword (8 * width)) (aq rl : bool) (priv : Privilege) (s : mstate) :
+    is_aligned_vaddr (Virtaddr va) width = false ->
+    register_lookup cur_privilege s.(sregs) = priv ->
+    register_lookup PC s.(sregs) = pc ->
+    exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional Data) aq rl true) s
+      = Some (Err (Trap (priv, make_sync_exception (E_SAMO_Access_Fault tt) va, pc)), s).
+  Proof.
+    intros Hnal Hcp Hpc.
+    unfold vmem_write_addr. rewrite exec_catch_early_return.
+    rewrite Hnal. cbn [Riscv.rv64d.not negb].
+    repeat (peel_b0 || peel_b || peel_l).
+    rewrite (exec_plat_misaligned_lrsc (StoreConditional Data) s eq_refl). cbn match.
+    repeat (peel_b0 || peel_b || peel_l).
+    rewrite (exec_memory_exception va pc (E_SAMO_Access_Fault tt) priv s Hcp Hpc). cbn match.
+    rewrite execR_early_ret. cbn match. reflexivity.
+  Qed.
+
+  Local Transparent plat_misaligned_exception memory_exception.
+End MisalignedFaults.
