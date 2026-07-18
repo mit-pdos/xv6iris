@@ -9,6 +9,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - minstret_inv (invariant counting retired instructions in minstret register), clock_inv
 - fupd-style spec for stepping one cycle, which enables opening inv like minstret_inv
 - interrupt handling with a WP for the address in stvec (kernelvec)
+- intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts
 - swtch spec
 - acquire/release separation logic spec (standard, but does work)
 - kalloc/kfree separation-logic-style specs

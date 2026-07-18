@@ -18,7 +18,7 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import RiscvExtras WpGpr WpLeafCommon UserBits.
+Require Import RiscvExtras WpGpr WpLeafCommon WpGprCsrrCommon UserBits.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -430,4 +430,641 @@ Proof.
   replace (16 * (q / 256) + 3) with (3 + (q / 256) * 4 * 4) in Hz by lia.
   rewrite Z_mod_plus_full in Hz.
   vm_compute in Hz. discriminate Hz.
+Qed.
+
+(* ===================================================================== *)
+(* §3b The accessibility traversal at User.                               *)
+(* ===================================================================== *)
+
+(* the complete U-accessible read set under the xv6 pins: the three
+   Zicntr counter shadows plus the Zihpm hpmcounter(h) shadow ranges *)
+Definition u_hpm_range (csr : mword 12) (k : mword 7) : Prop :=
+  eq_vec (subrange_vec_dec csr 11 5) k = true /\
+  Z.geb (uint (subrange_vec_dec csr 4 0)) 3 = true.
+
+Definition u_csr_readable (csr : mword 12) : Prop :=
+  csr = Ox"C00" \/ csr = Ox"C01" \/ csr = Ox"C02" \/
+  u_hpm_range csr ('b"1100000").
+
+Lemma exec_hartSupports_Zihpm (s : mstate) :
+  exec (hartSupports Ext_Zihpm) s = Some (true, s).
+Proof.
+  unfold hartSupports. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
+  change (Z.geb (hartSupports_measure Ext_Zihpm) 0) with true. cbn match.
+  erewrite exec_bind_Some. 2:{ apply exec_returnM. }
+  cbn beta. apply exec_returnM.
+Qed.
+
+Lemma exec_currentlyEnabled_Zihpm (s : mstate) :
+  exec (currentlyEnabled Ext_Zihpm) s = Some (true, s).
+Proof.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  change (Z.geb (currentlyEnabled_measure Ext_Zihpm) 0) with true. cbn match.
+  erewrite exec_bind_Some. 2:{ apply exec_returnM. }
+  cbn beta. cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zihpm s)).
+  apply exec_rec_cE_Zicsr.
+Qed.
+
+Lemma sub115_unsigned (x : mword 12) :
+  bv_unsigned (subrange_vec_dec x 11 5) = (bv_unsigned x / 32) mod 128.
+Proof.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 5 + 1))) with 128.
+  rewrite Z.shiftr_div_pow2 by (vm_compute; congruence).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 5)) with 5.
+  change (2 ^ 5) with 32.
+  reflexivity.
+Qed.
+
+(* an hpm-family 11:5 subrange guard whose high byte is M/S-addressed
+   contradicts the U priv gate (bits 9:8 of csr = bits 4:3 of the key) *)
+Lemma hpm_subrange_dead (csr : mword 12) (k : mword 7) :
+  eq_vec (subrange_vec_dec csr 11 5) k = true ->
+  (bv_unsigned k / 8) mod 4 <> 0 ->
+  zopz0zKzJ_u ('b"00") (csrPriv csr) = true -> False.
+Proof.
+  intros E Hk EP.
+  apply eq_vec_true_iff in E.
+  apply (f_equal bv_unsigned) in E.
+  rewrite sub115_unsigned in E.
+  unfold zopz0zKzJ_u in EP. apply Z.geb_le in EP.
+  rewrite !(uint_unsigned_n _) in EP.
+  rewrite csrPriv_unsigned in EP.
+  change (bv_unsigned ('b"00" : mword 2)) with 0 in EP.
+  set (c := bv_unsigned csr) in *.
+  pose proof (Z.mod_pos_bound (c / 256) 4 ltac:(lia)) as Hb.
+  assert (Hz : (c / 256) mod 4 = 0) by lia.
+  assert (Hdd : c / 256 = (c / 32) / 8).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 32) in *.
+  assert (Hh8 : q / 8 = 16 * (q / 128) + bv_unsigned k / 8).
+  { assert (Hq2 : q = 16 * (q / 128) * 8 + bv_unsigned k).
+    { pose proof (Z_div_mod_eq_full q 128) as Hd.
+      rewrite E in Hd.
+      replace (16 * (q / 128) * 8) with (128 * (q / 128)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia. reflexivity. }
+  rewrite Hdd, Hh8 in Hz.
+  replace (16 * (q / 128) + bv_unsigned k / 8)
+    with (bv_unsigned k / 8 + (q / 128) * 4 * 4) in Hz by ring.
+  rewrite Z_mod_plus_full in Hz.
+  exact (Hk Hz).
+Qed.
+
+Lemma exec_or_ff (l r : M bool) (s : mstate) :
+  exec l s = Some (false, s) ->
+  exec r s = Some (false, s) ->
+  exec (or_boolM l r) s = Some (false, s).
+Proof.
+  intros Hl Hr. unfold or_boolM.
+  rewrite (exec_bind_Some _ _ _ _ _ Hl). cbn match. exact Hr.
+Qed.
+
+(* per-clause closers for the U-addressed survivors of the priv gate *)
+Ltac csr_close HES EP Hms Hfs Hvs Hmisa Hmenv :=
+  lazymatch goal with
+  | |- exists _, exec (or_boolM _ _) _ = Some _ /\ _ =>
+      (* fflags / frm / fcsr: F ∨ Zfinx, both off *)
+      eexists; split;
+      [ apply exec_or_ff;
+        [ exact (exec_currentlyEnabled_F_off _ _ Hms Hfs)
+        | apply exec_currentlyEnabled_Zfinx ]
+      | let Hb := fresh in intro Hb; discriminate Hb ]
+  | |- exists _, exec (currentlyEnabled Ext_Zve32x) _ = Some _ /\ _ =>
+      eexists; split;
+      [ exact (exec_currentlyEnabled_Zve32x_off _ _ Hms Hvs)
+      | let Hb := fresh in intro Hb; discriminate Hb ]
+  | |- exists _, exec (is_ssp_accessible _) _ = Some _ /\ _ =>
+      eexists; split;
+      [ exact (exec_is_ssp_accessible_U_off _ Hmisa Hmenv)
+      | let Hb := fresh in intro Hb; discriminate Hb ]
+  | |- exists _, exec (and_boolM _ (and_boolM (returnM _) _)) _ = Some _ /\ _ =>
+      (* the RV32 counter highs: Zicntr ∧ (xlen = 32) ∧ … *)
+      eexists; split;
+      [ rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zicntr _));
+        unfold and_boolM at 1;
+        erewrite exec_bind_Some; [ | apply exec_returnM ];
+        cbn beta;
+        match goal with
+        | |- exec (if ?g then _ else _) _ = _ =>
+            replace g with false by (vm_compute; reflexivity)
+        end;
+        cbn match; apply exec_returnM
+      | let Hb := fresh in intro Hb; discriminate Hb ]
+  | |- exists _, exec (and_boolM _ (counter_enabled ?i _)) _ = Some _ /\ _ =>
+      (* cycle / time / instret: the enable bit decides; both outcomes fit *)
+      let en := fresh "en" in let Hen := fresh "Hen" in
+      destruct (exec_counter_enabled_U_total i _ HES) as [en Hen];
+      eexists; split;
+      [ rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zicntr _));
+        exact Hen
+      | let Hb := fresh in intro Hb; unfold u_csr_readable;
+        first [ left; reflexivity
+              | right; left; reflexivity
+              | right; right; left; reflexivity ] ]
+  end.
+
+(* the Zihpm hpm-range closers: the shadow range retires on the enable,
+   the RV32-high range dies on xlen = 32 *)
+Ltac csr_close_hpm HES E1 E2 :=
+  cbv zeta;
+  lazymatch goal with
+  | |- exists _, exec (and_boolM _ (and_boolM (returnM _) _)) _ = Some _ /\ _ =>
+      eexists; split;
+      [ rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zihpm _));
+        unfold and_boolM at 1;
+        erewrite exec_bind_Some; [ | apply exec_returnM ];
+        cbn beta;
+        match goal with
+        | |- exec (if ?g then _ else _) _ = _ =>
+            replace g with false by (vm_compute; reflexivity)
+        end;
+        cbn match; apply exec_returnM
+      | let Hb := fresh in intro Hb; discriminate Hb ]
+  | |- exists _, exec (and_boolM _ (counter_enabled ?i _)) _ = Some _ /\ _ =>
+      let en := fresh "en" in let Hen := fresh "Hen" in
+      destruct (exec_counter_enabled_U_total i _ HES) as [en Hen];
+      eexists; split;
+      [ rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_Zihpm _));
+        exact Hen
+      | let Hb := fresh in intro Hb;
+        unfold u_csr_readable, u_hpm_range;
+        right; right; right;
+        split; [ exact E1 | exact E2 ] ]
+  end.
+
+(* one dispatch guard: PMP subranges die on the priv gate; concrete
+   addresses either contradict the priv gate (M/S-addressed) or are
+   closed by the clause closer (U-addressed); the andb-guarded hpm
+   ranges either die the same way or close via the hpm closers *)
+Ltac csr_step HES EP Hms Hfs Hvs Hmisa Hmenv :=
+  lazymatch goal with
+  | |- exists _, exec (if andb ?g1 ?g2 then _ else _) _ = Some _ /\ _ =>
+      let E := fresh "E" in
+      destruct (andb g1 g2) eqn:E;
+      [ apply andb_prop in E;
+        let E1 := fresh "E1" in let E2 := fresh "E2" in
+        destruct E as [E1 E2];
+        first
+          [ exfalso;
+            exact (hpm_subrange_dead _ _ E1
+                     ltac:(vm_compute; congruence) EP)
+          | csr_close_hpm HES E1 E2 ]
+      | clear E ]
+  | |- exists _, exec (if eq_vec (subrange_vec_dec ?c 11 4) ?h then _ else _) _ = Some _ /\ _ =>
+      let E := fresh "E" in
+      destruct (eq_vec (subrange_vec_dec c 11 4) h) eqn:E;
+      [ exfalso;
+        exact (pmp_subrange_dead c h E ltac:(vm_compute; reflexivity) EP)
+      | clear E ]
+  | |- exists _, exec (if eq_vec ?c ?a then _ else _) _ = Some _ /\ _ =>
+      let E := fresh "E" in
+      destruct (eq_vec c a) eqn:E;
+      [ apply eq_vec_true_iff in E; subst c;
+        first
+          [ exfalso; vm_compute in EP; discriminate EP
+          | csr_close HES EP Hms Hfs Hvs Hmisa Hmenv ]
+      | clear E ]
+  end.
+
+Lemma exec_is_CSR_accessible_U (csr : mword 12) (acc : CSRAccessType)
+    (s : mstate) (ms_v : mword 64) :
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  zopz0zKzJ_u ('b"00") (csrPriv csr) = true ->
+  exists b, exec (is_CSR_accessible csr User acc) s = Some (b, s)
+            /\ (b = true -> u_csr_readable csr).
+Proof.
+  intros Hms Hfs Hvs Hmisa Hmenv HES EP.
+  unfold is_CSR_accessible.
+  repeat csr_step HES EP Hms Hfs Hvs Hmisa Hmenv.
+  (* the fall-through default *)
+  eexists; split; [ apply exec_returnM | ].
+  intro Hb; discriminate Hb.
+Qed.
+
+(* ===================================================================== *)
+(* §3c The assembled check at User.                                       *)
+(* ===================================================================== *)
+
+Lemma exec_check_CSR_U (csr : mword 12) (acc : CSRAccessType)
+    (s : mstate) (ms_v : mword 64) :
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists ok, exec (check_CSR csr User acc) s = Some (ok, s)
+    /\ (ok = true -> u_csr_readable csr /\ check_CSR_access csr acc = true).
+Proof.
+  intros Hms Hfs Hvs Hmisa Hmenv HES.
+  unfold check_CSR.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_check_CSR_priv_U csr s)).
+  destruct (zopz0zKzJ_u ('b"00") (csrPriv csr)) eqn:EP.
+  - (* priv gate passed *)
+    rewrite (exec_and_boolM_Some _ _ _ _ _
+               (exec_returnM (check_CSR_access csr acc) s)).
+    destruct (check_CSR_access csr acc) eqn:EA.
+    + (* access shape OK: the accessibility traversal decides *)
+      destruct (exec_is_CSR_accessible_U csr acc s ms_v
+                  Hms Hfs Hvs Hmisa Hmenv HES EP) as (b & Hb & Himp).
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hb).
+      destruct b.
+      * (* accessible: csr is a readable counter -- stateen is concrete *)
+        pose proof (Himp eq_refl) as Hr.
+        destruct Hr as [-> | [-> | [-> | Hhpm]]].
+        { eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if ?g then _ else _) _ = _ =>
+                replace g with false by (vm_compute; reflexivity)
+            end.
+            apply exec_returnM. }
+          intro; split; [ left; reflexivity | reflexivity ]. }
+        { eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if ?g then _ else _) _ = _ =>
+                replace g with false by (vm_compute; reflexivity)
+            end.
+            apply exec_returnM. }
+          intro; split; [ right; left; reflexivity | reflexivity ]. }
+        { eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if ?g then _ else _) _ = _ =>
+                replace g with false by (vm_compute; reflexivity)
+            end.
+            apply exec_returnM. }
+          intro; split; [ right; right; left; reflexivity | reflexivity ]. }
+        { (* the hpm range: stateen's guards are all concrete-address
+             mismatches EXCEPT none match the 0xCxx range -- every guard
+             is eq_vec csr ADDR with ADDR outside the range; kill each by
+             the range facts *)
+          destruct Hhpm as [E1 E2].
+          eexists. split.
+          { unfold stateen_allows_CSR_access. cbn match.
+            repeat match goal with
+            | |- exec (if eq_vec ?c ?a then _ else _) _ = _ =>
+                let EX := fresh "EX" in
+                destruct (eq_vec c a) eqn:EX;
+                [ exfalso;
+                  apply eq_vec_true_iff in EX; subst c;
+                  vm_compute in E1; discriminate E1
+                | clear EX ]
+            end.
+            apply exec_returnM. }
+          intro; split;
+            [ right; right; right; split; assumption | reflexivity ]. }
+      * (* inaccessible *)
+        eexists. split; [ apply exec_returnM | ].
+        intro Hb'; discriminate Hb'.
+    + (* wrong access shape (write to a read-only address) *)
+      eexists. split; [ apply exec_returnM | ].
+      intro Hb'; discriminate Hb'.
+  - (* priv gate failed *)
+    eexists. split; [ apply exec_returnM | ].
+    intro Hb'; discriminate Hb'.
+Qed.
+
+(* ===================================================================== *)
+(* §3d check_CSR_result and the survivor reads.                           *)
+(* ===================================================================== *)
+
+Lemma exec_check_CSR_result_U (csr : mword 12) (acc : CSRAccessType)
+    (s : mstate) (ms_v : mword 64) :
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists res, exec (check_CSR_result csr User acc) s = Some (res, s)
+    /\ (res = CSR_Check_OK tt \/ res = CSR_Illegal tt)
+    /\ (res = CSR_Check_OK tt ->
+        u_csr_readable csr /\ check_CSR_access csr acc = true).
+Proof.
+  intros Hms Hfs Hvs Hmisa Hmenv HES.
+  unfold check_CSR_result.
+  destruct (exec_check_CSR_U csr acc s ms_v Hms Hfs Hvs Hmisa Hmenv HES)
+    as (ok & Hok & Himp).
+  rewrite (exec_bind_Some _ _ _ _ _ Hok).
+  destruct ok.
+  - (* passed: CSR_Check_OK *)
+    cbn match.
+    eexists. split; [ apply exec_returnM | ].
+    split; [ left; reflexivity | ].
+    intro; exact (Himp eq_refl).
+  - (* failed: User is not a virtual privilege, so plain Illegal *)
+    cbn match.
+    eexists. split.
+    { erewrite exec_bind_Some.
+      2:{ unfold and_boolM.
+          erewrite exec_bind_Some; [ | apply exec_returnM ].
+          cbn beta. cbn match.
+          apply (exec_returnM false s). }
+      cbn beta. cbv zeta.
+      apply exec_returnM. }
+    split; [ right; reflexivity | ].
+    intro Hr; discriminate Hr.
+Qed.
+
+(* the two missing Zicntr counter reads (time exists in WpGprCsrrB) *)
+Lemma exec_read_CSR_cycle_u (s : mstate) :
+  exec (read_CSR (Ox"C00")) s
+    = Some (subrange_vec_dec (register_lookup mcycle s.(sregs)) (Z.sub xlen 1) 0, s).
+Proof.
+  drive_csr.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcycle s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_read_CSR_time_u (s : mstate) :
+  exec (read_CSR (Ox"C01")) s
+    = Some (subrange_vec_dec (register_lookup mtime s.(sregs)) (Z.sub xlen 1) 0, s).
+Proof.
+  drive_csr.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mtime s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_read_CSR_instret_u (s : mstate) :
+  exec (read_CSR (Ox"C02")) s
+    = Some (subrange_vec_dec (register_lookup minstret s.(sregs)) (Z.sub xlen 1) 0, s).
+Proof.
+  drive_csr.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg minstret s)).
+  apply exec_returnM.
+Qed.
+
+(* a readable csr sits at a read-only address (bits 11:10 = 11), so the
+   only access shape check_CSR_access admits is CSRRead *)
+Lemma csrAccess_unsigned (x : mword 12) :
+  bv_unsigned (csrAccess x) = (bv_unsigned x / 1024) mod 4.
+Proof.
+  unfold csrAccess, subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 10 + 1))) with 4.
+  rewrite Z.shiftr_div_pow2 by (vm_compute; congruence).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 10)) with 10.
+  change (2 ^ 10) with 1024.
+  reflexivity.
+Qed.
+
+Lemma u_readable_read_only (csr : mword 12) :
+  u_csr_readable csr -> csrAccess csr = ('b"11" : mword 2).
+Proof.
+  intros [-> | [-> | [-> | [E1 E2]]]];
+    try (vm_compute; reflexivity).
+  (* hpm range: bits 11:10 come from the key's top bits *)
+  apply eq_vec_true_iff in E1.
+  apply (f_equal bv_unsigned) in E1.
+  rewrite sub115_unsigned in E1.
+  apply bv_eq.
+  rewrite csrAccess_unsigned.
+  change (bv_unsigned ('b"11" : mword 2)) with 3.
+  set (c := bv_unsigned csr) in *.
+  assert (Hdd : c / 1024 = (c / 32) / 32).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 32) in *.
+  assert (Hh32 : q / 32 = 4 * (q / 128) + bv_unsigned ('b"1100000" : mword 7) / 32).
+  { assert (Hq2 : q = 4 * (q / 128) * 32 + bv_unsigned ('b"1100000" : mword 7)).
+    { pose proof (Z_div_mod_eq_full q 128) as Hd.
+      rewrite E1 in Hd.
+      replace (4 * (q / 128) * 32) with (128 * (q / 128)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia. reflexivity. }
+  rewrite Hdd, Hh32.
+  change (bv_unsigned ('b"1100000" : mword 7) / 32) with 3.
+  replace (4 * (q / 128) + 3) with (3 + (q / 128) * 4) by ring.
+  rewrite Z_mod_plus_full.
+  vm_compute; reflexivity.
+Qed.
+
+Lemma u_readable_acc_read (csr : mword 12) (acc : CSRAccessType) :
+  u_csr_readable csr ->
+  check_CSR_access csr acc = true ->
+  acc = CSRRead.
+Proof.
+  intros Hr EA.
+  unfold check_CSR_access in EA.
+  rewrite (u_readable_read_only csr Hr) in EA.
+  destruct acc; [ reflexivity | | ];
+    vm_compute in EA; discriminate EA.
+Qed.
+
+(* ===================================================================== *)
+(* §3e read_CSR over the hpm shadow range.                                *)
+(* ===================================================================== *)
+
+(* priv bits from a matched subrange, extracted for reuse *)
+Lemma sub115_priv (csr : mword 12) (k : mword 7) :
+  eq_vec (subrange_vec_dec csr 11 5) k = true ->
+  (bv_unsigned csr / 256) mod 4 = (bv_unsigned k / 8) mod 4.
+Proof.
+  intros E.
+  apply eq_vec_true_iff in E.
+  apply (f_equal bv_unsigned) in E.
+  rewrite sub115_unsigned in E.
+  set (c := bv_unsigned csr) in *.
+  assert (Hdd : c / 256 = (c / 32) / 8).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 32) in *.
+  assert (Hh8 : q / 8 = 16 * (q / 128) + bv_unsigned k / 8).
+  { assert (Hq2 : q = 16 * (q / 128) * 8 + bv_unsigned k).
+    { pose proof (Z_div_mod_eq_full q 128) as Hd.
+      rewrite E in Hd.
+      replace (16 * (q / 128) * 8) with (128 * (q / 128)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia. reflexivity. }
+  rewrite Hdd, Hh8.
+  replace (16 * (q / 128) + bv_unsigned k / 8)
+    with (bv_unsigned k / 8 + (q / 128) * 4 * 4) by ring.
+  rewrite Z_mod_plus_full.
+  reflexivity.
+Qed.
+
+Lemma sub114_priv (csr : mword 12) (h : mword 8) :
+  eq_vec (subrange_vec_dec csr 11 4) h = true ->
+  (bv_unsigned csr / 256) mod 4 = (bv_unsigned h / 16) mod 4.
+Proof.
+  intros E.
+  apply eq_vec_true_iff in E.
+  apply (f_equal bv_unsigned) in E.
+  rewrite sub114_unsigned in E.
+  set (c := bv_unsigned csr) in *.
+  assert (Hdd : c / 256 = (c / 16) / 16).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 16) in *.
+  assert (Hh16 : q / 16 = 16 * (q / 256) + bv_unsigned h / 16).
+  { assert (Hq2 : q = 16 * (q / 256) * 16 + bv_unsigned h).
+    { pose proof (Z_div_mod_eq_full q 256) as Hd.
+      rewrite E in Hd.
+      replace (16 * (q / 256) * 16) with (256 * (q / 256)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia. reflexivity. }
+  rewrite Hdd, Hh16.
+  replace (16 * (q / 256) + bv_unsigned h / 16)
+    with (bv_unsigned h / 16 + (q / 256) * 4 * 4) by ring.
+  rewrite Z_mod_plus_full.
+  reflexivity.
+Qed.
+
+(* a PMP-file 11:4 guard cannot coexist with the hpm 11:5 range *)
+Lemma pmp_vs_hpm_dead (csr : mword 12) (h : mword 8) :
+  eq_vec (subrange_vec_dec csr 11 4) h = true ->
+  bv_unsigned h / 16 = 3 ->
+  eq_vec (subrange_vec_dec csr 11 5) ('b"1100000") = true -> False.
+Proof.
+  intros E4 Hh E5.
+  pose proof (sub114_priv csr h E4) as H4.
+  pose proof (sub115_priv csr ('b"1100000") E5) as H5.
+  rewrite Hh in H4.
+  change (bv_unsigned ('b"1100000" : mword 7) / 8) with 12 in H5.
+  rewrite H4 in H5.
+  vm_compute in H5. discriminate H5.
+Qed.
+
+(* one read_CSR guard, killed from the hpm range membership *)
+Ltac csr_read_step E1 :=
+  lazymatch goal with
+  | |- exists _, exec (if andb false ?g2 then _ else _) _ = Some _ =>
+      (* a prior [change] already exposed the closed-false conjunct *)
+      rewrite (andb_false_l g2); cbn match
+  | |- exists _, exec (if andb (Z.eqb xlen 32) ?g2 then _ else _) _ = Some _ =>
+      (* an RV32-only clause: the first conjunct is closed false *)
+      change (Z.eqb xlen 32) with false;
+      rewrite (andb_false_l g2);
+      cbn match
+  | |- exists _, exec (if andb (eq_vec (subrange_vec_dec ?c 11 4) ?h) ?g2 then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (andb (eq_vec (subrange_vec_dec c 11 4) h) g2) eqn:E;
+      [ apply andb_prop in E;
+        let Ea := fresh "Ea" in let Eb := fresh "Eb" in
+        destruct E as [Ea Eb];
+        exfalso;
+        exact (pmp_vs_hpm_dead c h Ea ltac:(vm_compute; reflexivity) E1)
+      | clear E ]
+  | |- exists _, exec (if andb (eq_vec (subrange_vec_dec ?c 11 5) ?k) ?g2 then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (andb (eq_vec (subrange_vec_dec c 11 5) k) g2) eqn:E;
+      [ apply andb_prop in E;
+        let Ea := fresh "Ea" in let Eb := fresh "Eb" in
+        destruct E as [Ea Eb];
+        exfalso;
+        apply eq_vec_true_iff in Ea;
+        let E1' := fresh "E1x" in
+        pose proof E1 as E1';
+        apply eq_vec_true_iff in E1';
+        rewrite E1' in Ea; vm_compute in Ea; discriminate Ea
+      | clear E ]
+  | |- exists _, exec (if eq_vec (subrange_vec_dec ?c 11 4) ?h then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (eq_vec (subrange_vec_dec c 11 4) h) eqn:E;
+      [ exfalso;
+        exact (pmp_vs_hpm_dead c h E ltac:(vm_compute; reflexivity) E1)
+      | clear E ]
+  | |- exists _, exec (if eq_vec ?c ?a then _ else _) _ = Some _ =>
+      let E := fresh "E" in
+      destruct (eq_vec c a) eqn:E;
+      [ exfalso; apply eq_vec_true_iff in E; subst c;
+        vm_compute in E1; discriminate E1
+      | clear E ]
+  end.
+
+Lemma exec_read_CSR_hpm (csr : mword 12) (s : mstate) :
+  u_hpm_range csr ('b"1100000") ->
+  exists v, exec (read_CSR csr) s = Some (v, s).
+Proof.
+  intros [E1 E2].
+  unfold read_CSR.
+  repeat csr_read_step E1.
+  (* the live hpm clause *)
+  cbv zeta.
+  match goal with
+  | |- exists _, exec (if ?g then _ else _) _ = Some _ =>
+      replace g with true
+        by (symmetry; apply andb_true_iff; split; [ exact E1 | exact E2 ])
+  end.
+  eexists.
+  erewrite exec_bind_Some.
+  2:{ unfold hpmidx_from_bits, Defs.assert_exp'. cbv zeta.
+      lazymatch goal with
+      | |- exec (Defs.bind (match ?g with true => _ | false => _ end) _) _ = _ =>
+          lazymatch type of E2 with
+          | ?g2 = true => change g2 with g in E2
+          end;
+          let E3 := fresh "E3" in
+          destruct g eqn:E3; [ | discriminate E2 ]
+      end.
+      cbn match.
+      erewrite exec_bind_Some; [ | apply exec_returnM ].
+      cbn beta. apply exec_returnM. }
+  cbn beta.
+  unfold read_mhpmcounter.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mhpmcounter s)). cbn beta.
+  apply exec_returnM.
+Qed.
+
+(* ===================================================================== *)
+(* §3f Concretizing the hpm range: 29 addresses.                          *)
+(* ===================================================================== *)
+
+Lemma sub40_unsigned (x : mword 12) :
+  bv_unsigned (subrange_vec_dec x 4 0) = bv_unsigned x mod 32.
+Proof.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (4 - 0 + 1))) with 32.
+  reflexivity.
+Qed.
+
+Lemma u_hpm_unsigned (csr : mword 12) :
+  u_hpm_range csr ('b"1100000") ->
+  3072 + 3 <= bv_unsigned csr <= 3072 + 31.
+Proof.
+  intros [E1 E2].
+  apply eq_vec_true_iff in E1.
+  apply (f_equal bv_unsigned) in E1.
+  rewrite sub115_unsigned in E1.
+  change (bv_unsigned ('b"1100000" : mword 7)) with 96 in E1.
+  rewrite (uint_unsigned_n _) in E2.
+  rewrite sub40_unsigned in E2.
+  apply Z.geb_le in E2.
+  pose proof (bv_unsigned_in_range _ csr) as Hr.
+  unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 4096 in Hr.
+  set (c := bv_unsigned csr) in *.
+  assert (H32 : (0 < 32)%Z) by (vm_compute; constructor).
+  assert (Hd32 : c / 32 < 128).
+  { apply Z.div_lt_upper_bound; [ exact H32 | ].
+    change (32 * 128) with 4096. lia. }
+  assert (Hd0 : 0 <= c / 32) by (apply Z.div_pos; lia).
+  rewrite Z.mod_small in E1 by (split; [ exact Hd0 | exact Hd32 ]).
+  pose proof (Z_div_mod_eq_full c 32) as Hdm.
+  pose proof (Z.mod_pos_bound c 32 H32) as Hmb.
+  lia.
 Qed.
