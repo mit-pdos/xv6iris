@@ -7,7 +7,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
-Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
+Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -238,6 +238,50 @@ Proof.
   change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, XOR)))
     with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) XOR).
   eapply exec_execute_RTYPE_XOR.
+  - apply (exec_rX_bits_gpr rs1 s).
+  - apply (exec_rX_bits_gpr rs2 s).
+  - rewrite exec_wX_bits_gpr.
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    reflexivity.
+Qed.
+
+(* WpGprLogic.v-style : RTYPE SRL (register shift -- walk's loop-variable
+   shift amount) *)
+Definition gpr_srl_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
+  shift_bits_right
+    (if Z.eqb (uint rs1) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    (subrange_vec_dec
+       (if Z.eqb (uint rs2) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
+       (Z.sub log2_xlen 1) 0).
+
+Lemma exec_execute_RTYPE_SRL (rs2 rs1 rd : regidx) (a b : mword 64) s s' :
+  exec (rX_bits rs1) s = Some (a, s) ->
+  exec (rX_bits rs2) s = Some (b, s) ->
+  exec (wX_bits rd (shift_bits_right a (subrange_vec_dec b (Z.sub log2_xlen 1) 0))) s
+  = Some (tt, s') ->
+  exec (execute_RTYPE rs2 rs1 rd SRL) s = Some (RETIRE_SUCCESS, s').
+Proof.
+  intros Ha Hb Hw. unfold execute_RTYPE. cbn match.
+  rewrite (exec_bind_Some _ _ _
+             (shift_bits_right a (subrange_vec_dec b (Z.sub log2_xlen 1) 0)) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha).
+      rewrite (exec_bind_Some _ _ _ _ _ Hb). apply exec_returnm. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm.
+Qed.
+
+Lemma exec_execute_RTYPE_SRL_gpr (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SRL))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg (gpr_srl_val rs2 rs1 s))).
+Proof.
+  intro Hrd. unfold gpr_srl_val.
+  change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SRL)))
+    with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SRL).
+  eapply exec_execute_RTYPE_SRL.
   - apply (exec_rX_bits_gpr rs1 s).
   - apply (exec_rX_bits_gpr rs2 s).
   - rewrite exec_wX_bits_gpr.
