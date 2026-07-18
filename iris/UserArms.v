@@ -39,12 +39,19 @@
                             untouched, but nextPC moved (the pre-execute
                             write), so [illegal_obligation] hands it over.
 
+     [enter_wait_branch]    run_hart_active returns [Enter_Wait] (a user
+                            WRS): hart_state := WAITING, NO pc tick, NO
+                            bump -- PC stays at the WRS, nextPC after it
+                            (the decoupled WAITING shape [user_inv]
+                            binds); re-enters [user_inv].
+
    All arms are WIRE-FREE: the dispatch decision reaches them as a pure
    fact at the post-minstret-increment states (∀ over the written bit), so
    no arm ever owns the wire cells.  Each does its own minstret prelude
    (the write is the first thing [try_step] does, so it belongs to the
-   step shape, not to the classification).  The one step shape WITHOUT an
-   arm yet is WRS enter-wait (writes hart_state, skips the tick).          *)
+   step shape, not to the classification).  The step-shape arm set is
+   COMPLETE: retire / interrupt (inlined in the wrapper) / execute-trap /
+   fetch-fault / illegal / enter-wait.                                     *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -709,6 +716,112 @@ Section UserArms.
       rewrite utrap_ms_SIE; reflexivity. }
     iSplitL "Hpc Hnpc". { iFrame "Hpc Hnpc". }
     iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* The ENTER-WAIT obligation: execute returned [Enter_Wait] (a user WRS  *)
+  (* -- the reason is pinned to the two user-reachable ones, which is      *)
+  (* exactly [user_hart_ok] for the WAITING re-entry).  Like the illegal   *)
+  (* shape, the gpr file is untouched but nextPC moved (the pre-execute    *)
+  (* write) and the fetch may have filled the TLB.                         *)
+  (* ------------------------------------------------------------------- *)
+  Definition enter_wait_obligation (E : coPset) (σ : mstate) (va : mword 64)
+      : iProp Σ :=
+    (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
+     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
+     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
+     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
+     mstate_interp σ -∗
+     nextPC ↦ᵣ va -∗
+     upt_inv pt -∗
+     user_cfg C -∗
+     |={E}=>
+       ∃ (wr : WaitReason) (ib : mword 32) (s_x : mstate) (va' : mword 64),
+         ⌜exec (run_hart_active 0) σ
+            = Some (Step_Execute (Enter_Wait wr, ib), s_x)⌝ ∗
+         ⌜wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO⌝ ∗
+         mstate_interp s_x ∗
+         nextPC ↦ᵣ va' ∗
+         upt_inv pt ∗
+         user_cfg C)%I.
+
+  (* ------------------------------------------------------------------- *)
+  (* The ENTER-WAIT arm: hart_state := HART_WAITING (wr, ib); NO pc tick,  *)
+  (* NO bump -- PC stays at the WRS and nextPC after it, the decoupled     *)
+  (* WAITING shape [user_inv] binds ([wp_user_step_waiting] later wakes    *)
+  (* or stays from there).                                                 *)
+  (* ------------------------------------------------------------------- *)
+  Lemma enter_wait_branch (Ei : coPset) (Φ : mval -> iProp Σ)
+      (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
+      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+    user_mstatus_ok ms_v ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    register_lookup mstatus σ.(sregs) = ms_v ->
+    register_lookup PC σ.(sregs) = va ->
+    (forall b : bool,
+       exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
+         = Some (None, set_reg σ (R_bool minstret_increment) b)) ->
+    mstate_interp σ -∗
+    (minstret ↦ᵣ mst) -∗ (R_bool minstret_increment ↦ᵣ mi) -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
+    gpr_file g -∗ upt_inv pt -∗ user_cfg C -∗
+    (∀ b : bool,
+       enter_wait_obligation Ei (set_reg σ (R_bool minstret_increment) b) va) -∗
+    ▷ (user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    |={Ei}=> ∃ s' : mstate,
+      ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
+      ▷ (mstate_interp s' ∗ minstret_inv_body ∗
+         WP (Loop : expr riscv_lang) {{ Φ }}).
+  Proof.
+    iIntros (Hmsok Lpriv Lms Lpc Hdisp)
+      "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hob Hcont".
+    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs0.
+    (* minstret prelude *)
+    destruct (exec_should_inc_minstret_Some
+                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
+    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
+    set (s_a := set_reg σ (R_bool minstret_increment) b).
+    assert (T : forall (r : register) (v : type_of_register r),
+              register_lookup r σ.(sregs) = v ->
+              register_beq r (R_bool minstret_increment) = false ->
+              register_lookup r s_a.(sregs) = v).
+    { intros r v Hv Hne. unfold s_a, set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
+    assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt)
+      by exact (T hart_state _ Lhs0 eq_refl).
+    assert (HprivA : register_lookup cur_privilege s_a.(sregs) = User)
+      by exact (T cur_privilege _ Lpriv eq_refl).
+    assert (HpcA : register_lookup PC s_a.(sregs) = va)
+      by exact (T PC _ Lpc eq_refl).
+    assert (HmsokA : user_mstatus_ok (register_lookup mstatus s_a.(sregs))).
+    { rewrite (T mstatus _ Lms eq_refl). exact Hmsok. }
+    (* the obligation, at the post-increment state *)
+    iMod ("Hob" $! b (Hdisp b) HprivA HpcA HmsokA
+            with "[Hreg Hmd] Hnpc Hupt Hcfg")
+      as (wr ib s_x va')
+         "(%Hha & %Hwr & [Hreg Hmd] & Hnpc & Hupt & Hcfg)".
+    { unfold s_a, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd". }
+    assert (Hnop : wait_is_nop wr = false)
+      by (destruct Hwr as [-> | ->]; reflexivity).
+    (* the whole-step reduction: hart_state := WAITING, no tick, no bump *)
+    pose proof (exec_riscv_step_enter_wait σ s_x wr ib b
+                  Hsi Hhart_a Hha Hnop) as Hstep.
+    (* GHOST: the one write *)
+    iMod (reg_update _ hart_state _ (HART_WAITING (wr, ib)) with "Hreg Hhs")
+      as "[Hreg Hhs]".
+    iModIntro. iExists _.
+    iSplitR. { iPureIntro. exact Hstep. }
+    iNext.
+    unfold set_reg; cbn [sregs mem mdev].
+    iFrame "Hreg Hmd".
+    iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
+    iApply ("Hcont" with "[-]").
+    iExists (HART_WAITING (wr, ib)), ms_v, sc_v, stval_v, sepc_v, va, va', g.
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg".
+    iPureIntro.
+    split; [exact Hwr | split; [exact Hmsok | intros u Hu; discriminate Hu]].
   Qed.
 
 End UserArms.

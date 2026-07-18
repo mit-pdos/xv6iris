@@ -726,3 +726,54 @@ Proof.
   rewrite execR_bind execR_liftR Hexec2. cbn match.
   rewrite execR_returnR. cbn match. reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* §7 The ENTER-WAIT step: an ACTIVE hart executes a WRS and suspends.     *)
+(* hart_state := HART_WAITING; NO pc tick, NO minstret bump (the epilogue  *)
+(* only ticks/bumps a hart that ends the step ACTIVE) -- so PC stays at    *)
+(* the WRS and nextPC at the instruction after it, exactly the decoupled   *)
+(* shape [user_inv]'s WAITING case binds.                                  *)
+(* ===================================================================== *)
+Section StepEnterWait.
+  Context (s s_x : mstate) (wr : WaitReason) (ib : mword 32) (b : bool).
+  Hypothesis Hsi :
+    exec (should_inc_minstret (register_lookup cur_privilege s.(sregs))) s
+      = Some (b, s).
+  Let s_a : mstate := set_reg s (R_bool minstret_increment) b.
+  Hypothesis Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt.
+  Hypothesis Hha :
+    exec (run_hart_active 0) s_a = Some (Step_Execute (Enter_Wait wr, ib), s_x).
+  Hypothesis Hnop : wait_is_nop wr = false.
+
+  Let s_w : mstate := set_reg s_x hart_state (HART_WAITING (wr, ib)).
+
+  Lemma exec_riscv_step_enter_wait : exec (riscv_step false) s = Some (tt, s_w).
+  Proof using All.
+    unfold riscv_step.
+    rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (try_step 0 false) s = Some (true, s_w))).
+    { reflexivity. }
+    unfold try_step.
+    cbn [ext_pre_step_hook].
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)). cbn beta.
+    rewrite Hhart_a. cbn beta iota.
+    rewrite (exec_bind_Some _ _ _ _ _ Hha). cbn beta.
+    cbn match.
+    (* Enter_Wait arm: not a nop -> (print-skip) >> write hart_state *)
+    rewrite Hnop. cbn match.
+    assert (Lw : register_lookup hart_state s_w.(sregs) = HART_WAITING (wr, ib)).
+    { unfold s_w, set_reg; cbn [sregs]. apply register_lookup_set. }
+    erewrite exec_bind_Some.
+    2:{ erewrite exec_bind0_Some.
+        2:{ erewrite exec_bind0_Some.
+            2:{ unfold get_config_print_instr. cbn match.
+                apply (exec_returnM tt s_x). }
+            apply (exec_write_reg hart_state (HART_WAITING (wr, ib)) s_x). }
+        apply (exec_read_reg hart_state s_w). }
+    rewrite Lw. cbn beta iota.
+    apply exec_returnm.
+  Qed.
+End StepEnterWait.

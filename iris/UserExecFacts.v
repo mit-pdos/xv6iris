@@ -191,3 +191,13 @@ Lemma exec_execute_SINVAL_VMA (rs1 rs2 : regidx) (s : mstate) :
   exec (execute (SINVAL_VMA (rs1, rs2))) s
     = Some (ExecuteAs (SFENCE_VMA (rs1, rs2)), s).
 Proof. apply exec_returnm. Qed.
+
+(* WRS: a PURE Enter_Wait outcome (user-executable; the enter-wait step
+   shape parks the hart WAITING with no pc tick).                          *)
+Lemma exec_execute_WRS (op : wrsop) (s : mstate) :
+  exec (execute (WRS op)) s
+    = Some (Enter_Wait (match op with
+                        | WRS_STO => WAIT_WRS_STO
+                        | WRS_NTO => WAIT_WRS_NTO
+                        end), s).
+Proof. destruct op; apply exec_returnm. Qed.

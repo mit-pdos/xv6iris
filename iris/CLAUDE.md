@@ -395,8 +395,15 @@ files or copy code from them; build fresh from the live tree.
        UserTrap.v) delivers E_Illegal_Instr with the INSTRUCTION BITS as
        tval; gpr untouched, nextPC moved (the pre-execute write); produces
        `user_trap_frame`.
-     The only step shape without an arm is WRS ENTER-WAIT (`Enter_Wait`:
-     writes hart_state := WAITING, skips the tick, retired=false).
+     - `enter_wait_branch` + `enter_wait_obligation` (UserArms.v): run
+       outcome `Enter_Wait wr` with `wr ∈ {WRS_STO, WRS_NTO}` (= exactly
+       `user_hart_ok`'s WAITING side) — hart_state := WAITING, NO tick,
+       NO bump (`exec_riscv_step_enter_wait`, UserStep.v §7): PC stays at
+       the WRS and nextPC after it, the decoupled shape `user_inv` binds;
+       re-enters `user_inv`. `exec_execute_WRS` (UserExecFacts.v) is the
+       pure Enter_Wait outcome.
+     The step-shape arm set is COMPLETE (retire / interrupt / execute-trap
+     / fetch-fault / illegal / enter-wait).
      PURE U-MODE EXECUTE FACTS (UserExecFacts.v, iris-free, axiom-clean):
      `exec_execute_{ECALL,EBREAK}_U` (→ `rv64d_types.Trap (User,
      make_sync_exception e xv, pc)`, state unchanged — feed
