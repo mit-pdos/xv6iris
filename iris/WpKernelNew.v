@@ -23,7 +23,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec WpEntry WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpGprCsrwA WpGprCsrwB.
 Require Import WpGprMretWp.
-Require Import MinstretInv InstrBytes WpEntryNew WpTimerinit WpStartNew StackOwn.
+Require Import InstrBytes WpEntryNew WpTimerinit WpStartNew StackOwn.
 Require Import KernelText.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.

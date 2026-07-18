@@ -33,7 +33,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import WpGprCsrwCommon.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for the pop_off interrupt-off fact. *)
 Require WpGprCsrwC.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.

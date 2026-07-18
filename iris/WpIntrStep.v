@@ -29,16 +29,8 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
-Require Import WpGpr.
-Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeSret KernelText.
-Require Import WpKernelvecNew.
-Require Import WpIntrBits WpIntrCore.
 (* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the
    WpGprCsrwCommon/C namespaces don't shadow anything here. *)
-Require WpGprCsrwCommon WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

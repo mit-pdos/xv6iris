@@ -163,9 +163,9 @@ Qed.
 (* producing [user_trap_frame].  ONE arm, generic over a per-flavor        *)
 (* fault-derivation callback (the §2 / UserTranslate §3 facts plug in).    *)
 (* ===================================================================== *)
-Require Import MinstretInv InstrBytes WpGpr.
-Require Import SmodePte KptPt SmodeCore CommonWalk.
-Require Import UserBits UserPt UserExec UserStep UserTrap UserTranslate UserMem.
+Require Import KptPt CommonWalk.
+Require Import KptPt.
+Require Import UserPt UserTranslate UserMem.
 
 
 (* ===================================================================== *)

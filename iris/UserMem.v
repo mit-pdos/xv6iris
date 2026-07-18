@@ -225,7 +225,7 @@ Qed.
 (* ===================================================================== *)
 (* §3 Sourcing the fetched word from the OWNED pages.                      *)
 (* ===================================================================== *)
-Require Import KptPt CommonWalk UserBits UserPt.
+Require Import CommonWalk UserBits UserPt.
 
 (* bytes of a 4-byte-aligned access stay on the translated page *)
 Lemma u_walk_pa_window (pte0 : mword 64) (va : mword 64) (j : nat) :
