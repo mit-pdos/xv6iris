@@ -489,3 +489,109 @@ Proof.
       first [ apply (exec_sail_barrier' _ s) | apply exec_returnm ]. }
   apply exec_returnm.
 Qed.
+
+(* ===================================================================== *)
+(* CONTROL FLOW: JAL / JALR / BTYPE.  All three route through [jump_to];   *)
+(* with C enabled ([currentlyEnabled Ext_Zca = true], from hw_config's     *)
+(* misa pin) a 2-aligned target always succeeds.  The BIT-0 premise on     *)
+(* JAL/BTYPE targets is a DECODER invariant (encdec appends '0' to the     *)
+(* immediate; the fetched pc is 2-aligned) -- jump_to ASSERTS it (a false  *)
+(* assert is stuck, not a trap), so the classification must discharge it   *)
+(* from the planned decode-wf refinement of [decode_total_u_set].  JALR    *)
+(* clears bit 0 explicitly, so it needs no such premise -- only the        *)
+(* Zicfilp-off reduction for [update_elp_state].                           *)
+(* ===================================================================== *)
+Require Import WpLeafCommon.
+
+Lemma exec_execute_JAL_total (imm : mword 21) (ird : mword 5) (s : mstate) :
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  eq_vec (access_vec_dec
+            (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0)
+         ('b"0") = true ->
+  exists v : mword 64,
+    exec (execute (JAL (imm, Regidx ird))) s
+      = Some (RETIRE_SUCCESS,
+              gpr_write_state ird v
+                (set_reg s nextPC
+                   (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))).
+Proof.
+  intros Hzca Halign.
+  change (execute (JAL (imm, Regidx ird))) with (execute_JAL imm (Regidx ird)).
+  unfold execute_JAL, get_next_pc, gpr_write_state.
+  eexists.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to_zca _ s Halign Hzca)). cbn beta.
+  change RETIRE_SUCCESS with (Retire_Success tt). cbn match.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ _) ].
+Qed.
+
+Lemma exec_execute_JALR_total (imm : mword 12) (i1 ird : mword 5) (s : mstate) :
+  exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s) ->
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  (forall t : mword 64,
+     eq_vec (access_vec_dec (update_vec_dec t 0 ('b"0")) 0) ('b"0") = true) ->
+  exists (v tgt : mword 64),
+    exec (execute (JALR (imm, Regidx i1, Regidx ird))) s
+      = Some (RETIRE_SUCCESS, gpr_write_state ird v (set_reg s nextPC tgt)).
+Proof.
+  intros Hzic Hzca Hbit0.
+  change (execute (JALR (imm, Regidx i1, Regidx ird)))
+    with (execute_JALR imm (Regidx i1) (Regidx ird)).
+  unfold execute_JALR, gpr_write_state.
+  assert (Help : exec (update_elp_state (Regidx i1)) s = Some (tt, s)).
+  { unfold update_elp_state. rewrite (exec_bind_Some _ _ _ _ _ Hzic).
+    cbn match. apply exec_returnm. }
+  assert (Hpre : exec (Defs.bind0 (update_elp_state (Regidx i1)) (get_next_pc tt)) s
+                 = Some (register_lookup nextPC s.(sregs), s)).
+  { rewrite (exec_bind0_Some _ _ _ _ _ Help).
+    unfold get_next_pc. exact (exec_read_reg nextPC s). }
+  do 2 eexists.
+  rewrite (exec_bind_Some _ _ _ _ _ Hpre).
+  cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr i1 s)). cbn beta. cbv zeta.
+  erewrite exec_bind_Some.
+  2:{ apply (exec_jump_to_zca _ s); [ apply Hbit0 | exact Hzca ]. }
+  cbn beta.
+  change RETIRE_SUCCESS with (Retire_Success tt). cbn match.
+  erewrite exec_bind0_Some;
+    [ apply exec_returnm | apply (exec_wX_bits_gpr ird _ _) ].
+Qed.
+
+Lemma exec_execute_BTYPE_total (imm : mword 13) (i2 i1 : mword 5)
+    (op : bop) (s : mstate) :
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  eq_vec (access_vec_dec
+            (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0)
+         ('b"0") = true ->
+  exists s' : mstate,
+    exec (execute (BTYPE (imm, Regidx i2, Regidx i1, op))) s
+      = Some (RETIRE_SUCCESS, s')
+    /\ (s' = s \/
+        s' = set_reg s nextPC
+               (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+Proof.
+  intros Hzca Halign.
+  change (execute (BTYPE (imm, Regidx i2, Regidx i1, op)))
+    with (execute_BTYPE imm (Regidx i2) (Regidx i1) op).
+  unfold execute_BTYPE.
+  destruct op;
+    ((erewrite exec_bind_Some;
+       [ | erewrite exec_bind_Some;
+           [ cbn beta;
+             erewrite exec_bind_Some;
+             [ apply exec_returnm | apply (exec_rX_bits_gpr i2 s) ]
+           | apply (exec_rX_bits_gpr i1 s) ] ]);
+     cbn beta;
+     (match goal with
+      | |- context [ if ?C then _ else _ ] => destruct C
+      end;
+      [ (* taken: read PC, jump_to *)
+        eexists; split;
+        [ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)); cbn beta;
+          apply (exec_jump_to_zca _ s Halign Hzca)
+        | right; reflexivity ]
+      | (* fall-through *)
+        eexists; split; [ apply exec_returnm | left; reflexivity ] ])).
+Qed.

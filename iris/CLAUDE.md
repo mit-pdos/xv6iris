@@ -517,8 +517,20 @@ files or copy code from them; build fresh from the live tree.
      values irrelevant). Proof pattern: `destruct op; eexists;` then
      erewrite `exec_bind_Some`/`exec_bind0_Some` chains ending
      `apply (exec_wX_bits_gpr ird _ s)` — the existential value unifies
-     with whatever the op computes. Still to add there: JAL/JALR/BTYPE
-     (misaligned-target check needs a misa.C premise), the
+     with whatever the op computes. CONTROL FLOW is there too:
+     `exec_execute_{JAL,JALR}_total` (existential link value; JALR also
+     existential target) and `exec_execute_BTYPE_total` (∃ s', retire with
+     `s' = s ∨ s' = set_reg s nextPC target` — the taken/fall split
+     stays existential). All take `exec (currentlyEnabled Ext_Zca) s =
+     Some (true, s)` (from the misa pin); JALR additionally the Zicfilp-off
+     reduction (for `update_elp_state`) and a ∀-quantified bit0-of-
+     `update_vec_dec _ 0 'b0` premise (generically true; the mw_prep/tb1
+     scripts hang on it — discharge pending). CRITICAL GAP for JAL/BTYPE:
+     their bit-0 target premise is a DECODER invariant (encdec appends '0'
+     to the immediate) and `jump_to` ASSERTS it (false assert = STUCK, not
+     a trap) — `decode_total_{u,c}_set` must be strengthened to a
+     decode-wf set that records payload invariants (JAL/BTYPE imm bit0=0)
+     before those arms can be classified. Still to add: the
      currentlyEnabled-gated families (ZBB*/ZICOND/CLMUL*/REV8/RORI(W)/
      ZIMOP — need misa/mstateen pins), Zicbo* (senvcfg=0-gated), CSR-at-U
      dispatch, SSAMOSWAP, and the C_* ExecuteAs expansion facts.
