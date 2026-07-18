@@ -74,10 +74,7 @@ Section UserCompute.
      untouched CSR fragments.  [E] is the ambient mask. *)
   Definition retire_obligation (E : coPset) (σ : mstate) (va : mword 64)
       (g : gmap regidx (mword 64)) : iProp Σ :=
-    (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
-     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
-     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
-     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
+    (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      gpr_file g -∗
      nextPC ↦ᵣ va -∗

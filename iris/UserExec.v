@@ -57,7 +57,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpGpr.
 Require Import WpIntrCore.
 Require Import UserPt.
@@ -144,6 +144,44 @@ Definition user_mstatus_ok (ms : mword 64) : Prop :=
 (* after the trap: same pins, plus what the trap transform wrote --
    SPP = User (we trapped FROM user) and SIE = 0 (interrupts masked,
    exactly the state the kernel's S-mode leaves require) *)
+(* THE per-step pure precondition every classification obligation takes:
+   the machine (at the post-minstret-increment state the arms instantiate
+   it at) is a no-pending-interrupt User machine at pc [va] with the
+   mstatus pins.  ONE premise instead of four in every obligation. *)
+Definition u_step_pre (σ : mstate) (va : mword 64) : Prop :=
+  exec (dispatchInterrupt User) σ = Some (None, σ) /\
+  register_lookup cur_privilege σ.(sregs) = User /\
+  register_lookup PC σ.(sregs) = va /\
+  user_mstatus_ok (register_lookup mstatus σ.(sregs)).
+
+(* a register lookup survives the minstret_increment write *)
+Lemma lookup_set_mi (σ : mstate) (b : bool) (r : register) (v : type_of_register r) :
+  register_lookup r σ.(sregs) = v ->
+  register_beq r (R_bool minstret_increment) = false ->
+  register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v.
+Proof.
+  intros Hv Hne. unfold set_reg; cbn [sregs].
+  rewrite irrelevant_register_set; [exact Hv | exact Hne].
+Qed.
+
+(* the arms build [u_step_pre] at the post-increment state from the
+   σ-level frame facts + the wrapper's ∀-b dispatch fact *)
+Lemma u_step_pre_intro (σ : mstate) (va ms_v : mword 64) (b : bool) :
+  user_mstatus_ok ms_v ->
+  register_lookup cur_privilege σ.(sregs) = User ->
+  register_lookup mstatus σ.(sregs) = ms_v ->
+  register_lookup PC σ.(sregs) = va ->
+  exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
+    = Some (None, set_reg σ (R_bool minstret_increment) b) ->
+  u_step_pre (set_reg σ (R_bool minstret_increment) b) va.
+Proof.
+  intros Hmsok Lpriv Lms Lpc Hdisp.
+  split; [ exact Hdisp | ].
+  split; [ exact (lookup_set_mi σ b cur_privilege _ Lpriv eq_refl) | ].
+  split; [ exact (lookup_set_mi σ b PC _ Lpc eq_refl) | ].
+  rewrite (lookup_set_mi σ b mstatus _ Lms eq_refl). exact Hmsok.
+Qed.
+
 Definition trap_mstatus_ok (ms : mword 64) : Prop :=
   _get_Mstatus_SXL ms = 'b"10" /\
   eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\

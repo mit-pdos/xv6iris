@@ -471,7 +471,12 @@ files or copy code from them; build fresh from the live tree.
      STEP-SHAPE ARMS ALL DONE (UserArms.v, payload form, axiom-clean) —
      every arm does its own minstret prelude and takes a per-family
      obligation ∀-quantified over the increment bit at the post-increment
-     state:
+     state. Every obligation's pure precondition is the ONE Prop
+     `u_step_pre σ va` (UserExec.v: dispatch-None ∧ priv=User ∧ PC=va ∧
+     mstatus pins, at the state the obligation is instantiated at); the
+     arms build it once via `u_step_pre_intro` (+ `lookup_set_mi` for the
+     hart-state transport) — do NOT re-introduce per-obligation premise
+     lists or per-arm transport blocks:
      - `retire_branch` + `retire_obligation` (UserCompute.v): retiring
        steps (compute/control/fence/nop). The obligation owns exactly what
        fetch+execute mutate (interp, gpr file, nextPC cell, `upt_inv`;
@@ -588,7 +593,15 @@ files or copy code from them; build fresh from the live tree.
      needs at an existential post-execute state are READ there via
      `reg_valid_dq` against the withheld cells (priv/mstatus/scause/PC)
      and the persistent `hw_config` cells (misa/elp) and `user_cfg`
-     fractional cells (stvec/medeleg).
+     fractional cells (stvec/medeleg). KNOWN CLEANUP DEBT: the three
+     sync-trap arms (execute-trap / fetch-fault / illegal) share their
+     ~60-line tower-ghost + `user_trap_frame`-rebuild block verbatim (they
+     differ only in the exception/tval/sepc values and the riscv_step
+     wrapper). The factoring: a `utrap_state s_x elp0 ms_v sc_v info pcx`
+     mstate definition spelling the LITERAL 12-write tower, a ghost lemma
+     `interp s_x ∗ cells ==∗ interp (utrap_state …) ∗ cells-at-final`, and
+     a frame-rebuild lemma — delicate only in keeping the definition
+     syntactically aligned with what the step wrappers produce.
      OTHER ENGINES DONE (axiom-clean): fetch-success composer
      `upt_fetch_instr` (UserFetch §6, word from the existential pages via
      `upt_fetch_word`/`upt_fetch_mem_read`, UserMem.v);

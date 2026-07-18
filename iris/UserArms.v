@@ -112,22 +112,12 @@ Section UserArms.
                 (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     set (s_a := set_reg σ (R_bool minstret_increment) b).
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r σ.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r s_a.(sregs) = v).
-    { intros r v Hv Hne. unfold s_a, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt)
-      by exact (T hart_state _ Lhs0 eq_refl).
-    assert (HprivA : register_lookup cur_privilege s_a.(sregs) = User)
-      by exact (T cur_privilege _ Lpriv eq_refl).
-    assert (HpcA : register_lookup PC s_a.(sregs) = va)
-      by exact (T PC _ Lpc eq_refl).
-    assert (HmsokA : user_mstatus_ok (register_lookup mstatus s_a.(sregs))).
-    { rewrite (T mstatus _ Lms eq_refl). exact Hmsok. }
+      by exact (lookup_set_mi σ b hart_state _ Lhs0 eq_refl).
+    assert (Hpre : u_step_pre s_a va)
+      by exact (u_step_pre_intro σ va ms_v b Hmsok Lpriv Lms Lpc (Hdisp b)).
     (* the per-family obligation, at the post-increment state *)
-    iMod ("Hob" $! b (Hdisp b) HprivA HpcA HmsokA
+    iMod ("Hob" $! b Hpre
             with "[Hreg Hmd] Hgpr Hnpc Hupt Hcfg")
       as (ib s_x g' va')
          "(%Hha & %Hhart_x & %Hmi_x & %Lnpc_x & [Hreg Hmd] & Hgpr & Hnpc & Hupt & Hcfg)".
@@ -184,10 +174,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Definition execute_trap_obligation (E : coPset) (σ : mstate) (va : mword 64)
       (g : gmap regidx (mword 64)) : iProp Σ :=
-    (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
-     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
-     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
-     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
+    (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      gpr_file g -∗
      nextPC ↦ᵣ va -∗
@@ -249,22 +236,12 @@ Section UserArms.
                 (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     set (s_a := set_reg σ (R_bool minstret_increment) b).
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r σ.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r s_a.(sregs) = v).
-    { intros r v Hv Hne. unfold s_a, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt)
-      by exact (T hart_state _ Lhs0 eq_refl).
-    assert (HprivA : register_lookup cur_privilege s_a.(sregs) = User)
-      by exact (T cur_privilege _ Lpriv eq_refl).
-    assert (HpcA : register_lookup PC s_a.(sregs) = va)
-      by exact (T PC _ Lpc eq_refl).
-    assert (HmsokA : user_mstatus_ok (register_lookup mstatus s_a.(sregs))).
-    { rewrite (T mstatus _ Lms eq_refl). exact Hmsok. }
+      by exact (lookup_set_mi σ b hart_state _ Lhs0 eq_refl).
+    assert (Hpre : u_step_pre s_a va)
+      by exact (u_step_pre_intro σ va ms_v b Hmsok Lpriv Lms Lpc (Hdisp b)).
     (* the per-family obligation, at the post-increment state *)
-    iMod ("Hob" $! b (Hdisp b) HprivA HpcA HmsokA
+    iMod ("Hob" $! b Hpre
             with "[Hreg Hmd] Hgpr Hnpc Hupt Hcfg")
       as (ib s_x g' e xv pcx va')
          "(%Hha & %He & %Hhart_x & %Hmi_x & %Lnpc_x & [Hreg Hmd] & Hgpr & Hnpc & Hupt & Hcfg)".
@@ -372,10 +349,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Definition fetch_fault_obligation (E : coPset) (σ : mstate) (va : mword 64)
       : iProp Σ :=
-    (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
-     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
-     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
-     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
+    (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      upt_inv pt -∗
      user_cfg C -∗
@@ -430,22 +404,12 @@ Section UserArms.
                 (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     set (s_a := set_reg σ (R_bool minstret_increment) b).
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r σ.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r s_a.(sregs) = v).
-    { intros r v Hv Hne. unfold s_a, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt)
-      by exact (T hart_state _ Lhs0 eq_refl).
-    assert (HprivA : register_lookup cur_privilege s_a.(sregs) = User)
-      by exact (T cur_privilege _ Lpriv eq_refl).
-    assert (HpcA : register_lookup PC s_a.(sregs) = va)
-      by exact (T PC _ Lpc eq_refl).
-    assert (HmsokA : user_mstatus_ok (register_lookup mstatus s_a.(sregs))).
-    { rewrite (T mstatus _ Lms eq_refl). exact Hmsok. }
+      by exact (lookup_set_mi σ b hart_state _ Lhs0 eq_refl).
+    assert (Hpre : u_step_pre s_a va)
+      by exact (u_step_pre_intro σ va ms_v b Hmsok Lpriv Lms Lpc (Hdisp b)).
     (* the per-flavor obligation, at the post-increment state *)
-    iMod ("Hob" $! b (Hdisp b) HprivA HpcA HmsokA
+    iMod ("Hob" $! b Hpre
             with "[Hreg Hmd] Hupt Hcfg")
       as (s_f e xv)
          "(%Hha & %He & %Hhart_f & %Hmi_f & [Hreg Hmd] & Hupt & Hcfg)".
@@ -547,10 +511,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Definition illegal_obligation (E : coPset) (σ : mstate) (va : mword 64)
       : iProp Σ :=
-    (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
-     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
-     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
-     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
+    (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      nextPC ↦ᵣ va -∗
      upt_inv pt -∗
@@ -607,22 +568,12 @@ Section UserArms.
                 (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     set (s_a := set_reg σ (R_bool minstret_increment) b).
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r σ.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r s_a.(sregs) = v).
-    { intros r v Hv Hne. unfold s_a, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt)
-      by exact (T hart_state _ Lhs0 eq_refl).
-    assert (HprivA : register_lookup cur_privilege s_a.(sregs) = User)
-      by exact (T cur_privilege _ Lpriv eq_refl).
-    assert (HpcA : register_lookup PC s_a.(sregs) = va)
-      by exact (T PC _ Lpc eq_refl).
-    assert (HmsokA : user_mstatus_ok (register_lookup mstatus s_a.(sregs))).
-    { rewrite (T mstatus _ Lms eq_refl). exact Hmsok. }
+      by exact (lookup_set_mi σ b hart_state _ Lhs0 eq_refl).
+    assert (Hpre : u_step_pre s_a va)
+      by exact (u_step_pre_intro σ va ms_v b Hmsok Lpriv Lms Lpc (Hdisp b)).
     (* the per-family obligation, at the post-increment state *)
-    iMod ("Hob" $! b (Hdisp b) HprivA HpcA HmsokA
+    iMod ("Hob" $! b Hpre
             with "[Hreg Hmd] Hnpc Hupt Hcfg")
       as (ib s_x va')
          "(%Hha & %Hhart_x & %Hmi_x & %Lnpc_x & [Hreg Hmd] & Hnpc & Hupt & Hcfg)".
@@ -727,10 +678,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Definition enter_wait_obligation (E : coPset) (σ : mstate) (va : mword 64)
       : iProp Σ :=
-    (⌜exec (dispatchInterrupt User) σ = Some (None, σ)⌝ -∗
-     ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
-     ⌜register_lookup PC σ.(sregs) = va⌝ -∗
-     ⌜user_mstatus_ok (register_lookup mstatus σ.(sregs))⌝ -∗
+    (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      nextPC ↦ᵣ va -∗
      upt_inv pt -∗
@@ -783,22 +731,12 @@ Section UserArms.
                 (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     set (s_a := set_reg σ (R_bool minstret_increment) b).
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r σ.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r s_a.(sregs) = v).
-    { intros r v Hv Hne. unfold s_a, set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     assert (Hhart_a : register_lookup hart_state s_a.(sregs) = HART_ACTIVE tt)
-      by exact (T hart_state _ Lhs0 eq_refl).
-    assert (HprivA : register_lookup cur_privilege s_a.(sregs) = User)
-      by exact (T cur_privilege _ Lpriv eq_refl).
-    assert (HpcA : register_lookup PC s_a.(sregs) = va)
-      by exact (T PC _ Lpc eq_refl).
-    assert (HmsokA : user_mstatus_ok (register_lookup mstatus s_a.(sregs))).
-    { rewrite (T mstatus _ Lms eq_refl). exact Hmsok. }
+      by exact (lookup_set_mi σ b hart_state _ Lhs0 eq_refl).
+    assert (Hpre : u_step_pre s_a va)
+      by exact (u_step_pre_intro σ va ms_v b Hmsok Lpriv Lms Lpc (Hdisp b)).
     (* the obligation, at the post-increment state *)
-    iMod ("Hob" $! b (Hdisp b) HprivA HpcA HmsokA
+    iMod ("Hob" $! b Hpre
             with "[Hreg Hmd] Hnpc Hupt Hcfg")
       as (wr ib s_x va')
          "(%Hha & %Hwr & [Hreg Hmd] & Hnpc & Hupt & Hcfg)".
