@@ -83,6 +83,31 @@ Proof.
   apply exec_returnM.
 Qed.
 
+(* helper: exec_BTYPE_cmp_BLTU *)
+Local Lemma exec_BTYPE_cmp_BLTU (rs2 rs1 : mword 5) s :
+  exec (Defs.bind (rX_bits (Regidx rs1))
+          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
+             (fun w3 => returnM (zopz0zI_u w2 w3)))) s
+    = Some (zopz0zI_u (rvv rs1 s) (rvv rs2 s), s).
+Proof.
+  unfold rvv.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  apply exec_returnM.
+Qed.
+
+(* helper: exec_execute_BTYPE_BLTU_fall *)
+Local Lemma exec_execute_BTYPE_BLTU_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
+  zopz0zI_u (rvv rs1 s) (rvv rs2 s) = false ->
+  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))) s
+    = Some (RETIRE_SUCCESS, s).
+Proof.
+  intro Hfall.
+  unfold execute. cbn match. unfold execute_BTYPE.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BLTU rs2 rs1 s)).
+  rewrite Hfall. apply exec_returnM.
+Qed.
+
 (* helper: exec_execute_BTYPE_BEQ_taken *)
 Local Lemma exec_execute_BTYPE_BEQ_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
     eq_vec (rvv rs1 s) (rvv rs2 s) = true ->
@@ -767,6 +792,97 @@ Section WpSmodePtBtype.
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
     exact (wp_bne_fall_s_config_scfg_r (kpt_regime root_ppn) γ Φ pc imm rs2 rs1 m (dq:=dq)).
+  Qed.
+
+  Lemma wp_bltu_fall_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : gmap regidx (mword 64))
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
+    hw_config -∗ minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    sr_inv R -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU)) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      sr_inv R -∗
+      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp)
+      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+       [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iApply (wp_instr_s_config_regime R Φ pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
+              mstatus0 mie_v mdv0 menvcfg0
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
+    iIntros (σ Hpceq)
+      "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply lookup_lookup_total_dom; apply Hdom).
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct ("Hfba" with "Hrac") as "Hfmap".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
+    iModIntro. iExists s_pc.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      apply exec_execute_BTYPE_BLTU_fall. unfold rvv. rewrite Lva Lvb. exact Hcmp. }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+                          [$Hpc' $Hnpc] [Hfmap]").
+    iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+  Qed.
+
+  Lemma wp_bltu_fall_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
+    smode_config γ dq -∗ sr_inv R -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU)) -∗
+    ( smode_config γ dq -∗ sr_inv R -∗
+      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs1 Hrs2 Hcmp) "Hsm Htlbinv Hpc Hgpr Hinstr Hcont".
+    iDestruct (smode_config_unbundle with "Hsm") as
+      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
+    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
+    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+    iApply (wp_bltu_fall_s_config_r R Φ pc imm rs2 rs1 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
+ HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hinstr").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr".
+    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
+                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
+                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
+    iApply ("Hcont" with "Hsm Htlbinv Hpc Hgpr").
   Qed.
 
   Lemma wp_bne_taken_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
