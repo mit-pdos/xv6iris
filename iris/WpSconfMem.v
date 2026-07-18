@@ -1764,4 +1764,62 @@ Section WpSconfMem.
   Qed.
 
 
+
+  (* ------------------------------------------------------------------- *)
+  (* c.ldsp / c.sdsp -- the sp-relative immediate forms, bridged onto     *)
+  (* the c.ld / c.sd leaves by [sext9_12_64] (pure immediate rewrite).    *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_cldsp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (uimm : mword 6) (rd : mword 5)
+      (m : gmap regidx (mword 64)) (v : mword 64) {dqm : dfrac} :
+    let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
+    let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
+    pa ↦₈{ dqm } v -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg v]> m) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
+      pa ↦₈{ dqm } v -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros imm pa Hrd Hrdsp.
+    unfold pa.
+    rewrite <- sext9_12_64.
+    change sp with (Regidx csp_rs1).
+    exact (wp_cld_s_sconf γ root_ppn Φ pc rd csp_rs1 imm m v (dqm:=dqm) Hrd Hrdsp).
+  Qed.
+
+  Lemma wp_csdsp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
+      (m : gmap regidx (mword 64)) (vold : mword 64) :
+    let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
+    let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗
+    instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
+    pa ↦₈ vold -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file m -∗
+      pa ↦₈ (m !!! Regidx rs2) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros imm pa.
+    unfold pa.
+    rewrite <- sext9_12_64.
+    change sp with (Regidx csp_rs1).
+    exact (wp_csd_s_sconf γ root_ppn Φ pc rs2 csp_rs1 imm m vold).
+  Qed.
+
 End WpSconfMem.
