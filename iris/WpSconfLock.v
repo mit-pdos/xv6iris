@@ -20,6 +20,7 @@ Require Import SmodeCore WpSmodeGpr WpMmodeJal.
 Require Import KptTree SmodeCorePt WpSmodePtLeaves WpSmodePtMem WpSmodePtLock WpAmo.
 Require Import WpLock.
 Require Import StackOwn WpSmodeSret AlignBits.
+Require Import SRegime.
 Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -237,10 +238,22 @@ Section WpSconfLock.
                             set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd)))
                               (regval_into_reg (sign_extend' 64 v)))).
     { rewrite <- Hev.
-      apply (exec_execute_LOAD_4_gpr_S_walk_pt rs1 rd imm v region_ld satp1 s_pc s_tr Hrd
-               Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode
-               ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
-               ltac:(rewrite Lmenv_pc; exact Hpmm)
+      assert (Htea : exec (transform_effective_address
+                 (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                           (sign_extend' 64 imm))) (Load Data)) s_pc
+               = Some (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                           (sign_extend' 64 imm)), s_pc)).
+      { apply (exec_transform_effective_address_mode (Load Data) Sv39 _ s_pc Lpriv_pc
+                 (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
+                    ltac:(rewrite Lms_pc; exact HMPRV))
+                 (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
+                    ltac:(rewrite Lmenv_pc; exact Hpmm))
+                 (exec_translationMode_S_sv39 satp1 s_pc
+                    ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode)). }
+      apply (exec_execute_LOAD_4_gpr_S_walk_pt rs1 rd imm v region_ld s_pc s_tr Hrd
+               Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign4) ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; exact Htr_pc)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                ltac:(rewrite Lpmpc_tr; exact HA0) ltac:(rewrite Lpmpaddr_tr; exact Hord0)
@@ -455,10 +468,22 @@ Section WpSconfLock.
                             MState s_tr.(sregs)
                               (write_bytes s_tr.(mem) pa 4 storeval)
                               s_tr.(mdev))).
-    { pose proof (exec_execute_STORE_4_gpr_S_walk_pt (mword_of_int 0 : mword 5) rs1 imm region_st satp1 s_pc s_tr
-               Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode
-               ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
-               ltac:(rewrite Lmenv_pc; exact Hpmm)
+    { assert (Htea : exec (transform_effective_address
+            (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                           (sign_extend' 64 imm))) (Store Data)) s_pc
+          = Some (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                           (sign_extend' 64 imm)), s_pc)).
+ { apply (exec_transform_effective_address_mode (Store Data) Sv39 _ s_pc Lpriv_pc
+            (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
+               ltac:(rewrite Lms_pc; exact HMPRV))
+            (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
+               ltac:(rewrite Lmenv_pc; exact Hpmm))
+            (exec_translationMode_S_sv39 satp1 s_pc
+               ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode)). }
+ pose proof (exec_execute_STORE_4_gpr_S_walk_pt (mword_of_int 0 : mword 5) rs1 imm region_st s_pc s_tr
+               Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign4) ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; exact Htr_pc)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                ltac:(rewrite Lpmpc_tr; exact HA0) ltac:(rewrite Lpmpaddr_tr; exact Hord0)
@@ -694,10 +719,22 @@ Section WpSconfLock.
                    (regval_into_reg (amoswap_loaded w))).
     assert (Hexec : exec (execute (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))) s_pc
                     = Some (RETIRE_SUCCESS, s_x)).
-    { rewrite (exec_execute_AMOSWAP_4_gpr_S_walk_pt rs2 rs1 rd region_amo satp1 w s_pc s_tr Hrd
-                 Lpriv_pc ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode
-                 ltac:(rewrite Lms_pc; exact HMPRV) ltac:(rewrite Lms_pc; exact HMXR)
-                 ltac:(rewrite Lmenv_pc; exact Hpmm)
+    { assert (Htea : exec (transform_effective_address
+            (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                           (zeros' 64))) (Atomic (AMOSWAP, Data, Data))) s_pc
+          = Some (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                           (zeros' 64)), s_pc)).
+ { apply (exec_transform_effective_address_mode (Atomic (AMOSWAP, Data, Data)) Sv39 _ s_pc Lpriv_pc
+            (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) s_pc
+               ltac:(rewrite Lms_pc; exact HMPRV))
+            (exec_get_pmlen_amo_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
+               ltac:(rewrite Lmenv_pc; exact Hpmm))
+            (exec_translationMode_S_sv39 satp1 s_pc
+               ltac:(rewrite Lms_pc; exact HSXL) Lsatp_pc Hmode)). }
+ rewrite (exec_execute_AMOSWAP_4_gpr_S_walk_pt rs2 rs1 rd region_amo w s_pc s_tr Hrd
+                 Htea
                  ltac:(rewrite Ha8_pc; exact Halign4)
                  ltac:(rewrite Ha8_pc; exact Htr_pc)
                  Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
