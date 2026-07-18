@@ -25,6 +25,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - userret: tricky state at second sfence.vma: new page table but old TLB contents (TransPt.v)
 - kpt_regime: unified Bare + Sv39 page-table configurations
 - needed axioms about load_reservation and cancel_reservation, which aren't specified in Sail model
+- push_off returns intr_off_tok, which is needed to call pop_off to ensure no panic (probably need to revise this spec to have a push_off stack/count)
 
 Big things that still need to be done/explored:
 
