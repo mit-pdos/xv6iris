@@ -35,6 +35,7 @@ Require Import UserBits.
 Require Import UserMem.
 Require Import UserMemPt.
 Require Import WpLoad.
+Require Import WpMmodeLeafBase.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -163,3 +164,140 @@ Section UserMemAccessLoad.
   Qed.
 
 End UserMemAccessLoad.
+
+(* ===================================================================== *)
+(* §2 The aligned vmem_write_addr reduction (width 8).                     *)
+(*    STORE (res=false): mem_write_ea then mem_write_value, write_success  *)
+(*    = true.  The premise-shaped form takes the ea + write facts, so it   *)
+(*    serves the SC-success arm too (via the [access]/[res] parameters).   *)
+(* ===================================================================== *)
+
+Lemma exec_vmem_write_addr_aligned_store_8 (va pa : mword 64) (dat : mword (8*8))
+    (s s' : mstate) :
+  is_aligned_vaddr (Virtaddr va) 8 = true ->
+  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))) (Store Data)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
+  exec (mem_write_ea (Physaddr pa) 8 false false false) s' = Some (Ok tt, s') ->
+  exec (mem_write_value (Physaddr pa) 8 dat (Store Data) PBMT_PMA false false false) s'
+    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa 8 dat) s'.(mdev)) ->
+  exec (vmem_write_addr (Virtaddr va) 8 dat (Store Data) false false false) s
+    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa 8 dat) s'.(mdev)).
+Proof.
+  intros Halign Htr Hea Hwv.
+  set (sw := MState s'.(sregs) (write_bytes s'.(mem) pa 8 dat) s'.(mdev)).
+  unfold vmem_write_addr.
+  rewrite exec_catch_early_return.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
+                          liftR (split_misaligned (Virtaddr va) 8)) s = Some (inr (1, 8), s)).
+  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned (Virtaddr va) s Halign). reflexivity. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+  rewrite misaligned_order_1.
+  match goal with
+  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (true, 0%Z, true), sw))
+  end.
+  { eapply execR_untilMT_1.
+    - reflexivity.
+    - cbn match.
+      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+      rewrite (execR_liftR_seq _ _ _ _ _ Htr).
+      cbn [bits_of_virtaddr] in *. cbn match.
+      assert (Hsc : exec (assert_exp (Bool.eqb false (is_store_conditional (Store Data)))
+                            "sys/vmem_utils.sail:197.50-197.51") s' = Some (tt, s')) by reflexivity.
+      assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data)))
+                              "sys/vmem_utils.sail:197.50-197.51")
+                            : Defs.monadR (result bool ExecutionResult) exception unit) s'
+                     = Some (inr tt, s'))
+        by (rewrite execR_liftR; rewrite Hsc; reflexivity).
+      match goal with
+      | |- context [ Defs.bind (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) ?post ] =>
+          assert (Hwrloop : execR (Defs.bind0 (Defs.liftR asrt) Nbody) s' = Some (inr true, sw))
+      end.
+      { match goal with
+        | |- execR (Defs.bind0 _ ?Nbody) s' = _ => set (NN := Nbody)
+        end.
+        rewrite (execR_bind0_Some _ _ _ _ Hscm).
+        unfold NN; clear NN.
+        match goal with
+        | |- execR (match _ as x in bool return @?P x with | true => _ | false => ?B end) ?ss = ?R =>
+            change (execR B ss = R)
+        end.
+        rewrite (execR_liftR_seq _ _ _ _ _ Hea).
+        cbn match.
+        match goal with
+        | |- context [ mem_write_value ?pp 8 ?D (Store Data) ?pb false false false ] =>
+            replace D with dat
+        end.
+        2:{ symmetry.
+            change (8*(0+1)*8-1) with 63. change (8*0*8) with 0.
+            rewrite autocast_id.
+            unfold subrange_vec_dec. change (63 - 0 + 1) with 64. rewrite autocast_id.
+            unfold to_word_idx, to_word, get_word, MachineWord.MachineWord.slice.
+            rewrite MachineWord.MachineWord.cast_idx_refl.
+            apply bv_eq. rewrite bv_extract_unsigned.
+            change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0. rewrite Z.shiftr_0_r.
+            apply bv_wrap_bv_unsigned. }
+        rewrite (execR_liftR_seq _ _ _ _ _ Hwv).
+        cbn match. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hwrloop).
+      cbn. apply execR_returnR_fwd.
+    - apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu).
+  cbn. reflexivity.
+Qed.
+
+Section UserMemAccessStore.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma user_pt_vmem_write_addr_store_8 (uroot tfp : mword 44)
+      (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
+      (w va : mword 64) (dat : mword (8*8)) (σ : mstate) :
+    um !! svpn_of va = Some w ->
+    uleaf_ok (Store Data) w ->
+    udata_cov um data ->
+    is_aligned_vaddr (Virtaddr va) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1") = false ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ∃ σ' : mstate,
+      ⌜exec (vmem_write_addr (Virtaddr va) 8 dat (Store Data) false false false) σ
+        = Some (Ok true, MState σ'.(sregs) (write_bytes σ'.(mem) (u_walk_pa w va) 8 dat) σ'.(mdev))⌝ ∗
+      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
+      ⌜(σ'.(sregs) = σ.(sregs) \/
+        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
+      reg_interp σ'.(sregs) ∗
+      gen_heap_interp (write_bytes σ'.(mem) (u_walk_pa w va) 8 dat) ∗
+      utlb_inv_pt uroot tfp um ∗ udata_own data.
+  Proof.
+    intros Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
+    iIntros "Hri Hgh Hinv Hdata".
+    iMod (user_pt_store_data_8 uroot tfp um data w va dat σ
+            Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
+            with "Hri Hgh Hinv Hdata")
+      as (σ') "(%Htr & %Hwv & %Hmdev & %Hsregs & Hri & Hgh & Hinv & Hdata)".
+    iModIntro. iExists σ'.
+    iSplit; [ iPureIntro | ].
+    { apply (exec_vmem_write_addr_aligned_store_8 va (u_walk_pa w va) dat σ σ' Hal).
+      - change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))
+          with (add_vec_int va (0 * 8)).
+        rewrite avi0_mul8. exact Htr.
+      - exact (exec_mem_write_ea (u_walk_pa w va) σ').
+      - exact Hwv. }
+    iSplit; [ iPureIntro; exact Hmdev | ].
+    iSplit; [ iPureIntro; exact Hsregs | ].
+    iFrame "Hri Hgh Hinv Hdata".
+  Qed.
+
+End UserMemAccessStore.
