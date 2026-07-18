@@ -186,7 +186,88 @@ root `README.md`: state current behavior/config as fact, not "X used to do Y" /
 - **The general interrupt invariant + interrupt-absorbing step engine (WpIntrInv.v, LIVE, all proven, tick-aware).** The SIE ghost `γ` (the `smode_config` argument) is split **1/2 + 1/4 + 1/4** (`sie_ghost_alloc`): the HALF rides with the mstatus cell tied to the live SIE bit; one QUARTER is the kernel-code "interrupts are currently on/off" token (for push_off/pop_off-style reasoning); one QUARTER lives in `intr_inv γ handler root_ppn menvcfg0 := ⌜TV_Direct⌝ ∗ ⌜stvec_base handler = handler⌝ ∗ inv intrN (∃ b, ghost_var γ (1/4) b ∗ stvec ↦ᵣ handler ∗ □(⌜b='1'⌝ -∗ intr_handler_spec handler root_ppn menvcfg0))` — the two handler-address facts are fixed at allocation (`kernelvec_tv_direct`/`kernelvec_stvec_base` discharge them for kernelvec). Changing SIE needs all three ghost pieces (`sie_ghost_flip`; the flipping csr-leaf must open the invariant across its own step — push_off/pop_off integration NOT done yet). **`intr_config γ` is the SIE=1 mirror of `smode_config`** (which is unusable here — it pins SIE=0): hw_config + minstret_inv + cur_privilege + (∃ms, mstatus ∗ tied ghost half ∗ ⌜`intr_ms_facts`⌝ [SIE=1+MPRV/SXL/MXR/TSR+XS/FS/VS/SD/MPP, roundtrip-closed via `intr_ms_facts_roundtrip`]) + (∃mie,mdv with mie&~mdv=0) + value-agnostic sepc/scause/stval (the trap scribbles them). All cells FULL (the trap writes them); hart_state deliberately NOT bundled (the step engine holds it across the σ-callback, like `wp_exec_step_hart_active_inv`). **The per-trap frame is the CONCRETE `intr_frame root_ppn menvcfg0 m := menvcfg ↦ᵣ menvcfg0 ∗ tlb_inv root_ppn ∗ (∃ n, ⌜kv_frame_slots ≤ n⌝ ∗ stack_own (m!!!sp) n)`** (no higher-order frame parameter — the specific predicate is plugged in): THE KERNEL MUST MAINTAIN `stack_own` OF DEPTH ≥ `kv_frame_slots` (= 32 slots = 256 bytes, kernelvec's c.addi16sp frame) BELOW SP AT EVERY INTERRUPTS-ENABLED INSTRUCTION; the depth is a BOUND — a client packs in however much free below-sp stack it owns.
 - **THE ENGINE `wp_exec_step_intr γ handler pc0 root_ppn menvcfg0 m`**: premise `sret_tgt pc0 = pc0`; resources `intr_inv`, hart_state, `intr_config γ`, `pc_is pc0`, `gpr_file m`, `intr_frame root_ppn menvcfg0 m`; the σ-callback gets ONE pure fact `exec (dispatchInterrupt Supervisor) σ = Some (None, σ)`, every threaded resource back UNCHANGED, and owes `wp_exec_step_hart_active_inv`'s retire obligation. Internals: a Löb loop over the joint rule `wp_exec_step_retire_or_intr` (merge of `wp_exec_step_hart_active_inv` + `wp_exec_step_interrupt_inv` over `wp_exec_step_minstret` — the σ-callback picks retire-vs-trap AFTER seeing σ; retire bumps minstret, a taken interrupt does not). Dispatch inputs mip/sig_meip/sig_seip are read straight OFF σ (`dispatch_S_transient`, pure conclusion): they live in `clock_inv`/`wire_inv` and can never be pinned by cells, so the interrupt SOURCES need no ownership at all. Pending → borrow stvec + quarter + handler WP from `intr_inv` for the trap step (ghost agreement with the client half pins b='1'), run the handler, Löb — arbitrarily many back-to-back interrupts absorbed. `intr_handler_spec handler root_ppn menvcfg0` (persistent, lives in the invariant) is the round-trip contract ∀-quantified PER TRAP over (elp, ms with facts, pc0, mie/mdv, m): from `pc_is handler` at `trap_ms elp ms` with `gpr_file m ∗ intr_frame … m` back to pc0 at `sret_ms5 (trap_ms elp ms)` with the SAME `gpr_file m` (stated explicitly so callers see file preservation) and the frame intact. Axiom-clean (baseline 5 + funext; kernelvec instantiation adds `kerneltrap_returns`). Also there: `s_dispatch_None_of_pending_zero` (the "SIP=0" form), `intr_inv_alloc{,_off}`. Proof gotcha: `destruct <term taken from Hdisp0's type> eqn:Hdres` substitutes into Hdisp0 too — a follow-up `rewrite Hdres in Hdisp0` then FAILS (nothing to rewrite).
 - **`kernelvec_handler_spec`: kernelvec satisfies the contract.** The proof peels the top 32 slots (`stack_own_split_1`, the remainder rides along), re-addresses kernelvec's 17 sparse positive-offset windows as `pa_stk` slots via `kv_slot_addr{,0}` (kv_sp1 = sp−256, so window kv_sp1+8j = slot 32−j; used slots k ∈ {2..5,16..23,26..28,30,32}), flattens/rebuilds the 32-slot frame with the `stack_own_slots; cbn [seq]` incantation, recombines with `stack_own_split_2`, and allocates a FRESH per-trap SIE ghost `γk` for `wp_kernelvec` — the real γ's pieces ride outside the handler run untouched (SIE=1 is restored by the sret, so the live-bit tie resumes for free; `roundtrip_SIE_true` recasts the ghost value).
-- **REMAINING for the SIE=1 regime:** per-instruction engines consuming the engine's σ-fact (port the parked WpIntrCore §6 `wp_instr_s_intr_tlbinv` onto the current kpt fetch chain, swapping the SIE=0 dispatch discharge for the callback's `s_dispatch = None`); a whole-instruction WpIntrStep-style example; push_off/pop_off ghost/invariant integration. WpIntrStep.v and WpIntrCore.v's `§5b/§6` region stay COMMENTED OUT as the old pinned-cell example (`acq_ms_facts` was reborn as `intr_ms_facts` in WpIntrInv.v). WpIntrCore's PURE prefix (`s_dispatch`, getPendingSet/trap reduce lemmas, `Section StepInterrupt`, `wp_exec_step_interrupt_inv`, `reg_interp_set_same`, `elp_no_lp`, `s_dispatch_Some_S`) is live and consumed by WpIntrInv.v/WpUart.
+- WpIntrStep.v (the old pinned-cell single-instruction example) is DELETED — do not resurrect it; `acq_ms_facts` was reborn as `intr_ms_facts` in WpIntrInv.v. WpIntrCore.v's `§5b/§6` region stays COMMENTED OUT as porting stock for the SIE=1 instruction engine (worklist item 1 below). WpIntrCore's PURE prefix (`s_dispatch`, getPendingSet/trap reduce lemmas, `Section StepInterrupt`, `wp_exec_step_interrupt_inv`, `reg_interp_set_same`, `elp_no_lp`, `s_dispatch_Some_S`) is live and consumed by WpIntrInv.v/WpUart.
+
+## Worklist: SIE-agnostic S-mode execution lemmas (the interrupt sweep)
+
+GOAL: every S-mode execution lemma — leaf instructions upward — holds whether
+interrupts are enabled or disabled, discharging "no interrupt dispatched"
+either from SIE=0 (as today) or by absorbing pending interrupts through
+`intr_inv`/`wp_exec_step_intr`.  Migrate ADDITIVELY (new definitions beside
+old, call sites flipped file-by-file, old variants deleted last) so `make
+proofs` is green at every commit; validate the interface on a VERTICAL PILOT
+before any mechanical sweep.
+
+1. **SIE=1 instruction engine (new file WpSmodeIntr.v).** Port the parked
+   WpIntrCore §6 `wp_instr_s_intr_tlbinv` onto the current kpt fetch chain,
+   rebased on `wp_exec_step_intr`: inside its σ-callback drive the unified
+   fetch (`fetch_from_instr_bytes_s_consistent_gen` — the fetch chain is
+   σ-level and SIE-blind, so it reuses verbatim; tlb_inv/menvcfg borrowed
+   from `intr_frame`), discharge dispatch from the callback's
+   `exec (dispatchInterrupt Supervisor) σ = Some (None, σ)` fact, and
+   assemble the retire witness via `exec_hart_active_progress{,_RVC}`.
+   Deliverable: `wp_instr_s_intr` with the same callback shape as
+   `wp_instr_s_config_tlbinv`'s, plus an RVC gpr-write engine on top.
+2. **Pilot.** Prove ONE real leaf (e.g. `wp_addi_s`'s SIE=1 twin) over the
+   Stage-1 engine and chain 2-3 of them into a straight-line demo at SIE=1
+   (arbitrary interrupts absorbed, `intr_frame`/`stack_own` threaded).
+   This validates the whole interface stack end-to-end BEFORE the sweep;
+   expect interface fixes here, not later.  (The old WpIntrStep.v example
+   is deleted — do not port it.)
+3. **REPLACE `smode_config` with ONE SIE-agnostic bundle** (do NOT keep the
+   old SIE=0-pinned smode_config as a disjunct — it is superseded).  The v2
+   bundle = today's `intr_config` + the menvcfg conjunct (moved back from
+   `intr_frame`): SIE UNPINNED, `intr_ms_facts`-minus-SIE common facts, the
+   ghost half tied to the live bit.  The SIE discrimination is the
+   kernel-code ghost QUARTER, threaded beside the bundle as
+   `sie_cap γ m := ghost_var γ (1/4) '0'
+                   ∨ (ghost_var γ (1/4) '1' ∗ (∃sepc)(∃scause)(∃stval)
+                      ∗ ∃ n ≥ kv_frame_slots, stack_own (m!!!sp) n)` —
+   the trap CSRs and the stack bound are demanded ONLY when interrupts are
+   on; SIE=0 code (kernelvec's own body, sret paths) keeps owning sepc
+   explicitly as today.  The engines learn the mode by GHOST AGREEMENT
+   (quarter value vs the bundle's tied half), replacing every pure SIE=0
+   premise.  sepc-pinned code (kernelvec body) runs in the '0' arm where
+   sie_cap owns nothing.  The m-coupling of the '1' arm needs a retarget
+   lemma (`m!!!sp = m'!!!sp → sie_cap γ m -∗ sie_cap γ m'`) applied after
+   non-sp writes, and explicit re-carving at sp-moving instructions (where
+   function proofs already do stack bookkeeping).  dq-fractionality: the v2
+   bundle is FULL-ownership (the trap writes its cells); the mycpu
+   fraction-island unbundles to raw cells and splits locally as today.
+4. **Engine agnosticization.** Rework the ~6 funnel engines
+   (`wp_instr_s_tlbinv`, `wp_instr_s_config_tlbinv` + `_gen`/`_ad`,
+   WpSmodeLeafBase's gpr-write engines) to take the v2 bundle + `sie_cap`,
+   case-splitting on the sie_cap disjunct internally: '0' arm = today's
+   body with dispatch-None from ghost-derived SIE=0, '1' arm = the Stage-1
+   engine.  Factor the shared σ-level fetch-drive ONCE so both arms use it
+   (that is the perf-hot code; do NOT duplicate it).
+5. **Leaf sweep (mechanical, file-by-file):** Wp{Smode}{Itype,Rtype,Btype,
+   Utype,Jal,Jalr,Load,Store,Shiftiop,Addiw,Csr,Fence,Sret}.v + WpSmodeUart/
+   WpUartKpt leaves: swap in the v2 bundle + `sie_cap` line; `_scfg`
+   wrappers keep their names (same bundle name, new definition).  Delete
+   the old smode_config at the END of the sweep, not before.  Keep per-file
+   compile times within ~10% (the CLAUDE.md perf rules apply; sie_cap adds
+   one iDestruct per instruction).
+6. **VCgen:** lift `wp_vc_block_s`/`_den` onto `sconf` (the block executor
+   steps through the same engines).
+7. **SIE flips (push_off/pop_off):** csrci/csrsi-sstatus leaves that open
+   `intr_inv` across their own step, `sie_ghost_flip` all three pieces, and
+   convert between the sconf disjuncts.  pop_off's restore arm must supply
+   `intr_frame` (its own below-sp stack) and the handler spec — store the
+   spec UNCONDITIONALLY in `intr_inv` at allocation (or carry the persistent
+   `intr_handler_spec` ambient) so flips need not re-prove it.
+8. **Whole functions + boot:** re-derive the function specs' stack
+   accounting (below-CURRENT-sp free stack packs into the frame at every
+   instruction; the function's own saves above sp stay out — matches the
+   "below sp is volatile when SIE=1" semantics); wire γ-piece + `intr_inv`
+   allocation into wp_kernel/start at the stvec-install point; adequacy
+   plumbing last.
+
+Robustness rails: axiom check (`Print Assumptions`, baseline + funext +
+kerneltrap_returns) and full `make proofs` per stage; stale-`.vo` resync
+(`make proofs`) before diagnosing any "impossible" literal mismatch — the
+kernel-image regen rot in WpKvInstr's kv_i19 (0xa44fd0ef → 0xa46fd0ef,
+imm 0x1fd244 → 0x1fd246) hid behind a stale `.vo` for a full commit cycle.
 
 ## TLB, page-walk & translation (the kvmmake-faithful all-4KB kernel PT)
 

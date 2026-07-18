@@ -1,6 +1,6 @@
 (* WpIntrInv.v -- the GENERAL S-mode interrupt invariant and the
    interrupt-absorbing step engine (the tick-aware redesign of the old
-   WpIntrStep/WpIntrInv capstone).
+   pinned-cell interrupt capstone).
 
    THE DESIGN.  The SIE ghost variable [γ] (the same [γ] that is the argument
    of [smode_config]) is split into THREE pieces:
