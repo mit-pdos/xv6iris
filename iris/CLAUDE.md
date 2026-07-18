@@ -694,10 +694,31 @@ files or copy code from them; build fresh from the live tree.
      the CSR-dispatch perf rule) — NEVER leave csr abstract into a second
      dispatch (that's the 100×90 cross-product). The false-chain
      continues linearly (~100 guards for is_CSR_accessible + stateen).
-     and_boolM short-circuits monadically: destruct the priv-bits compare
-     FIRST (kills all non-U-addressed csr in one split — and with it
-     every M/S-addressed clause's probe, which then never needs
-     reducing). VERIFIED probe details: `exec (currentlyEnabled
+     REFINED §3 SHAPE (all §1/§2 components are DONE in UserCsr.v; only
+     the traversal remains): prove ONE combined lemma
+     `exec_check_CSR_U : (pins: mstatus + FS=Off + VS=Off, misa=MISA_C,
+     menvcfg=MENVCFG_S, mstateen0=0, HES) → ∃ ok, exec (check_CSR csr
+     User acc) s = Some (ok, s) ∧ (ok = true → u_csr_readable csr ∧ acc
+     is not a write)` with `u_csr_readable csr := csr = 0xC00 ∨ 0xC01 ∨
+     0xC02` (the only survivors). Destruct the priv boolean
+     (`exec_check_CSR_priv_U`) first, keeping `EP : csr[9:8] = 00` in
+     the true branch; then in the accessibility traversal every
+     M/S-addressed guard's TRUE branch is closed by CONTRADICTION with
+     EP (`apply eq_vec_true_iff in E; subst; vm_compute in EP;
+     discriminate`) — the U-addressed clauses reduce via the §1/§2
+     probes (F_off / Zve32x_off / ssp_off / Zicntr+counter_enabled
+     totality; 0xC80-82 die on the xlen=32 conjunct). The PMP-file
+     SUBRANGE guards (0x3A?-0x3E?) contradict EP via one reusable bit
+     lemma `subrange 11 4 = 0x3A.. → csrPriv ≠ 00`. Check
+     stateen_allows' dispatch the same way (S/M-addressed clauses only;
+     confirm its default is returnM true). The doCSR wrapper then cases
+     on ok: false → Illegal (s unchanged); true → subst a counter,
+     access is CSRRead, `read_CSR 0xC00/1/2` reduces per-CSR (concrete —
+     `drive_csr` or plain equations), the sip/mip special guards
+     (0x344/0x144) are refutable from u_csr_readable, `exec_wX_bits_gpr`
+     gives `gpr_write_state rd v s` → RETIRE_SUCCESS. Full sketch:
+     scratchpad csr_traversal_skeleton.v (session-local) — this
+     paragraph is the durable copy. VERIFIED probe details: `exec (currentlyEnabled
      Ext_Zfinx) s = Some (false, s)` holds by plain `reflexivity`
      (hartSupports constant false); `currentlyEnabled Ext_F` =
      hartSupports(true) ∧ misa.F(true in MISA_C!) ∧ mstatus.FS ≠ 'b00 —
