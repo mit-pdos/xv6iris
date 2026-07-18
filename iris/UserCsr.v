@@ -18,7 +18,7 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import RiscvExtras WpGpr WpLeafCommon UserBits.
+Require Import RiscvExtras WpGpr WpLeafCommon WpGprCsrrCommon UserBits.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -738,4 +738,134 @@ Proof.
   - (* priv gate failed *)
     eexists. split; [ apply exec_returnM | ].
     intro Hb'; discriminate Hb'.
+Qed.
+
+(* ===================================================================== *)
+(* §3d check_CSR_result and the survivor reads.                           *)
+(* ===================================================================== *)
+
+Lemma exec_check_CSR_result_U (csr : mword 12) (acc : CSRAccessType)
+    (s : mstate) (ms_v : mword 64) :
+  register_lookup mstatus s.(sregs) = ms_v ->
+  eq_vec (_get_Mstatus_FS ms_v) ('b"00") = true ->
+  eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
+  register_lookup misa s.(sregs) = MISA_C ->
+  register_lookup menvcfg s.(sregs) = MENVCFG_S ->
+  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
+  exists res, exec (check_CSR_result csr User acc) s = Some (res, s)
+    /\ (res = CSR_Check_OK tt \/ res = CSR_Illegal tt)
+    /\ (res = CSR_Check_OK tt ->
+        u_csr_readable csr /\ check_CSR_access csr acc = true).
+Proof.
+  intros Hms Hfs Hvs Hmisa Hmenv HES.
+  unfold check_CSR_result.
+  destruct (exec_check_CSR_U csr acc s ms_v Hms Hfs Hvs Hmisa Hmenv HES)
+    as (ok & Hok & Himp).
+  rewrite (exec_bind_Some _ _ _ _ _ Hok).
+  destruct ok.
+  - (* passed: CSR_Check_OK *)
+    cbn match.
+    eexists. split; [ apply exec_returnM | ].
+    split; [ left; reflexivity | ].
+    intro; exact (Himp eq_refl).
+  - (* failed: User is not a virtual privilege, so plain Illegal *)
+    cbn match.
+    eexists. split.
+    { erewrite exec_bind_Some.
+      2:{ unfold and_boolM.
+          erewrite exec_bind_Some; [ | apply exec_returnM ].
+          cbn beta. cbn match.
+          apply (exec_returnM false s). }
+      cbn beta. cbv zeta.
+      apply exec_returnM. }
+    split; [ right; reflexivity | ].
+    intro Hr; discriminate Hr.
+Qed.
+
+(* the two missing Zicntr counter reads (time exists in WpGprCsrrB) *)
+Lemma exec_read_CSR_cycle_u (s : mstate) :
+  exec (read_CSR (Ox"C00")) s
+    = Some (subrange_vec_dec (register_lookup mcycle s.(sregs)) (Z.sub xlen 1) 0, s).
+Proof.
+  drive_csr.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mcycle s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_read_CSR_time_u (s : mstate) :
+  exec (read_CSR (Ox"C01")) s
+    = Some (subrange_vec_dec (register_lookup mtime s.(sregs)) (Z.sub xlen 1) 0, s).
+Proof.
+  drive_csr.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mtime s)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_read_CSR_instret_u (s : mstate) :
+  exec (read_CSR (Ox"C02")) s
+    = Some (subrange_vec_dec (register_lookup minstret s.(sregs)) (Z.sub xlen 1) 0, s).
+Proof.
+  drive_csr.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg minstret s)).
+  apply exec_returnM.
+Qed.
+
+(* a readable csr sits at a read-only address (bits 11:10 = 11), so the
+   only access shape check_CSR_access admits is CSRRead *)
+Lemma csrAccess_unsigned (x : mword 12) :
+  bv_unsigned (csrAccess x) = (bv_unsigned x / 1024) mod 4.
+Proof.
+  unfold csrAccess, subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 10 + 1))) with 4.
+  rewrite Z.shiftr_div_pow2 by (vm_compute; congruence).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 10)) with 10.
+  change (2 ^ 10) with 1024.
+  reflexivity.
+Qed.
+
+Lemma u_readable_read_only (csr : mword 12) :
+  u_csr_readable csr -> csrAccess csr = ('b"11" : mword 2).
+Proof.
+  intros [-> | [-> | [-> | [E1 E2]]]];
+    try (vm_compute; reflexivity).
+  (* hpm range: bits 11:10 come from the key's top bits *)
+  apply eq_vec_true_iff in E1.
+  apply (f_equal bv_unsigned) in E1.
+  rewrite sub115_unsigned in E1.
+  apply bv_eq.
+  rewrite csrAccess_unsigned.
+  change (bv_unsigned ('b"11" : mword 2)) with 3.
+  set (c := bv_unsigned csr) in *.
+  assert (Hdd : c / 1024 = (c / 32) / 32).
+  { rewrite Z.div_div by lia. reflexivity. }
+  set (q := c / 32) in *.
+  assert (Hh32 : q / 32 = 4 * (q / 128) + bv_unsigned ('b"1100000" : mword 7) / 32).
+  { assert (Hq2 : q = 4 * (q / 128) * 32 + bv_unsigned ('b"1100000" : mword 7)).
+    { pose proof (Z_div_mod_eq_full q 128) as Hd.
+      rewrite E1 in Hd.
+      replace (4 * (q / 128) * 32) with (128 * (q / 128)) by ring.
+      exact Hd. }
+    rewrite Hq2 at 1.
+    rewrite Z.div_add_l by lia. reflexivity. }
+  rewrite Hdd, Hh32.
+  change (bv_unsigned ('b"1100000" : mword 7) / 32) with 3.
+  replace (4 * (q / 128) + 3) with (3 + (q / 128) * 4) by ring.
+  rewrite Z_mod_plus_full.
+  vm_compute; reflexivity.
+Qed.
+
+Lemma u_readable_acc_read (csr : mword 12) (acc : CSRAccessType) :
+  u_csr_readable csr ->
+  check_CSR_access csr acc = true ->
+  acc = CSRRead.
+Proof.
+  intros Hr EA.
+  unfold check_CSR_access in EA.
+  rewrite (u_readable_read_only csr Hr) in EA.
+  destruct acc; [ reflexivity | | ];
+    vm_compute in EA; discriminate EA.
 Qed.
