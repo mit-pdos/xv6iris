@@ -758,9 +758,71 @@ Where things landed (the stage descriptions below remain the design rationale):
   `andb_false_r` instead of cbn so op stays abstract; NB WpAmo defines
   its OWN same-named AMOSWAP-specialized copies and does not import
   MemAmo4, so it is untouched).  `user_pt_amo_data_4` passes AMOSWAP;
-  other ops are now a bare instantiation.  STILL OPEN: AMO width 8, LR/SC
-  (reservation-axiom destructs), and the misaligned-access fault flavors
-  (instruction-level, no translation).
+  other ops are now a bare instantiation.
+- **THE vmem_read_addr / vmem_write_addr LAYER (UserMemAccess.v)** -- the
+  LOAD/STORE/LR/SC access layer just below execute_*, where instruction
+  alignment and the LR/SC reservation live.  DONE and green:
+  * the RESERVATION platform-effect axioms `exec_load_reservation` /
+    `exec_cancel_reservation` (the opaque monadic reservation ops leave the
+    modeled sregs/mem/mdev unchanged -- reservation state is not in mstate;
+    extends the reservation platform-axiom family, assuming nothing about a
+    particular reservation content since match_reservation stays opaque);
+  * `exec_vmem_read_addr_aligned_8` (premise-shaped, res-generic: LOAD
+    res=false AND LR res=true both route through it; the res
+    load_reservation side effect discharged by the axiom) + the LOAD
+    composer `user_pt_vmem_read_addr_load_8` over user_pt_load_data_8;
+  * `exec_vmem_write_addr_aligned_store_8` (the write loop through the
+    SC-assert bind0 and the store branch) + `user_pt_vmem_write_addr_store_8`;
+  * the misaligned-fault exec bricks `exec_memory_exception` (a memory
+    fault ExecutionResult is Trap(priv, sync_exc, pc)) and
+    `exec_plat_misaligned_lrsc` (the platform delivers AccessFault for a
+    misaligned reservation access).
+  STILL OPEN (the memory tail, in rough order):
+  1. The MISALIGNED LR/SC fault reductions on top of the two bricks
+     (`exec_vmem_read_addr_misaligned_lr` -> E_Load_Access_Fault,
+     `_write_addr_misaligned_sc` -> E_SAMO_Access_Fault).  BLOCKER: reducing
+     the model's align guard `(if not is_aligned then FAULT else returnR tt)
+     >> split >>= loop` inside catch_early_return.  Findings:
+     `rewrite Hnal` DOES fire (guard becomes `if not false`), but the guard
+     is a `bind0`-sequenced block `bind (bind0 FAULT_BLOCK split) loop`
+     where FAULT_BLOCK = `liftR plat_misaligned_exception >>= (match ... =>
+     memory_exception >>= early_return)`.  cbn evaluates
+     plat_misaligned_exception's computable body (making it opaque via
+     `Local Opaque plat_misaligned_exception memory_exception` fixes that),
+     but the folded `execR_liftR_seq`/`execR_bind` lemmas then fail to
+     re-match because the `Defs.bind`/`Defs.liftR`/`Defs.bind0` combinators
+     have been unfolded by cbn -- and making THOSE opaque stops cbn from
+     collapsing the bind0 chain to expose FAULT_BLOCK.  The fix is a small
+     dedicated reduction lemma for `execR (bind0 FAULT_BLOCK rest) s` where
+     FAULT_BLOCK early-returns inl (its execR = inl propagates through the
+     enclosing binds regardless of rest), proven at the RAW execR level
+     rather than via the folded combinator lemmas; then the two misaligned
+     lemmas are `exec_catch_early_return` + that reduction.
+  2. SC (StoreConditional res=true): the vmem_write_addr loop destructs the
+     opaque pure `match_reservation (bits_of_physaddr paddr)` -- true =>
+     write branch (Ok true -> wX rd:=0), false => SC-fail branch
+     (phys_access_check, no write, Ok false -> wX rd:=1).  Needs the
+     StoreConditional physical write chain at User (res=true: reserved
+     write_kind; MemAmo4 has the width-4 reserved primitives
+     `exec_write_ram_cond_4` to clone).
+  3. LR (LoadReserved res=true) aligned success: the physical read chain at
+     User for the reserved-acquire read_kind (MemAmo4's
+     `run_read_ram_resacq_4_pin` is the width-4 reserved read primitive to
+     clone); the vmem_read_addr aligned lemma already handles the
+     load_reservation side effect via the axiom.
+  4. AMO EXECUTE reduction (execute_AMO): its own pre-translation alignment
+     check (misaligned -> E_SAMO_Access_Fault via GlobalMisalignedExceptions_
+     amo = AccessFault), then translate + mem_write_ea + mem_read +
+     mem_write_value + the result computation (per-op, AMOCAS special-cased)
+     + wX; the mem-level facts are `user_pt_amo_data_4`.  This is
+     execute-level (borders the assembly).
+  5. widths 2/4/8 clones of the vmem LOAD/STORE composers (the width-8 ones
+     are the exemplars; user_pt_{load,store}_data_{4,2,1} already exist).
+  6. plain LOAD/STORE MISALIGNED split (n=2): plat_misaligned_access.
+     load_store = None, so a misaligned plain load/store does NOT fault --
+     the hardware splits it into aligned sub-accesses, each translated
+     independently through the absorption.  (Lower priority; xv6 rarely
+     misaligns plain accesses.)
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process
