@@ -267,6 +267,19 @@ Section WpIntrInv.
      (∃ n : nat, ⌜ (kv_frame_slots <= n)%nat ⌝ ∗
                  stack_own (m !!! Regidx csp_rs1) n))%I.
 
+  (* [intr_frame] depends on [m] only through sp: any register write that
+     PRESERVES sp transports the frame to the new map.  (An sp-moving
+     instruction instead re-carves its stack explicitly.) *)
+  Lemma intr_frame_retarget (root_ppn : mword 44) (menvcfg0 : mword 64)
+      (m m' : gmap regidx (mword 64)) :
+    m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
+    intr_frame root_ppn menvcfg0 m -∗ intr_frame root_ppn menvcfg0 m'.
+  Proof.
+    iIntros (Hsp) "(Hmenv & Htlbinv & Hstk)".
+    iFrame "Hmenv Htlbinv". iDestruct "Hstk" as (n) "[%Hn Hstk]".
+    iExists n. iSplit; [iPureIntro; exact Hn |]. rewrite Hsp. iExact "Hstk".
+  Qed.
+
   Definition intr_handler_spec (handler : mword 64)
       (root_ppn : mword 44) (menvcfg0 : mword 64) : iProp Σ :=
     (□ ∀ (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
