@@ -655,7 +655,29 @@ files or copy code from them; build fresh from the live tree.
      beta iota` before the next `execR_bind`; mind `>>` (bind0) vs `>>=`
      at the outermost node; in plain-rewrite files instantiate dependent
      reads explicitly (`(exec_read_reg r st)`).
-     Still missing before FULL assembly: CSR-at-U dispatch (plan below),
+     CSR-AT-U IS DONE (UserCsr.v, axiom-FREE):
+     `exec_execute_{CSRReg,CSRImm}_total_U` — at User under the pins
+     (priv, mstatus FS=Off ∧ VS=Off, misa=MISA_C, menvcfg=MENVCFG_S,
+     HES), every CSR instruction either returns `Illegal_Instruction`
+     with the state unchanged (→ `illegal_obligation`) or RETIRES a read
+     with a single existential-valued rd write, `gpr_write_state rd v s`
+     (→ `retire_obligation`); the model itself excludes CSR WRITES at U
+     (`u_readable_acc_read`: every readable csr sits at a read-only
+     address, so `check_CSR_access` admits only CSRRead). The readable
+     set (`u_csr_readable`) = cycle/time/instret + the Zihpm hpmcounter
+     shadow range (bits 11:5 = 1100000, index ≥ 3; the Nh range dies on
+     xlen=32). Structure: §1 gate probes, §2 component reductions
+     (priv/feature/counter-enable/ssp), §3b the 90-guard accessibility
+     traversal (csr_step/csr_close drivers), §3c check_CSR assembly
+     (stateen needs NO traversal — survivors are concrete or
+     range-killed into its returnM-true default), §3d survivor reads +
+     access shape, §3e read_CSR over the hpm range (csr_read_step
+     driver), §3f the 29-address concretization (only the NAME-MAP
+     callback needs it — its 342-guard dispatch has a stuck default on
+     abstract csr), §3g doCSR assembly, §4 the execute wrappers.
+     Consider threading the FS/VS pins into `user_mstatus_ok` when
+     wiring these into UserClassify.
+     Still missing before FULL assembly:
      ZICBOP (does TRANSLATION — ADUE-coupled, defer), the memory arms
      (LOAD/STORE/AMO/LR/SC — WAIT for the Svadu/ADUE page-table rework),
      and the fetch-fault flavor corollaries' payload wiring (also
