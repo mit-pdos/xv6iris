@@ -342,6 +342,77 @@ imm 0x1fd244 → 0x1fd246) hid behind a stale `.vo` for a full commit cycle.
 - `lockG Σ = exclR unitO`; `locked γ := own γ (Excl ())`; `lock_inv γ lk R := ∃ v, lock_word lk v ∗ (⌜v=0⌝ ∗ locked γ ∗ R ∨ ⌜v≠0⌝)`; `is_lock := inv lockN lock_inv` (`lockN` disjoint from `minstretN`). Core: `newlock`, `locked_exclusive`. Leaves in `WpSmodePtLock.v` (`wp_amoswap_lockinv_pt`, `wp_clw_lockinv_pt{,_locked}` — the `_locked` twin refutes the free branch via `locked_exclusive`, `wp_sw_zero_lockinv_pt`, `wp_sd_zero_s_pt`); higher levels in `WpHoldingInv.v`/`WpAcquireLock.v`/`WpRelease.v`.
 - **Invariant-opening leaf technique** (reusable): inside the σ-callback (mask `E ∖ ↑minstretN`) do `iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]"; [solve_ndisj|]`, strip the timeless window `iDestruct … as (w) "[>Hbytes Hbr]"`, use/update bytes for the exec witness, RE-CLOSE before the final `iModIntro`, and hand the `▷`-ed payload to the continuation (the engine's `▷ WP` strips it). pop_off preconditions (constrain callers): SIE=0, `noff>0` signed, `intena=0`.
 
+## PLAN: the kvminit / kvmmake / kvmmap / mappages / walk proofs (KvmSpec.v)
+
+The five spec statements are CHECKED IN as compiled iProp definitions in
+KvmSpec.v — read its header first: it fixes the design (edited-table vs
+ambient-regime separation; the `pt_rep t m` map view; walk's
+`ptree_same_rep` + `ptree_level0` post; mappages' k-of-n prefix post; the
+`panic_wp` absorption of kvmmap's failure arm).  Remaining work, in order:
+
+1. **The BARE S-mode leaf family** (prerequisite): kvminit runs before
+   kvminithart with satp=0 (start() writes it), so the boot instances of
+   these specs need S-mode leaves at Bare translation — `translateAddr`
+   short-circuits to the identity before ever consulting the TLB, so the
+   engine is a SIMPLER clone of the pt one (`bare_inv := satp cell +
+   ⌜Mode=Bare⌝ + pmp_config`, no TLB, no absorption theorem).  Alphabet
+   needed: the WpSmodePtAlu/Ctl/Btype/Mem sets (walk/mappages bodies) plus
+   whatever kalloc/memset's proofs consume — which forces Bare variants of
+   wp_kalloc / wp_memset_page and their callee chain (acquire/release/
+   push_off/pop_off/mycpu).  DECISION POINT (coordinate with the
+   interrupt-sweep agent, which is reworking the same engine layer): either
+   clone the needed leaves at `bare_inv`, or parameterize the S-mode
+   engine/leaf layer over an abstract regime interface (the TrampStepPt
+   Variable-INV/Habs pattern, already proven out) with Sv39 and Bare
+   instances — the parameterization is the clean end-state and also serves
+   the user-table callers, but touches the sweep's files; cloning is
+   conflict-free but duplicates the leaf layer.
+2. **The pure construction layer** (PtBuild.v, no regime dependence):
+   `pt_empty_node ppn` (all-zero ents, no kids; every idx blocks —
+   `pte_invalid_zero`), `pt_graft t path c` via `pt_upd_kid`/`pt_upd_ent`
+   (write a pointer PTE into an invalid slot + attach a zeroed child):
+   preserves maps/blocks for ALL vpns (`ptree_same_rep`) and makes
+   `ptree_level0` progress for the target vpn; `ptree_set_leaf0` (leaf
+   write through a `ptree_level0` path — `ptree_set_leaf` generalized to
+   not require the old word to be a valid leaf) with maps_self /
+   maps_other / blocks_other; `pt_rep` insertion:
+   `pt_rep t m → ptree_level0 t vpn … → classify(w') → pt_rep (set_leaf0
+   t vpn w') (<[vpn:=w']>m)`.  Iris side: `zero_page_to_node` (4096 ↦ₘ 0
+   bytes at a page_valid base ⇒ `ptree_own 0` of the empty node — the
+   byte-to-↦₈ regroup), `ptree_own_graft` (own t + own child ⇒ own of the
+   grafted tree), `ptree_own_level0_upd` (peel/restore the L0 slot cell
+   through a level0 path).
+3. **wp_walk**: fuel-free (the loop is 2 iterations, unrolled); per
+   iteration: srl/andi/slli/add address arithmetic, ld the slot (through
+   the regime + the slot's ↦₈ from `ptree_own_path`-style accessors),
+   V-bit branch; invalid arm: kalloc (existing spec at the regime) +
+   memset + `zero_page_to_node` + graft + sd of the pointer PTE.  kalloc's
+   null return exits with a0=0 (the spec's left disjunct).
+4. **wp_mappages**: fuel induction over npages (NOT iLöb — bounded loop);
+   the loop invariant is the spec's own post at k pages
+   (`pt_rep t_k (pt_insert_run m vpn0 ppn0 perm k)`), each iteration =
+   wp_walk + the remap-check ld (invalid by `pt_rep` + no-remap premise +
+   `ptree_blocks`→`pte_invalid` at the level0 slot) + the leaf sd through
+   `ptree_own_level0_upd`.  Mind `vpn_at`/`mappages_pte` bv-arithmetic:
+   prove the step identities (`vpn_at vpn0 (S k)` vs va+PGSIZE·k) as
+   abstract bv lemmas, never vm_compute on symbolic words.
+5. **wp_kvmmap** = wp_mappages + the beqz on a0 + `panic_wp` for the -1
+   arm (state `panic_wp` as an interim axiom in its own file, like
+   wp_myproc; eventually provable — printf/uartputc + a Löb spin loop).
+6. **wp_proc_mapstacks** (NPROC=64 kalloc+kvmmap loop, fuel induction over
+   the proc array — needs the `proc` array base + KSTACK geometry), then
+   **wp_kvmmake** (kalloc root + memset + `zero_page_to_node` at level 2 +
+   six kvmmap calls at concrete (vpn0,ppn0,perm,npages) tuples + the
+   `kvm_map` gmap literal built from `pt_insert_run` so the posts chain
+   definitionally), then **wp_kvminit** (store the root into
+   `kernel_pagetable`).
+7. **Boot introduction** (separate, later): kvminithart establishes
+   `tlb_inv_pt` from `pt_rep t kvm_map` — at which point `kpt_tree_spec`
+   must be REVISED to the true per-region flags (text RX / data RW /
+   devices RW; the KptPt uniform-RWX deviation dies), rippling into the
+   `kpt_variant_check_*` dispatch (fetches only from text, stores only to
+   data — the `addr_is_ram`-keyed wrappers become region-keyed).
+
 ## PLAN: porting user-mode execution onto the ptree page-table layer (UserPt → utlb_inv_pt)
 
 GOAL: replace UserPt.v's `upt` record (`u_root`/`u_slots`/`u_map`/`u_data` +
