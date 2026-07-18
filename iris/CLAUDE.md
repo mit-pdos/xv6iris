@@ -647,14 +647,26 @@ files or copy code from them; build fresh from the live tree.
      `exec_execute_JALR_total` is premise-free now (`bit0_update0_64` in
      UserBits.v: update_slice at bit 0 is a nested bv_concat whose low
      limb is the written literal; parity by `even_lor`/`even_shiftl1`).
-     Still missing before FULL assembly: ZICBOM/ZICBOZ-at-U facts
-     (illegal under the pinned configs — MENVCFG_S has CBZE/CBCFE/CBIE
-     clear, so `feature_enabled_for_priv` short-circuits on the m-bit
-     alone; needs the catch_early_return/MR reduction like jump_to's),
-     ZICBOP (does TRANSLATION — ADUE-coupled, defer), CSR-at-U dispatch,
-     SSAMOSWAP, the memory arms (LOAD/STORE/AMO/LR/SC — WAIT for the
-     Svadu/ADUE page-table rework), and the fetch-fault flavor
-     corollaries' payload wiring (also ADUE-coupled).
+     The config-gated stragglers are DONE (UserExecFacts.v):
+     `exec_execute_{ZICBOZ,ZICBOM,SSAMOSWAP}_U` — all ILLEGAL at User
+     under the pins (MENVCFG_S has CBZE/CBCFE/CBIE/SSE clear;
+     `feature_enabled_for_priv` short-circuits on the m-bit,
+     `cbop_priv_check` returns CBOP_ILLEGAL from mCBIE alone, the xSSE
+     gate reads the pinned `read_senvcfg` composite). Shared reductions
+     there: `exec_read_senvcfg_pinned`, `exec_feature_illegal_U`.
+     MR-reduction gotchas baked into those proofs: a type-ASCRIBED read
+     (`(read_reg r : M _)`) carries a Cast that blocks a direct rewrite —
+     bridge with an asserted instance (`etransitivity; [exact
+     (exec_read_reg r st)|…]`); after reducing a privilege match, `cbv
+     beta iota` before the next `execR_bind`; mind `>>` (bind0) vs `>>=`
+     at the outermost node; in plain-rewrite files instantiate dependent
+     reads explicitly (`(exec_read_reg r st)`).
+     Still missing before FULL assembly: CSR-at-U dispatch (the
+     check_CSR 90-clause machinery — its own work item), ZICBOP (does
+     TRANSLATION — ADUE-coupled, defer), the memory arms
+     (LOAD/STORE/AMO/LR/SC — WAIT for the Svadu/ADUE page-table rework),
+     and the fetch-fault flavor corollaries' payload wiring (also
+     ADUE-coupled).
      LEFT — discharging `active_class`: the total classification. Per
      machine case, produce the run_hart_active reduction and feed the
      matching arm: fetch outcome (fetchable → `upt_fetch_instr`; else a

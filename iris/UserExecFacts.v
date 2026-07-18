@@ -501,7 +501,7 @@ Qed.
 (* clears bit 0 explicitly, so it needs no such premise -- only the        *)
 (* Zicfilp-off reduction for [update_elp_state].                           *)
 (* ===================================================================== *)
-Require Import WpLeafCommon UserBits.
+Require Import WpLeafCommon WpIntrCore UserBits.
 
 Lemma exec_execute_JAL_total (imm : mword 21) (ird : mword 5) (s : mstate) :
   exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
@@ -924,4 +924,162 @@ Proof.
   erewrite exec_bind_Some; [ | apply (exec_rX_bits_gpr i s) ]. cbn beta.
   erewrite exec_bind0_Some;
     [ apply exec_returnm | apply (exec_wX_bits_gpr i _ s) ].
+Qed.
+
+(* ===================================================================== *)
+(* Zicbom / Zicboz at User: ILLEGAL under the pinned configs.  MENVCFG_S  *)
+(* has CBZE/CBCFE clear and CBIE = 00 (CBIE_ILLEGAL), so                  *)
+(* [feature_enabled_for_priv] short-circuits on the machine-enable bit    *)
+(* and [cbop_priv_check] returns CBOP_ILLEGAL from mCBIE alone; the       *)
+(* senvcfg = 0 pin keeps [read_senvcfg]'s sCBIE decode off the reserved-  *)
+(* encoding error.  (ZICBOP is NOT here: prefetch does a real             *)
+(* translation -- ADUE-coupled.)                                          *)
+(* ===================================================================== *)
+
+Lemma exec_read_senvcfg_pinned (st : mstate) :
+  register_lookup menvcfg st.(sregs) = MENVCFG_S ->
+  register_lookup senvcfg st.(sregs) = (mword_of_int 0 : mword 64) ->
+  exec (read_senvcfg tt) st
+    = Some (_update_SEnvcfg_SSE (mword_of_int 0 : mword 64)
+              (and_vec (_get_MEnvcfg_SSE MENVCFG_S)
+                       (_get_SEnvcfg_SSE (mword_of_int 0 : mword 64))), st).
+Proof.
+  intros Hmenv Hsenv.
+  unfold read_senvcfg.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg st)). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg st)). cbn beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg st)). cbn beta.
+  rewrite Hmenv, Hsenv.
+  apply exec_returnm.
+Qed.
+
+Lemma exec_feature_illegal_U (m s h : mword 1) (st : mstate) :
+  eq_vec m ('b"1") = false ->
+  exec (feature_enabled_for_priv User m s h) st = Some (FEATURE_ILLEGAL, st).
+Proof.
+  intro Hm.
+  unfold feature_enabled_for_priv. cbn match.
+  unfold and_boolM.
+  erewrite exec_bind_Some.
+  2:{ erewrite exec_bind_Some; [ | apply (exec_returnM (eq_vec m ('b"1")) st) ].
+      cbn beta. rewrite Hm. cbn match. apply (exec_returnM false st). }
+  cbn beta. cbv zeta. cbn match.
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_ZICBOZ_U (i1 : mword 5) (st : mstate) :
+  register_lookup cur_privilege st.(sregs) = User ->
+  register_lookup menvcfg st.(sregs) = MENVCFG_S ->
+  register_lookup senvcfg st.(sregs) = (mword_of_int 0 : mword 64) ->
+  exec (execute (ZICBOZ (Regidx i1))) st = Some (Illegal_Instruction tt, st).
+Proof.
+  intros Hpriv Hmenv Hsenv.
+  change (execute (ZICBOZ (Regidx i1))) with (execute_ZICBOZ (Regidx i1)).
+  unfold execute_ZICBOZ.
+  rewrite exec_catch_early_return.
+  rewrite execR_bind, execR_liftR, (exec_read_reg cur_privilege st), Hpriv. cbn match.
+  assert (Hrdm : exec ((read_reg menvcfg) : M (mword 64)) st = Some (MENVCFG_S, st)).
+  { etransitivity; [ exact (exec_read_reg menvcfg st) | rewrite Hmenv; reflexivity ]. }
+  rewrite execR_bind, execR_liftR, Hrdm. cbn match.
+  rewrite execR_bind, execR_liftR, (exec_read_senvcfg_pinned st Hmenv Hsenv). cbn match.
+  rewrite execR_bind, execR_liftR.
+  erewrite exec_feature_illegal_U. 2:{ vm_compute; reflexivity. }
+  cbn match.
+  rewrite execR_bind. rewrite execR_bind0.
+  rewrite execR_early_return. cbn match.
+  reflexivity.
+Qed.
+
+Lemma exec_execute_ZICBOM_U (op : cbop_zicbom) (i1 : mword 5) (st : mstate) :
+  register_lookup cur_privilege st.(sregs) = User ->
+  register_lookup menvcfg st.(sregs) = MENVCFG_S ->
+  register_lookup senvcfg st.(sregs) = (mword_of_int 0 : mword 64) ->
+  exec (currentlyEnabled Ext_S) st = Some (true, st) ->
+  exec (execute (ZICBOM (op, Regidx i1))) st = Some (Illegal_Instruction tt, st).
+Proof.
+  intros Hpriv Hmenv Hsenv HES.
+  change (execute (ZICBOM (op, Regidx i1))) with (execute_ZICBOM op (Regidx i1)).
+  unfold execute_ZICBOM. cbv zeta.
+  destruct op.
+  - (* CBO_CLEAN: CBCFE gate *)
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege st)). cbn beta.
+    rewrite Hpriv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg st)). cbn beta.
+    rewrite Hmenv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_senvcfg_pinned st Hmenv Hsenv)). cbn beta.
+    erewrite exec_bind_Some.
+    2:{ apply exec_feature_illegal_U. vm_compute; reflexivity. }
+    cbn beta. cbn match. apply exec_returnm.
+  - (* CBO_FLUSH: CBCFE gate *)
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege st)). cbn beta.
+    rewrite Hpriv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg st)). cbn beta.
+    rewrite Hmenv.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_senvcfg_pinned st Hmenv Hsenv)). cbn beta.
+    erewrite exec_bind_Some.
+    2:{ apply exec_feature_illegal_U. vm_compute; reflexivity. }
+    cbn beta. cbn match. apply exec_returnm.
+  - (* CBO_INVAL: cbop_priv_check, CBOP_ILLEGAL from mCBIE = 00 *)
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege st)). cbn beta.
+    rewrite Hpriv.
+    erewrite exec_bind_Some.
+    2:{ unfold cbop_priv_check.
+        rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg st)). cbn beta.
+        rewrite Hmenv.
+        erewrite exec_bind_Some.
+        2:{ unfold encdec_cbie_backwards. cbv zeta.
+            replace (eq_vec (_get_MEnvcfg_CBIE MENVCFG_S) ('b"00")) with true
+              by (vm_compute; reflexivity).
+            cbn match. apply (exec_returnM CBIE_ILLEGAL st). }
+        cbn beta.
+        rewrite (exec_bind_Some _ _ _ _ _ HES). cbn beta. cbn match.
+        erewrite exec_bind_Some.
+        2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_senvcfg_pinned st Hmenv Hsenv)).
+            cbn beta.
+            unfold encdec_cbie_backwards. cbv zeta.
+            match goal with
+            | |- exec (if ?g then _ else _) _ = _ =>
+                replace g with true by (vm_compute; reflexivity)
+            end.
+            cbn match. apply (exec_returnM CBIE_ILLEGAL st). }
+        cbn beta. cbn match.
+        apply (exec_returnM CBOP_ILLEGAL st). }
+    cbn beta. cbn match.
+    apply exec_returnm.
+Qed.
+
+(* SSAMOSWAP (Zicfiss shadow-stack swap): ILLEGAL at User under the pins --
+   the xSSE gate reads senvcfg.SSE, which the [read_senvcfg] composite pins
+   to 0 (menvcfg.SSE ∧ senvcfg.SSE with senvcfg = 0). *)
+Lemma exec_execute_SSAMOSWAP_U (aq rl : bool) (i2 i1 ird : mword 5)
+    (width : Z) (st : mstate) :
+  register_lookup cur_privilege st.(sregs) = User ->
+  register_lookup menvcfg st.(sregs) = MENVCFG_S ->
+  register_lookup senvcfg st.(sregs) = (mword_of_int 0 : mword 64) ->
+  exec (currentlyEnabled Ext_S) st = Some (true, st) ->
+  exec (execute (SSAMOSWAP (aq, rl, Regidx i2, Regidx i1, width, Regidx ird))) st
+    = Some (Illegal_Instruction tt, st).
+Proof.
+  intros Hpriv Hmenv Hsenv HES.
+  change (execute (SSAMOSWAP (aq, rl, Regidx i2, Regidx i1, width, Regidx ird)))
+    with (execute_SSAMOSWAP aq rl (Regidx i2) (Regidx i1) width (Regidx ird)).
+  unfold execute_SSAMOSWAP.
+  rewrite exec_catch_early_return.
+  rewrite execR_bind, execR_liftR, (exec_read_reg cur_privilege st), Hpriv. cbn match.
+  cbv beta iota.
+  rewrite execR_bind0.
+  rewrite execR_bind.
+  unfold or_boolM.
+  rewrite execR_bind.
+  rewrite execR_bind, execR_liftR, HES. cbn match.
+  rewrite execR_returnR. cbn [not negb]. cbn match.
+  rewrite execR_bind, execR_liftR, (exec_read_senvcfg_pinned st Hmenv Hsenv). cbn match.
+  rewrite execR_returnR. cbn match.
+  match goal with
+  | |- context [ if ?g then _ else _ ] =>
+      replace g with true by (vm_compute; reflexivity)
+  end.
+  cbn match.
+  rewrite execR_early_return. cbn match.
+  reflexivity.
 Qed.
