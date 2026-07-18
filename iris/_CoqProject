@@ -136,6 +136,7 @@ WpSmodeIntr.v
 WpSconfAlu.v
 WpSconfMem.v
 WpSconfBtype.v
+WpSconfCtl.v
 WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
