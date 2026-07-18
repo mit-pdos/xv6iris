@@ -1096,3 +1096,77 @@ Proof.
     change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
     exact (Hbytes j Hj).
 Qed.
+
+(* ===================================================================== *)
+(* §5b The reserved pmaCheck, branching on reservability.  On the RAM     *)
+(*    region [pma_allows_all] gives readable/writable=true but leaves     *)
+(*    [PMA_reservability] free, so the LR/SC pma arm                       *)
+(*    [andb R/W (reservability<>RsrvNone)] resolves to the reservability  *)
+(*    bit: [<>None] -> allowed (None fault), [=None] -> the delegated      *)
+(*    access fault (E_Load/E_SAMO).  This is the branch point of the      *)
+(*    retire-or-fault disjunction.                                        *)
+(* ===================================================================== *)
+
+Lemma exec_pmaCheck_ram_lr_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (pmaCheck (Physaddr addr) k (LoadReserved Data) pbmt true) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then None else Some (E_Load_Access_Fault tt)), s).
+Proof.
+  intros Hmatch Halign Hread.
+  unfold pmaCheck.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
+  rewrite Hmatch.
+  destruct region as [rbase rsize rattr rdtree].
+  cbn [PMA_Region_attributes] in Hread |- *.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
+  cbn match beta.
+  change (assert_exp' true "sys/mem.sail:111.56-111.57" >>=
+          (fun _ : true = true => returnM (andb (PMA_readable (override_PMA rattr pbmt))
+                                             (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone))))
+    with (returnM (andb (PMA_readable (override_PMA rattr pbmt))
+                    (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone)) : M bool).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
+  rewrite Hread. cbn [andb].
+  destruct (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone) eqn:Hr.
+  - cbn match. apply exec_returnM.
+  - cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (E_Load_Access_Fault tt) s)).
+    apply exec_returnM.
+Qed.
+
+Lemma exec_pmaCheck_ram_sc_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+  exec (pmaCheck (Physaddr addr) k (StoreConditional Data) pbmt true) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then None else Some (E_SAMO_Access_Fault tt)), s).
+Proof.
+  intros Hmatch Halign Hwrite.
+  unfold pmaCheck.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
+  rewrite Hmatch.
+  destruct region as [rbase rsize rattr rdtree].
+  cbn [PMA_Region_attributes] in Hwrite |- *.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
+  cbn match beta.
+  change (assert_exp' true "sys/mem.sail:112.56-112.57" >>=
+          (fun _ : true = true => returnM (andb (PMA_writable (override_PMA rattr pbmt))
+                                             (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone))))
+    with (returnM (andb (PMA_writable (override_PMA rattr pbmt))
+                    (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone)) : M bool).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
+  rewrite Hwrite. cbn [andb].
+  destruct (generic_neq (PMA_reservability (override_PMA rattr pbmt)) RsrvNone) eqn:Hr.
+  - cbn match. apply exec_returnM.
+  - cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (E_SAMO_Access_Fault tt) s)).
+    apply exec_returnM.
+Qed.
