@@ -20,9 +20,10 @@ Require Import InstrBytes.
 Require Import WpDecode WpLeafCommon.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore KernelText WpMemsetS WpTimerinit.
+Require Import SmodeCore KernelText WpMemsetS.
 Require Import StackOwn.
 Require Import WpRvcBridge.
+Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
@@ -51,38 +52,9 @@ Local Ltac m_close0 s HmisaC :=
   [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; m_ast
   | apply (exec_currentlyEnabled_Zca s HmisaC) ].
 
-(* ---- the eight reused prologue/epilogue decodes (bytes match WpTimerinit) ---- *)
-Lemma mdec_ccc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x1141 : mword 16)) s = Some (C_ADDI (mword_of_int 48, Regidx csp_rs1), s).
-Proof. intro H. exact (ti_decode9 s H). Qed.
-
-Lemma mdec_cce s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe406 : mword 16)) s = Some (C_SDSP (mword_of_int 1, Regidx (mword_of_int 1)), s).
-Proof. intro H. exact (ti_decode10 s H). Qed.
-
-Lemma mdec_cd0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe022 : mword 16)) s = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 8)), s).
-Proof. intro H. exact (ti_decode11 s H). Qed.
-
-Lemma mdec_cd2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x0800 : mword 16)) s = Some (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4), s).
-Proof. intro H. exact (ti_decode12 s H). Qed.
-
-Lemma mdec_cea s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x60a2 : mword 16)) s = Some (C_LDSP (mword_of_int 1, Regidx (mword_of_int 1)), s).
-Proof. intro H. exact (ti_decode26 s H). Qed.
-
-Lemma mdec_cec s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6402 : mword 16)) s = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 8)), s).
-Proof. intro H. exact (ti_decode27 s H). Qed.
-
-Lemma mdec_cee s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x0141 : mword 16)) s = Some (C_ADDI (mword_of_int 16, Regidx csp_rs1), s).
-Proof. intro H. exact (ti_decode28 s H). Qed.
-
-Lemma mdec_cf0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8082 : mword 16)) s = Some (C_JR (Regidx (mword_of_int 1)), s).
-Proof. intro H. exact (ti_decode29 s H). Qed.
+(* The eight 16-byte-frame prologue/epilogue decodes ([mdec_ccc]..[mdec_cf0],
+   c.addi sp / c.sdsp / c.addi4spn / c.ldsp / c.ret) live in KernelRvcDecode.v,
+   shared with the other functions that use this frame. *)
 
 (* ---- the five fresh RVC decodes ---- *)
 (* cd6: 0x87aa -> c.mv a5,a0 *)
