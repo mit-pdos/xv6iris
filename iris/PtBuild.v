@@ -38,6 +38,86 @@ Definition pt_rep (t : ptree) (m : gmap (mword 27) (mword 64)) : Prop :=
   (forall vpn w, m !! vpn = Some w -> exists p2 p1, ptree_maps t vpn p2 p1 w) /\
   (forall vpn, m !! vpn = None -> ptree_blocks t vpn).
 
+(* xv6-SHAPED blocking: the walk of [vpn] stops at a slot holding the
+   LITERAL ZERO word.  [ptree_blocks] only demands model-invalidity
+   ([pte_invalid]) -- too weak for the xv6 walk code, which tests the V
+   BIT alone: a reserved-encoding word with V=1 is model-invalid yet the
+   C walk would descend it.  Tables built by kvmmake/mappages have zero
+   stop words by construction, and every construction lemma preserves
+   the shape. *)
+Definition ptree_blocks0 (t : ptree) (vpn : mword 27) : Prop :=
+  (pt_kids t (vpn_idx 2 vpn) = None /\ pt_ents t (vpn_idx 2 vpn) = mword_of_int 0)
+  \/ (exists c1,
+        pt_kids t (vpn_idx 2 vpn) = Some c1 /\
+        pt_kids c1 (vpn_idx 1 vpn) = None /\
+        pte_valid (pt_ents t (vpn_idx 2 vpn)) /\
+        pte_ptr (pt_ents t (vpn_idx 2 vpn)) /\
+        u_next_base (pt_ents t (vpn_idx 2 vpn)) = pt_base c1 /\
+        pt_ents c1 (vpn_idx 1 vpn) = mword_of_int 0)
+  \/ (exists c1 c0,
+        pt_kids t (vpn_idx 2 vpn) = Some c1 /\
+        pt_kids c1 (vpn_idx 1 vpn) = Some c0 /\
+        pte_valid (pt_ents t (vpn_idx 2 vpn)) /\
+        pte_ptr (pt_ents t (vpn_idx 2 vpn)) /\
+        pte_valid (pt_ents c1 (vpn_idx 1 vpn)) /\
+        pte_ptr (pt_ents c1 (vpn_idx 1 vpn)) /\
+        u_next_base (pt_ents t (vpn_idx 2 vpn)) = pt_base c1 /\
+        u_next_base (pt_ents c1 (vpn_idx 1 vpn)) = pt_base c0 /\
+        pt_ents c0 (vpn_idx 0 vpn) = mword_of_int 0).
+
+Lemma pte_invalid_zero : pte_invalid (mword_of_int 0).
+Proof. intros s. vm_compute. reflexivity. Qed.
+
+Lemma ptree_blocks0_blocks (t : ptree) (vpn : mword 27) :
+  ptree_blocks0 t vpn -> ptree_blocks t vpn.
+Proof.
+  intros [ (Hk & He) | [ (c1 & Hk2 & Hk1 & Hv & Hp & Hb & He)
+                       | (c1 & c0 & Hk2 & Hk1 & Hv2 & Hp2 & Hv1 & Hp1 & Hb1 & Hb0 & He) ] ].
+  - left. rewrite He. split; [exact Hk | exact pte_invalid_zero].
+  - right. left. exists c1. rewrite He.
+    repeat split; try assumption; exact pte_invalid_zero.
+  - right. right. exists c1, c0. rewrite He.
+    repeat split; try assumption; exact pte_invalid_zero.
+Qed.
+
+(* the tree represents [m] IN xv6 SHAPE: exact leaves, ZERO stop words *)
+Definition pt_rep0 (t : ptree) (m : gmap (mword 27) (mword 64)) : Prop :=
+  (forall vpn w, m !! vpn = Some w -> exists p2 p1, ptree_maps t vpn p2 p1 w) /\
+  (forall vpn, m !! vpn = None -> ptree_blocks0 t vpn).
+
+Lemma pt_rep0_rep (t : ptree) (m : gmap (mword 27) (mword 64)) :
+  pt_rep0 t m -> pt_rep t m.
+Proof.
+  intros (Hm & Hb). split; [exact Hm |].
+  intros vpn Hl. exact (ptree_blocks0_blocks t vpn (Hb vpn Hl)).
+Qed.
+
+(* same represented map, xv6-shaped: walk's frame condition *)
+Definition ptree_same_rep0 (t t' : ptree) : Prop :=
+  pt_base t' = pt_base t /\
+  (forall v p2 p1 p0, ptree_maps t v p2 p1 p0 <-> ptree_maps t' v p2 p1 p0) /\
+  (forall v, ptree_blocks0 t v <-> ptree_blocks0 t' v).
+
+Lemma ptree_same_rep0_refl (t : ptree) : ptree_same_rep0 t t.
+Proof. split; [reflexivity | split; tauto]. Qed.
+
+Lemma ptree_same_rep0_trans (t t' t'' : ptree) :
+  ptree_same_rep0 t t' -> ptree_same_rep0 t' t'' -> ptree_same_rep0 t t''.
+Proof.
+  intros (Hb & Hm & Hbl) (Hb' & Hm' & Hbl').
+  split; [congruence |].
+  split; intros; [rewrite Hm; apply Hm' | rewrite Hbl; apply Hbl'].
+Qed.
+
+Lemma pt_rep0_same (t t' : ptree) (m : gmap (mword 27) (mword 64)) :
+  ptree_same_rep0 t t' -> pt_rep0 t m -> pt_rep0 t' m.
+Proof.
+  intros (Hb & Hm & Hbl) (Hmap & Hblk). split.
+  - intros vpn w Hl. destruct (Hmap vpn w Hl) as (p2 & p1 & Hp).
+    exists p2, p1. apply Hm. exact Hp.
+  - intros vpn Hl. apply Hbl. exact (Hblk vpn Hl).
+Qed.
+
 (* same represented map: what walk's tree-growing preserves *)
 Definition ptree_same_rep (t t' : ptree) : Prop :=
   pt_base t' = pt_base t /\
@@ -109,25 +189,22 @@ Fixpoint pt_insert_run (m : gmap (mword 27) (mword 64))
 (* §2 The empty node: a freshly zeroed PT page.                           *)
 (* ===================================================================== *)
 
-Lemma pte_invalid_zero : pte_invalid (mword_of_int 0).
-Proof. intros s. vm_compute. reflexivity. Qed.
-
 Definition pt_empty_node (b : mword 44) : ptree :=
   PtNode b (fun _ => mword_of_int 0) (fun _ => None).
 
 Lemma pt_empty_node_base (b : mword 44) : pt_base (pt_empty_node b) = b.
 Proof. reflexivity. Qed.
 
-(* every vpn's walk stops at the (invalid, zero) root slot *)
-Lemma ptree_blocks_empty (b : mword 44) (vpn : mword 27) :
-  ptree_blocks (pt_empty_node b) vpn.
-Proof. left. split; [reflexivity | exact pte_invalid_zero]. Qed.
+(* every vpn's walk stops at the ZERO root slot *)
+Lemma ptree_blocks0_empty (b : mword 44) (vpn : mword 27) :
+  ptree_blocks0 (pt_empty_node b) vpn.
+Proof. left. split; reflexivity. Qed.
 
-Lemma pt_rep_empty (b : mword 44) : pt_rep (pt_empty_node b) ∅.
+Lemma pt_rep0_empty (b : mword 44) : pt_rep0 (pt_empty_node b) ∅.
 Proof.
   split.
   - intros vpn w Hl. rewrite lookup_empty in Hl. discriminate.
-  - intros vpn _. exact (ptree_blocks_empty b vpn).
+  - intros vpn _. exact (ptree_blocks0_empty b vpn).
 Qed.
 
 (* ===================================================================== *)
@@ -161,8 +238,8 @@ Lemma ptree_set_leaf0_blocks_other (t : ptree) (vpn vpn' : mword 27)
     (p2 p1 w0 w : mword 64) :
   vpn' <> vpn ->
   ptree_level0 t vpn p2 p1 w0 ->
-  ptree_blocks t vpn' ->
-  ptree_blocks (ptree_set_leaf t vpn w) vpn'.
+  ptree_blocks0 t vpn' ->
+  ptree_blocks0 (ptree_set_leaf t vpn w) vpn'.
 Proof.
   intros Hne (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 &
               Hv2 & Hn2 & Hv1 & Hn1) Hbl.
@@ -233,13 +310,13 @@ Proof.
 Qed.
 
 (* THE INSERTION: writing a classified leaf through walk's returned slot
-   moves the represented map by one insert *)
-Lemma pt_rep_insert (t : ptree) (m : gmap (mword 27) (mword 64))
+   moves the represented map by one insert (xv6 shape preserved) *)
+Lemma pt_rep0_insert (t : ptree) (m : gmap (mword 27) (mword 64))
     (vpn : mword 27) (p2 p1 w0 w : mword 64) :
-  pt_rep t m ->
+  pt_rep0 t m ->
   ptree_level0 t vpn p2 p1 w0 ->
   pte_valid w -> pte_leaf w -> pte_no_napot w -> pte_pbmt0 w ->
-  pt_rep (ptree_set_leaf t vpn w) (<[vpn := w]> m).
+  pt_rep0 (ptree_set_leaf t vpn w) (<[vpn := w]> m).
 Proof.
   intros (Hmap & Hblk) Hl0 Hv Hl Hnap Hpb. split.
   - intros v wv Hlk.
