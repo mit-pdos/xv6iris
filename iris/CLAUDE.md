@@ -402,12 +402,33 @@ before any mechanical sweep.
      with a closed bv_eq assert before that leaf — the final a0
      conjunct then closes by plain reflexivity (NEVER vm_compute: the
      value contains the symbolic m0!!!tp).
-   - `wp_push_off_sconf`: prologue movers + csrr (save leaf; arm report
-     ties the stored intena to the payload) + csrci (whole-cap-back
-     continuation) + noff/intena stores + epilogue; post carries the
-     '1' payload iff the saved bit was 1 (the report disjunct is the
-     correlation).  Then `wp_pop_off_sconf` (csrsi dual; the
-     already-enabled branch refuted inside the leaf).
+   - DONE — `wp_push_off_suffix_sconf` (WpSconfPushOff.v): push_off's
+     shared tail (PO+0x18: 2nd mycpu call, noff increment, epilogue
+     frame-trade, c.ret), transformed from wp_push_off_suffix_r.  The
+     epilogue c.addi16sp,+32 is the mover: the three restored frame
+     cells + a caller-supplied GAP slot (`spm ↦₈ vgap`) rebuild
+     `stack_own sp0up 4`, traded via `sie_cap_move_up` for the deep-4
+     custody returned in the post; `po_up_cancel` is the closed-offset
+     re-anchor cancel (proved via `pa_stk_off2` + a vm'd wrap-to-zero
+     + `avi0` — the recipe for any +K/-K sp cancel).  The cap returns
+     packed inside the ∃mfin.  GOTCHA: rewrite bridges must use
+     EXPLICIT spellings, not let-bound names (a `rewrite -H` whose RHS
+     is a let-local like `a8_p24` finds no occurrence — the round-trip
+     through a leaf re-spells cells in the leaf's own let-forms).
+   - TODO — `wp_push_off_sconf` MAIN (same file): prologue mover k:=4
+     (deep-6 input: top 4 feed `sie_cap_move_down`, deeper 2 ride for
+     the mycpu calls at `pa_stk sp' kv_frame_slots`) + 3 csdsp saves +
+     caddi4spn + the FUSED `csrrci a5,sstatus,2` at 0x0a =
+     `wp_csrci_sstatus_s_sconf` (rd=a5; continuation returns the WHOLE
+     cap at '0' + the report/payload disjunct — thread the payload
+     OPAQUELY through everything after) + c.mv s1,a5 + 1st mycpu call +
+     clw noff + cbeqz (WpSconfBtype taken/fall) + intena arm (0x2c 3rd
+     mycpu call, 0x30 srli4 a5,s1,1, 0x34 candi a5,1, 0x36 csw
+     124(a0), 0x38 c.j back — c.j hands the later out, absorb with
+     iNext) + `wp_push_off_suffix_sconf` on both arms.  Post: ∀ms mfin
+     with callee_saved + noff+1 + intena update + the flip payload
+     disjunct tied to ⌜SIE ms⌝; deep-6 custody back.  Then
+     `wp_pop_off_sconf` (csrsi dual; already-enabled refuted in-leaf).
    - the rest of the kalloc cone file-by-file (acquire/release/holding/
      kalloc/kfree...), VCgen `_den` sconf wrapper with the first
      converted function.
