@@ -385,7 +385,30 @@ before any mechanical sweep.
    simply keeps threading the cap.  REMAINING, in order:
    - `wp_mycpu` onto sconf (push_off's callee; convert first — the old
      unbundle-island route is unusable at SIE=1).  Its 2-slot frame =
-     `sie_cap_move_down` k:=2.
+     `sie_cap_move_down` k:=2.  RECIPE (leaf inventory verified, all
+     twins exist; go LEAF-BY-LEAF — the old proof's `wp_vc_block_s_den_r`
+     prologue/epilogue blocks contain the sp-moves, which
+     `wp_vc_block_s_sconf`'s `vblock_no_sp` guard forbids, and no den
+     sconf wrapper exists yet): new file WpSconfMycpu.v; statement =
+     wp_mycpu_r's ∀-continuation shape with sconf γ + hart_state +
+     sie_cap γ root m0 + tlb_inv_pt replacing the raw cells/facts, and
+     `stack_own (pa_stk sp0 kv_frame_slots) 2` (deep slots) replacing
+     `stack_own sp0 n`.  Instructions (myi_XX instr facts are PUBLIC in
+     WpMycpu.v; offsets 0x00..0x1e): 0x00 c.addi sp,-16 =
+     `wp_caddi_sp_s_sconf` with transformer from `sie_cap_move_down` 2
+     (P := the released `stack_own sp0 2`, split to cells via
+     `stack_own_2_elim`; slot addrs = old proof's Hpra/Hps0); 0x02/0x04
+     c.sdsp ra,8 / s0,0 = `wp_csdsp_s_sconf`; 0x06 c.addi4spn s0,sp,4 =
+     `wp_caddi4spn_s_sconf`; 0x08 c.mv a5,tp = `wp_cmv_s_sconf`; 0x0a
+     c.addiw a5,0 = `wp_caddiw_s_sconf`; 0x0c c.slli a5,7 =
+     `wp_cslli_s_sconf`; 0x0e auipc a0 = `wp_auipc_s_sconf`; 0x12
+     addi a0,a0,0xa86 = `wp_addi4_s_sconf` (NEW, WpSconfAlu.v); 0x16
+     c.add a0,a5 = `wp_cadd_s_sconf`; 0x18/0x1a c.ldsp restores =
+     `wp_cldsp_s_sconf`; 0x1c c.addi sp,16 = mover with
+     `sie_cap_move_up` 2 (frame via `stack_own_2_intro`); 0x1e c.ret =
+     `wp_cret_s_sconf` (WpSconfCtl.v).  callee_saved discharge: reuse
+     wp_mycpu_r's m1..m11 chain + `callee_saved_apply_writes` ending
+     verbatim.
    - `wp_push_off_sconf`: prologue movers + csrr (save leaf; arm report
      ties the stored intena to the payload) + csrci (whole-cap-back
      continuation) + noff/intena stores + epilogue; post carries the

@@ -503,6 +503,40 @@ Section WpSconfAlu.
   Qed.
 
 
+  (* base-width addi (rd != x0, rd != sp): [wval] is the model's
+     [gpr_addi_val] at map-form operands. *)
+  Lemma wp_addi4_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : gmap regidx (mword 64)) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg
+        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))]> m) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rs1 rs1
+              (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
+              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
+              m Hrd Hrdsp _
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_addi_val, gpr_src. rewrite Hva. reflexivity.
+  Qed.
+
+
+
   (* ------------------------------------------------------------------- *)
   (* The PC-READING 4-byte gpr-write engine (auipc): the base engine      *)
   (* with [register_lookup PC s_pc = pc] handed to the exec hypothesis.   *)
