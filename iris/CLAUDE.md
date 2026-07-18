@@ -306,7 +306,26 @@ before any mechanical sweep.
      pattern).  `exec_execute_csrr_sstatus` is imported from WpPopOff
      (the WpSmodePtCtl copy is Local) — relocate to a shared csr base
      when convenient.
-   - TODO — the csrci ('1'→'0') and csrsi ('0'→'1') FLIP leaves.  The
+   - DONE — the csrci ('1'→'0') FLIP leaf `wp_csrci_sstatus_s_sconf`
+     (WpSconfCsr.v), modulo ONE named pure premise `csrci_sie_flip_ok`
+     (below): the funnel callback flips mstatus via the new
+     non-collapse `exec_execute_csrrci_sstatus_gen`, opens intrN,
+     `sie_ghost_flip`s all three pieces to '0', reseals `intr_inv` at
+     b:='0' (vacuous handler guard), and hands the caller the freed
+     '1'-arm payload; the '0' arm is the idempotent write via
+     `legalize_sie_clear_idem`.  The continuation returns the bare '0'
+     quarter + the old-bit report disjunct.
+   - DONE — the csrsi ('0'→'1') restore leaf `wp_csrsi_sstatus_s_sconf`
+     (WpSconfCsr.v): consumes the saved payload (which now carries
+     `▷ intr_handler_spec`, extracted by the csrci flip from the
+     invariant's guard via quarter-quarter agreement) to re-arm
+     `sie_cap`-'1'; the invariant reseals at b:='1' with that spec; the
+     already-enabled `sie_cap` branch is refuted by sepc-cell
+     exclusivity (`reg_pointsto_excl`).  The dual exec fact
+     `exec_execute_csrsi_sstatus_gen` and `sstatus_write_set_val` are
+     local there.
+   - TODO — the two pure characterizations (`csrci_sie_flip_ok` /
+     `csrsi_sie_flip_ok`, WpSconfCsr.v), currently named premises:  The
      missing ingredient is the SIE=1 characterization of the csr write:
      for `ms' := legalize_sstatus_val ms (sstatus_write_val ms 2)` (and
      the csrsi dual) prove (a) `SIE ms' = 0` (resp. 1), (b) every
@@ -442,6 +461,23 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
         (`wp_instr_s_tlbinv_pt`, `wp_instr_s_config_tlbinv_pt`,
         `tlb_inv_pt_fetch`) become Definitions instantiating
         `kpt_regime` — zero downstream churn, sweep unaffected.
+     b''. STATUS UPDATE (2026-07-18e): the DATA side of stage (c) is DONE —
+        sr_transform (the third regime field: the pointer-masking
+        effective-address transform is the identity at pmlen 0 in EITHER
+        mode; mode-generic exec_transform_effective_address_mode), every
+        vmem tower (widths 8/4/1 + AMO) takes the transform outcome as
+        the premise Htea instead of satp0/Sv39 hypotheses, and ALL data
+        leaves are regime-generic with kpt_regime restatement wrappers
+        under the old names: wp_{cld,csd}_s_r (Leaves), wp_{ld,sd,clw,lw,
+        csw,sw,sb}_s_r (Mem), wp_{sd_zero,clw_lockinv(+_locked),
+        sw_zero_lockinv,amoswap_lockinv}_..._r (Lock — regime binder Rg
+        there; R is the lock's resource).  The sconf files' tower call
+        sites discharge Htea inline from their own satp facts (interface
+        unchanged).  REMAINING in stage (c): the NON-memory files
+        WpSmodePtAlu/Btype/Ctl — pure renames now (statements swap
+        tlb_inv_pt->sr_inv R, engine calls already generic; use the
+        validated wrapper recipe), plus WpSmodePtMemWrap's _scfg
+        wrappers.  Then stage (d), the kalloc-cone flip.
      b'. STATUS: (a) and (b) are DONE (SRegime.v; SmodeCorePt.v now proves
         the generic `s_regime_fetch` / `wp_instr_s_regime` /
         `wp_instr_s_config_regime`, with the old names as restatement
