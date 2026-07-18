@@ -254,12 +254,17 @@ before any mechanical sweep.
      `data2_id_4`, storeval `trunc32`); Local helper copies as in
      WpSmodePtMem.  DONE: the pc-reading engine
      `wp_gpr_write_s_sconf_base_pc` + `wp_auipc_s_sconf` (WpSconfAlu.v).
-   - TODO, in rough order: sb (width-1 RAM byte store, no alignment premise);
-     Ctl (Jal/Jalr: register write + nextPC redirect over the funnel,
-     using the pc-reading pattern; Csr/Sret are '0'-arm-only at first:
-     sret runs in kernelvec's body, csrci/csrsi are the stage-7 flips);
-     Lock/Uart (accessor-form device leaves); MemWrap's c.ldsp/c.sdsp
-     bridges.  sp-MOVING instructions
+   - DONE: **WpSconfCtl.v** — fence / c.j / jal / c.ret over the funnel
+     (c.j hands the later out — an unconditional backward jump is a loop
+     back edge; jal carries rd ≠ sp; c.ret opens the bundle only for the
+     LPE/priv/misa side conditions).  Csr/Sret deliberately NOT here:
+     sret runs in kernelvec's SIE=0 body, csrci/csrsi ARE the stage-7
+     flips.
+   - TODO, in rough order: sb (width-1 RAM byte store, no alignment
+     premise); Lock/Uart (accessor-form device leaves); MemWrap's
+     c.ldsp/c.sdsp bridges; dedicated sp-mover leaves (c.addi sp /
+     c.addi16sp re-carve the sie_cap stack bound); then VCgen (item 6)
+     and the function proofs (item 8).  sp-MOVING instructions
      (c.addi sp / c.addi16sp) get dedicated leaves that re-carve
      `sie_cap`'s stack bound explicitly.
    Watch the import direction: leaf files must import
