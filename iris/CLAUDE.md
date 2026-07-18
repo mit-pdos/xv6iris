@@ -276,13 +276,27 @@ before any mechanical sweep.
      from pure stack splitting ('0' arm is m-blind, only the '1' arm's
      ≥32-slot bound at the new sp is owed — where function proofs do
      their stack bookkeeping anyway).
-   - TODO, in rough order: sb (width-1 RAM byte store, no alignment
-     premise); wp_clw_lockinv_locked (read while holding); Uart
-     accessor-form device leaves; then VCgen (item 6:
-     wp_vc_block_s_aux re-derived over the funnel — a real recursion
-     adaptation, not a wrapper swap) and the function proofs (item 8).  sp-MOVING instructions
-     (c.addi sp / c.addi16sp) get dedicated leaves that re-carve
-     `sie_cap`'s stack bound explicitly.
+   - DONE: `wp_sb_s_sconf` (WpSconfMem.v — width-1 RAM byte store, no
+     alignment premise; stored byte is the new `trunc8` of rs2; local
+     width-1 helper copies incl. `nth_byte0_id`) and
+     `wp_clw_lockinv_locked_s_sconf` (WpSconfLock.v — read while
+     holding; the free branch refuted by `locked_exclusive`, token
+     rides through, invariant reseals on the nonzero branch).
+   - DONE: **WpSconfUart.v** — the accessor-form device leaves
+     `wp_sb_uart_s_sconf` / `wp_lb_uart_s_sconf` over the funnel:
+     `dev_inv` opens across the funnel callback's own step (devN
+     disjoint from minstretN AND intrN — arm-blind, like the lock
+     leaves), the uart ghost step runs through the caller's accessor
+     wand while the invariant is open, and the translate side reuses
+     the REGIME machinery instantiated at `kpt_regime`
+     (`sr_inv (kpt_regime root)` IS `tlb_inv_pt root` definitionally,
+     so `sr_transform`/`sr_absorb_dev` consume the bundle's invariant
+     directly — no PMP peel/reseal needed, the grant facts come out of
+     the absorption).  This "regime-at-kpt inside the sconf funnel"
+     shortcut is the template for any future sconf device leaf.
+   The stage-5 leaf sweep is COMPLETE.  Function proofs (item 8) still
+   pending; sp-MOVING instructions have their dedicated re-carving
+   leaves (WpSconfAlu.v).
    Watch the import direction: leaf files must import
    IntrDefs/WpSmodeIntr — WpIntrInv no longer imports any leaf file, but
    WpKernelvecSpec does; keep the kernelvec cap on top.  Delete the old

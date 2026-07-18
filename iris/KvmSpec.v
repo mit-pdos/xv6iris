@@ -13,27 +13,32 @@
       callers (uvmalloc &c.) edit a USER table while satp holds the KERNEL
       table.  So every spec here separates
         - the EDITED table: [ptree_own 2 1 t] + pure facts about [t], and
-        - the AMBIENT TRANSLATION REGIME [SINV]: an abstract invariant
-          (Section variable) standing for whatever governs instruction
-          fetch and data access -- a Bare-satp bundle during boot,
-          [tlb_inv_pt kroot] for the user-table callers.
-      Proving a spec at a given regime requires the S-mode leaf layer at
-      that regime; the Sv39 leaves exist (the WpSmodePt files), the BARE
-      leaf family is a prerequisite work item (see the plan in CLAUDE.md).
+        - the AMBIENT TRANSLATION REGIME [R : s_regime] (SRegime.v), the
+          abstract invariant governing instruction fetch and data access:
+          [bare_regime] during boot, [kpt_regime kroot] for the
+          user-table callers.
+      The S-mode leaf layer is regime-generic (the [_r] leaves), so the
+      instruction proofs run ONCE over the abstract [R] and both
+      instantiations come free.
 
    2. THE MAP VIEW.  A table under construction is described by a finite
       map [m : gmap (mword 27) (mword 64)] (vpn -> leaf word), through
-        [pt_rep t m]  :=  every m-mapped vpn walks to its EXACT leaf word,
-                          every other vpn's walk stops at an invalid slot.
-      This is the same shape as UptTree's [um] (and [upt_tree_spec] /
-      [kpt_tree_spec] are derivable from [pt_rep] at their concrete maps,
-      exact leaves being A/D variants of themselves) -- so the specs
-      compose unchanged into both the kernel boot story and the user
-      page-table story.
+        [pt_rep0 t m] :=  every m-mapped vpn walks to its EXACT leaf word,
+                          every other vpn's walk stops at a slot holding
+                          the LITERAL ZERO word.
+      The zero stop word (not mere model-invalidity) is the xv6 shape:
+      the C walk tests only the V BIT, so soundness of its descend/alloc
+      branch needs the blocked slot to actually be zero -- and tables
+      built by kvmmake/mappages have zero stop words by construction.
+      [pt_rep0_rep] weakens to the model-invalid view [pt_rep], which is
+      the same shape as UptTree's [um] (and [upt_tree_spec] /
+      [kpt_tree_spec] are derivable at the concrete maps, exact leaves
+      being A/D variants of themselves) -- so the specs compose unchanged
+      into both the kernel boot story and the user page-table story.
 
    3. WALK'S FUNCTIONAL ESSENCE.  walk(pt, va, alloc=1) grows the tree
       with (zeroed) intermediate nodes but NEVER writes a leaf, so it
-      PRESERVES the represented map exactly: [ptree_same_rep t t'].  Its
+      PRESERVES the represented map exactly: [ptree_same_rep0 t t'].  Its
       value is the address of vpn's L0 slot, exposed through
       [ptree_level0 t' vpn p2 p1 w0] (the pointer path down to the L0
       slot, whose current word is [w0]) -- [ptree_maps] minus the leaf
@@ -77,81 +82,17 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes KernelText WpGpr WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
-Require Import SmodeCore StackOwn CalleeSaved KallocInv WpLock.
+Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt PtBuild.
+Require Import SmodeCore SRegime StackOwn CalleeSaved KallocInv WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* §1 Pure representation predicates.                                     *)
-(* ===================================================================== *)
-
-(* the tree represents EXACTLY the finite map [m] (vpn -> leaf word) *)
-Definition pt_rep (t : ptree) (m : gmap (mword 27) (mword 64)) : Prop :=
-  (forall vpn w, m !! vpn = Some w -> exists p2 p1, ptree_maps t vpn p2 p1 w) /\
-  (forall vpn, m !! vpn = None -> ptree_blocks t vpn).
-
-(* same represented map: what walk's tree-growing preserves *)
-Definition ptree_same_rep (t t' : ptree) : Prop :=
-  pt_base t' = pt_base t /\
-  (forall v p2 p1 p0, ptree_maps t v p2 p1 p0 <-> ptree_maps t' v p2 p1 p0) /\
-  (forall v, ptree_blocks t v <-> ptree_blocks t' v).
-
-Lemma pt_rep_same (t t' : ptree) (m : gmap (mword 27) (mword 64)) :
-  ptree_same_rep t t' -> pt_rep t m -> pt_rep t' m.
-Proof.
-  intros (Hb & Hm & Hbl) (Hmap & Hblk). split.
-  - intros vpn w Hl. destruct (Hmap vpn w Hl) as (p2 & p1 & Hp).
-    exists p2, p1. apply Hm. exact Hp.
-  - intros vpn Hl. apply Hbl. exact (Hblk vpn Hl).
-Qed.
-
-(* the pointer path down to [vpn]'s L0 slot, whose current word is [w0]
-   ([ptree_maps] minus the leaf classification -- walk's return value) *)
-Definition ptree_level0 (t : ptree) (vpn : mword 27) (p2 p1 w0 : mword 64) : Prop :=
-  exists c1 c0,
-    pt_kids t (vpn_idx 2 vpn) = Some c1 /\
-    pt_kids c1 (vpn_idx 1 vpn) = Some c0 /\
-    pt_ents t (vpn_idx 2 vpn) = p2 /\
-    pt_ents c1 (vpn_idx 1 vpn) = p1 /\
-    pt_ents c0 (vpn_idx 0 vpn) = w0 /\
-    u_next_base p2 = pt_base c1 /\
-    u_next_base p1 = pt_base c0 /\
-    pte_valid p2 /\ pte_ptr p2 /\
-    pte_valid p1 /\ pte_ptr p1.
-
-Lemma ptree_maps_level0 (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
-  ptree_maps t vpn p2 p1 p0 -> ptree_level0 t vpn p2 p1 p0.
-Proof.
-  intros (c1 & c0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & _).
-  exists c1, c0. tauto.
-Qed.
-
-(* the leaf word mappages writes for page [i] of a run starting at
-   physical page [ppn0] with permission bits [perm]: PA2PTE(pa)|perm|V,
-   A/D clear -- exactly the store at mappages+0x50 *)
-Definition mappages_pte (ppn0 : mword 44) (perm : Z) (i : nat) : mword 64 :=
-  mk_pte (add_vec_int ppn0 (Z.of_nat i)) (Z.lor perm 1).
-
-(* vpn arithmetic for the page run *)
-Definition vpn_at (vpn0 : mword 27) (i : nat) : mword 27 :=
-  add_vec_int vpn0 (Z.of_nat i).
-
-(* [m] extended with the first [k] pages of the run *)
-Fixpoint pt_insert_run (m : gmap (mword 27) (mword 64))
-    (vpn0 : mword 27) (ppn0 : mword 44) (perm : Z) (k : nat)
-    : gmap (mword 27) (mword 64) :=
-  match k with
-  | O => m
-  | S k' => <[vpn_at vpn0 k' := mappages_pte ppn0 perm k']>
-              (pt_insert_run m vpn0 ppn0 perm k')
-  end.
-
-(* ===================================================================== *)
-(* §2 The spec statements.  [SINV] is the ambient S-mode translation      *)
-(*    regime (see the header); every spec threads it opaquely.  The       *)
+(* §2 The spec statements.  [R : s_regime] is the ambient S-mode          *)
+(*    translation regime (see the header); every spec threads [sr_inv R]  *)
+(*    opaquely.  The                                                      *)
 (*    statements are definitions so the file compiles proof-free; the     *)
 (*    instruction-level lemmas will conclude these exact iProps.          *)
 (* ===================================================================== *)
@@ -159,7 +100,7 @@ Fixpoint pt_insert_run (m : gmap (mword 27) (mword 64))
 Section KvmSpecs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
-  Variable SINV : iProp Σ.
+  Variable R : s_regime.
 
   (* kalloc's ambient resources, bundled for readability: the kmem lock +
      the per-cpu push_off/pop_off cells kalloc's acquire/release need
@@ -174,7 +115,7 @@ Section KvmSpecs.
   (*   ret <> 0 : the tree grew intermediate nodes only (same represented  *)
   (*     map); vpn's pointer path now reaches L0; ret = the L0 slot        *)
   (*     address; the slot's current word is exposed (the caller's remap   *)
-  (*     check reads it: if [ptree_blocks t vpn] held, w0 is invalid).     *)
+  (*     check reads it: if [ptree_blocks0 t vpn] held, w0 is ZERO).       *)
   (*   ret = 0 : kalloc failed; the tree may still have grown (same        *)
   (*     represented map).                                                 *)
   (* alloc=0 (walkaddr's mode) is a separate, simpler spec when the user-  *)
@@ -191,19 +132,19 @@ Section KvmSpecs.
       ⌜m !!! Regidx (mword_of_int 12) = mword_of_int 1⌝ -∗
       ⌜(uint va < 2 ^ 38)%Z⌝ -∗          (* below MAXVA: no panic arm *)
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      SINV -∗ kernel_text -∗
+      sr_inv R -∗ kernel_text -∗
       pc_is (mword_of_int KernelSyms.walk) -∗
       gpr_file m -∗ stack_own (m !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ lkA fl -∗
       ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        SINV -∗
+        sr_inv R -∗
         pc_is (update_vec_dec (m !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (m !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         ⌜callee_saved m mr⌝ -∗
-        ⌜ptree_same_rep t t'⌝ -∗
+        ⌜ptree_same_rep0 t t'⌝ -∗
         ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)   (* alloc failed *)
           \/ (exists p2 p1 w0,
                ptree_level0 t' vpn p2 p1 w0 /\
@@ -237,23 +178,23 @@ Section KvmSpecs.
       ⌜mm !!! Regidx (mword_of_int 14) = mword_of_int perm⌝ -∗
       ⌜(0 <= perm < 1024)%Z⌝ -∗
       ⌜(uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z⌝ -∗
-      ⌜pt_rep t m⌝ -∗
+      ⌜pt_rep0 t m⌝ -∗
       ⌜forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None⌝ -∗
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      SINV -∗ kernel_text -∗
+      sr_inv R -∗ kernel_text -∗
       pc_is (mword_of_int KernelSyms.mappages) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ lkA fl -∗
       ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree) (k : nat),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        SINV -∗
+        sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
-        ⌜pt_rep t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
+        ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
         ⌜ (k = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
           \/ ((k < npages)%nat /\
               mr !!! Regidx (mword_of_int 10) = mword_of_int (-1)) ⌝ -∗
@@ -292,24 +233,24 @@ Section KvmSpecs.
       ⌜mm !!! Regidx (mword_of_int 14) = mword_of_int perm⌝ -∗
       ⌜(0 <= perm < 1024)%Z⌝ -∗
       ⌜(uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z⌝ -∗
-      ⌜pt_rep t m⌝ -∗
+      ⌜pt_rep0 t m⌝ -∗
       ⌜forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None⌝ -∗
       panic_wp -∗
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      SINV -∗ kernel_text -∗
+      sr_inv R -∗ kernel_text -∗
       pc_is (mword_of_int KernelSyms.kvmmap) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ lkA fl -∗
       ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        SINV -∗
+        sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
-        ⌜pt_rep t' (pt_insert_run m vpn0 ppn0 perm npages)⌝ -∗
+        ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm npages)⌝ -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
       WP (Loop : expr riscv_lang) {{ Φ }})%I.
 

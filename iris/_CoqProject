@@ -89,6 +89,7 @@ UserretPt.v
 UserretEntryPt.v
 UserretAllPt.v
 SRegime.v
+PtBuild.v
 KvmSpec.v
 InstrBytes.v
 KernelText.v
@@ -142,6 +143,7 @@ WpSconfMem.v
 WpSconfBtype.v
 WpSconfCtl.v
 WpSconfLock.v
+WpSconfUart.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
