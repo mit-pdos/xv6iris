@@ -858,13 +858,21 @@ Where things landed (the stage descriptions below remain the design rationale):
      mem_write_value + the result computation (per-op, AMOCAS special-cased)
      + wX; the mem-level facts are `user_pt_amo_data_4`.  This is
      execute-level (borders the assembly).
-  5. widths 2/4/8 clones of the vmem LOAD/STORE composers (the width-8 ones
-     are the exemplars; user_pt_{load,store}_data_{4,2,1} already exist).
-  6. plain LOAD/STORE MISALIGNED split (n=2): plat_misaligned_access.
+  5. DONE -- the vmem LOAD/STORE composers are WIDTH-GENERIC:
+     exec_vmem_read_addr_aligned / exec_vmem_write_addr_aligned_store and
+     user_pt_vmem_{read_addr_load,write_addr_store} take the width k (+ the
+     two width-typed plain-RAM bricks, like UserMemPt SS5), with the RV64
+     width instances user_pt_vmem_{read_addr_load,write_addr_store}_{8,4,2,1}
+     the trivial derivations.  The STORE composer threads the model's own
+     subrange write-value (udata_own absorbs it, contents existential), so
+     no per-width subrange-identity is needed.
+  6. plain LOAD/STORE MISALIGNED split (n>1): plat_misaligned_access.
      load_store = None, so a misaligned plain load/store does NOT fault --
      the hardware splits it into aligned sub-accesses, each translated
-     independently through the absorption.  (Lower priority; xv6 rarely
-     misaligns plain accesses.)
+     independently through the absorption.  REQUIRED for totality over
+     arbitrary user code (whether xv6 itself misaligns is irrelevant --
+     the classification must handle every decodable access), so this is
+     NOT optional; the split loop runs with n = width/bytes_per_access.
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process
