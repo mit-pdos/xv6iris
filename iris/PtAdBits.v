@@ -238,6 +238,18 @@ Qed.
 (* reusing KptPt §12's machinery.                                         *)
 (* ===================================================================== *)
 
+(* For a 1-bit value every bit above bit 0 is zero -- lets the A/D
+   contributions reduce to [false] SYMBOLICALLY (no case split on a/d). *)
+Lemma mword1_testbit_high (a : mword 1) (j : Z) :
+  1 <= j -> Z.testbit (bv_unsigned a) j = false.
+Proof.
+  intros Hj. pose proof (bv_unsigned_in_range _ a) as Hr.
+  change (bv_modulus _) with 2 in Hr.
+  apply Z.bits_above_log2; [ lia | ].
+  apply Z.le_lt_trans with (m := Z.log2 1);
+    [ apply Z.log2_le_mono; lia | rewrite Z.log2_1; lia ].
+Qed.
+
 Lemma pte_set_ad_zext_concat (p : mword 44) (f : Z) (a d : mword 1) :
   0 <= f < 1024 ->
   pte_set_ad (zero_extend' 64 (concat_vec p (mword_of_int f : mword 10))) a d
@@ -247,7 +259,7 @@ Lemma pte_set_ad_zext_concat (p : mword 44) (f : Z) (a d : mword 1) :
                     (Z.shiftl (bv_unsigned d) 7))) : mword 10)).
 Proof.
   intros Hf.
-  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+  (* a,d stay symbolic; [mword1_testbit_high] zeroes their high bits. *)
   (unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags;
    unfold zero_extend', Operators_mwords.zero_extend, extz_vec, concat_vec,
      mword_of_int, Values.mword_of_int;
@@ -286,6 +298,8 @@ Proof.
      | match goal with |- context [Z.testbit ?z ?i] =>
          rewrite (Z.testbit_neg_r z i) by lia end
      | rewrite Z.bits_0
+     | progress (rewrite (mword1_testbit_high a) by lia)
+     | progress (rewrite (mword1_testbit_high d) by lia)
      | progress zn_norm
      | progress rewrite ?orb_false_l, ?orb_false_r, ?andb_true_l,
          ?andb_false_l, ?andb_true_r, ?andb_false_r
