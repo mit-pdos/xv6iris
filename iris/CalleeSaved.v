@@ -62,6 +62,28 @@ Lemma is_cs_idx_true_neq (k c : mword 5) :
   is_cs_idx k = false -> is_cs_idx c = true -> Regidx k <> Regidx c.
 Proof. intros Hk Hc Heq. injection Heq as Heq'. subst c. rewrite Hc in Hk. discriminate. Qed.
 
+Lemma Regidx_ne_of_ne (c k : mword 5) : c <> k -> Regidx c <> Regidx k.
+Proof. intros H Heq. apply H. injection Heq as ->. reflexivity. Qed.
+
+(* Project one register out of a [callee_saved] fact, uniformly for ANY
+   callee-saved index [c] (decided by [is_cs_idx c = true]).  A caller that
+   threads a register through a sub-call hop can [rewrite (callee_saved_lookup
+   H (mword_of_int c) …)] instead of picking the right conjunct out of a
+   [first [rewrite H_tp | rewrite H_s3 | …]] alternation (O(#conjuncts) failed
+   rewrites per hop). *)
+Lemma callee_saved_lookup {m m' : gmap regidx (mword 64)}
+      (Hcs : callee_saved m m') (c : mword 5) :
+  is_cs_idx c = true -> m' !!! Regidx c = m !!! Regidx c.
+Proof.
+  intros Hc. unfold callee_saved in Hcs.
+  destruct Hcs as (H&H0&H1&H2&H3&H4&H5&H6&H7&H8&H9&H10&H11&H12).
+  (* [c] is one of the 14 concrete indices; [is_cs_idx c] picks which. *)
+  unfold is_cs_idx in Hc. cbn [existsb] in Hc. rewrite !orb_true_iff in Hc.
+  repeat (destruct Hc as [Hc|Hc]); try discriminate;
+    apply bool_decide_eq_true in Hc; subst c;
+    first [ change (mword_of_int 2) with (csp_rs1 : mword 5); assumption | assumption ].
+Qed.
+
 (* Writing a CALLER-saved register (rd, ra, or any t/a register) leaves
    [callee_saved] intact.  This is THE efficient discharge primitive for own
    register writes: each own-write becomes one [apply callee_saved_insert_r]

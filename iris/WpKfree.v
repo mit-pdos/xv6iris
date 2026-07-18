@@ -725,6 +725,7 @@ Section Kfree.
     iIntros (mfp) "Hcfg Htlbinv Hpc Hstk Hpage Hfile %Hpinsf".
     iEval (rewrite HMmsa0) in "Hpage".
     iEval (rewrite HMmssp) in "Hstk". iRename "Hstk" into "Hdeep".
+    pose proof Hpinsf as Hpinsf_cs.
     unfold callee_saved in Hpinsf.
     destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & Hfs2 & Hfs3 & Hfs4 & Hfs5 & Hfs6 & Hfs7 & Hfs8 & Hfs9 & Hfs10 & Hfs11).
     assert (Hpc36 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x36)).
@@ -852,6 +853,7 @@ Section Kfree.
     assert (Hpc44 : update_vec_dec (add_vec (Kacq !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x44)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
+    pose proof Hacqpins as Hacqpins_cs.
     unfold callee_saved in Hacqpins.
     destruct Hacqpins as (Hqsp & Hqtp & Hqs0 & Hqs1 & Hqs2 & Hqs3 & Hqs4 & Hqs5 & Hqs6 & Hqs7 & Hqs8 & Hqs9 & Hqs10 & Hqs11).
     assert (Hs1p : macq !!! Regidx (mword_of_int 9 : mword 5) = p) by (rewrite Hqs1; exact Hmacq_s1).
@@ -980,6 +982,7 @@ Section Kfree.
     assert (Hpc54 : update_vec_dec (add_vec (Rrel !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".
+    pose proof Hrelpins as Hrelpins_cs.
     unfold callee_saved in Hrelpins.
     destruct Hrelpins as (Hrsp & Hrtp & Hrs0 & Hrs1 & _ & Hrs3 & Hrs4 & Hrs5 & Hrs6 & Hrs7 & Hrs8 & Hrs9 & Hrs10 & Hrs11).
     assert (HspMrel : mrel !!! Regidx csp_rs1 = spr) by (rewrite Hrsp; exact HRrelcsp).
@@ -1080,6 +1083,29 @@ Section Kfree.
          (R1 = m) values and sp via the +32/-32 c.addi16sp cancel; tp and s3-s11
          thread untouched through memset/acquire/release (each callee_saved) and
          kfree's own body, which never writes them. *)
+      (* Amortize the register-preservation chain: prove ONCE, for a symbolic
+         register [c] not written by kfree's own body (i.e. c not among the ten
+         insert keys {1,2,8,9,10,11,12,14,15,18}), that [c]'s value threads
+         untouched from m to Q5c through the four own-insert groups (peeled) and
+         the three sub-calls (callee_saved_lookup).  The tp and s3..s11 conjuncts
+         then close by ONE [apply Hthread] each (concrete side conditions only),
+         instead of re-peeling all four towers per register. *)
+      assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
+                c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
+                c <> mword_of_int 9 -> c <> mword_of_int 10 -> c <> mword_of_int 11 ->
+                c <> mword_of_int 12 -> c <> mword_of_int 14 -> c <> mword_of_int 15 ->
+                c <> mword_of_int 18 ->
+                Q5c !!! Regidx c = m !!! Regidx c).
+      { intros c Hcs N1 N2 N8 N9 N10 N11 N12 N14 N15 N18.
+        let peel := (repeat (rewrite lookup_total_insert_ne; [ | congruence ])) in
+        rewrite /Q5c /Q5a /Q58 /Q56 /Q54; peel;
+        rewrite (callee_saved_lookup Hrelpins_cs c Hcs);
+        rewrite /Rrel /Rae /Rld; peel;
+        rewrite (callee_saved_lookup Hacqpins_cs c Hcs);
+        rewrite /Kacq /S3 /S2 /S1; peel;
+        rewrite (callee_saved_lookup Hpinsf_cs c Hcs);
+        rewrite /Mms /R14 /R13 /R12 /R11 /R10 /R9 /R8 /R7 /R6 /R5 /R4 /R3 /R2 /R1; peel;
+        reflexivity. }
       unfold callee_saved.
       (* the register-preservation chain m -> ... -> mrel for a reg K that
          kfree's own code never touches (tp, s3-s11): peel each own-code map
@@ -1093,19 +1119,7 @@ Section Kfree.
           exact HspMrel. }
         rewrite HQ5acsp. unfold regval_into_reg, spr. apply kfree_sp_cancel. }
       split.
-      { (* tp *)
-        rewrite /Q5c /Q5a /Q58 /Q56 /Q54.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        first [rewrite Hrtp | rewrite Hrs3 | rewrite Hrs4 | rewrite Hrs5 | rewrite Hrs6 | rewrite Hrs7 | rewrite Hrs8 | rewrite Hrs9 | rewrite Hrs10 | rewrite Hrs11].
-        rewrite /Rrel /Rae /Rld.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        first [rewrite Hqtp | rewrite Hqs3 | rewrite Hqs4 | rewrite Hqs5 | rewrite Hqs6 | rewrite Hqs7 | rewrite Hqs8 | rewrite Hqs9 | rewrite Hqs10 | rewrite Hqs11].
-        rewrite /Kacq /S3 /S2 /S1.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        first [rewrite Hftp | rewrite Hfs3 | rewrite Hfs4 | rewrite Hfs5 | rewrite Hfs6 | rewrite Hfs7 | rewrite Hfs8 | rewrite Hfs9 | rewrite Hfs10 | rewrite Hfs11].
-        rewrite /Mms /R14 /R13 /R12 /R11 /R10 /R9 /R8 /R7 /R6 /R5 /R4 /R3 /R2 /R1.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        reflexivity. }
+      { (* tp *) apply Hthread; vm_compute; first [reflexivity | discriminate]. }
       split.
       { (* s0 *)
         rewrite /Q5c lookup_total_insert_ne; [| vm_compute; discriminate].
@@ -1124,20 +1138,8 @@ Section Kfree.
         rewrite /Q5c lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /Q5a lookup_total_insert.
         rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
-      (* s3..s11: identical chain to tp *)
-      repeat split;
-        rewrite /Q5c /Q5a /Q58 /Q56 /Q54;
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-        first [rewrite Hrtp | rewrite Hrs3 | rewrite Hrs4 | rewrite Hrs5 | rewrite Hrs6 | rewrite Hrs7 | rewrite Hrs8 | rewrite Hrs9 | rewrite Hrs10 | rewrite Hrs11];
-        rewrite /Rrel /Rae /Rld;
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-        first [rewrite Hqtp | rewrite Hqs3 | rewrite Hqs4 | rewrite Hqs5 | rewrite Hqs6 | rewrite Hqs7 | rewrite Hqs8 | rewrite Hqs9 | rewrite Hqs10 | rewrite Hqs11];
-        rewrite /Kacq /S3 /S2 /S1;
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-        first [rewrite Hftp | rewrite Hfs3 | rewrite Hfs4 | rewrite Hfs5 | rewrite Hfs6 | rewrite Hfs7 | rewrite Hfs8 | rewrite Hfs9 | rewrite Hfs10 | rewrite Hfs11];
-        rewrite /Mms /R14 /R13 /R12 /R11 /R10 /R9 /R8 /R7 /R6 /R5 /R4 /R3 /R2 /R1;
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-        reflexivity. }
+      (* s3..s11: each closes by one [apply Hthread] (amortized peel). *)
+      repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
   Qed.
 
 End Kfree.
