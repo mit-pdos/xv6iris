@@ -230,7 +230,7 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr H".
-    iDestruct "Hcap" as "[Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hstk)]".
+    iDestruct "Hcap" as "[Hstk [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]".
     - (* ---- quarter-'0': the dispatch-None engine, SIE=0 from ghost ---- *)
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
       iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
@@ -248,7 +248,7 @@ Section WpSmodeIntr.
                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpcr Hinstr").
       iIntros (σ Hpceq) "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
       iMod ("H" $! σ Hpceq
-              with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv] [Hq0] Htlbinv Hfile Hnpc Hsi")
+              with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv] [Hstk Hq0] Htlbinv Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iFrame "Hhw Hminv Hpriv".
         iSplitL "Hms Hhalf".
@@ -257,7 +257,7 @@ Section WpSmodeIntr.
         { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
-      { iLeft. iExact "Hq0". }
+      { iFrame "Hstk". iLeft. iExact "Hq0". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
       iFrame "Hsi'". iExact "Hcont".
@@ -283,7 +283,7 @@ Section WpSmodeIntr.
       iMod ("H" $! σ Hpceq
               with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hstk] Htlbinv Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
-      { iRight. iFrame "Hq1 Hsepcx Hscausex Hstvalx Hstk".
+      { iFrame "Hstk". iRight. iFrame "Hq1 Hsepcx Hscausex Hstvalx".
         iExists handler. iExact "Hintr". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].

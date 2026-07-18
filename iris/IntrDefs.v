@@ -168,8 +168,11 @@ Section IntrDefs.
   (* frame) BELOW SP AT EVERY INTERRUPTS-ENABLED INSTRUCTION -- the trap   *)
   (* saves its 17 caller-saved registers into the top of that region --    *)
   (* plus the allocation-fixed menvcfg cell and tlb_inv_pt.  The depth is  *)
-  (* a BOUND (existential), so a client simply packs in however much free  *)
-  (* stack it currently owns below sp.  The frame exists because the       *)
+  (* EXACTLY [kv_frame_slots]: an exact carve keeps sp-move re-carving     *)
+  (* deterministic (an existential bound would make a downward sp move     *)
+  (* unprovable -- the mover could never extract its frame slots from an   *)
+  (* unknown-depth pack); clients keep any deeper free stack OUTSIDE the   *)
+  (* frame, adjacent below it.  The frame exists because the               *)
   (* handler genuinely USES m-dependent resources beyond the register      *)
   (* file: they can neither sit in the fixed invariant (sp varies per      *)
   (* trap) nor be framed around the handler WP.                            *)
@@ -193,8 +196,7 @@ Section IntrDefs.
       (m : gmap regidx (mword 64)) : iProp Σ :=
     (menvcfg ↦ᵣ menvcfg0 ∗
      tlb_inv_pt root_ppn ∗
-     (∃ n : nat, ⌜ (kv_frame_slots <= n)%nat ⌝ ∗
-                 stack_own (m !!! Regidx csp_rs1) n))%I.
+     stack_own (m !!! Regidx csp_rs1) kv_frame_slots)%I.
 
   (* [intr_frame] depends on [m] only through sp: any register write that
      PRESERVES sp transports the frame to the new map.  (An sp-moving
@@ -205,8 +207,7 @@ Section IntrDefs.
     intr_frame root_ppn menvcfg0 m -∗ intr_frame root_ppn menvcfg0 m'.
   Proof.
     iIntros (Hsp) "(Hmenv & Htlbinv & Hstk)".
-    iFrame "Hmenv Htlbinv". iDestruct "Hstk" as (n) "[%Hn Hstk]".
-    iExists n. iSplit; [iPureIntro; exact Hn |]. rewrite Hsp. iExact "Hstk".
+    iFrame "Hmenv Htlbinv". rewrite Hsp. iExact "Hstk".
   Qed.
 
   Definition intr_handler_spec (handler : mword 64)
@@ -329,39 +330,38 @@ Section IntrDefs.
 
   (* [sie_cap] -- the kernel-code capability that DISCRIMINATES the SIE
      mode by the ghost QUARTER's value (agreement with [sconf]'s tied
-     half pins the live bit).  The '1' arm carries exactly the extra
-     obligations of interrupts-enabled execution: the interrupt
-     invariant (handler existential -- no client names the handler), the
-     trap-scratch CSRs (any trap scribbles them, so enabled code cannot
-     pin their values), and the free-stack bound below sp. *)
-  Definition sie_cap (γ : gname) (root_ppn : mword 44)
-      (m : gmap regidx (mword 64)) : iProp Σ :=
+     half pins the live bit).  The EXACT [kv_frame_slots]-slot free-stack
+     carve below the CURRENT sp is factored OUT of the disjunction: it is
+     held at BOTH arms (harmless -- the ABI never writes below sp, and an
+     exact arm-blind carve is what makes sp-move re-carving deterministic;
+     see [sie_cap_move_down]/[sie_cap_move_up]).  The '1' arm carries the
+     remaining extra obligations of interrupts-enabled execution: the
+     interrupt invariant (handler existential -- no client names the
+     handler) and the trap-scratch CSRs (any trap scribbles them, so
+     enabled code cannot pin their values). *)
+  Definition sie_arm (γ : gname) (root_ppn : mword 44) : iProp Σ :=
     (ghost_var γ (1/4) ('b"0" : mword 1) ∨
      (ghost_var γ (1/4) ('b"1" : mword 1) ∗
       (∃ handler : mword 64, intr_inv γ handler root_ppn MENVCFG_S) ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
-      (∃ v : mword 64, stval ↦ᵣ v) ∗
-      (∃ n : nat, ⌜ (kv_frame_slots <= n)%nat ⌝ ∗
-                  stack_own (m !!! Regidx csp_rs1) n)))%I.
+      (∃ v : mword 64, stval ↦ᵣ v)))%I.
 
-  (* build an sp-MOVING transformer: the '0' arm is m-blind, so a
-     caller only re-carves the '1' arm's stack bound at the new sp
-     (pure [stack_own] splitting, where function proofs already do
-     their stack bookkeeping). *)
+  Definition sie_cap (γ : gname) (root_ppn : mword 44)
+      (m : gmap regidx (mword 64)) : iProp Σ :=
+    (stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
+     sie_arm γ root_ppn)%I.
+
+  (* generic sp-MOVING transformer: the arm is m-blind, so a caller only
+     re-carves the exact stack slice at the new sp. *)
   Lemma sie_cap_recarve (γ : gname) (root_ppn : mword 44)
       (m m' : gmap regidx (mword 64)) :
-    ( ∀ n : nat, ⌜ (kv_frame_slots <= n)%nat ⌝ -∗
-      stack_own (m !!! Regidx csp_rs1) n -∗
-      ∃ n' : nat, ⌜ (kv_frame_slots <= n')%nat ⌝ ∗
-                  stack_own (m' !!! Regidx csp_rs1) n' ) -∗
+    ( stack_own (m !!! Regidx csp_rs1) kv_frame_slots -∗
+      stack_own (m' !!! Regidx csp_rs1) kv_frame_slots ) -∗
     sie_cap γ root_ppn m -∗ sie_cap γ root_ppn m'.
   Proof.
-    iIntros "Hcarve [H0 | (Hq & Hinv & Hsepc & Hscause & Hstval & Hstk)]".
-    - iLeft. iExact "H0".
-    - iRight. iFrame "Hq Hinv Hsepc Hscause Hstval".
-      iDestruct "Hstk" as (n) "[%Hn Hstk]".
-      iApply ("Hcarve" $! n with "[%] Hstk"). exact Hn.
+    iIntros "Hcarve [Hstk Harm]". iFrame "Harm".
+    iApply ("Hcarve" with "Hstk").
   Qed.
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
@@ -370,11 +370,49 @@ Section IntrDefs.
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
     sie_cap γ root_ppn m -∗ sie_cap γ root_ppn m'.
   Proof.
-    iIntros (Hsp) "[H0 | (Hq & Hinv & Hsepc & Hscause & Hstval & Hstk)]".
-    - iLeft. iExact "H0".
-    - iRight. iFrame "Hq Hinv Hsepc Hscause Hstval".
-      iDestruct "Hstk" as (n) "[%Hn Hstk]".
-      iExists n. iSplit; [iPureIntro; exact Hn |]. rewrite Hsp. iExact "Hstk".
+    iIntros (Hsp) "[Hstk Harm]". iFrame "Harm". rewrite Hsp. iExact "Hstk".
+  Qed.
+
+  (* The canonical DOWNWARD sp move (sp' = sp - 8k, a prologue's frame
+     allocation): feed in k slots adjacent BELOW the current carve; the
+     carve re-anchors at sp' and the top k slots -- the function's new
+     frame region [sp', sp), which sits ABOVE the new sp and is therefore
+     trap-stable -- come OUT. *)
+  Lemma sie_cap_move_down (γ : gname) (root_ppn : mword 44)
+      (m m' : gmap regidx (mword 64)) (k : nat) :
+    m' !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) k ->
+    stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) k -∗
+    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m' ∗ stack_own (m !!! Regidx csp_rs1) k.
+  Proof.
+    iIntros (Hsp') "Hdeep [Hstk Harm]". iFrame "Harm".
+    iAssert (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + k))
+      with "[Hstk Hdeep]" as "Hall".
+    { iApply stack_own_app. iFrame "Hstk Hdeep". }
+    iEval (rewrite (Nat.add_comm kv_frame_slots k)) in "Hall".
+    iDestruct (stack_own_app with "Hall") as "[Htop Hrest]".
+    iFrame "Htop". rewrite Hsp'. iExact "Hrest".
+  Qed.
+
+  (* The canonical UPWARD sp move (sp' = sp + 8k, an epilogue's frame
+     release): the function's frame [sp, sp') = the top k slots at sp'
+     get packed back IN, and the k deepest slots of the carve come out
+     (returning to the caller's deep-stack custody). *)
+  Lemma sie_cap_move_up (γ : gname) (root_ppn : mword 44)
+      (m m' : gmap regidx (mword 64)) (k : nat) :
+    m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
+    stack_own (m' !!! Regidx csp_rs1) k -∗
+    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m' ∗
+    stack_own (pa_stk (m' !!! Regidx csp_rs1) kv_frame_slots) k.
+  Proof.
+    iIntros (Hsp) "Hframe [Hstk Harm]". iFrame "Harm".
+    iAssert (stack_own (m' !!! Regidx csp_rs1) (k + kv_frame_slots))
+      with "[Hstk Hframe]" as "Hall".
+    { iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk". }
+    iEval (rewrite (Nat.add_comm k kv_frame_slots)) in "Hall".
+    iDestruct (stack_own_app with "Hall") as "[Htop Hdeep]".
+    iFrame "Htop Hdeep".
   Qed.
 
   (* =================================================================== *)
