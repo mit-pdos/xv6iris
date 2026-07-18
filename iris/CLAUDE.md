@@ -350,23 +350,77 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
 `ptree_same_rep` + `ptree_level0` post; mappages' k-of-n prefix post; the
 `panic_wp` absorption of kvmmap's failure arm).  Remaining work, in order:
 
-1. **The BARE S-mode leaf family** (prerequisite): kvminit runs before
-   kvminithart with satp=0 (start() writes it), so the boot instances of
-   these specs need S-mode leaves at Bare translation — `translateAddr`
-   short-circuits to the identity before ever consulting the TLB, so the
-   engine is a SIMPLER clone of the pt one (`bare_inv := satp cell +
-   ⌜Mode=Bare⌝ + pmp_config`, no TLB, no absorption theorem).  Alphabet
-   needed: the WpSmodePtAlu/Ctl/Btype/Mem sets (walk/mappages bodies) plus
-   whatever kalloc/memset's proofs consume — which forces Bare variants of
-   wp_kalloc / wp_memset_page and their callee chain (acquire/release/
-   push_off/pop_off/mycpu).  DECISION POINT (coordinate with the
-   interrupt-sweep agent, which is reworking the same engine layer): either
-   clone the needed leaves at `bare_inv`, or parameterize the S-mode
-   engine/leaf layer over an abstract regime interface (the TrampStepPt
-   Variable-INV/Habs pattern, already proven out) with Sv39 and Bare
-   instances — the parameterization is the clean end-state and also serves
-   the user-table callers, but touches the sweep's files; cloning is
-   conflict-free but duplicates the leaf layer.
+1. **THE TRANSLATION-REGIME PARAMETERIZATION (decided — no leaf
+   duplication).**  The S-mode leaf layer's contact with translation is
+   NARROW: every leaf threads `tlb_inv_pt root_ppn` as an opaque resource,
+   the step engines discharge the FETCH through
+   `tlb_inv_pt_translateAddr_fetch`, and the data leaves run their
+   data-side translation through `tlb_inv_pt_translateAddr_load/_store`
+   (/the AMO instantiation) inside the engine callback.  Nothing else in
+   any leaf mentions the MMU.  So: define ONE interface and make the layer
+   generic over it (`SRegime.v`):
+     `Record s_regime := { sr_inv : iProp; sr_fetch; sr_load; sr_store;
+        sr_amo }` — each `sr_<acc>` an absorption entailment in the EXACT
+     shape of TrampStepPt's `Habs` (the proven pattern): for a va with
+     `addr_is_ram va` + the standard reg facts,
+     `reg_interp ∗ gen_heap ∗ sr_inv ==∗ ∃ σ', ⌜translate = Ok (va
+     identity)⌝ ∗ ⌜mdev unchanged⌝ ∗ ⌜sregs same-or-one-tlb-write⌝ ∗
+     ⌜the access-class PMP facts at σ'⌝ ∗ interps ∗ sr_inv`.
+   Instances:
+     - `kpt_regime root_ppn`: `sr_inv := tlb_inv_pt root_ppn`, fields =
+       the four EXISTING absorption wrappers, η-expanded with the PMP
+       facts peeled-and-resealed (exactly what `ktramp_fetch_habs`
+       already does; ~zero new proof).
+     - `bare_regime`: `sr_inv := ∃ satp0, satp ↦ᵣ satp0 ∗ ⌜Mode(satp0) =
+       Bare⌝ ∗ pmp_config r` (BareMode.v).  The fields are TRIVIAL:
+       `translateAddr` at Bare short-circuits to the identity before
+       touching the TLB — one new pure reduction
+       (`exec_translateAddr_bare`, the S-mode analog of UserTranslate
+       §1's mode dispatch, at `satpMode_of_bits = Bare`), σ' = σ, left
+       sregs disjunct always; the PMP facts come off `pmp_config`.
+   The leaves keep both SPEC CLEANLINESS and generality: a generic leaf
+   states `sr_inv R` where it stated `tlb_inv_pt root_ppn` (the
+   `root_ppn` parameter disappears from generic statements — it was only
+   the invariant's index), and its proof changes only the absorption call
+   to the record field.  MIGRATION (additive at every step, `make proofs`
+   green per commit; coordinates with the interrupt sweep by never
+   renaming what its files reference):
+     a. SRegime.v (record + kpt_regime) and BareMode.v (bare_inv +
+        bare_regime).  Sanity-check the record-of-entailments encoding
+        compiles cleanly; fallback is TrampStepPt's Section-Variables
+        style (Variable R-pieces), same content.
+     b. SmodeCorePt: generalize the unified fetch + the two step engines
+        over `R : s_regime` (new Section); the OLD names
+        (`wp_instr_s_tlbinv_pt`, `wp_instr_s_config_tlbinv_pt`,
+        `tlb_inv_pt_fetch`) become Definitions instantiating
+        `kpt_regime` — zero downstream churn, sweep unaffected.
+     c. Leaf sweep (script-assisted, file-by-file like previous sweeps):
+        WpSmodePtLeaves/Alu/Ctl/Btype/Mem/MemWrap/Lock generalize over R;
+        old names re-instantiated at `kpt_regime` so every current
+        consumer compiles untouched.  (WpSmodePtUart stays kpt-specific
+        for now — its DEV absorption needs kpt-shaped premises; add dev
+        fields to the record only when a Bare device access is actually
+        needed, i.e. when proving panic/printf rather than axiomatizing
+        `panic_wp`.)
+     d. Flip the kalloc cone to regime-generic statements (`sr_inv R`
+        replaces `tlb_inv_pt root_ppn`; mechanical rename + leaf-name
+        swaps): memset_page, mycpu, push_off/pop_off(+Csr/Mem), holding,
+        acquire, release, kalloc — again keeping old-name kpt instances
+        for existing callers (kfree, wakeup, …, which can migrate
+        lazily).  KvmSpec.v's `Variable SINV` becomes
+        `Variable R : s_regime` (`SINV := sr_inv R`).
+   ORTHOGONALITY NOTE for the interrupt sweep: regime (what translation
+   invariant fetches go through) and SIE-agnosticism (the sconf bundle)
+   are independent axes; the sweep's v2 engines should eventually take a
+   regime argument the same way, and TrampStepPt's Variable-INV engine is
+   a candidate to re-express as an `s_regime` whose fields are keyed on
+   the trampoline va instead of `addr_is_ram` — both are follow-ups, not
+   blockers.
+   BOOT NOTE: the Bare→Sv39 switch at kvminithart needs NO pt2-style
+   window — Bare execution never fills the TLB, kvminithart's first
+   sfence zeroes it anyway, so after the `csrw satp` the proof builds
+   `tlb_inv_pt` directly from `pt_rep t kvm_map` + `tlb_ok_pt_empty`,
+   and the second sfence is an ordinary Sv39 step.
 2. **The pure construction layer** (PtBuild.v, no regime dependence):
    `pt_empty_node ppn` (all-zero ents, no kids; every idx blocks —
    `pte_invalid_zero`), `pt_graft t path c` via `pt_upd_kid`/`pt_upd_ent`
