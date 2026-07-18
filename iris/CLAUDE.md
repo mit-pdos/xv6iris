@@ -662,12 +662,40 @@ files or copy code from them; build fresh from the live tree.
      beta iota` before the next `execR_bind`; mind `>>` (bind0) vs `>>=`
      at the outermost node; in plain-rewrite files instantiate dependent
      reads explicitly (`(exec_read_reg r st)`).
-     Still missing before FULL assembly: CSR-at-U dispatch (the
-     check_CSR 90-clause machinery — its own work item), ZICBOP (does
-     TRANSLATION — ADUE-coupled, defer), the memory arms
+     Still missing before FULL assembly: CSR-at-U dispatch (plan below),
+     ZICBOP (does TRANSLATION — ADUE-coupled, defer), the memory arms
      (LOAD/STORE/AMO/LR/SC — WAIT for the Svadu/ADUE page-table rework),
      and the fetch-fault flavor corollaries' payload wiring (also
      ADUE-coupled).
+     CSR-AT-U PLAN (UserCsr.v; values never matter — existential reads).
+     Target statement (CSRReg and CSRImm): under pins (priv=User,
+     mstateen0=0, menvcfg=MENVCFG_S, senvcfg=0, misa via hw_config, and
+     mstatus.FS=Off — needed so the F CSRs can't reach the WRITE path):
+     `∃ res s', exec (execute (CSRReg (csr,rs1,rd,op))) s = Some (res,s')
+     ∧ ((res = Illegal_Instruction tt ∧ s' = s) ∨ (res = RETIRE_SUCCESS ∧
+     ∃ v, s' = gpr_write_state rd v s))` — counter-enable bits
+     (mcounteren/scounteren) are NOT pinned: both enabled (retiring read)
+     and disabled (illegal) land in the disjunction. Model structure:
+     `execute_CSRReg = rX rs1 ; doCSR`; `doCSR = read priv ;
+     check_CSR_result ; CSR_Illegal → Illegal | OK → ext_check_CSR (const
+     true?) ; read_CSR (skipped for pure writes) ; sip/mip special-cases
+     (S/M-addressed — dead at U) ; CSRRead → wX rd → RETIRE | else
+     write_CSR (must be UNREACHABLE at U: 0xCxx are RO addresses —
+     `check_CSR_access` kills writes; F/ssp/seed writes are killed by
+     accessibility gates)`. `check_CSR = and_boolM (check_CSR_priv: pure
+     `'b00 ≥u csrPriv csr` — bits 9:8 must be 00) (and_boolM
+     (check_CSR_access: pure RO-vs-write) (and_boolM (is_CSR_accessible:
+     THE per-CSR dispatch) (stateen_allows_CSR_access: mstateen0-gated
+     handful)))`. PROOF DRIVER (the linearity trick): destruct each
+     dispatch guard `eq_vec csr ADDR` WITH eqn:, and in the TRUE branch
+     convert (`eq_vec_true_iff`) and SUBSTITUTE csr := ADDR — everything
+     downstream (read_CSR etc.) becomes CONCRETE and reduces with the
+     existing batched peel machinery (`drive_csr`, WpGprCsrrCommon.v; see
+     the CSR-dispatch perf rule) — NEVER leave csr abstract into a second
+     dispatch (that's the 100×90 cross-product). The false-chain
+     continues linearly (~100 guards for is_CSR_accessible + stateen).
+     and_boolM short-circuits monadically: destruct the priv-bits compare
+     FIRST (kills all non-U-addressed csr in one split).
      LEFT — discharging `active_class`: the total classification. Per
      machine case, produce the run_hart_active reduction and feed the
      matching arm: fetch outcome (fetchable → `upt_fetch_instr`; else a
