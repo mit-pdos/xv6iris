@@ -84,6 +84,7 @@ UserretDefs.v
 UserretPt.v
 UserretEntryPt.v
 UserretAllPt.v
+KvmSpec.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
