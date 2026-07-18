@@ -143,6 +143,7 @@ WpIntrInv.v
 WpKernelvecSpec.v
 WpSmodeIntr.v
 WpSconfAlu.v
+WpSconfMem.v
 WpPushOff.v
 WpPushOffMem.v
 WpPushOffCsr.v
