@@ -91,6 +91,7 @@ UptTree.v
 PtFetchGen.v
 TrampStepPt.v
 TransPt.v
+UserretDefs.v
 UserretPt.v
 UserretEntryPt.v
 UserretAllPt.v
@@ -167,11 +168,6 @@ WpMemsetPage.v
 WpKalloc.v
 WpKfree.v
 TrampPt.v
-TrampTlb.v
-WpUserret.v
-WpUserretEntry.v
-WpUserretTop.v
-WpUserretAll.v
 VcGen.v
 VcGenS.v
 WpSwtchVc.v

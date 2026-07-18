@@ -26,10 +26,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import WpLoad WpLeafCommon WpGpr WpGprCsrwB WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt TrampPt TrampTlb.
+Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt TrampPt.
 Require Import SmodeCore SmodeCorePt WpSmodeGpr KptTree UptTree.
 Require Import WpSmodePtLeaves PtFetchGen TrampStepPt TransPt.
-Require Import WpUserret.
+Require Import UserretDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

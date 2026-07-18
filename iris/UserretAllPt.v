@@ -17,7 +17,7 @@ Require Import WpGpr WpMmodeShiftiop.
 Require Import WpMmodeLeafBase.
 Require Import KernelText SmodeCore WpSmodeSret.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
-Require Import TrampPt KptTree UptTree TransPt WpUserret UserretPt UserretEntryPt.
+Require Import TrampPt KptTree UptTree TransPt UserretDefs UserretPt UserretEntryPt.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

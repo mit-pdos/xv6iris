@@ -20,7 +20,7 @@ Require Import WpLoad WpLeafCommon WpGpr WpMmodeLeafBase.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt TrampPt.
 Require Import SmodeCore SmodeCorePt WpSmodeGpr KptTree UptTree.
 Require Import WpSmodePtLeaves PtFetchGen TrampStepPt.
-Require Import WpUserret WpSmodeSret WpUserretTop.
+Require Import UserretDefs WpSmodeSret WpDecode WpGprMret.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -260,6 +260,53 @@ Proof.
     eexists. split; [reflexivity |].
     exact (uwe_match_other vpn0 tramp_vpn q2 q1 (pte_set_ad qp0 a d)
              (mword_of_int 0) Hne).
+Qed.
+
+Lemma tfcat_unsigned (tfp : mword 44) (x : mword 12) :
+  bv_unsigned (zero_extend' 64 (concat_vec tfp x)) = bv_unsigned tfp * 4096 + bv_unsigned x.
+Proof.
+  pose proof (bv_unsigned_in_range _ x) as Hx. unfold bv_modulus in Hx.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12 in Hx.
+  unfold zero_extend', concat_vec.
+  cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
+       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
+       SailStdpp.Values.with_word autocast].
+  cbn.
+  destruct (Z.eq_dec (Z.of_N (44 + 12)) (44 + 12)) as [e | ne]; [| exfalso; exact (ne eq_refl)].
+  rewrite (TypeCasts.cast_Z_refl (H := e)).
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  erewrite bv_zero_extend_unsigned by (cbn; lia).
+  erewrite bv_concat_unsigned by (cbn; lia).
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
+  erewrite Z.shiftl_mul_pow2 by lia.
+  change (2 ^ 12) with 4096.
+  apply Z_lor_disjoint_add.
+  change 4096 with (2 ^ 12).
+  apply Z_land_shift_low; [lia |].
+  change (2 ^ 12) with 4096.
+  pose proof (bv_unsigned_in_range _ x) as Hx2.
+  change (MachineWord.MachineWord.Z_idx 12) with 12%N in Hx2.
+  unfold bv_modulus in Hx2.
+  change (Z.of_N 12%N) with 12 in Hx2.
+  change (2 ^ 12) with 4096 in Hx2.
+  lia.
+Qed.
+
+Lemma tfcat_aligned8 (tfp : mword 44) (x : mword 12) :
+  bv_unsigned x `mod` 8 = 0 ->
+  is_aligned_paddr (Physaddr (zero_extend' 64 (concat_vec tfp x))) 8 = true.
+Proof.
+  intro Hx8. unfold is_aligned_paddr. apply Z.eqb_eq.
+  rewrite uint_unsigned.
+  rewrite tfcat_unsigned.
+  rewrite Z.rem_mod_nonneg; [| | lia].
+  - rewrite Zplus_mod. rewrite Hx8.
+    replace (bv_unsigned tfp * 4096) with ((bv_unsigned tfp * 512) * 8) by lia.
+    rewrite Z_mod_mult. reflexivity.
+  - pose proof (bv_unsigned_in_range _ tfp) as Ht. unfold bv_modulus in Ht.
+    pose proof (bv_unsigned_in_range _ x) as Hx. unfold bv_modulus in Hx.
+    nia.
 Qed.
 
 Section WpUldPt.
@@ -529,6 +576,221 @@ Section WpUldPt.
   Qed.
 
 End WpUldPt.
+
+(* ===================================================================== *)
+(* sret to USER mode: pure execute reductions.                                 *)
+(* ===================================================================== *)
+
+(* get_xLPE at User with senvcfg = 0 and menvcfg = MENVCFG_S: reads
+   senvcfg/menvcfg/senvcfg (via read_senvcfg); the LPE bit of the
+   SSE-merged senvcfg is 0. *)
+Lemma exec_get_xLPE_U (sz : mstate) :
+  eq_vec (_get_Misa_S (register_lookup misa sz.(sregs))) ('b"1") = true ->
+  register_lookup senvcfg sz.(sregs) = mword_of_int 0 ->
+  register_lookup menvcfg sz.(sregs) = MENVCFG_S ->
+  exec (get_xLPE User) sz = Some (false, sz).
+Proof.
+  intros HS Hsenv Hmenv.
+  unfold get_xLPE. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
+  replace (Z.geb 2 0) with true by reflexivity.
+  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl sz)). cbn match.
+  match goal with |- context[_rec_currentlyEnabled Ext_S ?k ?a] =>
+    assert (HrecS : exec (_rec_currentlyEnabled Ext_S k a) sz
+                    = Some (eq_vec (_get_Misa_S (register_lookup misa sz.(sregs))) ('b"1"), sz)) end.
+  { match goal with |- context[_rec_currentlyEnabled Ext_S ?k ?a] => destruct a end.
+    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+    match goal with |- context[Z.geb ?kk 0] => change (Z.geb kk 0) with true end.
+    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl sz)). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_S sz)). cbn match.
+    rewrite (exec_and_boolM_Some _ _ sz
+               (eq_vec (_get_Misa_S (register_lookup misa sz.(sregs))) ('b"1")) sz).
+    - destruct (eq_vec (_get_Misa_S (register_lookup misa sz.(sregs))) ('b"1")) eqn:?.
+      + match goal with |- context[_rec_currentlyEnabled Ext_Zicsr ?k2 ?a2] =>
+          exact (exec_rec_cE_Zicsr_any k2 a2 sz ltac:(reflexivity)) end.
+      + reflexivity.
+    - rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa sz)). apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ HrecS).
+  rewrite HS. cbv iota.
+  (* read_senvcfg: senvcfg, menvcfg, senvcfg -- all pinned *)
+  unfold read_senvcfg.
+  assert (Hrs : exec (Defs.bind (Defs.read_reg senvcfg)
+           (fun w0 => Defs.bind (Defs.read_reg menvcfg)
+              (fun w1 => Defs.bind (Defs.read_reg senvcfg)
+                 (fun w2 => returnM (_update_SEnvcfg_SSE w0
+                              (and_vec (_get_MEnvcfg_SSE w1) (_get_SEnvcfg_SSE w2))))))) sz
+         = Some (_update_SEnvcfg_SSE (mword_of_int 0)
+                   (and_vec (_get_MEnvcfg_SSE MENVCFG_S)
+                            (_get_SEnvcfg_SSE (mword_of_int 0))), sz)).
+  { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg sz)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg sz)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg senvcfg sz)).
+    rewrite Hsenv. rewrite Hmenv. apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hrs).
+  match goal with |- context[bool_bit_backwards ?b] =>
+    replace (bool_bit_backwards b) with false by (vm_compute; reflexivity) end.
+  apply exec_returnM.
+Qed.
+
+(* The SRET execute reduction (verbatim WpSmodeSret's [ExecSRET] tower)
+   with the [get_xLPE] premise ALSO carrying the senvcfg and misa lookups
+   of the intermediate state -- [get_xLPE User] reads both. *)
+Section ExecSRETU.
+  Context (s : mstate) (lpe : bool) (menvcfg0 : mword 64).
+  Let ms0 := register_lookup mstatus s.(sregs).
+  Let ms1 := update_subrange_vec_dec ms0 1 1 (_get_Mstatus_SPIE ms0).
+  Let ms2 := update_subrange_vec_dec ms1 5 5 ('b"1").
+  Let newpriv : Privilege := if eq_vec (_get_Mstatus_SPP ms2) ('b"1") then Supervisor else User.
+  Let ms3 := update_subrange_vec_dec ms2 8 8 ('b"0").
+  Let ms4 := update_subrange_vec_dec ms3 17 17 ('b"0").
+  Let ms5 := update_subrange_vec_dec ms4 23 23 (landing_pad_bits_backwards NO_LP_EXPECTED).
+  Let elpv := if lpe then _get_Mstatus_SPELP ms4 else landing_pad_bits_backwards NO_LP_EXPECTED.
+  Let tgt := update_vec_dec (register_lookup sepc s.(sregs)) 0 ('b"0").
+  Let sF := set_reg (set_reg (set_reg (set_reg (set_reg
+              (set_reg (set_reg (set_reg s mstatus ms1) mstatus ms2)
+                       cur_privilege newpriv) mstatus ms3) mstatus ms4)
+              mstatus ms5) elp elpv) nextPC tgt.
+
+  Hypothesis Hpriv : register_lookup cur_privilege s.(sregs) = Supervisor.
+  Hypothesis HS : eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true.
+  Hypothesis HTSR : eq_vec (_get_Mstatus_TSR ms0) ('b"1") = false.
+  Hypothesis Hmc : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true.
+  Hypothesis Hmenv : register_lookup menvcfg s.(sregs) = menvcfg0.
+  Hypothesis Hlpe : forall sz : mstate,
+      register_lookup menvcfg sz.(sregs) = menvcfg0 ->
+      register_lookup senvcfg sz.(sregs) = register_lookup senvcfg s.(sregs) ->
+      register_lookup misa sz.(sregs) = register_lookup misa s.(sregs) ->
+      exec (get_xLPE newpriv) sz = Some (lpe, sz).
+
+  Lemma exec_execute_SRET_menvU : exec (execute (SRET tt)) s = Some (RETIRE_SUCCESS, sF).
+  Proof using All.
+    change (execute (SRET tt)) with (execute_SRET tt).
+    unfold execute_SRET.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite Hpriv. cbn match.
+    assert (Harm1 : exec (Defs.bind (currentlyEnabled Ext_S)
+                          (fun w1 : bool => returnM (Riscv.rv64d.not w1))) s = Some (false, s)).
+    { rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_S s)). rewrite HS.
+      cbn [Riscv.rv64d.not negb]. apply exec_returnM. }
+    assert (Hguard : exec (or_boolM (Defs.bind (currentlyEnabled Ext_S)
+                            (fun w1 : bool => returnM (Riscv.rv64d.not w1)))
+                          (Defs.bind (Defs.read_reg mstatus)
+                            (fun w2 : mword 64 => returnM (eq_vec (_get_Mstatus_TSR w2) ('b"1"))))) s
+                    = Some (false, s)).
+    { unfold or_boolM. rewrite (exec_bind_Some _ _ _ _ _ Harm1). cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). rewrite HTSR. apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hguard). cbn match.
+    change (ext_check_xret_priv Supervisor) with true. cbn [Riscv.rv64d.not negb]. cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+    set (s1 := set_reg s mstatus ms1).
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus ms1 s)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s1)).
+    replace (register_lookup mstatus s1.(sregs)) with ms1
+      by (subst s1; rewrite register_lookup_set; reflexivity).
+    set (s2 := set_reg s1 mstatus ms2).
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus ms2 s1)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s2)).
+    replace (register_lookup mstatus s2.(sregs)) with ms2
+      by (subst s2; rewrite register_lookup_set; reflexivity).
+    set (s3 := set_reg s2 cur_privilege newpriv).
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg cur_privilege newpriv s2)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s3)).
+    replace (register_lookup mstatus s3.(sregs)) with ms2
+      by (subst s3; rewrite irrelevant_register_set; [subst s2; rewrite register_lookup_set; reflexivity | vm_compute; reflexivity]).
+    set (s4 := set_reg s3 mstatus ms3).
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus ms3 s3)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s4)).
+    replace (register_lookup cur_privilege s4.(sregs)) with newpriv
+      by (subst s4; rewrite irrelevant_register_set; [subst s3; rewrite register_lookup_set; reflexivity | vm_compute; reflexivity]).
+    assert (Hnpm : generic_neq newpriv Machine = true)
+      by (unfold newpriv; destruct (eq_vec (_get_Mstatus_SPP ms2) ('b"1")); reflexivity).
+    rewrite Hnpm. cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s4)).
+    replace (register_lookup mstatus s4.(sregs)) with ms3
+      by (subst s4; rewrite register_lookup_set; reflexivity).
+    set (s5 := set_reg s4 mstatus ms4).
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus ms4 s4)).
+    set (s6 := set_reg s5 mstatus ms5).
+    set (s7 := set_reg s6 elp elpv).
+    assert (HL6 : register_lookup menvcfg s6.(sregs) = menvcfg0).
+    { subst s6 s5 s4 s3 s2 s1.
+      repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]).
+      exact Hmenv. }
+    assert (HL6s : register_lookup senvcfg s6.(sregs) = register_lookup senvcfg s.(sregs)).
+    { subst s6 s5 s4 s3 s2 s1.
+      repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]).
+      reflexivity. }
+    assert (HL6m : register_lookup misa s6.(sregs) = register_lookup misa s.(sregs)).
+    { subst s6 s5 s4 s3 s2 s1.
+      repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]).
+      reflexivity. }
+    rewrite (exec_bind_Some _ _ _ _ _
+      (_ : exec (Defs.bind0 (Defs.bind (Defs.read_reg cur_privilege)
+                   (fun w12 : Privilege => zicfilp_restore_elp_on_xret sRET w12))
+                (Defs.read_reg mstatus)) s5 = Some (ms5, s7))).
+    2:{ rewrite (exec_bind0_Some _ _ _ _ _
+          (_ : exec (Defs.bind (Defs.read_reg cur_privilege)
+                  (fun w12 : Privilege => zicfilp_restore_elp_on_xret sRET w12)) s5
+               = Some (tt, s7))).
+        2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s5)).
+            replace (register_lookup cur_privilege s5.(sregs)) with newpriv
+              by (subst s5 s4 s3; rewrite irrelevant_register_set; [|vm_compute; reflexivity];
+                  rewrite irrelevant_register_set; [|vm_compute; reflexivity];
+                  rewrite register_lookup_set; reflexivity).
+            unfold zicfilp_restore_elp_on_xret. cbn match.
+            rewrite (exec_bind_Some _ _ _ _ _
+              (_ : exec (Defs.bind (Defs.read_reg mstatus)
+                     (fun w0 : mword 64 => Defs.bind (Defs.read_reg mstatus)
+                        (fun w1 : mword 64 => Defs.bind0
+                          (Defs.write_reg mstatus (update_subrange_vec_dec w1 23 23
+                             (landing_pad_bits_backwards NO_LP_EXPECTED)))
+                          (returnM (_get_Mstatus_SPELP w0))))) s5
+                   = Some (_get_Mstatus_SPELP ms4, s6))).
+            2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s5)).
+                replace (register_lookup mstatus s5.(sregs)) with ms4
+                  by (subst s5; rewrite register_lookup_set; reflexivity).
+                rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s5)).
+                replace (register_lookup mstatus s5.(sregs)) with ms4
+                  by (subst s5; rewrite register_lookup_set; reflexivity).
+                rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus ms5 s5)).
+                apply exec_returnm. }
+            rewrite (exec_bind_Some _ _ _ _ _ (Hlpe s6 HL6 HL6s HL6m)).
+            rewrite (exec_write_reg elp elpv s6). reflexivity. }
+        rewrite (exec_read_reg mstatus s7).
+        replace (register_lookup mstatus s7.(sregs)) with ms5
+          by (subst s7 s6; rewrite irrelevant_register_set; [|vm_compute; reflexivity];
+              rewrite register_lookup_set; reflexivity).
+        reflexivity. }
+    rewrite (exec_bind_Some _ _ _ _ _
+      (_ : exec (Defs.bind0 (Defs.bind0 (long_csr_write_callback "mstatus" "mstatush" ms5) _)
+                   (prepare_xret_target Supervisor)) s7 = Some (tgt, s7))).
+    2:{ rewrite (exec_bind0_Some _ _ _ _ _
+          (_ : exec (Defs.bind0 (long_csr_write_callback "mstatus" "mstatush" ms5) _)
+                 s7 = Some (tt, s7))).
+        2:{ rewrite (exec_bind0_Some _ _ _ _ _
+              (_ : exec (long_csr_write_callback "mstatus" "mstatush" ms5) s7 = Some (tt, s7))).
+            2:{ apply exec_long_csr_write_mstatus. }
+            replace (get_config_print_exception tt) with false by reflexivity.
+            cbn match. apply exec_returnm. }
+        unfold prepare_xret_target, get_xepc. cbn match.
+        rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg sepc s7)).
+        replace (register_lookup sepc s7.(sregs)) with (register_lookup sepc s.(sregs))
+          by (subst s7 s6 s5 s4 s3 s2 s1;
+              repeat (rewrite irrelevant_register_set; [|vm_compute; reflexivity]); reflexivity).
+        unfold align_pc.
+        rewrite (exec_bind_Some _ _ _ _ _
+          (_ : exec (currentlyEnabled Ext_Zca) s7 = Some (true, s7))).
+        2:{ apply exec_currentlyEnabled_Zca.
+            subst s7 s6 s5 s4 s3 s2 s1.
+            repeat (rewrite irrelevant_register_set; [|vm_compute; reflexivity]). exact Hmc. }
+        cbn match. apply exec_returnM. }
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_set_next_pc tgt s7)).
+    apply exec_returnm.
+  Qed.
+End ExecSRETU.
+
 
 Section WpUaluUsretPt.
   Context `{!riscvGS Σ, !sieG Σ}.
