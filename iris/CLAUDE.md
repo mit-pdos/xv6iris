@@ -1884,12 +1884,30 @@ files or copy code from them; build fresh from the live tree.
      `fetch = F_Error` to `run_hart_active = Step_Fetch_Failure`, `user_exc`
      holds by reflexivity, and s_f = σ so the hart_state/minstret equalities
      and the interp re-frame are trivial.  hart_state=HART_ACTIVE is a
-     premise (the caller's active-step fact — not in u_step_pre).  NOT built:
-     the 2-aligned SECOND-halfword case — `user_pt_fetch_fault_2_second` is a
-     DISJUNCTION (RVC success OR high-half fault at va+2, with a TLB-filled
-     s_f ≠ σ), so it is a branch point for the split success producer (item
-     A / the compressed-fetch classification), not a single-outcome fault
-     corollary.  NOTHING in fetch/progress/retire/trap
+     premise (the caller's active-step fact — not in u_step_pre).
+     THE SPLIT (2-aligned) FETCH — DONE (UserExecProducer.v).  The post-fetch
+     pipeline (isRVC case → progress composer → package the exec_step_obligation
+     body) is FACTORED into `user_exec_step_from_fetch`, taking a completed
+     fetch (`fetch = if isRVC then F_RVC .. else F_Base ..`, at σf) + the ∀r≠tlb
+     TLB-fill transport `Tr`; both success producers now just run their fetch
+     composer and delegate to it (the 4-aligned `user_exec_step_producer` was
+     refactored onto it too — the ~40-line post-fetch body is written ONCE).
+     `user_exec_step_producer_2` (both halfwords fetchable, via
+     `user_pt_fetch_instr_2`, high leaf at va+2) → the same
+     `exec_step_obligation` as 4-aligned.  `user_exec_step_or_fault_producer_
+     2_second` handles low-OK/pc+2-faults: `user_pt_fetch_fault_2_second` is a
+     RUNTIME disjunction (low-half RVC executes / 32-bit straddle faults at
+     va+2, both over a TLB-filled s'≠σ), so this producer yields
+     `(exec_step body) ∨ (fetch_fault body)` — the classification (item A)
+     cases on it and hands each disjunct to `exec_step_branch` /
+     `fetch_fault_branch`.  Its RVC branch reuses `user_exec_step_from_fetch`
+     with iw:=zero_extend' 32 h (`subrange16_zext32`+`autocast_mword_id` give
+     `sub (autocast iw) 15 0 = h`); the fault branch lifts via
+     `exec_run_hart_active_fetch_failure`, hart_state/minstret survive the
+     TLB fill through `Tr`.  So EVERY fetch geometry (odd / 4-aligned /
+     2-aligned, success & fault) now has a producer; only the runtime
+     dispatch among them remains, and that lives in active_class (item A).
+     NOTHING in fetch/progress/retire/trap
      is re-touched per family; base-vs-RVC is the one inherent split (it is
      the two progress composers, hidden behind the two totality premises).
      THE MEMORY FAMILIES: their execute fact is `execute_LOAD/STORE/…` run
