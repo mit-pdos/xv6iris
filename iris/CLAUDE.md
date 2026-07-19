@@ -512,18 +512,22 @@ before any mechanical sweep.
      lemma needed).  The old spec's intena=0 pin and the
      `ghost_var γc (1/2) b` rider are GONE.
    - REMAINING spinlock layer:
-     `wp_release_sconf` (holding + the zero store + pop_off: its OLD
-     spec pinned intena=0 — the sconf spec instead threads the
-     push_off payload disjunct through and lets pop_off restore;
-     drop the old `ghost_var γc (1/2) b` rider — the arm knowledge now
-     travels as the off-token inside the payload), then
-     `wp_acquire_sconf` (push_off + holding-panic-check + the amoswap
-     Löb loop + fence; its post carries push_off's payload + the
-     locked token — the intr-off region begins here).  Composition
-     uses `po_intena_val_zero/_one` (WpIntenaBits.v) to convert the
-     payload keying.  THEN the rest of the kalloc cone file-by-file
-     (kalloc/kfree/wakeup...), VCgen `_den` sconf wrapper with the
-     first converted function.
+     ALL DONE — `wp_holding_lockinv{,_locked}_s_sconf`
+     (WpSconfHolding.v), `wp_release_sconf` (WpSconfRelease.v), and
+     `wp_acquire_sconf` + `wp_acquire_lock_loop_sconf`
+     (WpSconfAcquire.v), all axiom-clean.  Acquire's push_off flip
+     opens the interrupts-off region (its ∀ms payload rides framed to
+     the post alongside locked ∗ R); release's pop_off may genuinely
+     restore, with the conditional payload flowing back out; the
+     old intena=0 pins and ghost riders are gone.  Löb-loop gotchas:
+     generalize the CAP alongside the file in the iLöb (both keyed on
+     the loop register), and seed with `insert_id` +
+     `lookup_lookup_total_dom` on BOTH.  Composition between
+     acquire's ⌜SIE ms⌝-keyed post and release's intenav-keyed input
+     uses `po_intena_val_zero/_one` (WpIntenaBits.v).  THE SPINLOCK
+     LAYER IS COMPLETE.  NEXT: the rest of the kalloc cone
+     file-by-file (kalloc/kfree/wakeup...), VCgen `_den` sconf wrapper
+     with the first converted function.
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
      stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
      initial 32 slots); adequacy plumbing last; delete `smode_config`
