@@ -1812,9 +1812,20 @@ files or copy code from them; build fresh from the live tree.
      lambda) so `execR_liftR_seq Htr` applies directly.  `access`/`vaddr` must
      be INLINED (`Atomic (op,Data,Data)` / `Virtaddr (add_vec …)`) not `let`s,
      else the model's zeta-inlined occurrences won't unify with the rewrites.
-     REMAINING AMO edge cases (rare, not built): AMOCAS (the w__18=true CAS-
-     mismatch no-write path), and mem_write_ea-err / mem_write_value-err
-     (an announce that cannot fail here / a device-only post-read write fault).
+     AMO edge cases now DONE too: `_ea_err` (mem_write_ea Err → early_return
+     trap), `_write_err` (mem_write_value Err → the memory_exception is the
+     Err-branch BODY result, an `inr` trap not an early_return — so `execR_
+     liftR` + exec_memory_exception directly, no execR_bind), and `_cas_
+     nostore` (AMOCAS with `neq_vec lc rd_val = true` → w__18 = true → wX rd
+     (sext loaded) >> RETIRE, NO store, state stays s').  The AMOCAS case is
+     where `w__18` does NOT short-circuit: `generic_eq AMOCAS AMOCAS = true`
+     (assert + rewrite, reflexivity), so `and_boolM (returnR true) B` runs B =
+     the rd-read + `neq_vec loaded rd_val` (two nested binds, built via an
+     inner `execR (…) = Some (inr rd_val, s')` assert like rX rs2).  Only the
+     AMOCAS-MATCH store path (w__18=false, loaded=rd_val, op=AMOCAS) is left
+     unbuilt — it is the retire lemma's write path but excluded by its
+     `generic_eq op AMOCAS = false` premise, and is unreachable on this RAM
+     anyway (atomic_support=AMOSwap denies AMOCAS at mem_read → `_read_err`).
      (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
      UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
      (`gpr_write_state`-shaped, value existential) for every compute /
