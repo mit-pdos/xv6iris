@@ -376,6 +376,15 @@ Section Kfree.
     let q_noff_a5 := sign_extend' 64 (subrange_vec_dec
         (add_vec (sign_extend' 64 qnoff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let q_noff_store := (autocast (T := mword) (subrange_vec_dec q_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    (* the per-CPU scratch cells kfree returns: acquire's push_off then
+       release's pop_off net-zero the noff nesting, so [q_noff] comes back at
+       release's pop_off store value [q_noff_ret] (provably = qnoff), [q_intena]
+       at the interrupt-enable it recorded, and [q_cpu] zeroed by release. *)
+    let q_int_ret := (if eq_vec (sign_extend' 64 qnoff) zero_reg then (zeros' 32) else qintena_old) in
+    let q_noff_ret := (autocast (T := mword) (subrange_vec_dec
+        (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 q_noff_store)
+           (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
+        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     (14 <= n)%nat ->
     (* S-mode config facts + the pop_off sstatus fact are folded into
        [smode_config γc] below; acquire's mycpu pins reduce to the single
@@ -406,10 +415,13 @@ Section Kfree.
       gpr_file mr -∗
       ⌜ callee_saved m mr ⌝ -∗
       stack_own sp0 n -∗
+      q_noff ↦₄ q_noff_ret -∗
+      q_intena ↦₄ q_int_ret -∗
+      q_cpu ↦₈ (zero_reg : mword 64) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pcE p sp0 ret_tgt q_noff q_intena q_cpu q_noff_a5 q_noff_store Hn Hcpune Hretm Hlk Hfl Ha0fcpu Hnoffpos Hintena0.
+    intros pcE p sp0 ret_tgt q_noff q_intena q_cpu q_noff_a5 q_noff_store q_int_ret q_noff_ret Hn Hcpune Hretm Hlk Hfl Ha0fcpu Hnoffpos Hintena0.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcfg Htoken Htlbinv
              #Htext Hpc Hfile #Hkmem Hpre Hstk Hqnoff Hqint Hqcpu Hcont".
@@ -1144,7 +1156,10 @@ Section Kfree.
       done. }
     iEval (rewrite -Hsprstk) in "Hdeep".
     iDestruct (stack_own_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! Q5c with "Hcfg Htoken Htlbinv Hpc Hfile [%] Hstk").
+    iEval (rewrite HRrela0 -Hlk) in "Hcpu2".
+    iEval (rewrite HRreltp -Ha0fcpu) in "Hnoff2".
+    iEval (rewrite HRreltp -Ha0fcpu) in "Hint2".
+    iApply ("Hcont" $! Q5c with "Hcfg Htoken Htlbinv Hpc Hfile [%] Hstk Hnoff2 Hint2 Hcpu2").
     { (* callee_saved m Q5c: the epilogue restores ra/s0/s1/s2 to their entry
          (R1 = m) values and sp via the +32/-32 c.addi16sp cancel; tp and s3-s11
          thread untouched through memset/acquire/release (each callee_saved) and
@@ -1227,6 +1242,15 @@ Section Kfree.
     let q_noff_a5 := sign_extend' 64 (subrange_vec_dec
         (add_vec (sign_extend' 64 qnoff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let q_noff_store := (autocast (T := mword) (subrange_vec_dec q_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    (* the per-CPU scratch cells kfree returns: acquire's push_off then
+       release's pop_off net-zero the noff nesting, so [q_noff] comes back at
+       release's pop_off store value [q_noff_ret] (provably = qnoff), [q_intena]
+       at the interrupt-enable it recorded, and [q_cpu] zeroed by release. *)
+    let q_int_ret := (if eq_vec (sign_extend' 64 qnoff) zero_reg then (zeros' 32) else qintena_old) in
+    let q_noff_ret := (autocast (T := mword) (subrange_vec_dec
+        (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 q_noff_store)
+           (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
+        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     (14 <= n)%nat ->
     (* S-mode config facts + the pop_off sstatus fact are folded into
        [smode_config γc] below; acquire's mycpu pins reduce to the single
@@ -1257,6 +1281,9 @@ Section Kfree.
       gpr_file mr -∗
       ⌜ callee_saved m mr ⌝ -∗
       stack_own sp0 n -∗
+      q_noff ↦₄ q_noff_ret -∗
+      q_intena ↦₄ q_int_ret -∗
+      q_cpu ↦₈ (zero_reg : mword 64) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
