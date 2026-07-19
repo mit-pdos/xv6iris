@@ -316,9 +316,7 @@ Section Walk.
       unfold spr. apply walk_sp_cancel. }
     (* +0x64 ret *)
     assert (HE9ra : E9 !!! Regidx (mword_of_int 1 : mword 5) = mm !!! Regidx (mword_of_int 1)).
-    { rewrite /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2.
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      rewrite lookup_total_insert. reflexivity. }
+    { peel_reg. }
     assert (Hrt : update_vec_dec (add_vec (E9 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0" : mword 1) = ret_tgt).
     { rewrite HE9ra.
       replace (sign_extend' 64 (zeros' 12) : mword 64) with (mword_of_int 0 : mword 64)
@@ -357,29 +355,19 @@ Section Walk.
         exact Htp. }
       split.
       { rewrite /E9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /E8 /E7 /E6 /E5 /E4 /E3.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        rewrite lookup_total_insert. reflexivity. }
+        peel_reg. }
       split.
       { rewrite /E9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /E8 /E7 /E6 /E5 /E4.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        rewrite lookup_total_insert. reflexivity. }
+        peel_reg. }
       split.
       { rewrite /E9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /E8 /E7 /E6 /E5.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        rewrite lookup_total_insert. reflexivity. }
+        peel_reg. }
       split.
       { rewrite /E9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /E8 /E7 /E6.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        rewrite lookup_total_insert. reflexivity. }
+        peel_reg. }
       split.
       { rewrite /E9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite /E8 /E7.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        rewrite lookup_total_insert. reflexivity. }
+        peel_reg. }
       split.
       { rewrite /E9. rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
         rewrite /E8.
@@ -397,9 +385,7 @@ Section Walk.
     { (* the payload: a0 is untouched by the epilogue *)
       assert (HE9a0 : E9 !!! Regidx (mword_of_int 10 : mword 5)
                       = Mf !!! Regidx (mword_of_int 10 : mword 5)).
-      { rewrite /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        reflexivity. }
+      { peel_reg. }
       rewrite HE9a0. exact Hpay. }
   Qed.
 
@@ -907,9 +893,7 @@ Section Walk.
     iEval (rewrite Htgtm) in "Hpc".
     (* memset(p, 0, 4096) keeping the zero bytes *)
     assert (HN4a0 : N4 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10 : mword 5)).
-    { rewrite /N4 /N3 /N2 /N1.
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      reflexivity. }
+    { peel_reg. }
     iApply (wp_memset_page_zero_r R Φ N4 (mword_of_int 0 : mword 64) (n - 8)%nat γc (dq:=DfracOwn 1)
               ltac:(lia)
               ltac:(rewrite HN4a0; exact Hpv)
@@ -1310,9 +1294,7 @@ Section Walk.
     (* the register-value facts the loop needs *)
     assert (Hva' : uint va < 274877906944) by (change 274877906944 with (2 ^ 38); exact Hva).
     assert (HW9va : W9 !!! Regidx (mword_of_int 11 : mword 5) = va).
-    { rewrite /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      reflexivity. }
+    { peel_reg. }
     assert (HW6a5 : W6 !!! Regidx (mword_of_int 15 : mword 5)
                     = (mword_of_int 18446744073709551615 : mword 64)).
     { rewrite /W6 lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
@@ -1733,11 +1715,7 @@ Section Walk.
       iEval (rewrite Hpp46) in "Hpc".
       (* ---- funnel into the shared tail with b0 := pt_base c0 ---- *)
       assert (HspM9 : M9 !!! Regidx csp_rs1 = spr).
-      { rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        rewrite lookup_total_insert. reflexivity. }
+      { peel_reg. }
       assert (HM9s3 : M9 !!! Regidx (mword_of_int 19 : mword 5) = va).
       { rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1.
         repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
@@ -2088,11 +2066,7 @@ Section Walk.
       iEval (rewrite Hpp46) in "Hpc".
       (* ---- funnel into the shared tail with b0 := pt_base c0 ---- *)
       assert (HspM9 : M9 !!! Regidx csp_rs1 = spr).
-      { rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-        rewrite lookup_total_insert. reflexivity. }
+      { peel_reg. }
       assert (HM9s3 : M9 !!! Regidx (mword_of_int 19 : mword 5) = va).
       { rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1.
         repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).

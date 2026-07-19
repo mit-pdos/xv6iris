@@ -40,6 +40,21 @@ Section Mappages.
 
   Notation MP := KernelSyms.mappages.
 
+  (* Fast register-map lookup discharge -- see the extended note at [peel_reg] in
+     WpWalk.v.  The old idiom [rewrite /M12 .. /M5; repeat rewrite
+     lookup_total_insert_ne; reflexivity] unfolds the whole set-chain into one
+     giant term and peels it (O(depth^2)); inline in an [iApply] it also
+     re-elaborates.  [peel_reg_core] peels ONE layer at a time (O(depth)).
+     [peel_reg] closes the peeled goal by reflexivity / a hit / [assumption]
+     against a named base-map fact.  MUST be [first [peel | unfold-var]] with the
+     peel first (see WpWalk.v). *)
+  Ltac peel_reg_core :=
+    repeat first
+      [ rewrite lookup_total_insert_ne; [| vm_compute; discriminate]
+      | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
+  Ltac peel_reg :=
+    peel_reg_core; rewrite ?lookup_total_insert; first [ reflexivity | assumption ].
+
   (* the -80/+80 c.addi16sp frame cancel *)
   Lemma mappages_sp_cancel (X : mword 64) :
     add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))
@@ -945,24 +960,12 @@ Section Mappages.
               = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt9c) in "Hpc".
       iApply (wp_mappages_epilogue R Φ γ γc bsie mm F1 t tS m npages (S k) perm n Hn
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      exact Hmrsp)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      exact Hmrtp)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      exact Hmr24)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      exact Hmr25)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      exact Hmr26)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      exact Hmr27)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
                 HbaseS HrepS
                 ltac:(left; split; [lia |];
                       rewrite /F1 lookup_total_insert;
@@ -1025,41 +1028,19 @@ Section Mappages.
               Hn ltac:(lia) ltac:(lia) Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmrsp)
+              ltac:(peel_reg)
               HM12s1
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr18)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr19)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr20)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr21)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr22)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
               ltac:(rewrite HM12s7v; exact Hmr23)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmrtp)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr24)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr25)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr26)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    exact Hmr27)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
               HbaseS HrepS
               with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -1546,21 +1527,11 @@ Section Mappages.
                     rewrite /P11 lookup_total_insert;
                     apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite /P13 lookup_total_insert; vm_compute; reflexivity)
-              ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    reflexivity)
-              ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    reflexivity)
-              ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    reflexivity)
-              ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    reflexivity)
-              ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1;
-                    repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                    reflexivity)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
+              ltac:(peel_reg)
               eq_refl Hrep
               with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 [S10]
