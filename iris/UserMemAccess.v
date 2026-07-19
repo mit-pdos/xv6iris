@@ -1437,3 +1437,96 @@ Proof.
   destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone);
     cbn [MemoryOpResult_drop_meta]; apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §5f The aligned vmem_read_addr FAULT path (width-generic): translate    *)
+(*    Ok but mem_read Err e -> the loop raises memory_exception (a Trap)   *)
+(*    and early-returns, so vmem_read_addr returns Err (Trap ...).  The    *)
+(*    complement of exec_vmem_read_addr_aligned (the retire path); the LR  *)
+(*    disjunction picks between them on the reserved read's outcome.       *)
+(*    (The fault carries the loop's chunk address add_vec_int va (0*w),    *)
+(*    matching the retire lemma's translate-premise address form.)         *)
+(* ===================================================================== *)
+
+Lemma exec_vmem_read_addr_aligned_err (width : Z) (va pa pc : mword 64) (e : ExceptionType)
+    (acc : MemoryAccessType mem_payload) (aq rl res : bool) (priv : Privilege) (s s' : mstate) :
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) acc) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
+  exec (mem_read acc PBMT_PMA (Physaddr pa) width aq rl res) s' = Some (Err e, s') ->
+  register_lookup cur_privilege s'.(sregs) = priv ->
+  register_lookup PC s'.(sregs) = pc ->
+  exec (vmem_read_addr (Virtaddr va) width acc aq rl res) s
+    = Some (Err (Trap (priv, make_sync_exception e
+                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc)), s').
+Proof.
+  intros Halign Htr Hmr Hcp Hpc.
+  unfold vmem_read_addr.
+  rewrite exec_catch_early_return.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  assert (Hinner : execR (returnR (result (mword (8 * width)) ExecutionResult) tt >>
+                          liftR (split_misaligned (Virtaddr va) width)) s = Some (inr (1, width), s)).
+  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_g width (Virtaddr va) s Halign). reflexivity. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+  rewrite (misaligned_order_split 1).
+  match goal with
+  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s
+                 = Some (inl (Err (Trap (priv, make_sync_exception e
+                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s'))
+  end.
+  { unfold Defs.untilMT. destruct (Defs.Zwf_guarded _) as [accf]. cbn [Defs.untilMT'].
+    destruct (Z_ge_dec _ 0) as [Hge|Hge]; [| cbn in Hge; exfalso; lia ].
+    (* the loop body at (zeros, false, 0): assert_exp' -> translate -> mem_read Err -> memory_exception -> early_return *)
+    match goal with |- context [ Defs.bind ?bd ?k ] =>
+      assert (Hbody : execR bd s = Some (inl (Err (Trap (priv, make_sync_exception e
+                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s')) end.
+    { cbn match.
+      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+      rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn [bits_of_virtaddr] in *. cbn match.
+      match goal with |- execR (Defs.bind ?mm ?post) s' = _ =>
+        assert (Hmrm : execR mm s' = Some (inl (Err (Trap (priv, make_sync_exception e
+                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s')) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _ Hmr). cbn match.
+        rewrite (execR_liftR_seq _ _ _ _ _
+                  (exec_memory_exception (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))
+                     pc e priv s' Hcp Hpc)). cbn match.
+        rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
+      rewrite execR_bind. rewrite Hmrm. reflexivity. }
+    rewrite execR_bind. rewrite Hbody. reflexivity. }
+  rewrite execR_bind. rewrite Hu. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §5g The vmem-level LR RETIRE-OR-FAULT disjunction (width-generic) --    *)
+(*    the instruction-facing statement.  Given the translate (the bundle   *)
+(*    absorption supplies it) and the §5e mem_read disjunction, LR either  *)
+(*    RETIRES (exists a loaded value) or takes the delegated               *)
+(*    E_Load_Access_Fault Trap, selected by the unpinned reservability.    *)
+(*    A trivial case-split combining exec_vmem_read_addr_aligned (retire)  *)
+(*    and §5f (fault); res=true, aq/rl-generic.                            *)
+(* ===================================================================== *)
+
+Lemma exec_vmem_read_addr_lr_disj (width : Z) (va pa pc : mword 64) (w : mword (8 * width))
+    (aq rl : bool) (priv : Privilege) (resv : bool) (s s' : mstate) :
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (LoadReserved Data)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
+  exec (mem_read (LoadReserved Data) PBMT_PMA (Physaddr pa) width aq rl true) s'
+    = Some ((if resv then Ok w else Err (E_Load_Access_Fault tt)), s') ->
+  register_lookup cur_privilege s'.(sregs) = priv ->
+  register_lookup PC s'.(sregs) = pc ->
+  (exists dvv : mword (8 * width),
+     exec (vmem_read_addr (Virtaddr va) width (LoadReserved Data) aq rl true) s = Some (Ok dvv, s'))
+  \/ exec (vmem_read_addr (Virtaddr va) width (LoadReserved Data) aq rl true) s
+       = Some (Err (Trap (priv, make_sync_exception (E_Load_Access_Fault tt)
+                          (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc)), s').
+Proof.
+  intros Halign Htr Hmr Hcp Hpc.
+  destruct resv.
+  - left. exact (exec_vmem_read_addr_aligned width va pa w (LoadReserved Data) aq rl true s s' Halign Htr Hmr).
+  - right. exact (exec_vmem_read_addr_aligned_err width va pa pc (E_Load_Access_Fault tt)
+                    (LoadReserved Data) aq rl true priv s s' Halign Htr Hmr Hcp Hpc).
+Qed.
