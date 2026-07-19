@@ -583,102 +583,22 @@ before any mechanical sweep.
      cells got it via the cldsp round-trip, the padding didn't).  The
      noff-cancel + memset-deep-2 + acquire/release-deep-10 patterns are
      exactly kfree's.
-   - WAKEUP (WpSconfWakeup.v) — MYPROC + BOTH END-CAPS DONE (Qed,
-     axiom-clean); only the loop remains.  Key enabler discovered: EVERY
-     wakeup instruction already has an individual `wki_*` fact
-     (`wki_00`..`wki_68`), so the whole function is leaf-portable — no
-     VCgen blocks needed (the sconf VCgen forbids the sp-move the smode
-     prologue/epilogue blocks contain).  DONE:
-     * `wp_myproc_sconf` (axiom) — mirror of the smode `wp_myproc`,
-       threading sconf + hart_state + sie_cap + intr_count n (net-zero) +
-       tlb_inv_pt + a deep-K slice; returns a0 = proc_addr j +
-       callee_saved.  The loop skips the current proc.
-     * `wp_wakeup_epilogue_sconf` — 7 c.ldsp (restore ra/s0/s1..s5) +
-       c.addi16sp sp,+64 (`sie_cap_move_up 8`) + c.ret, leaf-by-leaf; the
-       8 frame cells at `wk_fcell spF u` recombine into deep-K.
-     * `wp_wakeup_prologue_sconf` — c.addi16sp sp,-64 (`sie_cap_move_down
-       8`) + 7 c.sdsp saves + c.addi4spn + loop-register setup (s4:=chan,
-       s1:=&proc[0], s3:=2, s5:=3, s2:=&proc[64]) + c.j to the loop test.
-       Hands the 8 frame cells + deep-(K-8) + register shape to the loop.
-     * THE LOOP `wp_wakeup_loop_sconf` — DONE (WpSconfWakeupLoop.v,
-       registered, Qed, axiom-clean: baseline 5 + funext + the pre-existing
-       `wp_myproc_sconf`).  The full sconf port of the 796-line smode
-       `wp_wakeup_loop`: a bounded fuel induction over the proc counter
-       whose invariant threads sconf + hart_state + sie_cap + intr_count
-       (net-zero per iter) + deep-10 custody + `wk_res_sconf` + procs_inv,
-       each iteration acquire(proc lock, lvl→S lvl) → clw state / bne / cld
-       chan / bne / conditional wake (sw state:=RUNNABLE via
-       `proc_lock_res_wakeup`) → release(S lvl→lvl) → p++ / termination,
-       skipping the myproc-returned current proc.  `wk_res_sconf` =
-       deep-10 ∗ noff cell ∗ (∃iv, intena cell) ∗ wk_lockcells (the ∃-intena
-       is the resolution of the intena crux, see below).  The proc-lock
-       resource is threaded OPAQUELY (parameters `Rreg/γc/bsie/dq`): wakeup
-       only relays parked contexts, never resumes them, so the smode
-       `proc_lock_res` (whose proc_ctx embeds a smode `valid_context`) rides
-       along untouched — it ports later, with the scheduler.  The release's
-       coupling premise reduces to the loop entry coupling
-       `neq_vec (sext noffv) zero = false ↔ lvl=0` via `wk_release_nv1_cancel`
-       (reuses `kfree_nv1_cancel_pure`).  TWO PERF TRAPS hit + fixed (both
-       in CLAUDE.md perf rules): (i) an inline `ltac:(rewrite …)` premise
-       over the OPAQUE loop map `Mr2c` hangs the release `iApply` (>5 min) —
-       pre-assert every premise as a named hyp; (ii) the release resource
-       list MUST include `Htext` (kernel_text) at its sig position or the
-       whole `iApply` mis-aligns and blows up.
-     * `wp_wakeup_sconf` = prologue → loop → epilogue — DONE
-       (WpSconfWakeupLoop.v, Qed, axiom-clean).  The WHOLE wakeup function
-       is now ported to sconf.  The DEEP-CUSTODY ACCOUNTING (the one
-       non-obvious part):
-     caller provides deep-K at sp0 + noff cell + (∃iv, intena cell) +
-     wk_lockcells + procs_inv + intr_count lvl + the coupling/round-trip
-     premises.  (1) `wp_wakeup_prologue_sconf`: deep-K → deep-(K-8) at spF
-     + 8 wk_fcell frame cells (7 saved regs + 1 padding vpad) + loop-head
-     map M at wakeup+0x38.  (2) The loop's `wk_res_sconf` holds EXACTLY
-     deep-10, so split deep-(K-8) = deep-10 ∗ deep-(K-18) via
-     `stack_own_split_1` (needs K≥18); bundle wk_res_sconf = deep-10 + noff
-     + (∃iv) + lockcells, and wk_frame = the 7 saved cells; HOLD deep-(K-18)
-     + vpad + the exit continuation aside.  (3) run `wp_wakeup_loop_sconf`
-     at k=0 with rtp=m!!!x4, chan=m!!!x10, vs6..vs11=m!!!x22..x27 (the
-     prologue's M output IS `wk_loop_regs`); its EXIT continuation (at
-     wakeup+0x58) unbundles wk_res_sconf, recombines deep-10 ∗ deep-(K-18) =
-     deep-(K-8) via `stack_own_split_2`, and calls (4)
-     `wp_wakeup_epilogue_sconf` (deep-(K-8) + 7 cells + vpad → deep-K at
-     sp0, restores callee-saved).  Route noff/(∃iv)/lockcells straight back
-     to the caller's return continuation (procs_inv is persistent;
-     intr_count lvl rides through untouched — the prologue/epilogue don't
-     mention it).  NEXT AFTER WAKEUP: the boot wiring, then delete
-     smode_config.
-     LOOP CRUX — the intena-cell threading (the one design subtlety absent
-     from the smode proof, where intena≡0 under SIE=0).  Each iteration is
-     acquire(n→S n) then release(S n→n), so the token returns to n EVERY
-     iteration.  acquire writes `a_int` only when noff==0 (⟺ intr_count
-     level==0, by the coupling); release never writes it.  Hence at n≥1
-     the intena cell is STABLE across the whole loop (noff never reaches 0
-     inside it) → the loop invariant carries a fixed intena (the clean
-     case).  At n=0, EVERY iteration's acquire rewrites intena to
-     `po_intena_val ms` (a consistent value — SIE is stable at the loop
-     level between iterations because release restores it), so the loop
-     invariant must hold the post-first-acquire intena and the prologue
-     must convert the caller's intena to it.  The noff cell IS net-zero
-     per iteration (`wk_noff_acq`/`wk_noff_rel` round-trip, already in the
-     smode invariant).  Mirror how kfree/kalloc thread `(if noffv==0 then
-     po_intena_val ms else intena_old)`; the loop just iterates that.
-     RESOLUTION (makes the sconf loop no harder than the smode one): hold
-     the intena cell EXISTENTIALLY in the invariant — `∃ iv,
-     wk_intena_addr a0f ↦₄ iv` — instead of pinning a value.  release
-     passes a_int through unchanged (fractional `dqi`, returns `intenav`)
-     and acquire accepts ANY incoming intena (`intena_old`), so whether
-     noffv==0 (acquire rewrites to `po_intena_val ms`) or noffv≠0
-     (passthrough), the existential absorbs it and the invariant closes
-     with NO dependence on ms.  The smode proof pins `zeros' 32` only
-     because SIE=0 forces `po_intena_val≡0`; sconf just ∃-quantifies.  So
-     `wk_res_sconf` = `stack_own (pa_stk spF kv_frame_slots) 10 ∗
-     wk_noff_addr a0f ↦₄ noffv ∗ (∃ iv, wk_intena_addr a0f ↦₄ iv) ∗
-     wk_lockcells γs`, with `intr_count γ root n` + sconf + hart_state +
-     sie_cap + tlb threaded alongside (net-zero per iter: acquire n→S n,
-     release S n→n; a_cpu cpuold→zero_reg after each release, and the next
-     acquire needs cpuold≠cpuv which zero_reg satisfies since
-     cpuv=mycpu_ret≠0 by `Hmycpu_nz`).
-     NEXT AFTER WAKEUP: the boot wiring, then delete smode_config.
+   - WAKEUP — FULLY PORTED to sconf (Qed, axiom-clean).  `wp_myproc_sconf`
+     (axiom) + `wp_wakeup_prologue_sconf`/`wp_wakeup_epilogue_sconf` live in
+     WpSconfWakeup.v; `wp_wakeup_loop_sconf` (the 796-line loop) +
+     `wp_wakeup_sconf` (= prologue → loop → epilogue) in WpSconfWakeupLoop.v.
+     Two design decisions worth remembering: (a) `wk_res_sconf` holds the
+     intena cell EXISTENTIALLY (`∃ iv, wk_intena_addr a0f ↦₄ iv`) — this
+     sidesteps the smode's intena≡0-under-SIE=0 assumption, since acquire
+     rewrites intena only when noff==0 and release passes it through, so the
+     ∃ absorbs both cases with no `ms` dependence; (b) the proc-lock resource
+     is threaded OPAQUELY (params `Rreg/γc/bsie/dq`) — wakeup relays parked
+     contexts but never resumes them, so the smode `proc_lock_res` (whose
+     `proc_ctx` embeds a smode `valid_context`) rides along untouched and
+     ports later with the scheduler.  release's coupling premise reduces to
+     the entry coupling `neq_vec (sext noffv) zero = false ↔ lvl=0` via
+     `wk_release_nv1_cancel` (reuses `kfree_nv1_cancel_pure`).  The compose
+     needs K≥18 (prologue carves 8 for the frame, loop borrows deep-10).
    - (historical) KALLOC CONE (kfree/kalloc/wakeup, unblocked by the counting token).
      Each is acquire → critical section → release, so the SPEC threads
      `intr_count γ root n` NET-ZERO: `intr_count n` in and out (acquire
