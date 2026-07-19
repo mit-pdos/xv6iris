@@ -192,6 +192,7 @@ VcGen.v
 VcGenS.v
 WpSwtchVc.v
 WpWakeup.v
+WpSconfWakeupLoop.v
 WpSmodeUart.v
 KernelDataInv.v
 WpUartPutcSync.v
