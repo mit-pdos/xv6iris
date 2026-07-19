@@ -820,14 +820,27 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    insert-hit, more peels, add_vec_zero_l, reflexivity); register
    facts across kalloc/alloc-chunk boundaries hop via the transport
    fact (Htrans c is_cs_idx-guarded) then peel the pre-call chain.
-4. **wp_mappages**: fuel induction over npages (NOT iLöb — bounded loop);
-   the loop invariant is the spec's own post at k pages
-   (`pt_rep0 t_k (pt_insert_run m vpn0 ppn0 perm k)`), each iteration =
-   wp_walk + the remap-check ld (the level0 slot holds ZERO by `pt_rep0`
-   + the no-remap premise, so the panic branch falls through) + the leaf
-   sd through `ptree_own_level0_upd` + `pt_rep0_insert`.  Mind `vpn_at`/`mappages_pte` bv-arithmetic:
-   prove the step identities (`vpn_at vpn0 (S k)` vs va+PGSIZE·k) as
-   abstract bv lemmas, never vm_compute on symbolic words.
+4. **wp_mappages** (DONE, Qed; WpMappages.v + WpMappagesInstr.v registered;
+   full build green, axioms = the 6 standard model stubs).  Architecture:
+   WpMappagesInstr.v = the 56-instruction decode catalog (mdec_*/mi_*).
+   WpMappages.v = `mappages_sp_cancel`, a Qed-sealed `wp_mappages_epilogue`
+   (+0x9c..+0xb0: the 9 cldsp restores + addi16sp + ret, both exits funnel
+   here with a0 decided), a fuel-inducted `wp_mappages_loop` (induction on
+   the REMAINING page count `rem`, NOT npages — invariant carries k+rem=npages,
+   the register-file column facts, `pt_base tk = pt_base t`, and `pt_rep0 tk
+   (pt_insert_run m vpn0 ppn0 perm k)`; each iteration calls `wp_walk_r`,
+   recovers callee-saved regs via `callee_saved_lookup`, reads the L0 slot
+   pinned to zero by `pt_rep0_level0_zero` + `pt_insert_run_lookup_None`,
+   collapses srli/slli/or/ori to `mappages_pte` via the §8 bridges,
+   stores through `ptree_own_level0_upd` + `pt_rep0_insert`, then either
+   funnels to the epilogue (walk-null → −1 at k<npages; last page → 0 at
+   k=npages) or steps s1 by PGSIZE and recurses on IH), and `wp_mappages_r`
+   (the prologue: 10-slot frame, the three entry checks falling by the
+   aligned/nonzero premises via `mappages_align_probe`/`mappages_size_nonzero`,
+   loop-state setup `s2 := last-page va` via `mappages_s2_val`, then the loop)
+   + `mappages_spec_holds : ⊢ mappages_spec`.  KvmSpec's mappages/kvmmap
+   specs now premise `mappages_perm_ok perm` and the pa-run bound
+   `uint pa + npages*4096 < 2^56`.  PtBuild §8 holds all the pure bridges.
 5. **wp_kvmmap** = wp_mappages + the beqz on a0 + `panic_wp` for the -1
    arm (state `panic_wp` as an interim axiom in its own file, like
    wp_myproc; eventually provable — printf/uartputc + a Löb spin loop).
