@@ -1706,7 +1706,7 @@ Proof.
     rewrite Z.mod_small in HzB; lia.
 Qed.
 
-Local Lemma pb_va_k_unsigned (va : mword 64) (k : nat) :
+Lemma pb_va_k_unsigned (va : mword 64) (k : nat) :
   (bv_unsigned va + 4096 * Z.of_nat k < 18446744073709551616)%Z ->
   bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat k)))
   = bv_unsigned va + 4096 * Z.of_nat k.
@@ -2091,4 +2091,14 @@ Proof.
   replace (bv_wrap 64 0) with 0 by (vm_compute; reflexivity).
   rewrite Z.add_0_r.
   apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+
+(* public: a small constant as a 64-bit word (register-value bridges) *)
+Lemma mappages_moi_small (z : Z) :
+  (0 <= z < 18446744073709551616)%Z ->
+  bv_unsigned (mword_of_int z : mword 64) = z.
+Proof.
+  intros Hz. rewrite pb_moi_unsigned. apply bv_wrap_small.
+  unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616. lia.
 Qed.
