@@ -1722,3 +1722,129 @@ Proof.
     cbn match in Hcmw;
     rewrite (exec_bind_Some _ _ _ _ _ Hcmw); cbn match; apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §5j The vmem-level SC FAULT path (reservability = RsrvNone).  BOTH      *)
+(*    match_reservation branches fault: mr=true takes the write branch     *)
+(*    where mem_write_value returns Err E_SAMO (§5i =None), mr=false takes  *)
+(*    the check branch where phys_access_check denies (§5b =None); each     *)
+(*    raises memory_exception and early-returns, so vmem_write_addr returns *)
+(*    Err (Trap E_SAMO).  The complement of exec_vmem_write_addr_sc.        *)
+(* ===================================================================== *)
+
+Lemma exec_vmem_write_addr_sc_fault (width : Z) (va pa pc : mword 64) (dat : mword (8*width))
+    (aq rl : bool) (s s' : mstate) :
+  let wv := autocast (T := mword) (subrange_vec_dec dat (8*(0+1)*width-1) (8*0*width))
+            : mword (8 * width) in
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (StoreConditional Data)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false ->
+  register_lookup cur_privilege s'.(sregs) = User ->
+  register_lookup PC s'.(sregs) = pc ->
+  (* match_reservation=true path: ea ok, then write faults *)
+  exec (mem_write_ea (Physaddr pa) width aq rl true) s' = Some (Ok tt, s') ->
+  exec (mem_write_value (Physaddr pa) width wv (StoreConditional Data) PBMT_PMA aq rl true) s'
+    = Some (Err (E_SAMO_Access_Fault tt), s') ->
+  (* match_reservation=false path: access denied *)
+  exec (phys_access_check (StoreConditional Data) PBMT_PMA User (Physaddr pa) width true) s'
+    = Some (Some (E_SAMO_Access_Fault tt), s') ->
+  exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional Data) aq rl true) s
+    = Some (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt)
+                       (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc)), s').
+Proof.
+  intros wv Halign Htr Hmprv Hcp Hpc Hea Hwv Hpac.
+  set (A := add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)).
+  unfold vmem_write_addr.
+  rewrite exec_catch_early_return.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
+                          liftR (split_misaligned (Virtaddr va) width)) s = Some (inr (1, width), s)).
+  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_g width (Virtaddr va) s Halign). reflexivity. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+  rewrite (misaligned_order_split 1).
+  match goal with
+  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s
+                 = Some (inl (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) A, pc))), s'))
+  end.
+  { unfold Defs.untilMT. destruct (Defs.Zwf_guarded _) as [accf]. cbn [Defs.untilMT'].
+    destruct (Z_ge_dec _ 0) as [Hge|Hge]; [| cbn in Hge; exfalso; lia ].
+    match goal with |- context [ Defs.bind ?bd ?k ] =>
+      assert (Hbody : execR bd s = Some (inl (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) A, pc))), s')) end.
+    { cbn match.
+      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+      rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn [bits_of_virtaddr] in *. cbn match.
+      assert (Hsc : exec (assert_exp (Bool.eqb true (is_store_conditional (StoreConditional Data)))
+                            "sys/vmem_utils.sail:197.50-197.51") s' = Some (tt, s')) by reflexivity.
+      assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb true (is_store_conditional (StoreConditional Data)))
+                              "sys/vmem_utils.sail:197.50-197.51")
+                            : Defs.monadR (result bool ExecutionResult) exception unit) s'
+                     = Some (inr tt, s'))
+        by (rewrite execR_liftR; rewrite Hsc; reflexivity).
+      match goal with
+      | |- execR (Defs.bind ?mm ?post) s' = _ =>
+          assert (Hwrblk : execR mm s' = Some (inl (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) A, pc))), s')) end.
+      { rewrite (execR_bind0_Some _ _ _ _ Hscm).
+        destruct (match_reservation (bits_of_physaddr (Physaddr pa))) eqn:Hmr; cbn [Riscv.rv64d.not negb andb].
+        - (* mr=true -> WRITE branch, mem_write_value faults *)
+          rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+          rewrite (execR_liftR_seq _ _ _ _ _ Hwv). cbn match.
+          rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception A pc (E_SAMO_Access_Fault tt) User s' Hcp Hpc)). cbn match.
+          rewrite execR_bind0. rewrite execR_early_ret. reflexivity.
+        - (* mr=false -> FAIL branch, phys_access_check denies *)
+          rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s')).
+          rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s')). rewrite Hcp.
+          rewrite (execR_liftR_seq _ _ _ _ _
+            (exec_effectivePrivilege_mprv0 (StoreConditional Data)
+               (register_lookup mstatus s'.(sregs)) User s' Hmprv)).
+          rewrite (execR_liftR_seq _ _ _ _ _ Hpac). cbn match.
+          rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception A pc (E_SAMO_Access_Fault tt) User s' Hcp Hpc)). cbn match.
+          rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
+      rewrite execR_bind. rewrite Hwrblk. reflexivity. }
+    rewrite execR_bind. rewrite Hbody. reflexivity. }
+  rewrite execR_bind. rewrite Hu. reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §5k The vmem-level SC RETIRE-OR-FAULT disjunction (width-generic) --    *)
+(*    the instruction-facing SC statement.  Given the translate and the    *)
+(*    §5i/§5b physical disjunctions, SC either RETIRES (Ok of              *)
+(*    match_reservation: the write lands iff the reservation is still      *)
+(*    valid) or takes the delegated E_SAMO_Access_Fault Trap, selected by  *)
+(*    the unpinned reservability.  A case-split combining                  *)
+(*    exec_vmem_write_addr_sc (retire) and §5j (fault).                    *)
+(* ===================================================================== *)
+
+Lemma exec_vmem_write_addr_sc_disj (width : Z) (va pa pc : mword 64) (dat : mword (8*width))
+    (aq rl : bool) (resv : bool) (s s' : mstate) :
+  let wv := autocast (T := mword) (subrange_vec_dec dat (8*(0+1)*width-1) (8*0*width))
+            : mword (8 * width) in
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (StoreConditional Data)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false ->
+  register_lookup cur_privilege s'.(sregs) = User ->
+  register_lookup PC s'.(sregs) = pc ->
+  exec (mem_write_ea (Physaddr pa) width aq rl true) s' = Some (Ok tt, s') ->
+  exec (mem_write_value (Physaddr pa) width wv (StoreConditional Data) PBMT_PMA aq rl true) s'
+    = Some (if resv then (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev))
+            else (Err (E_SAMO_Access_Fault tt), s')) ->
+  exec (phys_access_check (StoreConditional Data) PBMT_PMA User (Physaddr pa) width true) s'
+    = Some ((if resv then None else Some (E_SAMO_Access_Fault tt)), s') ->
+  (exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional Data) aq rl true) s
+     = Some (Ok (match_reservation (bits_of_physaddr (Physaddr pa))),
+             if match_reservation (bits_of_physaddr (Physaddr pa))
+             then MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)
+             else s'))
+  \/ exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional Data) aq rl true) s
+       = Some (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt)
+                          (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc)), s').
+Proof.
+  intros wv Halign Htr Hmprv Hcp Hpc Hea Hwv Hpac.
+  destruct resv; cbn match in Hwv, Hpac.
+  - left. exact (exec_vmem_write_addr_sc width va pa dat aq rl s s' Halign Htr Hmprv Hcp Hea Hwv Hpac).
+  - right. exact (exec_vmem_write_addr_sc_fault width va pa pc dat aq rl s s' Halign Htr Hmprv Hcp Hpc Hea Hwv Hpac).
+Qed.
