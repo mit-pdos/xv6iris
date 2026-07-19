@@ -198,3 +198,4 @@ WpSmodeUart.v
 KernelDataInv.v
 WpUartPutcSync.v
 WpUartPutcSyncFull.v
+WpSconfUartPutc.v
