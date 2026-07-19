@@ -22,8 +22,8 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import MinstretInv WpGpr UserBits.
 Require Import WpLeafCommon WpIntrCore.
 Require Import SmodeCore.
 Require Import UserPtTree UserExec UserStep UserTrap UserCompute UserArms UserFetch UserFetchPt UserStepExec.
@@ -90,6 +90,80 @@ Section UserExecProducer.
            mstate_interp s_x ∗ gpr_file g' ∗ nextPC ↦ᵣ va' ∗
            user_pt_inv pt ∗ user_cfg C)%I.
 
+  (* The post-fetch pipeline, factored so every alignment shares it.  Given a
+     completed fetch (4-aligned or the 2-aligned split both report the same
+     if-isRVC shape + a TLB-fill transport Tr), case on isRVC, drive the
+     matching result-generic progress composer, and package the
+     exec_step_obligation body.  The two success producers below differ ONLY
+     in which fetch composer feeds this. *)
+  Lemma user_exec_step_from_fetch (E : coPset) (σ σf : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) (iw : mword 32) :
+    register_lookup cur_privilege σ.(sregs) = User ->
+    exec (dispatchInterrupt User) σ = Some (None, σ) ->
+    register_lookup PC σ.(sregs) = va ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    (forall r : register, register_beq r tlb = false ->
+       register_lookup r σf.(sregs) = register_lookup r σ.(sregs)) ->
+    exec (fetch tt) σ
+      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               else F_Base (autocast (T := mword) iw)), σf) ->
+    base_exec_total E σ va g -∗ rvc_exec_total E σ va g -∗
+    mstate_interp σf -∗ gpr_file g -∗ nextPC ↦ᵣ va -∗ user_pt_inv pt -∗ user_cfg C -∗
+    |={E}=>
+      ∃ (r : ExecutionResult) (ib : mword 32) (s_x : mstate)
+        (g' : gmap regidx (mword 64)) (va' : mword 64),
+        ⌜exec (run_hart_active 0) σ = Some (Step_Execute (r, ib), s_x)⌝ ∗
+        ⌜exec_step_result_ok r⌝ ∗
+        ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
+        ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
+           = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
+        ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
+        mstate_interp s_x ∗ gpr_file g' ∗ nextPC ↦ᵣ va' ∗ user_pt_inv pt ∗ user_cfg C.
+  Proof.
+    intros Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch.
+    iIntros "Htb Htr Hint Hgpr Hnpc Hupt Hcfg".
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    assert (Hcfgf : post_fetch_cfg σf va (register_lookup (R_bool minstret_increment) σ.(sregs))).
+    { unfold post_fetch_cfg. repeat split.
+      - rewrite (Tr PC ltac:(vm_compute; reflexivity)); exact Lpc.
+      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
+      - rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact HSXL.
+      - rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv.
+      - apply Tr; vm_compute; reflexivity. }
+    assert (LelpF : eq_vec (register_lookup elp σf.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false)
+      by (rewrite (Tr elp ltac:(vm_compute; reflexivity)); exact Help).
+    assert (LpcF : register_lookup PC σf.(sregs) = va) by (rewrite (Tr PC ltac:(vm_compute; reflexivity)); exact Lpc).
+    destruct (isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)) eqn:Hrvc.
+    - iMod (reg_update _ nextPC _ (add_vec_int va 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+      iMod ("Htr" $! (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0) σf Hcfgf
+              with "[Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg")
+        as (instr other r s_x g' va') "(%Hdec & %Hzca & %Hex1 & %Hex2 & %Hok & %Hnex & %Hhx & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
+      { unfold mstate_interp; cbn [sregs mem mdev]. iFrame "Hreg Hgh Hdev". }
+      { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
+      pose proof (exec_hart_active_progress_RVC_gen User σ σf s_x
+                    (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                    instr other va r Hcp Hdisp Hfetch Hdec LelpF LpcF Hzca Hex1 Hex2) as Hrun.
+      iModIntro. iExists r, (zero_extend' 32 (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)), s_x, g', va'.
+      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
+      iPureIntro. repeat split; try assumption.
+    - iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+      iMod ("Htb" $! (autocast (T := mword) iw) σf Hcfgf
+              with "[Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg")
+        as (instr r s_x g' va') "(%Hdec & %Hlpad & %Hex & %Hok & %Hnex & %Hhx & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
+      { unfold mstate_interp; cbn [sregs mem mdev]. iFrame "Hreg Hgh Hdev". }
+      { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
+      pose proof (exec_hart_active_progress_base_gen User σ σf s_x
+                    (autocast (T := mword) iw) instr va r
+                    Hcp Hdisp Hfetch Hdec LelpF Hlpad LpcF Hex Hnex) as Hrun.
+      iModIntro. iExists r, (zero_extend' 32 (autocast (T := mword) iw : mword 32)), s_x, g', va'.
+      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
+      iPureIntro. repeat split; try assumption.
+  Qed.
+
   Lemma user_exec_step_producer (E : coPset) (σ : mstate) (va : mword 64)
       (g : gmap regidx (mword 64)) (w_leaf : mword 64) :
     pt.(ud_um) !! svpn_of va = Some w_leaf ->
@@ -120,43 +194,11 @@ Section UserExecProducer.
               register_lookup r σf.(sregs) = register_lookup r σ.(sregs)).
     { intros r Hne. destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
         [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    assert (Hcfgf : post_fetch_cfg σf va (register_lookup (R_bool minstret_increment) σ.(sregs))).
-    { unfold post_fetch_cfg. repeat split.
-      - rewrite (Tr PC ltac:(vm_compute; reflexivity)); exact Lpc.
-      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
-      - rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact HSXL.
-      - rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv.
-      - apply Tr; vm_compute; reflexivity. }
-    assert (LelpF : eq_vec (register_lookup elp σf.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false)
-      by (rewrite (Tr elp ltac:(vm_compute; reflexivity)); exact Help).
-    assert (LpcF : register_lookup PC σf.(sregs) = va) by (rewrite (Tr PC ltac:(vm_compute; reflexivity)); exact Lpc).
-    destruct (isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)) eqn:Hrvc.
-    - (* F_RVC *)
-      iMod (reg_update _ nextPC _ (add_vec_int va 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
-      iMod ("Htr" $! (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0) σf Hcfgf
-              with "[Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg")
-        as (instr other r s_x g' va') "(%Hdec & %Hzca & %Hex1 & %Hex2 & %Hok & %Hnex & %Hhx & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
-      { unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev". }
-      { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
-      pose proof (exec_hart_active_progress_RVC_gen User σ σf s_x
-                    (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
-                    instr other va r Hcp Hdisp Hfetch Hdec LelpF LpcF Hzca Hex1 Hex2) as Hrun.
-      iModIntro. iExists r, (zero_extend' 32 (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)), s_x, g', va'.
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. repeat split; try assumption.
-    - (* F_Base *)
-      iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-      iMod ("Htb" $! (autocast (T := mword) iw) σf Hcfgf
-              with "[Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg")
-        as (instr r s_x g' va') "(%Hdec & %Hlpad & %Hex & %Hok & %Hnex & %Hhx & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
-      { unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev". }
-      { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
-      pose proof (exec_hart_active_progress_base_gen User σ σf s_x
-                    (autocast (T := mword) iw) instr va r
-                    Hcp Hdisp Hfetch Hdec LelpF Hlpad LpcF Hex Hnex) as Hrun.
-      iModIntro. iExists r, (zero_extend' 32 (autocast (T := mword) iw : mword 32)), s_x, g', va'.
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. repeat split; try assumption.
+    iApply (user_exec_step_from_fetch E σ σf va g iw
+              Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch
+              with "Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg").
+    - unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev".
+    - unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption.
   Qed.
 
   (* ===================================================================== *)
@@ -248,6 +290,144 @@ Section UserExecProducer.
     iSplitL "Hreg Hgh Hdev"; [unfold mstate_interp; iFrame "Hreg Hgh Hdev"|].
     iSplitL "Hutlb Hudata"; [unfold user_pt_inv; iFrame "Hutlb Hudata"; iPureIntro; split; assumption|].
     iFrame "Hcfg".
+  Qed.
+
+  (* ===================================================================== *)
+  (* The 2-ALIGNED (split) fetch.  At a 2-aligned (not 4-aligned) pc the    *)
+  (* low halfword comes off pc's page and, if it is not RVC, the high       *)
+  (* halfword translates INDEPENDENTLY at pc+2 (possibly a straddled page). *)
+  (* Three geometries (the low-half fault is _2_first, in the fault block   *)
+  (* above): both halves fetchable -> a clean exec_step_obligation; low OK  *)
+  (* but pc+2 faults -> a RUNTIME disjunction (RVC executes / straddle      *)
+  (* faults) the classification cases on.  Both reuse user_exec_step_from_  *)
+  (* fetch for the execute side; the fetch composer is the only difference. *)
+  (* ===================================================================== *)
+
+  (* Both halfwords fetchable: same exec_step_obligation as the 4-aligned    *)
+  (* producer, via user_pt_fetch_instr_2.                                    *)
+  Lemma user_exec_step_producer_2 (E : coPset) (σ : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) (w_leaf wh_leaf : mword 64) :
+    pt.(ud_um) !! svpn_of va = Some w_leaf ->
+    uleaf_ok (InstructionFetch tt) w_leaf ->
+    pt.(ud_um) !! svpn_of (add_vec_int va 2) = Some wh_leaf ->
+    uleaf_ok (InstructionFetch tt) wh_leaf ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
+    is_aligned_vaddr (Virtaddr (add_vec_int va 2)) 2 = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    base_exec_total E σ va g -∗ rvc_exec_total E σ va g -∗
+    exec_step_obligation C pt E σ va g.
+  Proof.
+    intros Hum Hleaf Humh Hleafh Hal2 Hal2h Hbit0 Hbit1 Hnal4 Hcanon Hcanonh
+           Hmisa Hmenv Hhtif HSXL Hall Help.
+    iIntros "Htb Htr %Hpre Hint Hgpr Hnpc Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iMod (user_pt_fetch_instr_2 pt.(ud_root) pt.(ud_tfp) pt.(ud_um) pt.(ud_data)
+            w_leaf wh_leaf va σ Hum Hleaf Humh Hleafh Hcov Hal2 Hal2h Hbit0 Hbit1 Hnal4
+            Lpc Hcanon Hcanonh Hmisa Hmenv Hhtif Hcp HSXL Hall
+            with "Hreg Hgh Hutlb Hudata")
+      as (iw σf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hgh & Hutlb & Hudata)".
+    iApply (user_exec_step_from_fetch E σ σf va g iw
+              Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch
+              with "Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg").
+    - unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev".
+    - unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption.
+  Qed.
+
+  (* Low halfword OK, pc+2 faults: the RUNTIME disjunction.  If the low half  *)
+  (* is RVC the instruction executes (no high fetch); otherwise the straddle  *)
+  (* faults.  Produces (exec_step body) OR (fetch_fault body) -- both over    *)
+  (* the one composer's TLB-filled s'; the classification cases + dispatches. *)
+  Lemma user_exec_step_or_fault_producer_2_second (E : coPset) (σ : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) (w_leaf : mword 64) :
+    pt.(ud_um) !! svpn_of va = Some w_leaf ->
+    uleaf_ok (InstructionFetch tt) w_leaf ->
+    u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) (add_vec_int va 2) ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    base_exec_total E σ va g -∗ rvc_exec_total E σ va g -∗
+    ⌜u_step_pre σ va⌝ -∗ mstate_interp σ -∗ gpr_file g -∗ nextPC ↦ᵣ va -∗
+    user_pt_inv pt -∗ user_cfg C -∗
+    |={E}=>
+      (∃ (r : ExecutionResult) (ib : mword 32) (s_x : mstate)
+         (g' : gmap regidx (mword 64)) (va' : mword 64),
+         ⌜exec (run_hart_active 0) σ = Some (Step_Execute (r, ib), s_x)⌝ ∗
+         ⌜exec_step_result_ok r⌝ ∗
+         ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
+         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
+            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
+         ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
+         mstate_interp s_x ∗ gpr_file g' ∗ nextPC ↦ᵣ va' ∗ user_pt_inv pt ∗ user_cfg C)
+      ∨
+      (∃ (s_f : mstate) (e : ExceptionType) (xv : mword 64),
+         ⌜exec (run_hart_active 0) σ = Some (Step_Fetch_Failure (Virtaddr xv, e), s_f)⌝ ∗
+         ⌜user_exc e = true⌝ ∗
+         ⌜register_lookup hart_state s_f.(sregs) = HART_ACTIVE tt⌝ ∗
+         ⌜register_lookup (R_bool minstret_increment) s_f.(sregs)
+            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
+         mstate_interp s_f ∗ user_pt_inv pt ∗ user_cfg C ∗ gpr_file g ∗ nextPC ↦ᵣ va).
+  Proof.
+    intros Hum Hleaf Hflavor Hal2 Hbit0 Hbit1 Hnal4 Hcanon Hhart
+           Hmisa Hmenv Hhtif HSXL Hall Help.
+    iIntros "Htb Htr %Hpre Hint Hgpr Hnpc Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iMod (user_pt_fetch_fault_2_second pt.(ud_root) pt.(ud_tfp) pt.(ud_um) pt.(ud_data)
+            w_leaf va σ Hum Hleaf Hflavor Hcov Hal2 Hbit0 Hbit1 Hnal4 Lpc Hcanon
+            Hmisa Hmenv Hhtif Hcp HSXL Hall
+            with "Hreg Hgh Hutlb Hudata")
+      as (σ') "(%Hdisj & %Hmdev & %Tr & Hreg & Hgh & Hutlb & Hudata)".
+    destruct Hdisj as [(h & HisRVC & Hfr) | Hfe].
+    - pose (iw := zero_extend' 32 h).
+      assert (Hsub : subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0 = h)
+        by (subst iw; rewrite autocast_mword_id; apply subrange16_zext32).
+      assert (Hfetch2 : exec (fetch tt) σ
+        = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                 then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                 else F_Base (autocast (T := mword) iw)), σ')).
+      { rewrite Hsub HisRVC. exact Hfr. }
+      iMod (user_exec_step_from_fetch E σ σ' va g iw
+              Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch2
+              with "Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg") as "H".
+      { unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev". }
+      { unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
+      iModIntro. iLeft. iExact "H".
+    - iClear "Htb Htr".
+      pose proof (exec_run_hart_active_fetch_failure User σ σ' (add_vec_int va 2)
+                    (E_Fetch_Page_Fault tt) Hcp Hdisp Hfe) as Hrun.
+      iModIntro. iRight. iExists σ', (E_Fetch_Page_Fault tt), (add_vec_int va 2).
+      iSplitR; [iPureIntro; exact Hrun|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; rewrite (Tr hart_state ltac:(vm_compute; reflexivity)); exact Hhart|].
+      iSplitR; [iPureIntro; apply Tr; vm_compute; reflexivity|].
+      iSplitL "Hreg Hgh Hdev"; [unfold mstate_interp; cbn [sregs mem mdev]; rewrite Hmdev; iFrame "Hreg Hgh Hdev"|].
+      iSplitL "Hutlb Hudata"; [unfold user_pt_inv; iFrame "Hutlb Hudata"; iPureIntro; split; assumption|].
+      iFrame "Hcfg Hgpr Hnpc".
   Qed.
 
 End UserExecProducer.
