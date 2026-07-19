@@ -182,6 +182,7 @@ WpKallocDecode.v
 WpMemsetPage.v
 WpKalloc.v
 WpKfree.v
+WpInitlock.v
 TrampPt.v
 VcGen.v
 VcGenS.v
