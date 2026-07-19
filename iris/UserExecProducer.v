@@ -26,7 +26,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv WpGpr.
 Require Import WpLeafCommon WpIntrCore.
 Require Import SmodeCore.
-Require Import UserPtTree UserExec UserStep UserTrap UserCompute UserArms UserFetchPt UserStepExec.
+Require Import UserPtTree UserExec UserStep UserTrap UserCompute UserArms UserFetch UserFetchPt UserStepExec.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -157,6 +157,97 @@ Section UserExecProducer.
       iModIntro. iExists r, (zero_extend' 32 (autocast (T := mword) iw : mword 32)), s_x, g', va'.
       iFrame "Hint Hgpr Hnpc Hupt Hcfg".
       iPureIntro. repeat split; try assumption.
+  Qed.
+
+  (* ===================================================================== *)
+  (* The FETCH-FAULT half of the classification.  Where the success        *)
+  (* producer needs a fetchable leaf (um !! svpn = Some w, uleaf_ok), these *)
+  (* discharge [fetch_fault_obligation] from the UserFetchPt fault          *)
+  (* composers: the fetch faults, [exec_run_hart_active_fetch_failure]      *)
+  (* lifts it to [Step_Fetch_Failure], and (all these geometries leave the  *)
+  (* state unchanged) the invariant re-frames trivially.  user_exc holds by *)
+  (* reflexivity for both causes.  The 2-aligned SECOND-halfword fault is a *)
+  (* disjunction (RVC success OR high-half fault, with a TLB-filled state)  *)
+  (* and belongs with the split success producer (classification, item A);  *)
+  (* it is not a single-outcome fault corollary.                            *)
+  (* ===================================================================== *)
+
+  (* Odd pc: E_Fetch_Addr_Align, before any translation, state unchanged. *)
+  Lemma user_fetch_fault_producer_align (E : coPset) (σ : mstate) (va : mword 64) :
+    neq_vec (access_vec_dec va 0) ('b"0") = true ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    ⊢ fetch_fault_obligation C pt E σ va.
+  Proof.
+    intros Hbit0 Hhart.
+    iIntros "%Hpre Hint Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    pose proof (exec_fetch_align_fault σ va Lpc Hbit0) as Hfetch.
+    pose proof (exec_run_hart_active_fetch_failure User σ σ va (E_Fetch_Addr_Align tt)
+                  Hcp Hdisp Hfetch) as Hrun.
+    iModIntro. iExists σ, (E_Fetch_Addr_Align tt), va.
+    iFrame "Hint Hupt Hcfg". iPureIntro. repeat split; try assumption; reflexivity.
+  Qed.
+
+  (* 4-aligned pc whose walk faults (non-canonical / unmapped / denied all  *)
+  (* collapse to E_Fetch_Page_Fault at the user tables), state unchanged.   *)
+  Lemma user_fetch_fault_producer (E : coPset) (σ : mstate) (va : mword 64) :
+    u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) va ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ⊢ fetch_fault_obligation C pt E σ va.
+  Proof.
+    intros Hflavor Hal Hhart Hhtif Hall.
+    iIntros "%Hpre Hint Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iDestruct (user_pt_fetch_fault pt.(ud_root) pt.(ud_tfp) pt.(ud_um) va σ
+                 Hflavor Hal Lpc Hhtif Hcp (proj1 Hmsok) Hall with "Hreg Hgh Hutlb") as %Hfetch.
+    pose proof (exec_run_hart_active_fetch_failure User σ σ va (E_Fetch_Page_Fault tt)
+                  Hcp Hdisp Hfetch) as Hrun.
+    iModIntro. iExists σ, (E_Fetch_Page_Fault tt), va.
+    iSplitR; [iPureIntro; exact Hrun|].
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitR; [iPureIntro; exact Hhart|].
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitL "Hreg Hgh Hdev"; [unfold mstate_interp; iFrame "Hreg Hgh Hdev"|].
+    iSplitL "Hutlb Hudata"; [unfold user_pt_inv; iFrame "Hutlb Hudata"; iPureIntro; split; assumption|].
+    iFrame "Hcfg".
+  Qed.
+
+  (* 2-aligned (not 4-aligned) pc whose LOW halfword's page faults: same    *)
+  (* single-outcome E_Fetch_Page_Fault at va, state unchanged.              *)
+  Lemma user_fetch_fault_producer_2_first (E : coPset) (σ : mstate) (va : mword 64) :
+    u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) va ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ⊢ fetch_fault_obligation C pt E σ va.
+  Proof.
+    intros Hflavor Hbit0 Hbit1 Hnal4 Hhart Hmisa Hhtif Hall.
+    iIntros "%Hpre Hint Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iDestruct (user_pt_fetch_fault_2_first pt.(ud_root) pt.(ud_tfp) pt.(ud_um) va σ
+                 Hflavor Hbit0 Hbit1 Hnal4 Lpc Hmisa Hhtif Hcp (proj1 Hmsok) Hall
+                 with "Hreg Hgh Hutlb") as %Hfetch.
+    pose proof (exec_run_hart_active_fetch_failure User σ σ va (E_Fetch_Page_Fault tt)
+                  Hcp Hdisp Hfetch) as Hrun.
+    iModIntro. iExists σ, (E_Fetch_Page_Fault tt), va.
+    iSplitR; [iPureIntro; exact Hrun|].
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitR; [iPureIntro; exact Hhart|].
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitL "Hreg Hgh Hdev"; [unfold mstate_interp; iFrame "Hreg Hgh Hdev"|].
+    iSplitL "Hutlb Hudata"; [unfold user_pt_inv; iFrame "Hutlb Hudata"; iPureIntro; split; assumption|].
+    iFrame "Hcfg".
   Qed.
 
 End UserExecProducer.

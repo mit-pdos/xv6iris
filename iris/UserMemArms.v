@@ -300,3 +300,564 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
   rewrite (exec_bind_Some _ _ _ _ _ Hvw). cbn match. apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* AMO family.  Unlike LOAD/STORE/LR/SC, execute_AMO does not go through   *)
+(* vmem_read/write: it inlines the read-modify-write (own alignment check, *)
+(* translate, mem_write_ea, mem_read, per-op result, the AMOCAS guard,     *)
+(* mem_write_value, wX).  But the RMW is OP-GENERIC: the written value is   *)
+(* symbolic (mem_write_value is stated forall-v by the composer) and the    *)
+(* w__18 CAS-check short-circuits to false for every non-AMOCAS op, so ONE   *)
+(* retire lemma covers all 9 non-CAS ops.  The RAM pins atomic_support =    *)
+(* AMOSwap, so only AMOSWAP actually retires; the other ops (and misalign / *)
+(* walk faults) take the op-generic fault lemmas below.                     *)
+(* ===================================================================== *)
+Lemma exec_execute_AMO_u_ok
+    (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (addr : physaddr) (pbmt : page_based_mem_type)
+    (loaded : mword (8 * width)) (md : SATPMode) (s s' s'' : mstate) :
+  let rs2_val : bits (width * 8) :=
+    trunc (Z.mul (__id width) 8)
+      (if Z.eqb (uint rs2) 0 then zero_reg
+       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs)) in
+  let lc : bits (width * 8) := autocast (T := mword) loaded in
+  let result' : bits (width * 8) :=
+    match op with
+    | AMOSWAP => rs2_val | AMOADD => add_vec rs2_val lc | AMOXOR => xor_vec rs2_val lc
+    | AMOAND => and_vec rs2_val lc | AMOOR => or_vec rs2_val lc
+    | AMOMIN => if zopz0zI_s rs2_val lc then rs2_val else lc
+    | AMOMAX => if zopz0zK_s rs2_val lc then rs2_val else lc
+    | AMOMINU => if zopz0zI_u rs2_val lc then rs2_val else lc
+    | AMOMAXU => if zopz0zK_u rs2_val lc then rs2_val else lc
+    | AMOCAS => rs2_val end in
+  (width <=? xlen_bytes) = true ->
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  uint rd <> 0 ->
+  generic_eq op AMOCAS = false ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = true ->
+  exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (op, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
+  exec (mem_write_value addr width (sign_extend' (Z.mul 8 (__id width)) result') (Atomic (op, Data, Data)) pbmt (andb aq rl) rl true) s'
+    = Some (Ok true, s'') ->
+  exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s'' (R_bitvector_64 (gpr_of_Z (uint rd)))
+              (regval_into_reg (sign_extend' 64 lc))).
+Proof.
+  intros rs2_val lc result'.
+  intros Hw Hw2 Hrd Hop Hcp Heff Hpml Htm Hal Htr Hea Hrdm Hwv.
+  change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  (* assert width <= 2*xlen_bytes *)
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  (* gtda -> OK vaddr *)
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  (* alignment: is_aligned true -> not true = false -> else branch (translate) *)
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
+  (* rX rs2 branch: width <= xlen_bytes -> rX_bits rs2 (nested bind) *)
+  rewrite Hw.
+  assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
+                    (fun w6 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w6))) s'
+               = Some (inr rs2_val, s')).
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
+  (* mem_write_ea addr -> Ok tt *)
+  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+  (* mem_read -> Ok loaded (nested bind: outer via execR_bind, inner via liftR_seq) *)
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
+  rewrite execR_returnR_fwd. cbn match.
+  (* and_boolM (returnR (op=?AMOCAS)) B: op<>AMOCAS -> short-circuits to false *)
+  rewrite Hop.
+  assert (Hab : forall (B : Defs.monadR ExecutionResult exception bool),
+           execR (and_boolM (returnR ExecutionResult false) B) s' = Some (inr false, s')).
+  { intro B. unfold and_boolM.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd false s')). cbn match.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ (Hab _)). cbn match.
+  (* else branch (w__18 = false): mem_write_value -> Ok true *)
+  rewrite (execR_liftR_seq _ _ _ _ _ Hwv). cbn match.
+  (* wX_bits rd (sign_extend' 64 loaded) >> RETIRE *)
+  assert (Hwx : exec (wX_bits (Regidx rd) (sign_extend' 64 lc)) s''
+                = Some (tt, set_reg s'' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (sign_extend' 64 lc)))).
+  { rewrite (exec_wX_bits_gpr rd (sign_extend' 64 lc) s'').
+    rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
+  assert (Hwxr : execR (R := ExecutionResult) (Defs.liftR (wX_bits (Regidx rd) (sign_extend' 64 lc))) s''
+               = Some (inr tt, set_reg s'' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (sign_extend' 64 lc)))).
+  { rewrite execR_liftR. rewrite Hwx. reflexivity. }
+  rewrite (execR_bind0_Some _ _ _ _ Hwxr).
+  rewrite execR_returnR_fwd. reflexivity.
+Qed.
+
+(* mem_read Err -> delegated trap.  This is the pma-deny path (non-AMOSWAP ops
+   the RAM does not support, atomic_support = AMOSwap), and any read fault.    *)
+Lemma exec_execute_AMO_u_read_err
+    (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (addr : physaddr) (pbmt : page_based_mem_type) (e : ExceptionType)
+    (pc : mword 64) (md : SATPMode) (s s' : mstate) :
+  (width <=? xlen_bytes) = true ->
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  register_lookup cur_privilege s'.(sregs) = User ->
+  register_lookup PC s'.(sregs) = pc ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = true ->
+  exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (op, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Err e, s') ->
+  exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (Trap (User, make_sync_exception e
+                    (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                             (zeros' 64)), pc), s').
+Proof.
+  intros Hw Hw2 Hcp Heff Hpml Htm Hcp' Hpc' Hal Htr Hea Hrdm.
+  change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
+  rewrite Hw.
+  assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
+                    (fun w6 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w6))) s'
+               = Some (inr (trunc (Z.mul (__id width) 8)
+                              (if Z.eqb (uint rs2) 0 then zero_reg
+                               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs))), s')).
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+  (* mem_read -> Err e: early_return the memory_exception trap *)
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception _ pc e User s' Hcp' Hpc')).
+  reflexivity.
+Qed.
+
+(* translateAddr Err -> delegated trap (page fault / access fault on walk). *)
+Lemma exec_execute_AMO_u_translate_err
+    (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (e : ExceptionType) (pc : mword 64) (md : SATPMode) (s s' : mstate) :
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  register_lookup cur_privilege s'.(sregs) = User ->
+  register_lookup PC s'.(sregs) = pc ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = true ->
+  exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Err (e, tt), s') ->
+  exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (Trap (User, make_sync_exception e
+                    (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                             (zeros' 64)), pc), s').
+Proof.
+  intros Hw2 Hcp Heff Hpml Htm Hcp' Hpc' Hal Htr.
+  change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  (* translate -> Err e: early_return the memory_exception trap *)
+  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception _ pc e User s' Hcp' Hpc')).
+  reflexivity.
+Qed.
+
+(* misaligned AMO -> E_SAMO_Access_Fault trap (plat amo policy = AccessFault). *)
+Lemma exec_execute_AMO_u_misaligned
+    (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (pc : mword 64) (md : SATPMode) (s : mstate) :
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  register_lookup PC s.(sregs) = pc ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = false ->
+  exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt)
+                    (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                             (zeros' 64)), pc), s).
+Proof.
+  intros Hw2 Hcp Heff Hpml Htm Hpc Hal.
+  change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  (* misaligned: not false = true -> then branch (memory_exception) *)
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  cbv [plat_misaligned_access GlobalMisalignedExceptions_amo]. cbn match.
+  rewrite execR_liftR.
+  rewrite (exec_memory_exception _ pc (E_SAMO_Access_Fault tt) User s Hcp Hpc).
+  reflexivity.
+Qed.
+
+(* --- AMO edge cases: the remaining fault arms + AMOCAS mismatch. --- *)
+(* mem_write_ea Err -> delegated trap. *)
+Lemma exec_execute_AMO_u_ea_err
+    (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (addr : physaddr) (pbmt : page_based_mem_type) (e : ExceptionType)
+    (pc : mword 64) (md : SATPMode) (s s' : mstate) :
+  (width <=? xlen_bytes) = true ->
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  register_lookup cur_privilege s'.(sregs) = User ->
+  register_lookup PC s'.(sregs) = pc ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = true ->
+  exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Err e, s') ->
+  exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (Trap (User, make_sync_exception e
+                    (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                             (zeros' 64)), pc), s').
+Proof.
+  intros Hw Hw2 Hcp Heff Hpml Htm Hcp' Hpc' Hal Htr Hea.
+  change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
+  rewrite Hw.
+  assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
+                    (fun w6 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w6))) s'
+               = Some (inr (trunc (Z.mul (__id width) 8)
+                              (if Z.eqb (uint rs2) 0 then zero_reg
+                               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs))), s')).
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
+  (* mem_write_ea -> Err e: early_return the memory_exception trap *)
+  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception _ pc e User s' Hcp' Hpc')).
+  reflexivity.
+Qed.
+
+(* mem_write_value Err -> delegated trap (device-only post-read write fault).  *)
+Lemma exec_execute_AMO_u_write_err
+    (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (addr : physaddr) (pbmt : page_based_mem_type)
+    (loaded : mword (8 * width)) (e : ExceptionType)
+    (pc : mword 64) (md : SATPMode) (s s' s'' : mstate) :
+  let rs2_val : bits (width * 8) :=
+    trunc (Z.mul (__id width) 8)
+      (if Z.eqb (uint rs2) 0 then zero_reg
+       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs)) in
+  let lc : bits (width * 8) := autocast (T := mword) loaded in
+  let result' : bits (width * 8) :=
+    match op with
+    | AMOSWAP => rs2_val | AMOADD => add_vec rs2_val lc | AMOXOR => xor_vec rs2_val lc
+    | AMOAND => and_vec rs2_val lc | AMOOR => or_vec rs2_val lc
+    | AMOMIN => if zopz0zI_s rs2_val lc then rs2_val else lc
+    | AMOMAX => if zopz0zK_s rs2_val lc then rs2_val else lc
+    | AMOMINU => if zopz0zI_u rs2_val lc then rs2_val else lc
+    | AMOMAXU => if zopz0zK_u rs2_val lc then rs2_val else lc
+    | AMOCAS => rs2_val end in
+  (width <=? xlen_bytes) = true ->
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  generic_eq op AMOCAS = false ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  register_lookup cur_privilege s''.(sregs) = User ->
+  register_lookup PC s''.(sregs) = pc ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = true ->
+  exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (op, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
+  exec (mem_write_value addr width (sign_extend' (Z.mul 8 (__id width)) result') (Atomic (op, Data, Data)) pbmt (andb aq rl) rl true) s'
+    = Some (Err e, s'') ->
+  exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (Trap (User, make_sync_exception e
+                    (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                             (zeros' 64)), pc), s'').
+Proof.
+  intros rs2_val lc result'.
+  intros Hw Hw2 Hop Hcp Heff Hpml Htm Hcp'' Hpc'' Hal Htr Hea Hrdm Hwv.
+  change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
+  rewrite Hw.
+  assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
+                    (fun w6 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w6))) s'
+               = Some (inr rs2_val, s')).
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
+  rewrite execR_returnR_fwd. cbn match.
+  rewrite Hop.
+  assert (Hab : forall (B : Defs.monadR ExecutionResult exception bool),
+           execR (and_boolM (returnR ExecutionResult false) B) s' = Some (inr false, s')).
+  { intro B. unfold and_boolM.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd false s')). cbn match.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ (Hab _)). cbn match.
+  (* mem_write_value -> Err e: the memory_exception is the body result (not early_return) *)
+  rewrite (execR_liftR_seq _ _ _ _ _ Hwv). cbn match.
+  rewrite execR_liftR.
+  rewrite (exec_memory_exception _ pc e User s'' Hcp'' Hpc'').
+  reflexivity.
+Qed.
+
+(* AMOCAS, compare mismatch (w__18 = true): NO store, rd := sign_extend loaded. *)
+Lemma exec_execute_AMO_u_cas_nostore
+    (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (addr : physaddr) (pbmt : page_based_mem_type)
+    (loaded : mword (8 * width)) (md : SATPMode) (s s' : mstate) :
+  let lc : bits (width * 8) := autocast (T := mword) loaded in
+  let rd_val : bits (width * 8) :=
+    trunc (Z.mul (__id width) 8)
+      (if Z.eqb (uint rd) 0 then zero_reg
+       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rd))) s'.(sregs)) in
+  (width <=? xlen_bytes) = true ->
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  uint rd <> 0 ->
+  neq_vec lc rd_val = true ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (AMOCAS, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (AMOCAS, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = true ->
+  exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                         (zeros' 64))) (Atomic (AMOCAS, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (AMOCAS, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
+  exec (execute (AMO (AMOCAS, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+              (regval_into_reg (sign_extend' 64 lc))).
+Proof.
+  intros lc rd_val.
+  intros Hw Hw2 Hrd Hneq Hcp Heff Hpml Htm Hal Htr Hea Hrdm.
+  change (execute (AMO (AMOCAS, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO AMOCAS aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (AMOCAS, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (AMOCAS, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (AMOCAS, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
+  rewrite Hw.
+  assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
+                    (fun w6 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w6))) s'
+               = Some (inr (trunc (Z.mul (__id width) 8)
+                              (if Z.eqb (uint rs2) 0 then zero_reg
+                               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs))), s')).
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
+  rewrite execR_returnR_fwd. cbn match.
+  (* and_boolM (returnR true) B: op = AMOCAS -> evaluate B = neq_vec loaded rd_val *)
+  assert (Hcas : generic_eq AMOCAS AMOCAS = true) by reflexivity.
+  rewrite Hcas.
+  assert (Hrdr : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rd)))
+                   (fun w15 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w15))) s'
+              = Some (inr rd_val, s')).
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rd s')). apply execR_returnR_fwd. }
+  assert (HB : execR (Defs.bind (Defs.bind (Defs.liftR (rX_bits (Regidx rd)))
+                        (fun w15 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w15)))
+                        (fun w17 : bits (width * 8) => returnR ExecutionResult (neq_vec lc w17))) s'
+               = Some (inr (neq_vec lc rd_val), s')).
+  { rewrite (execR_bind_Some _ _ _ _ _ Hrdr). apply execR_returnR_fwd. }
+  assert (Hab : execR (and_boolM (returnR ExecutionResult true)
+                        (Defs.bind (Defs.bind (Defs.liftR (rX_bits (Regidx rd)))
+                          (fun w15 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w15)))
+                          (fun w17 : bits (width * 8) => returnR ExecutionResult (neq_vec lc w17)))) s'
+               = Some (inr (neq_vec lc rd_val), s')).
+  { unfold and_boolM.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd true s')). cbn match. exact HB. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hab). rewrite Hneq. cbn match.
+  (* w__18 = true: wX_bits rd (sign_extend' 64 loaded) >> RETIRE, no store *)
+  assert (Hwx : exec (wX_bits (Regidx rd) (sign_extend' 64 lc)) s'
+                = Some (tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (sign_extend' 64 lc)))).
+  { rewrite (exec_wX_bits_gpr rd (sign_extend' 64 lc) s').
+    rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
+  assert (Hwxr : execR (R := ExecutionResult) (Defs.liftR (wX_bits (Regidx rd) (sign_extend' 64 lc))) s'
+               = Some (inr tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (sign_extend' 64 lc)))).
+  { rewrite execR_liftR. rewrite Hwx. reflexivity. }
+  rewrite (execR_bind0_Some _ _ _ _ Hwxr).
+  rewrite execR_returnR_fwd. reflexivity.
+Qed.

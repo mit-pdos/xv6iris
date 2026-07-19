@@ -898,13 +898,104 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    base jals are decoded locally.  callee_saved mm mr recovered from
    callee_saved P6 mr since P6 = mm off the callee-saved set (only a2/a3/a5
    clobbered).  `kvmmap_spec_holds : ⊢ kvmmap_spec`.
-6. **wp_proc_mapstacks** (NPROC=64 kalloc+kvmmap loop, fuel induction over
-   the proc array — needs the `proc` array base + KSTACK geometry), then
-   **wp_kvmmake** (kalloc root + memset + `zero_page_to_node` at level 2 +
-   six kvmmap calls at concrete (vpn0,ppn0,perm,npages) tuples + the
-   `kvm_map` gmap literal built from `pt_insert_run` so the posts chain
-   definitionally), then **wp_kvminit** (store the root into
-   `kernel_pagetable`).
+6. **wp_kvmmake / wp_proc_mapstacks / wp_kvminit** (NOT STARTED; walk +
+   mappages + kvmmap all DONE and green as the building blocks).  This is
+   a large, design-heavy NEW LAYER, not an incremental proof.  Full design
+   checkpoint (2026-07-19) so the next session starts from the design, not
+   from scratch:
+
+   **(a) Constants to add** (most do NOT exist yet — only UART0/plic_base
+   in DevModel, TRAMPOLINE in TrampPt, etext/proc in KernelSyms, NPROC in
+   WpWakeup).  From xv6-riscv/kernel/memlayout.h + riscv.h:
+     - KERNBASE = 0x80000000, PHYSTOP = KERNBASE + 128*1024*1024 = 0x88000000
+     - UART0 = 0x10000000, VIRTIO0 = 0x10001000, PLIC = 0x0c000000
+     - MAXVA = 1 << (9+9+9+12-1) = 0x4000000000; TRAMPOLINE = MAXVA - PGSIZE
+       = 0x3FFFFFF000 (already in TrampPt.v)
+     - KSTACK(p) = TRAMPOLINE - (p+1)*2*PGSIZE  (guard page below each stack)
+     - proc array base = KernelSyms.proc = 0x80012778; sizeof(struct proc)
+       needed for the p++ stride (read from the +0x78 addi in the
+       proc_mapstacks loop: 0x168 = 360 bytes — CONFIRM against the dump).
+     - PTE flag values: perm passed to kvmmap is WITHOUT V (mappages ORs V
+       in): R|W = 2|4 = 6, R|X = 2|8 = 10.
+
+   **(b) The [kvm_map] gmap literal** (kernel/vm.c kvmmake order; each
+   region is a [pt_insert_run] applied to the accumulator so the six
+   kvmmap posts chain DEFINITIONALLY -- the k-th kvmmap's post
+   [pt_insert_run m_prev vpn0_k ppn0_k perm_k npages_k] becomes the next
+   call's precondition [pt_rep0 t m_k]):
+     1. UART0    va=pa=0x10000000, 1 page,      perm 6   (R|W)
+     2. VIRTIO0  va=pa=0x10001000, 1 page,      perm 6
+     3. PLIC     va=pa=0x0c000000, 0x4000000 B = 16384 pages, perm 6
+     4. text     va=pa=KERNBASE,   (etext-KERNBASE)=0x7000 = 7 pages, perm 10 (R|X)
+     5. data     va=pa=etext,      (PHYSTOP-etext)=0x7FF9000 = 31977 pages, perm 6
+     6. tramp    va=TRAMPOLINE, pa=trampoline (the phys page), 1 page, perm 10
+     then proc_mapstacks: 64 KSTACK(i) pages -> kalloc-chosen pas, perm 6.
+   NB the PLIC (16384) and data (31977) runs are BIG: mappages_spec's
+   premises [uint va + npages*4096 <= 2^38] and [uint pa + npages*4096 <
+   2^56] must hold -- check: PLIC pa 0x0c000000 + 16384*4096 = 0x10000000
+   ok; data va 0x80007000 + 31977*4096 = 0x88000000 = 2^31+... < 2^38 ok,
+   pa same < 2^56 ok.  So the existing bounds SUFFICE -- no spec loosening.
+   Also each region's start is page-aligned by construction (all the
+   constants are multiples of 0x1000) so [subrange va 11 0 = 0] discharges
+   by vm_compute, and [mappages_perm_ok 6]/[mappages_perm_ok 10] are two
+   fixed lemmas provable once (pte_valid/leaf/no_napot/pbmt0 of
+   mk_pte 0 (6|1) and mk_pte 0 (10|1) -- all vm_compute on the flag byte).
+   NO-REMAP obligation ([forall i<npages, m_k !! vpn_at vpn0_k i = None]):
+   the regions are DISJOINT in va (devices < 0x10002000, PLIC region
+   0x0c.., text/data 0x8.., tramp at MAXVA, stacks just below tramp) so
+   each region's vpns are unmapped in the accumulator -- prove a disjointness
+   lemma per region (vpn ranges don't overlap) feeding pt_insert_run_lookup
+   -style reasoning; this is the main NEW pure-arithmetic burden.
+
+   **(c) Spec signatures to add to KvmSpec.v** (currently only sketched in
+   comments there):
+     - [proc_mapstacks_spec]: args kpgtbl=a0, tree t repr m, the 64 KSTACK
+       vpns unmapped, kalloc_env, panic_wp; post = ∃ (pas : nat -> mword 44),
+       tree t' repr (m + {KSTACK i -> mk_pte (pas i) 6 | i<64}), pt_base
+       preserved, kalloc_env restored.  Existential pas as a FUNCTION
+       nat->pa (not a list) keeps the induction clean.  Fuel = remaining
+       proc count, invariant carries the pas chosen so far (partial function
+       / accumulator map).  Structurally = mappages' loop but the per-iter
+       body is kalloc (env threading, null->panic) + kvmmap (needs panic_wp,
+       aligned page from kalloc, KSTACK(i) aligned+unmapped+bounded).
+     - [kvmmake_spec]: NO incoming tree (it kallocs the root itself); pre =
+       kalloc_env with ENOUGH free pages (root + all intermediate PT nodes
+       for the six regions + 64 stacks + 64 stack pages -- the kalloc_env
+       must guarantee non-failure OR the spec's post is the ret=0/partial
+       disjunction like mappages; SIMPLEST: require panic_wp and make every
+       kalloc-null go to panic, so the post is unconditional full kvm_map).
+       Post: ret(a0) = root pa, ptree_own 2 1 t with pt_rep0 t kvm_map (for
+       the existential stack pas), + the root is a FRESH page.  Stack depth:
+       kvmmake frame is 4 slots (ra,s0,s1,s2 at +0x00 c.addi16sp -32... check:
+       +0x00 0x1101 = c.addi16sp -32? decode) -- but it CALLS mappages/walk
+       which need 32; so n must be >= 32 + kvmmake's own frame.
+     - [kvminit_spec]: kvmmake then [sd a0, kernel_pagetable]; needs the
+       kernel_pagetable global cell.  Post: kernel_pagetable points at the
+       kvm_map root.
+   Get Nickolai's sign-off on the kvm_map shape + the "panic on any
+   kalloc-null" simplification BEFORE building the proofs (spec-design
+   preferences: constant depth bounds, no ad-hoc arg coupling).
+
+   **(d) Decode catalogs** (mechanical but ~90 + ~44 instrs; reuse
+   KernelRvcDecode's shared frame templates mdec_ccc..cf0 for the standard
+   frames, like WpKvmmap did): WpProcMapstacksInstr.v (frame 0x715d = 80-byte
+   =11 slots, the KSTACK arith auipc/lui/addi/mul-by-stride/sub, kalloc+kvmmap
+   jals, the p<&proc[64] bne loop) and WpKvmmakeInstr.v (kalloc+memset+6*
+   {auipc/lui/addi arg setup + kvmmap jal} + proc_mapstacks jal).  Generate
+   programmatically as in WpMappagesInstr; the JAL residues = (target - pc)
+   mod 2^21 (confirmed formula from walk/mappages/kvmmap).  WATCH the base
+   ASTs for lui/mul/sub -- probe with the vm_compute-on-decode trick only if
+   rvc_oneshot/decode_bridge_ms rejects a guessed AST (each miss = a full
+   ~minute compile, so get the immediates right up front from the dump).
+
+   **(e) Proof order**: proc_mapstacks FIRST (self-contained, unblocks
+   kvmmake), then kvmmake (root kalloc + memset + zero_page_to_node at level
+   2 + the six chained kvmmap calls + the proc_mapstacks call), then kvminit
+   (kvmmake + one sd).  Each funnels through a sealed epilogue like the
+   mappages/kvmmap ones.  The six kvmmap calls each want callee_saved
+   recovery + the accumulator-tree transport (t_k repr m_k) between calls --
+   the a0/a1/.. arg-register reloads between calls are the per-call auipc/lui
+   /addi sequences already in the dump.
 7. **Boot introduction** (separate, later): kvminithart establishes
    `tlb_inv_pt` from `pt_rep t kvm_map` — at which point `kpt_tree_spec`
    must be REVISED to the true per-region flags (text RX / data RW /
@@ -1778,7 +1869,31 @@ files or copy code from them; build fresh from the live tree.
      to: prove the two totalities (⇒ `user_exec_step_producer` ⇒
      `exec_step_obligation` ⇒ `exec_step_branch` ⇒ active_class), and each
      totality is proved by casing on the decoded instruction and handing
-     each family its execute fact.  NOTHING in fetch/progress/retire/trap
+     each family its execute fact.
+     THE FETCH-FAULT HALF (UserExecProducer.v, DONE): the companions to
+     `user_exec_step_producer` that discharge `fetch_fault_obligation`
+     (UserArms) instead of `exec_step_obligation`.  Three single-outcome
+     σ-unchanged producers, one per fault geometry: `user_fetch_fault_
+     producer_align` (odd pc → E_Fetch_Addr_Align, via the pure
+     `exec_fetch_align_fault`), `user_fetch_fault_producer` (4-aligned walk
+     fault, via `user_pt_fetch_fault` — non-canonical/unmapped/denied all
+     collapse to E_Fetch_Page_Fault at U tables), and `user_fetch_fault_
+     producer_2_first` (2-aligned low-halfword fault, via
+     `user_pt_fetch_fault_2_first`).  Each: intro `u_step_pre` (gives PC=va,
+     cur_priv=User, dispatchInterrupt=None; SXL is `proj1` of its
+     user_mstatus_ok), split `mstate_interp`/`user_pt_inv`, apply the fault
+     composer (the `iDestruct … as %` pure-extraction keeps reg/gh/utlb — a
+     pure conclusion does not consume its spatial args here),
+     `exec_run_hart_active_fetch_failure` (UserFetch, ALREADY EXISTED) lifts
+     `fetch = F_Error` to `run_hart_active = Step_Fetch_Failure`, `user_exc`
+     holds by reflexivity, and s_f = σ so the hart_state/minstret equalities
+     and the interp re-frame are trivial.  hart_state=HART_ACTIVE is a
+     premise (the caller's active-step fact — not in u_step_pre).  NOT built:
+     the 2-aligned SECOND-halfword case — `user_pt_fetch_fault_2_second` is a
+     DISJUNCTION (RVC success OR high-half fault at va+2, with a TLB-filled
+     s_f ≠ σ), so it is a branch point for the split success producer (item
+     A / the compressed-fetch classification), not a single-outcome fault
+     corollary.  NOTHING in fetch/progress/retire/trap
      is re-touched per family; base-vs-RVC is the one inherent split (it is
      the two progress composers, hidden behind the two totality premises).
      THE MEMORY FAMILIES: their execute fact is `execute_LOAD/STORE/…` run
@@ -1796,9 +1911,47 @@ files or copy code from them; build fresh from the live tree.
      negb-success + cancel_reservation; STORE none), Err → the delegated
      trap.  So each memory family plugs into the base/RVC totalities as
      "apply the composer (Ok/Err) → apply the execute fact → classify".
-     REMAINING memory family: AMO (read-modify-write via
-     `user_pt_amo_data_4` + the AMO op computation) — same shape, more
-     execute structure.
+     AMO DONE (UserMemArms.v, op-generic, all green): execute_AMO does NOT
+     use vmem — it inlines the RMW (own align check, translate, mem_write_ea,
+     mem_read, per-op result', the AMOCAS w__18 guard, mem_write_value, wX).
+     The clean abstraction that collapses the case-cross-product: (a) the
+     written value is symbolic — `user_pt_amo_data_4`'s mem_write_value is
+     ∀-v, so the retire proof never reduces result' (kept as the op-match);
+     (b) `w__18 = and_boolM (op=?AMOCAS) …` short-circuits to false for every
+     non-AMOCAS op (`generic_eq op AMOCAS = false` premise), so ONE retire
+     lemma `exec_execute_AMO_u_ok` covers all 9 non-CAS ops.  Faults are
+     op-generic too: `_translate_err` (walk page/access fault → early_return
+     trap), `_read_err` (pma-deny — RAM pins atomic_support=AMOSwap so only
+     AMOSWAP retires, every other op faults here — plus any read fault),
+     `_misaligned` (plat amo policy = AccessFault → E_SAMO_Access_Fault, the
+     then-branch not an early_return).  All premise-shaped over the mem-level
+     results (translate/mem_write_ea/mem_read/mem_write_value at width 4 from
+     the composer + `exec_mem_write_ea_amo_4`); iris absorption stays in the
+     composer.  Reduction gotchas: execute_AMO is inside catch_early_return
+     so the body reduces at execR level (execR_liftR_seq / execR_bind /
+     execR_bind_Some / execR_returnR_fwd / execR_bind0_Some); the rX-rs2 and
+     mem_read binds are `(liftR m >>= k) >>= K` NESTED (the `>>= fun x` sits
+     OUTSIDE the branch), so `execR_liftR_seq` won't match at top — use
+     `rewrite execR_bind` to split the outer bind first (or an explicit inner
+     `execR (…) = Some (inr v, s)` assert, as for rX rs2); the translate bind
+     is a SINGLE top bind (the `>>= fun (addr,pbmt)` is inside the `fun w3`
+     lambda) so `execR_liftR_seq Htr` applies directly.  `access`/`vaddr` must
+     be INLINED (`Atomic (op,Data,Data)` / `Virtaddr (add_vec …)`) not `let`s,
+     else the model's zeta-inlined occurrences won't unify with the rewrites.
+     AMO edge cases now DONE too: `_ea_err` (mem_write_ea Err → early_return
+     trap), `_write_err` (mem_write_value Err → the memory_exception is the
+     Err-branch BODY result, an `inr` trap not an early_return — so `execR_
+     liftR` + exec_memory_exception directly, no execR_bind), and `_cas_
+     nostore` (AMOCAS with `neq_vec lc rd_val = true` → w__18 = true → wX rd
+     (sext loaded) >> RETIRE, NO store, state stays s').  The AMOCAS case is
+     where `w__18` does NOT short-circuit: `generic_eq AMOCAS AMOCAS = true`
+     (assert + rewrite, reflexivity), so `and_boolM (returnR true) B` runs B =
+     the rd-read + `neq_vec loaded rd_val` (two nested binds, built via an
+     inner `execR (…) = Some (inr rd_val, s')` assert like rX rs2).  Only the
+     AMOCAS-MATCH store path (w__18=false, loaded=rd_val, op=AMOCAS) is left
+     unbuilt — it is the retire lemma's write path but excluded by its
+     `generic_eq op AMOCAS = false` premise, and is unreachable on this RAM
+     anyway (atomic_support=AMOSwap denies AMOCAS at mem_read → `_read_err`).
      (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
      UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
      (`gpr_write_state`-shaped, value existential) for every compute /
@@ -1835,18 +1988,18 @@ files or copy code from them; build fresh from the live tree.
      discharge lemmas are independent and parallelize; keep each one
      "obligation-in, obligation-out" so the final assembly is a bare
      case tree.
-     (B) THE ADUE-COUPLED SEAM — yours to reshape as the UptTree port
-     lands. The classification's fetch step currently targets
-     `upt_fetch_instr` (UserFetch §6) whose premises are pre-ADUE
-     (`upte_check_ok`, `update_PTE_Bits … = None`, `upt_*` from
-     UserPt.v). If UptTree/PtFetchGen replaces the UserPt layer, port
-     `upt_fetch_instr` + the fetch-fault flavor corollaries
-     (UserTranslate/UserFetch §1-5) to it FIRST, then wire the flavor
-     corollaries into `fetch_fault_obligation` (the arm is
-     cause-generic and will not change). NOTE with hardware A/D setting
-     the needs-update fault flavor DISAPPEARS for enabled tables — the
-     flavor set shrinks; `user_exc` and `uc_del` already cover every
-     remaining cause.
+     (B) THE ADUE-COUPLED SEAM — DONE.  The UptTree port has landed: the
+     fetch composer is `user_pt_fetch_instr` (UserFetchPt, over the
+     `utlb_inv_pt`/`udata_own` bundle, ADUE-aware) and the fault composers
+     are `user_pt_fetch_fault` / `_2_first` / `_2_second` (UserFetchPt) with
+     the flavor predicate `u_fetch_fault_flavor` = `u_fault_flavor
+     (InstructionFetch tt)` (UserPtTree; three disjuncts non-canonical /
+     unmapped / denied — the needs-update flavor is GONE, ADUE is pinned on
+     so an A/D-insufficient fetch takes the write-back path, never faults).
+     The flavor corollaries are now WIRED into `fetch_fault_obligation` by
+     the three producers in (2'') above.  The arm (`fetch_fault_branch`,
+     UserArms) is cause-generic and unchanged; `user_exc`+`uc_del` cover
+     E_Fetch_Addr_Align and E_Fetch_Page_Fault (the only two live causes).
      (C) THE MEMORY ARMS (LOAD/STORE/AMO/LR/SC + ZICBOP) — after (B),
      same pattern as the S-mode WpSmodePtMem port: a data access either
      retires (store re-establishes `upt_inv`'s existential pages; load
