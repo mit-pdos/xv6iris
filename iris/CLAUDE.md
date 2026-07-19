@@ -734,128 +734,32 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    `ptree_own_graft2`/`_graft1` (slot cell out; closing wand takes the
    rewritten pointer-PTE cell + the zeroed child), and
    `ptree_own_level0_upd` (mappages' remap-check read + leaf store).
-3. **wp_walk** (IN PROGRESS).  Landed so far: the five missing ALU
-   leaves (`wp_srl_s_r` register-shift RTYPE — new
-   `exec_execute_RTYPE_SRL{,_gpr}`/`gpr_srl_val` in WpMmodeLeafBase —
-   plus `wp_andi_s_r`/`wp_ori_s_r`/`wp_cslli_s_r`/`wp_csrli_s_r`, all
-   with `_pt` wrappers, WpSmodePtAlu.v), and **WpWalkInstr.v — the
-   COMPLETE decode catalog** (header = the full 47-instruction table;
-   40 wdec_* decode facts + 47 wi_* instr lemmas, all compiled;
-   C_BEQZ/C_J ExecuteAs redirects are Local copies since they live in
-   WpKallocDecode, not WpMmodeLeafBase).
-   NEXT: the address-arithmetic BRIDGES (pure; put them in PtBuild §4,
-   which needs a `Riscv.riscv_extras` import for shift_bits_*; reduce
-   concrete shift amounts by WpKfree's `shift_bits_left52_zero` recipe —
-   `unfold shift_bits_left; f_equal; vm_compute` down to plain
-   shiftl/shiftr, then unsigned arithmetic).  In the body proof,
-   register values arrive as closed insert-chain terms (e.g. s4 =
-   add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 30
-   : mword 6)))) — normalize to `mword_of_int K` with `replace … by
-   (apply bv_eq; vm_compute; reflexivity)` BEFORE applying a bridge.
-   The three bridges:
-   (i) slot address, one lemma per level (sh 30/21/12 -> lvl 2/1/0):
-       uint va < 2^38 -> add_vec (shift_bits_left (and_vec
-       (shift_bits_right va (subrange_vec_dec (mword_of_int sh :
-       mword 64) (Z.sub log2_xlen 1) 0)) (sign_extend' 64 (mword_of_int
-       511 : mword 12))) (subrange_vec_dec (mword_of_int 3 : mword 6)
-       (Z.sub log2_xlen 1) 0)) (zero_extend' 64 (concat_vec b (zeros'
-       12))) = u_pte_addr b (vpn_idx lvl (svpn_of va));
-   (ii) descend base: pte_valid w -> pte_ptr w -> shift_bits_left
-       (shift_bits_right w (..10..)) (..12..) = zero_extend' 64
-       (concat_vec (u_next_base w) (zeros' 12)), via pte_valid_ptr_ext0;
-   (iii) alloc PTE: for a page_valid pa, or_vec (shift_bits_left
-       (shift_bits_right pa (..12..)) (..10..)) (sign_extend' 64
-       (mword_of_int 1 : mword 12)) = pt_ptr_pte (the subrange-55-12
-       ppn of pa), plus zero_extend' 64 (concat_vec that-ppn (zeros'
-       12)) = pa.
-   BODY STATUS: WpWalk.v (kept OUT of _CoqProject while WIP; compiles
-   standalone, ends in Abort) holds: walk_sp_cancel; the Qed-SEALED
-   shared chunks wp_walk_epilogue (+0x52..ret: the 8 cldsp restores fed
-   from pa_stk-form cells holding the ENTRY values, the ±64 cancel, the
-   Zca ret via bit0_update0_64, stack rebundle, callee_saved -- tp/s7-
-   s11 from six Mf!!!k = mm!!!k premises -- and the payload transport;
-   every exit path funnels here) and wp_walk_tail (+0x46..+0x50: a0 :=
-   u_pte_addr b0 (vpn_idx 0 vpn) via walk_slot_addr0, premises Mf!!!19 =
-   va and Mf!!!9 = page-base b0 + a level0-with-pt_addr0-eq payload,
-   then the epilogue); and wp_walk_r's script complete for PATH 1
-   (m !! vpn = Some w: prologue, both descend iterations, funnel).
-   REMAINING: the None-case destruct with arm 3 (descend/descend, w0=0
-   -- clone path 1's loop script with the blocks0-arm-3 facts, payload
-   via ptree_level0_intro), arm 2 (descend then graft1: kalloc via the
-   kalloc_env destructure feeding wp_kalloc_r -- qnoff := zeros' 32
-   makes every side condition vm-provable -- then wp_memset_page_zero_r,
-   zero_page_to_node, ptree_own_graft1, walk_alloc_pte/page_base for
-   the sd, wp_cj_s_scfg_r back to +0x40; the kalloc-null exit funnels
-   wp_walk_epilogue directly with the LEFT payload from the c.beqz-
-   taken at +0x7c), and arm 1 (graft2 then graft1 on t2 := pt_graft2,
-   using pt_graft2_kid/_ent path facts for iteration 2 and
-   pt_graft2_same_rep0 / trans for the same_rep0 premise).  The +0x72
-   beqz s6 gate falls through via the NEW wp_beqz_x0_fall_s_scfg_r
-   (WpSmodePtBtype; rs2 = zreg, cmp from Ha2: s6 = 1).  PERF: one path
-   ~4 min of leaf iApplys; keep new endings funneling into the sealed
-   chunks; re-register WpWalk.v in _CoqProject only when Qed.
-   ARM-3 landed as a 3:{...} goal-selector block (a mechanical
-   transform of path 1's script: drop the maps destruct, use the arm-3
-   conjuncts directly -- no He2/He1 rewrites -- payload via
-   ptree_level0_intro with He0z rewriting w0 to zero).  DESIGN for the
-   ALLOC ARM (+0x72..+0x94, shared by arm 1 twice and arm 2 once --
-   seal it ONCE as wp_walk_alloc): parameterize over the slot cell
-   address [cellA] (premise Mf!!!18 = cellA), the OLD slot word (any),
-   a caller-provided CLOSE WAND (∀ b, cellA ↦₈ pt_ptr_pte b -∗
-   ptree_own clvl 1 (pt_empty_node b) -∗ ptree_own 2 1 (tG b)) with
-   tG : mword 44 -> ptree and child level clvl (1 for graft2, 0 for
-   graft1), the beqz-s6 fall fact (Mf!!!22 <> 0 from Ha2), and TWO
-   continuations: the null exit (funnel wp_walk_epilogue with LEFT
-   payload; callee-saved facts across kalloc via callee_saved_lookup
-   on its returned ⌜callee_saved⌝) and the success exit (∀ b, pc at
-   +0x40, s1 = page-base b, ptree_own 2 1 (tG b), map facts → WP).
-   Body: beqz-s6 fall (wp_beqz_x0_fall_s_scfg_r), jal (ra := +0x7a),
-   wp_kalloc_r fed from the kalloc_env destructure (qnoff := zeros' 32
-   → every noff/intena side condition vm-provable; lkA/fl equalities
-   closed vm; a0f := mycpu_ret of the tp value via peel), kalloc_post
-   destruct; success: cmv s1, cbeqz FALL (page_valid_ne_null →
-   eq_vec_false_iff), clui a2 (luival → 4096 vm), cli a1, jal,
-   wp_memset_page_zero_r, cbyte → zero byte (vm), zero_page_to_node
-   (address via walk_alloc_page_base from page_valid's alignment/range
-   projections), srli/cslli/ori → walk_alloc_pte, wp_sd_s_scfg_r
-   through the graft cell, close the wand, wp_cj_s_scfg_r to +0x40.
-   Then arm 2 = descend-iter1 (clone) + wp_walk_alloc at graft1 +
-   rejoin-iter2's addiw/bne-fall + tail (payload pt_graft1_level0);
-   arm 1 = wp_walk_alloc at graft2 (t2 := pt_graft2 t vpn b), then
-   iter-2 via pt_graft2_kid/_ent facts + wp_walk_alloc at graft1-on-t2
-   + tail; same_rep0 via pt_graft2_same_rep0/pt_graft1_same_rep0 +
-   trans.  Original plan: fuel-free (the loop is 2 iterations, unrolled);
-   per iteration: srl/andi/slli/add address arithmetic, ld the slot
-   (`ptree_own_slot2_ro`/`slot1_ro` cells through the regime-generic ld
-   leaf), V-bit branch; invalid arm: kalloc (existing spec at the
-   regime) + memset (`wp_memset_s_full_kt_r` directly — its post keeps
-   the concrete zero bytes; `wp_memset_page`'s post forgets them) +
-   `zero_page_to_node` + graft + sd of the pointer PTE.  kalloc's null
-   return exits with a0=0 (the spec's left disjunct).  The V-bit
-   dichotomy against the description: prove `pte_invalid_bit0` (bit 0
-   clear ⇒ `pte_invalid`, by making the first `or_boolM` disjunct of
-   `pte_is_invalid` true — do NOT try to invert the opaque exec fact of
-   `pte_valid`); then in the V=1 branch blocks0-arm-1 (w=0) is refuted
-   by the bit, and in the V=0 branch maps/arm-2/3 are refuted by
-   `pte_valid_invalid_excl` — `pt_rep0`'s totality dispatches.  BOTH are
-   DONE (`pte_flags_V_bit0` PtAdBits.v, `pte_invalid_bit0` PtBuild.v).
-   STILL NEEDED (pure, wp_walk-stage): (i) `pte_valid w → pte_ptr w →
-   ext bits 63:54 = 0` — the C descend computes `(w>>10)<<12`, which is
-   `u_next_base w * 4096` ONLY with ext=0; this one DOES invert the
-   exec fact (specialize at `dstateM`, destruct each or/and_boolM
-   boolean with `exec_or_boolM_Some`; the third disjunct nonleaf∧(A∨D∨
-   U∨ext≠0) must be false, nonleaf is true by `pte_ptr` → ext=0);
-   (ii) the address-arithmetic bridges: srl/andi/slli/add computes
-   `u_pte_addr b (vpn_idx lvl (svpn_of va))` from the page-aligned base
-   and va (per level: shifts 30/21/12), and kalloc's page `(pa>>12)<<10
-   |1 = pt_ptr_pte (svpn-of-pa-style ppn)` — abstract bv lemmas, never
-   vm_compute on symbolic words.  NOTE the local xv6-riscv/kernel.asm
-   is 0xe bytes STALE vs kernel-rocq's regenerated dump — read walk's
-   real encodings from the kernel-rocq kinstr records at
-   KernelSyms.walk (function shape: 8-slot frame saving ra,s0..s6;
-   s1=table, s3=va, s6=alloc, s4=shift 30→21, s5=12 loop sentinel;
-   panic arm excluded by the va<2^38 premise; alloc=1 premise kills
-   the !alloc arm; kalloc-null exits through the epilogue with a0=0).
+3. **wp_walk** (DONE, all four paths Qed; WpWalk.v registered in
+   _CoqProject, full build green).  Architecture: WpWalkInstr.v holds
+   the complete 47-instruction decode catalog (wdec_*/wi_*); WpWalk.v
+   holds three Qed-sealed chunks — `wp_walk_epilogue` (+0x52..ret),
+   `wp_walk_tail` (+0x46..+0x50: a0 := L0 slot addr, then epilogue),
+   `wp_walk_alloc` (+0x72..+0x94: beqz-s6 fall, kalloc, null-exit via
+   epilogue with a0=0, else memset + `zero_page_to_node` + graft-cell
+   sd + c.j rejoin; parameterized over cellA/old word/child level and
+   a close wand ∀ b, cellA ↦₈ pt_ptr_pte b -∗ ptree_own clvl 1
+   (pt_empty_node b) -∗ ptree_own 2 1 (tG b); the SUCCESS continuation
+   receives the walk-spec continuation BACK as a wand premise so the
+   one linear Hcont threads through both exits) — and `wp_walk_r`
+   (walk_spec shape: premises a1=1M-aligned root a0, a2=1, va<2^38,
+   pt_rep0 t m; post = callee_saved + kalloc_env + ptree_own t' with
+   `ptree_same_rep0 t t'` + a0=0 ∨ level0-slot-addr payload) with four
+   paths: mapped descend/descend, arm 3 (descend/descend to zero L0),
+   arm 2 (descend + graft1 alloc), arm 1 (graft2 alloc + loop iter 2
+   on the grafted tree + graft1-on-t2 alloc; same_rep0 by trans of
+   pt_graft2_same_rep0/pt_graft1_same_rep0; payload pt_graft1_level0).
+   Axioms of wp_walk_r = the 6 standard model stubs only.  Proof-
+   engineering notes that carry forward: instr wi_* facts are
+   persistent (reusable across loop iterations); repeat ne-peels
+   delta-see through set-vars (overshoot ⇒ continue inline:
+   insert-hit, more peels, add_vec_zero_l, reflexivity); register
+   facts across kalloc/alloc-chunk boundaries hop via the transport
+   fact (Htrans c is_cs_idx-guarded) then peel the pre-call chain.
 4. **wp_mappages**: fuel induction over npages (NOT iLöb — bounded loop);
    the loop invariant is the spec's own post at k pages
    (`pt_rep0 t_k (pt_insert_run m vpn0 ppn0 perm k)`), each iteration =

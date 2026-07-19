@@ -992,11 +992,12 @@ Section PtBuildIris.
   (* ROOT graft: the root slot cell comes out (walk reads it, sees V=0,
      writes the pointer PTE); the closing wand takes the rewritten cell +
      the zeroed child and yields ownership of the grafted tree *)
-  Lemma ptree_own_graft2 (dq : dfrac) (t : ptree) (vpn : mword 27) (b : mword 44) :
+  Lemma ptree_own_graft2 (dq : dfrac) (t : ptree) (vpn : mword 27) :
     pt_kids t (vpn_idx 2 vpn) = None ->
     ptree_own 2 dq t ⊢
       pt_addr2 t vpn ↦₈{dq} pt_ents t (vpn_idx 2 vpn) ∗
-      (pt_addr2 t vpn ↦₈{dq} pt_ptr_pte b -∗
+      (∀ b : mword 44,
+       pt_addr2 t vpn ↦₈{dq} pt_ptr_pte b -∗
        ptree_own 1 dq (pt_empty_node b) -∗
        ptree_own 2 dq (pt_graft2 t vpn b)).
   Proof.
@@ -1004,7 +1005,7 @@ Section PtBuildIris.
     iIntros "[Hpg Hks]".
     iDestruct (pt_page_own_acc dq t (vpn_idx 2 vpn) with "Hpg") as "[Hs2 Hpg]".
     iFrame "Hs2".
-    iIntros "Hs2 Hc".
+    iIntros (b) "Hs2 Hc".
     iSpecialize ("Hpg" $! (pt_ptr_pte b) with "Hs2").
     iDestruct (pt_kids_own_ins 1 dq t (vpn_idx 2 vpn) Hk with "Hks") as "Hks".
     iSpecialize ("Hks" $! (pt_empty_node b) with "Hc").
@@ -1014,13 +1015,14 @@ Section PtBuildIris.
 
   (* L1 graft: [vpn]'s L1 slot cell (inside the existing kid [c1]) comes
      out; the closing wand takes the rewritten cell + the zeroed child *)
-  Lemma ptree_own_graft1 (dq : dfrac) (t c1 : ptree) (vpn : mword 27) (b : mword 44) :
+  Lemma ptree_own_graft1 (dq : dfrac) (t c1 : ptree) (vpn : mword 27) :
     pt_kids t (vpn_idx 2 vpn) = Some c1 ->
     pt_kids c1 (vpn_idx 1 vpn) = None ->
     u_next_base (pt_ents t (vpn_idx 2 vpn)) = pt_base c1 ->
     ptree_own 2 dq t ⊢
       pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦₈{dq} pt_ents c1 (vpn_idx 1 vpn) ∗
-      (pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦₈{dq} pt_ptr_pte b -∗
+      (∀ b : mword 44,
+       pt_addr1 (pt_ents t (vpn_idx 2 vpn)) vpn ↦₈{dq} pt_ptr_pte b -∗
        ptree_own 0 dq (pt_empty_node b) -∗
        ptree_own 2 dq (pt_graft1 t vpn b)).
   Proof.
@@ -1031,7 +1033,7 @@ Section PtBuildIris.
     iDestruct (pt_page_own_acc dq c1 (vpn_idx 1 vpn) with "Hpg1") as "[Hs1 Hpg1]".
     unfold pt_addr1. rewrite Hb1.
     iFrame "Hs1".
-    iIntros "Hs1 Hc".
+    iIntros (b) "Hs1 Hc".
     iSpecialize ("Hpg1" $! (pt_ptr_pte b) with "Hs1").
     iDestruct (pt_kids_own_ins 0 dq c1 (vpn_idx 1 vpn) Hk1 with "Hks1") as "Hks1".
     iSpecialize ("Hks1" $! (pt_empty_node b) with "Hc").
