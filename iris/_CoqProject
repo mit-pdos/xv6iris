@@ -151,6 +151,7 @@ WpIntenaBits.v
 WpSconfPushOff.v
 WpSconfHolding.v
 WpSconfRelease.v
+WpSconfAcquire.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
