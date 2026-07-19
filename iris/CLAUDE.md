@@ -613,8 +613,23 @@ before any mechanical sweep.
      (bne to the test) and the wake branch each need the intr_count
      re-fold (`intr_restore_intro`+`intr_count_pack_S`) after their
      taken-branch iNext; (c) compose `wp_wakeup_sconf` = prologue → loop
-     → epilogue.  NEXT AFTER WAKEUP: the boot wiring, then delete
-     smode_config.
+     → epilogue.
+     LOOP CRUX — the intena-cell threading (the one design subtlety absent
+     from the smode proof, where intena≡0 under SIE=0).  Each iteration is
+     acquire(n→S n) then release(S n→n), so the token returns to n EVERY
+     iteration.  acquire writes `a_int` only when noff==0 (⟺ intr_count
+     level==0, by the coupling); release never writes it.  Hence at n≥1
+     the intena cell is STABLE across the whole loop (noff never reaches 0
+     inside it) → the loop invariant carries a fixed intena (the clean
+     case).  At n=0, EVERY iteration's acquire rewrites intena to
+     `po_intena_val ms` (a consistent value — SIE is stable at the loop
+     level between iterations because release restores it), so the loop
+     invariant must hold the post-first-acquire intena and the prologue
+     must convert the caller's intena to it.  The noff cell IS net-zero
+     per iteration (`wk_noff_acq`/`wk_noff_rel` round-trip, already in the
+     smode invariant).  Mirror how kfree/kalloc thread `(if noffv==0 then
+     po_intena_val ms else intena_old)`; the loop just iterates that.
+     NEXT AFTER WAKEUP: the boot wiring, then delete smode_config.
    - (historical) KALLOC CONE (kfree/kalloc/wakeup, unblocked by the counting token).
      Each is acquire → critical section → release, so the SPEC threads
      `intr_count γ root n` NET-ZERO: `intr_count n` in and out (acquire
