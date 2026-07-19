@@ -660,6 +660,69 @@ before any mechanical sweep.
      initial 32 slots); adequacy plumbing last; delete `smode_config`
      at the very end.
 
+## Worklist: the kinit cone (kinit → initlock + freerange, over kfree)
+
+`kinit()` = `initlock(&kmem.lock)` then `freerange(end, PHYSTOP)`, with the
+`is_kmem` lock invariant allocated (via `newlock`) in between.  Status:
+
+- **initlock DONE** (WpInitlock.v, axiom-clean).  Whole-function WP for the
+  11-instruction `initlock` (prologue / 3 field stores name·locked·cpu /
+  epilogue).  Spec owns the spinlock's three struct fields as raw memory
+  (`lk ↦₄ vlock`, `lk+8 ↦₈ vname`, `lk+16 ↦₈ vcpu`) and returns them
+  initialised (`lk ↦₄ 0`, `lk+8 ↦₈ name`, `lk+16 ↦₈ 0`) + `callee_saved`.
+  Ships a REUSABLE leaf **`wp_sw_zero_s`** (+`_pt`/`_scfg`): the plain 4-byte
+  zero store over a PLAINLY-owned `↦₄` word (width-4 sibling of
+  `wp_sd_zero_s`), needed because `lk->locked := 0` precedes the lock's
+  invariant — the `_lockinv` sw-zero leaf does not apply pre-lock.  x0 stores
+  MUST use the zero leaves (value `zero_reg`); the generic `wp_sw_s`/`wp_sd_s`
+  post `m!!!Regidx rs2` is only correct for `rs2≠0` (the model reads x0 = 0).
+- **kfree EXTENDED** to return the three per-CPU scratch cells in its post
+  (`q_noff ↦₄ q_noff_ret`, `q_intena ↦₄ q_int_ret`, `q_cpu ↦₈ zero_reg`) — they
+  were live right after `release` (`Hcpu2/Hnoff2/Hint2`), just dropped.  This
+  UNBLOCKS a repeated caller: freerange threads the same fixed cells across
+  iterations.  Address gotcha: `release`'s `m` is `Rrel` (not kfree's m), so
+  its post cells are keyed on `Rrel!!!{4,10}` — convert with the SAME facts
+  kfree used to pass them IN (`rewrite HRrela0 -Hlk` for cpu; `rewrite HRreltp
+  -Ha0fcpu` for noff/int).
+- **freerange** (NOT yet built — the hard loop) @ 0x80000ab2, 30 instrs
+  (offsets +0x00..+0x46).  Shape: prologue saves ra@40/s0@32/s1@24 (48-byte
+  frame); computes `s1 = PGROUNDUP(pa_start)+PGSIZE` (c.lui a5,1 / addi a4,-1 /
+  add / c.lui a4,0xfffff mask / c.and / c.add); `bltu a1,s1` (+0x1a) SKIPS the
+  loop to the epilogue when no full page fits — the CONDITIONAL s2/s3/s4 saves
+  (+0x1e..+0x28) and the loop live only on the fall-through; loop body
+  (+0x2a..+0x34): `a0 = s1+s4 = p` (s4 = -PGSIZE mask), `jal kfree`, `s1 +=
+  PGSIZE`, `bgeu s2,s1` back edge; then restore s2/s3/s4; epilogue.  s1 holds
+  `p+PGSIZE` throughout; a0 = s1-PGSIZE = the page freed.
+  - **BOUNDED loop ⇒ fuel induction** (NOT iLöb — packaged leaves strip the ▷).
+    Fuel = length of the remaining page list.  Two exit paths (loop-skipped vs
+    loop-ran) converge at the epilogue with DIFFERENT s2/s3/s4 states (skipped:
+    never saved, unchanged ⇒ callee_saved trivially; ran: saved+restored).
+  - Spec: `is_kmem γ lk fl` (persistent) ∗ `smode_config`+ghost SIE+`sr_inv` ∗
+    a page big-sep `[∗ list] p ∈ ps, page_own p` where `ps` = the pages
+    PGROUNDUP(pa_start)..(pa_end, PGSIZE-step), each `page_valid` ∗ a DEEP
+    `stack_own` slice (≥14 slots below freerange's sp) to LEND kfree (kfree's
+    sp0 = freerange's post-frame sp) ∗ the three per-CPU cells.  Post =
+    `callee_saved` + cells back + stack back (pages consumed into the lock).
+  - **Cell-threading resolutions (all make side conditions vm_computable):**
+    require `qnoff = zeros' 32` (noff=0 at boot-time kinit) ⇒ `q_noff_ret(0)=0`
+    and `q_int_ret(0)=0` are CONCRETE (vm_compute), so the loop is stable at
+    noff=0/intena=0.  `initlock` zeroes `lk->cpu` BEFORE freerange runs, so
+    freerange enters with `q_cpu = zero_reg`; every kfree returns `q_cpu =
+    zero_reg`, so the loop is stable there too — and kfree's `Hcpune`
+    (`qcpuold ≠ mycpu`) reduces to the STANDING hypothesis `eq_vec zero_reg
+    (mycpu_ret (m!!!Regidx 4)) = false` (mycpu is a nonzero .bss address;
+    `mycpu_ret` is symbolic in tp, so take it as a freerange/kinit hypothesis,
+    discharged ultimately from the boot cpus-array address).  Callee-saved
+    pins across the kfree call: s0,s1,s2,s3,s4 (the loop registers).
+- **kinit** (NOT yet built): prologue (ra@8/s0@0, 16-byte frame) → auipc/addi
+  set a1="kmem" a0=&kmem → `jal initlock` (wp_initlock) → **`newlock` ghost
+  step** building `is_kmem γ lk (kmem_res fl)` from `lk ↦₄ 0` (initlock's
+  output) + `fl ↦₈ 0` (kmem.freelist BSS-zero) + empty `freelist_chain nullp
+  []` → li/slli set a1=PHYSTOP, auipc/addi a0=end → `jal freerange` → epilogue.
+  Precondition owns the `kmem` struct bytes (lock 3 fields + freelist word) +
+  ALL physical pages `[PGROUNDUP(end), PHYSTOP)` + the cells (noff=0) + the
+  `mycpu≠0` hypothesis.
+
 Robustness rails: axiom check (`Print Assumptions`, baseline + funext +
 kerneltrap_returns) and full `make proofs` per stage; stale-`.vo` resync
 (`make proofs`) before diagnosing any "impossible" literal mismatch — the
@@ -1655,622 +1718,98 @@ files or copy code from them; build fresh from the live tree.
     reads + wf), `upt_unmapped_walk_fault` / `upt_denied_walk_fault` (the
     access-generic `pt_walk` fault facts, via CommonWalk's UserWalkFault).
 
-- **Worklist (step-obligation decomposition; keep each layer ONE lemma per
-  concern — the v1 failure mode was hit/miss × width × compressed × fault arm
-  cross-products):**
-  1. *translateAddr trichotomy* over `upt_inv`, access-generic: one lemma per
-     outcome class — Ok via TLB hit (state unchanged), Ok via walk+fill (state
-     = `set_reg s tlb (vec_update_dec …)`, consistency by `upt_tlb_ok_fill`),
-     Err page fault (non-canonical va / unmapped / denied / needs-update).
-     Built from CommonWalk `exec_translate_walk_user{,_nomatch,_err}` +
-     `exec_translate_TLB_miss_user{,_needs_update}` + the UserPt slot layer.
-     Absorb hit-vs-miss into ONE caller-facing interface with a uniform
-     continuation (present the hit TLB as the trivially-filled vector).
-     STARTED (UserTranslate.v): the mode-dispatch head every reduction begins
-     with — `exec_get_satp_39`, `exec_translationMode_U_sv39` (axiom-free).
-     The dispatch decision is DONE (UserStep.v, axiom-free):
-     `exec_getPendingSet_U_reduce` / `exec_dispatchInterrupt_U_reduce` reduce
-     the dispatcher to `u_dispatch` over the CURRENT mip/wire values (no
-     mstatus hypothesis — both effective enables are true at User), the
-     no-pending corollary `exec_dispatchInterrupt_U_none`, and the Iris form
-     `dispatch_U_from_regs` (all cells dfrac-generic BORROWED resources, so
-     the wire values can come from the future device-shared invariant).
-     The WAITING-hart arm is DONE (UserStep.v, axiom-clean):
-     `user_step_obligation_holds` reduces `user_step_obligation` to its
-     ACTIVE residue `user_step_obligation_active` (UserExec.v: same contract,
-     machine handed over unpacked via `user_regs`, hart pinned ACTIVE, pc in
-     lock-step); `wp_user_exec_active` is the capstone over the residue.
-     The WAITING case: `wp_user_step_waiting` steps a WRS-suspended hart by
-     case-splitting on wake = raw `mip & mie ≠ 0` and then on the OPAQUE
-     `valid_reservation` axiom — destructing an opaque bool axiom in the
-     proof makes BOTH branches reducible (stay-waiting: the step's only
-     write is minstret_increment, NO pc tick; wake: hart_state := ACTIVE,
-     tick, bump), each re-entering `user_inv`. Exec layer:
-     `exec_run_hart_waiting_{wake,wake_resv,stay}` +
-     `exec_riscv_step_wait_{stay,wake}` (clones of RiscvExec's
-     StepHartActive spine with the WAITING arm selected). PROOF GOTCHA: a
-     try_step wrapper section must declare its `Let` states BEFORE the
-     hypotheses that mention them and state those hypotheses via the FOLDED
-     names — a raw-spelled RHS makes every derived epilogue term raw and
-     the folded `replace`/rewrite patterns miss syntactically.
-     THE UNIFIED STEP WRAPPER IS DONE (UserStepFull.v, axiom-clean):
-     `wp_user_step_active` reduces `user_step_obligation_active` to
-     `active_class` — it opens `wire_inv`, peels the ambient hart's pin
-     cells, reads every dispatch input, case-splits `u_dispatch`, and
-     either runs the inlined `interrupt_branch` (pending delegated
-     interrupt → trap tower → `user_trap_frame`) or hands the whole step
-     to the classification. `active_class` receives the frame + interp +
-     `minstret_inv_body` + the pure dispatch-None fact stated at the
-     POST-minstret-increment states (∀ over the written bit — no dispatch
-     read is minstret_increment) and must return the
-     `wp_exec_step_minstret` payload (`∃ s', ⌜riscv_step false σ = s'⌝ ∗
-     ▷(interp ∗ body ∗ WP)`).
-     STEP-SHAPE ARMS ALL DONE (UserArms.v, payload form, axiom-clean) —
-     every arm does its own minstret prelude and takes a per-family
-     obligation ∀-quantified over the increment bit at the post-increment
-     state. Every obligation's pure precondition is the ONE Prop
-     `u_step_pre σ va` (UserExec.v: dispatch-None ∧ priv=User ∧ PC=va ∧
-     mstatus pins, at the state the obligation is instantiated at); the
-     arms build it once via `u_step_pre_intro` (+ `lookup_set_mi` for the
-     hart-state transport) — do NOT re-introduce per-obligation premise
-     lists or per-arm transport blocks:
-     - `retire_branch` + `retire_obligation` (UserCompute.v): retiring
-       steps (compute/control/fence/nop). The obligation owns exactly what
-       fetch+execute mutate (interp, gpr file, nextPC cell, `upt_inv`;
-       `user_cfg` borrowed for the decode reads) and returns them at the
-       post-execute state with an EXISTENTIAL retired pc `va'` (+4 base,
-       +2 RVC, target for jumps/taken branches); the arm ticks PC := va',
-       bumps minstret when due, re-enters `user_inv`.
-     - `execute_trap_branch` + `execute_trap_obligation` (UserArms.v):
-       execute-produced sync traps (ecall/ebreak/illegal/memory page
-       fault) — run outcome `Trap (User, make_sync_exception e xv, pcx)`
-       with `user_exc e`; the arm runs the delegated tower at the
-       post-execute state (sepc := pcx), no bump, produces
-       `user_trap_frame`.
-     - `fetch_fault_branch` + `fetch_fault_obligation` (UserArms.v):
-       failed fetches — run outcome `Step_Fetch_Failure (Virtaddr xv, e)`;
-       gpr/nextPC never move (only interp + `upt_inv` change hands — a
-       split fetch may fill the TLB on its successful half); sepc := the
-       faulting pc read from PC; produces `user_trap_frame`.
-     - `illegal_branch` + `illegal_obligation` (UserArms.v): run outcome
-       `Illegal_Instruction tt` (every privileged instruction at User) —
-       try_step's DEDICATED arm (`exec_riscv_step_execute_illegal`,
-       UserTrap.v) delivers E_Illegal_Instr with the INSTRUCTION BITS as
-       tval; gpr untouched, nextPC moved (the pre-execute write); produces
-       `user_trap_frame`.
-     - `enter_wait_branch` + `enter_wait_obligation` (UserArms.v): run
-       outcome `Enter_Wait wr` with `wr ∈ {WRS_STO, WRS_NTO}` (= exactly
-       `user_hart_ok`'s WAITING side) — hart_state := WAITING, NO tick,
-       NO bump (`exec_riscv_step_enter_wait`, UserStep.v §7): PC stays at
-       the WRS and nextPC after it, the decoupled shape `user_inv` binds;
-       re-enters `user_inv`. `exec_execute_WRS` (UserExecFacts.v) is the
-       pure Enter_Wait outcome.
-     The step-shape arm set is COMPLETE (retire / interrupt / execute-trap
-     / fetch-fault / illegal / enter-wait).
-     PURE U-MODE EXECUTE FACTS (UserExecFacts.v, iris-free, axiom-clean):
-     `exec_execute_{ECALL,EBREAK}_U` (→ `rv64d_types.Trap (User,
-     make_sync_exception e xv, pc)`, state unchanged — feed
-     `execute_trap_obligation`; EnvCall's xtval is None for ANY xv so the
-     make_sync_exception spelling matches) and
-     `exec_execute_{MRET,SRET,WFI}_U` (→ `Illegal_Instruction tt`, state
-     unchanged — feed `illegal_obligation`; WFI because
-     `plat_wfi_available_to_usermode = false`), and the sfence family
-     `exec_execute_{SFENCE_VMA,SFENCE_W_INVAL,SFENCE_INVAL_IR}_U` (also
-     illegal; SFENCE_VMA harmlessly reads rs1/rs2 first via the total
-     `exec_rX_bits_gpr`). `exec_execute_SINVAL_VMA` is the pure
-     `ExecuteAs (SFENCE_VMA …)` redirection, composed through the BASE
-     one-redirection progress composer
-     `exec_hart_active_progress_base_redirect_gen` (UserStep.v §6).
-     RETIRING TOTALITY facts (same file): `gpr_write_state rd v s` (=
-     `exec_wX_bits_gpr`'s post-state: identity at rd=x0) and
-     `exec_execute_<F>_total : ∃ v, exec (execute (F …)) s =
-     Some (RETIRE_SUCCESS, gpr_write_state rd v s)` for EVERY operand
-     (value existential — safety never tracks it) — F ∈ {ITYPE, RTYPE,
-     RTYPEW, SHIFTIOP, SHIFTIWOP, ADDIW, MUL, MULW, DIV, DIVW, REM, REMW,
-     UTYPE}; plus the state-preserving retires `exec_execute_{PAUSE,NTL,
-     FENCE_TSO_U,FENCEI_U,FENCE_total_U}` (FENCE's pred/succ if-tree is
-     destructed wholesale; at User `is_fiom_active` reads menvcfg+senvcfg,
-     values irrelevant). Proof pattern: `destruct op; eexists;` then
-     erewrite `exec_bind_Some`/`exec_bind0_Some` chains ending
-     `apply (exec_wX_bits_gpr ird _ s)` — the existential value unifies
-     with whatever the op computes. CONTROL FLOW is there too:
-     `exec_execute_{JAL,JALR}_total` (existential link value; JALR also
-     existential target) and `exec_execute_BTYPE_total` (∃ s', retire with
-     `s' = s ∨ s' = set_reg s nextPC target` — the taken/fall split
-     stays existential). All take `exec (currentlyEnabled Ext_Zca) s =
-     Some (true, s)` (from the misa pin); JALR additionally the Zicfilp-off
-     reduction (for `update_elp_state`) and a ∀-quantified bit0-of-
-     `update_vec_dec _ 0 'b0` premise (generically true; the mw_prep/tb1
-     scripts hang on it — discharge pending). The decode-wf gap for
-     JAL/BTYPE is CLOSED: `decodable_u`'s JAL/BTYPE arms now RECORD the
-     payload invariant `eq_vec (access_vec_dec imm 0) ('b"0")` (the
-     decoder builds both immediates as `concat_vec imm₀ 'b"0"`;
-     `jump_to` ASSERTS target bit-0 — false assert = STUCK, not a trap —
-     so the classification needs this fact). Dischargers
-     `bit0_concat0_{20,12}` (UserBits.v; the KptPt
-     bv_concat/bv_extract-unsigned unfolding recipe — access_vec_dec is
-     `bv_extract i 1` under the casts) are wired into `dtp_pure`, and the
-     `repeat dtp_core` traversal re-proves `goodbP_encdec_u` unchanged.
-     `decodable_c` needs NO strengthening: the compressed control-flow
-     expansions build their JAL/BTYPE immediates VISIBLY aligned
-     (`sign_extend' 21 (concat_vec imm 'b"0")` inside execute_C_J etc.),
-     so the invariant is syntactic at the expansion site. The USE-side
-     transport kit is DONE (UserBits.v): `wf_imm_even_{21,13}` (the
-     decodable_u payload fact as mod-2), `aligned_even` (a fetched pc is
-     even — the align check at width 2 or 4), and
-     `add_sext_even_64_{21,13}` (even pc + sign-extended even imm ⇒
-     target bit 0 clear — EXACTLY jump_to's assert, i.e. the Halign
-     premise of `exec_execute_{JAL,BTYPE}_total`). Supporting mod-2 kit
-     there: `mod2_wrap`/`mod2_swrap` (bv_wrap/bv_swrap preserve parity),
-     `access0_unsigned_{64,21,13}` (bit 0 as `mod 2`). Recipe for any
-     future mword-bit fact: go to `bv_unsigned` arithmetic (KptPt-style
-     unfolding: access_vec_dec = `bv_extract i 1` under casts,
-     concat/add/sext = `bv_concat/bv_add/bv_sign_extend`), then plain Z
-     mod arithmetic — never bit-blast at word level. The Zbb/Zbc/Zicond/Zimop
-     families are covered too (`exec_execute_{ZBB_RTYPE,ZBB_RTYPEW,CLMUL,
-     CLMULH,CLMULR,REV8,RORI,RORIW,ZIMOP_MOP_R,ZIMOP_MOP_RR,
-     ZICOND_RTYPE}_total`) — their extension gates live at DECODE time,
-     so the execute bodies are gate-free (ZICOND's runtime condition is
-     absorbed by deriving from ZicondGpr's already-total
-     `exec_execute_ZICOND_RTYPE_gpr`). Still to add: Zicbo*
-     (senvcfg=0-gated), CSR-at-U dispatch, SSAMOSWAP, and the missing
-     C_* ExecuteAs expansion facts — WpMmodeLeafBase.v §C_* already has
-     ~20 of them OPERAND-GENERIC (abstract regidx/imm, e.g.
-     `exec_execute_C_ADD`); the ~24 `decodable_c` stragglers (C_ADDW,
-     C_ANDI, C_EBREAK, C_ILLEGAL, C_JALR, the C loads/stores, C_MUL,
-     C_NOP, C_NOT, C_NTL, C_SRAI, C_SUB(W), C_XOR, C_ZEXT_B, ZCMOP) are
-     the same 3-line pure-returnM shape.
-     Iris trap-arm recipe (used by all three tower arms): ghost-update
-     EVERY physical write in tower order (repeated writes to the same CSR
-     each get their own reg_update — the interp goal is the literal
-     set_reg tower); elp's reset write is same-value (`elp_no_lp`: 1-bit
-     elp pinned ≠ LP_EXPECTED already holds NO_LP_EXPECTED) absorbed by
-     `reg_interp_set_same`; ALL iMods happen BEFORE the payload's
-     iModIntro (the payload has no fupd under its ▷). Values the tower
-     needs at an existential post-execute state are READ there via
-     `reg_valid_dq` against the withheld cells (priv/mstatus/scause/PC)
-     and the persistent `hw_config` cells (misa/elp) and `user_cfg`
-     fractional cells (stvec/medeleg). The DELIVERED-STATE machinery is
-     SHARED (UserTrap.v §6, used by ALL FOUR trap producers — interrupt /
-     execute-trap / fetch-fault / illegal): `utrap_state s_x c info pcx
-     ms_v sc_v elp0 stvec_v` spells the literal 12-write delivered state
-     (its mstatus/scause layers folded as `utrap_ms`/`utrap_scause`);
-     `utrap_ghost` mirrors it in ghost state in ONE bupd (interp s_x + 7
-     cells ==∗ interp (utrap_state …) + cells-at-final); `utrap_ms_ok`
-     turns `user_mstatus_ok` into the frame's `trap_mstatus_ok`;
-     `user_trap_frame_intro` (UserExec.v) assembles the frame. An arm's
-     whole delivery is now: pure step fact → `assert (Hs' : s' =
-     utrap_state …) by (unfold s_trap…; reflexivity)` (conversion aligns
-     the wrapper's tower with the definition) → `iMod utrap_ghost` →
-     payload (`iFrame "Hint"` — no cbn needed, the interp spellings match)
-     → `user_trap_frame_intro`. Do NOT hand-roll tower iMod chains in new
-     arms.
-     OTHER ENGINES DONE (axiom-clean): fetch-success composer
-     `upt_fetch_instr` (UserFetch §6, word from the existential pages via
-     `upt_fetch_word`/`upt_fetch_mem_read`, UserMem.v);
-     decode-agreement `agree_u` + `decodable_{u,c}_not_lpad` (UserStep);
-     `gpr_file_acc` (UserCompute); the pure fetch-fault layers (UserTrap.v:
-     cause-generic tower `exec_trap_handler_U` + handle_interrupt /
-     exception_handler / handle_exception instances + the trapish
-     riscv_step wrappers `exec_riscv_step_{fetch_failure,execute_trap}` +
-     delegation `exec_exception_delegatee_U`; UserTranslate.v: the
-     COMPLETE fetch translateAddr trichotomy with all-slot-case composers
-     `upt_translateAddr_fetch_{unmapped,denied_full,needs_update_full}`;
-     UserFetch.v §1-5: align fault, translate-fault, fetch_bytes ok/fault,
-     `exec_fetch_ok_4`; UserMem.v: U-mode PMP grant +
-     `exec_mem_read_fetch_{4,2}_U`; UserBits.v: page-window arithmetic —
-     GOTCHA: do bv-level steps by etransitivity/exact, goal rewrites of
-     width-carrying bv lemmas miss on implicit-width spellings).
-     ============ HANDOFF CHECKPOINT (user-mode WP, July 2026) ============
-     For whoever picks this up (written for the agent finishing the
-     Svadu/ADUE page-table port). CURRENT STATE — everything below is
-     proven, committed, and full-build green; axiom budget: the 5
-     platform axioms everywhere, and UserCsr.v is axiom-FREE.
-     (1) THE FRAME AND THE STEP: `wp_user_exec` (Löb capstone, UserExec)
-     over `user_inv`/`user_trap_frame`; `user_step_obligation_holds`
-     dispatches WAITING (WRS stay/wake, UserStep) so only
-     `user_step_obligation_active` remains; the unified step wrapper
-     `wp_user_step_active` (UserStepFull) opens `wire_inv`, decides
-     `u_dispatch`, discharges the interrupt arm inline, and reduces
-     everything else to `active_class` — the fupd payload the
-     classification must produce.
-     (2) THE SIX PAYLOAD ARMS (UserArms; + the wrapper's interrupt arm):
-     retire / execute-trap / fetch-fault / illegal / enter-wait, all
-     wire-free, each consuming a per-family obligation ∀-quantified over
-     the minstret-increment bit at the post-increment state, with ONE
-     pure precondition `u_step_pre σ va` (built via `u_step_pre_intro`)
-     and ONE shared trap-delivery machinery (`utrap_state`/`utrap_ghost`/
-     `utrap_ms_ok`/`user_trap_frame_intro` — never hand-roll tower iMod
-     chains).
-     (2') THE UNIFIED EXECUTE-STEP ARM (UserStepExec.v — USE THIS for the
-     classification, esp. the memory families).  retire_obligation and
-     execute_trap_obligation are identical except the Step_Execute RESULT,
-     and a data access retires XOR traps depending on RUNTIME state (mapping/
-     reservability/alignment) — so a static retire-vs-trap classification
-     forces a split the access cannot resolve.  `exec_step_obligation E σ va
-     g` is the result-PARAMETERIZED obligation (execute produces SOME r,
-     `exec_step_result_ok r` := retire XOR delegated-user-trap, at s_x with
-     the invariant re-established); `exec_step_branch` runs it and DISPATCHES
-     on r at runtime (Retire → tick tower + the ∧-continuation's user_inv
-     side; user Trap → exception tower + its user_trap_frame side).
-     `retire_to_exec_step`/`trap_to_exec_step` embed the statically-classified
-     families, so `exec_step_branch` is the SINGLE arm for every
-     execute-reaching family.  Since the progress composer
-     (`exec_hart_active_progress_base_gen`/`_RVC_gen`, SmodeCore/UserStep) is
-     ALSO generic over the execute result `resf`, the per-family discharge
-     factors as: fetch (common) → decode → the family's ONE execute fact
-     (its result r) → progress composer → classify r → exec_step_obligation
-     → exec_step_branch.  ONLY the execute fact varies; retire/trap and the 5
-     memory families never fork the arm.  (illegal keeps its own arm — its
-     obligation drops gpr_file; folding it in would need a 3-way
-     exec_step_result_ok.)
-     (2'') THE GENERIC PRODUCER (UserExecProducer.v) — the other half of
-     the clean skeleton.  `user_exec_step_producer` factors the
-     fetch → decode → progress-composer → classify pipeline ONCE: it fetches
-     over the user invariant (`user_pt_fetch_instr`), cases on `isRVC`, and
-     drives the matching RESULT-GENERIC progress composer
-     (`exec_hart_active_progress_base_gen` / `_RVC_gen`), packaging
-     `exec_step_obligation`.  Its two premises are the EXECUTE TOTALITIES:
-     `base_exec_total` (4-byte, `ext_decode w → instr`, execute it) and
-     `rvc_exec_total` (2-byte, `ext_decode_compressed h → instr`, execute →
-     `ExecuteAs other`, execute the expansion).  So the WHOLE
-     `user_step_obligation_active` for execute-reaching instructions reduces
-     to: prove the two totalities (⇒ `user_exec_step_producer` ⇒
-     `exec_step_obligation` ⇒ `exec_step_branch` ⇒ active_class), and each
-     totality is proved by casing on the decoded instruction and handing
-     each family its execute fact.
-     THE FETCH-FAULT HALF (UserExecProducer.v, DONE): the companions to
-     `user_exec_step_producer` that discharge `fetch_fault_obligation`
-     (UserArms) instead of `exec_step_obligation`.  Three single-outcome
-     σ-unchanged producers, one per fault geometry: `user_fetch_fault_
-     producer_align` (odd pc → E_Fetch_Addr_Align, via the pure
-     `exec_fetch_align_fault`), `user_fetch_fault_producer` (4-aligned walk
-     fault, via `user_pt_fetch_fault` — non-canonical/unmapped/denied all
-     collapse to E_Fetch_Page_Fault at U tables), and `user_fetch_fault_
-     producer_2_first` (2-aligned low-halfword fault, via
-     `user_pt_fetch_fault_2_first`).  Each: intro `u_step_pre` (gives PC=va,
-     cur_priv=User, dispatchInterrupt=None; SXL is `proj1` of its
-     user_mstatus_ok), split `mstate_interp`/`user_pt_inv`, apply the fault
-     composer (the `iDestruct … as %` pure-extraction keeps reg/gh/utlb — a
-     pure conclusion does not consume its spatial args here),
-     `exec_run_hart_active_fetch_failure` (UserFetch, ALREADY EXISTED) lifts
-     `fetch = F_Error` to `run_hart_active = Step_Fetch_Failure`, `user_exc`
-     holds by reflexivity, and s_f = σ so the hart_state/minstret equalities
-     and the interp re-frame are trivial.  hart_state=HART_ACTIVE is a
-     premise (the caller's active-step fact — not in u_step_pre).
-     THE SPLIT (2-aligned) FETCH — DONE (UserExecProducer.v).  The post-fetch
-     pipeline (isRVC case → progress composer → package the exec_step_obligation
-     body) is FACTORED into `user_exec_step_from_fetch`, taking a completed
-     fetch (`fetch = if isRVC then F_RVC .. else F_Base ..`, at σf) + the ∀r≠tlb
-     TLB-fill transport `Tr`; both success producers now just run their fetch
-     composer and delegate to it (the 4-aligned `user_exec_step_producer` was
-     refactored onto it too — the ~40-line post-fetch body is written ONCE).
-     `user_exec_step_producer_2` (both halfwords fetchable, via
-     `user_pt_fetch_instr_2`, high leaf at va+2) → the same
-     `exec_step_obligation` as 4-aligned.  `user_exec_step_or_fault_producer_
-     2_second` handles low-OK/pc+2-faults: `user_pt_fetch_fault_2_second` is a
-     RUNTIME disjunction (low-half RVC executes / 32-bit straddle faults at
-     va+2, both over a TLB-filled s'≠σ), so this producer yields
-     `(exec_step body) ∨ (fetch_fault body)` — the classification (item A)
-     cases on it and hands each disjunct to `exec_step_branch` /
-     `fetch_fault_branch`.  Its RVC branch reuses `user_exec_step_from_fetch`
-     with iw:=zero_extend' 32 h (`subrange16_zext32`+`autocast_mword_id` give
-     `sub (autocast iw) 15 0 = h`); the fault branch lifts via
-     `exec_run_hart_active_fetch_failure`, hart_state/minstret survive the
-     TLB fill through `Tr`.  So EVERY fetch geometry (odd / 4-aligned /
-     2-aligned, success & fault) now has a producer; only the runtime
-     dispatch among them remains, and that lives in active_class (item A).
-     NOTHING in fetch/progress/retire/trap
-     is re-touched per family; base-vs-RVC is the one inherent split (it is
-     the two progress composers, hidden behind the two totality premises).
-     THE MEMORY FAMILIES: their execute fact is `execute_LOAD/STORE/…` run
-     through the UserMemAccess §2/§6/§7/§8 composers + the §9 address
-     transform (an Ok/Err from a composer IS the retire/trap
-     classification); no per-width/aligned-vs-misaligned arm work.  DONE
-     (UserMemArms.v — LOAD/STORE/LR/SC, all width-generic, all green): the
-     execute-level reductions premise-shaped over the vmem result (the iris
-     absorption stays in the composers, so these are PURE exec).
-     `exec_vmem_read_u`/`exec_vmem_write_u` bridge `vmem_read`/`vmem_write`
-     → `vmem_read_addr`/`vmem_write_addr` (rX rs + offset, then the §9
-     identity transform).  `exec_execute_{LOAD,STORE,LOADRES,STORECON}_u_
-     {ok,err}` reduce each `execute_*` over that vmem result: Ok →
-     RETIRE (+ the family's rd write: LOAD extend, LR sign-extend, SC
-     negb-success + cancel_reservation; STORE none), Err → the delegated
-     trap.  So each memory family plugs into the base/RVC totalities as
-     "apply the composer (Ok/Err) → apply the execute fact → classify".
-     AMO DONE (UserMemArms.v, op-generic, all green): execute_AMO does NOT
-     use vmem — it inlines the RMW (own align check, translate, mem_write_ea,
-     mem_read, per-op result', the AMOCAS w__18 guard, mem_write_value, wX).
-     The clean abstraction that collapses the case-cross-product: (a) the
-     written value is symbolic — `user_pt_amo_data_4`'s mem_write_value is
-     ∀-v, so the retire proof never reduces result' (kept as the op-match);
-     (b) `w__18 = and_boolM (op=?AMOCAS) …` short-circuits to false for every
-     non-AMOCAS op (`generic_eq op AMOCAS = false` premise), so ONE retire
-     lemma `exec_execute_AMO_u_ok` covers all 9 non-CAS ops.  Faults are
-     op-generic too: `_translate_err` (walk page/access fault → early_return
-     trap), `_read_err` (pma-deny — RAM pins atomic_support=AMOSwap so only
-     AMOSWAP retires, every other op faults here — plus any read fault),
-     `_misaligned` (plat amo policy = AccessFault → E_SAMO_Access_Fault, the
-     then-branch not an early_return).  All premise-shaped over the mem-level
-     results (translate/mem_write_ea/mem_read/mem_write_value at width 4 from
-     the composer + `exec_mem_write_ea_amo_4`); iris absorption stays in the
-     composer.  Reduction gotchas: execute_AMO is inside catch_early_return
-     so the body reduces at execR level (execR_liftR_seq / execR_bind /
-     execR_bind_Some / execR_returnR_fwd / execR_bind0_Some); the rX-rs2 and
-     mem_read binds are `(liftR m >>= k) >>= K` NESTED (the `>>= fun x` sits
-     OUTSIDE the branch), so `execR_liftR_seq` won't match at top — use
-     `rewrite execR_bind` to split the outer bind first (or an explicit inner
-     `execR (…) = Some (inr v, s)` assert, as for rX rs2); the translate bind
-     is a SINGLE top bind (the `>>= fun (addr,pbmt)` is inside the `fun w3`
-     lambda) so `execR_liftR_seq Htr` applies directly.  `access`/`vaddr` must
-     be INLINED (`Atomic (op,Data,Data)` / `Virtaddr (add_vec …)`) not `let`s,
-     else the model's zeta-inlined occurrences won't unify with the rewrites.
-     AMO edge cases now DONE too: `_ea_err` (mem_write_ea Err → early_return
-     trap), `_write_err` (mem_write_value Err → the memory_exception is the
-     Err-branch BODY result, an `inr` trap not an early_return — so `execR_
-     liftR` + exec_memory_exception directly, no execR_bind), and `_cas_
-     nostore` (AMOCAS with `neq_vec lc rd_val = true` → w__18 = true → wX rd
-     (sext loaded) >> RETIRE, NO store, state stays s').  The AMOCAS case is
-     where `w__18` does NOT short-circuit: `generic_eq AMOCAS AMOCAS = true`
-     (assert + rewrite, reflexivity), so `and_boolM (returnR true) B` runs B =
-     the rd-read + `neq_vec loaded rd_val` (two nested binds, built via an
-     inner `execR (…) = Some (inr rd_val, s')` assert like rX rs2).  Only the
-     AMOCAS-MATCH store path (w__18=false, loaded=rd_val, op=AMOCAS) is left
-     unbuilt — it is the retire lemma's write path but excluded by its
-     `generic_eq op AMOCAS = false` premise, and is unreachable on this RAM
-     anyway (atomic_support=AMOSwap denies AMOCAS at mem_read → `_read_err`).
-     (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
-     UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
-     (`gpr_write_state`-shaped, value existential) for every compute /
-     control / fence family incl. JAL/JALR/BTYPE; illegal-at-U for every
-     privileged/config-gated instruction; ECALL/EBREAK traps; WRS
-     Enter_Wait; CSRReg/CSRImm total (Illegal ∨ retiring read — the
-     model excludes CSR writes at U).
-     (4) DECODE: `decode_total_{u,c}_set` with the JAL/BTYPE bit-0
-     payload invariant recorded in `decodable_u`, `agree_u`, and the
-     UserBits transport kit (`wf_imm_even_*`, `aligned_even`,
-     `add_sext_even_64_*`) turning it into jump_to's premise.
-     WHAT IS LEFT, IN SUGGESTED ORDER:
-     (A) UserClassify.v — THE ASSEMBLY (start here; mostly
-     ADUE-independent). Per family, discharge the arm's obligation at
-     the post-increment state s_a: fetch via `upt_fetch_instr` (or its
-     UptTree successor — see (B)) → decode via `decode_total_u_set` /
-     `decode_total_c_set` + `agree_u` (its lookups come from `user_cfg`
-     + hw_config via `reg_valid_dq` against the obligation's interp) →
-     destruct the decodable set (~54 base + ~44 compressed
-     constructors) → that family's execute fact → the matching progress
-     composer (`exec_hart_active_progress_base_gen` for base,
-     `_base_redirect_gen` in UserStep §6 for SINVAL/ExecuteAs-base,
-     `_RVC_gen` for compressed expansions) → the arm's obligation
-     shape. Control flow additionally: pc-evenness from the fetch
-     alignment (`aligned_even`) + `wf_imm_even_*` + `add_sext_even_64_*`
-     discharge jump_to's target-bit-0 premise (compressed control flow
-     carries its alignment SYNTACTICALLY in the expansion term:
-     `sign_extend' 21 (concat_vec imm 'b"0")` — prove the bit-0 fact
-     per-shape, the sext transport is `mod2_swrap`-based like
-     `add_sext_even_64_21`'s proof). Then assemble `active_class` (case
-     first on fetchability, then on the decoded constructor) and with
-     it `user_step_obligation_active`; `wp_user_exec_active` closes the
-     capstone. SUGGESTION: one file per concern — the per-family
-     discharge lemmas are independent and parallelize; keep each one
-     "obligation-in, obligation-out" so the final assembly is a bare
-     case tree.
-     (B) THE ADUE-COUPLED SEAM — DONE.  The UptTree port has landed: the
-     fetch composer is `user_pt_fetch_instr` (UserFetchPt, over the
-     `utlb_inv_pt`/`udata_own` bundle, ADUE-aware) and the fault composers
-     are `user_pt_fetch_fault` / `_2_first` / `_2_second` (UserFetchPt) with
-     the flavor predicate `u_fetch_fault_flavor` = `u_fault_flavor
-     (InstructionFetch tt)` (UserPtTree; three disjuncts non-canonical /
-     unmapped / denied — the needs-update flavor is GONE, ADUE is pinned on
-     so an A/D-insufficient fetch takes the write-back path, never faults).
-     The flavor corollaries are now WIRED into `fetch_fault_obligation` by
-     the three producers in (2'') above.  The arm (`fetch_fault_branch`,
-     UserArms) is cause-generic and unchanged; `user_exc`+`uc_del` cover
-     E_Fetch_Addr_Align and E_Fetch_Page_Fault (the only two live causes).
-     (C) THE MEMORY ARMS (LOAD/STORE/AMO/LR/SC + ZICBOP) — after (B),
-     same pattern as the S-mode WpSmodePtMem port: a data access either
-     retires (store re-establishes `upt_inv`'s existential pages; load
-     writes rd existentially; AMO both; ZICBOP is a prefetch-retire) or
-     traps with a delegated data fault (align/unmapped/denied →
-     `execute_trap_obligation`; the Trap outcome carries
-     `make_sync_exception e xv` with xv the faulting va). LR/SC: SC
-     always-fails is NOT assumable — destruct the opaque
-     `match_reservation`/`valid_reservation` axioms like
-     `wp_user_step_waiting` does and handle both outcomes (success
-     writes memory + rd; fail writes rd:=1).
-     (D) SMALL CLEANUPS while integrating: thread the FS/VS pins into
-     `user_mstatus_ok` (UserCsr's facts take them as separate premises;
-     WpUserret already claims FS=Off structurally — check VS at boot,
-     else add a `uc` pin); consider folding `u_step_pre` into the arm
-     SIGNATURES (arms still take the 5 σ-level facts; the wrapper could
-     hand `∀ b, u_step_pre …` directly).
-     (E) KERNEL INTEGRATION (worklist item 5, meets your userret port):
-     massage `wp_userret`'s postcondition into `user_inv` at the
-     concrete upt (trampoline + trapframe + process pages — your
-     UserretPt/TransPt layer is exactly this bridge), and prove
+- **Design principle (step-obligation decomposition):** keep each layer ONE
+  lemma per concern — the v1 failure mode was the hit/miss × width ×
+  compressed × fault-arm cross-product.  Corollary: absorb hit-vs-miss and
+  aligned-vs-misaligned into ONE caller-facing interface (the translateAddr
+  trichotomy, the vmem/AMO composers) with a uniform continuation, so callers
+  never fork.  The dispatch decision (`u_dispatch`, UserStep) and the
+  WAITING-hart arm (`wp_user_step_waiting`, UserStep) are built and green.
+  The user-mode WP architecture and remaining work follow.
+     ============ USER-MODE WP: ARCHITECTURE & REMAINING WORK ============
+     `wp_user_exec` (Löb capstone, UserExec) runs over `user_inv` (a valid
+     User machine) / `user_trap_frame` (post delegated trap).
+     `wp_user_step_active` (UserStepFull) opens the wires, dispatches the
+     interrupt + WAITING cases inline, and reduces `user_step_obligation_
+     active` to ONE goal: `active_class` — the fetch/decode/execute
+     classification of a no-pending-interrupt active step.  Axiom budget: the
+     5 platform axioms everywhere; UserCsr.v is axiom-FREE.
+
+     THE CLASSIFICATION (UserClassify.v — the core architectural decision).
+     An active step's `run_hart_active` outcome is FIVE-way, not two: retire /
+     delegated user-trap / illegal / enter-wait (WRS) / fetch-failure (and
+     SINVAL_VMA's base-`ExecuteAs` redirects to one of these).  Hence:
+       * `u_result_ok` / `u_step_outcome` classify the full outcome space.
+       * `active_step_obligation` (ONE obligation, replacing the old four):
+         `run_hart_active σ = Some (st, s_x)` with `u_step_outcome st`,
+         invariant + gpr_file + nextPC re-established (gpr/nextPC threaded
+         uniformly — illegal/wait/fetch simply don't change them).
+       * `active_step_branch` runs it and dispatches all five outcomes;
+         trap/illegal/fetch-fault share ONE delivery tail `deliver_user_trap`
+         (utrap tower → `user_trap_frame`), differing only in (cause,tval,epc).
+     WHY: the earlier 2-way `exec_step_result_ok` (retire XOR trap) could not
+     classify illegal/enter-wait/ExecuteAs, which made the execute totalities
+     UNPROVABLE and fragmented the arms.  A spec drawn at one arm's outcome
+     instead of the full run_hart_active outcome space; the totalities were
+     also unproven Definitions, so the mismatch stayed invisible (green ≠
+     inhabited).  The fix: full outcome space + one obligation + one arm.
+
+     THE PRODUCER (UserClassifyAsm.v).  fetch → decode → progress-composer →
+     classify, factored ONCE (`user_exec_step_from_fetch_u`).  Every fetch
+     geometry yields `active_step_obligation`: success via
+     `user_exec_step_producer_u` (4-aligned) / `_producer_2_u` (2-aligned,
+     both halves); fault via `user_fetch_fault_active{_align,,_2_first}` and
+     `user_exec_or_fault_active_2_second` (low-OK/pc+2-fault — now ONE
+     obligation, since RVC-exec and straddle-fault are both `u_step_outcome`).
+     The two producer premises are the EXECUTE TOTALITIES `base_exec_total_u`
+     / `rvc_exec_total_u`: `∀ w σf`, decode → execute (with the SINVAL base-
+     ExecuteAs redirect disjunct) → a `u_result_ok` result; they take
+     `hw_config` so decode's `agree_u` (misa=MISA_C) is dischargeable.
+     base-vs-RVC is the ONE inherent split, behind the two totality premises +
+     the result-generic progress composers (`exec_hart_active_progress_base_
+     gen` / `_base_redirect_gen` / `_RVC_gen`, SmodeCore/UserStep).
+
+     THE EXECUTE FACTS (per-instruction bricks the totalities consume — all
+     built, green).  Non-memory (UserExecFacts/UserCsr/WpMmodeLeafBase C_*):
+     retiring totality (`gpr_write_state`-shaped, value existential) for
+     compute/control/fence incl. JAL/JALR/BTYPE; illegal-at-U for privileged/
+     config-gated; ECALL/EBREAK traps; WRS Enter_Wait; CSRReg/CSRImm (Illegal
+     ∨ retiring read; writes excluded at U).  Memory (UserMemArms.v, width-
+     generic): each `execute_*` fact is premise-shaped over the UserMemAccess
+     vmem/AMO composer result — Ok IS the retire, Err IS the delegated trap,
+     so the composer's Ok/Err disjunction is the classification (AMO is op-
+     generic: written value symbolic, AMOCAS guard short-circuits).  Decode:
+     `decode_total_{u,c}_set` + `agree_u`, with the JAL/BTYPE bit-0 payload
+     invariant in `decodable_u` (UserBits kit `aligned_even`/`add_sext_even_
+     64_*` turns it into jump_to's premise).  The user page-table / fetch /
+     translate / memory layer (UserPtTree/UserFetchPt/UserMemAccess, ADUE-
+     aware over the ptree bundle) is complete and green.
+
+     WHAT IS LEFT (all de-risked — volume + one wiring proof, not design):
+     (A) `active_class` (UserClassify assembly): a `va` case-tree — alignment
+     (odd→align-fault) / canonicality / mapping (`ud_um !! svpn_of va`) / leaf
+     (`upt_acc_wf` gives `uleaf_ok ∨ uleaf_denied`) — routing each case to one
+     of the six producers/adapters, then `active_step_branch`.  Needs one
+     helper `fetchable ∨ u_fetch_fault_flavor va` (only subtlety: unmapped ⇒
+     svpn ≠ tramp/tf, from the tramp/tf-are-mapped invariant fact).  Then
+     `user_step_obligation_active` (via `wp_user_step_active`) and
+     `wp_user_exec` close.
+     (B) The two totality PROOFS `base_exec_total_u` (~54 base arms + SINVAL
+     redirect) / `rvc_exec_total_u` (~44 compressed arms): the bulk — destruct
+     the decode set, apply each family's execute fact, classify.
+     (C) Missing execute facts: ZICBOP (prefetch retire), base ILLEGAL,
+     C_J / C_BEQZ (expansions are syntactic — no clean ExecuteAs fact).
+     (D) Delete the SUPERSEDED old machinery (still present, green, unused):
+     `exec_step_result_ok` / `exec_step_obligation` / `exec_step_branch` +
+     embeddings (UserStepExec); the four per-outcome obligations/arms
+     (retire / execute_trap / illegal / fetch_fault / enter_wait, UserArms);
+     `base/rvc_exec_total` + `user_exec_step_producer` / `_from_fetch` / the
+     fetch producers (UserExecProducer).  Thread the FS/VS pins into
+     `user_mstatus_ok` while wiring (A).
+     (E) Kernel integration: bridge `wp_userret`'s postcondition into
+     `user_inv` at the concrete page table (UserretPt/TransPt) and prove
      uservec's spec to discharge `stvec_handler_wp`.
-     RECIPES YOU WILL NEED (all documented in this file): the arm/
-     obligation shapes and `u_step_pre` (payload-arms bullet); the
-     trap-delivery machinery (delivered-state bullet); the decode-wf
-     dischargers and the mword-bit-fact recipe (decode-wf bullets); the
-     guarded-fixpoint probe pattern and the MR-reduction gotchas
-     (CSR-plan bullets); the dependent-if/dependent-read traps
-     (`change`-the-scrutinee, destruct-with-eqn substitutes into
-     hypotheses, `exact`-bridge across Cast nodes, instantiate dependent
-     reads under plain rewrite).
-     ====================================================================== The C_* expansion facts are COMPLETE
-     (UserExecFacts.v holds the 22 stragglers incl. the direct retires
-     `exec_execute_C_{NOT,ZEXT_B}_total` — stated with an ∃-bound
-     `creg2reg_idx c = Regidx i` witness — and the pure results
-     C_NOP/C_NTL/ZCMOP/C_ILLEGAL; WpMmodeLeafBase.v has the other ~20).
-     `exec_execute_JALR_total` is premise-free now (`bit0_update0_64` in
-     UserBits.v: update_slice at bit 0 is a nested bv_concat whose low
-     limb is the written literal; parity by `even_lor`/`even_shiftl1`).
-     The config-gated stragglers are DONE (UserExecFacts.v):
-     `exec_execute_{ZICBOZ,ZICBOM,SSAMOSWAP}_U` — all ILLEGAL at User
-     under the pins (MENVCFG_S has CBZE/CBCFE/CBIE/SSE clear;
-     `feature_enabled_for_priv` short-circuits on the m-bit,
-     `cbop_priv_check` returns CBOP_ILLEGAL from mCBIE alone, the xSSE
-     gate reads the pinned `read_senvcfg` composite). Shared reductions
-     there: `exec_read_senvcfg_pinned`, `exec_feature_illegal_U`.
-     MR-reduction gotchas baked into those proofs: a type-ASCRIBED read
-     (`(read_reg r : M _)`) carries a Cast that blocks a direct rewrite —
-     bridge with an asserted instance (`etransitivity; [exact
-     (exec_read_reg r st)|…]`); after reducing a privilege match, `cbv
-     beta iota` before the next `execR_bind`; mind `>>` (bind0) vs `>>=`
-     at the outermost node; in plain-rewrite files instantiate dependent
-     reads explicitly (`(exec_read_reg r st)`).
-     CSR-AT-U IS DONE (UserCsr.v, axiom-FREE):
-     `exec_execute_{CSRReg,CSRImm}_total_U` — at User under the pins
-     (priv, mstatus FS=Off ∧ VS=Off, misa=MISA_C, menvcfg=MENVCFG_S,
-     HES), every CSR instruction either returns `Illegal_Instruction`
-     with the state unchanged (→ `illegal_obligation`) or RETIRES a read
-     with a single existential-valued rd write, `gpr_write_state rd v s`
-     (→ `retire_obligation`); the model itself excludes CSR WRITES at U
-     (`u_readable_acc_read`: every readable csr sits at a read-only
-     address, so `check_CSR_access` admits only CSRRead). The readable
-     set (`u_csr_readable`) = cycle/time/instret + the Zihpm hpmcounter
-     shadow range (bits 11:5 = 1100000, index ≥ 3; the Nh range dies on
-     xlen=32). Structure: §1 gate probes, §2 component reductions
-     (priv/feature/counter-enable/ssp), §3b the 90-guard accessibility
-     traversal (csr_step/csr_close drivers), §3c check_CSR assembly
-     (stateen needs NO traversal — survivors are concrete or
-     range-killed into its returnM-true default), §3d survivor reads +
-     access shape, §3e read_CSR over the hpm range (csr_read_step
-     driver), §3f the 29-address concretization (only the NAME-MAP
-     callback needs it — its 342-guard dispatch has a stuck default on
-     abstract csr), §3g doCSR assembly, §4 the execute wrappers.
-     Consider threading the FS/VS pins into `user_mstatus_ok` when
-     wiring these into UserClassify.
-     Still missing before FULL assembly:
-     ZICBOP (does TRANSLATION — ADUE-coupled, defer), the memory arms
-     (LOAD/STORE/AMO/LR/SC), and the fetch-fault flavor corollaries'
-     payload wiring.
-     UPDATE (memory layer DONE): the Svadu/ADUE page-table rework the
-     memory arms were waiting on is COMPLETE — the whole user memory LAYER
-     is proven, green, and wired to the user invariant (UserMemAccess.v):
-     aligned LOAD/STORE (§2), LR/SC atom-to-invariant retire-or-fault (§5
-     physical + §6 bundle composers), and the misaligned plain LOAD/STORE
-     split (§4 exec + §7/§8 N-fold bundle composers).  So the memory arms
-     are now UNBLOCKED.  §9 lays the first arm brick,
-     `exec_transform_effective_address_u` (the identity address transform
-     at User/MPRV=0/pmlen=0 that every data access runs before the vmem
-     composer).  THE REMAINING MEMORY-ARM CHAIN (per family, exec-level
-     then iris): (i) `exec_get_pmlen_u` (User: currentlyEnabled Ext_S ->
-     read_senvcfg -> PMM_Disabled -> 0; reuse UserCsr's
-     `exec_read_senvcfg_pinned` + a currentlyEnabled reduction), feeding §9
-     so the transform is premise-free; (ii) the exec-level
-     `exec_get_transformed_data_addr_u` (ext_data_get_addr = rX rs1+offset,
-     then §9) and the `execute_LOAD`/`execute_STORE`/... skeletons
-     premise-shaped over the vmem composer result; (iii) the IRIS memory
-     arms discharging `retire_obligation` (load: rd:=extend data; store:
-     re-establish udata pages) / `execute_trap_obligation` (delegated data
-     fault) by running the exec skeleton through the §2/§6/§7/§8 composer
-     under the user frame, mirroring the S-mode WpSmodePtMem port.  This
-     chain + the fetch-seam port (checkpoint (B)) + the decode case tree is
-     the bulk of the remaining UserClassify assembly.
-     CSR-AT-U PLAN (UserCsr.v; values never matter — existential reads).
-     Target statement (CSRReg and CSRImm): under pins (priv=User,
-     mstateen0=0, menvcfg=MENVCFG_S, senvcfg=0, misa via hw_config, and
-     mstatus.FS=Off — needed so the F CSRs can't reach the WRITE path):
-     `∃ res s', exec (execute (CSRReg (csr,rs1,rd,op))) s = Some (res,s')
-     ∧ ((res = Illegal_Instruction tt ∧ s' = s) ∨ (res = RETIRE_SUCCESS ∧
-     ∃ v, s' = gpr_write_state rd v s))` — counter-enable bits
-     (mcounteren/scounteren) are NOT pinned: both enabled (retiring read)
-     and disabled (illegal) land in the disjunction. Model structure:
-     `execute_CSRReg = rX rs1 ; doCSR`; `doCSR = read priv ;
-     check_CSR_result ; CSR_Illegal → Illegal | OK → ext_check_CSR (const
-     true?) ; read_CSR (skipped for pure writes) ; sip/mip special-cases
-     (S/M-addressed — dead at U) ; CSRRead → wX rd → RETIRE | else
-     write_CSR (must be UNREACHABLE at U: 0xCxx are RO addresses —
-     `check_CSR_access` kills writes; F/ssp/seed writes are killed by
-     accessibility gates)`. `check_CSR = and_boolM (check_CSR_priv: pure
-     `'b00 ≥u csrPriv csr` — bits 9:8 must be 00) (and_boolM
-     (check_CSR_access: pure RO-vs-write) (and_boolM (is_CSR_accessible:
-     THE per-CSR dispatch) (stateen_allows_CSR_access: mstateen0-gated
-     handful)))`. PROOF DRIVER (the linearity trick): destruct each
-     dispatch guard `eq_vec csr ADDR` WITH eqn:, and in the TRUE branch
-     convert (`eq_vec_true_iff`) and SUBSTITUTE csr := ADDR — everything
-     downstream (read_CSR etc.) becomes CONCRETE and reduces with the
-     existing batched peel machinery (`drive_csr`, WpGprCsrrCommon.v; see
-     the CSR-dispatch perf rule) — NEVER leave csr abstract into a second
-     dispatch (that's the 100×90 cross-product). The false-chain
-     continues linearly (~100 guards for is_CSR_accessible + stateen).
-     REFINED §3 SHAPE (all §1/§2 components are DONE in UserCsr.v; only
-     the traversal remains): prove ONE combined lemma
-     `exec_check_CSR_U : (pins: mstatus + FS=Off + VS=Off, misa=MISA_C,
-     menvcfg=MENVCFG_S, mstateen0=0, HES) → ∃ ok, exec (check_CSR csr
-     User acc) s = Some (ok, s) ∧ (ok = true → u_csr_readable csr ∧ acc
-     is not a write)` with `u_csr_readable csr := csr = 0xC00 ∨ 0xC01 ∨
-     0xC02` (the only survivors). Destruct the priv boolean
-     (`exec_check_CSR_priv_U`) first, keeping `EP : csr[9:8] = 00` in
-     the true branch; then in the accessibility traversal every
-     M/S-addressed guard's TRUE branch is closed by CONTRADICTION with
-     EP (`apply eq_vec_true_iff in E; subst; vm_compute in EP;
-     discriminate`) — the U-addressed clauses reduce via the §1/§2
-     probes (F_off / Zve32x_off / ssp_off / Zicntr+counter_enabled
-     totality; 0xC80-82 die on the xlen=32 conjunct). The PMP-file
-     SUBRANGE guards (0x3A?-0x3E?) contradict EP via one reusable bit
-     lemma `subrange 11 4 = 0x3A.. → csrPriv ≠ 00`. Check
-     stateen_allows' dispatch the same way (S/M-addressed clauses only;
-     confirm its default is returnM true). The doCSR wrapper then cases
-     on ok: false → Illegal (s unchanged); true → subst a counter,
-     access is CSRRead, `read_CSR 0xC00/1/2` reduces per-CSR (concrete —
-     `drive_csr` or plain equations), the sip/mip special guards
-     (0x344/0x144) are refutable from u_csr_readable, `exec_wX_bits_gpr`
-     gives `gpr_write_state rd v s` → RETIRE_SUCCESS. Full sketch:
-     scratchpad csr_traversal_skeleton.v (session-local) — this
-     paragraph is the durable copy. VERIFIED probe details: `exec (currentlyEnabled
-     Ext_Zfinx) s = Some (false, s)` holds by plain `reflexivity`
-     (hartSupports constant false); `currentlyEnabled Ext_F` =
-     hartSupports(true) ∧ misa.F(true in MISA_C!) ∧ mstatus.FS ≠ 'b00 —
-     the FS=Off pin is what kills the F CSRs (fflags 0x001 / frm 0x002 /
-     fcsr 0x003 gate on `Ext_F ∨ Ext_Zfinx`), so the CSR facts need an
-     `_get_Mstatus_FS ms_v = 'b"00"` premise (consider adding the FS pin
-     to `user_mstatus_ok` — WpUserret already claims FS=Off
-     structurally). STARTED (UserCsr.v §1, compiling): the probe
-     reductions `exec_currentlyEnabled_Zfinx` (plain reflexivity),
-     `exec_hartSupports_F`, `exec_currentlyEnabled_F_off` (FS pin).
-     Guarded-fixpoint gotcha for the probes: the recursion-limit assert
-     is a DEPENDENT if — `replace` on its scrutinee silently misses; use
-     `change (Z.geb (..._measure Ext_X) 0) with true. cbn match.` then
-     `erewrite exec_bind_Some. 2:{ apply exec_returnM. }` (the eq_refl's
-     implicit type blocks an instantiated rewrite). The decode-bridge
-     shortcut (`decode_state_bridge`, as in the Svnapot probe) does NOT
-     apply here: it needs WHOLE-value agreement on read registers, and
-     mstatus is abstract with only the FS bit pinned.
-     LEFT — discharging `active_class`: the total classification. Per
-     machine case, produce the run_hart_active reduction and feed the
-     matching arm: fetch outcome (fetchable → `upt_fetch_instr`; else a
-     fetch-fault flavor → `fetch_fault_obligation`), decode
-     (`decode_total_{u,c}_set` + `agree_u`), destruct the decodable set,
-     per-family discharge `retire_obligation` (compute/control via
-     `exec_hart_active_progress_base_gen/_RVC_gen` + `_gpr` facts) /
-     `execute_trap_obligation` (ecall/ebreak/illegal + memory faults) /
-     data-memory arms / WRS-enter (needs its own arm: enter-wait writes
-     hart_state and skips the tick — the one step shape without an arm
-     yet) / LR/SC always-fault.
-  2. *Pure leaf dichotomies:* for a structurally-wf leaf, per access at mxr=0:
-     `upte_check_ok ∨ upte_check_denied` (case analysis on the flag byte);
-     `update_PTE_Bits` None-vs-Some by the A(/D) bits.
-  3. *Fetch abstraction:* bytes out of `upt_data_own` (borrow `dm`, `mem_valid`
-     per byte) feeding the fetch geometry (4-aligned single read / 2-aligned
-     2+2 split / RVC / page-straddling halves translate separately) — outcome:
-     an arbitrary fetched word or a fetch fault into the trap arm.
-  4. *Execute dispatch by decode totality:* register-only ops via ONE generic
-     retire engine + per-family `_gpr` facts (live: ZicondGpr/ZbbGpr/ClmulGpr/
-     ZbbRtypeGpr + the WpMmodeLeafBase exec facts); ONE width-generic memory
-     access abstraction (load/store/AMO against `upt_data_own`); control flow;
-     ONE generic sync-trap delivery lemma (ecall/ebreak/illegal/page-fault →
-     `user_trap_frame`, delegation from `uc_del`); the INTERRUPT-trap arm
-     (`u_dispatch = Some (i, Supervisor)` → the interrupt trap tower →
-     `user_trap_frame`), whose wire values come from the invariant shared
-     with the device WP — designing that shared invariant is joint work with
-     updating the kernel-side proofs for the device model.
-  5. *Kernel integration:* massage `wp_userret`'s postcondition into
-     `user_inv` at a concrete `upt` (trampoline + trapframe + process pages);
-     prove uservec's spec to discharge `stvec_handler_wp`; simplify
-     `wp_userret`'s precondition against the new abstractions.
+     ====================================================================
 
 ## Userret / trampoline / user page table
 
