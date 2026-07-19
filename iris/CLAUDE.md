@@ -990,11 +990,19 @@ Where things landed (the stage descriptions below remain the design rationale):
      `exec_vmem_write_addr_sc_disj` (the instruction-facing SC disjunction:
      retire [Ok of match_reservation, write lands iff reservation valid] or
      E_SAMO Trap).  All width-generic where the layer allows; the
-     per-width bricks are widths 4 and 8 (LR.W/LR.D, SC.W/SC.D).  ONLY
-     REMAINING: the iris bundle composers over user_pt_inv (thread the
-     translate through the utlb_inv_pt_translateAddr_u absorption and the
-     data-page ownership; the exec-level disjunctions are premise-shaped
-     over the translate + physical facts the absorption supplies).
+     per-width bricks are widths 4 and 8 (LR.W/LR.D, SC.W/SC.D).  The IRIS
+     BUNDLE COMPOSERS ARE ALSO DONE (§6a/§6b, widths 4/8, all green):
+     `user_pt_vmem_read_addr_lr_4/_8` and `user_pt_vmem_write_addr_sc_4/_8`
+     thread the reserved translate through the utlb_inv_pt_translateAddr_u
+     absorption + udata_own and expose the instruction-facing disjunction,
+     re-establishing utlb_inv_pt + udata_own; same shape as §2's aligned
+     LOAD/STORE composers.  SC's composer cases on the opaque
+     match_reservation for the CONDITIONAL ghost write (udata_own_store_g
+     fires only on the mr=true retire sub-case; mr=false retires without
+     writing, RsrvNone faults).  So LR/SC is COMPLETE from atom to
+     invariant.  (UserMemAccess now Require Imports SmodeCore / UserBits /
+     WpMmodeLeafBase for ram_fetch_pmp / pa_aligned_div / within_htif_
+     writable_false, which UserMemPt does not re-export.)
      §5 PHYSICAL PIECES DONE (UserMemAccess §5a-d, all green):
        - §5a `exec_read_ram_resv_4/_8`: the reserved-RAM read atoms.
          read_ram is AK-agnostic for RAM, so these clone the plain read
@@ -1016,9 +1024,8 @@ Where things landed (the stage descriptions below remain the design rationale):
          disjunction at the checked_mem_read layer -- one `if` on the
          unpinned reservability gives Ok(bytes) [retire] or
          Err E_Load_Access_Fault [fault].  Composes §5a+§5b+§5c.
-     (§5e-k above completed all of what this list previously enumerated;
-     the only LR/SC item left is the iris bundle composers over
-     user_pt_inv, shared with the rest of the memory layer.)
+     (§5e-k + §6a/§6b above completed the entire LR/SC stack, atom to
+     invariant; NOTHING remains for LR/SC.)
   4. AMO EXECUTE reduction (execute_AMO): its own pre-translation alignment
      check (misaligned -> E_SAMO_Access_Fault via GlobalMisalignedExceptions_
      amo = AccessFault), then translate + mem_write_ea + mem_read +
@@ -1071,10 +1078,12 @@ Where things landed (the stage descriptions below remain the design rationale):
      without breaking the Acc-dependent type; the initial loop var
      `(zeros', false, 0)` must be `replace`d with `split_var 0` (the
      `Nat.eqb 0 N` flag is not definitionally false for abstract N).
-     REMAINING: the iris bundle composer threading the N absorptions
-     through user_pt_inv (each chunk's translate goes through the
-     utlb_inv_pt_translateAddr_u absorption; the abstract byte-heap owns the
-     bytes across the possibly-straddling chunks).
+     REMAINING (misaligned-split only): the iris bundle composer threading
+     the N absorptions through user_pt_inv (each chunk's translate goes
+     through the utlb_inv_pt_translateAddr_u absorption; the abstract
+     byte-heap owns the bytes across the possibly-straddling chunks).  §6's
+     LR/SC composers show the SINGLE-absorption pattern this generalizes to
+     N (loop the absorb+physical per chunk, threading σ and the invariant).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process
