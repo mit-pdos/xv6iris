@@ -1285,6 +1285,47 @@ Section WpSmodePtAlu.
     exact (wp_add_s_r (kpt_regime root_ppn) γ Φ pc rd rs1 rs2 wval m (dq:=dq)).
   Qed.
 
+  Lemma wp_or_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    uint rd <> 0 ->
+    or_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
+    smode_config γ dq -∗ sr_inv R -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
+    ( smode_config γ dq -∗ sr_inv R -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg_regime R γ Φ pc rd rs1 rs2
+              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) wval m (dq:=dq)
+ Hrd _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva Hvb.
+    change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)))
+      with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) OR).
+    rewrite (exec_execute_RTYPE_OR_gpr rs2 rs1 rd s_pc Hrd).
+    unfold gpr_or_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  Lemma wp_or_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : gmap regidx (mword 64)) {dq : dfrac} :
+    uint rd <> 0 ->
+    or_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
+    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
+    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof.
+    exact (wp_or_s_r (kpt_regime root_ppn) γ Φ pc rd rs1 rs2 wval m (dq:=dq)).
+  Qed.
+
   (* ---- from WpSmodeUtype.v ---- *)
 
   Lemma wp_auipc_s_r (R : s_regime) (Φ : mval -> iProp Σ)

@@ -93,6 +93,7 @@ PtBuild.v
 KvmSpec.v
 WpWalkInstr.v
 WpWalk.v
+WpMappagesInstr.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
