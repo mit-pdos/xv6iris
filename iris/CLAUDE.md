@@ -887,13 +887,104 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    base jals are decoded locally.  callee_saved mm mr recovered from
    callee_saved P6 mr since P6 = mm off the callee-saved set (only a2/a3/a5
    clobbered).  `kvmmap_spec_holds : ⊢ kvmmap_spec`.
-6. **wp_proc_mapstacks** (NPROC=64 kalloc+kvmmap loop, fuel induction over
-   the proc array — needs the `proc` array base + KSTACK geometry), then
-   **wp_kvmmake** (kalloc root + memset + `zero_page_to_node` at level 2 +
-   six kvmmap calls at concrete (vpn0,ppn0,perm,npages) tuples + the
-   `kvm_map` gmap literal built from `pt_insert_run` so the posts chain
-   definitionally), then **wp_kvminit** (store the root into
-   `kernel_pagetable`).
+6. **wp_kvmmake / wp_proc_mapstacks / wp_kvminit** (NOT STARTED; walk +
+   mappages + kvmmap all DONE and green as the building blocks).  This is
+   a large, design-heavy NEW LAYER, not an incremental proof.  Full design
+   checkpoint (2026-07-19) so the next session starts from the design, not
+   from scratch:
+
+   **(a) Constants to add** (most do NOT exist yet — only UART0/plic_base
+   in DevModel, TRAMPOLINE in TrampPt, etext/proc in KernelSyms, NPROC in
+   WpWakeup).  From xv6-riscv/kernel/memlayout.h + riscv.h:
+     - KERNBASE = 0x80000000, PHYSTOP = KERNBASE + 128*1024*1024 = 0x88000000
+     - UART0 = 0x10000000, VIRTIO0 = 0x10001000, PLIC = 0x0c000000
+     - MAXVA = 1 << (9+9+9+12-1) = 0x4000000000; TRAMPOLINE = MAXVA - PGSIZE
+       = 0x3FFFFFF000 (already in TrampPt.v)
+     - KSTACK(p) = TRAMPOLINE - (p+1)*2*PGSIZE  (guard page below each stack)
+     - proc array base = KernelSyms.proc = 0x80012778; sizeof(struct proc)
+       needed for the p++ stride (read from the +0x78 addi in the
+       proc_mapstacks loop: 0x168 = 360 bytes — CONFIRM against the dump).
+     - PTE flag values: perm passed to kvmmap is WITHOUT V (mappages ORs V
+       in): R|W = 2|4 = 6, R|X = 2|8 = 10.
+
+   **(b) The [kvm_map] gmap literal** (kernel/vm.c kvmmake order; each
+   region is a [pt_insert_run] applied to the accumulator so the six
+   kvmmap posts chain DEFINITIONALLY -- the k-th kvmmap's post
+   [pt_insert_run m_prev vpn0_k ppn0_k perm_k npages_k] becomes the next
+   call's precondition [pt_rep0 t m_k]):
+     1. UART0    va=pa=0x10000000, 1 page,      perm 6   (R|W)
+     2. VIRTIO0  va=pa=0x10001000, 1 page,      perm 6
+     3. PLIC     va=pa=0x0c000000, 0x4000000 B = 16384 pages, perm 6
+     4. text     va=pa=KERNBASE,   (etext-KERNBASE)=0x7000 = 7 pages, perm 10 (R|X)
+     5. data     va=pa=etext,      (PHYSTOP-etext)=0x7FF9000 = 31977 pages, perm 6
+     6. tramp    va=TRAMPOLINE, pa=trampoline (the phys page), 1 page, perm 10
+     then proc_mapstacks: 64 KSTACK(i) pages -> kalloc-chosen pas, perm 6.
+   NB the PLIC (16384) and data (31977) runs are BIG: mappages_spec's
+   premises [uint va + npages*4096 <= 2^38] and [uint pa + npages*4096 <
+   2^56] must hold -- check: PLIC pa 0x0c000000 + 16384*4096 = 0x10000000
+   ok; data va 0x80007000 + 31977*4096 = 0x88000000 = 2^31+... < 2^38 ok,
+   pa same < 2^56 ok.  So the existing bounds SUFFICE -- no spec loosening.
+   Also each region's start is page-aligned by construction (all the
+   constants are multiples of 0x1000) so [subrange va 11 0 = 0] discharges
+   by vm_compute, and [mappages_perm_ok 6]/[mappages_perm_ok 10] are two
+   fixed lemmas provable once (pte_valid/leaf/no_napot/pbmt0 of
+   mk_pte 0 (6|1) and mk_pte 0 (10|1) -- all vm_compute on the flag byte).
+   NO-REMAP obligation ([forall i<npages, m_k !! vpn_at vpn0_k i = None]):
+   the regions are DISJOINT in va (devices < 0x10002000, PLIC region
+   0x0c.., text/data 0x8.., tramp at MAXVA, stacks just below tramp) so
+   each region's vpns are unmapped in the accumulator -- prove a disjointness
+   lemma per region (vpn ranges don't overlap) feeding pt_insert_run_lookup
+   -style reasoning; this is the main NEW pure-arithmetic burden.
+
+   **(c) Spec signatures to add to KvmSpec.v** (currently only sketched in
+   comments there):
+     - [proc_mapstacks_spec]: args kpgtbl=a0, tree t repr m, the 64 KSTACK
+       vpns unmapped, kalloc_env, panic_wp; post = ∃ (pas : nat -> mword 44),
+       tree t' repr (m + {KSTACK i -> mk_pte (pas i) 6 | i<64}), pt_base
+       preserved, kalloc_env restored.  Existential pas as a FUNCTION
+       nat->pa (not a list) keeps the induction clean.  Fuel = remaining
+       proc count, invariant carries the pas chosen so far (partial function
+       / accumulator map).  Structurally = mappages' loop but the per-iter
+       body is kalloc (env threading, null->panic) + kvmmap (needs panic_wp,
+       aligned page from kalloc, KSTACK(i) aligned+unmapped+bounded).
+     - [kvmmake_spec]: NO incoming tree (it kallocs the root itself); pre =
+       kalloc_env with ENOUGH free pages (root + all intermediate PT nodes
+       for the six regions + 64 stacks + 64 stack pages -- the kalloc_env
+       must guarantee non-failure OR the spec's post is the ret=0/partial
+       disjunction like mappages; SIMPLEST: require panic_wp and make every
+       kalloc-null go to panic, so the post is unconditional full kvm_map).
+       Post: ret(a0) = root pa, ptree_own 2 1 t with pt_rep0 t kvm_map (for
+       the existential stack pas), + the root is a FRESH page.  Stack depth:
+       kvmmake frame is 4 slots (ra,s0,s1,s2 at +0x00 c.addi16sp -32... check:
+       +0x00 0x1101 = c.addi16sp -32? decode) -- but it CALLS mappages/walk
+       which need 32; so n must be >= 32 + kvmmake's own frame.
+     - [kvminit_spec]: kvmmake then [sd a0, kernel_pagetable]; needs the
+       kernel_pagetable global cell.  Post: kernel_pagetable points at the
+       kvm_map root.
+   Get Nickolai's sign-off on the kvm_map shape + the "panic on any
+   kalloc-null" simplification BEFORE building the proofs (spec-design
+   preferences: constant depth bounds, no ad-hoc arg coupling).
+
+   **(d) Decode catalogs** (mechanical but ~90 + ~44 instrs; reuse
+   KernelRvcDecode's shared frame templates mdec_ccc..cf0 for the standard
+   frames, like WpKvmmap did): WpProcMapstacksInstr.v (frame 0x715d = 80-byte
+   =11 slots, the KSTACK arith auipc/lui/addi/mul-by-stride/sub, kalloc+kvmmap
+   jals, the p<&proc[64] bne loop) and WpKvmmakeInstr.v (kalloc+memset+6*
+   {auipc/lui/addi arg setup + kvmmap jal} + proc_mapstacks jal).  Generate
+   programmatically as in WpMappagesInstr; the JAL residues = (target - pc)
+   mod 2^21 (confirmed formula from walk/mappages/kvmmap).  WATCH the base
+   ASTs for lui/mul/sub -- probe with the vm_compute-on-decode trick only if
+   rvc_oneshot/decode_bridge_ms rejects a guessed AST (each miss = a full
+   ~minute compile, so get the immediates right up front from the dump).
+
+   **(e) Proof order**: proc_mapstacks FIRST (self-contained, unblocks
+   kvmmake), then kvmmake (root kalloc + memset + zero_page_to_node at level
+   2 + the six chained kvmmap calls + the proc_mapstacks call), then kvminit
+   (kvmmake + one sd).  Each funnels through a sealed epilogue like the
+   mappages/kvmmap ones.  The six kvmmap calls each want callee_saved
+   recovery + the accumulator-tree transport (t_k repr m_k) between calls --
+   the a0/a1/.. arg-register reloads between calls are the per-call auipc/lui
+   /addi sequences already in the dump.
 7. **Boot introduction** (separate, later): kvminithart establishes
    `tlb_inv_pt` from `pt_rep t kvm_map` — at which point `kpt_tree_spec`
    must be REVISED to the true per-region flags (text RX / data RW /
