@@ -159,6 +159,7 @@ WpSconfHolding.v
 WpSconfRelease.v
 WpSconfAcquire.v
 WpSconfMemset.v
+WpSconfMemsetPage.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v

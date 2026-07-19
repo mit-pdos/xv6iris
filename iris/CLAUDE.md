@@ -588,11 +588,22 @@ before any mechanical sweep.
      `stack_own (pa_stk sp0 kv_frame_slots) 2` (the deep-2 custody),
      NOT just sie_cap arm-blind — exactly like the release/acquire/
      mycpu epilogues.  The sp-move leaf is `wp_caddi_sp_s_sconf` (not
-     the plain caddi), fed the mover transformer.  Transform each `_r`
-     lemma: smode_config -> sconf + hart_state + sie_cap + deep-custody,
-     leaves -> sconf twins, sie_cap retargeted across gpr writes / traded
-     across sp moves.  Then kfree/kalloc call `wp_memset_page_sconf`
-     directly (they already own the page's stack region to lend).  (The SIE=0-pinned memset engine stays for any caller
+     the plain caddi), fed the mover transformer.  FRAME-MODEL REWORK
+     (not a mechanical transform): the OLD suffix threads the ra/s0
+     save slots as dqm-FRACTIONAL caller cells (`pa_ra ↦₈{dqm} ra0`);
+     the sconf version instead takes them as FULL slots that come FROM
+     the sie_cap reserve via the frame trade — memset's frame
+     [sp', sp'+16) is the top-2 output of `sie_cap_move_down k:=2` in
+     the prefix, and `move_up k:=2` in the suffix packs them back and
+     returns the deep-2 custody.  So `wp_memset_page_sconf` takes
+     `stack_own (pa_stk sp0 kv_frame_slots) 2` (deep-2), the prefix's
+     c.addi sp,-16 trades it for the 2 frame cells (fed to the two
+     c.sdsp saves), and the suffix's two c.ldsp restore into full cells
+     that the c.addi sp,16 mover packs (build `stack_own sp0 2` from the
+     cells at `pa_stk sp0 1/2` via the HpaK bridges, exactly the
+     release/mycpu epilogue).  cldsp/csdsp called at dqm:=DfracOwn 1.
+     Then kfree/kalloc call `wp_memset_page_sconf` directly, lending the
+     deep-2 from the stack region they already own.  (The SIE=0-pinned memset engine stays for any caller
      that genuinely holds smode_config; the sconf version is a
      parallel funnel-based derivation.)
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
