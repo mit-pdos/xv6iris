@@ -29,7 +29,7 @@ Require Import KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodeCore.
 Require Import WpMycpu WpCallMycpu.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved StackOwn.
@@ -38,9 +38,9 @@ Require Export WpSmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtMemWrap WpSmodePtLock.
 Import Defs.
 
 (* seqz on a-b for EQUAL operands: result 1 (twin of WpHolding.seqz_sub_neq) *)

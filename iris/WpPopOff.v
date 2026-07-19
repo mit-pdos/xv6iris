@@ -41,7 +41,7 @@ Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
 Require Import SmodeCore WpMemsetS.
-Require Import WpPushOffCsr WpMycpu WpMemsetInstr.
+Require Import WpPushOffCsr WpMycpu.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpRvcBridge KernelRvcDecode.
@@ -52,9 +52,9 @@ Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import KptTree.
+Require Import WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMemWrap.
 Import Defs.
 
 (* ===================================================================== *)

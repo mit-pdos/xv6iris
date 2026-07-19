@@ -3,7 +3,6 @@
    4-byte-encoded width-8 forms (ld/sd).  State-generic width-4/1 towers
    cloned from WpSmodeLoad.v / WpSmodeStore.v; leaves follow the
    wp_cld_s_pt / wp_csd_s_pt recipe (see WpSmodePtLeaves.v). *)
-Require Import WpSmodeLeafBase.
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -12,9 +11,9 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpLoad WpLeafCommon.
+Require Import WpLoad.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
+Require Import SmodePte PtTreeAdue.
 Require Import SmodeCore WpSmodeGpr.
 Require Import KptTree SmodeCorePt SRegime WpSmodePtLeaves.
 Require Import Riscv.rv64d_types Riscv.rv64d.

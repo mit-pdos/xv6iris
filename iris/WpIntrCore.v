@@ -45,7 +45,6 @@ Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Import Defs.
 
 (* ===================================================================== *)

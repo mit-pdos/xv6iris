@@ -36,7 +36,7 @@ Require Import SmodeCore.
 Require Import InstrBytes RiscvFetchExec WpGpr KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
-Require Import WpSmodeGpr VcGen VcGenS.
+Require Import VcGen VcGenS.
 Require Import WpAcquireTop WpAcquireLock WpRelease WpMycpu.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved.
@@ -47,9 +47,9 @@ From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtMemWrap.
 Import Defs.
 
 (* ======================================================================= *)

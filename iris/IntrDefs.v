@@ -26,7 +26,7 @@ From iris.base_logic.lib Require Import ghost_var invariants.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.

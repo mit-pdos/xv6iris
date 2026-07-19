@@ -33,7 +33,6 @@ Require Import WpDecode WpLeafCommon KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore.
 Require Import KernelRvcDecode.
 Require Import WpRvcBridge.
 Require Import StackOwn.
@@ -44,7 +43,7 @@ Require Import VcGen VcGenS.
 Require Import CalleeSaved.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import WpSmodePtAlu WpSmodePtCtl.
 Import Defs.
 

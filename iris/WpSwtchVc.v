@@ -46,9 +46,7 @@ From Kernel Require KernelSyms.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtCtl.
 Import Defs.
 
 (* ====================================================================== *)

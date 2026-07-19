@@ -32,13 +32,12 @@ Require Import MinstretInv InstrBytes.
 Require Import WpLeafCommon.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeGpr WpSmodeSret KernelText WpKvInstr.
+Require Import SmodeCore WpSmodeSret KernelText WpKvInstr.
 Require Import VcGen VcGenS.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import KptTree.
+Require Import WpSmodePtLeaves WpSmodePtCtl.
 Import Defs.
 
 Notation KV := KernelSyms.kernelvec.

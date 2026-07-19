@@ -20,16 +20,8 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import SmodePte.
-Require Import PtAdBits.
-Require Import Pt4kWalk.
 Require Import CommonWalk.
-Require Import PtTree.
-Require Import PtTreeAdue.
-Require Import KptPt.
-Require Import TrampPt.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import UptTree.
 Require Import UserPtTree.
 Require Import UserBits.

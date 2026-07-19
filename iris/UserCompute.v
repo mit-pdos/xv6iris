@@ -23,8 +23,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
-Require Import MinstretInv WpGpr.
-Require Import UptTree UserPtTree UserExec.
+Require Import WpGpr.
+Require Import UserPtTree UserExec.
 Local Open Scope Z_scope.
 Import Defs.
 

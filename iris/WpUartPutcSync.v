@@ -24,18 +24,18 @@ Require Import InstrBytes.
 Require Import WpDecodeBridge WpRvcBridge KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import KptPt SmodeCore.
-Require Import WpMmodeLeafBase WpSmodeLeafBase.
+Require Import SmodeCore.
+Require Import WpMmodeLeafBase.
 Require Import WpAuipc.
-Require Import WpUart WpSmodeUart.
+Require Import WpUart.
 Require Import CalleeSaved.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import SRegime.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
+Require Import WpSmodePtMemWrap WpSmodePtUart.
 Import Defs.
 
 (* ===================================================================== *)

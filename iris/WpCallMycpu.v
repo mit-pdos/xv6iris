@@ -17,9 +17,8 @@ Require Import MinstretInv InstrBytes WpGpr WpMmodeLeafBase.
 Require Import SRegime.
 Require Import SmodeCore.
 Require Import KernelText WpGprCsrwCommon StackOwn CalleeSaved WpMycpu.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import KptTree.
+Require Import WpSmodePtCtl.
 From Kernel Require KernelSyms.
 
 Section WpCallMycpu.

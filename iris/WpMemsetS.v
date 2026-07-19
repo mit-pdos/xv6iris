@@ -45,9 +45,9 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export WpSmodeLeafBase.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import KptTree.
+Require Import WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMem WpSmodePtMemWrap.
 Import Defs.
 
 Section WpMemsetS.

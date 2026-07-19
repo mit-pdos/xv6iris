@@ -12,8 +12,9 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import SmodePte SmodeCore.
+Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import SmodePte.
+Require Import SmodePte.
 Local Open Scope Z_scope.
 Import Defs.
 

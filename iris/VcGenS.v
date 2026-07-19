@@ -34,9 +34,9 @@ Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodeCore.
 Require Import VcGen.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
 Require Import WpSmodePtMem WpSmodePtMemWrap.
 From iris.base_logic.lib Require Import invariants.

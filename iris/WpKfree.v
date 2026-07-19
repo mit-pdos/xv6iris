@@ -28,17 +28,16 @@ Require Import KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodeCore.
 Require Import WpMycpu.
 Require Import WpLock.
 Require Import WpAcquireLock WpRelease WpMemsetPage.
-Require Import WpHoldingInv.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtMem WpSmodePtMemWrap.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -29,13 +29,8 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvExec.
 Require Import WpGprCsrwB.
-Require Import SmodePte KptPt.
-Require Import KptPt.
-Require Import Pt4kWalk.
-Require Import SmodePte.
-Require Import CommonWalk.
 Local Open Scope Z_scope.
 Import Defs.
 

@@ -27,17 +27,15 @@ Require Import WpMmodeLeafBase.
 Require Import SRegime.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
-Require Import WpSmodeGpr.
-Require Import WpMemsetInstr KernelRvcDecode.
+Require Import KernelRvcDecode.
 Require Import VcGen VcGenS.
 Require Import CalleeSaved.
 Require Import WpUart.
 Require Import WpUartPutcSync.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import KptTree.
+Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtCtl.
 Import Defs.
 
 Notation UPS := KernelSyms.uartputc_sync.

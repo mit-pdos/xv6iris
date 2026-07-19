@@ -20,18 +20,18 @@ From iris.base_logic.lib Require Import ghost_var invariants.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
-Require Import WpGpr WpMmodeLeafBase StackOwn.
-Require Import SmodeCore WpSmodeSret KernelText.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import MinstretInv.
+Require Import WpMmodeLeafBase StackOwn.
+Require Import SmodeCore KernelText.
 Require Import WpKernelvecNew.
 Require Import WpIntrBits WpIntrCore.
-Require Import IntrDefs WpIntrInv.
+Require Import IntrDefs.
+Require Import IntrDefs.
 (* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the
    WpGprCsrwCommon/C namespaces don't shadow anything here. *)
 Require WpGprCsrwCommon WpGprCsrwC.
 From Kernel Require KernelSyms.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.

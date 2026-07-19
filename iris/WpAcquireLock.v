@@ -26,7 +26,7 @@ Require Import KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodeCore.
 Require Import WpMycpu WpCallMycpu WpPushOffTop WpAmo WpAcquireTop.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved.
@@ -37,9 +37,9 @@ Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtMemWrap WpSmodePtLock.
 Import Defs.
 
 (* The interrupt-enable byte that push_off (inside acquire) saves to

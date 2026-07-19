@@ -18,7 +18,6 @@
        [uint rd <> 0] and [rd <> csp_rs1].
    The remaining WpSmodePtMem widths (4/1, base widths) follow this
    template mechanically.                                                *)
-Require Import WpSmodeLeafBase.
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -26,14 +25,14 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpLoad WpLeafCommon.
-Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
-Require Import SmodeCore WpSmodeGpr WpMmodeJal.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import WpLoad.
+Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import SmodePte PtTreeAdue.
+Require Import SmodeCore WpSmodeGpr.
 Require Import KptTree SmodeCorePt WpSmodePtLeaves WpSmodePtMem.
-Require Import StackOwn WpSmodeSret AlignBits.
-Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

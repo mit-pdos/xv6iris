@@ -3,7 +3,6 @@
    increment, the epilogue frame-trade and c.ret) -- the shared tail of
    both branch arms -- and (next) the main lemma with the prologue, the
    fused csrrci flip, and the intena arm. *)
-Require Import WpSmodeLeafBase.
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -11,15 +10,15 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpLoad WpLeafCommon WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
-Require Import SmodeCore WpSmodeGpr WpMmodeJal.
-Require Import KptTree SmodeCorePt WpSmodePtLeaves SRegime.
-Require Import StackOwn CalleeSaved WpSmodeSret AlignBits KernelText.
-Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
-Require Import WpAuipc VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu WpCallMycpu WpSconfMycpu WpPushOffTop WpPopOff.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import KptTree.
+Require Import StackOwn CalleeSaved KernelText.
+Require Import IntrDefs.
+Require Import IntrDefs.
+Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
+Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu WpSconfMycpu WpPushOffTop WpPopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

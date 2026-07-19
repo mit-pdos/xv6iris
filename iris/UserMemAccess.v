@@ -28,11 +28,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodePte.
 Require Import CommonWalk.
-Require Import PtTree.
 Require Import UptTree.
 Require Import UserPtTree.
-Require Import UserBits.
-Require Import UserMem.
 Require Import UserMemPt.
 Require Import WpLoad.
 Require Import WpMmodeLeafBase.

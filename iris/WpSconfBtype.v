@@ -24,11 +24,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
-Require Import SmodeCore WpSmodeGpr.
-Require Import KptTree SmodeCorePt.
-Require Import StackOwn WpSmodeSret AlignBits WpMmodeLeafBase.
-Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
+Require Import InstrBytes WpLeafCommon WpGpr.
+Require Import SmodeCore.
+Require Import KptTree.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Import Defs.
 
 (* ---- Local helpers (copies: WpSmodePtBtype's are Local) ---- *)

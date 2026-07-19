@@ -4,7 +4,6 @@
    (lockN is disjoint from minstretN and intrN, so the open works in
    BOTH sie_cap arms -- in particular while the absorbing engine's
    interrupt invariant is closed).                                       *)
-Require Import WpSmodeLeafBase.
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -12,16 +11,16 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpLoad WpLeafCommon.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import WpLoad.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
-Require Import SmodeCore WpSmodeGpr WpMmodeJal.
-Require Import KptTree SmodeCorePt WpSmodePtLeaves WpSmodePtMem WpSmodePtLock WpAmo.
+Require Import SmodePte KptPt.
+Require Import SmodeCore WpSmodeGpr.
+Require Import KptTree SmodeCorePt WpSmodePtMem WpSmodePtLock WpAmo.
 Require Import WpLock.
-Require Import StackOwn WpSmodeSret AlignBits.
 Require Import SRegime.
-Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.

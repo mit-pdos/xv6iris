@@ -25,17 +25,18 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
-Require Import SmodeCore WpSmodeGpr WpMmodeLeafBase.
-Require Import KptTree SmodeCorePt WpSmodePtCtl.
+Require Import MinstretInv InstrBytes WpGpr WpGprCsrwCommon.
+Require Import SmodeCore WpMmodeLeafBase.
+Require Import KptTree.
 (* exec_execute_csrr_sstatus: the exported copy lives in WpPopOff.v (the
    WpSmodePtCtl one is Local); the csr-write reduction chain
    (exec_write_CSR_sstatus & co.) is exported from WpPushOffCsr.v --
    relocate all of them down when the csr leaves get a shared base. *)
 Require Import WpPopOff WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
-Require Import StackOwn WpSmodeSret AlignBits.
-Require Import WpIntrBits WpIntrCore IntrDefs WpIntrInv WpSmodeIntr.
+Require Import StackOwn.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)

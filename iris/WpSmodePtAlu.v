@@ -2,7 +2,6 @@
    [tlb_inv_pt] (ptree abstraction, arbitrary A/D bits under Svadu/ADUE).
    Ports of the Itype/Rtype/Utype/Addiw/Shiftiop leaves; see WpSmodePtLeaves.v
    for the engines and the migration recipe. *)
-Require Import WpSmodeLeafBase.
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -15,8 +14,8 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import SRegime.
 Require Import SmodeCore WpAuipc.
-Require Import WpMmodeLeafBase WpSmodeLeafBase WpMmodeShiftiop.
-Require Import KptTree SmodeCorePt WpSmodePtLeaves.
+Require Import WpMmodeLeafBase WpMmodeShiftiop.
+Require Import KptTree WpSmodePtLeaves.
 Import Defs.
 
 Section WpSmodePtAlu.

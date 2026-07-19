@@ -3,13 +3,12 @@
    leaf base. Primitives are Require Import (local, non-propagating) to avoid
    changing notation resolution in downstream files. *)
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import WpGpr MinstretInv InstrBytes.
+Require Import RiscvLang RiscvPtsto.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 From stdpp Require Import bitvector.definitions gmap.
 
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodeCore.
 From Kernel Require Import KernelInstrs KernelSyms.
 From Stdlib Require Import Lia List.
 From iris.program_logic Require Import lifting.

@@ -33,7 +33,7 @@ Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore WpSmodeGpr WpMemsetS.
+Require Import SmodeCore WpMemsetS.
 Require Import WpMycpu WpAcquireTop KernelRvcDecode.
 Require Import WpLock WpHoldingInv WpPopOff.
 Require Import StackOwn.
@@ -45,9 +45,9 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
-Require Import PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap WpSmodePtLock WpSmodePtUart.
+Require Import WpSmodePtMemWrap WpSmodePtLock.
 Import Defs.
 
 (* ===================================================================== *)
