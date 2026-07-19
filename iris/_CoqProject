@@ -163,6 +163,7 @@ WpSconfMemset.v
 WpSconfMemsetPage.v
 WpSconfKfree.v
 WpSconfKalloc.v
+WpSconfWalk.v
 WpSconfWakeup.v
 WpSconfVc.v
 WpSieFlipBits.v
