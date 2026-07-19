@@ -562,23 +562,25 @@ before any mechanical sweep.
      around the section, `wp_release_sconf` (S n→n), epilogue.  The
      acquire/release coupling premises (`neq nv1 zero <-> level=0`)
      discharge from the concrete noff values.
-   - THE MEMSET BRIDGE (kfree/kalloc call memset inside the disabled
-     region; resolve FIRST).  memset uses the SIE=0-pinned
-     `smode_config` engine, so a sconf caller must convert.
-     `sconf γ ∗ hart_state ∗ ghost_var γ (1/4/2) '0' -∗
-     smode_config γ (DfracOwn 1) ∗ eighth` is ALMOST clean — SIE=0 from
-     the eighth-agreement, legalize-idem from `legalize_sie_clear_idem`
-     (as the funnel '0' arm does), MPRV/SXL/MXR shared — BUT
-     `smode_config` pins FEWER mstatus facts than `sconf_ms_facts` (no
-     TSR/XS/FS/VS/SD/MPP), so `smode_config -> sconf` can't rebuild
-     sconf without them.  RESOLUTION: memset does NOT write mstatus, so
-     strengthen `wp_memset_page` (or a `_sconf` wrapper) to return the
-     SAME `ms` (mstatus-preservation); the caller keeps the extra
-     `sconf_ms_facts` conjuncts as pure Props across the call.  Prove
-     the two bridge lemmas (WpSconfBridge.v), then the memset call site
-     is bridge → `wp_memset_page` (engine unchanged) → bridge back.
-     The '0' eighth is available from `intr_count_pos_off` on the S-n
-     token acquire produced.
+   - MEMSET must be SCONF-NATIVE, not bridged (CORRECTED).  In BOTH
+     kfree (memset BEFORE acquire) and kalloc (memset AFTER release),
+     memset runs OUTSIDE the interrupt-disabled region, at the caller's
+     ambient SIE level (possibly ENABLED).  So the SIE=0-pinned
+     `smode_config` engine is UNSOUND here — an interrupt can fire
+     mid-fill, which that proof forbids.  The sconf<->smode_config
+     bridge idea is therefore WRONG for this call site.  Instead
+     convert the memset engine to run over the funnel (SIE-agnostic,
+     interrupts absorbed), threading `sconf + sie_cap + tlb_inv_pt`
+     (NO intr_count — memset never touches the disable nesting).  The
+     leaf already exists (`wp_sb_s_sconf`, the width-1 store); the work
+     is the bounded fill LOOP (`wp_memset_loop` -> sconf via fuel
+     induction over the byte count, sie_cap threaded arm-blind — the
+     packaged leaf strips the step's later so use fuel induction, NOT
+     iLöb, per the bounded-loop rule) and the prefix/suffix/full_kt
+     wrappers on top.  Then kfree/kalloc call `wp_memset_page_sconf`
+     directly.  (The SIE=0-pinned memset engine stays for any caller
+     that genuinely holds smode_config; the sconf version is a
+     parallel funnel-based derivation.)
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
      stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
      initial 32 slots); adequacy plumbing last; delete `smode_config`
