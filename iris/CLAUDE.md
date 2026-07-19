@@ -1799,13 +1799,9 @@ files or copy code from them; build fresh from the live tree.
      the decode set, apply each family's execute fact, classify.
      (C) Missing execute facts: ZICBOP (prefetch retire), base ILLEGAL,
      C_J / C_BEQZ (expansions are syntactic — no clean ExecuteAs fact).
-     (D) Delete the SUPERSEDED old machinery (still present, green, unused):
-     `exec_step_result_ok` / `exec_step_obligation` / `exec_step_branch` +
-     embeddings (UserStepExec); the four per-outcome obligations/arms
-     (retire / execute_trap / illegal / fetch_fault / enter_wait, UserArms);
-     `base/rvc_exec_total` + `user_exec_step_producer` / `_from_fetch` / the
-     fetch producers (UserExecProducer).  Thread the FS/VS pins into
-     `user_mstatus_ok` while wiring (A).
+     (D) Prune the pre-redesign obligations/arms/totalities/producers left
+     unused by UserClassify (UserStepExec/UserArms/UserExecProducer), and
+     thread the FS/VS pins into `user_mstatus_ok`.
      (E) Kernel integration: bridge `wp_userret`'s postcondition into
      `user_inv` at the concrete page table (UserretPt/TransPt) and prove
      uservec's spec to discharge `stvec_handler_wp`.
