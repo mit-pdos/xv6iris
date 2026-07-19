@@ -1720,7 +1720,21 @@ files or copy code from them; build fresh from the live tree.
      THE MEMORY FAMILIES: their execute fact is `execute_LOAD/STORE/…` run
      through the UserMemAccess §2/§6/§7/§8 composers + the §9 address
      transform (an Ok/Err from a composer IS the retire/trap
-     classification); no per-width/aligned-vs-misaligned arm work.
+     classification); no per-width/aligned-vs-misaligned arm work.  DONE
+     (UserMemArms.v — LOAD/STORE/LR/SC, all width-generic, all green): the
+     execute-level reductions premise-shaped over the vmem result (the iris
+     absorption stays in the composers, so these are PURE exec).
+     `exec_vmem_read_u`/`exec_vmem_write_u` bridge `vmem_read`/`vmem_write`
+     → `vmem_read_addr`/`vmem_write_addr` (rX rs + offset, then the §9
+     identity transform).  `exec_execute_{LOAD,STORE,LOADRES,STORECON}_u_
+     {ok,err}` reduce each `execute_*` over that vmem result: Ok →
+     RETIRE (+ the family's rd write: LOAD extend, LR sign-extend, SC
+     negb-success + cancel_reservation; STORE none), Err → the delegated
+     trap.  So each memory family plugs into the base/RVC totalities as
+     "apply the composer (Ok/Err) → apply the execute fact → classify".
+     REMAINING memory family: AMO (read-modify-write via
+     `user_pt_amo_data_4` + the AMO op computation) — same shape, more
+     execute structure.
      (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
      UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
      (`gpr_write_state`-shaped, value existential) for every compute /
