@@ -2391,3 +2391,197 @@ Section UserMemAccessBundleSC.
   Qed.
 
 End UserMemAccessBundleSC.
+
+(* ===================================================================== *)
+(* §7 The MISALIGNED-SPLIT bundle composer over the user invariant.       *)
+(*    The last memory-layer piece: threads the N chunk translates through *)
+(*    the utlb_inv_pt_translateAddr_u absorption (looping                 *)
+(*    user_pt_load_data_g at width [bytes] and the chunk address), then    *)
+(*    feeds the collected per-chunk translate/read facts to §4b to reduce *)
+(*    the misaligned plain LOAD.  [sst] is the deterministic per-chunk     *)
+(*    state (a fixpoint over the exec), [spa]/[sval] the closed-form       *)
+(*    physical address / read value; [split_load_fold] is the N-fold      *)
+(*    absorption induction (config_ok preserved across each absorption;    *)
+(*    data bytes are A/D-stable so reads are consistent).  Within-page     *)
+(*    coverage: the caller supplies um !! svpn_of (chunk k) = Some w for   *)
+(*    every chunk.  This is the single-absorption §6 pattern generalized   *)
+(*    to N chunks.                                                         *)
+(* ===================================================================== *)
+
+Section SplitLoadBundle.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (bytes : Z).
+  Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)).
+  Context (Huintb : uint (to_bits 64 bytes) = bytes).
+  Context (Hread_plain : forall (addr : mword 64) (ww : mword (8 * bytes)) s,
+      dev_addr addr = false ->
+      (forall j : nat, (N.of_nat j < Z.to_N bytes)%N ->
+         s.(mem) !! (pa_add addr j) = Some (nth_byte ww j)) ->
+      exec (read_ram Read_plain (Physaddr addr) bytes false) s = Some ((ww, default_meta), s)).
+  Context (Hwrite_plain : forall (addr : mword 64) (dd : mword (8 * bytes)) s,
+      dev_addr addr = false ->
+      exec (write_ram rv64d_types.Write_plain (Physaddr addr) bytes dd tt) s
+      = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N bytes) dd) s.(mdev))).
+  Context (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+          (data : gset Arch.pa) (w va : mword 64).
+
+  Definition cva (k : nat) : mword 64 := add_vec_int va (Z.of_nat k * bytes).
+
+  Definition config_ok (s : mstate) : Prop :=
+    register_lookup misa s.(sregs) = MISA_C /\
+    register_lookup menvcfg s.(sregs) = MENVCFG_S /\
+    register_lookup htif_tohost_base s.(sregs) = None /\
+    register_lookup cur_privilege s.(sregs) = User /\
+    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" /\
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false /\
+    pma_allows_all (register_lookup pma_regions s.(sregs)).
+
+  Lemma config_ok_pres (s s' : mstate) :
+    (s'.(sregs) = s.(sregs) \/ exists tv, s'.(sregs) = register_set tlb tv s.(sregs)) ->
+    config_ok s -> config_ok s'.
+  Proof.
+    intros Hd (H1 & H2 & H3 & H4 & H5 & H6 & H7). unfold config_ok.
+    assert (Tr : forall r : register, register_beq r tlb = false ->
+              register_lookup r s'.(sregs) = register_lookup r s.(sregs)).
+    { intros r Hne. destruct Hd as [Heq | (tv & Heq)]; rewrite Heq;
+        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+    rewrite (Tr misa ltac:(vm_compute; reflexivity)).
+    rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)).
+    rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)).
+    rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)).
+    rewrite (Tr mstatus ltac:(vm_compute; reflexivity)).
+    rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)).
+    repeat split; assumption.
+  Qed.
+
+  Context (σ0 : mstate).
+
+  Fixpoint sst (k : nat) : mstate :=
+    match k with
+    | O => σ0
+    | S k' =>
+      match exec (translateAddr (Virtaddr (cva k')) (Load Data)) (sst k') with
+      | Some (Ok (Physaddr _, _, _), s') => s'
+      | _ => sst k'
+      end
+    end.
+
+  Definition spa (k : nat) : mword 64 := u_walk_pa w (cva k).
+  Definition sval (k : nat) : mword (8 * bytes) :=
+    match exec (mem_read (Load Data) PBMT_PMA (Physaddr (spa k)) bytes false false false) (sst (S k)) with
+    | Some (Ok v, _) => v
+    | _ => zeros' (8 * bytes)
+    end.
+
+  Lemma split_load_fold (N : nat) :
+    forall (m start : nat),
+    (start + m = N)%nat ->
+    config_ok (sst start) ->
+    (forall k, (start <= k < N)%nat -> um !! svpn_of (cva k) = Some w) ->
+    (forall k, (start <= k < N)%nat -> uleaf_ok (Load Data) w) ->
+    (forall k, (start <= k < N)%nat -> is_aligned_vaddr (Virtaddr (cva k)) bytes = true) ->
+    (forall k, (start <= k < N)%nat ->
+       neq_vec (bits_of_virtaddr (Virtaddr (cva k)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (cva k))) (Z.sub 39 1) 0)) = false) ->
+    udata_cov um data ->
+    reg_interp (sst start).(sregs) -∗ gen_heap_interp (sst start).(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ⌜forall k, (start <= k < N)%nat ->
+       exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (Z.of_nat k * bytes))) (Load Data)) (sst k)
+         = Some (Ok (Physaddr (spa k), PBMT_PMA, init_ext_ptw), sst (S k))⌝ ∗
+    ⌜forall k, (start <= k < N)%nat ->
+       exec (mem_read (Load Data) PBMT_PMA (Physaddr (spa k)) bytes false false false) (sst (S k))
+         = Some (Ok (sval k), sst (S k))⌝ ∗
+    ⌜(sst N).(mdev) = (sst start).(mdev)⌝ ∗
+    reg_interp (sst N).(sregs) ∗ gen_heap_interp (sst N).(mem) ∗
+    utlb_inv_pt uroot tfp um ∗ udata_own data.
+  Proof.
+    induction m as [|m' IH]; intros start Hsm Hcfg Hmap Hleaf Halk Hcank Hcov;
+      iIntros "Hri Hgh Hinv Hdata".
+    - (* m=0: start=N *)
+      assert (start = N) by lia. subst start.
+      iModIntro. iSplit; [ iPureIntro; intros; lia | ].
+      iSplit; [ iPureIntro; intros; lia | ].
+      iSplit; [ iPureIntro; reflexivity | ]. iFrame.
+    - (* m=S m': process chunk start, recurse *)
+      assert (Hlt : (start < N)%nat) by lia.
+      pose proof Hcfg as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & Hmprv & Hall).
+      iMod (user_pt_load_data_g bytes Hb Hb8 Hbdvd Huintb Hread_plain
+              uroot tfp um data w (cva start) (sst start)
+              (Hmap start ltac:(lia)) (Hleaf start ltac:(lia)) Hcov
+              (Halk start ltac:(lia)) (Hcank start ltac:(lia))
+              Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
+              with "Hri Hgh Hinv Hdata")
+        as (dv σ') "(%Htr0 & %Hmr0 & %Hmdev & %Hsregs & Hri & Hgh & Hinv & Hdata)".
+      (* sst (S start) = σ' *)
+      assert (Hstep : sst (S start) = σ').
+      { cbn [sst]. fold (cva start). rewrite Htr0. reflexivity. }
+      (* config preserved at sst (S start) *)
+      assert (Hcfg' : config_ok (sst (S start))).
+      { rewrite Hstep. exact (config_ok_pres (sst start) σ' Hsregs Hcfg). }
+      replace σ' with (sst (S start)) in * by (exact Hstep). clear Hstep.
+      iMod (IH (S start) ltac:(lia) Hcfg'
+              (fun k Hk => Hmap k ltac:(lia)) (fun k Hk => Hleaf k ltac:(lia))
+              (fun k Hk => Halk k ltac:(lia)) (fun k Hk => Hcank k ltac:(lia)) Hcov
+              with "Hri Hgh Hinv Hdata")
+        as "(%HtrR & %HmrR & %HmdR & Hri & Hgh & Hinv & Hdata)".
+      iModIntro.
+      iSplit.
+      { iPureIntro. intros k Hk.
+        destruct (Nat.eq_dec k start) as [->|Hne].
+        - (* chunk start: Htr0 is already at sst (S start) *)
+          replace (add_vec_int (bits_of_virtaddr (Virtaddr va)) (Z.of_nat start * bytes))
+            with (cva start) by reflexivity.
+          exact Htr0.
+        - apply HtrR. lia. }
+      iSplit.
+      { iPureIntro. intros k Hk.
+        destruct (Nat.eq_dec k start) as [->|Hne].
+        - unfold sval, spa. rewrite Hmr0. cbn match. reflexivity.
+        - apply HmrR. lia. }
+      iSplit; [ iPureIntro; rewrite HmdR; exact Hmdev | ].
+      iFrame.
+  Qed.
+
+  Lemma user_pt_vmem_read_addr_misaligned_split_load (N : nat) (width : Z) :
+    (1 <= N)%nat ->
+    Z.of_nat N * bytes = width ->
+    is_aligned_vaddr (Virtaddr va) width = false ->
+    exec (split_misaligned (Virtaddr va) width) σ0 = Some ((Z.of_nat N, bytes), σ0) ->
+    config_ok σ0 ->
+    (forall k, (k < N)%nat -> um !! svpn_of (cva k) = Some w) ->
+    uleaf_ok (Load Data) w ->
+    (forall k, (k < N)%nat -> is_aligned_vaddr (Virtaddr (cva k)) bytes = true) ->
+    (forall k, (k < N)%nat ->
+       neq_vec (bits_of_virtaddr (Virtaddr (cva k)))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (cva k))) (Z.sub 39 1) 0)) = false) ->
+    udata_cov um data ->
+    reg_interp σ0.(sregs) -∗ gen_heap_interp σ0.(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ∃ (σ' : mstate) (dvv : mword (8 * width)),
+      ⌜exec (vmem_read_addr (Virtaddr va) width (Load Data) false false false) σ0
+        = Some (Ok dvv, σ')⌝ ∗
+      ⌜σ'.(mdev) = σ0.(mdev)⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      utlb_inv_pt uroot tfp um ∗ udata_own data.
+  Proof.
+    intros HN Hwidth Hnal Hsplit Hcfg Hmap Hleaf Halk Hcank Hcov.
+    iIntros "Hri Hgh Hinv Hdata".
+    iMod (split_load_fold N N 0%nat ltac:(lia) Hcfg
+            (fun k Hk => Hmap k ltac:(lia)) (fun k Hk => Hleaf)
+            (fun k Hk => Halk k ltac:(lia)) (fun k Hk => Hcank k ltac:(lia)) Hcov
+            with "Hri Hgh Hinv Hdata")
+      as "(%Htr & %Hmr & %Hmd & Hri & Hgh & Hinv & Hdata)".
+    destruct (exec_vmem_read_addr_misaligned_split width bytes va (Load Data) false false N
+                spa sval sst HN Hb
+                (fun k Hk => Htr k ltac:(lia)) (fun k Hk => Hmr k ltac:(lia))
+                Hnal eq_refl eq_refl Hsplit)
+      as (dvv & Hvr).
+    iModIntro. iExists (sst N), dvv.
+    iSplit; [ iPureIntro; exact Hvr | ].
+    iSplit; [ iPureIntro; exact Hmd | ].
+    iFrame.
+  Qed.
+
+End SplitLoadBundle.
