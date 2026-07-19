@@ -560,8 +560,24 @@ before any mechanical sweep.
      WpSconfKfree.v etc.): prologue frame trade, the freelist load/store
      leaves over the funnel, `wp_acquire_sconf` (n→S n) around the
      section, `wp_release_sconf` (S n→n), epilogue.
-     KFREE STATUS (IN PROGRESS, WpSconfKfree.v — spec + prologue Qed-clean,
-     body admitted, file UNREGISTERED so the tree stays green):
+     KFREE STATUS (WpSconfKfree.v — the ENTIRE body is transcribed and
+     compiling; ONE bv identity admitted; file UNREGISTERED so the tree
+     stays green).  DONE end-to-end: prologue, panic-check ALU, memset
+     call, acquire call (intr_count n→S n), freelist push, release call
+     (S n→n), epilogue, callee_saved — all the frame trades
+     (move_down/_up 4), deep-custody split/recombine around each sub-call
+     (memset deep-2, acquire/release deep-10), and the intr_count net-zero
+     threading work.  THE ONE REMAINING ADMIT (`Hnv1eq`): the bv identity
+     `sign_extend' 64 (subrange_vec_dec (add_vec (sext64 po_noff_store)
+     (sext64 (sext12 63))) 31 0) = sign_extend' 64 noffv` — i.e. acquire's
+     noff +1 then release's -1 cancels mod 2^32 (63 in a 6-bit field is
+     -1).  It reduces to the mword-32 fact `subrange(sext64 po_noff_store
+     - 1) 31 0 = noffv` where `po_noff_store = low32(noffv+1)`; a focused
+     ~30-line bv-arithmetic proof (needs a low-32 subrange-unsigned lemma
+     — none exists yet; build via the WpIntenaBits recipe:
+     bv_unsigned + bv_wrap arithmetic, vm'd modulus literals, abstract
+     b2z bounds, avoid the zify-hook lia trap).  Once that lands, kfree is
+     Qed and gets registered.  Historical detail (spec/prologue):
        - SPEC decided.  Threads `sconf γ + hart_state + sie_cap γ root m +
          intr_count γ root n + tlb_inv_pt` and a DEEP-`K` custody
          `stack_own (pa_stk sp0 kv_frame_slots) K` with `14 <= K` (its own
