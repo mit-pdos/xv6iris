@@ -193,3 +193,110 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ Hvw). cbn match.
   apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* LR / SC (Zalrsc).  LR = LOAD with offset 0, LoadReserved, res=true,     *)
+(* sign-extended rd (the reserved read is the res-generic vmem_read_addr   *)
+(* composer).  SC = STORE with StoreConditional, con=true; the Ok case     *)
+(* writes rd := negb success, cancels the reservation, and retires (its    *)
+(* conditional-write composer's Ok/Err is the retire/trap classification). *)
+(* ===================================================================== *)
+Lemma exec_execute_LOADRES_u_ok (aq rl : bool) (rs1 rd : mword 5) (width : Z)
+    (data : mword (8 * width)) (s s' : mstate) :
+  (width <=? xlen_bytes) = true ->
+  uint rd <> 0 ->
+  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved Data) aq (andb aq rl) true) s
+    = Some (Ok data, s') ->
+  exec (execute (LOADRES (aq, rl, Regidx rs1, width, Regidx rd))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+              (regval_into_reg (sign_extend' 64 data))).
+Proof.
+  intros Hw Hrd Hvr.
+  change (execute (LOADRES (aq, rl, Regidx rs1, width, Regidx rd)))
+    with (execute_LOADRES aq rl (Regidx rs1) width (Regidx rd)).
+  unfold execute_LOADRES. rewrite Hw.
+  assert (Hass : exec (assert_exp' true "extensions/A/zalrsc_insts.sail:43.28-43.29" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (exec_bind_Some _ _ _ _ _ Hass).
+  rewrite (exec_bind_Some _ _ _ _ _ Hvr). cbn match.
+  assert (Hw2 : exec (wX_bits (Regidx rd) (sign_extend' 64 data)) s'
+               = Some (tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (sign_extend' 64 data)))).
+  { rewrite (exec_wX_bits_gpr rd (sign_extend' 64 data) s').
+    rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hw2). apply exec_returnM.
+Qed.
+Lemma exec_execute_LOADRES_u_err (aq rl : bool) (rs1 rd : mword 5) (width : Z)
+    (e : ExecutionResult) (s s' : mstate) :
+  (width <=? xlen_bytes) = true ->
+  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved Data) aq (andb aq rl) true) s
+    = Some (Err e, s') ->
+  exec (execute (LOADRES (aq, rl, Regidx rs1, width, Regidx rd))) s = Some (e, s').
+Proof.
+  intros Hw Hvr.
+  change (execute (LOADRES (aq, rl, Regidx rs1, width, Regidx rd)))
+    with (execute_LOADRES aq rl (Regidx rs1) width (Regidx rd)).
+  unfold execute_LOADRES. rewrite Hw.
+  assert (Hass : exec (assert_exp' true "extensions/A/zalrsc_insts.sail:43.28-43.29" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (exec_bind_Some _ _ _ _ _ Hass).
+  rewrite (exec_bind_Some _ _ _ _ _ Hvr). cbn match. apply exec_returnM.
+Qed.
+Lemma exec_execute_STORECON_u_ok (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (b : bool) (s s' : mstate) :
+  (width <=? xlen_bytes) = true ->
+  uint rd <> 0 ->
+  exec (vmem_write (Regidx rs1) (zeros' 64) width
+          (autocast (T := mword) (subrange_vec_dec
+             (if Z.eqb (uint rs2) 0 then zero_reg
+              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
+             (Z.sub (Z.mul width 8) 1) 0))
+          (StoreConditional Data) (andb aq rl) rl true) s = Some (Ok b, s') ->
+  exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+              (regval_into_reg (zero_extend' 64 (bool_bit_forwards (negb b))))).
+Proof.
+  intros Hw Hrd Hvw.
+  change (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_STORECON aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_STORECON. rewrite Hw.
+  assert (Hass : exec (assert_exp' true "extensions/A/zalrsc_insts.sail:68.28-68.29" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (exec_bind_Some _ _ _ _ _ Hass).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ Hvw). cbn match.
+  assert (Hw2 : exec (wX_bits (Regidx rd) (zero_extend' 64 (bool_bit_forwards (negb b)))) s'
+               = Some (tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (zero_extend' 64 (bool_bit_forwards (negb b)))))).
+  { rewrite (exec_wX_bits_gpr rd (zero_extend' 64 (bool_bit_forwards (negb b))) s').
+    rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
+  assert (Hwc : exec (Defs.bind0 (wX_bits (Regidx rd) (zero_extend' 64 (bool_bit_forwards (negb b))))
+                        (cancel_reservation tt)) s'
+               = Some (tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (zero_extend' 64 (bool_bit_forwards (negb b)))))).
+  { rewrite (exec_bind0_Some _ _ _ _ _ Hw2). apply exec_cancel_reservation. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hwc). apply exec_returnM.
+Qed.
+Lemma exec_execute_STORECON_u_err (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (e : ExecutionResult) (s s' : mstate) :
+  (width <=? xlen_bytes) = true ->
+  exec (vmem_write (Regidx rs1) (zeros' 64) width
+          (autocast (T := mword) (subrange_vec_dec
+             (if Z.eqb (uint rs2) 0 then zero_reg
+              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
+             (Z.sub (Z.mul width 8) 1) 0))
+          (StoreConditional Data) (andb aq rl) rl true) s = Some (Err e, s') ->
+  exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s = Some (e, s').
+Proof.
+  intros Hw Hvw.
+  change (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_STORECON aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_STORECON. rewrite Hw.
+  assert (Hass : exec (assert_exp' true "extensions/A/zalrsc_insts.sail:68.28-68.29" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (exec_bind_Some _ _ _ _ _ Hass).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ Hvw). cbn match. apply exec_returnM.
+Qed.
