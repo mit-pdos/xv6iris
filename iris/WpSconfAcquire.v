@@ -157,7 +157,7 @@ Section WpSconfAcquire.
   Lemma wp_acquire_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (R : iProp Σ)
       (m : gmap regidx (mword 64))
-      (cpuold : mword 64) (noffv intena_old : mword 32) :
+      (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) :
     let pcE : mword 64 := mword_of_int AQ in
     let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
     let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
@@ -174,6 +174,7 @@ Section WpSconfAcquire.
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m -∗
+    intr_count γ root_ppn n -∗
     tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
     is_lock γl lk0 R -∗
@@ -196,20 +197,12 @@ Section WpSconfAcquire.
       a_int ↦₄ (if eq_vec (sign_extend' 64 noffv) zero_reg
                 then po_intena_val ms else intena_old) -∗
       stack_own (pa_stk sp0 kv_frame_slots) 10 -∗
-      ( ⌜ _get_Mstatus_SIE ms = ('b"0" : mword 1) ⌝
-      ∨ (⌜ _get_Mstatus_SIE ms = ('b"1" : mword 1) ⌝ ∗
-         intr_off_tok γ ∗
-         (∃ handler : mword 64,
-            intr_inv γ handler root_ppn MENVCFG_S ∗
-            ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
-         (∃ v : mword 64, sepc ↦ᵣ v) ∗
-         (∃ v : mword 64, scause ↦ᵣ v) ∗
-         (∃ v : mword 64, stval ↦ᵣ v)) ) -∗
+      intr_count γ root_ppn (S n) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pcE lk0 a_cpu sp0 cpuv a_noff a_int po_noff_a5 po_noff_store ret_tgt Hnotmine Hal0.
-    iIntros "Hsc Hhs Hcap Htlbinv #Htext Hpc Hfile #Hlock Hcpu Hnoff Hint Hdeep10 Hcont".
+    iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile #Hlock Hcpu Hnoff Hint Hdeep10 Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
     iPoseProof (aqi_02 with "Htext") as "Hi02".
     iPoseProof (aqi_04 with "Htext") as "Hi04".
@@ -329,14 +322,14 @@ Section WpSconfAcquire.
       rewrite /A2 lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /A1 lookup_total_insert_ne; [| vm_compute; discriminate].
       exact HcspA0. }
-    iApply (wp_push_off_sconf γ root_ppn Φ A3 noffv intena_old cpuv
+    iApply (wp_push_off_sconf γ root_ppn Φ A3 noffv intena_old cpuv n
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               ltac:(rewrite HtpA3; reflexivity)
-              with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile [Hdeep6] [Hnoff] [Hint] [-]").
+              with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile [Hdeep6] [Hnoff] [Hint] [-]").
     { iEval (rewrite HcspA3). iExact "Hdeep6". }
     { iExact "Hnoff". }
     { iExact "Hint". }
-    iIntros (ms mp) "%Hmsf Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmp Hdeep6 Hnoff Hint Hpay".
+    iIntros (ms mp) "%Hmsf Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmp Hdeep6 Hnoff Hint Hcnt".
     iEval (rewrite HcspA3) in "Hdeep6".
     destruct Hmp as (Hcspp & Htpp & Hs0p & Hs1p & Hs2p & Hs3p & Hs4p & Hs5p & Hs6p & Hs7p & Hs8p & Hs9p & Hs10p & Hs11p).
     iEval (rewrite lookup_total_insert) in "Hpc".
@@ -600,7 +593,7 @@ Section WpSconfAcquire.
     iEval (rewrite -Hd6b) in "Hdeep6".
     iDestruct (stack_own_split_2 (pa_stk sp0 kv_frame_slots) 4 10 ltac:(lia)
                  with "[$Hdeep4 $Hdeep6]") as "Hdeep10".
-    iApply ("Hcont" $! ms E4 with "[%] Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Htok HRes Hcpu Hnoff Hint Hdeep10 Hpay").
+    iApply ("Hcont" $! ms E4 with "[%] Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Htok HRes Hcpu Hnoff Hint Hdeep10 Hcnt").
     { exact Hmsf. }
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.

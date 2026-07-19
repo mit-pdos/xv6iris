@@ -538,7 +538,7 @@ Section WpSconfPushOff.
 
   Lemma wp_push_off_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
-      (noff intena_old : mword 32) (a0f : mword 64)
+      (noff intena_old : mword 32) (a0f : mword 64) (n : nat)
       :
     let sp0 := m !!! Regidx csp_rs1 in
     (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
@@ -555,6 +555,7 @@ Section WpSconfPushOff.
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m -∗
+    intr_count γ root_ppn n -∗
     tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int (PO + 0x00) : mword 64) -∗ gpr_file m -∗
     (* the DEEP custody: the top 4 slots feed the prologue's frame trade,
@@ -575,15 +576,7 @@ Section WpSconfPushOff.
       a_noff ↦₄ noff_store -∗
       a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg
                    then po_intena_val ms else intena_old) -∗
-      ( ⌜ _get_Mstatus_SIE ms = ('b"0" : mword 1) ⌝
-      ∨ (⌜ _get_Mstatus_SIE ms = ('b"1" : mword 1) ⌝ ∗
-         intr_off_tok γ ∗
-         (∃ handler : mword 64,
-            intr_inv γ handler root_ppn MENVCFG_S ∗
-            ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
-         (∃ v : mword 64, sepc ↦ᵣ v) ∗
-         (∃ v : mword 64, scause ↦ᵣ v) ∗
-         (∃ v : mword 64, stval ↦ᵣ v)) ) -∗
+      intr_count γ root_ppn (S n) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -592,7 +585,7 @@ Section WpSconfPushOff.
     set (N0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
     set (N1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (N0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> N0).
-    iIntros "Hsc Hhs Hcap Htlbinv #Htext Hpc Hfile Hdeep6 Hnoff Hintena Hcont".
+    iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile Hdeep6 Hnoff Hintena Hcont".
     (* split the deep custody: the top 4 feed the prologue's frame trade,
        the deeper 2 ride for the mycpu calls at the moved sp. *)
     iDestruct (stack_own_split_1 (pa_stk sp0 kv_frame_slots) 4 6 ltac:(lia)
@@ -668,11 +661,11 @@ Section WpSconfPushOff.
     iEval (rewrite Hpp0a) in "Hpc".
     (* ---- 0x0a: csrrci a5,sstatus,2 ---- *)
     iPoseProof (poi_0a with "Htext") as "Hi0a".
-    iApply (wp_csrci_sstatus_s_sconf γ root_ppn Φ (mword_of_int (PO + 0x0a)) (mword_of_int 15 : mword 5)
+    iApply (wp_csrci_sstatus_s_sconf γ root_ppn Φ (mword_of_int (PO + 0x0a)) (mword_of_int 15 : mword 5) n
               N1
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi0a [-]").
-    iIntros (mstatus0) "%Hmsf Hhs Hsc Hcap Htlbinv Hpc Hfile Hpayload".
+              with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hi0a [-]").
+    iIntros (mstatus0) "%Hmsf Hhs Hsc Hcap Hpayload Htlbinv Hpc Hfile".
     set (N2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read mstatus0)]> N1).
     set (N3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
         (add_vec zero_reg (N2 !!! Regidx (mword_of_int 15 : mword 5)))]> N2).
@@ -1007,12 +1000,9 @@ Section WpSconfPushOff.
           rewrite /N1 lookup_total_insert_ne; [| vm_compute; discriminate].
           rewrite /N0 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
       { first [ iExact "Hintena" | (iEval (rewrite -Hsv32); iExact "Hintena") ]. }
-      { (* the taken arm's iNext stripped the payload's later; re-introduce *)
-        iDestruct "Hpayload" as "[%Hpb0 | (%Hpb1 & Htok & Hhx & Hsepcx & Hscausex & Hstvalx)]".
-        - iLeft. iPureIntro. exact Hpb0.
-        - iRight. iFrame "Htok Hsepcx Hscausex Hstvalx".
-          iSplitR; [iPureIntro; exact Hpb1 |].
-          iDestruct "Hhx" as (h) "[Hi Hs]". iExists h. iFrame "Hi". iNext. iExact "Hs". }
+      { (* the taken arm's iNext stripped the restore's later; re-introduce *)
+        iDestruct "Hpayload" as "[Htok ((%h & Hi & Hs) & Hsepcx & Hscausex & Hstvalx)]".
+        iFrame "Htok Hsepcx Hscausex Hstvalx". iExists h. iFrame "Hi". iNext. iExact "Hs". }
     - (* ===== FALL arm: noff <> 0 ===== *)
       iApply (wp_cbeqz_fall_s_sconf γ root_ppn Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) N5
@@ -1162,7 +1152,7 @@ Section WpSconfPushOff.
   (* ------------------------------------------------------------------- *)
   Lemma wp_pop_off_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
-      (noffv intenav : mword 32) {dqi : dfrac} :
+      (noffv intenav : mword 32) (n : nat) {dqi : dfrac} :
     let pcE : mword 64 := mword_of_int PP in
     let sp0 := m !!! Regidx csp_rs1 in
     let a0v := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
@@ -1171,30 +1161,25 @@ Section WpSconfPushOff.
     let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
     let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let pinp : iProp Σ :=
-      ( (⌜ neq_vec (sign_extend' 64 intenav) zero_reg = false ⌝ ∗ intr_off_tok γ)
-      ∨ (⌜ neq_vec (sign_extend' 64 intenav) zero_reg = true ⌝ ∗ intr_off_tok γ ∗
-         (∃ handler : mword 64,
-            intr_inv γ handler root_ppn MENVCFG_S ∗
-            ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
-         (∃ v : mword 64, sepc ↦ᵣ v) ∗
-         (∃ v : mword 64, scause ↦ᵣ v) ∗
-         (∃ v : mword 64, stval ↦ᵣ v)) )%I in
+    (* the counting token's level mirrors the noff cell: the machine
+       branch [noff-1 == 0] holds iff we are popping to level 0. *)
+    (neq_vec nv1 zero_reg = false <-> n = 0%nat) ->
     zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m -∗
+    intr_count γ root_ppn (S n) -∗
     tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
     stack_own (pa_stk sp0 kv_frame_slots) 4 -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
-    pinp -∗
     ( ∀ mf,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
       sie_cap γ root_ppn mf -∗
+      intr_count γ root_ppn n -∗
       tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mf -∗
@@ -1202,17 +1187,16 @@ Section WpSconfPushOff.
       stack_own (pa_stk sp0 kv_frame_slots) 4 -∗
       a_noff ↦₄ storeval -∗
       a_int ↦₄{ dqi } intenav -∗
-      (if (negb (neq_vec nv1 zero_reg) && neq_vec (sign_extend' 64 intenav) zero_reg)%bool
-       then emp else pinp) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pcE sp0 a0v a_noff a_int nv1 storeval ret_tgt pinp Hnoffpos Hal0.
+    intros pcE sp0 a0v a_noff a_int nv1 storeval ret_tgt Hcoup Hnoffpos Hal0.
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     set (P0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
     set (P1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (P0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> P0).
-    iIntros "Hsc Hhs Hcap Htlbinv #Htext Hpc Hfile Hdeep4 Hnoff Hint Hinp Hcont".
+    iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile Hdeep4 Hnoff Hint Hcont".
+    iDestruct (intr_count_pos_off with "Hcnt") as "[Htok Hres]".
     iPoseProof (ppi_00 with "Htext") as "Hi00".
     iPoseProof (ppi_02 with "Htext") as "Hi02".
     iPoseProof (ppi_04 with "Htext") as "Hi04".
@@ -1312,14 +1296,12 @@ Section WpSconfPushOff.
     iIntros (msr) "%Hmsfr Hhs Hsc Htlbinv Hpc Hfile Harm".
     set (P3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read msr)]> C).
     iDestruct "Harm" as "[Hstk Hrep]".
-    (* the cap must be at '0': BOTH input cases carry the off-token,
-       which refutes the '1' arm by ghost agreement *)
+    (* the cap must be at '0': the count token's eighth-'0' refutes the
+       '1' arm by ghost agreement *)
     iDestruct "Hrep" as "[[%HSIEr Hq0] | (%HSIEr & Hq1 & Hrest)]".
-    2:{ iAssert False%I with "[Hinp Hq1]" as %[].
-        iDestruct "Hinp" as "[[%Hie Htok] | (%Hie & Htok & Hrest2)]";
-          iDestruct (ghost_var_agree with "Htok Hq1") as %Habs;
-          exfalso; apply (f_equal (@bv_unsigned _)) in Habs;
-          vm_compute in Habs; discriminate. }
+    2:{ iDestruct (ghost_var_agree with "Htok Hq1") as %Habs.
+        exfalso. apply (f_equal (@bv_unsigned _)) in Habs.
+        vm_compute in Habs. discriminate. }
     iAssert (sie_cap γ root_ppn P3) with "[Hstk Hq0]" as "Hcap".
     { iFrame "Hstk". iLeft. iExact "Hq0". }
     assert (Hsst2 : neq_vec (and_vec (sstatus_read msr)
@@ -1457,12 +1439,15 @@ Section WpSconfPushOff.
       iDestruct (stack_own_split_2 (pa_stk sp0 kv_frame_slots) 2 4 ltac:(lia)
                    with "[$Hdeepe $Hdeep2]") as "Hdeep4".
       subst mf.
-      iApply ("Hcont" $! _ with "Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Hdeep4 Hnoff Hint [Hinp]").
-      2:{ iDestruct "Hinp" as "[[%Hie Htok] | (%Hie & Htok & Hhx & Hsep & Hsca & Hstv)]".
-          - iLeft. iFrame "Htok". iPureIntro. exact Hie.
-          - iRight. iFrame "Htok Hsep Hsca Hstv".
-            iSplitR; [iPureIntro; exact Hie |].
-            iDestruct "Hhx" as (h) "[Hi Hs]". iExists h. iFrame "Hi". iNext. iExact "Hs". }
+      (* still nested: neq nv1 0 = true, so n = S n'; the token rides
+         through un-flipped, repacked one level lower. *)
+      assert (Hn0 : n <> 0%nat).
+      { intro Hz. pose proof (proj2 Hcoup Hz) as HH. congruence. }
+      destruct n as [|n']; [ contradiction |].
+      iDestruct "Hres" as "((%hA & #HiA & HsA) & HsepA & HscaA & HstvA)".
+      iApply ("Hcont" $! _ with "Hhs Hsc Hcap [Htok HsepA HscaA HstvA HsA] Htlbinv Hpc Hfile [%] Hdeep4 Hnoff Hint").
+      { iApply (intr_count_pack_S γ root_ppn n' with "Htok").
+        iApply (intr_restore_intro γ root_ppn hA with "HiA HsA HsepA HscaA HstvA"). }
       unfold callee_saved. repeat split.
       + rewrite lookup_total_insert HcspP6 Hsp0up. reflexivity.
       + do 3 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
@@ -1617,13 +1602,12 @@ Section WpSconfPushOff.
         iDestruct (stack_own_split_2 (pa_stk sp0 kv_frame_slots) 2 4 ltac:(lia)
                      with "[$Hdeepe $Hdeep2]") as "Hdeep4".
         subst mf.
-        iApply ("Hcont" $! _ with "Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Hdeep4 Hnoff Hint [Hinp]").
-        2:{ iEval (rewrite HneqF). cbn [andb].
-            iDestruct "Hinp" as "[[%Hie Htok] | (%Hie & Htok & Hhx & Hsep & Hsca & Hstv)]".
-            - iLeft. iFrame "Htok". iPureIntro. exact Hie.
-            - iRight. iFrame "Htok Hsep Hsca Hstv".
-              iSplitR; [iPureIntro; exact Hie |].
-              iDestruct "Hhx" as (h) "[Hi Hs]". iExists h. iFrame "Hi". iNext. iExact "Hs". }
+        assert (Hn0B : n = 0%nat) by (apply (proj1 Hcoup); unfold neq_vec in *; congruence).
+        subst n.
+        iDestruct "Hres" as "((%hB & #HiB & HsB) & HsepB & HscaB & HstvB)".
+        iApply ("Hcont" $! _ with "Hhs Hsc Hcap [Htok HsepB HscaB HstvB HsB] Htlbinv Hpc Hfile [%] Hdeep4 Hnoff Hint").
+        { iRight. iFrame "Htok".
+          iApply (intr_restore_intro γ root_ppn hB with "HiB HsB HsepB HscaB HstvB"). }
         unfold callee_saved. repeat split.
         * rewrite lookup_total_insert HcspP7 Hsp0up. reflexivity.
         * do 3 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
@@ -1746,14 +1730,15 @@ Section WpSconfPushOff.
         iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
         assert (Hpc24 : add_vec_int (mword_of_int (PP + 0x22) : mword 64) 2 = mword_of_int (PP + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc24) in "Hpc".
-        (* the input must be the payload case *)
-        iDestruct "Hinp" as "[[%Hie Htok] | (%Hie & Htok & Hhx & Hsep & Hsca & Hstv)]".
-        { exfalso. rewrite HneqT in Hie. discriminate. }
+        assert (Hn0C : n = 0%nat).
+        { apply (proj1 Hcoup). unfold neq_vec in *. congruence. }
+        subst n.
         (* ---- 0x24: csrsi sstatus,2 (rd = x0) -- the restore ---- *)
         iPoseProof (ppi_24 with "Htext") as "Hi24".
         iApply (wp_csrsi_sstatus_x0_s_sconf γ root_ppn Φ (mword_of_int (PP + 0x24)) P7
-                  with "Hsc Hhs Hcap Htok Hhx Hsep Hsca Hstv Htlbinv Hpc Hfile Hi24 [-]").
-        iIntros (msi) "%Hmsfi Hhs Hsc Hcap Htlbinv Hpc Hfile".
+                  with "Hsc Hhs Hcap [Htok Hres] Htlbinv Hpc Hfile Hi24 [-]").
+        { iApply (intr_count_pack_S γ root_ppn 0 with "Htok Hres"). }
+        iIntros (msi) "%Hmsfi Hhs Hsc Hcap Hcnt0 Htlbinv Hpc Hfile".
         assert (Hpc28 : add_vec_int (mword_of_int (PP + 0x24) : mword 64) 4 = mword_of_int (PP + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc28) in "Hpc".
         iApply (wp_pop_off_epi_sconf γ root_ppn Φ P7
@@ -1768,8 +1753,7 @@ Section WpSconfPushOff.
         iDestruct (stack_own_split_2 (pa_stk sp0 kv_frame_slots) 2 4 ltac:(lia)
                      with "[$Hdeepe $Hdeep2]") as "Hdeep4".
         subst mf.
-        iApply ("Hcont" $! _ with "Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Hdeep4 Hnoff Hint []").
-        2:{ iEval (rewrite HneqT). cbn [andb negb]. done. }
+        iApply ("Hcont" $! _ with "Hhs Hsc Hcap Hcnt0 Htlbinv Hpc Hfile [%] Hdeep4 Hnoff Hint").
         unfold callee_saved. repeat split.
         * rewrite lookup_total_insert HcspP7 Hsp0up. reflexivity.
         * do 3 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).

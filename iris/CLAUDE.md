@@ -527,39 +527,29 @@ before any mechanical sweep.
      uses `po_intena_val_zero/_one` (WpIntenaBits.v).  THE SPINLOCK
      LAYER IS COMPLETE.  NEXT: the kalloc cone — BLOCKED on
      the NESTING-EVIDENCE design decision below.
-   - OPEN DESIGN QUESTION (kalloc/kfree and every acquire+release
-     client): release's pop_off input demands, in its intena=0 case,
-     the interrupts-off token — evidence that the cap is at '0'.  Who
-     supplies it, case by case?  (a) NESTED call (entry noff>0): the
-     enclosing region's pinp (its opener's payload carries the token)
-     — caller-suppliable, spec-expressible via a
-     ⌜neq (sext64 qnoff) zero⌝-guarded input.  (b) TOP-LEVEL call at
-     arm '1' (steady state): the client's OWN acquire flips and its
-     payload carries the token — self-contained.  (c) TOP-LEVEL call
-     at arm '0' with noff=0 (the BOOT transient, kinit's kfree loop):
-     the boot chain must hold the initial token from
-     sie_ghost_alloc (interrupts start off — the spare eighth IS the
-     boot's token; consumed by the first intr_on).  The PROBLEM: cases
-     (b) and (c) are indistinguishable at the spec level (the cap is
-     arm-blind), so a single kalloc spec cannot demand the token
-     exactly when (c) holds.  OPTIONS considered: (i) two premise-
-     disjoint kalloc variants (nested-or-boot WITH a token loan /
-     top-at-'1' — but '1'-ness is not spec-expressible either); (ii)
-     sub-token fractions minted by the '0'-arm csrci and merged back
-     by the nested pop_off (makes the cap's '0' fraction variable —
-     breaks the exact flip gather unless the at-rest fraction is
-     re-established, which needs a nesting invariant); (iii) an
-     auth-nat region counter in the '0' arm (●n in the cap, ◯1 per
-     open region; refutes '1' by ◯-vs-●0 validity) — clean for
-     evidence, but the restore's ●1→●0 step needs "no other ◯s",
-     i.e. a ghost-to-noff tie.  RECOMMENDATION: (iii) with the tie
-     provided at the FUNCTION level (pop_off's restore premise
-     noffv=1 already encodes outermost-ness; strengthen the region
-     discipline so ◯-count mirrors noff — the natural invariant
-     "●n ∧ noff-cell = n" lives in the per-cpu resources the
-     push/pop specs already thread).  DECIDE BEFORE converting
-     kalloc.  (Then: kalloc/kfree/wakeup file-by-file, VCgen `_den`
-     sconf wrapper with the first converted function.)
+   - RESOLVED — the COUNTING TOKEN (IntrDefs §6b, all pushed
+     axiom-clean): the SIE ghost's spare quarter splits into TWO
+     eighths — one in `sie_cap` (per-instruction arm witness), one in
+     `intr_count γ root n` (the per-function counting token mirroring
+     noff nesting).  Both agree with the mstatus-tied half, so the flip
+     (`sie_ghost_flip_off`/`_on`) gathers half + cap-eighth +
+     count-eighth + inv-quarter.  `intr_count 0` = eighth-'1' ∨
+     (eighth-'0' ∗ restore); n≥1 = eighth-'0' ∗ restore.  `n>0 ⇒ off`
+     (`intr_count_pos_off`); level-0 ↔ raw SIE token
+     (`intr_count_init`).  The exclusive trap CSRs MOVE between
+     sie_cap's '1' arm and intr_count at each flip (persistent
+     intr_inv/handler-spec duplicate freely; the ▷ on the spec is
+     re-added via `intr_restore_intro` after a branch's iNext).
+     push_off: `intr_count n` → `intr_count (S n)` (csrci: real flip at
+     n=0 arm-'1', idempotent otherwise; the leaf refutes impossible
+     arms by agreement, `intr_count_get_on/_off`).  pop_off:
+     `intr_count (S n)` → `intr_count n`, with the COUPLING premise
+     `neq_vec nv1 zero_reg = false ↔ n = 0` tying the runtime
+     noff-1==0 branch to the token level (so the restore path, csrsi
+     1→0, coincides with the outermost pop).  acquire passes the token
+     with an INCREMENT (push_off inside), release with a DECREMENT
+     (pop_off inside).  csrr keeps its arm-report (pop_off refutes the
+     '1' arm via its count eighth); csrsi flips only 1→0.
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
      stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
      initial 32 slots); adequacy plumbing last; delete `smode_config`

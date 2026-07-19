@@ -55,7 +55,7 @@ Section WpSconfRelease.
   Lemma wp_release_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (R : iProp Σ)
       (m : gmap regidx (mword 64))
-      (cpuold : mword 64) (noffv intenav : mword 32) {dqi : dfrac} :
+      (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) {dqi : dfrac} :
     let pcE : mword 64 := mword_of_int RL in
     let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
     let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
@@ -66,17 +66,9 @@ Section WpSconfRelease.
     let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
     let storeval_noff := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let pinp : iProp Σ :=
-      ( (⌜ neq_vec (sign_extend' 64 intenav) zero_reg = false ⌝ ∗ intr_off_tok γ)
-      ∨ (⌜ neq_vec (sign_extend' 64 intenav) zero_reg = true ⌝ ∗ intr_off_tok γ ∗
-         (∃ handler : mword 64,
-            intr_inv γ handler root_ppn MENVCFG_S ∗
-            ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
-         (∃ v : mword 64, sepc ↦ᵣ v) ∗
-         (∃ v : mword 64, scause ↦ᵣ v) ∗
-         (∃ v : mword 64, stval ↦ᵣ v)) )%I in
     add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
     eq_vec cpuold cpuv = true ->
+    (neq_vec nv1 zero_reg = false <-> n = 0%nat) ->
     zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     sconf γ -∗
@@ -91,7 +83,7 @@ Section WpSconfRelease.
     a_noff ↦₄ noffv -∗
     a_int ↦₄{ dqi } intenav -∗
     stack_own (pa_stk sp0 kv_frame_slots) 10 -∗
-    pinp -∗
+    intr_count γ root_ppn (S n) -∗
     ( ∀ mr,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
@@ -104,14 +96,13 @@ Section WpSconfRelease.
       a_noff ↦₄ storeval_noff -∗
       a_int ↦₄{ dqi } intenav -∗
       stack_own (pa_stk sp0 kv_frame_slots) 10 -∗
-      (if (negb (neq_vec nv1 zero_reg) && neq_vec (sign_extend' 64 intenav) zero_reg)%bool
-       then emp else pinp) -∗
+      intr_count γ root_ppn n -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pcE lk0 a_cpu sp0 cpuv a_noff a_int nv1 storeval_noff ret_tgt pinp
-           Hlka Hmine Hnoffpos Hal0.
-    iIntros "Hsc Hhs Hcap Htlbinv #Htext Hpc Hfile #Hlock Htok HR Hcpu Hnoff Hint Hdeep10 Hinp Hcont".
+    intros pcE lk0 a_cpu sp0 cpuv a_noff a_int nv1 storeval_noff ret_tgt
+           Hlka Hmine Hcoup Hnoffpos Hal0.
+    iIntros "Hsc Hhs Hcap Htlbinv #Htext Hpc Hfile #Hlock Htoken HR Hcpu Hnoff Hint Hdeep10 Hcnt Hcont".
     iPoseProof (rli_00 with "Htext") as "Hi00".
     iPoseProof (rli_02 with "Htext") as "Hi02".
     iPoseProof (rli_04 with "Htext") as "Hi04".
@@ -240,10 +231,10 @@ Section WpSconfRelease.
               ltac:(rewrite Ha0R3; exact Hlka)
               ltac:(rewrite HtpR3; exact Hmine)
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-              with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile Hlock Htok [Hcpu] [Hdeep6] [-]").
+              with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile Hlock Htoken [Hcpu] [Hdeep6] [-]").
     { iEval (rewrite Ha0R3). iExact "Hcpu". }
     { iEval (rewrite HcspR3). iExact "Hdeep6". }
-    iIntros (mh) "Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmh Htok Hcpu Hdeep6".
+    iIntros (mh) "Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmh Htoken Hcpu Hdeep6".
     iEval (rewrite Ha0R3) in "Hcpu".
     iEval (rewrite HcspR3) in "Hdeep6".
     destruct Hmh as [Hcsh Ha0h].
@@ -290,7 +281,7 @@ Section WpSconfRelease.
     iApply (wp_sw_zero_lockinv_s_sconf γ root_ppn Φ γl lka R (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) mh
               ltac:(rewrite Hs1mh; exact Hlka)
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi1a Hlock Htok HR [-]").
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi1a Hlock Htoken HR [-]").
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
     assert (Hpc1e : add_vec_int (mword_of_int (RL + 0x1a) : mword 64) 4 = mword_of_int (RL + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
@@ -315,14 +306,14 @@ Section WpSconfRelease.
       rewrite Hcsph. exact HcspR3. }
     iDestruct (stack_own_split_1 (pa_stk spr kv_frame_slots) 4 6 ltac:(lia)
                  with "Hdeep6") as "[Hpd4 Hspare2]".
-    iApply (wp_pop_off_sconf γ root_ppn Φ M1 noffv intenav (dqi := dqi)
-              Hnoffpos
+    iApply (wp_pop_off_sconf γ root_ppn Φ M1 noffv intenav n (dqi := dqi)
+              Hcoup Hnoffpos
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
-              with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile [Hpd4] [Hnoff] [Hint] Hinp [-]").
+              with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile [Hpd4] [Hnoff] [Hint] [-]").
     { iEval (rewrite HcspM1). iExact "Hpd4". }
     { iEval (rewrite HtpM1). iExact "Hnoff". }
     { iEval (rewrite HtpM1). iExact "Hint". }
-    iIntros (mf) "Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmf Hpd4 Hnoff Hint Hpay".
+    iIntros (mf) "Hhs Hsc Hcap Hcnt Htlbinv Hpc Hfile %Hmf Hpd4 Hnoff Hint".
     iEval (rewrite HcspM1) in "Hpd4".
     iEval (rewrite HtpM1) in "Hnoff".
     iEval (rewrite HtpM1) in "Hint".
@@ -436,7 +427,7 @@ Section WpSconfRelease.
     iEval (rewrite -Hd6b) in "Hdeep6".
     iDestruct (stack_own_split_2 (pa_stk sp0 kv_frame_slots) 4 10 ltac:(lia)
                  with "[$Hdeep4 $Hdeep6]") as "Hdeep10".
-    iApply ("Hcont" $! E4 with "Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Hcpu Hnoff Hint Hdeep10 Hpay").
+    iApply ("Hcont" $! E4 with "Hhs Hsc Hcap Htlbinv Hpc Hfile [%] Hcpu Hnoff Hint Hdeep10 Hcnt").
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.
     + do 4 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).

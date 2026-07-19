@@ -135,15 +135,17 @@ Section IntrDefs.
     iModIntro. iFrame.
   Qed.
 
-  (* '1'->'0' (csrci): gather 1/2 + 1/4 + 1/4, come back 1/2 + 1/8(cap)
-     + 1/8(token) + 1/4(invariant). *)
-  Lemma sie_ghost_flip_off (γ : gname) (v1 v2 v3 : mword 1) :
-    ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4) v2 -∗ ghost_var γ (1/4) v3 ==∗
+  (* '1'->'0' (csrci): gather 1/2 + 1/8(cap) + 1/8(count) + 1/4(inv),
+     come back the same shape at '0'. *)
+  Lemma sie_ghost_flip_off (γ : gname) (v1 v2a v2b v3 : mword 1) :
+    ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4/2)%Qp v2a -∗ ghost_var γ (1/4/2)%Qp v2b -∗
+    ghost_var γ (1/4) v3 ==∗
     ghost_var γ (1/2) ('b"0" : mword 1) ∗ ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
     ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ ghost_var γ (1/4) ('b"0" : mword 1).
   Proof.
-    iIntros "H1 H2 H3".
-    iMod (sie_ghost_flip γ v1 v2 v3 ('b"0") with "H1 H2 H3") as "(H1 & H2 & H3)".
+    iIntros "H1 H2a H2b H3".
+    iCombine "H2a H2b" as "H2".
+    iMod (sie_ghost_flip γ v1 v2a v3 ('b"0") with "H1 H2 H3") as "(H1 & H2 & H3)".
     iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
     { iPureIntro. apply (bool_decide_unpack _). by compute. }
     iEval (rewrite Hq) in "H2".
@@ -151,17 +153,21 @@ Section IntrDefs.
     iModIntro. iFrame.
   Qed.
 
-  (* '0'->'1' (csrsi): gather 1/2 + 1/8 + 1/8 + 1/4, come back
-     1/2 + 1/4(cap) + 1/4(invariant). *)
+  (* '0'->'1' (csrsi): gather the same four pieces, come back at '1'
+     (cap eighth + count eighth + invariant quarter). *)
   Lemma sie_ghost_flip_on (γ : gname) (v1 v2a v2b v3 : mword 1) :
     ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4/2)%Qp v2a -∗ ghost_var γ (1/4/2)%Qp v2b -∗
     ghost_var γ (1/4) v3 ==∗
-    ghost_var γ (1/2) ('b"1" : mword 1) ∗ ghost_var γ (1/4) ('b"1" : mword 1) ∗
-    ghost_var γ (1/4) ('b"1" : mword 1).
+    ghost_var γ (1/2) ('b"1" : mword 1) ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
+    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗ ghost_var γ (1/4) ('b"1" : mword 1).
   Proof.
     iIntros "H1 H2a H2b H3".
     iCombine "H2a H2b" as "H2".
     iMod (sie_ghost_flip γ v1 v2a v3 ('b"1") with "H1 H2 H3") as "(H1 & H2 & H3)".
+    iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
+    { iPureIntro. apply (bool_decide_unpack _). by compute. }
+    iEval (rewrite Hq) in "H2".
+    iDestruct (ghost_var_split with "H2") as "[H2a H2b]".
     iModIntro. iFrame.
   Qed.
 
@@ -381,7 +387,7 @@ Section IntrDefs.
 
   Definition sie_arm (γ : gname) (root_ppn : mword 44) : iProp Σ :=
     (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∨
-     (ghost_var γ (1/4) ('b"1" : mword 1) ∗
+     (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
       (∃ handler : mword 64, intr_inv γ handler root_ppn MENVCFG_S) ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
@@ -456,6 +462,103 @@ Section IntrDefs.
   Qed.
 
   (* =================================================================== *)
+  (* §6b THE PUSH/POP COUNTING TOKEN.  [intr_count γ root n] is the      *)
+  (* per-cpu interrupt-disable bookkeeping token push_off/pop_off manage *)
+  (* (n mirrors the noff nesting depth).  It carries the COMPLEMENTARY   *)
+  (* EIGHTH of the SIE ghost at EVERY level -- the other half of the     *)
+  (* capability's eighth at either arm -- so arm knowledge is pure ghost *)
+  (* agreement wherever the token travels: n > 0 implies interrupts are  *)
+  (* disabled ('0'-eighth), and at n = 0 the eighth records the current  *)
+  (* arm.  Every level >= 1 (and the n = 0 disabled state) also carries  *)
+  (* the RESTORE payload (the invariant copy + later'd handler spec +    *)
+  (* the trap CSRs) -- the enable flip is sound whenever csrsi actually  *)
+  (* executes, so no intena correlation is needed in the token itself.   *)
+  (* =================================================================== *)
+  Definition intr_restore (γ : gname) (root_ppn : mword 44) : iProp Σ :=
+    ((∃ handler : mword 64,
+        intr_inv γ handler root_ppn MENVCFG_S ∗
+        ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
+     (∃ v : mword 64, sepc ↦ᵣ v) ∗
+     (∃ v : mword 64, scause ↦ᵣ v) ∗
+     (∃ v : mword 64, stval ↦ᵣ v))%I.
+
+  Definition intr_count (γ : gname) (root_ppn : mword 44) (n : nat) : iProp Σ :=
+    match n with
+    | O => (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1)
+            ∨ (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn))%I
+    | S _ => (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn)%I
+    end.
+
+  (* enter the push/pop discipline at level 0 from raw SIE-token
+     ownership (the boot path: interrupts start disabled, the boot holds
+     the spare eighth + the trap CSRs + the freshly allocated invariant) *)
+  Lemma intr_count_init (γ : gname) (root_ppn : mword 44) :
+    intr_off_tok γ -∗ intr_restore γ root_ppn -∗ intr_count γ root_ppn 0.
+  Proof. iIntros "Htok Hres". iRight. iFrame "Htok Hres". Qed.
+
+  (* n > 0 implies interrupts disabled: any fraction of '0' pins the arm *)
+  Lemma intr_count_pos_off (γ : gname) (root_ppn : mword 44) (n : nat) :
+    intr_count γ root_ppn (S n) -∗ ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn.
+  Proof. iIntros "[Htok Hres]". iFrame. Qed.
+
+  (* at the '0' arm (cap-eighth-'0'), [intr_count n] yields the count
+     eighth-'0' + the restore payload -- the n=0 '1'-branch is refuted
+     by ghost agreement with the cap. *)
+  Lemma intr_count_get_off (γ : gname) (root_ppn : mword 44) (n : nat) :
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
+    intr_count γ root_ppn n -∗
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn.
+  Proof.
+    iIntros "Hcap Hcnt". destruct n.
+    - iDestruct "Hcnt" as "[Hc1 | [Hc0 Hres]]".
+      + iDestruct (ghost_var_agree with "Hcap Hc1") as %Hbad.
+        exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
+      + iFrame.
+    - iDestruct "Hcnt" as "[Hc0 Hres]". iFrame.
+  Qed.
+
+  (* at the '1' arm (cap-eighth-'1'), [intr_count n] forces n=0 and
+     yields the count eighth-'1' -- the S-case and the n=0 '0'-branch
+     both carry a '0' eighth, refuted by agreement. *)
+  Lemma intr_count_get_on (γ : gname) (root_ppn : mword 44) (n : nat) :
+    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) -∗
+    intr_count γ root_ppn n -∗
+    ⌜ n = 0%nat ⌝ ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1)
+                  ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1).
+  Proof.
+    iIntros "Hcap Hcnt". destruct n.
+    - iDestruct "Hcnt" as "[Hc1 | [Hc0 _]]".
+      + iFrame. done.
+      + iDestruct (ghost_var_agree with "Hcap Hc0") as %Hbad.
+        exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
+    - iDestruct "Hcnt" as "[Hc0 _]".
+      iDestruct (ghost_var_agree with "Hcap Hc0") as %Hbad.
+      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
+  Qed.
+
+  (* pack a count eighth-'0' + restore back into [intr_count (S n)]. *)
+  (* rebuild [intr_restore] from its pieces, re-introducing the later on
+     the persistent handler spec (needed after a branch's [iNext] strips
+     it). *)
+  Lemma intr_restore_intro (γ : gname) (root_ppn : mword 44) (h : mword 64) :
+    intr_inv γ h root_ppn MENVCFG_S -∗
+    intr_handler_spec h root_ppn MENVCFG_S -∗
+    (∃ v : mword 64, sepc ↦ᵣ v) -∗
+    (∃ v : mword 64, scause ↦ᵣ v) -∗
+    (∃ v : mword 64, stval ↦ᵣ v) -∗
+    intr_restore γ root_ppn.
+  Proof.
+    iIntros "#Hi #Hs Hsep Hsca Hstv". iFrame "Hsep Hsca Hstv".
+    iExists h. iFrame "Hi". iNext. iExact "Hs".
+  Qed.
+
+  Lemma intr_count_pack_S (γ : gname) (root_ppn : mword 44) (n : nat) :
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗ intr_restore γ root_ppn -∗
+    intr_count γ root_ppn (S n).
+  Proof. iIntros "Hc0 Hres". iFrame. Qed.
+
+  (* =================================================================== *)
   (* §7 The v2 <-> interrupts-enabled conversions: the agnostic engines'  *)
   (* '1' arm assembles [intr_config]/[intr_frame] for the absorbing step  *)
   (* engine and disassembles them back around its σ-callback.  Ghost      *)
@@ -465,11 +568,11 @@ Section IntrDefs.
   (* =================================================================== *)
   Lemma intr_config_of_v2 (γ : gname) :
     sconf γ -∗
-    ghost_var γ (1/4) ('b"1" : mword 1) -∗
+    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) -∗
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_config γ ∗ ghost_var γ (1/4) ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S.
+    intr_config γ ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S.
   Proof.
     iIntros "Hsc Hq Hsepc Hscause Hstval".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
