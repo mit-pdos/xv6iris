@@ -624,9 +624,10 @@ before any mechanical sweep.
        pre-assert every premise as a named hyp; (ii) the release resource
        list MUST include `Htext` (kernel_text) at its sig position or the
        whole `iApply` mis-aligns and blows up.
-     REMAINING: compose `wp_wakeup_sconf` = prologue → loop → epilogue
-     (mirror the smode `wp_wakeup`, WpWakeup.v:2248).  The DEEP-CUSTODY
-     ACCOUNTING is the one non-obvious part (all three specs already read):
+     * `wp_wakeup_sconf` = prologue → loop → epilogue — DONE
+       (WpSconfWakeupLoop.v, Qed, axiom-clean).  The WHOLE wakeup function
+       is now ported to sconf.  The DEEP-CUSTODY ACCOUNTING (the one
+       non-obvious part):
      caller provides deep-K at sp0 + noff cell + (∃iv, intena cell) +
      wk_lockcells + procs_inv + intr_count lvl + the coupling/round-trip
      premises.  (1) `wp_wakeup_prologue_sconf`: deep-K → deep-(K-8) at spF

@@ -824,4 +824,127 @@ Section WpSconfWakeupLoop.
       [lia | exact Hk | exact Hregs].
   Qed.
 
+  (* ===================================================================== *)
+  (* Whole-function WP for wakeup(chan) over sconf: prologue -> loop        *)
+  (* (k=0, exiting to the epilogue) -> return.  Mirrors the smode wp_wakeup  *)
+  (* (WpWakeup.v).  The caller supplies deep-K custody (K>=18, so deep-10    *)
+  (* remains for the loop after the prologue's 8-slot frame carve), the      *)
+  (* per-cpu push_off scratch (noff + EXISTENTIAL intena + lock words), and  *)
+  (* procs_inv; the arithmetic side conditions (mycpu non-null, noff round-  *)
+  (* trip, and the noff<->intr_count coupling) are the caller's obligations. *)
+  (* proc_lock_res is threaded opaquely (Rreg/gc/bsie/dq), as in the loop.   *)
+  (* ===================================================================== *)
+  Lemma wp_wakeup_sconf
+      (γ : gname) (root_ppn : mword 44)
+      (Rreg : s_regime) (γc : gname) (bsie : mword 1) (dq : dfrac)
+      (Φ : mval -> iProp Σ)
+      (m : gmap regidx (mword 64)) (γs : list gname) (a0f : mword 64)
+      (noffv : mword 32) (lvl K : nat) :
+    let sp0 := m !!! Regidx csp_rs1 in
+    let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
+    let rettgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (18 <= K)%nat ->
+    (forall r : regidx, r ∈ dom m) ->
+    length γs = NPROC ->
+    mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
+    eq_vec (zero_reg : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
+    zopz0zKzJ_s zero_reg (sign_extend' 64 (wk_noff_acq noffv)) = false ->
+    wk_noff_rel (wk_noff_acq noffv) = noffv ->
+    (neq_vec (sign_extend' 64 noffv) zero_reg = false <-> lvl = 0%nat) ->
+    eq_vec (access_vec_dec rettgt 0) ('b"0") = true ->
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn m -∗
+    intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
+    kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗ gpr_file m -∗
+    stack_own (pa_stk sp0 kv_frame_slots) K -∗
+    wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
+    wk_lockcells γs -∗ procs_inv Rreg Φ γc bsie dq γs -∗
+    ( ∀ Mf : gmap regidx (mword 64),
+        ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
+        sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn Mf -∗
+        intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
+        kernel_text -∗ pc_is rettgt -∗ gpr_file Mf -∗
+        stack_own (pa_stk sp0 kv_frame_slots) K -∗
+        wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
+        wk_lockcells γs -∗
+        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros sp0 spF rettgt HK Hdom Hlen Hmycpu Hmycpu_nz Hnf_pos Hnf_rt Hcoupling Halign.
+    iIntros "Hsc Hhs Hcap Hcnt Htlb #Htext Hpc Hfile HdeepK Hnoffc Hintc Hlockcells #Hpinv Hcont".
+    (* ---- prologue: save frame (carve 8 from deep-K), set up loop regs ---- *)
+    iApply (wp_wakeup_prologue_sconf γ root_ppn Φ m K ltac:(lia) Hdom
+              with "Hsc Hhs Hcap Htlb Htext Hpc Hfile HdeepK [-]").
+    iIntros (M vpad) "%Hpro Hsc Hhs Hcap Htlb Hpc Hfile HdeepK8 Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
+    destruct Hpro as (HM9 & HM18 & HM19 & HM21 & HM20 & HMcsp & HM1 & HM4 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
+    (* split the prologue's deep-(K-8) into the loop's deep-10 + a held remainder *)
+    iDestruct (stack_own_split_1 (pa_stk spF kv_frame_slots) 10 (K - 8)%nat ltac:(lia) with "HdeepK8") as "[Hd10 Hdrest]".
+    (* ---- the loop, with the epilogue as its exit continuation ---- *)
+    iPoseProof (wp_wakeup_loop_sconf γ root_ppn Rreg γc bsie dq Φ γs spF a0f
+                  (m !!! Regidx (mword_of_int 4 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) noffv
+                  (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
+                  (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
+                  (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
+                  (m !!! Regidx (mword_of_int 21 : mword 5))
+                  (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5))
+                  (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
+                  (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) lvl
+                  Hlen Hmycpu Hmycpu_nz Hnf_pos Hnf_rt Hcoupling
+                  with "Hpinv") as "Hloop".
+    iSpecialize ("Hloop" with "[Hdrest Hf0 Hcont]").
+    { (* exit continuation = epilogue at wakeup+0x58 *)
+      iIntros (Mexit) "(%Hecsp & %He4 & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
+                       Hsc Hhs Hcap Hcnt Htlb Htextx Hpc Hfile Hres Hframe".
+      iDestruct "Hres" as "(Hd10 & Hnoffc & Hintc & Hlockcells)".
+      (* recombine deep-10 ∗ deep-(K-18) = deep-(K-8) *)
+      iDestruct (stack_own_split_2 (pa_stk spF kv_frame_slots) 10 (K - 8)%nat ltac:(lia)
+                   with "[$Hd10 $Hdrest]") as "HdeepK8".
+      iDestruct "Hframe" as "(Hf7 & Hf6 & Hf5 & Hf4 & Hf3 & Hf2 & Hf1)".
+      assert (Hcsp_eq : pa_stk spF kv_frame_slots = pa_stk (Mexit !!! Regidx csp_rs1) kv_frame_slots)
+        by (f_equal; symmetry; exact Hecsp).
+      iEval (rewrite Hcsp_eq) in "HdeepK8".
+      iApply (wp_wakeup_epilogue_sconf γ root_ppn Φ Mexit K
+                (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
+                (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
+                (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
+                (m !!! Regidx (mword_of_int 21 : mword 5)) vpad
+                ltac:(lia) Hedom Halign
+                with "Hsc Hhs Hcap Htlb Htextx Hpc Hfile HdeepK8 [Hf7] [Hf6] [Hf5] [Hf4] [Hf3] [Hf2] [Hf1] [Hf0] [-]").
+      { iEval (rewrite Hecsp). iExact "Hf7". }
+      { iEval (rewrite Hecsp). iExact "Hf6". }
+      { iEval (rewrite Hecsp). iExact "Hf5". }
+      { iEval (rewrite Hecsp). iExact "Hf4". }
+      { iEval (rewrite Hecsp). iExact "Hf3". }
+      { iEval (rewrite Hecsp). iExact "Hf2". }
+      { iEval (rewrite Hecsp). iExact "Hf1". }
+      { iEval (rewrite Hecsp). iExact "Hf0". }
+      iIntros (Mf) "%Hepi Hsc Hhs Hcap Htlb Hpc Hfile HdeepK".
+      destruct Hepi as (Hf1v & Hf0v & Hf9v & Hf18v & Hf19v & Hf20v & Hf21v & Hfcsp & Hf4v & Hf22v & Hf23v & Hf24v & Hf25v & Hf26v & Hf27v & Hfdom).
+      (* the epilogue's restored sp equals the caller's sp0 (the -64/+60+4 cancel) *)
+      assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0)
+        by (rewrite Hecsp; subst spF sp0; apply wakeup_sp_cancel).
+      iEval (rewrite Hspcancel) in "HdeepK".
+      iApply ("Hcont" $! Mf with "[%] Hsc Hhs Hcap Hcnt Htlb Htext [Hpc] Hfile [HdeepK] Hnoffc Hintc Hlockcells").
+      - (* callee_saved m Mf /\ dom Mf *)
+        split; [| exact Hfdom].
+        unfold callee_saved.
+        rewrite Hfcsp Hf4v Hf0v Hf9v Hf18v Hf19v Hf20v Hf21v Hf22v Hf23v Hf24v Hf25v Hf26v Hf27v.
+        rewrite He4 He22 He23 He24 He25 He26 He27.
+        repeat split; try reflexivity. exact Hspcancel.
+      - (* pc_is rettgt : the epilogue's rettgt matches the caller's *)
+        iExact "Hpc".
+      - (* deep-K back at sp0 *)
+        iExact "HdeepK". }
+    (* discharge the loop at k=0 with the prologue's loop-head map M *)
+    iApply ("Hloop" $! 0%nat M with "[%] [%] Hsc Hhs Hcap Hcnt Htlb Htext Hpc Hfile [Hd10 Hnoffc Hintc Hlockcells] [Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1]").
+    - unfold NPROC. lia.
+    - unfold wk_loop_regs.
+      split; [exact HM9|]. split; [exact HMcsp|]. split; [exact HM4|].
+      split; [exact HM18|]. split; [exact HM19|]. split; [exact HM20|].
+      split; [exact HM21|]. split; [exact HM22|]. split; [exact HM23|].
+      split; [exact HM24|]. split; [exact HM25|]. split; [exact HM26|].
+      split; [exact HM27|]. exact HMdom.
+    - rewrite /wk_res_sconf. iFrame "Hd10 Hnoffc Hintc Hlockcells".
+    - rewrite /wk_frame. iFrame "Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1".
+  Qed.
+
 End WpSconfWakeupLoop.
