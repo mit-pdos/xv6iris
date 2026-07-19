@@ -499,7 +499,19 @@ before any mechanical sweep.
      conversion, so iExact/iFrame across the transformer bracket fails
      otherwise; and remember the leaf ROUND-TRIP re-spells cells at
      ITS map's lookups (bridge goal-side with -HcspSx rewrites).
-   - NEXT — the rest of the spinlock layer in dependency order:
+   - DONE — `wp_release_sconf` (WpSconfRelease.v, axiom-clean): the
+     FIRST end-to-end payload composition — holding-locked (the token
+     forces a0=1), lk->cpu := 0, fence, the lock-word clear (locked ∗ R
+     re-enter the invariant), then pop_off with the intenav-keyed
+     input threaded straight through; the conditional payload flows
+     back out in release's post, and pop_off's restore is genuinely
+     reachable.  Deep-10 custody: 4 for release's frame, 6 riding for
+     holding, of which 4 re-lent to pop_off (split_1/split_2 around
+     the call).  jal-calls are INLINE (jal leaf + callee spec at the
+     ra-inserted map + a closed pc-normalization assert — no wrapper
+     lemma needed).  The old spec's intena=0 pin and the
+     `ghost_var γc (1/2) b` rider are GONE.
+   - REMAINING spinlock layer:
      `wp_release_sconf` (holding + the zero store + pop_off: its OLD
      spec pinned intena=0 — the sconf spec instead threads the
      push_off payload disjunct through and lets pop_off restore;
