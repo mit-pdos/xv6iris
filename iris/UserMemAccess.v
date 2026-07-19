@@ -28,10 +28,12 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodePte.
 Require Import CommonWalk.
+Require Import UserBits.
 Require Import UptTree.
 Require Import UserPtTree.
 Require Import UserMemPt.
 Require Import MemAmo4.
+Require Import SmodeCore.
 Require Import WpLoad.
 Require Import WpMmodeLeafBase.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -1848,3 +1850,234 @@ Proof.
   - left. exact (exec_vmem_write_addr_sc width va pa dat aq rl s s' Halign Htr Hmprv Hcp Hea Hwv Hpac).
   - right. exact (exec_vmem_write_addr_sc_fault width va pa pc dat aq rl s s' Halign Htr Hmprv Hcp Hpc Hea Hwv Hpac).
 Qed.
+
+(* ===================================================================== *)
+(* §6 The iris BUNDLE COMPOSERS over the user invariant (utlb_inv_pt +     *)
+(*    udata_own).  These thread the translate through the                 *)
+(*    utlb_inv_pt_translateAddr_u absorption and the reserved physical     *)
+(*    access through §5, re-establishing the invariant, and expose the     *)
+(*    instruction-facing retire-or-fault DISJUNCTION for LR/SC.  Same      *)
+(*    shape as §2's aligned LOAD/STORE composers.  Widths 4/8 (LR.W/LR.D,  *)
+(*    SC.W/SC.D); the reserved physical bricks are per-width (§5).         *)
+(*                                                                        *)
+(* §6a LR (LoadReserved, aq=rl=false): absorb the translate, read the      *)
+(*    reserved word (§5e disjunction), and apply §5g -- LR either retires  *)
+(*    with a value or takes E_Load_Access_Fault, per the region's          *)
+(*    (unpinned) reservability.                                            *)
+(* ===================================================================== *)
+
+Section UserMemAccessBundle.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma user_pt_vmem_read_addr_lr_4 (uroot tfp : mword 44)
+      (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
+      (w va : mword 64) (σ : mstate) :
+    um !! svpn_of va = Some w ->
+    uleaf_ok (LoadReserved Data) w ->
+    udata_cov um data ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1") = false ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ∃ σ' : mstate,
+      ⌜(exists dvv : mword 32,
+          exec (vmem_read_addr (Virtaddr va) 4 (LoadReserved Data) false false true) σ
+            = Some (Ok dvv, σ'))
+       \/ exec (vmem_read_addr (Virtaddr va) 4 (LoadReserved Data) false false true) σ
+            = Some (Err (Trap (User, make_sync_exception (E_Load_Access_Fault tt) va,
+                               register_lookup PC σ.(sregs))), σ')⌝ ∗
+      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
+      ⌜(σ'.(sregs) = σ.(sregs) \/
+        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      utlb_inv_pt uroot tfp um ∗ udata_own data.
+  Proof.
+    intros Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
+    iIntros "Hri Hgh Hinv Hdata".
+    iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
+      as %(HA & Hord & HX & HR & HW & Hcovp).
+    iMod (utlb_inv_pt_translateAddr_u (LoadReserved Data) uroot tfp um w va
+            (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
+            Hmisa Hmenv Hhtif Hcp HSXL
+            (exec_effectivePrivilege_mprv0 (LoadReserved Data)
+               (register_lookup mstatus σ.(sregs)) User σ Hmprv)
+            (exec_is_shadow_stack_u_acc (LoadReserved Data) σ
+               (or_intror (or_intror (or_intror (or_introl eq_refl))))) Hall
+            with "Hri Hgh Hinv")
+      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
+    assert (Tr : forall r : register, register_beq r tlb = false ->
+              register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
+    { intros r Hne.
+      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
+        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+    iDestruct (udata_read_word_g 4 ltac:(lia) ltac:(exists 1024; reflexivity) um data w va σ' Hl Hcov Hal with "Hgh Hdata")
+      as %(dv & Hbytes & Hram0 & Hram7).
+    set (pa := u_walk_pa w va) in *.
+    destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 4)
+      as (region & Hpmam & _ & Hrd & _).
+    pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
+    pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
+    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
+              (uint pa) (uint (to_bits 64 4)) = PMP_Match).
+    { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact (ram_fetch_pmp pa _ 4 (Z.to_nat 4 - 1) ltac:(lia) ltac:(lia)
+               ltac:(vm_compute; reflexivity) ltac:(lia)
+               Hram0 Hram7 Hcovp). }
+    assert (Hmmio : exec (within_mmio_readable (Physaddr pa) 4) σ' = Some (false, σ')).
+    { unfold within_mmio_readable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _ (within_clint_false pa 4 σ' Hnc ltac:(lia))). cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _ (within_sig_false pa 4 σ' Hns ltac:(lia))). cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _ (within_htif_false pa 4 σ'
+                 (ltac:(rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif)))).
+      cbn match. reflexivity. }
+    assert (Hmr := exec_mem_read_lr_4 PBMT_PMA pa region dv σ'
+             (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+             (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+             Hrange
+             (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HR))
+             Hpmam (pa_aligned_div _ va 4 ltac:(lia) ltac:(exists 1024; reflexivity) Hal) Hrd
+             Hmmio (addr_is_ram_not_dev _ Hram0) Hbytes
+             (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
+             (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4))) (LoadReserved Data)) σ
+                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
+    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4)) with (add_vec_int va (0 * 4)).
+      rewrite avi0. exact Htr. }
+    destruct (exec_vmem_read_addr_lr_disj 4 va pa (register_lookup PC σ'.(sregs)) dv
+                false false User (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone)
+                σ σ' Hal Htr' Hmr
+                (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
+                eq_refl)
+      as [Hret | Hflt].
+    - iModIntro. iExists σ'.
+      iSplit; [ iPureIntro; left; exact Hret | ].
+      iSplit; [ iPureIntro; exact Hmdev | ].
+      iSplit; [ iPureIntro; exact Hsregs | ].
+      iFrame "Hri Hgh Hinv Hdata".
+    - iModIntro. iExists σ'.
+      iSplit; [ iPureIntro; right | ].
+      { rewrite (Tr PC ltac:(vm_compute; reflexivity)) in Hflt.
+        change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4)) with (add_vec_int va (0 * 4)) in Hflt.
+        rewrite avi0 in Hflt. exact Hflt. }
+      iSplit; [ iPureIntro; exact Hmdev | ].
+      iSplit; [ iPureIntro; exact Hsregs | ].
+      iFrame "Hri Hgh Hinv Hdata".
+  Qed.
+
+  Lemma user_pt_vmem_read_addr_lr_8 (uroot tfp : mword 44)
+      (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
+      (w va : mword 64) (σ : mstate) :
+    um !! svpn_of va = Some w ->
+    uleaf_ok (LoadReserved Data) w ->
+    udata_cov um data ->
+    is_aligned_vaddr (Virtaddr va) 8 = true ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = User ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1") = false ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ∃ σ' : mstate,
+      ⌜(exists dvv : mword 64,
+          exec (vmem_read_addr (Virtaddr va) 8 (LoadReserved Data) false false true) σ
+            = Some (Ok dvv, σ'))
+       \/ exec (vmem_read_addr (Virtaddr va) 8 (LoadReserved Data) false false true) σ
+            = Some (Err (Trap (User, make_sync_exception (E_Load_Access_Fault tt) va,
+                               register_lookup PC σ.(sregs))), σ')⌝ ∗
+      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
+      ⌜(σ'.(sregs) = σ.(sregs) \/
+        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      utlb_inv_pt uroot tfp um ∗ udata_own data.
+  Proof.
+    intros Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
+    iIntros "Hri Hgh Hinv Hdata".
+    iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
+      as %(HA & Hord & HX & HR & HW & Hcovp).
+    iMod (utlb_inv_pt_translateAddr_u (LoadReserved Data) uroot tfp um w va
+            (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
+            Hmisa Hmenv Hhtif Hcp HSXL
+            (exec_effectivePrivilege_mprv0 (LoadReserved Data)
+               (register_lookup mstatus σ.(sregs)) User σ Hmprv)
+            (exec_is_shadow_stack_u_acc (LoadReserved Data) σ
+               (or_intror (or_intror (or_intror (or_introl eq_refl))))) Hall
+            with "Hri Hgh Hinv")
+      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
+    assert (Tr : forall r : register, register_beq r tlb = false ->
+              register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
+    { intros r Hne.
+      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
+        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+    iDestruct (udata_read_word_g 8 ltac:(lia) ltac:(exists 512; reflexivity) um data w va σ' Hl Hcov Hal with "Hgh Hdata")
+      as %(dv & Hbytes & Hram0 & Hram7).
+    set (pa := u_walk_pa w va) in *.
+    destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 8)
+      as (region & Hpmam & _ & Hrd & _).
+    pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
+    pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
+    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
+              (uint pa) (uint (to_bits 64 8)) = PMP_Match).
+    { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact (ram_fetch_pmp pa _ 8 (Z.to_nat 8 - 1) ltac:(lia) ltac:(lia)
+               ltac:(vm_compute; reflexivity) ltac:(lia)
+               Hram0 Hram7 Hcovp). }
+    assert (Hmmio : exec (within_mmio_readable (Physaddr pa) 8) σ' = Some (false, σ')).
+    { unfold within_mmio_readable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _ (within_clint_false pa 8 σ' Hnc ltac:(lia))). cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _ (within_sig_false pa 8 σ' Hns ltac:(lia))). cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _ (within_htif_false pa 8 σ'
+                 (ltac:(rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif)))).
+      cbn match. reflexivity. }
+    assert (Hmr := exec_mem_read_lr_8 PBMT_PMA pa region dv σ'
+             (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+             (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+             Hrange
+             (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HR))
+             Hpmam (pa_aligned_div _ va 8 ltac:(lia) ltac:(exists 512; reflexivity) Hal) Hrd
+             Hmmio (addr_is_ram_not_dev _ Hram0) Hbytes
+             (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
+             (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))) (LoadReserved Data)) σ
+                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
+    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8)) with (add_vec_int va (0 * 8)).
+      rewrite avi0. exact Htr. }
+    destruct (exec_vmem_read_addr_lr_disj 8 va pa (register_lookup PC σ'.(sregs)) dv
+                false false User (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone)
+                σ σ' Hal Htr' Hmr
+                (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
+                eq_refl)
+      as [Hret | Hflt].
+    - iModIntro. iExists σ'.
+      iSplit; [ iPureIntro; left; exact Hret | ].
+      iSplit; [ iPureIntro; exact Hmdev | ].
+      iSplit; [ iPureIntro; exact Hsregs | ].
+      iFrame "Hri Hgh Hinv Hdata".
+    - iModIntro. iExists σ'.
+      iSplit; [ iPureIntro; right | ].
+      { rewrite (Tr PC ltac:(vm_compute; reflexivity)) in Hflt.
+        change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8)) with (add_vec_int va (0 * 8)) in Hflt.
+        rewrite avi0 in Hflt. exact Hflt. }
+      iSplit; [ iPureIntro; exact Hmdev | ].
+      iSplit; [ iPureIntro; exact Hsregs | ].
+      iFrame "Hri Hgh Hinv Hdata".
+  Qed.
+
+End UserMemAccessBundle.
