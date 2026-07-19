@@ -34,6 +34,7 @@ Require Import UserPtTree.
 Require Import UserMemPt.
 Require Import MemAmo4.
 Require Import SmodeCore.
+Require Import SRegime.
 Require Import WpLoad.
 Require Import WpMmodeLeafBase.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -2780,3 +2781,36 @@ Section SplitStoreBundle.
   Qed.
 
 End SplitStoreBundle.
+
+(* ===================================================================== *)
+(* §9 The U-mode data-address transform (memory-arm foundation).  Every   *)
+(*    U-mode data access (execute_LOAD/STORE/AMO/LR/SC via vmem_read /     *)
+(*    vmem_write) first runs transform_effective_address on the           *)
+(*    rs1+offset effective address.  At User with MPRV=0 and pointer       *)
+(*    masking disabled (pmlen=0), the transform is the IDENTITY (Sv39 ->   *)
+(*    pm_transform_VA_0, or Bare -> pm_transform_PA_0), so the va the      *)
+(*    §2/§6/§7/§8 composers consume is exactly rs1+offset.  U-mode analog  *)
+(*    of SRegime.exec_transform_effective_address_mode (Supervisor).       *)
+(* ===================================================================== *)
+
+Lemma exec_transform_effective_address_u (acc : MemoryAccessType mem_payload)
+    (md : SATPMode) (ea : mword 64) (s : mstate) :
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) User) s
+    = Some (User, s) ->
+  exec (get_pmlen acc User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  exec (transform_effective_address (Virtaddr ea) acc) s = Some (Virtaddr ea, s).
+Proof.
+  intros Hcp Heff Hpml Htm.
+  unfold transform_effective_address.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hcp.
+  rewrite (exec_bind_Some _ _ _ _ _ Heff).
+  rewrite (exec_bind_Some _ _ _ _ _ Hpml).
+  rewrite (exec_bind_Some _ _ _ _ _ Htm).
+  destruct (generic_eq md Bare);
+    [ rewrite pm_transform_PA_0 | rewrite pm_transform_VA_0 ];
+    apply exec_returnM.
+Qed.
