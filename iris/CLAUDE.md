@@ -552,16 +552,53 @@ before any mechanical sweep.
      (pop_off inside).  csrr keeps its arm-report (pop_off refutes the
      '1' arm via its count eighth); csrsi flips only 1→0.
 
-   - KALLOC CONE PLAN (kfree/kalloc/wakeup, unblocked by the counting
-     token).  Each is acquire → critical section → release, so the SPEC
-     threads `intr_count γ root n` NET-ZERO: `intr_count n` in and out
-     (acquire increments to S n inside the disabled region, release
-     decrements back).  Follow WpSconfRelease/WpSconfAcquire (new files
-     WpSconfKfree.v etc.): prologue frame trade, the freelist
-     load/store leaves over the funnel, `wp_acquire_sconf` (n→S n)
-     around the section, `wp_release_sconf` (S n→n), epilogue.  The
-     acquire/release coupling premises (`neq nv1 zero <-> level=0`)
-     discharge from the concrete noff values.
+   - KALLOC CONE (kfree/kalloc/wakeup, unblocked by the counting token).
+     Each is acquire → critical section → release, so the SPEC threads
+     `intr_count γ root n` NET-ZERO: `intr_count n` in and out (acquire
+     increments to S n inside the disabled region, release decrements
+     back).  Follow WpSconfRelease/WpSconfAcquire (new files
+     WpSconfKfree.v etc.): prologue frame trade, the freelist load/store
+     leaves over the funnel, `wp_acquire_sconf` (n→S n) around the
+     section, `wp_release_sconf` (S n→n), epilogue.
+     KFREE STATUS (IN PROGRESS, WpSconfKfree.v — spec + prologue Qed-clean,
+     body admitted, file UNREGISTERED so the tree stays green):
+       - SPEC decided.  Threads `sconf γ + hart_state + sie_cap γ root m +
+         intr_count γ root n + tlb_inv_pt` and a DEEP-`K` custody
+         `stack_own (pa_stk sp0 kv_frame_slots) K` with `14 <= K` (its own
+         4-slot frame + the 10 the deepest sub-call, acquire/release,
+         wants).  The lock is `is_lock γl lk (kmem_res fl)`; the cpu-struct
+         cells `a_cpu`/`a_noff`/`a_int` are threaded (acquire/release read
+         and write them).  The acquire/release coupling `neq nv1 zero <->
+         level=0` is stated cleanly as the ENTRY premise
+         `neq_vec (sign_extend' 64 noffv) zero_reg = false <-> n = 0` — the
+         natural lockstep between the hardware noff counter and the ghost
+         token level (NOT ad-hoc: it IS the counting token's meaning).
+       - PROLOGUE done: the c.addi16sp sp,-32 is `wp_caddi_sp_s_sconf` fed
+         a `sie_cap_move_down 4` transformer; split the deep-K via
+         `stack_own_split_1 (pa_stk sp0 32) 4 K` (top-4 → move_down, rest
+         `stack_own (pa_stk sp' 32) (K-4)` = the sub-call custody at sp'),
+         four `wp_csdsp_s_sconf` saves into the freed frame cells,
+         `wp_caddi4spn_s_sconf`.  Gotcha: Hsp1's `apply f_equal` needs an
+         explicit `unfold regval_into_reg` first (lookup_total_insert
+         leaves the identity wrapper on).  Import gotcha: needs
+         `SRegime SmodeCore` for the gmap `!!!` Inhabited/LookupTotal
+         instance (else the whole statement is UNDEFINED EVARS), and must
+         NOT do a trailing `Import Defs`/`Require Import Riscv.rv64d`
+         (shadows the `!!!` instance — WpKfree has neither).
+       - REMAINING: the panic-check ALU (0x0c..0x30, pure sconf leaf swaps
+         — auipc/addi4/sltu/cli/cslli/caddi/cor/cbnez_fall/cmv/slli/clui,
+         all exist as `_s_sconf`, `wp_slli_s_sconf` just added to
+         WpSconfAlu), then `wp_memset_page_sconf` (lend deep-2, split from
+         the deep-(K-4)), the acquire setup + `wp_acquire_sconf` (lend
+         deep-10, n→S n), the freelist push (ld/csd/sd_s_sconf +
+         `kmem_res_push`), `wp_release_sconf` (deep-10, S n→n), the
+         epilogue (4 c.ldsp + c.addi16sp +32 via `sie_cap_move_up 4` +
+         c.ret), and callee_saved.  The register-map lets (R1..R14, Mms,
+         S1..S3, Kacq, Rld, Rae, Rrel, Q54..Q5c) transcribe VERBATIM from
+         WpKfree; only the resource threading + leaf names change (each
+         sconf leaf: `γ root Φ pc … m` + `rd≠0`,`rd≠csp` + value hyp,
+         thread `Hsc Hhs Hcap Htlbinv Hpc Hfile Hi [-]`, cont
+         `Hhs Hsc Hcap Htlbinv Hpc Hfile`).
    - MEMSET over sconf — DONE, axiom-clean (baseline 5 + funext).
      memset runs OUTSIDE the interrupt-disabled region (kfree: before
      acquire; kalloc: after release), at the caller's ambient SIE level

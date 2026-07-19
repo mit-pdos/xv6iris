@@ -349,6 +349,35 @@ Section WpSconfAlu.
 
   (* ---- UTYPE / ADDIW / SHIFTIOP families ------------------------------- *)
 
+  (* base (32-bit) SLLI: [slli rd,rs1,shamt] with rd <> rs1 (not compressible). *)
+  Lemma wp_slli_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6) (wval : mword 64)
+      (m : gmap regidx (mword 64)) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    shift_bits_left (m !!! Regidx rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) = wval ->
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rs1 rs1
+              (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) wval m
+              Hrd Hrdsp _
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_slli_val, gpr_src. rewrite Hva Hwval. reflexivity.
+  Qed.
+
   Lemma wp_clui_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20) (wval : mword 64)
       (m : gmap regidx (mword 64)) :
