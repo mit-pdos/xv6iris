@@ -571,8 +571,35 @@ before any mechanical sweep.
      rewrite HspR1 into it too before the epilogue rebundle (the loaded
      cells got it via the cldsp round-trip, the padding didn't).  The
      noff-cancel + memset-deep-2 + acquire/release-deep-10 patterns are
-     exactly kfree's.  NEXT: wakeup (same shape, uses wp_myproc), then the
-     boot wiring, then delete smode_config.
+     exactly kfree's.
+   - WAKEUP (WpSconfWakeup.v) — STARTED: the sconf myproc axiom
+     `wp_myproc_sconf` is in place (mirror of the smode `wp_myproc`,
+     threading sconf + hart_state + sie_cap + intr_count n (net-zero) +
+     tlb_inv_pt + a deep-K slice; returns a0 = proc_addr j + callee_saved
+     — the only fact wakeup needs, the loop skips the current proc).  THE
+     REMAINING WAKEUP PORT IS THE BIGGEST cone piece and its own multi-
+     session effort: unlike kfree/kalloc (straight-line + one branch),
+     wakeup is a LOOP over the 64-proc table (fuel induction) with a
+     per-iteration acquire(proc lock) → holding/state-check → conditional
+     wake → release, plus VCgen straight-line blocks for the prologue and
+     epilogue (an 8-slot/64-byte frame saving ra/s0/s1..s5), the custom
+     mutable-resource bundle `wk_res`, and `procs_inv γs` (the 64 proc
+     is_locks).  PORT PLAN: (1) redefine `wk_res`/`wk_frame` over sconf
+     (sie_cap + intr_count + a deep-custody slice instead of the smode
+     frame); (2) port the epilogue (the tractable sub-lemma — 7 c.ldsp
+     leaf-by-leaf + c.addi16sp `sie_cap_move_up`, like the kfree/kalloc
+     epilogues but more slots; NOT a VCgen block, since sconf VCgen forbids
+     the sp-move); (3) the prologue similarly; (4) the loop: a fuel
+     induction whose invariant threads sconf + sie_cap + intr_count
+     (net-zero per iteration) + the proc-lock resources, each iteration
+     composing `wp_acquire_sconf`/`wp_holding_lockinv_s_sconf`/
+     `wp_release_sconf` + the proc state/chan clw/sw leaves + the
+     conditional wake, calling `wp_myproc_sconf` once.  The intr_count
+     re-fold gotcha (a taken-branch iNext strips the reducible
+     `intr_count (S n)`'s inner later — re-fold via
+     `intr_restore_intro`+`intr_count_pack_S`) applies at every taken
+     branch in the loop.  NEXT AFTER WAKEUP: the boot wiring, then delete
+     smode_config.
    - (historical) KALLOC CONE (kfree/kalloc/wakeup, unblocked by the counting token).
      Each is acquire → critical section → release, so the SPEC threads
      `intr_count γ root n` NET-ZERO: `intr_count n` in and out (acquire
