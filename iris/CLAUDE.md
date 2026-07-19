@@ -562,50 +562,46 @@ before any mechanical sweep.
      around the section, `wp_release_sconf` (S n→n), epilogue.  The
      acquire/release coupling premises (`neq nv1 zero <-> level=0`)
      discharge from the concrete noff values.
-   - MEMSET must be SCONF-NATIVE, not bridged (CORRECTED).  In BOTH
-     kfree (memset BEFORE acquire) and kalloc (memset AFTER release),
-     memset runs OUTSIDE the interrupt-disabled region, at the caller's
-     ambient SIE level (possibly ENABLED).  So the SIE=0-pinned
-     `smode_config` engine is UNSOUND here — an interrupt can fire
-     mid-fill, which that proof forbids.  The sconf<->smode_config
-     bridge idea is therefore WRONG for this call site.  Instead
-     convert the memset engine to run over the funnel (SIE-agnostic,
-     interrupts absorbed), threading `sconf + sie_cap + tlb_inv_pt`
-     (NO intr_count — memset never touches the disable nesting).  The
-     fill LOOP is DONE (`wp_memset_loop_sconf`, WpSconfMemset.v,
-     axiom-clean — fuel induction, sie_cap arm-blind retargeted across
-     the a5 increment; the bne-taken back edge hands the step's later
-     out, stripped by iNext against the fuel IH; two local bridges
-     align the sb leaf's [add_vec cur (sext 0)]/[trunc8 v] byte shape
-     with the buffer's [ms_pa cur]/[nth_byte .. 0]).  REMAINING: the
-     prefix and suffix wrappers, then `wp_memset_s_full_kt` and
-     `wp_memset_page` over sconf (WpMemsetS/WpMemsetInstr/WpMemsetPage).
-     KEY CORRECTION: unlike the loop (which only moves a5), memset's
-     PREFIX and SUFFIX MOVE sp — they alloc/free memset's own 2-slot
-     save frame (c.addi sp,-16 / c.addi sp,16).  So they need the
-     deep-custody FRAME TRADE (`sie_cap_move_down`/`_up` k:=2), and
-     `wp_memset_page_sconf`'s SPEC must thread
-     `stack_own (pa_stk sp0 kv_frame_slots) 2` (the deep-2 custody),
-     NOT just sie_cap arm-blind — exactly like the release/acquire/
-     mycpu epilogues.  The sp-move leaf is `wp_caddi_sp_s_sconf` (not
-     the plain caddi), fed the mover transformer.  FRAME-MODEL REWORK
-     (not a mechanical transform): the OLD suffix threads the ra/s0
-     save slots as dqm-FRACTIONAL caller cells (`pa_ra ↦₈{dqm} ra0`);
-     the sconf version instead takes them as FULL slots that come FROM
-     the sie_cap reserve via the frame trade — memset's frame
-     [sp', sp'+16) is the top-2 output of `sie_cap_move_down k:=2` in
-     the prefix, and `move_up k:=2` in the suffix packs them back and
-     returns the deep-2 custody.  So `wp_memset_page_sconf` takes
-     `stack_own (pa_stk sp0 kv_frame_slots) 2` (deep-2), the prefix's
-     c.addi sp,-16 trades it for the 2 frame cells (fed to the two
-     c.sdsp saves), and the suffix's two c.ldsp restore into full cells
-     that the c.addi sp,16 mover packs (build `stack_own sp0 2` from the
-     cells at `pa_stk sp0 1/2` via the HpaK bridges, exactly the
-     release/mycpu epilogue).  cldsp/csdsp called at dqm:=DfracOwn 1.
-     Then kfree/kalloc call `wp_memset_page_sconf` directly, lending the
-     deep-2 from the stack region they already own.  (The SIE=0-pinned memset engine stays for any caller
-     that genuinely holds smode_config; the sconf version is a
-     parallel funnel-based derivation.)
+   - MEMSET over sconf — DONE, axiom-clean (baseline 5 + funext).
+     memset runs OUTSIDE the interrupt-disabled region (kfree: before
+     acquire; kalloc: after release), at the caller's ambient SIE level
+     (possibly ENABLED), so the SIE=0-pinned `smode_config` engine is
+     UNSOUND (an interrupt can fire mid-fill) and the sconf<->smode_config
+     BRIDGE idea is wrong for this call site.  The whole memset thus runs
+     over the funnel (`wp_instr_s_sconf`), threading `sconf + hart_state +
+     sie_cap + tlb_inv_pt` (NO intr_count — memset never touches the
+     disable nesting):
+       - `wp_memset_loop_sconf` (WpSconfMemset.v): the byte-fill loop,
+         fuel induction, sie_cap arm-blind retargeted across the a5
+         increment; the bne-taken back edge hands the step's later out
+         (stripped by iNext against the fuel IH); two local bridges align
+         the sb leaf's [add_vec cur (sext 0)]/[trunc8 v] byte shape with
+         the buffer's [ms_pa cur]/[nth_byte .. 0].
+       - `wp_memset_prefix_sconf` / `wp_memset_suffix_sconf`
+         (WpSconfMemset.v): the 2-slot save-frame alloc/dealloc.  Unlike
+         the loop (a5 only), these MOVE sp, so they do the DEEP-CUSTODY
+         FRAME TRADE — the prefix's c.addi sp,-16 is `wp_caddi_sp_s_sconf`
+         fed a `sie_cap_move_down 2` transformer (deep-2 in → memset's own
+         2 frame cells [sp',sp'+16) out, FULL slots — NOT the old
+         dqm-fractional caller cells); the two c.sdsp save ra/s0 into them;
+         the suffix mirrors it with two c.ldsp + `sie_cap_move_up 2` (frame
+         cells packed back → deep-2 returned).  The suffix is the
+         `wp_pop_off_epi_sconf` shape at memset's concrete PCs.
+       - `wp_memset_page_sconf` (WpSconfMemsetPage.v): composes prefix +
+         loop + suffix at N = 4096, threads
+         `stack_own (pa_stk sp0 kv_frame_slots) 2` (deep-2 custody,
+         net-zero) + page_own, bridges page_own to the per-byte buffer,
+         assembles callee_saved.  kfree/kalloc call this directly, lending
+         the deep-2 from the stack region they already own.
+     Gotcha kept: a whole-function-composition assert like `Hpc2 :
+     add_vec_int (add_vec_int (mword_of_int (MS+0x14)) 6) 4 =
+     mword_of_int (MS+0x1e)` MUST carry explicit `: mword 64` annotations
+     — without them the width evar is inferred from the huge iris context
+     and the `vm_compute` diverges (the isolated goal is instant).  The
+     N=0 empty path is NOT ported (memset_page always fills 4096); if ever
+     needed, clone the prologue+taken-cbeqz→suffix shape.  (The SIE=0
+     `wp_memset_page` stays for any caller genuinely holding smode_config;
+     the sconf version is a parallel funnel-based derivation.)
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
      stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
      initial 32 slots); adequacy plumbing last; delete `smode_config`
