@@ -1813,9 +1813,31 @@ files or copy code from them; build fresh from the live tree.
      wiring these into UserClassify.
      Still missing before FULL assembly:
      ZICBOP (does TRANSLATION — ADUE-coupled, defer), the memory arms
-     (LOAD/STORE/AMO/LR/SC — WAIT for the Svadu/ADUE page-table rework),
-     and the fetch-fault flavor corollaries' payload wiring (also
-     ADUE-coupled).
+     (LOAD/STORE/AMO/LR/SC), and the fetch-fault flavor corollaries'
+     payload wiring.
+     UPDATE (memory layer DONE): the Svadu/ADUE page-table rework the
+     memory arms were waiting on is COMPLETE — the whole user memory LAYER
+     is proven, green, and wired to the user invariant (UserMemAccess.v):
+     aligned LOAD/STORE (§2), LR/SC atom-to-invariant retire-or-fault (§5
+     physical + §6 bundle composers), and the misaligned plain LOAD/STORE
+     split (§4 exec + §7/§8 N-fold bundle composers).  So the memory arms
+     are now UNBLOCKED.  §9 lays the first arm brick,
+     `exec_transform_effective_address_u` (the identity address transform
+     at User/MPRV=0/pmlen=0 that every data access runs before the vmem
+     composer).  THE REMAINING MEMORY-ARM CHAIN (per family, exec-level
+     then iris): (i) `exec_get_pmlen_u` (User: currentlyEnabled Ext_S ->
+     read_senvcfg -> PMM_Disabled -> 0; reuse UserCsr's
+     `exec_read_senvcfg_pinned` + a currentlyEnabled reduction), feeding §9
+     so the transform is premise-free; (ii) the exec-level
+     `exec_get_transformed_data_addr_u` (ext_data_get_addr = rX rs1+offset,
+     then §9) and the `execute_LOAD`/`execute_STORE`/... skeletons
+     premise-shaped over the vmem composer result; (iii) the IRIS memory
+     arms discharging `retire_obligation` (load: rd:=extend data; store:
+     re-establish udata pages) / `execute_trap_obligation` (delegated data
+     fault) by running the exec skeleton through the §2/§6/§7/§8 composer
+     under the user frame, mirroring the S-mode WpSmodePtMem port.  This
+     chain + the fetch-seam port (checkpoint (B)) + the decode case tree is
+     the bulk of the remaining UserClassify assembly.
      CSR-AT-U PLAN (UserCsr.v; values never matter — existential reads).
      Target statement (CSRReg and CSRImm): under pins (priv=User,
      mstateen0=0, menvcfg=MENVCFG_S, senvcfg=0, misa via hw_config, and
