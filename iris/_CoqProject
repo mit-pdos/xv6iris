@@ -150,6 +150,7 @@ WpSconfMycpu.v
 WpIntenaBits.v
 WpSconfPushOff.v
 WpSconfHolding.v
+WpSconfRelease.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
