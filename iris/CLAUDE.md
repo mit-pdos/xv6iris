@@ -1700,6 +1700,27 @@ files or copy code from them; build fresh from the live tree.
      memory families never fork the arm.  (illegal keeps its own arm — its
      obligation drops gpr_file; folding it in would need a 3-way
      exec_step_result_ok.)
+     (2'') THE GENERIC PRODUCER (UserExecProducer.v) — the other half of
+     the clean skeleton.  `user_exec_step_producer` factors the
+     fetch → decode → progress-composer → classify pipeline ONCE: it fetches
+     over the user invariant (`user_pt_fetch_instr`), cases on `isRVC`, and
+     drives the matching RESULT-GENERIC progress composer
+     (`exec_hart_active_progress_base_gen` / `_RVC_gen`), packaging
+     `exec_step_obligation`.  Its two premises are the EXECUTE TOTALITIES:
+     `base_exec_total` (4-byte, `ext_decode w → instr`, execute it) and
+     `rvc_exec_total` (2-byte, `ext_decode_compressed h → instr`, execute →
+     `ExecuteAs other`, execute the expansion).  So the WHOLE
+     `user_step_obligation_active` for execute-reaching instructions reduces
+     to: prove the two totalities (⇒ `user_exec_step_producer` ⇒
+     `exec_step_obligation` ⇒ `exec_step_branch` ⇒ active_class), and each
+     totality is proved by casing on the decoded instruction and handing
+     each family its execute fact.  NOTHING in fetch/progress/retire/trap
+     is re-touched per family; base-vs-RVC is the one inherent split (it is
+     the two progress composers, hidden behind the two totality premises).
+     THE MEMORY FAMILIES: their execute fact is `execute_LOAD/STORE/…` run
+     through the UserMemAccess §2/§6/§7/§8 composers + the §9 address
+     transform (an Ok/Err from a composer IS the retire/trap
+     classification); no per-width/aligned-vs-misaligned arm work.
      (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
      UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
      (`gpr_write_state`-shaped, value existential) for every compute /
