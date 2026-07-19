@@ -355,3 +355,52 @@ Section UserFetchFaultActive.
   Qed.
 
 End UserFetchFaultActive.
+Section UserExecProducer2U.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+
+  Lemma user_exec_step_producer_2_u (E : coPset) (σ : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) (w_leaf wh_leaf : mword 64) :
+    pt.(ud_um) !! svpn_of va = Some w_leaf ->
+    uleaf_ok (InstructionFetch tt) w_leaf ->
+    pt.(ud_um) !! svpn_of (add_vec_int va 2) = Some wh_leaf ->
+    uleaf_ok (InstructionFetch tt) wh_leaf ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
+    is_aligned_vaddr (Virtaddr (add_vec_int va 2)) 2 = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int va 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int va 2))) (Z.sub 39 1) 0)) = false ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    hw_config -∗
+    base_exec_total_u C pt E σ va g -∗ rvc_exec_total_u C pt E σ va g -∗
+    active_step_obligation C pt E σ va g.
+  Proof.
+    intros Hum Hleaf Humh Hleafh Hal2 Hal2h Hbit0 Hbit1 Hnal4 Hcanon Hcanonh
+           Hmisa Hmenv Hhtif HSXL Hall Help.
+    iIntros "#Hhw Htb Htr %Hpre Hint Hgpr Hnpc Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iMod (user_pt_fetch_instr_2 pt.(ud_root) pt.(ud_tfp) pt.(ud_um) pt.(ud_data)
+            w_leaf wh_leaf va σ Hum Hleaf Humh Hleafh Hcov Hal2 Hal2h Hbit0 Hbit1 Hnal4
+            Lpc Hcanon Hcanonh Hmisa Hmenv Hhtif Hcp HSXL Hall
+            with "Hreg Hgh Hutlb Hudata")
+      as (iw σf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hgh & Hutlb & Hudata)".
+    iApply (user_exec_step_from_fetch_u C pt E σ σf va g iw
+              Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch
+              with "Hhw Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg").
+    - unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev".
+    - unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption.
+  Qed.
+
+End UserExecProducer2U.
