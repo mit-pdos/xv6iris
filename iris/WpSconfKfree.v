@@ -37,6 +37,49 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
+(* The acquire (+1) / release (-1) noff cancellation: release's nv1
+   (derived from acquire's incremented [po_noff_store]) equals
+   [sign_extend' 64 noffv].  63 in a 6-bit field is -1, and trunc32
+   cancels each sign extension (trunc32_sext), so store = noffv+1 and
+   nv1_inner = (noffv+1) + (-1) = noffv. *)
+Lemma kfree_nv1_cancel_pure (noffv : mword 32) :
+  sign_extend' 64 (subrange_vec_dec (add_vec
+     (sign_extend' 64 (autocast (T := mword) (subrange_vec_dec
+        (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv)
+           (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
+        (Z.sub (Z.mul 4 8) 1) 0) : mword 32))
+     (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)
+  = sign_extend' 64 noffv.
+Proof.
+  set (a5 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv)
+                (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)).
+  set (store := (autocast (T := mword) (subrange_vec_dec a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32)).
+  assert (H1 : trunc32 (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)) : mword 64) = (mword_of_int 1 : mword 32))
+    by (apply bv_eq; vm_compute; reflexivity).
+  assert (H63 : trunc32 (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)) : mword 64) = (mword_of_int (-1) : mword 32))
+    by (apply bv_eq; vm_compute; reflexivity).
+  assert (Hstore : store = add_vec noffv (mword_of_int 1 : mword 32)).
+  { unfold store. change (Z.sub (Z.mul 4 8) 1) with 31. rewrite autocast_id.
+    rewrite <- trunc32_subrange. unfold a5. rewrite trunc32_sext.
+    rewrite <- trunc32_subrange. rewrite trunc32_add. rewrite trunc32_sext. rewrite H1. reflexivity. }
+  f_equal.
+  rewrite <- trunc32_subrange. rewrite trunc32_add. rewrite trunc32_sext. rewrite H63.
+  fold a5. fold store. rewrite Hstore.
+  (* add_vec (add_vec noffv 1) (-1) = noffv *)
+  apply bv_eq.
+  assert (avu : forall x y : mword 32, bv_unsigned (add_vec x y) = bv_wrap 32 (bv_unsigned x + bv_unsigned y)).
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned. reflexivity. }
+  rewrite !avu.
+  change (bv_unsigned (mword_of_int 1 : mword 32)) with 1.
+  change (bv_unsigned (mword_of_int (-1) : mword 32)) with (bv_modulus 32 - 1).
+  rewrite bv_wrap_add_idemp_l.
+  rewrite <- Z.add_assoc.
+  replace (1 + (bv_modulus 32 - 1)) with (bv_modulus 32) by lia.
+  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+Qed.
+
 Section WpSconfKfree.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
@@ -656,7 +699,7 @@ Section WpSconfKfree.
        equal to [sign_extend' 64 noffv], so its coupling premise IS Hnoff_lvl. *)
     assert (Hnv1eq : sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)
                      = sign_extend' 64 noffv).
-    { admit. (* bv: (noffv+1)-1 = noffv mod 2^32 *) }
+    { exact (kfree_nv1_cancel_pure noffv). }
     assert (kfree_nv1_cancel : neq_vec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)) zero_reg = false <-> n = 0%nat).
     { rewrite Hnv1eq. exact Hnoff_lvl. }
     (* split off deep-10 for release *)
@@ -837,6 +880,6 @@ Section WpSconfKfree.
         rewrite /Q5a lookup_total_insert.
         rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
       repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
-  Admitted.
+  Qed.
 
 End WpSconfKfree.

@@ -560,24 +560,41 @@ before any mechanical sweep.
      WpSconfKfree.v etc.): prologue frame trade, the freelist load/store
      leaves over the funnel, `wp_acquire_sconf` (n→S n) around the
      section, `wp_release_sconf` (S n→n), epilogue.
-     KFREE STATUS (WpSconfKfree.v — the ENTIRE body is transcribed and
-     compiling; ONE bv identity admitted; file UNREGISTERED so the tree
-     stays green).  DONE end-to-end: prologue, panic-check ALU, memset
-     call, acquire call (intr_count n→S n), freelist push, release call
-     (S n→n), epilogue, callee_saved — all the frame trades
-     (move_down/_up 4), deep-custody split/recombine around each sub-call
-     (memset deep-2, acquire/release deep-10), and the intr_count net-zero
-     threading work.  THE ONE REMAINING ADMIT (`Hnv1eq`): the bv identity
-     `sign_extend' 64 (subrange_vec_dec (add_vec (sext64 po_noff_store)
-     (sext64 (sext12 63))) 31 0) = sign_extend' 64 noffv` — i.e. acquire's
-     noff +1 then release's -1 cancels mod 2^32 (63 in a 6-bit field is
-     -1).  It reduces to the mword-32 fact `subrange(sext64 po_noff_store
-     - 1) 31 0 = noffv` where `po_noff_store = low32(noffv+1)`; a focused
-     ~30-line bv-arithmetic proof (needs a low-32 subrange-unsigned lemma
-     — none exists yet; build via the WpIntenaBits recipe:
-     bv_unsigned + bv_wrap arithmetic, vm'd modulus literals, abstract
-     b2z bounds, avoid the zify-hook lia trap).  Once that lands, kfree is
-     Qed and gets registered.  Historical detail (spec/prologue):
+     KFREE DONE — `wp_kfree_sconf` (WpSconfKfree.v, registered, Qed,
+     axiom-clean at baseline 5 + funext).  The FIRST full kalloc-cone
+     function over sconf.  End-to-end: prologue (frame trade
+     sie_cap_move_down 4), panic-check ALU (pure sconf leaf swaps —
+     register-map lets transcribe VERBATIM from WpKfree), the memset call
+     (wp_memset_page_sconf, deep-2 lent), the acquire call
+     (wp_acquire_sconf, intr_count n→S n, deep-10), the freelist push
+     (ld/csd/sd_s_sconf + kmem_res_push), the release call
+     (wp_release_sconf, S n→n), the epilogue (4 c.ldsp + c.addi16sp
+     move_up 4 + c.ret), and callee_saved.  The deep-custody
+     split/recombine around each sub-call and the intr_count net-zero
+     threading all work.  THE NOFF-CANCEL LEMMA `kfree_nv1_cancel_pure`
+     (top-level, iris-free): release's nv1 (from acquire's incremented
+     po_noff_store) = `sign_extend' 64 noffv`, so release's coupling
+     premise IS the clean entry premise `noff==0 ↔ intr_count level==0`.
+     THE CLEAN PROOF (reusable recipe for any acquire/release noff
+     composition): use VcGen's trunc32 algebra — `trunc32_subrange`
+     (subrange..31 0 = trunc32), `trunc32_add` (distributes over add_vec),
+     `trunc32_sext` (trunc32 ∘ sign_extend' 64 = id), `trunc32_mword_of_int`.
+     They collapse store to `noffv+1` and nv1_inner to
+     `(noffv+1)+(-1)`; the final `add_vec (add_vec noffv 1) (-1) = noffv`
+     is one bv_wrap-add-modulus step (63:mword6 = -1, so sext12/sext64 of
+     it = -1, trunc32 = the mword-32 all-ones = bv_modulus 32 - 1).  Do
+     NOT hand-roll subrange-unsigned lemmas — the trunc32 layer already
+     has them.  NEXT in the cone: kalloc, wakeup (same shape; kalloc's
+     memset is AFTER release, so it threads the same way with the call
+     order swapped).  GOTCHAS from the kfree build (all in the proof):
+     the `repeat rewrite lookup_total_insert_ne` delta-sees-through `set`
+     vars to `m` — use EXPLICIT per-map `rewrite /RK lookup_total_insert_ne`
+     peels for map-lookup asserts that must stop at an intermediate map;
+     a composition assert like `Hpc2` needs explicit `: mword 64` width
+     annotations or vm_compute diverges inferring the width from the iris
+     context; imports need `SRegime SmodeCore` for the gmap `!!!`
+     instance and must NOT trailing-`Import Defs`/`Require Riscv.rv64d`
+     (shadows `!!!`).  Historical detail (spec/prologue):
        - SPEC decided.  Threads `sconf γ + hart_state + sie_cap γ root m +
          intr_count γ root n + tlb_inv_pt` and a DEEP-`K` custody
          `stack_own (pa_stk sp0 kv_frame_slots) K` with `14 <= K` (its own
