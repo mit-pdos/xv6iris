@@ -861,9 +861,18 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    + `mappages_spec_holds : ⊢ mappages_spec`.  KvmSpec's mappages/kvmmap
    specs now premise `mappages_perm_ok perm` and the pa-run bound
    `uint pa + npages*4096 < 2^56`.  PtBuild §8 holds all the pure bridges.
-5. **wp_kvmmap** = wp_mappages + the beqz on a0 + `panic_wp` for the -1
-   arm (state `panic_wp` as an interim axiom in its own file, like
-   wp_myproc; eventually provable — printf/uartputc + a Löb spin loop).
+5. **wp_kvmmap** (DONE, Qed; WpKvmmap.v registered, full build green,
+   axioms = 6 standard model stubs; panic_wp is a proper HYPOTHESIS, not a
+   global axiom).  Thin wrapper: 2-slot frame, three c.mv swapping mappages's
+   size/pa args (a2↔a3 via a5), jal mappages (wp_mappages_r at the swapped
+   map P6, whose va/pa/vpn0/ppn0 coincide with kvmmap's via HP6a1/HP6a3),
+   then the beqz on a0: FALL (k=npages, a0=0) → the 2-slot epilogue → post
+   with the full run; TAKEN (k<npages, a0=-1) → the panic arm (auipc/addi/
+   jal panic) → `panic_wp` absorbs it.  Frame decodes reuse KernelRvcDecode's
+   shared mdec_ccc..cf0 templates; only the 3 c.mv, the c.bnez, and the two
+   base jals are decoded locally.  callee_saved mm mr recovered from
+   callee_saved P6 mr since P6 = mm off the callee-saved set (only a2/a3/a5
+   clobbered).  `kvmmap_spec_holds : ⊢ kvmmap_spec`.
 6. **wp_proc_mapstacks** (NPROC=64 kalloc+kvmmap loop, fuel induction over
    the proc array — needs the `proc` array base + KSTACK geometry), then
    **wp_kvmmake** (kalloc root + memset + `zero_page_to_node` at level 2 +
