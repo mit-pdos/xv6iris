@@ -513,8 +513,355 @@ Section WpSconfKalloc.
           rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
         repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
       { rewrite /kalloc_post. iLeft. iPureIntro. exact HP45a0. }
-    - (* ===== NONEMPTY: head=pg, pop + release + memset ===== *)
-      admit.
-  Admitted.
+    - (* ===== NONEMPTY: head=pg, pop + release + memset(p,5,4096) ===== *)
+      iDestruct "Hchain" as "(-> & %Hpv & Hrun)".
+      iDestruct "Hrun" as (nxt) "[Hrun Hchain]".
+      iApply (wp_cbeqz_fall_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x1e)) (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 1)) (mword_of_int 9 : mword 5)
+                R7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs1R7; apply eq_vec_false_iff; intro Hpz;
+                      apply (page_valid_ne_null pg Hpv); rewrite Hpz; apply bv_eq; vm_compute; reflexivity)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi1e [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      iEval (rewrite /run_page) in "Hrun".
+      iDestruct "Hrun" as "[Hpnext Hprest]".
+      iPoseProof (kai_20 with "Htext") as "Hi20".
+      iPoseProof (kai_22 with "Htext") as "Hi22".
+      iPoseProof (kai_26 with "Htext") as "Hi26".
+      (* +0x20 c.ld a5,0(s1) : a5 := nxt *)
+      assert (Hpaddr : add_vec (R7 !!! Regidx (mword_of_int 9 : mword 5))
+                 (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))) = pg).
+      { replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000"))) : mword 64)
+          with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
+        rewrite Hs1R7. apply kv_addv_zero. }
+      iApply (wp_cld_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+                (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
+                R7 nxt ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi20 [Hpnext] [-]").
+      { iEval (rewrite Hpaddr). rewrite /word_at. iExact "Hpnext". }
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hpnext".
+      iEval (rewrite Hpaddr) in "Hpnext".
+      set (R8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg nxt]> R7).
+      assert (Hpp22 : add_vec_int (mword_of_int (AK + 0x20) : mword 64) 2 = mword_of_int (AK + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp22) in "Hpc".
+      (* +0x22 auipc a4,0x11 *)
+      iApply (wp_auipc_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x22)) (mword_of_int 14 : mword 5) (mword_of_int 0x11 : mword 20)
+                R8 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi22 [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (R9 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x22) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R8).
+      assert (Ha4R9 : R9 !!! Regidx (mword_of_int 14 : mword 5) = add_vec (mword_of_int (AK + 0x22) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))
+        by (rewrite /R9; apply lookup_total_insert).
+      assert (Ha5R9 : R9 !!! Regidx (mword_of_int 15 : mword 5) = nxt).
+      { rewrite /R9 lookup_total_insert_ne; [| vm_compute; discriminate]. rewrite /R8; apply lookup_total_insert. }
+      assert (Hpp26 : add_vec_int (mword_of_int (AK + 0x22) : mword 64) 4 = mword_of_int (AK + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp26) in "Hpc".
+      (* +0x26 sd a5,2046(a4) : kmem.freelist := nxt *)
+      assert (Hstaddr : add_vec (R9 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 0x7f0 : mword 12)) = fl).
+      { rewrite Ha4R9 Hfl. apply bv_eq; vm_compute; reflexivity. }
+      iApply (wp_sd_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x7f0 : mword 12)
+                R9 pg with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi26 [Hflw] [-]").
+      { iEval (rewrite -Hstaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hflw".
+      rewrite Ha5R9. iEval (rewrite Hstaddr) in "Hflw".
+      iAssert (kmem_res fl) with "[Hflw Hchain]" as "HRres".
+      { iApply (kmem_res_close fl nxt ps). rewrite /word_at. iFrame "Hflw Hchain". }
+      iAssert (page_own pg) with "[Hpnext Hprest]" as "Hpage".
+      { iApply (run_page_page_own pg nxt). rewrite /run_page /word_at. iFrame "Hpnext Hprest". }
+      assert (Hpp2a : add_vec_int (mword_of_int (AK + 0x26) : mword 64) 4 = mword_of_int (AK + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp2a) in "Hpc".
+      iPoseProof (kai_2a with "Htext") as "Hi2a".
+      iPoseProof (kai_2e with "Htext") as "Hi2e".
+      (* +0x2a auipc a0,0x11 ; +0x2e addi a0,a0,2000 (a0 := &kmem) *)
+      iApply (wp_auipc_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x2a)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
+                R9 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi2a [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (R10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x2a) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R9).
+      assert (Hpp2e : add_vec_int (mword_of_int (AK + 0x2a) : mword 64) 4 = mword_of_int (AK + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp2e) in "Hpc".
+      iApply (wp_addi4_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x2e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7d0 : mword 12)
+                R10 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi2e [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (R11 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R10 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7d0 : mword 12)))]> R10).
+      assert (Ha0kmem : R11 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int KernelSyms.kmem).
+      { rewrite /R11 lookup_total_insert /R10 lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
+      assert (Hpp32 : add_vec_int (mword_of_int (AK + 0x2e) : mword 64) 4 = mword_of_int (AK + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp32) in "Hpc".
+      iPoseProof (kai_32 with "Htext") as "Hi32".
+      (* +0x32 jal ra,release *)
+      iApply (wp_jal_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x32)) (mword_of_int 1 : mword 5) (mword_of_int 0x130 : mword 21)
+                R11 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi32 [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (R12 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (AK + 0x32) : mword 64) 4)]> R11).
+      assert (Htgtr : add_vec (mword_of_int (AK + 0x32) : mword 64) (sign_extend' 64 (mword_of_int 0x130 : mword 21)) = mword_of_int KernelSyms.release)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgtr) in "Hpc".
+      assert (HR12csp : R12 !!! Regidx csp_rs1 = spr).
+      { rewrite /R12 /R11 /R10 /R9 /R8 /R7 /R6;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]); exact Hmsp. }
+      assert (HR12tp : R12 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
+      { rewrite /R12 /R11 /R10 /R9 /R8 /R7 /R6;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]); exact Hmtp. }
+      assert (HR12a0 : R12 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int KernelSyms.kmem).
+      { rewrite /R12 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Ha0kmem. }
+      assert (HR12ra : R12 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x32) : mword 64) 4)
+        by (rewrite /R12; apply lookup_total_insert).
+      assert (HR12s1 : R12 !!! Regidx (mword_of_int 9 : mword 5) = pg).
+      { rewrite /R12 /R11 /R10 /R9 /R8;
+        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]); exact Hs1R7. }
+      iDestruct (stack_own_split_1 (pa_stk spr kv_frame_slots) 10 (K-4) ltac:(lia) with "Hdeep") as "[Hd10 Hrest]".
+      iApply (wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) (kmem_res fl) R12
+                (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
+                po_noff_store
+                (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
+                n (dqi:=DfracOwn 1)
+                ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
+                ltac:(rewrite HR12tp; apply eq_vec_true_iff; reflexivity)
+                Hcancel Hnoffpos
+                ltac:(rewrite HR12ra; vm_compute; reflexivity)
+                with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile [Hlock] Htok HRres [Hacpu] [Hanoff] [Haint] [Hd10] Hcnt [-]").
+      { iExact "Hlock". }
+      { iEval (rewrite HmAa0 HmAtp) in "Hacpu". iEval (rewrite HR12a0). iExact "Hacpu". }
+      { iEval (rewrite HmAtp) in "Hanoff". iEval (rewrite HR12tp). iExact "Hanoff". }
+      { iEval (rewrite HmAtp) in "Haint". iEval (rewrite HR12tp). iExact "Haint". }
+      { iEval (rewrite HR12csp). iExact "Hd10". }
+      iIntros (mr) "Hhs Hsc Hcap Htlbinv Hpc Hfile %Hrelpins Hcpu2 Hnoff2 Hint2 Hd10 Hcnt".
+      iEval (rewrite HR12csp) in "Hd10".
+      iDestruct (stack_own_split_2 (pa_stk spr kv_frame_slots) 10 (K-4) ltac:(lia) with "[$Hd10 $Hrest]") as "Hdeep".
+      assert (Hpc36 : update_vec_dec (add_vec (R12 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x36)).
+      { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
+      iEval (rewrite Hpc36) in "Hpc".
+      pose proof Hrelpins as Hrelpins_cs.
+      unfold callee_saved in Hrelpins.
+      destruct Hrelpins as (Hmrcsp & Hmrtp & Hmrs0 & Hmrs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
+      iPoseProof (kai_36 with "Htext") as "Hi36".
+      iPoseProof (kai_38 with "Htext") as "Hi38".
+      iPoseProof (kai_3a with "Htext") as "Hi3a".
+      (* +0x36 c.lui a2,0x1 (a2:=4096) *)
+      iApply (wp_clui_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x36)) (mword_of_int 12 : mword 5)
+                (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 4096 : mword 64)
+                mr ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(unfold luival; apply bv_eq; vm_compute; reflexivity)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi36 [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (Mlui := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (mword_of_int 4096 : mword 64)]> mr).
+      assert (Hpp38 : add_vec_int (mword_of_int (AK + 0x36) : mword 64) 2 = mword_of_int (AK + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp38) in "Hpc".
+      (* +0x38 c.li a1,5 *)
+      iApply (wp_cli_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x38)) (mword_of_int 11 : mword 5)
+                (mword_of_int 5 : mword 6) (mword_of_int 5 : mword 64)
+                Mlui ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi38 [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (Mli := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 5 : mword 64)]> Mlui).
+      assert (Hpp3a : add_vec_int (mword_of_int (AK + 0x38) : mword 64) 2 = mword_of_int (AK + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp3a) in "Hpc".
+      (* +0x3a c.mv a0,s1 (a0 := p) *)
+      iApply (wp_cmv_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x3a)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+                Mli ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi3a [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (M3a := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (Mli !!! Regidx (mword_of_int 9 : mword 5)))]> Mli).
+      assert (Hpp3c : add_vec_int (mword_of_int (AK + 0x3a) : mword 64) 2 = mword_of_int (AK + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp3c) in "Hpc".
+      iPoseProof (kai_3c with "Htext") as "Hi3c".
+      (* +0x3c jal ra,memset *)
+      iApply (wp_jal_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 0x15e : mword 21)
+                M3a ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi3c [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (Mms := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (AK + 0x3c) : mword 64) 4)]> M3a).
+      assert (Htgtms : add_vec (mword_of_int (AK + 0x3c) : mword 64) (sign_extend' 64 (mword_of_int 0x15e : mword 21)) = mword_of_int KernelSyms.memset)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgtms) in "Hpc".
+      assert (HMmsa0 : Mms !!! Regidx (mword_of_int 10 : mword 5) = pg).
+      { rewrite /Mms lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M3a lookup_total_insert.
+        rewrite /Mli lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mlui lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hmrs1 HR12s1. apply add_vec_zero_l. }
+      assert (HMmss1 : Mms !!! Regidx (mword_of_int 9 : mword 5) = pg).
+      { rewrite /Mms lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M3a lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mli lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mlui lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hmrs1. exact HR12s1. }
+      assert (HMmsa1 : Mms !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 5 : mword 64)).
+      { rewrite /Mms lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M3a lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mli lookup_total_insert. reflexivity. }
+      assert (HMmsa2 : Mms !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int 4096 : mword 64)).
+      { rewrite /Mms lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M3a lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mli lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mlui lookup_total_insert. reflexivity. }
+      assert (HMmsra : Mms !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (AK + 0x40)).
+      { rewrite /Mms lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
+      assert (HMmssp : Mms !!! Regidx csp_rs1 = spr).
+      { rewrite /Mms lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /M3a lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mli lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Mlui lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite Hmrcsp. exact HR12csp. }
+      (* split off deep-2 for memset *)
+      assert (Hda3 : pa_stk (pa_stk sp0 kv_frame_slots) 4 = pa_stk spr kv_frame_slots).
+      { unfold spr, sp0, pa_stk, add_vec_int, kv_frame_slots. rewrite !add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+      iDestruct (stack_own_split_1 (pa_stk spr kv_frame_slots) 2 (K-4) ltac:(lia) with "Hdeep") as "[Hd2 Hrest]".
+      iApply (wp_memset_page_sconf γ root_ppn Φ Mms (mword_of_int 5 : mword 64)
+                ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
+                ltac:(rewrite HMmsra; vm_compute; reflexivity)
+                with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile [Hd2] [Hpage] [-]").
+      { iEval (rewrite HMmssp). iExact "Hd2". }
+      { iEval (rewrite HMmsa0). iExact "Hpage". }
+      iIntros (mfp) "Hsc Hhs Hcap Htlbinv Hpc Hd2 Hpage Hfile %Hpinsf".
+      iEval (rewrite HMmssp) in "Hd2".
+      iEval (rewrite HMmsa0) in "Hpage".
+      iDestruct (stack_own_split_2 (pa_stk spr kv_frame_slots) 2 (K-4) ltac:(lia) with "[$Hd2 $Hrest]") as "Hdeep".
+      pose proof Hpinsf as Hpinsf_cs.
+      unfold callee_saved in Hpinsf.
+      destruct Hpinsf as (Hfsp & Hftp & Hfs0 & Hfs1 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _).
+      assert (Hpc40 : update_vec_dec (add_vec (Mms !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x40)).
+      { rewrite HMmsra. apply bv_eq; vm_compute; reflexivity. }
+      iEval (rewrite Hpc40) in "Hpc".
+      assert (Hmfsp : mfp !!! Regidx csp_rs1 = spr) by (rewrite Hfsp HMmssp; reflexivity).
+      iPoseProof (kai_40 with "Htext") as "Hi40".
+      iPoseProof (kai_42 with "Htext") as "Hi42".
+      iPoseProof (kai_44 with "Htext") as "Hi44".
+      iPoseProof (kai_46 with "Htext") as "Hi46".
+      iPoseProof (kai_48 with "Htext") as "Hi48".
+      iPoseProof (kai_4a with "Htext") as "Hi4a".
+      (* +0x40 c.mv a0,s1 (a0 := p) *)
+      iApply (wp_cmv_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x40)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+                mfp ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi40 [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      set (Q41 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (mfp !!! Regidx (mword_of_int 9 : mword 5)))]> mfp).
+      assert (HspQ41 : Q41 !!! Regidx csp_rs1 = spr) by (rewrite /Q41 lookup_total_insert_ne; [ exact Hmfsp | vm_compute; discriminate ]).
+      assert (Hpp42 : add_vec_int (mword_of_int (AK + 0x40) : mword 64) 2 = mword_of_int (AK + 0x42)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp42) in "Hpc".
+      iEval (rewrite HspR1) in "Hr24". iEval (rewrite HspR1) in "Hr16". iEval (rewrite HspR1) in "Hr8". iEval (rewrite HspR1) in "Hg4".
+      (* +0x42 c.ldsp ra,24(sp) *)
+      iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x42)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+                Q41 (R1 !!! Regidx (mword_of_int 1 : mword 5))
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi42 [Hr24] [-]").
+      { iEval (rewrite HspQ41). iExact "Hr24". }
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hr24".
+      iEval (rewrite HspQ41) in "Hr24".
+      set (Q42 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (R1 !!! Regidx (mword_of_int 1 : mword 5))]> Q41).
+      assert (HspQ42 : Q42 !!! Regidx csp_rs1 = spr) by (rewrite /Q42 lookup_total_insert_ne; [ exact HspQ41 | vm_compute; discriminate ]).
+      assert (Hpp44 : add_vec_int (mword_of_int (AK + 0x42) : mword 64) 2 = mword_of_int (AK + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp44) in "Hpc".
+      (* +0x44 c.ldsp s0,16(sp) *)
+      iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x44)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+                Q42 (R1 !!! Regidx (mword_of_int 8 : mword 5))
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi44 [Hr16] [-]").
+      { iEval (rewrite HspQ42). iExact "Hr16". }
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hr16".
+      iEval (rewrite HspQ42) in "Hr16".
+      set (Q43 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (R1 !!! Regidx (mword_of_int 8 : mword 5))]> Q42).
+      assert (HspQ43 : Q43 !!! Regidx csp_rs1 = spr) by (rewrite /Q43 lookup_total_insert_ne; [ exact HspQ42 | vm_compute; discriminate ]).
+      assert (Hpp46 : add_vec_int (mword_of_int (AK + 0x44) : mword 64) 2 = mword_of_int (AK + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp46) in "Hpc".
+      (* +0x46 c.ldsp s1,8(sp) *)
+      iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x46)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+                Q43 (R1 !!! Regidx (mword_of_int 9 : mword 5))
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi46 [Hr8] [-]").
+      { iEval (rewrite HspQ43). iExact "Hr8". }
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hr8".
+      iEval (rewrite HspQ43) in "Hr8".
+      set (Q44 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (R1 !!! Regidx (mword_of_int 9 : mword 5))]> Q43).
+      assert (HspQ44 : Q44 !!! Regidx csp_rs1 = spr) by (rewrite /Q44 lookup_total_insert_ne; [ exact HspQ43 | vm_compute; discriminate ]).
+      assert (Hpp48 : add_vec_int (mword_of_int (AK + 0x46) : mword 64) 2 = mword_of_int (AK + 0x48)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp48) in "Hpc".
+      (* +0x48 c.addi16sp sp,32 -- move_up 4 *)
+      set (Q45 := <[Regidx csp_rs1 := regval_into_reg (add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q44).
+      assert (HQ45csp : Q45 !!! Regidx csp_rs1 = sp0).
+      { rewrite /Q45 lookup_total_insert. rewrite HspQ44. unfold spr, sp0. apply kalloc_sp_cancel. }
+      assert (HupQ : Q44 !!! Regidx csp_rs1 = pa_stk (Q45 !!! Regidx csp_rs1) 4).
+      { rewrite HspQ44 HQ45csp. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+      iApply (wp_caddi16sp_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x48)) (mword_of_int 2 : mword 6) Q44
+                (stack_own (pa_stk sp0 kv_frame_slots) 4)
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi48 [Hr24 Hr16 Hr8 Hg4] [-]").
+      { iIntros "Hcap".
+        iAssert (stack_own (Q45 !!! Regidx csp_rs1) 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe".
+        { rewrite HQ45csp. rewrite stack_own_slots. cbn [seq].
+          iSplitL "Hr24"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hr24"|].
+          iSplitL "Hr16"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hr16"|].
+          iSplitL "Hr8";  [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hr8"|].
+          iSplitL "Hg4";  [iEval (rewrite -Hb4 HspR1); iExists _; iExact "Hg4"|].
+          done. }
+        iDestruct (sie_cap_move_up γ root_ppn Q44 Q45 4 HupQ with "Hframe Hcap") as "[Hcap Hdeep4]".
+        iEval (rewrite HQ45csp) in "Hdeep4". iFrame "Hcap Hdeep4". }
+      iIntros "Hhs Hsc Hcap Hdeep4 Htlbinv Hpc Hfile".
+      change (<[Regidx csp_rs1 := regval_into_reg (add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q44) with Q45.
+      assert (Hpp4a : add_vec_int (mword_of_int (AK + 0x48) : mword 64) 2 = mword_of_int (AK + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp4a) in "Hpc".
+      iEval (rewrite -Hda3) in "Hdeep".
+      iDestruct (stack_own_split_2 (pa_stk sp0 kv_frame_slots) 4 K ltac:(lia) with "[$Hdeep4 $Hdeep]") as "Hdeep".
+      (* +0x4a c.ret *)
+      assert (HQ45ra : Q45 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5)).
+      { rewrite /Q45 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q44 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q43 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q42 lookup_total_insert.
+        rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+      assert (HQ45a0 : Q45 !!! Regidx (mword_of_int 10 : mword 5) = pg).
+      { rewrite /Q45 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q44 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q43 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q42 lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite /Q41 lookup_total_insert.
+        rewrite Hfs1 HMmss1. apply add_vec_zero_l. }
+      assert (Hretaligned : eq_vec (access_vec_dec (update_vec_dec (add_vec (Q45 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
+        by (rewrite HQ45ra; exact Hretm).
+      iApply (wp_cret_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x4a)) (mword_of_int 1 : mword 5) Q45
+                ltac:(vm_compute; discriminate) Hretaligned
+                with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi4a [-]").
+      iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+      assert (Hretf : update_vec_dec (add_vec (Q45 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+        by (rewrite HQ45ra; reflexivity).
+      iEval (rewrite Hretf) in "Hpc".
+      iApply ("Hcont" $! Q45 with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] [Hpage] Hdeep").
+      { (* callee_saved m Q45 *)
+        assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
+                  c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
+                  c <> mword_of_int 9 -> c <> mword_of_int 10 ->
+                  c <> mword_of_int 11 -> c <> mword_of_int 12 ->
+                  c <> mword_of_int 14 -> c <> mword_of_int 15 ->
+                  Q45 !!! Regidx c = m !!! Regidx c).
+        { intros c Hcs N1 N2 N8 N9 N10 N11 N12 N14 N15.
+          let peel := (repeat (rewrite lookup_total_insert_ne; [ | congruence ])) in
+          rewrite /Q45 /Q44 /Q43 /Q42 /Q41; peel;
+          rewrite (callee_saved_lookup Hpinsf_cs c Hcs);
+          rewrite /Mms /M3a /Mli /Mlui; peel;
+          rewrite (callee_saved_lookup Hrelpins_cs c Hcs);
+          rewrite /R12 /R11 /R10 /R9 /R8 /R7 /R6; peel;
+          rewrite (callee_saved_lookup Hacqpins_cs c Hcs);
+          rewrite /mA /R4 /R3 /R2 /R1; peel;
+          reflexivity. }
+        unfold callee_saved.
+        split.
+        { rewrite /Q45 lookup_total_insert.
+          rewrite HspQ44. unfold regval_into_reg, spr. apply kalloc_sp_cancel. }
+        split.
+        { apply Hthread; vm_compute; first [reflexivity | discriminate]. }
+        split.
+        { rewrite /Q45 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /Q44 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /Q43 lookup_total_insert.
+          rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+        split.
+        { rewrite /Q45 lookup_total_insert_ne; [| vm_compute; discriminate].
+          rewrite /Q44 lookup_total_insert.
+          rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+        repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
+      { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage". iPureIntro. exact Hpv. }
+  Qed.
 
 End WpSconfKalloc.

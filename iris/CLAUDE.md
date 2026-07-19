@@ -552,7 +552,28 @@ before any mechanical sweep.
      (pop_off inside).  csrr keeps its arm-report (pop_off refutes the
      '1' arm via its count eighth); csrsi flips only 1→0.
 
-   - KALLOC CONE (kfree/kalloc/wakeup, unblocked by the counting token).
+   - KALLOC + KFREE DONE (both Qed, axiom-clean, registered).  kalloc
+     (WpSconfKalloc.v) is the branchy one: acquire (n→S n) → ld freelist
+     head → c.beqz → EMPTY arm (reclose kmem_res, release S n→n, c.j,
+     return null / kalloc_post=Left) OR NONEMPTY arm (pop: ld nxt, sd
+     kmem.freelist:=nxt, reassemble page_own; release S n→n; memset(p,5,
+     4096) via wp_memset_page_sconf; return page / kalloc_post=Right).
+     THE ONE KALLOC-SPECIFIC GOTCHA: the c.beqz-TAKEN leaf hands the
+     step's later out, and the following iNext strips the ▷ from the
+     *reducible* `intr_count (S n)`'s inner (persistent) handler-spec, so
+     it must be re-folded before the release via `intr_restore_intro` +
+     `intr_count_pack_S` (destruct the stripped token, re-add the later).
+     The RETURNED `intr_count n` (symbolic n = a STUCK match) is NOT
+     stripped by iNext, so it needs no re-fold; and the NONEMPTY arm's
+     c.beqz-FALL leaf has a plain continuation (no iNext), so its release
+     needs no re-fold at all.  Padding-slot gotcha: kalloc's 4-slot frame
+     saves only ra/s0/s1 (3), leaving slot-0 padding `Hg4` never loaded —
+     rewrite HspR1 into it too before the epilogue rebundle (the loaded
+     cells got it via the cldsp round-trip, the padding didn't).  The
+     noff-cancel + memset-deep-2 + acquire/release-deep-10 patterns are
+     exactly kfree's.  NEXT: wakeup (same shape, uses wp_myproc), then the
+     boot wiring, then delete smode_config.
+   - (historical) KALLOC CONE (kfree/kalloc/wakeup, unblocked by the counting token).
      Each is acquire → critical section → release, so the SPEC threads
      `intr_count γ root n` NET-ZERO: `intr_count n` in and out (acquire
      increments to S n inside the disabled region, release decrements
