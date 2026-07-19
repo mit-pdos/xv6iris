@@ -188,3 +188,170 @@ Section UserExecProducerU.
   Qed.
 
 End UserExecProducerU.
+Section UserFetchFaultActive.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+
+  (* Odd pc -> E_Fetch_Addr_Align, state unchanged. *)
+  Lemma user_fetch_fault_active_align (E : coPset) (σ : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) :
+    neq_vec (access_vec_dec va 0) ('b"0") = true ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    ⊢ active_step_obligation C pt E σ va g.
+  Proof.
+    intros Hbit0 Hhart.
+    iIntros "%Hpre Hint Hgpr Hnpc Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct (reg_valid_dq with "Hreg Hnpc") as %Lnpc.
+    pose proof (exec_fetch_align_fault σ va Lpc Hbit0) as Hfetch.
+    pose proof (exec_run_hart_active_fetch_failure User σ σ va (E_Fetch_Addr_Align tt)
+                  Hcp Hdisp Hfetch) as Hrun.
+    iModIntro.
+    iExists (Step_Fetch_Failure (Virtaddr va, E_Fetch_Addr_Align tt)), σ, g, va.
+    iSplitR; [iPureIntro; exact Hrun|].
+    iSplitR; [iPureIntro; right; exists (E_Fetch_Addr_Align tt), va; split; reflexivity|].
+    iSplitR; [iPureIntro; exact Hhart|].
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitR; [iPureIntro; exact Lnpc|].
+    unfold mstate_interp; cbn [sregs mem mdev]. iFrame "Hreg Hgh Hdev Hgpr Hnpc Hupt Hcfg".
+  Qed.
+
+  (* 4-aligned walk fault -> E_Fetch_Page_Fault, state unchanged. *)
+  Lemma user_fetch_fault_active (E : coPset) (σ : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) :
+    u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) va ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ⊢ active_step_obligation C pt E σ va g.
+  Proof.
+    intros Hflavor Hal Hhart Hhtif Hall.
+    iIntros "%Hpre Hint Hgpr Hnpc Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iDestruct (reg_valid_dq with "Hreg Hnpc") as %Lnpc.
+    iDestruct (user_pt_fetch_fault pt.(ud_root) pt.(ud_tfp) pt.(ud_um) va σ
+                 Hflavor Hal Lpc Hhtif Hcp (proj1 Hmsok) Hall with "Hreg Hgh Hutlb") as %Hfetch.
+    pose proof (exec_run_hart_active_fetch_failure User σ σ va (E_Fetch_Page_Fault tt)
+                  Hcp Hdisp Hfetch) as Hrun.
+    iModIntro.
+    iExists (Step_Fetch_Failure (Virtaddr va, E_Fetch_Page_Fault tt)), σ, g, va.
+    iSplitR; [iPureIntro; exact Hrun|].
+    iSplitR; [iPureIntro; right; exists (E_Fetch_Page_Fault tt), va; split; reflexivity|].
+    iSplitR; [iPureIntro; exact Hhart|].
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitR; [iPureIntro; exact Lnpc|].
+    unfold mstate_interp, user_pt_inv; cbn [sregs mem mdev].
+    iFrame "Hreg Hgh Hdev Hgpr Hnpc Hutlb Hudata Hcfg".
+    iPureIntro; split; assumption.
+  Qed.
+
+  (* 2-aligned low-halfword fault -> E_Fetch_Page_Fault, state unchanged. *)
+  Lemma user_fetch_fault_active_2_first (E : coPset) (σ : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) :
+    u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) va ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ⊢ active_step_obligation C pt E σ va g.
+  Proof.
+    intros Hflavor Hbit0 Hbit1 Hnal4 Hhart Hmisa Hhtif Hall.
+    iIntros "%Hpre Hint Hgpr Hnpc Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iDestruct (reg_valid_dq with "Hreg Hnpc") as %Lnpc.
+    iDestruct (user_pt_fetch_fault_2_first pt.(ud_root) pt.(ud_tfp) pt.(ud_um) va σ
+                 Hflavor Hbit0 Hbit1 Hnal4 Lpc Hmisa Hhtif Hcp (proj1 Hmsok) Hall
+                 with "Hreg Hgh Hutlb") as %Hfetch.
+    pose proof (exec_run_hart_active_fetch_failure User σ σ va (E_Fetch_Page_Fault tt)
+                  Hcp Hdisp Hfetch) as Hrun.
+    iModIntro.
+    iExists (Step_Fetch_Failure (Virtaddr va, E_Fetch_Page_Fault tt)), σ, g, va.
+    iSplitR; [iPureIntro; exact Hrun|].
+    iSplitR; [iPureIntro; right; exists (E_Fetch_Page_Fault tt), va; split; reflexivity|].
+    iSplitR; [iPureIntro; exact Hhart|].
+    iSplitR; [iPureIntro; reflexivity|].
+    iSplitR; [iPureIntro; exact Lnpc|].
+    unfold mstate_interp, user_pt_inv; cbn [sregs mem mdev].
+    iFrame "Hreg Hgh Hdev Hgpr Hnpc Hutlb Hudata Hcfg".
+    iPureIntro; split; assumption.
+  Qed.
+
+  (* 2-aligned low-OK / pc+2 faults: RVC executes OR the straddle faults.
+     With the unified obligation BOTH land in u_step_outcome, so this is one
+     active_step_obligation (no disjunction of obligation types). *)
+  Lemma user_exec_or_fault_active_2_second (E : coPset) (σ : mstate) (va : mword 64)
+      (g : gmap regidx (mword 64)) (w_leaf : mword 64) :
+    pt.(ud_um) !! svpn_of va = Some w_leaf ->
+    uleaf_ok (InstructionFetch tt) w_leaf ->
+    u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) (add_vec_int va 2) ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
+    neq_vec (access_vec_dec va 0) ('b"0") = false ->
+    neq_vec (access_vec_dec va 1) ('b"0") = true ->
+    is_aligned_vaddr (Virtaddr va) 4 = false ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    hw_config -∗
+    base_exec_total_u C pt E σ va g -∗ rvc_exec_total_u C pt E σ va g -∗
+    active_step_obligation C pt E σ va g.
+  Proof.
+    intros Hum Hleaf Hflavor Hal2 Hbit0 Hbit1 Hnal4 Hcanon Hhart
+           Hmisa Hmenv Hhtif HSXL Hall Help.
+    iIntros "#Hhw Htb Htr %Hpre Hint Hgpr Hnpc Hupt Hcfg".
+    destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
+    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
+    iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    iMod (user_pt_fetch_fault_2_second pt.(ud_root) pt.(ud_tfp) pt.(ud_um) pt.(ud_data)
+            w_leaf va σ Hum Hleaf Hflavor Hcov Hal2 Hbit0 Hbit1 Hnal4 Lpc Hcanon
+            Hmisa Hmenv Hhtif Hcp HSXL Hall
+            with "Hreg Hgh Hutlb Hudata")
+      as (σ') "(%Hdisj & %Hmdev & %Tr & Hreg & Hgh & Hutlb & Hudata)".
+    destruct Hdisj as [(h & HisRVC & Hfr) | Hfe].
+    - (* RVC executes *)
+      pose (iw := zero_extend' 32 h).
+      assert (Hsub : subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0 = h)
+        by (subst iw; rewrite autocast_mword_id; apply subrange16_zext32).
+      assert (Hfetch2 : exec (fetch tt) σ
+        = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                 then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                 else F_Base (autocast (T := mword) iw)), σ')).
+      { rewrite Hsub HisRVC. exact Hfr. }
+      iApply (user_exec_step_from_fetch_u C pt E σ σ' va g iw
+                Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch2
+                with "Hhw Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg").
+      { unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev". }
+      { unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
+    - (* the straddle faults at va+2 *)
+      iClear "Htb Htr".
+      iDestruct (reg_valid_dq with "Hreg Hnpc") as %Lnpc.
+      pose proof (exec_run_hart_active_fetch_failure User σ σ' (add_vec_int va 2)
+                    (E_Fetch_Page_Fault tt) Hcp Hdisp Hfe) as Hrun.
+      iModIntro.
+      iExists (Step_Fetch_Failure (Virtaddr (add_vec_int va 2), E_Fetch_Page_Fault tt)), σ', g, va.
+      iSplitR; [iPureIntro; exact Hrun|].
+      iSplitR; [iPureIntro; right; exists (E_Fetch_Page_Fault tt), (add_vec_int va 2); split; reflexivity|].
+      iSplitR; [iPureIntro; rewrite (Tr hart_state ltac:(vm_compute; reflexivity)); exact Hhart|].
+      iSplitR; [iPureIntro; apply Tr; vm_compute; reflexivity|].
+      iSplitR; [iPureIntro; exact Lnpc|].
+      unfold mstate_interp, user_pt_inv; cbn [sregs mem mdev]. rewrite Hmdev.
+      iFrame "Hreg Hgh Hdev Hgpr Hnpc Hutlb Hudata Hcfg".
+      iPureIntro; split; assumption.
+  Qed.
+
+End UserFetchFaultActive.
