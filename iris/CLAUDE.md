@@ -629,6 +629,22 @@ before any mechanical sweep.
      per iteration (`wk_noff_acq`/`wk_noff_rel` round-trip, already in the
      smode invariant).  Mirror how kfree/kalloc thread `(if noffv==0 then
      po_intena_val ms else intena_old)`; the loop just iterates that.
+     RESOLUTION (makes the sconf loop no harder than the smode one): hold
+     the intena cell EXISTENTIALLY in the invariant — `∃ iv,
+     wk_intena_addr a0f ↦₄ iv` — instead of pinning a value.  release
+     passes a_int through unchanged (fractional `dqi`, returns `intenav`)
+     and acquire accepts ANY incoming intena (`intena_old`), so whether
+     noffv==0 (acquire rewrites to `po_intena_val ms`) or noffv≠0
+     (passthrough), the existential absorbs it and the invariant closes
+     with NO dependence on ms.  The smode proof pins `zeros' 32` only
+     because SIE=0 forces `po_intena_val≡0`; sconf just ∃-quantifies.  So
+     `wk_res_sconf` = `stack_own (pa_stk spF kv_frame_slots) 10 ∗
+     wk_noff_addr a0f ↦₄ noffv ∗ (∃ iv, wk_intena_addr a0f ↦₄ iv) ∗
+     wk_lockcells γs`, with `intr_count γ root n` + sconf + hart_state +
+     sie_cap + tlb threaded alongside (net-zero per iter: acquire n→S n,
+     release S n→n; a_cpu cpuold→zero_reg after each release, and the next
+     acquire needs cpuold≠cpuv which zero_reg satisfies since
+     cpuv=mycpu_ret≠0 by `Hmycpu_nz`).
      NEXT AFTER WAKEUP: the boot wiring, then delete smode_config.
    - (historical) KALLOC CONE (kfree/kalloc/wakeup, unblocked by the counting token).
      Each is acquire → critical section → release, so the SPEC threads
