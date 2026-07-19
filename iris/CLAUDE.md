@@ -578,13 +578,21 @@ before any mechanical sweep.
      out, stripped by iNext against the fuel IH; two local bridges
      align the sb leaf's [add_vec cur (sext 0)]/[trunc8 v] byte shape
      with the buffer's [ms_pa cur]/[nth_byte .. 0]).  REMAINING: the
-     prefix (the a4 := a2+a0 setup + the count==0 early-out) and suffix
-     (the trailing bytes / return) wrappers, then `wp_memset_s_full_kt`
-     and `wp_memset_page` over sconf (all in WpMemsetS/WpMemsetInstr/
-     WpMemsetPage — transform each `_r` lemma the same way: smode_config
-     -> sconf + hart_state + sie_cap, leaves -> sconf twins, sie_cap
-     retargeted across gpr writes).  Then kfree/kalloc call
-     `wp_memset_page_sconf` directly.  (The SIE=0-pinned memset engine stays for any caller
+     prefix and suffix wrappers, then `wp_memset_s_full_kt` and
+     `wp_memset_page` over sconf (WpMemsetS/WpMemsetInstr/WpMemsetPage).
+     KEY CORRECTION: unlike the loop (which only moves a5), memset's
+     PREFIX and SUFFIX MOVE sp — they alloc/free memset's own 2-slot
+     save frame (c.addi sp,-16 / c.addi sp,16).  So they need the
+     deep-custody FRAME TRADE (`sie_cap_move_down`/`_up` k:=2), and
+     `wp_memset_page_sconf`'s SPEC must thread
+     `stack_own (pa_stk sp0 kv_frame_slots) 2` (the deep-2 custody),
+     NOT just sie_cap arm-blind — exactly like the release/acquire/
+     mycpu epilogues.  The sp-move leaf is `wp_caddi_sp_s_sconf` (not
+     the plain caddi), fed the mover transformer.  Transform each `_r`
+     lemma: smode_config -> sconf + hart_state + sie_cap + deep-custody,
+     leaves -> sconf twins, sie_cap retargeted across gpr writes / traded
+     across sp moves.  Then kfree/kalloc call `wp_memset_page_sconf`
+     directly (they already own the page's stack region to lend).  (The SIE=0-pinned memset engine stays for any caller
      that genuinely holds smode_config; the sconf version is a
      parallel funnel-based derivation.)
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
