@@ -95,6 +95,7 @@ WpWalkInstr.v
 WpWalk.v
 WpMappagesInstr.v
 WpMappages.v
+WpKvmmap.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
