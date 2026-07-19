@@ -551,6 +551,34 @@ before any mechanical sweep.
      with an INCREMENT (push_off inside), release with a DECREMENT
      (pop_off inside).  csrr keeps its arm-report (pop_off refutes the
      '1' arm via its count eighth); csrsi flips only 1→0.
+
+   - KALLOC CONE PLAN (kfree/kalloc/wakeup, unblocked by the counting
+     token).  Each is acquire → critical section → release, so the SPEC
+     threads `intr_count γ root n` NET-ZERO: `intr_count n` in and out
+     (acquire increments to S n inside the disabled region, release
+     decrements back).  Follow WpSconfRelease/WpSconfAcquire (new files
+     WpSconfKfree.v etc.): prologue frame trade, the freelist
+     load/store leaves over the funnel, `wp_acquire_sconf` (n→S n)
+     around the section, `wp_release_sconf` (S n→n), epilogue.  The
+     acquire/release coupling premises (`neq nv1 zero <-> level=0`)
+     discharge from the concrete noff values.
+   - THE MEMSET BRIDGE (kfree/kalloc call memset inside the disabled
+     region; resolve FIRST).  memset uses the SIE=0-pinned
+     `smode_config` engine, so a sconf caller must convert.
+     `sconf γ ∗ hart_state ∗ ghost_var γ (1/4/2) '0' -∗
+     smode_config γ (DfracOwn 1) ∗ eighth` is ALMOST clean — SIE=0 from
+     the eighth-agreement, legalize-idem from `legalize_sie_clear_idem`
+     (as the funnel '0' arm does), MPRV/SXL/MXR shared — BUT
+     `smode_config` pins FEWER mstatus facts than `sconf_ms_facts` (no
+     TSR/XS/FS/VS/SD/MPP), so `smode_config -> sconf` can't rebuild
+     sconf without them.  RESOLUTION: memset does NOT write mstatus, so
+     strengthen `wp_memset_page` (or a `_sconf` wrapper) to return the
+     SAME `ms` (mstatus-preservation); the caller keeps the extra
+     `sconf_ms_facts` conjuncts as pure Props across the call.  Prove
+     the two bridge lemmas (WpSconfBridge.v), then the memset call site
+     is bridge → `wp_memset_page` (engine unchanged) → bridge back.
+     The '0' eighth is available from `intr_count_pos_off` on the S-n
+     token acquire produced.
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
      stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
      initial 32 slots); adequacy plumbing last; delete `smode_config`
