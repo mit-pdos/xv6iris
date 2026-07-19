@@ -1348,3 +1348,92 @@ Proof.
     rewrite (exec_bind_Some _ _ _ _ _ Hpac).
     cbn match. apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §5e The LR mem_read wrap (widths 4, 8): threads the mem_read-level      *)
+(*    reads (mstatus/cur_privilege/effectivePrivilege, MPRV=0, User) and   *)
+(*    the mem_read_priv_meta guard (aligned paddr -> no addr-align fault)  *)
+(*    over §5d, giving the retire-or-fault disjunction at mem_read.        *)
+(* ===================================================================== *)
+
+Lemma exec_mem_read_lr_4 (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : mword 32) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s) ->
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (mem_read (LoadReserved Data) pbmt (Physaddr addr) 4 false false true) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then Ok w else Err (E_Load_Access_Fault tt)), s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes Hmprv Hpriv.
+  unfold mem_read.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (LoadReserved Data) _ _ s Hmprv)).
+  rewrite Hpriv. unfold mem_read_priv.
+  assert (Hcmr := exec_checked_mem_read_lr_4 pbmt addr region w s HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes).
+  assert (Hmrpm : exec (mem_read_priv_meta (LoadReserved Data) pbmt User (Physaddr addr) 4 false false true false) s
+                 = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+                          then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s)).
+  { unfold mem_read_priv_meta.
+    rewrite Halign. cbn [Riscv.rv64d.not negb orb andb]. cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ Hcmr).
+    destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone);
+      cbn match; apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hmrpm).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone);
+    cbn [MemoryOpResult_drop_meta]; apply exec_returnM.
+Qed.
+
+Lemma exec_mem_read_lr_8 (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (w : mword 64) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
+  is_aligned_paddr (Physaddr addr) 8 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (mem_read (LoadReserved Data) pbmt (Physaddr addr) 8 false false true) s
+    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+             then Ok w else Err (E_Load_Access_Fault tt)), s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes Hmprv Hpriv.
+  unfold mem_read.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (LoadReserved Data) _ _ s Hmprv)).
+  rewrite Hpriv. unfold mem_read_priv.
+  assert (Hcmr := exec_checked_mem_read_lr_8 pbmt addr region w s HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes).
+  assert (Hmrpm : exec (mem_read_priv_meta (LoadReserved Data) pbmt User (Physaddr addr) 8 false false true false) s
+                 = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
+                          then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s)).
+  { unfold mem_read_priv_meta.
+    rewrite Halign. cbn [Riscv.rv64d.not negb orb andb]. cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ Hcmr).
+    destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone);
+      cbn match; apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hmrpm).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone);
+    cbn [MemoryOpResult_drop_meta]; apply exec_returnM.
+Qed.
