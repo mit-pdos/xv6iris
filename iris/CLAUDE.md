@@ -721,10 +721,35 @@ before any mechanical sweep.
      needed, clone the prologue+taken-cbeqz→suffix shape.  (The SIE=0
      `wp_memset_page` stays for any caller genuinely holding smode_config;
      the sconf version is a parallel funnel-based derivation.)
-   - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
-     stvec-install point (sie_ghost_alloc + intr_inv_alloc + carve the
-     initial 32 slots); adequacy plumbing last; delete `smode_config`
-     at the very end.
+   - BOOT WIRING — bigger than "just allocate + plumb"; there is a real
+     execution gap.  Current state (mapped): `wp_kernel` (WpKernelNew.v:36)
+     composes `_entry`→`start()` and STOPS at `<main>` (0x80000e82,
+     Supervisor) handing back RAW cells (hart_state, cur_privilege,
+     mstatus, mie, mideleg, menvcfg, satp, stack_own …) — NO γ, NO bundle,
+     NO stvec install.  The stvec handler is installed by `csrw stvec,a5`
+     inside `trapinithart` (0x80002436, KernelInstrs.v:12708), reached via
+     `main`→`trapinithart`.  So the boot wiring needs, IN ORDER:
+     (1) a NEW `csrw stvec` WP leaf (none exists; the general CSR-write
+         engines are WpGprCsrwA/B/C.v — model on those; it turns
+         `stvec ↦ᵣ v0` into `stvec ↦ᵣ kernelvec` over the raw S-mode cells);
+     (2) drive the `main`→`trapinithart` body to that csrw (an unproven
+         whole-function stretch — the biggest chunk);
+     (3) at the install point: `sie_ghost_alloc 'b0` → fresh γ with
+         1/2+1/4+1/4, re-split one 1/4 into two 1/4/2 eighths; build
+         `sconf γ` from the raw cells (SmodeCore.v:1086 `smode_config_rebuild`
+         or IntrDefs.v:350 direct); `intr_inv_alloc_off ⊤ γ kernelvec
+         root_ppn MENVCFG_S` (IntrDefs.v:328, uses `kernelvec_tv_direct`/
+         `kernelvec_stvec_base`, WpKernelvecSpec.v:41) → `intr_inv`; assemble
+         `sie_cap` (sie_arm left 'b0 arm + a 32-slot `stack_own` carve) and
+         `intr_count γ root 0` via `intr_count_init` (IntrDefs.v:495, needs
+         intr_off_tok = the 2nd eighth + `intr_restore` from
+         `intr_restore_intro` IntrDefs.v:544);
+     (4) enter the kernel body with sconf/sie_cap/intr_count.
+     ADEQUACY: `riscv_system_adequacy` (RiscvAdequacy.v:201) is at the raw-
+     resource/`WP Loop` level and says NOTHING about smode_config; the boot
+     assembly goes inside its `={⊤}=∗` (where the device ghosts are already
+     alloc'd, lines 230-231).  `sconf`/`smode_config` are INDEPENDENT (no
+     bridge lemma, intentionally).  DELETE `smode_config` at the very end.
 
 ## Worklist: the kinit cone (kinit → initlock + freerange, over kfree)
 
