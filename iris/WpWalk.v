@@ -3090,4 +3090,11 @@ Section Walk.
   Qed.
 
 
+  (* the record spec is exactly wp_walk_r's statement *)
+  Lemma walk_spec_holds (R : s_regime) : ⊢ walk_spec R.
+  Proof.
+    iIntros (Φ γ γc bsie mm t m n) "%Hn %Ha0 %Ha2 %Hva %Hrep".
+    iApply (wp_walk_r R Φ γ γc bsie mm t m n Hn Ha0 Ha2 Hva Hrep).
+  Qed.
+
 End Walk.
