@@ -56,6 +56,7 @@ root `README.md`: state current behavior/config as fact, not "X used to do Y" /
 - **State a whole-function WP's post in the ∀-continuation form — never with a deep `let m1 := … in … let mN := … in` register-map chain in the STATEMENT.** A let-chain statement makes every caller re-pay a huge structural `iApply` cost: each `iApply (wp_F …)` zeta-traverses the whole chain, ×N call sites (worst when the `mK` are nested `<[…]>` gmap inserts — those blow up quadratically; flat address lets are cheap). Instead universally quantify the return map as an abstract `∀ m', … gpr_file m' … ⌜callee_saved m0 m' ∧ <return-value facts>⌝ … -∗ WP` (the form CalleeSaved.v documents and most call specs already use), and keep the concrete `m1..mN` chain alive *inside the Proof only* as `set (mk := …)` local defs (the body's `change … with mk` / `unfold mk` steps are then unaffected), closing with `iApply ("Hcont" $! mN with …)`. Callers change by one token: `iIntros "…"` → `iIntros (m') "…"`. `wp_mycpu` is the worked example (single-caller cost dropped from ~18 s to sub-second at each of its two call sites). Gotcha: the `set` tactic here does NOT accept `set (x : T := v)` — put the ascription in the term: `set (x := (v : T))`.
 - **Mark big concrete literals `Global Typeclasses Opaque`** (e.g. `kernel_bytes`, `kernel_data`, `kernel_symbols`, `mem_pointsto`): otherwise typeclass search (Persistent instances, every `#`-intro) unfolds the 23K-entry gmap (~108 s each). `vm_compute`/`reflexivity` ignore `Typeclasses Opaque`, so lookups still reduce. Use `Typeclasses Opaque`, never `Opaque` (a tactic may need to `unfold`).
 - **Never bury a `vm_compute`-heavy discharge in an inline `ltac:(…)`** term-arg to `iApply`/`iDestruct` over a big gmap — the proofmode re-elaborates the spliced term without the Qed vm-seal (~16–26 s/call). Prove it FIRST as a named hyp `assert (H : …) by (tac)`, then pass `H` (a named hyp's type is fixed, no re-elaboration). If several such args exist, use the **"unshelve hoist"**: replace the inline `ltac:(…)`s with bare `_`, prefix `unshelve iApply`, and discharge the resulting evar subgoals as standalone `{ … }` goals (they land after Iris's bracketed-resource subgoals and before the WP continuation).
+- **Register-map lookups over a deep `set`-chain: peel ONE layer at a time, never unfold the whole chain first.** A whole-function threading proof builds the loop-head register file as a deep `set`-chain of single-key inserts (`M9 := <[…]> M8`, … over `L`/`W` chains — 20–30 layers). The natural idiom `rewrite /M9 /M8 … /W1; repeat rewrite lookup_total_insert_ne; reflexivity` unfolds the WHOLE chain into one giant nested-`<[…]>` term FIRST and then peels it, so every peel re-traverses the full term — O(depth²), ~17 s per lookup, and buried inline in an `iApply` it re-elaborates into a **~285 s single call**. Instead unfold ONE layer and peel it immediately, keeping the goal a single insert deep the whole way down (O(depth), sub-second): `repeat first [ rewrite lookup_total_insert_ne; [| vm_compute; discriminate] | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ]; rewrite ?lookup_total_insert; reflexivity` (the `peel_reg` tactic in WpWalk.v; handles both the all-miss case — bottoms out at `mm !!! r = mm !!! r` — and a final hit). Gotcha: this MUST be `first [peel | unfold-var]`, NOT a `lazymatch` with the var-branch first — the pattern `?M !!! _` also matches an exposed insert, so `lazymatch` commits to `is_var` (which fails) and never reaches the peel branch, silently stalling after one unfold.
 - **Never `vm_compute` a goal containing a symbolic `mword` variable** (a ∀-quantified pointer `p`/`head`/`spr`) or a concrete built-up `mstate` (a tower of `set_reg`/`update_subrange`) — it tries to normalize 64-bit modular arithmetic symbolically and does not terminate (looks like a multi-minute hang). Compute only the CLOSED offset (`replace (<offset> : mword 64) with (mword_of_int 0) by (apply bv_eq; vm_compute; reflexivity)`, then close `add_vec p 0 = p` with `avi0`/`kv_addv_zero`); or prove the pure fact against an ABSTRACT state and `apply` it. Diagnostic: two `coqc -time` runs dying at the exact same char = the next sentence hangs (not a wall-clock cap).
 - **A guard fixed by `change`/plain cast pushes a slow non-VM conversion to `Qed`** (minutes). Close it with `replace g with v by (vm_compute; reflexivity)` so the kernel gets a vm-cast instead. For CSR/extension dispatch guards use `csr_dispatch_eq` (WpLeafCommon.v) — a positive `cbv delta [eq_vec get_word … bool_decide] iota zeta beta; reflexivity` that decides only the guard primitives and leaves `currentlyEnabled`/`hartSupports` folded (~1.7 s → ~0.02 s). NEVER `cbv -[…]` (negative delta) to collapse a Sail dispatch guard — it unfolds a def with a huge normal form and OOMs the box (125 GB).
 - **A monolithic Iris WP threading proof grows super-linearly in #instructions** (17 chained iApply/iNext ≈ 22 min; 21 didn't finish in 58 min). Split long chains into `Qed`-sealed chunk lemmas of ~5–6 instructions, each stating the next chunk's precondition as its postcondition, then compose (each chunk is an opaque constant, so proof terms stay small). Also `clear -` irrelevant hyps before any `set_solver`/`vm_compute`/`assumption` over a big context.
@@ -809,14 +810,27 @@ ambient-regime separation; the `pt_rep t m` map view; walk's
    insert-hit, more peels, add_vec_zero_l, reflexivity); register
    facts across kalloc/alloc-chunk boundaries hop via the transport
    fact (Htrans c is_cs_idx-guarded) then peel the pre-call chain.
-4. **wp_mappages**: fuel induction over npages (NOT iLöb — bounded loop);
-   the loop invariant is the spec's own post at k pages
-   (`pt_rep0 t_k (pt_insert_run m vpn0 ppn0 perm k)`), each iteration =
-   wp_walk + the remap-check ld (the level0 slot holds ZERO by `pt_rep0`
-   + the no-remap premise, so the panic branch falls through) + the leaf
-   sd through `ptree_own_level0_upd` + `pt_rep0_insert`.  Mind `vpn_at`/`mappages_pte` bv-arithmetic:
-   prove the step identities (`vpn_at vpn0 (S k)` vs va+PGSIZE·k) as
-   abstract bv lemmas, never vm_compute on symbolic words.
+4. **wp_mappages** (DONE, Qed; WpMappages.v + WpMappagesInstr.v registered;
+   full build green, axioms = the 6 standard model stubs).  Architecture:
+   WpMappagesInstr.v = the 56-instruction decode catalog (mdec_*/mi_*).
+   WpMappages.v = `mappages_sp_cancel`, a Qed-sealed `wp_mappages_epilogue`
+   (+0x9c..+0xb0: the 9 cldsp restores + addi16sp + ret, both exits funnel
+   here with a0 decided), a fuel-inducted `wp_mappages_loop` (induction on
+   the REMAINING page count `rem`, NOT npages — invariant carries k+rem=npages,
+   the register-file column facts, `pt_base tk = pt_base t`, and `pt_rep0 tk
+   (pt_insert_run m vpn0 ppn0 perm k)`; each iteration calls `wp_walk_r`,
+   recovers callee-saved regs via `callee_saved_lookup`, reads the L0 slot
+   pinned to zero by `pt_rep0_level0_zero` + `pt_insert_run_lookup_None`,
+   collapses srli/slli/or/ori to `mappages_pte` via the §8 bridges,
+   stores through `ptree_own_level0_upd` + `pt_rep0_insert`, then either
+   funnels to the epilogue (walk-null → −1 at k<npages; last page → 0 at
+   k=npages) or steps s1 by PGSIZE and recurses on IH), and `wp_mappages_r`
+   (the prologue: 10-slot frame, the three entry checks falling by the
+   aligned/nonzero premises via `mappages_align_probe`/`mappages_size_nonzero`,
+   loop-state setup `s2 := last-page va` via `mappages_s2_val`, then the loop)
+   + `mappages_spec_holds : ⊢ mappages_spec`.  KvmSpec's mappages/kvmmap
+   specs now premise `mappages_perm_ok perm` and the pa-run bound
+   `uint pa + npages*4096 < 2^56`.  PtBuild §8 holds all the pure bridges.
 5. **wp_kvmmap** = wp_mappages + the beqz on a0 + `panic_wp` for the -1
    arm (state `panic_wp` as an interim axiom in its own file, like
    wp_myproc; eventually provable — printf/uartputc + a Löb spin loop).
@@ -1104,12 +1118,28 @@ Where things landed (the stage descriptions below remain the design rationale):
      without breaking the Acc-dependent type; the initial loop var
      `(zeros', false, 0)` must be `replace`d with `split_var 0` (the
      `Nat.eqb 0 N` flag is not definitionally false for abstract N).
-     REMAINING (misaligned-split only): the iris bundle composer threading
-     the N absorptions through user_pt_inv (each chunk's translate goes
-     through the utlb_inv_pt_translateAddr_u absorption; the abstract
-     byte-heap owns the bytes across the possibly-straddling chunks).  §6's
-     LR/SC composers show the SINGLE-absorption pattern this generalizes to
-     N (loop the absorb+physical per chunk, threading σ and the invariant).
+     BUNDLE COMPOSERS DONE (UserMemAccess §7/§8, all green): the N-fold
+     absorption is `split_load_fold` (§7) / `split_store_fold` (§8) -- an
+     induction on the chunk count that loops user_pt_load_data_g /
+     user_pt_store_data_g at width [bytes] and the chunk address, threading
+     the invariant + udata + a `config_ok` predicate across all N
+     absorptions (config preserved per absorption via config_ok_pres;
+     STORE additionally threads per-chunk ghost writes -- two-level state
+     sttS/sstS = post-translate/post-write).  The per-chunk state is a
+     deterministic fixpoint over exec ([sst]/[sstS]); [spa] the closed-form
+     paddr; the LOAD value [sval] is the exec output, the STORE value the
+     model's subrange slice of the full store data (matched to §4c's
+     internal wv via an Hwvdef hypothesis).  The top composers
+     user_pt_vmem_read_addr_misaligned_split_load /
+     user_pt_vmem_write_addr_misaligned_split_store feed the collected
+     per-chunk facts to §4b/§4c, reducing the misaligned plain LOAD/STORE
+     to Ok over utlb_inv_pt + udata_own.  Within-page coverage: the caller
+     supplies um !! svpn_of (chunk k) = Some w for every chunk (§7/§8 fix
+     one leaf w; a straddling access that maps two pages would take the
+     per-chunk-vpn generalization -- not needed for the within-page case).
+     This is §6's SINGLE-absorption pattern generalized to N.  THE USER
+     MEMORY LAYER IS NOW WIRED END-TO-END TO THE USER INVARIANT (aligned
+     LOAD/STORE §2, LR/SC §5-§6, and the misaligned split §4/§7/§8).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process
@@ -1648,6 +1678,28 @@ files or copy code from them; build fresh from the live tree.
      and ONE shared trap-delivery machinery (`utrap_state`/`utrap_ghost`/
      `utrap_ms_ok`/`user_trap_frame_intro` — never hand-roll tower iMod
      chains).
+     (2') THE UNIFIED EXECUTE-STEP ARM (UserStepExec.v — USE THIS for the
+     classification, esp. the memory families).  retire_obligation and
+     execute_trap_obligation are identical except the Step_Execute RESULT,
+     and a data access retires XOR traps depending on RUNTIME state (mapping/
+     reservability/alignment) — so a static retire-vs-trap classification
+     forces a split the access cannot resolve.  `exec_step_obligation E σ va
+     g` is the result-PARAMETERIZED obligation (execute produces SOME r,
+     `exec_step_result_ok r` := retire XOR delegated-user-trap, at s_x with
+     the invariant re-established); `exec_step_branch` runs it and DISPATCHES
+     on r at runtime (Retire → tick tower + the ∧-continuation's user_inv
+     side; user Trap → exception tower + its user_trap_frame side).
+     `retire_to_exec_step`/`trap_to_exec_step` embed the statically-classified
+     families, so `exec_step_branch` is the SINGLE arm for every
+     execute-reaching family.  Since the progress composer
+     (`exec_hart_active_progress_base_gen`/`_RVC_gen`, SmodeCore/UserStep) is
+     ALSO generic over the execute result `resf`, the per-family discharge
+     factors as: fetch (common) → decode → the family's ONE execute fact
+     (its result r) → progress composer → classify r → exec_step_obligation
+     → exec_step_branch.  ONLY the execute fact varies; retire/trap and the 5
+     memory families never fork the arm.  (illegal keeps its own arm — its
+     obligation drops gpr_file; folding it in would need a 3-way
+     exec_step_result_ok.)
      (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
      UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
      (`gpr_write_state`-shaped, value existential) for every compute /
@@ -1773,9 +1825,31 @@ files or copy code from them; build fresh from the live tree.
      wiring these into UserClassify.
      Still missing before FULL assembly:
      ZICBOP (does TRANSLATION — ADUE-coupled, defer), the memory arms
-     (LOAD/STORE/AMO/LR/SC — WAIT for the Svadu/ADUE page-table rework),
-     and the fetch-fault flavor corollaries' payload wiring (also
-     ADUE-coupled).
+     (LOAD/STORE/AMO/LR/SC), and the fetch-fault flavor corollaries'
+     payload wiring.
+     UPDATE (memory layer DONE): the Svadu/ADUE page-table rework the
+     memory arms were waiting on is COMPLETE — the whole user memory LAYER
+     is proven, green, and wired to the user invariant (UserMemAccess.v):
+     aligned LOAD/STORE (§2), LR/SC atom-to-invariant retire-or-fault (§5
+     physical + §6 bundle composers), and the misaligned plain LOAD/STORE
+     split (§4 exec + §7/§8 N-fold bundle composers).  So the memory arms
+     are now UNBLOCKED.  §9 lays the first arm brick,
+     `exec_transform_effective_address_u` (the identity address transform
+     at User/MPRV=0/pmlen=0 that every data access runs before the vmem
+     composer).  THE REMAINING MEMORY-ARM CHAIN (per family, exec-level
+     then iris): (i) `exec_get_pmlen_u` (User: currentlyEnabled Ext_S ->
+     read_senvcfg -> PMM_Disabled -> 0; reuse UserCsr's
+     `exec_read_senvcfg_pinned` + a currentlyEnabled reduction), feeding §9
+     so the transform is premise-free; (ii) the exec-level
+     `exec_get_transformed_data_addr_u` (ext_data_get_addr = rX rs1+offset,
+     then §9) and the `execute_LOAD`/`execute_STORE`/... skeletons
+     premise-shaped over the vmem composer result; (iii) the IRIS memory
+     arms discharging `retire_obligation` (load: rd:=extend data; store:
+     re-establish udata pages) / `execute_trap_obligation` (delegated data
+     fault) by running the exec skeleton through the §2/§6/§7/§8 composer
+     under the user frame, mirroring the S-mode WpSmodePtMem port.  This
+     chain + the fetch-seam port (checkpoint (B)) + the decode case tree is
+     the bulk of the remaining UserClassify assembly.
      CSR-AT-U PLAN (UserCsr.v; values never matter — existential reads).
      Target statement (CSRReg and CSRImm): under pins (priv=User,
      mstateen0=0, menvcfg=MENVCFG_S, senvcfg=0, misa via hw_config, and

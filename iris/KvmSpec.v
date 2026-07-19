@@ -195,8 +195,9 @@ Section KvmSpecs.
       ⌜mm !!! Regidx (mword_of_int 12) = mword_of_int (Z.of_nat npages * 4096)⌝ -∗
       ⌜(1 <= npages)%nat⌝ -∗
       ⌜mm !!! Regidx (mword_of_int 14) = mword_of_int perm⌝ -∗
-      ⌜(0 <= perm < 1024)%Z⌝ -∗
+      ⌜mappages_perm_ok perm⌝ -∗
       ⌜(uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z⌝ -∗
+      ⌜(uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z⌝ -∗
       ⌜pt_rep0 t m⌝ -∗
       ⌜forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None⌝ -∗
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
@@ -251,8 +252,9 @@ Section KvmSpecs.
       ⌜mm !!! Regidx (mword_of_int 13) = mword_of_int (Z.of_nat npages * 4096)⌝ -∗
       ⌜(1 <= npages)%nat⌝ -∗
       ⌜mm !!! Regidx (mword_of_int 14) = mword_of_int perm⌝ -∗
-      ⌜(0 <= perm < 1024)%Z⌝ -∗
+      ⌜mappages_perm_ok perm⌝ -∗
       ⌜(uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z⌝ -∗
+      ⌜(uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z⌝ -∗
       ⌜pt_rep0 t m⌝ -∗
       ⌜forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None⌝ -∗
       panic_wp -∗

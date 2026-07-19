@@ -188,6 +188,32 @@ Proof.
   reflexivity.
 Qed.
 
+(* the low-byte variant for flag values using the RSW bits (f < 1024):
+   [mword_of_int] itself truncates mod 256 *)
+Lemma mk_pte_flags1024 (p : mword 44) (f : Z) :
+  0 <= f < 1024 ->
+  subrange_vec_dec (mk_pte p f) 7 0 = (mword_of_int f : mword 8).
+Proof.
+  intros Hf. apply bv_eq.
+  rewrite subrange64_unsigned_7_0.
+  rewrite (mk_pte_unsigned p f ltac:(lia)).
+  cbv [mword_of_int Values.mword_of_int MachineWord.MachineWord.Z_to_word].
+  rewrite Z_to_bv_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 8)) with 256.
+  replace (bv_unsigned p * 1024 + f) with (f + (bv_unsigned p * 4) * 256) by lia.
+  rewrite Z.mod_add by lia.
+  reflexivity.
+Qed.
+
+Lemma mk_pte_ext_word (p : mword 44) (f : Z) :
+  0 <= f < 1024 ->
+  ext_bits_of_PTE (mk_pte p f) = ext_bits_of_PTE (mk_pte (zeros' 44) f).
+Proof.
+  intros Hf. unfold ext_bits_of_PTE.
+  rewrite (mk_pte_ext p f Hf), (mk_pte_ext (zeros' 44) f Hf). reflexivity.
+Qed.
+
 (* alignment: every PTE address ends in 3 zero bits, hence is 8-aligned. *)
 Lemma pte_addr_at_unsigned (base : mword 44) (idx : mword 9) :
   bv_unsigned (pte_addr_at base idx) = bv_unsigned base * 4096 + bv_unsigned idx * 8.

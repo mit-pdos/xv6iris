@@ -93,6 +93,8 @@ PtBuild.v
 KvmSpec.v
 WpWalkInstr.v
 WpWalk.v
+WpMappagesInstr.v
+WpMappages.v
 InstrBytes.v
 KernelText.v
 StackOwn.v
@@ -134,6 +136,7 @@ UserFetch.v
 UserCompute.v
 UserStepFull.v
 UserArms.v
+UserStepExec.v
 UserExecFacts.v
 UserCsr.v
 IntrDefs.v

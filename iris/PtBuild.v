@@ -1563,3 +1563,542 @@ Proof.
     apply bv_eq. rewrite Hand.
     vm_compute. reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* §8 mappages bridges: the pure facts wp_mappages' loop body needs.      *)
+(* ===================================================================== *)
+
+(* local unsigned-arithmetic helpers *)
+Local Lemma pb_add_vec_unsigned (x y : mword 64) :
+  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned. reflexivity.
+Qed.
+
+Local Lemma pb_moi_unsigned (k : Z) :
+  bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
+Proof.
+  unfold mword_of_int, Values.to_word, get_word. cbn.
+  rewrite Z_to_bv_unsigned. reflexivity.
+Qed.
+
+Local Lemma pb_add_vec_int27_wrap (a : mword 27) (j : Z) :
+  0 <= j < 134217728 ->
+  bv_unsigned (add_vec_int a j) = bv_wrap 27 (bv_unsigned a + j).
+Proof.
+  intros Hj.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  assert (Hjv : bv_unsigned (mword_of_int j : mword 27) = j).
+  { unfold mword_of_int, Values.to_word, get_word. cbn.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+    unfold bv_modulus. cbn. lia. }
+  rewrite Hjv. reflexivity.
+Qed.
+
+(* walk returned the L0 slot of an UNMAPPED vpn: the slot word is the
+   literal zero (pt_rep0's blocks0 arm against the level0 path) *)
+Lemma pt_rep0_level0_zero (t : ptree) (m : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (p2 p1 w0 : mword 64) :
+  pt_rep0 t m -> m !! vpn = None -> ptree_level0 t vpn p2 p1 w0 ->
+  w0 = mword_of_int 0.
+Proof.
+  intros (Hmap & Hblk) Hnone
+    (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & Hv2 & Hp2 & Hv1 & Hp1).
+  destruct (Hblk vpn Hnone) as
+    [ (Hk2n & _)
+    | [ (c1' & Hk2' & Hk1' & _)
+      | (c1' & c0' & Hk2' & Hk1' & _ & _ & _ & _ & _ & _ & He0z) ] ].
+  - rewrite Hk2n in Hk2. discriminate.
+  - rewrite Hk2' in Hk2. injection Hk2 as ->. rewrite Hk1' in Hk1. discriminate.
+  - rewrite Hk2' in Hk2. injection Hk2 as ->.
+    rewrite Hk1' in Hk1. injection Hk1 as ->.
+    rewrite He0z in He0. exact (eq_sym He0).
+Qed.
+
+(* distinct pages of a run have distinct vpns (the indices fit in 2^27) *)
+Lemma vpn_at_ne (vpn0 : mword 27) (j k : nat) :
+  (j < k)%nat -> (Z.of_nat k < 134217728)%Z ->
+  vpn_at vpn0 j <> vpn_at vpn0 k.
+Proof.
+  intros Hjk Hk Heq.
+  unfold vpn_at in Heq.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite (pb_add_vec_int27_wrap vpn0 (Z.of_nat j) ltac:(lia)) in Heq.
+  rewrite (pb_add_vec_int27_wrap vpn0 (Z.of_nat k) ltac:(lia)) in Heq.
+  unfold bv_wrap in Heq.
+  assert (HM : bv_modulus 27 = 134217728) by (vm_compute; reflexivity).
+  rewrite HM in Heq.
+  assert (Hz : (Z.of_nat k - Z.of_nat j) `mod` 134217728 = 0).
+  { replace (Z.of_nat k - Z.of_nat j)
+      with ((bv_unsigned vpn0 + Z.of_nat k) - (bv_unsigned vpn0 + Z.of_nat j)) by lia.
+    rewrite Zminus_mod. rewrite Heq. rewrite Z.sub_diag. reflexivity. }
+  rewrite Z.mod_small in Hz; lia.
+Qed.
+
+(* the current page's vpn stays unmapped after the previous inserts *)
+Lemma pt_insert_run_lookup_None (m : gmap (mword 27) (mword 64))
+    (vpn0 : mword 27) (ppn0 : mword 44) (perm : Z) (j k : nat) :
+  (k <= j)%nat -> (Z.of_nat j < 134217728)%Z ->
+  m !! vpn_at vpn0 j = None ->
+  pt_insert_run m vpn0 ppn0 perm k !! vpn_at vpn0 j = None.
+Proof.
+  intros Hkj Hj Hnone.
+  induction k as [| k' IH]; [exact Hnone |].
+  cbn.
+  assert (Hne : vpn_at vpn0 k' <> vpn_at vpn0 j)
+    by (apply vpn_at_ne; lia).
+  assert (Hstep : <[vpn_at vpn0 k' := mappages_pte ppn0 perm k']>
+                    (pt_insert_run m vpn0 ppn0 perm k') !! vpn_at vpn0 j
+                  = pt_insert_run m vpn0 ppn0 perm k' !! vpn_at vpn0 j).
+  { apply lookup_insert_ne. exact Hne. }
+  rewrite Hstep. apply IH. lia.
+Qed.
+
+
+(* ---- 64-bit run arithmetic ---------------------------------------- *)
+
+Local Lemma pb_subrange64_unsigned_11_0 (x : mword 64) :
+  bv_unsigned (subrange_vec_dec x 11 0) = bv_unsigned x `mod` 2 ^ 12.
+Proof.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  rewrite bv_extract_unsigned.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  change (Z.of_N 0) with 0.
+  rewrite Z.shiftr_0_r.
+  change (MachineWord.MachineWord.Z_idx (11 - 0 + 1)) with 12%N.
+  unfold bv_wrap, bv_modulus. reflexivity.
+Qed.
+
+Lemma aligned12_unsigned (a : mword 64) :
+  subrange_vec_dec a 11 0 = (zeros' 12 : mword 12) ->
+  bv_unsigned a `mod` 4096 = 0.
+Proof.
+  intros Hs. apply (f_equal bv_unsigned) in Hs.
+  rewrite pb_subrange64_unsigned_11_0 in Hs.
+  change (2 ^ 12) with 4096 in Hs.
+  replace (bv_unsigned (zeros' 12 : mword 12)) with 0 in Hs by (vm_compute; reflexivity).
+  exact Hs.
+Qed.
+
+Local Lemma pb_wrap64_add_inj (x A B : Z) :
+  0 <= A < 18446744073709551616 -> 0 <= B < 18446744073709551616 ->
+  bv_wrap 64 (x + A) = bv_wrap 64 (x + B) -> A = B.
+Proof.
+  intros HA HB Heq.
+  unfold bv_wrap in Heq.
+  assert (HM : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite HM in Heq.
+  destruct (Z.le_gt_cases B A) as [Hle | Hgt].
+  - assert (HzA : (A - B) `mod` 18446744073709551616 = 0).
+    { replace (A - B) with ((x + A) - (x + B)) by lia.
+      rewrite Zminus_mod. rewrite Heq. rewrite Z.sub_diag. reflexivity. }
+    rewrite Z.mod_small in HzA; lia.
+  - assert (HzB : (B - A) `mod` 18446744073709551616 = 0).
+    { replace (B - A) with ((x + B) - (x + A)) by lia.
+      rewrite Zminus_mod. rewrite Heq. rewrite Z.sub_diag. reflexivity. }
+    rewrite Z.mod_small in HzB; lia.
+Qed.
+
+Lemma pb_va_k_unsigned (va : mword 64) (k : nat) :
+  (bv_unsigned va + 4096 * Z.of_nat k < 18446744073709551616)%Z ->
+  bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+  = bv_unsigned va + 4096 * Z.of_nat k.
+Proof.
+  intros Hb.
+  rewrite pb_add_vec_unsigned. rewrite pb_moi_unsigned.
+  rewrite bv_wrap_add_idemp_r.
+  apply bv_wrap_small.
+  unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616.
+  pose proof (bv_unsigned_in_range _ va) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616 in Hr.
+  lia.
+Qed.
+
+(* the vpn of page [k] of the run *)
+Lemma svpn_of_run (va : mword 64) (k : nat) :
+  (bv_unsigned va + 4096 * Z.of_nat k < 274877906944)%Z ->
+  svpn_of (add_vec va (mword_of_int (4096 * Z.of_nat k))) = vpn_at (svpn_of va) k.
+Proof.
+  intros Hb.
+  pose proof (bv_unsigned_in_range _ va) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616 in Hr.
+  assert (Hu : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+               = bv_unsigned va + 4096 * Z.of_nat k)
+    by (apply pb_va_k_unsigned; lia).
+  apply bv_eq.
+  rewrite (svpn_of_unsigned_lo (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+             ltac:(rewrite uint_unsigned; rewrite Hu; lia)).
+  rewrite uint_unsigned. rewrite Hu.
+  unfold vpn_at.
+  rewrite (pb_add_vec_int27_wrap (svpn_of va) (Z.of_nat k) ltac:(lia)).
+  rewrite (svpn_of_unsigned_lo va ltac:(rewrite uint_unsigned; lia)).
+  rewrite uint_unsigned.
+  rewrite Z.shiftr_div_pow2; [| lia].
+  rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096.
+  replace (bv_unsigned va + 4096 * Z.of_nat k)
+    with (bv_unsigned va + Z.of_nat k * 4096) by lia.
+  rewrite Z.div_add; [| lia].
+  assert (Hdiv : bv_unsigned va `div` 4096 + Z.of_nat k < 134217728).
+  { pose proof (Z.div_lt_upper_bound (bv_unsigned va) 4096 67108864
+                  ltac:(lia) ltac:(lia)). lia. }
+  rewrite bv_wrap_small; [reflexivity |].
+  split.
+  - pose proof (Z.div_pos (bv_unsigned va) 4096 ltac:(lia) ltac:(lia)). lia.
+  - unfold bv_modulus. change (2 ^ Z.of_N 27) with 134217728. exact Hdiv.
+Qed.
+
+(* stepping s1 by PGSIZE *)
+Lemma mappages_va_step (va : mword 64) (k : nat) (w : mword 64) :
+  bv_unsigned w = 4096 ->
+  add_vec (add_vec va (mword_of_int (4096 * Z.of_nat k))) w
+  = add_vec va (mword_of_int (4096 * Z.of_nat (S k))).
+Proof.
+  intros Hw. apply bv_eq.
+  rewrite !pb_add_vec_unsigned. rewrite !pb_moi_unsigned. rewrite Hw.
+  rewrite bv_wrap_add_idemp_l.
+  replace (bv_unsigned va + bv_wrap 64 (4096 * Z.of_nat k) + 4096)
+    with (bv_unsigned va + 4096 + bv_wrap 64 (4096 * Z.of_nat k)) by lia.
+  rewrite !bv_wrap_add_idemp_r.
+  f_equal. lia.
+Qed.
+
+(* the beq loop-exit dichotomy *)
+Lemma mappages_va_eq_iff (va : mword 64) (j k : nat) :
+  (4096 * Z.of_nat j < 18446744073709551616)%Z ->
+  (4096 * Z.of_nat k < 18446744073709551616)%Z ->
+  add_vec va (mword_of_int (4096 * Z.of_nat j)) = add_vec va (mword_of_int (4096 * Z.of_nat k))
+  <-> j = k.
+Proof.
+  intros Hj Hk. split; [| intros ->; reflexivity].
+  intros Heq. apply (f_equal bv_unsigned) in Heq.
+  rewrite !pb_add_vec_unsigned in Heq. rewrite !pb_moi_unsigned in Heq.
+  rewrite !bv_wrap_add_idemp_r in Heq.
+  apply pb_wrap64_add_inj in Heq; lia.
+Qed.
+
+(* the entry alignment probe: an aligned address shifted 52 left is zero *)
+Lemma mappages_align_probe (x : mword 64) :
+  bv_unsigned x `mod` 4096 = 0 ->
+  shift_bits_left x (subrange_vec_dec (mword_of_int 52 : mword 6) (Z.sub log2_xlen 1) 0)
+  = (mword_of_int 0 : mword 64).
+Proof.
+  intros Hal.
+  assert (Hred : shift_bits_left x (subrange_vec_dec (mword_of_int 52 : mword 6) (Z.sub log2_xlen 1) 0)
+                 = shiftl x 52).
+  { unfold shift_bits_left.
+    f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal; vm_compute; reflexivity. }
+  rewrite Hred. apply bv_eq.
+  unfold shiftl, with_word, get_word,
+    MachineWord.MachineWord.logical_shift_left.
+  rewrite bv_shiftl_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 52))) with 52
+    by (vm_compute; reflexivity).
+  replace (bv_unsigned (mword_of_int 0 : mword 64)) with 0 by (vm_compute; reflexivity).
+  rewrite Z.shiftl_mul_pow2; [| lia].
+  rewrite (Z.div_mod (bv_unsigned x) 4096 ltac:(lia)).
+  rewrite Hal. rewrite Z.add_0_r.
+  replace (4096 * (bv_unsigned x `div` 4096) * 2 ^ 52)
+    with ((bv_unsigned x `div` 4096) * 18446744073709551616) by lia.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616.
+  apply Z.mod_mul. lia.
+Qed.
+
+
+(* ---- pa-side run arithmetic ---------------------------------------- *)
+
+Local Lemma pb_subrange_55_12_unsigned (a : mword 64) :
+  bv_unsigned a < 72057594037927936 ->
+  bv_unsigned (autocast (T := mword) (subrange_vec_dec a 55 12) : mword 44)
+  = bv_unsigned a / 4096.
+Proof.
+  intros Hlt.
+  rewrite autocast_id.
+  unfold subrange_vec_dec. rewrite autocast_id.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  rewrite bv_extract_unsigned.
+  change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
+  change (MachineWord.MachineWord.Z_idx (55 - 12 + 1)) with 44%N.
+  rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096.
+  apply bv_wrap_small.
+  unfold bv_modulus.
+  change (2 ^ Z.of_N 44) with 17592186044416.
+  split.
+  - apply Z.div_pos; [exact (proj1 (bv_unsigned_in_range _ a)) | reflexivity].
+  - apply Z.div_lt_upper_bound; [reflexivity |].
+    change (4096 * 17592186044416) with 72057594037927936.
+    exact Hlt.
+Qed.
+
+Local Lemma pb_add_vec_int44_wrap (a : mword 44) (j : Z) :
+  0 <= j < 17592186044416 ->
+  bv_unsigned (add_vec_int a j) = bv_wrap 44 (bv_unsigned a + j).
+Proof.
+  intros Hj.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  assert (Hjv : bv_unsigned (mword_of_int j : mword 44) = j).
+  { unfold mword_of_int, Values.to_word, get_word. cbn.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+    unfold bv_modulus. cbn. lia. }
+  rewrite Hjv. reflexivity.
+Qed.
+
+(* the ppn of page [k] of the run *)
+Lemma run_ppn (pa : mword 64) (k : nat) :
+  (bv_unsigned pa + 4096 * Z.of_nat k < 72057594037927936)%Z ->
+  (autocast (T := mword) (subrange_vec_dec (add_vec pa (mword_of_int (4096 * Z.of_nat k))) 55 12) : mword 44)
+  = add_vec_int (autocast (T := mword) (subrange_vec_dec pa 55 12) : mword 44) (Z.of_nat k).
+Proof.
+  intros Hb.
+  pose proof (bv_unsigned_in_range _ pa) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616 in Hr.
+  assert (Hu : bv_unsigned (add_vec pa (mword_of_int (4096 * Z.of_nat k)))
+               = bv_unsigned pa + 4096 * Z.of_nat k)
+    by (apply pb_va_k_unsigned; lia).
+  apply bv_eq.
+  rewrite pb_subrange_55_12_unsigned; [| rewrite Hu; lia].
+  rewrite Hu.
+  rewrite (pb_add_vec_int44_wrap _ (Z.of_nat k) ltac:(lia)).
+  rewrite pb_subrange_55_12_unsigned; [| lia].
+  replace (bv_unsigned pa + 4096 * Z.of_nat k)
+    with (bv_unsigned pa + Z.of_nat k * 4096) by lia.
+  rewrite Z.div_add; [| lia].
+  rewrite bv_wrap_small; [reflexivity |].
+  split.
+  - pose proof (Z.div_pos (bv_unsigned pa) 4096 ltac:(lia) ltac:(lia)). lia.
+  - unfold bv_modulus. change (2 ^ Z.of_N 44) with 17592186044416.
+    pose proof (Z.div_lt_upper_bound (bv_unsigned pa) 4096
+                  (17592186044416 - Z.of_nat k) ltac:(lia) ltac:(lia)).
+    lia.
+Qed.
+
+(* ---- the leaf PTE the loop stores ----------------------------------- *)
+
+Local Lemma pb_lor1_range (perm : Z) :
+  0 <= perm < 1024 -> 0 <= Z.lor perm 1 < 1024.
+Proof.
+  intros Hp.
+  split; [apply Z.lor_nonneg; lia |].
+  assert (Hpos : 0 < Z.lor perm 1).
+  { assert (Hn : 0 <= Z.lor perm 1) by (apply Z.lor_nonneg; lia).
+    destruct (Z.eq_dec (Z.lor perm 1) 0) as [He | Hne]; [| lia].
+    apply (f_equal (fun z => Z.testbit z 0)) in He.
+    rewrite Z.lor_spec in He.
+    change (Z.testbit 1 0) with true in He.
+    rewrite orb_true_r in He.
+    rewrite Z.bits_0 in He.
+    discriminate He. }
+  change 1024 with (2 ^ 10).
+  apply (proj2 (Z.log2_lt_pow2 _ 10 Hpos)).
+  rewrite Z.log2_lor; [| lia | lia].
+  apply Z.max_lub_lt.
+  - destruct (Z.eq_dec perm 0) as [-> | Hnz]; [vm_compute; reflexivity |].
+    apply (proj1 (Z.log2_lt_pow2 perm 10 ltac:(lia))).
+    change (2 ^ 10) with 1024. lia.
+  - vm_compute. reflexivity.
+Qed.
+
+(* the srli/slli/or/ori chain computes exactly [mk_pte] of the page *)
+Lemma mappages_pte_compute (p : mword 64) (perm : Z) (w5 : mword 64) :
+  bv_unsigned w5 = perm ->
+  0 <= perm < 1024 ->
+  bv_unsigned p `mod` 4096 = 0 ->
+  bv_unsigned p < 72057594037927936 ->
+  or_vec (or_vec
+    (shift_bits_left
+       (shift_bits_right p (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))
+       (subrange_vec_dec (mword_of_int 10 : mword 6) (Z.sub log2_xlen 1) 0))
+    w5)
+    (sign_extend' 64 (mword_of_int 1 : mword 12))
+  = mk_pte (autocast (T := mword) (subrange_vec_dec p 55 12) : mword 44) (Z.lor perm 1).
+Proof.
+  intros Hw5 Hperm Hal Hlt.
+  assert (Hred : shift_bits_left
+      (shift_bits_right p (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))
+      (subrange_vec_dec (mword_of_int 10 : mword 6) (Z.sub log2_xlen 1) 0)
+    = shiftl (shiftr p 12) 10).
+  { unfold shift_bits_left, shift_bits_right.
+    f_equal.
+    all: try (vm_compute; reflexivity).
+    all: f_equal; vm_compute; reflexivity. }
+  rewrite Hred.
+  pose proof (pb_lor1_range perm Hperm) as Hf.
+  apply bv_eq.
+  rewrite (mk_pte_unsigned _ (Z.lor perm 1) Hf).
+  rewrite pb_subrange_55_12_unsigned; [| exact Hlt].
+  unfold or_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.or.
+  rewrite !bv_or_unsigned.
+  replace (bv_unsigned (sign_extend' 64 (mword_of_int 1 : mword 12) : mword 64)) with 1
+    by (vm_compute; reflexivity).
+  rewrite Hw5.
+  unfold shiftl, shiftr, with_word, get_word,
+    MachineWord.MachineWord.logical_shift_left,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftl_unsigned. rewrite bv_shiftr_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 10))) with 10
+    by (vm_compute; reflexivity).
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12))) with 12
+    by (vm_compute; reflexivity).
+  rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096.
+  assert (Hq : 0 <= bv_unsigned p / 4096 < 17592186044416)
+    by (split; [apply Z.div_pos; pose proof (bv_unsigned_in_range _ p); lia
+               | apply Z.div_lt_upper_bound; lia]).
+  replace (Z.shiftl (bv_unsigned p / 4096) 10) with (bv_unsigned p / 4096 * 1024)
+    by (rewrite Z.shiftl_mul_pow2; [reflexivity | lia]).
+  rewrite bv_wrap_small.
+  2:{ unfold bv_modulus.
+      change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616.
+      lia. }
+  rewrite <- Z.lor_assoc.
+  rewrite <- Z_lor_disjoint_add.
+  - reflexivity.
+  - change 1024 with (2 ^ 10).
+    apply Z_land_shift_low.
+    + apply Z.leb_le; reflexivity.
+    + change (2 ^ 10) with 1024.
+      split; [apply Z.lor_nonneg; lia | lia].
+Qed.
+
+(* ---- classification of the stored leaf ------------------------------ *)
+
+(* everything walk/mappages needs of the flag bits, checked once at the
+   ZERO ppn (the predicates read only the flag byte and the ext field,
+   both ppn-independent) *)
+Definition mappages_perm_ok (perm : Z) : Prop :=
+  (0 <= perm < 1024)%Z /\
+  pte_valid (mk_pte (zeros' 44) (Z.lor perm 1)) /\
+  pte_leaf (mk_pte (zeros' 44) (Z.lor perm 1)) /\
+  pte_no_napot (mk_pte (zeros' 44) (Z.lor perm 1)) /\
+  pte_pbmt0 (mk_pte (zeros' 44) (Z.lor perm 1)).
+
+Lemma mappages_pte_class (ppn : mword 44) (perm : Z) :
+  mappages_perm_ok perm ->
+  pte_valid (mk_pte ppn (Z.lor perm 1)) /\
+  pte_leaf (mk_pte ppn (Z.lor perm 1)) /\
+  pte_no_napot (mk_pte ppn (Z.lor perm 1)) /\
+  pte_pbmt0 (mk_pte ppn (Z.lor perm 1)).
+Proof.
+  intros (Hr & Hv & Hl & Hn & Hp).
+  pose proof (pb_lor1_range perm Hr) as Hf.
+  pose proof (mk_pte_flags1024 ppn (Z.lor perm 1) Hf) as Hfl.
+  pose proof (mk_pte_flags1024 (zeros' 44) (Z.lor perm 1) Hf) as Hfl0.
+  pose proof (mk_pte_ext_word ppn (Z.lor perm 1) Hf) as He.
+  split; [| split; [| split]].
+  - intros s. rewrite Hfl. rewrite He.
+    specialize (Hv s). rewrite Hfl0 in Hv. exact Hv.
+  - unfold pte_leaf in Hl |- *. rewrite Hfl. rewrite Hfl0 in Hl. exact Hl.
+  - unfold pte_no_napot in Hn |- *. rewrite He. exact Hn.
+  - unfold pte_pbmt0 in Hp |- *. rewrite He. exact Hp.
+Qed.
+
+
+(* ---- prologue / loop-body glue -------------------------------------- *)
+
+Local Lemma pb_sub_vec_unsigned (x y : mword 64) :
+  bv_unsigned (sub_vec x y) = bv_wrap 64 (bv_unsigned x - bv_unsigned y).
+Proof.
+  unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
+  rewrite bv_sub_unsigned. reflexivity.
+Qed.
+
+(* adding [pa - va] to the k-th va lands on the k-th pa *)
+Lemma mappages_pa_of_va (va pa : mword 64) (k : nat) :
+  add_vec (add_vec va (mword_of_int (4096 * Z.of_nat k))) (sub_vec pa va)
+  = add_vec pa (mword_of_int (4096 * Z.of_nat k)).
+Proof.
+  apply bv_eq.
+  rewrite !pb_add_vec_unsigned. rewrite !pb_moi_unsigned.
+  rewrite bv_wrap_add_idemp_l.
+  replace (bv_unsigned va + bv_wrap 64 (4096 * Z.of_nat k)
+           + bv_wrap 64 (bv_unsigned pa - bv_unsigned va))
+    with (bv_wrap 64 (bv_unsigned pa - bv_unsigned va)
+          + (bv_unsigned va + bv_wrap 64 (4096 * Z.of_nat k))) by lia.
+  rewrite bv_wrap_add_idemp_l.
+  replace (bv_unsigned pa - bv_unsigned va + (bv_unsigned va + bv_wrap 64 (4096 * Z.of_nat k)))
+    with (bv_unsigned pa + bv_wrap 64 (4096 * Z.of_nat k)) by lia.
+  rewrite bv_wrap_add_idemp_r.
+  reflexivity.
+Qed.
+
+(* the prologue's s2: size - PGSIZE added to va is the LAST page's va *)
+Lemma mappages_s2_val (va a2v : mword 64) (npages : nat) :
+  bv_unsigned a2v = Z.of_nat npages * 4096 ->
+  (1 <= npages)%nat ->
+  add_vec (add_vec (add_vec a2v (sign_extend' 64 (mword_of_int 2048 : mword 12)))
+             (sign_extend' 64 (mword_of_int 2048 : mword 12))) va
+  = add_vec va (mword_of_int (4096 * Z.of_nat (npages - 1))).
+Proof.
+  intros Ha2 Hn.
+  apply bv_eq.
+  rewrite !pb_add_vec_unsigned. rewrite !pb_moi_unsigned.
+  rewrite Ha2.
+  rewrite bv_wrap_add_idemp_l.
+  replace (bv_wrap 64 (bv_signed (get_word (mword_of_int 2048 : mword 12))))
+    with 18446744073709549568 by (vm_compute; reflexivity).
+  replace (bv_wrap 64 (Z.of_nat npages * 4096 + 18446744073709549568)
+             + 18446744073709549568 + bv_unsigned va)
+    with (bv_unsigned va + 18446744073709549568
+            + bv_wrap 64 (Z.of_nat npages * 4096 + 18446744073709549568)) by lia.
+  rewrite bv_wrap_add_idemp_r.
+  rewrite bv_wrap_add_idemp_r.
+  replace (bv_unsigned va + 18446744073709549568
+             + (Z.of_nat npages * 4096 + 18446744073709549568))
+    with (bv_unsigned va + 4096 * Z.of_nat (npages - 1) + 2 * 18446744073709551616) by lia.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N 64) with 18446744073709551616.
+  rewrite (Z.mod_add (bv_unsigned va + 4096 * Z.of_nat (npages - 1)) 2
+             18446744073709551616); [reflexivity | lia].
+Qed.
+
+(* the size word is nonzero (the beqz size-check falls through) *)
+Lemma mappages_size_nonzero (npages : nat) :
+  (1 <= npages)%nat ->
+  (Z.of_nat npages * 4096 < 18446744073709551616)%Z ->
+  bv_unsigned (mword_of_int (Z.of_nat npages * 4096) : mword 64) <> 0.
+Proof.
+  intros Hn Hb.
+  rewrite pb_moi_unsigned.
+  rewrite bv_wrap_small; [lia |].
+  unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616. lia.
+Qed.
+
+(* entering the loop: page 0's va is va itself *)
+Lemma mappages_va0 (va : mword 64) :
+  add_vec va (mword_of_int (4096 * Z.of_nat 0)) = va.
+Proof.
+  apply bv_eq.
+  rewrite pb_add_vec_unsigned. rewrite pb_moi_unsigned.
+  change (4096 * Z.of_nat 0) with 0.
+  replace (bv_wrap 64 0) with 0 by (vm_compute; reflexivity).
+  rewrite Z.add_0_r.
+  apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+
+(* public: a small constant as a 64-bit word (register-value bridges) *)
+Lemma mappages_moi_small (z : Z) :
+  (0 <= z < 18446744073709551616)%Z ->
+  bv_unsigned (mword_of_int z : mword 64) = z.
+Proof.
+  intros Hz. rewrite pb_moi_unsigned. apply bv_wrap_small.
+  unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616. lia.
+Qed.

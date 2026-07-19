@@ -57,6 +57,21 @@ Section Walk.
 
   Notation WK := KernelSyms.walk.
 
+  (* Fast register-map lookup discharge.  The intermediate maps [M1..M9],
+     [L1..L9], [W1..W9], ... are deep [set]-chains of single-key inserts over
+     the caller's [mm].  The old idiom [rewrite /M9 .. /W1; repeat rewrite
+     lookup_total_insert_ne] unfolds the WHOLE ~27-layer chain into one giant
+     term FIRST and then peels it, so every peel re-traverses a huge goal
+     (O(depth^2), ~17 s per lookup).  [peel_reg] instead unfolds ONE layer at a
+     time and peels it immediately, keeping the goal a single insert deep the
+     whole way down (O(depth), sub-second).  Handles both the all-miss case
+     (bottoms out at [mm !!! r = mm !!! r]) and a final hit. *)
+  Ltac peel_reg :=
+    repeat first
+      [ rewrite lookup_total_insert_ne; [| vm_compute; discriminate]
+      | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ];
+    rewrite ?lookup_total_insert; reflexivity.
+
   (* the +64/-64 c.addi16sp frame cancel (walk's frame; clone of
      WpWakeup's wakeup_sp_cancel -- a whole-function file we do not
      import) *)
@@ -1765,45 +1780,19 @@ Section Walk.
       iEval (rewrite HspW1 Hb6) in "Hc16".
       iEval (rewrite HspW1 Hb7) in "Hc08".
       iEval (rewrite HspW1 Hb8) in "Hc00".
-      iApply (wp_walk_tail R Φ γ γc bsie mm M9 t t (pt_base c0) n Hn Hva'
+      unshelve iApply (wp_walk_tail R Φ γ γc bsie mm M9 t t (pt_base c0) n Hn Hva'
                 HspM9 HM9s3 HM9s1
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                _ _ _ _ _ _
                 (ptree_same_rep0_refl t)
-                ltac:(exists p2, p1, w; split;
-                      [exact (ptree_maps_level0 t vpn p2 p1 w Hmaps)
-                      | unfold pt_addr0; rewrite Hch1; reflexivity])
+                _
                 with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
                       Hdeep Hptree Henv Hcont").
+      all: first
+        [ peel_reg
+        | (exists p2, p1, w; split;
+           [exact (ptree_maps_level0 t vpn p2 p1 w Hmaps)
+           | unfold pt_addr0; rewrite Hch1; reflexivity]) ].
     - (* ============ UNMAPPED vpn: the blocks0 dichotomy ============ *)
       pose proof (proj2 Hrep vpn Hmv) as Hblk.
       destruct Hblk as [ (Hk2n & He2z)
@@ -2146,46 +2135,20 @@ Section Walk.
       iEval (rewrite HspW1 Hb6) in "Hc16".
       iEval (rewrite HspW1 Hb7) in "Hc08".
       iEval (rewrite HspW1 Hb8) in "Hc00".
-      iApply (wp_walk_tail R Φ γ γc bsie mm M9 t t (pt_base c0) n Hn Hva'
+      unshelve iApply (wp_walk_tail R Φ γ γc bsie mm M9 t t (pt_base c0) n Hn Hva'
                 HspM9 HM9s3 HM9s1
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                _ _ _ _ _ _
                 (ptree_same_rep0_refl t)
-                ltac:(pose proof (ptree_level0_intro t c1 c0 vpn Hk2 Hk1 Hv2 Hp2c Hv1 Hp1c Hch2 Hch1) as Hl0;
-                      rewrite He0z in Hl0;
-                      eexists _, _, _; split;
-                      [exact Hl0 | unfold pt_addr0; rewrite Hch1; reflexivity])
+                _
                 with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
                       Hdeep Hptree Henv Hcont").
+      all: first
+        [ peel_reg
+        | (pose proof (ptree_level0_intro t c1 c0 vpn Hk2 Hk1 Hv2 Hp2c Hv1 Hp1c Hch2 Hch1) as Hl0;
+           rewrite He0z in Hl0;
+           eexists _, _, _; split;
+           [exact Hl0 | unfold pt_addr0; rewrite Hch1; reflexivity]) ].
       }
       2:{ (* ---- arm 2: descend, then ALLOCATE at level 1 ---- *)
       iDestruct (ptree_own_slot2_ro (DfracOwn 1) t vpn with "Hptree") as "[Hslot Hcl2]".
@@ -2452,11 +2415,7 @@ Section Walk.
                 (fun b => pt_graft1 t vpn b) 0
                 (u_pte_addr (pt_base c1) (vpn_idx 1 vpn))
                 (pt_ents c1 (vpn_idx 1 vpn)) n Hn
-                ltac:(rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      rewrite lookup_total_insert; reflexivity)
+                ltac:(peel_reg)
                 ltac:(rewrite /M6 /M5;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       exact HM4s2)
@@ -2465,36 +2424,12 @@ Section Walk.
                       rewrite lookup_total_insert;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite Ha2 add_vec_zero_l; vm_compute; reflexivity)
-                ltac:(rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
                 (ptree_same_rep0_refl t) Hacc2
                 with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
@@ -2541,11 +2476,7 @@ Section Walk.
       iApply (wp_walk_tail R Φ γ γc bsie mm G1 t (pt_graft1 t vpn b) b n Hn Hva'
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans csp_rs1 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      rewrite lookup_total_insert; reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans (mword_of_int 19) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
                       rewrite /M6 /M5 /M4 /M3 /M2 /M1;
@@ -2557,46 +2488,22 @@ Section Walk.
                       exact Hs1b)
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans (mword_of_int 4) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans (mword_of_int 23) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans (mword_of_int 24) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans (mword_of_int 25) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans (mword_of_int 26) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G1; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /M6 /M5 /M4 /M3 /M2 /M1
-                              /L9 /L8 /L7 /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 (pt_graft1_same_rep0 t c1 vpn b Hk2 Hk1 He1z)
                 ltac:(pose proof (pt_graft1_level0 t c1 vpn b Hk2
                         ltac:(exact Hv2) ltac:(exact Hp2c) Hb1c) as Hl0;
@@ -2693,10 +2600,7 @@ Section Walk.
                 (fun b => pt_graft2 t vpn b) 1
                 (u_pte_addr (pt_base t) (vpn_idx 2 vpn))
                 (pt_ents t (vpn_idx 2 vpn)) n Hn
-                ltac:(rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      rewrite lookup_total_insert; reflexivity)
+                ltac:(peel_reg)
                 ltac:(rewrite /L6 /L5;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       exact HL4s2)
@@ -2705,30 +2609,12 @@ Section Walk.
                       rewrite lookup_total_insert;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite Ha2 add_vec_zero_l; vm_compute; reflexivity)
-                ltac:(rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
-                ltac:(rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
+                ltac:(peel_reg)
                 (ptree_same_rep0_refl t) Hacc1
                 with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
@@ -2896,10 +2782,7 @@ Section Walk.
                 ltac:(rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (csp_rs1) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      rewrite lookup_total_insert; reflexivity)
+                      peel_reg)
                 ltac:(rewrite /K6 /K5;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       exact HK4s2)
@@ -2914,45 +2797,27 @@ Section Walk.
                 ltac:(rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 4) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 23) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 24) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 25) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 26) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 (pt_graft2_same_rep0 t vpn b1 Hk2n He2z) Hacc2
                 with "Hcfg Htoken Htlbinv Htext Hpc Hfile
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
@@ -3007,10 +2872,7 @@ Section Walk.
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (csp_rs1) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      rewrite lookup_total_insert; reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G2; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans2 (mword_of_int 19) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
@@ -3028,55 +2890,37 @@ Section Walk.
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 4) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G2; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans2 (mword_of_int 23) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 23) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G2; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans2 (mword_of_int 24) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 24) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G2; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans2 (mword_of_int 25) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 25) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G2; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans2 (mword_of_int 26) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 26) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 ltac:(rewrite /G2; rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
                       rewrite (Htrans2 (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
                       rewrite /K6 /K5 /K4 /K3 /K2 /K1;
                       repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
                       rewrite (Htrans1 (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate));
-                      rewrite /L6 /L5 /L4 /L3 /L2 /L1
-                              /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1;
-                      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-                      reflexivity)
+                      peel_reg)
                 (ptree_same_rep0_trans t (pt_graft2 t vpn b1) (pt_graft1 (pt_graft2 t vpn b1) vpn b2)
                    (pt_graft2_same_rep0 t vpn b1 Hk2n He2z)
                    (pt_graft1_same_rep0 (pt_graft2 t vpn b1) (pt_empty_node b1) vpn b2 Hk2g ltac:(reflexivity) ltac:(reflexivity)))
