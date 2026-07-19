@@ -950,8 +950,29 @@ Where things landed (the stage descriptions below remain the design rationale):
      `reservability <> RsrvNone`.  So on RAM, LR/SC either RETIRE (if the
      PMA reservability is set) or take an ACCESS FAULT (if RsrvNone) --
      BOTH safe for totality.  DECISION MADE (per the user): route (b), the
-     retire-or-fault DISJUNCTION, no bundle change.  §5 PHYSICAL PIECES
-     DONE (UserMemAccess §5a-d, all green):
+     retire-or-fault DISJUNCTION, no bundle change.  DONE END-TO-END for
+     BOTH LR and SC at the vmem level (UserMemAccess §5a-k, all green) --
+     §5a-d below, plus §5e the LR mem_read wrap, §5f the aligned vmem
+     FAULT path (translate Ok but mem_read Err -> memory_exception Trap,
+     width-generic), §5g `exec_vmem_read_addr_lr_disj` (the
+     instruction-facing LR disjunction: retire [exists value] or delegated
+     E_Load_Access_Fault Trap, a case-split combining the res-generic
+     retire lemma and §5f); §5h `exec_checked_mem_write_sc_4/_8` (the SC
+     write mirror of §5d -- conditional write LANDS when reservable else
+     E_SAMO fault; adds `exec_write_ram_cond_8`, whose value-projection
+     needs an extra `cbn [Mem_write_request_value]`+`iMon_bind` vs width-4),
+     §5i the SC mem_write_value wrap, §5j `exec_vmem_write_addr_sc_fault`
+     (reservability=None -> BOTH match_reservation branches fault to
+     E_SAMO Trap; complements the granted `exec_vmem_write_addr_sc`), §5k
+     `exec_vmem_write_addr_sc_disj` (the instruction-facing SC disjunction:
+     retire [Ok of match_reservation, write lands iff reservation valid] or
+     E_SAMO Trap).  All width-generic where the layer allows; the
+     per-width bricks are widths 4 and 8 (LR.W/LR.D, SC.W/SC.D).  ONLY
+     REMAINING: the iris bundle composers over user_pt_inv (thread the
+     translate through the utlb_inv_pt_translateAddr_u absorption and the
+     data-page ownership; the exec-level disjunctions are premise-shaped
+     over the translate + physical facts the absorption supplies).
+     §5 PHYSICAL PIECES DONE (UserMemAccess §5a-d, all green):
        - §5a `exec_read_ram_resv_4/_8`: the reserved-RAM read atoms.
          read_ram is AK-agnostic for RAM, so these clone the plain read
          atoms verbatim; the reserved read_kind only swaps AV_plain ->
@@ -972,17 +993,9 @@ Where things landed (the stage descriptions below remain the design rationale):
          disjunction at the checked_mem_read layer -- one `if` on the
          unpinned reservability gives Ok(bytes) [retire] or
          Err E_Load_Access_Fault [fault].  Composes §5a+§5b+§5c.
-     REMAINING for LR/SC (mechanical layering on the §5 pieces):
-       - SC conditional-write disjunction at checked_mem_write (mirror of
-         §5d; the write lands via the reserved write_kind when reservable,
-         else E_SAMO fault) -- needs a reserved write_ram atom (clone the
-         plain write atoms as §5a cloned the reads);
-       - mem_read/mem_write_value wrap (add mstatus/cur_privilege/
-         effectivePrivilege_mprv0 -- see UserMemPt `exec_mem_read_data_U`);
-       - vmem retire (`exec_vmem_read_addr_aligned` is already res-generic)
-         + vmem aligned FAULT path (translate Ok, mem_read/write Err ->
-         memory_exception Trap) -> the vmem-level LR/SC disjunction;
-       - the iris bundle composers over user_pt_inv.
+     (§5e-k above completed all of what this list previously enumerated;
+     the only LR/SC item left is the iris bundle composers over
+     user_pt_inv, shared with the rest of the memory layer.)
   4. AMO EXECUTE reduction (execute_AMO): its own pre-translation alignment
      check (misaligned -> E_SAMO_Access_Fault via GlobalMisalignedExceptions_
      amo = AccessFault), then translate + mem_write_ea + mem_read +
