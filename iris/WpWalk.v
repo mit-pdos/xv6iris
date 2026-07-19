@@ -66,11 +66,19 @@ Section Walk.
      time and peels it immediately, keeping the goal a single insert deep the
      whole way down (O(depth), sub-second).  Handles both the all-miss case
      (bottoms out at [mm !!! r = mm !!! r]) and a final hit. *)
+  (* Try the HIT lemma [lookup_total_insert] BEFORE the miss lemma at every
+     layer.  Crucial: at the terminating hit layer [<[k:=v]> m !!! k], the old
+     miss-first order attempts [lookup_total_insert_ne], whose side goal
+     [k <> k] is FALSE, and [vm_compute; discriminate] fails CATASTROPHICALLY
+     slowly (~4-8 s) trying to refute a true bitvector-record equality.  Trying
+     the hit first stops there instantly.  Miss layers only pay one cheap failed
+     unification of [lookup_total_insert] before falling through to the miss. *)
   Ltac peel_reg :=
     repeat first
-      [ rewrite lookup_total_insert_ne; [| vm_compute; discriminate]
+      [ rewrite lookup_total_insert
+      | rewrite lookup_total_insert_ne; [| vm_compute; discriminate]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ];
-    rewrite ?lookup_total_insert; reflexivity.
+    reflexivity.
 
   (* the +64/-64 c.addi16sp frame cancel (walk's frame; clone of
      WpWakeup's wakeup_sp_cancel -- a whole-function file we do not
