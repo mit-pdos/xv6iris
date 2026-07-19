@@ -1785,9 +1785,36 @@ files or copy code from them; build fresh from the live tree.
      negb-success + cancel_reservation; STORE none), Err → the delegated
      trap.  So each memory family plugs into the base/RVC totalities as
      "apply the composer (Ok/Err) → apply the execute fact → classify".
-     REMAINING memory family: AMO (read-modify-write via
-     `user_pt_amo_data_4` + the AMO op computation) — same shape, more
-     execute structure.
+     AMO DONE (UserMemArms.v, op-generic, all green): execute_AMO does NOT
+     use vmem — it inlines the RMW (own align check, translate, mem_write_ea,
+     mem_read, per-op result', the AMOCAS w__18 guard, mem_write_value, wX).
+     The clean abstraction that collapses the case-cross-product: (a) the
+     written value is symbolic — `user_pt_amo_data_4`'s mem_write_value is
+     ∀-v, so the retire proof never reduces result' (kept as the op-match);
+     (b) `w__18 = and_boolM (op=?AMOCAS) …` short-circuits to false for every
+     non-AMOCAS op (`generic_eq op AMOCAS = false` premise), so ONE retire
+     lemma `exec_execute_AMO_u_ok` covers all 9 non-CAS ops.  Faults are
+     op-generic too: `_translate_err` (walk page/access fault → early_return
+     trap), `_read_err` (pma-deny — RAM pins atomic_support=AMOSwap so only
+     AMOSWAP retires, every other op faults here — plus any read fault),
+     `_misaligned` (plat amo policy = AccessFault → E_SAMO_Access_Fault, the
+     then-branch not an early_return).  All premise-shaped over the mem-level
+     results (translate/mem_write_ea/mem_read/mem_write_value at width 4 from
+     the composer + `exec_mem_write_ea_amo_4`); iris absorption stays in the
+     composer.  Reduction gotchas: execute_AMO is inside catch_early_return
+     so the body reduces at execR level (execR_liftR_seq / execR_bind /
+     execR_bind_Some / execR_returnR_fwd / execR_bind0_Some); the rX-rs2 and
+     mem_read binds are `(liftR m >>= k) >>= K` NESTED (the `>>= fun x` sits
+     OUTSIDE the branch), so `execR_liftR_seq` won't match at top — use
+     `rewrite execR_bind` to split the outer bind first (or an explicit inner
+     `execR (…) = Some (inr v, s)` assert, as for rX rs2); the translate bind
+     is a SINGLE top bind (the `>>= fun (addr,pbmt)` is inside the `fun w3`
+     lambda) so `execR_liftR_seq Htr` applies directly.  `access`/`vaddr` must
+     be INLINED (`Atomic (op,Data,Data)` / `Virtaddr (add_vec …)`) not `let`s,
+     else the model's zeta-inlined occurrences won't unify with the rewrites.
+     REMAINING AMO edge cases (rare, not built): AMOCAS (the w__18=true CAS-
+     mismatch no-write path), and mem_write_ea-err / mem_write_value-err
+     (an announce that cannot fail here / a device-only post-read write fault).
      (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
      UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
      (`gpr_write_state`-shaped, value existential) for every compute /
