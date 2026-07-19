@@ -625,11 +625,27 @@ before any mechanical sweep.
        list MUST include `Htext` (kernel_text) at its sig position or the
        whole `iApply` mis-aligns and blows up.
      REMAINING: compose `wp_wakeup_sconf` = prologue → loop → epilogue
-     (mirror the smode `wp_wakeup`, WpWakeup.v:2248: the prologue's
-     `wk_regs`-exit refines the loop's `wk_loop_regs`-entry via a
-     `wk_regs_loop`-style lemma, the loop's exit continuation IS the
-     epilogue at wakeup+0x58; the caller supplies procs_inv + `wk_res_sconf`
-     + the coupling + `wk_noff` round-trip premises).
+     (mirror the smode `wp_wakeup`, WpWakeup.v:2248).  The DEEP-CUSTODY
+     ACCOUNTING is the one non-obvious part (all three specs already read):
+     caller provides deep-K at sp0 + noff cell + (∃iv, intena cell) +
+     wk_lockcells + procs_inv + intr_count lvl + the coupling/round-trip
+     premises.  (1) `wp_wakeup_prologue_sconf`: deep-K → deep-(K-8) at spF
+     + 8 wk_fcell frame cells (7 saved regs + 1 padding vpad) + loop-head
+     map M at wakeup+0x38.  (2) The loop's `wk_res_sconf` holds EXACTLY
+     deep-10, so split deep-(K-8) = deep-10 ∗ deep-(K-18) via
+     `stack_own_split_1` (needs K≥18); bundle wk_res_sconf = deep-10 + noff
+     + (∃iv) + lockcells, and wk_frame = the 7 saved cells; HOLD deep-(K-18)
+     + vpad + the exit continuation aside.  (3) run `wp_wakeup_loop_sconf`
+     at k=0 with rtp=m!!!x4, chan=m!!!x10, vs6..vs11=m!!!x22..x27 (the
+     prologue's M output IS `wk_loop_regs`); its EXIT continuation (at
+     wakeup+0x58) unbundles wk_res_sconf, recombines deep-10 ∗ deep-(K-18) =
+     deep-(K-8) via `stack_own_split_2`, and calls (4)
+     `wp_wakeup_epilogue_sconf` (deep-(K-8) + 7 cells + vpad → deep-K at
+     sp0, restores callee-saved).  Route noff/(∃iv)/lockcells straight back
+     to the caller's return continuation (procs_inv is persistent;
+     intr_count lvl rides through untouched — the prologue/epilogue don't
+     mention it).  NEXT AFTER WAKEUP: the boot wiring, then delete
+     smode_config.
      LOOP CRUX — the intena-cell threading (the one design subtlety absent
      from the smode proof, where intena≡0 under SIE=0).  Each iteration is
      acquire(n→S n) then release(S n→n), so the token returns to n EVERY
