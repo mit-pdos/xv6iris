@@ -1858,7 +1858,31 @@ files or copy code from them; build fresh from the live tree.
      to: prove the two totalities (⇒ `user_exec_step_producer` ⇒
      `exec_step_obligation` ⇒ `exec_step_branch` ⇒ active_class), and each
      totality is proved by casing on the decoded instruction and handing
-     each family its execute fact.  NOTHING in fetch/progress/retire/trap
+     each family its execute fact.
+     THE FETCH-FAULT HALF (UserExecProducer.v, DONE): the companions to
+     `user_exec_step_producer` that discharge `fetch_fault_obligation`
+     (UserArms) instead of `exec_step_obligation`.  Three single-outcome
+     σ-unchanged producers, one per fault geometry: `user_fetch_fault_
+     producer_align` (odd pc → E_Fetch_Addr_Align, via the pure
+     `exec_fetch_align_fault`), `user_fetch_fault_producer` (4-aligned walk
+     fault, via `user_pt_fetch_fault` — non-canonical/unmapped/denied all
+     collapse to E_Fetch_Page_Fault at U tables), and `user_fetch_fault_
+     producer_2_first` (2-aligned low-halfword fault, via
+     `user_pt_fetch_fault_2_first`).  Each: intro `u_step_pre` (gives PC=va,
+     cur_priv=User, dispatchInterrupt=None; SXL is `proj1` of its
+     user_mstatus_ok), split `mstate_interp`/`user_pt_inv`, apply the fault
+     composer (the `iDestruct … as %` pure-extraction keeps reg/gh/utlb — a
+     pure conclusion does not consume its spatial args here),
+     `exec_run_hart_active_fetch_failure` (UserFetch, ALREADY EXISTED) lifts
+     `fetch = F_Error` to `run_hart_active = Step_Fetch_Failure`, `user_exc`
+     holds by reflexivity, and s_f = σ so the hart_state/minstret equalities
+     and the interp re-frame are trivial.  hart_state=HART_ACTIVE is a
+     premise (the caller's active-step fact — not in u_step_pre).  NOT built:
+     the 2-aligned SECOND-halfword case — `user_pt_fetch_fault_2_second` is a
+     DISJUNCTION (RVC success OR high-half fault at va+2, with a TLB-filled
+     s_f ≠ σ), so it is a branch point for the split success producer (item
+     A / the compressed-fetch classification), not a single-outcome fault
+     corollary.  NOTHING in fetch/progress/retire/trap
      is re-touched per family; base-vs-RVC is the one inherent split (it is
      the two progress composers, hidden behind the two totality premises).
      THE MEMORY FAMILIES: their execute fact is `execute_LOAD/STORE/…` run
@@ -1953,18 +1977,18 @@ files or copy code from them; build fresh from the live tree.
      discharge lemmas are independent and parallelize; keep each one
      "obligation-in, obligation-out" so the final assembly is a bare
      case tree.
-     (B) THE ADUE-COUPLED SEAM — yours to reshape as the UptTree port
-     lands. The classification's fetch step currently targets
-     `upt_fetch_instr` (UserFetch §6) whose premises are pre-ADUE
-     (`upte_check_ok`, `update_PTE_Bits … = None`, `upt_*` from
-     UserPt.v). If UptTree/PtFetchGen replaces the UserPt layer, port
-     `upt_fetch_instr` + the fetch-fault flavor corollaries
-     (UserTranslate/UserFetch §1-5) to it FIRST, then wire the flavor
-     corollaries into `fetch_fault_obligation` (the arm is
-     cause-generic and will not change). NOTE with hardware A/D setting
-     the needs-update fault flavor DISAPPEARS for enabled tables — the
-     flavor set shrinks; `user_exc` and `uc_del` already cover every
-     remaining cause.
+     (B) THE ADUE-COUPLED SEAM — DONE.  The UptTree port has landed: the
+     fetch composer is `user_pt_fetch_instr` (UserFetchPt, over the
+     `utlb_inv_pt`/`udata_own` bundle, ADUE-aware) and the fault composers
+     are `user_pt_fetch_fault` / `_2_first` / `_2_second` (UserFetchPt) with
+     the flavor predicate `u_fetch_fault_flavor` = `u_fault_flavor
+     (InstructionFetch tt)` (UserPtTree; three disjuncts non-canonical /
+     unmapped / denied — the needs-update flavor is GONE, ADUE is pinned on
+     so an A/D-insufficient fetch takes the write-back path, never faults).
+     The flavor corollaries are now WIRED into `fetch_fault_obligation` by
+     the three producers in (2'') above.  The arm (`fetch_fault_branch`,
+     UserArms) is cause-generic and unchanged; `user_exc`+`uc_del` cover
+     E_Fetch_Addr_Align and E_Fetch_Page_Fault (the only two live causes).
      (C) THE MEMORY ARMS (LOAD/STORE/AMO/LR/SC + ZICBOP) — after (B),
      same pattern as the S-mode WpSmodePtMem port: a data access either
      retires (store re-establishes `upt_inv`'s existential pages; load
