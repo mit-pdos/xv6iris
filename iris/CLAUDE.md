@@ -572,13 +572,19 @@ before any mechanical sweep.
      convert the memset engine to run over the funnel (SIE-agnostic,
      interrupts absorbed), threading `sconf + sie_cap + tlb_inv_pt`
      (NO intr_count — memset never touches the disable nesting).  The
-     leaf already exists (`wp_sb_s_sconf`, the width-1 store); the work
-     is the bounded fill LOOP (`wp_memset_loop` -> sconf via fuel
-     induction over the byte count, sie_cap threaded arm-blind — the
-     packaged leaf strips the step's later so use fuel induction, NOT
-     iLöb, per the bounded-loop rule) and the prefix/suffix/full_kt
-     wrappers on top.  Then kfree/kalloc call `wp_memset_page_sconf`
-     directly.  (The SIE=0-pinned memset engine stays for any caller
+     fill LOOP is DONE (`wp_memset_loop_sconf`, WpSconfMemset.v,
+     axiom-clean — fuel induction, sie_cap arm-blind retargeted across
+     the a5 increment; the bne-taken back edge hands the step's later
+     out, stripped by iNext against the fuel IH; two local bridges
+     align the sb leaf's [add_vec cur (sext 0)]/[trunc8 v] byte shape
+     with the buffer's [ms_pa cur]/[nth_byte .. 0]).  REMAINING: the
+     prefix (the a4 := a2+a0 setup + the count==0 early-out) and suffix
+     (the trailing bytes / return) wrappers, then `wp_memset_s_full_kt`
+     and `wp_memset_page` over sconf (all in WpMemsetS/WpMemsetInstr/
+     WpMemsetPage — transform each `_r` lemma the same way: smode_config
+     -> sconf + hart_state + sie_cap, leaves -> sconf twins, sie_cap
+     retargeted across gpr writes).  Then kfree/kalloc call
+     `wp_memset_page_sconf` directly.  (The SIE=0-pinned memset engine stays for any caller
      that genuinely holds smode_config; the sconf version is a
      parallel funnel-based derivation.)
    - wire γ-piece + `intr_inv` allocation into wp_kernel/start at the
