@@ -1688,6 +1688,28 @@ files or copy code from them; build fresh from the live tree.
      and ONE shared trap-delivery machinery (`utrap_state`/`utrap_ghost`/
      `utrap_ms_ok`/`user_trap_frame_intro` — never hand-roll tower iMod
      chains).
+     (2') THE UNIFIED EXECUTE-STEP ARM (UserStepExec.v — USE THIS for the
+     classification, esp. the memory families).  retire_obligation and
+     execute_trap_obligation are identical except the Step_Execute RESULT,
+     and a data access retires XOR traps depending on RUNTIME state (mapping/
+     reservability/alignment) — so a static retire-vs-trap classification
+     forces a split the access cannot resolve.  `exec_step_obligation E σ va
+     g` is the result-PARAMETERIZED obligation (execute produces SOME r,
+     `exec_step_result_ok r` := retire XOR delegated-user-trap, at s_x with
+     the invariant re-established); `exec_step_branch` runs it and DISPATCHES
+     on r at runtime (Retire → tick tower + the ∧-continuation's user_inv
+     side; user Trap → exception tower + its user_trap_frame side).
+     `retire_to_exec_step`/`trap_to_exec_step` embed the statically-classified
+     families, so `exec_step_branch` is the SINGLE arm for every
+     execute-reaching family.  Since the progress composer
+     (`exec_hart_active_progress_base_gen`/`_RVC_gen`, SmodeCore/UserStep) is
+     ALSO generic over the execute result `resf`, the per-family discharge
+     factors as: fetch (common) → decode → the family's ONE execute fact
+     (its result r) → progress composer → classify r → exec_step_obligation
+     → exec_step_branch.  ONLY the execute fact varies; retire/trap and the 5
+     memory families never fork the arm.  (illegal keeps its own arm — its
+     obligation drops gpr_file; folding it in would need a 3-way
+     exec_step_result_ok.)
      (3) EXECUTE-LEVEL FACTS, ALL NON-MEMORY FAMILIES (UserExecFacts +
      UserCsr + WpMmodeLeafBase's C_* expansions): retiring totality
      (`gpr_write_state`-shaped, value existential) for every compute /
