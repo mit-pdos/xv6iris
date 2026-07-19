@@ -1082,12 +1082,28 @@ Where things landed (the stage descriptions below remain the design rationale):
      without breaking the Acc-dependent type; the initial loop var
      `(zeros', false, 0)` must be `replace`d with `split_var 0` (the
      `Nat.eqb 0 N` flag is not definitionally false for abstract N).
-     REMAINING (misaligned-split only): the iris bundle composer threading
-     the N absorptions through user_pt_inv (each chunk's translate goes
-     through the utlb_inv_pt_translateAddr_u absorption; the abstract
-     byte-heap owns the bytes across the possibly-straddling chunks).  §6's
-     LR/SC composers show the SINGLE-absorption pattern this generalizes to
-     N (loop the absorb+physical per chunk, threading σ and the invariant).
+     BUNDLE COMPOSERS DONE (UserMemAccess §7/§8, all green): the N-fold
+     absorption is `split_load_fold` (§7) / `split_store_fold` (§8) -- an
+     induction on the chunk count that loops user_pt_load_data_g /
+     user_pt_store_data_g at width [bytes] and the chunk address, threading
+     the invariant + udata + a `config_ok` predicate across all N
+     absorptions (config preserved per absorption via config_ok_pres;
+     STORE additionally threads per-chunk ghost writes -- two-level state
+     sttS/sstS = post-translate/post-write).  The per-chunk state is a
+     deterministic fixpoint over exec ([sst]/[sstS]); [spa] the closed-form
+     paddr; the LOAD value [sval] is the exec output, the STORE value the
+     model's subrange slice of the full store data (matched to §4c's
+     internal wv via an Hwvdef hypothesis).  The top composers
+     user_pt_vmem_read_addr_misaligned_split_load /
+     user_pt_vmem_write_addr_misaligned_split_store feed the collected
+     per-chunk facts to §4b/§4c, reducing the misaligned plain LOAD/STORE
+     to Ok over utlb_inv_pt + udata_own.  Within-page coverage: the caller
+     supplies um !! svpn_of (chunk k) = Some w for every chunk (§7/§8 fix
+     one leaf w; a straddling access that maps two pages would take the
+     per-chunk-vpn generalization -- not needed for the within-page case).
+     This is §6's SINGLE-absorption pattern generalized to N.  THE USER
+     MEMORY LAYER IS NOW WIRED END-TO-END TO THE USER INVARIANT (aligned
+     LOAD/STORE §2, LR/SC §5-§6, and the misaligned split §4/§7/§8).
 - NEXT after that: wire the fault wrappers into `fetch_fault_obligation` /
   the memory-trap arms, then the UserClassify assembly (see the HANDOFF
   CHECKPOINT's item A), then the concrete-witness stage (a real process
