@@ -137,6 +137,7 @@ UserCompute.v
 UserStepFull.v
 UserArms.v
 UserStepExec.v
+UserExecProducer.v
 UserExecFacts.v
 UserCsr.v
 IntrDefs.v
