@@ -18,7 +18,6 @@ RiscvExtras.v
 AlignBits.v
 RiscvTryStep.v
 RiscvFetchExec.v
-WpAdd.v
 WpAuipc.v
 WpLoad.v
 WpFetch.v
@@ -140,6 +139,7 @@ UserArms.v
 UserStepExec.v
 UserExecProducer.v
 UserMemArms.v
+UserClassify.v
 UserExecFacts.v
 UserCsr.v
 IntrDefs.v
@@ -182,6 +182,7 @@ WpKallocDecode.v
 WpMemsetPage.v
 WpKalloc.v
 WpKfree.v
+WpInitlock.v
 TrampPt.v
 VcGen.v
 VcGenS.v
