@@ -487,8 +487,19 @@ before any mechanical sweep.
      zify-hooked `lia` "Cannot find witness" trap applies — use
      compute/congruence and explicit Z.le/lt_trans); `Z.land y 1` via
      a local ones-based helper.
-   - NEXT — the spinlock layer over sconf, in dependency order:
-     `wp_holding_sconf` (mycpu + the lk->cpu read; no flips), then
+   - DONE — `wp_holding_lockinv_s_sconf` + `_locked_s_sconf`
+     (WpSconfHolding.v, axiom-clean): the not-mine form (returns 0 —
+     acquire's check; fast path when the lock is free, slow path
+     through the k:=4 frame trade + mycpu + the seqz chain) and the
+     locked/mine form (the caller's lock token refutes the fast path
+     via the locked clw leaf, returns 1 — release's check).  GOTCHA
+     (recurring): define each sp-write map (`set (S0 := ...)`) with
+     the LEAF's exact value spelling (`add_vec (Hprev !!! csp) ...`),
+     NOT a pre-folded let — a proved gmap-lookup equation is not
+     conversion, so iExact/iFrame across the transformer bracket fails
+     otherwise; and remember the leaf ROUND-TRIP re-spells cells at
+     ITS map's lookups (bridge goal-side with -HcspSx rewrites).
+   - NEXT — the rest of the spinlock layer in dependency order:
      `wp_release_sconf` (holding + the zero store + pop_off: its OLD
      spec pinned intena=0 — the sconf spec instead threads the
      push_off payload disjunct through and lets pop_off restore;

@@ -149,6 +149,7 @@ WpSconfUart.v
 WpSconfMycpu.v
 WpIntenaBits.v
 WpSconfPushOff.v
+WpSconfHolding.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
