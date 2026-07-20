@@ -600,36 +600,6 @@ Section WpSmodePtCtl.
                           [$Hpc' $Hnpc] Hfile").
   Qed.
 
-  Lemma wp_fence_s_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
-                           Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_fence_s_r (kpt_regime root_ppn) Φ pc m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
-  Qed.
 
   Lemma wp_fence_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (m : gmap regidx (mword 64)) {dq : dfrac} :
@@ -659,19 +629,6 @@ Section WpSmodePtCtl.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-  Lemma wp_fence_s_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : gmap regidx (mword 64)) {dq : dfrac} :
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
-                           Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_fence_s_scfg_r (kpt_regime root_ppn) γ Φ pc m (dq:=dq)).
-  Qed.
 
   (* ---- from WpSmodeJal.v ---- *)
 
@@ -748,35 +705,6 @@ Section WpSmodePtCtl.
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
-  Lemma wp_cj_s_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    let tgt := add_vec pc (sign_extend' 64 jimm) in
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (JAL (jimm, zreg)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is tgt -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cj_s_r (kpt_regime root_ppn) Φ pc jimm m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
-  Qed.
 
   Lemma wp_cj_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (jimm : mword 21)
@@ -807,20 +735,6 @@ Section WpSmodePtCtl.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-  Lemma wp_cj_s_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    let tgt := add_vec pc (sign_extend' 64 jimm) in
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (JAL (jimm, zreg)) -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is tgt -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cj_s_scfg_r (kpt_regime root_ppn) γ Φ pc jimm m (dq:=dq)).
-  Qed.
 
   Lemma wp_jal_gpr_s_zca_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
@@ -1035,48 +949,6 @@ Section WpSmodePtCtl.
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
-  Lemma wp_cret_s_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    uint ra <> 0 ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec tgt 1) = false ->
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗
-    mideleg ↦ᵣ{ dq } mdv0 -∗
-    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗
-      mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗
-      mideleg ↦ᵣ{ dq } mdv0 -∗
-      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is tgt -∗
-      gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cret_s_r (kpt_regime root_ppn) Φ pc ra m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
-  Qed.
 
   Lemma wp_cret_s_zca_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
@@ -1182,47 +1054,6 @@ Section WpSmodePtCtl.
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
-  Lemma wp_cret_s_zca_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    uint ra <> 0 ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗
-    mideleg ↦ᵣ{ dq } mdv0 -∗
-    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗
-      mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗
-      mideleg ↦ᵣ{ dq } mdv0 -∗
-      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is tgt -∗
-      gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cret_s_zca_r (kpt_regime root_ppn) Φ pc ra m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
-  Qed.
 
   Lemma wp_cret_s_zca_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
@@ -1254,21 +1085,6 @@ Section WpSmodePtCtl.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-  Lemma wp_cret_s_zca_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    uint ra <> 0 ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is tgt -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cret_s_zca_scfg_r (kpt_regime root_ppn) γ Φ pc ra m (dq:=dq)).
-  Qed.
 
   (* ---- from WpSmodeCsr.v ---- *)
 
@@ -1358,36 +1174,6 @@ Section WpSmodePtCtl.
     iExact "Hfmap".
   Qed.
 
-  Lemma wp_csrr_sstatus_s_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    uint rd <> 0 ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (sstatus_read mstatus0)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_csrr_sstatus_s_r (kpt_regime root_ppn) Φ pc rd m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
-  Qed.
 
   Lemma wp_csrr_sstatus_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
@@ -1422,24 +1208,6 @@ Section WpSmodePtCtl.
     iExists mstatus0. iFrame "Hfile". iPureIntro. exact HSIE.
   Qed.
 
-  Lemma wp_csrr_sstatus_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
-    ( smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      (∃ ms : mword 64, ⌜ eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ⌝ ∗
-         gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_csrr_sstatus_scfg_r (kpt_regime root_ppn) γ Φ pc rd m (dq:=dq)).
-  Qed.
 
   Lemma wp_csrrci_sstatus_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd imm5 : mword 5)
@@ -1536,38 +1304,6 @@ Section WpSmodePtCtl.
     iExact "Hfmap".
   Qed.
 
-  Lemma wp_csrrci_sstatus_s_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd imm5 : mword 5)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    uint rd <> 0 ->
-    eq_vec imm5 (zeros' 5) = false ->
-    legalize_sstatus_val mstatus0 (sstatus_write_val mstatus0 imm5) = mstatus0 ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc false (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRC)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (sstatus_read mstatus0)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_csrrci_sstatus_s_r (kpt_regime root_ppn) Φ pc rd imm5 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
-  Qed.
 
   Lemma wp_csrrci_sstatus_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
@@ -1603,24 +1339,6 @@ Section WpSmodePtCtl.
     iExists mstatus0. iFrame "Hfile". iPureIntro. exact HSIE.
   Qed.
 
-  Lemma wp_csrrci_sstatus_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
-    ( smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      (∃ ms : mword 64, ⌜ eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ⌝ ∗
-         gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_csrrci_sstatus_scfg_r (kpt_regime root_ppn) γ Φ pc rd m (dq:=dq)).
-  Qed.
 
   (* ---- from WpSmodeSret.v ---- *)
 

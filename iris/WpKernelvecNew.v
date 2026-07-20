@@ -128,23 +128,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma kv_exec_execute_JAL_zca (imm : mword 21) (rd : regidx) s s_w :
-  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-  exec (wX_bits rd (register_lookup nextPC s.(sregs)))
-       (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))) = Some (tt, s_w) ->
-  exec (execute_JAL imm rd) s = Some (RETIRE_SUCCESS, s_w).
-Proof.
-  intros Halign Hzca Hwx.
-  unfold execute_JAL, get_next_pc.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (kv_exec_jump_to_zca _ s Halign Hzca)).
-  cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _ Hwx).
-  apply exec_returnm.
-Qed.
-
 
 (* sp after the prologue c.addi16sp (the value the whole frame is based on). *)
 Definition kv_sp1 (m : gmap regidx (mword 64)) : mword 64 :=

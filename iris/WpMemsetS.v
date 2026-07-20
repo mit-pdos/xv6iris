@@ -61,7 +61,6 @@ Section WpMemsetS.
      [rsd_caddi] in WpEntry). *)
 
 
-
   (* ---- decode: 0x1141 decodes to [C_ADDI (imm_memset0, rsd_memset0)] ---- *)
 
   (* ---- the [instr] fact at [memset]'s entry ---- *)
@@ -106,59 +105,6 @@ Section WpMemsetS.
     apply exec_returnM.
   Qed.
 
-  Lemma exec_execute_BTYPE_BNE_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
-    neq_vec (rvv rs1 s) (rvv rs2 s) = false ->
-    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))) s
-      = Some (RETIRE_SUCCESS, s).
-  Proof.
-    intro Hfall.
-    unfold execute. cbn match. unfold execute_BTYPE.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BNE rs2 rs1 s)).
-    rewrite Hfall. apply exec_returnM.
-  Qed.
-
-  Lemma exec_execute_BTYPE_BEQ_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
-    eq_vec (rvv rs1 s) (rvv rs2 s) = false ->
-    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))) s
-      = Some (RETIRE_SUCCESS, s).
-  Proof.
-    intro Hfall.
-    unfold execute. cbn match. unfold execute_BTYPE.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BEQ rs2 rs1 s)).
-    rewrite Hfall. apply exec_returnM.
-  Qed.
-
-  Lemma exec_execute_BTYPE_BEQ_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
-    eq_vec (rvv rs1 s) (rvv rs2 s) = true ->
-    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
-    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
-  Proof.
-    intros Htaken Halign Hbit1.
-    unfold execute. cbn match. unfold execute_BTYPE.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BEQ rs2 rs1 s)).
-    rewrite Htaken.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-    exact (exec_jump_to _ s Halign Hbit1).
-  Qed.
-
-  Lemma exec_execute_BTYPE_BNE_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
-    neq_vec (rvv rs1 s) (rvv rs2 s) = true ->
-    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
-    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
-  Proof.
-    intros Htaken Halign Hbit1.
-    unfold execute. cbn match. unfold execute_BTYPE.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BNE rs2 rs1 s)).
-    rewrite Htaken.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-    exact (exec_jump_to _ s Halign Hbit1).
-  Qed.
 
   (* jump_to variant allowing a 2-aligned (bit1 = 1) target under the C
      extension (Zca enabled) -- for the memset loop's back-edge, whose head
@@ -200,8 +146,6 @@ Section WpMemsetS.
      menvcfg.LPE at Supervisor (vs mseccfg.MLPE at Machine). *)
 
 
-
-
   (* =================================================================== *)
   (*  Width-1 (store-byte) low-level data-path primitives -- ports of the  *)
   (*  width-8 store primitives in WpSmodeGpr Part A with width := 1.        *)
@@ -209,12 +153,7 @@ Section WpMemsetS.
   (* =================================================================== *)
 
 
-
-
-
   (* width-1 split_misaligned: a 1-byte access is always aligned -> 1 chunk. *)
-
-
 
 
   (* ---- width-1 vmem_write_addr: the aligned single-byte write path ---- *)
@@ -446,7 +385,6 @@ Section WpMemsetS.
   End ExecStoreGS1walk.
 
 
-
   (* =================================================================== *)
   (*  sb rs2, imm(rs1)  in S-mode: store the low byte of rs2 to the byte  *)
   (*  address ea = rs1 + sext(imm) -- a TLB HIT at tlb_hash of its vpn.    *)
@@ -481,8 +419,6 @@ Section WpMemsetS.
   (* ===== BEQ leaves (clones of the BNE leaves above, for wakeup's beq) ===== *)
 
 
-
-
   (* ---- unbundled BASE (4-byte) register-write engine (for `add a4`) ---- *)
 
 
@@ -493,14 +429,6 @@ Section WpMemsetS.
 
   (* ============ unbundled RVC register-write wrappers ============ *)
   (* Shared config-fact block, abbreviated in each wrapper below via a copy. *)
-
-
-
-
-
-
-
-
 
 
   (* ------------------------------------------------------------------- *)
@@ -595,9 +523,6 @@ Section WpMemsetS.
      re-bundling in the continuation (the branch preserves every config cell). *)
 
 
-
-
-
   (* =================================================================== *)
   (*  memset SUFFIX, 0xcea..0xcf0: restore ra/s0 from the frame, pop it,   *)
   (*  and return.                                                          *)
@@ -609,18 +534,6 @@ Section WpMemsetS.
   (* =================================================================== *)
 
   (* ===== smode_config leaf wrappers (local, for the memset sequencers) ===== *)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   (* =================================================================== *)
@@ -636,14 +549,12 @@ Section WpMemsetS.
   (* =================================================================== *)
 
 
-
   (* =================================================================== *)
   (*  memset with a ZERO byte count (n = 0): prologue (0xccc..0xcd2) then  *)
   (*  the TAKEN c.beqz at 0xcd4 jumps straight to the epilogue at          *)
   (*  memset+0x1e, skipping the loop.  ra/s0 are saved on the frame (to    *)
   (*  be restored by the suffix); a2/a4/a5 are left untouched (m2).        *)
   (* =================================================================== *)
-
 
 
 End WpMemsetS.

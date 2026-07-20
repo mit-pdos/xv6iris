@@ -841,59 +841,7 @@ Lemma exec_execute_ZCMOP (mop : mword 3) (s : mstate) :
 Proof. apply exec_returnm. Qed.
 
 (* the compressed memory expansions *)
-Lemma exec_execute_C_LBU (uimm : mword 2) (rdc rsc1 : cregidx) (s : mstate) :
-  exec (execute (C_LBU (uimm, rdc, rsc1))) s
-    = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1,
-                             creg2reg_idx rdc, true, 1)), s).
-Proof. apply exec_returnm. Qed.
 
-Lemma exec_execute_C_LH (uimm : mword 2) (rdc rsc1 : cregidx) (s : mstate) :
-  exec (execute (C_LH (uimm, rdc, rsc1))) s
-    = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1,
-                             creg2reg_idx rdc, false, 2)), s).
-Proof. apply exec_returnm. Qed.
-
-Lemma exec_execute_C_LHU (uimm : mword 2) (rdc rsc1 : cregidx) (s : mstate) :
-  exec (execute (C_LHU (uimm, rdc, rsc1))) s
-    = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1,
-                             creg2reg_idx rdc, true, 2)), s).
-Proof. apply exec_returnm. Qed.
-
-Lemma exec_execute_C_LW (uimm : mword 5) (rsc rdc : cregidx) (s : mstate) :
-  exec (execute (C_LW (uimm, rsc, rdc))) s
-    = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
-                             creg2reg_idx rsc, creg2reg_idx rdc, false, 4)), s).
-Proof. apply exec_returnm. Qed.
-
-Lemma exec_execute_C_LWSP (uimm : mword 6) (rd : regidx) (s : mstate) :
-  exec (execute (C_LWSP (uimm, rd))) s
-    = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
-                             sp, rd, false, 4)), s).
-Proof. apply exec_returnm. Qed.
-
-Lemma exec_execute_C_SB (uimm : mword 2) (rsc1 rsc2 : cregidx) (s : mstate) :
-  exec (execute (C_SB (uimm, rsc1, rsc2))) s
-    = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx rsc2,
-                              creg2reg_idx rsc1, 1)), s).
-Proof. apply exec_returnm. Qed.
-
-Lemma exec_execute_C_SH (uimm : mword 2) (rsc1 rsc2 : cregidx) (s : mstate) :
-  exec (execute (C_SH (uimm, rsc1, rsc2))) s
-    = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx rsc2,
-                              creg2reg_idx rsc1, 2)), s).
-Proof. apply exec_returnm. Qed.
-
-Lemma exec_execute_C_SW (uimm : mword 5) (rsc1 rsc2 : cregidx) (s : mstate) :
-  exec (execute (C_SW (uimm, rsc1, rsc2))) s
-    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
-                              creg2reg_idx rsc2, creg2reg_idx rsc1, 4)), s).
-Proof. apply exec_returnm. Qed.
-
-Lemma exec_execute_C_SWSP (uimm : mword 6) (rs2 : regidx) (s : mstate) :
-  exec (execute (C_SWSP (uimm, rs2))) s
-    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
-                              rs2, sp, 4)), s).
-Proof. apply exec_returnm. Qed.
 
 (* C_NOT / C_ZEXT_B: DIRECT retires (read/write the same creg). *)
 Lemma exec_execute_C_NOT_total (c : cregidx) (s : mstate) :

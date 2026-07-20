@@ -83,17 +83,3 @@ Proof.
 Qed.
 
 (* Nonzero-rd form, dispatched through [execute], as ustep_rtype2 expects. *)
-Lemma exec_execute_ZICOND_RTYPE_gpr_nz (rs2 rs1 rd : mword 5) (op : zicondop) s :
-  uint rd <> 0 ->
-  exec (execute (ZICOND_RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op))) s
-  = Some (RETIRE_SUCCESS,
-          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-            (regval_into_reg (zicond_rd_val op rs2 rs1 s))).
-Proof.
-  intro Hrd.
-  change (execute (ZICOND_RTYPE (Regidx rs2, Regidx rs1, Regidx rd, op)))
-    with (execute_ZICOND_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) op).
-  rewrite (exec_execute_ZICOND_RTYPE_gpr rs2 rs1 rd op s).
-  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-  reflexivity.
-Qed.

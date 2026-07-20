@@ -409,37 +409,6 @@ Proof.
   iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
 Qed.
 
-Lemma wp_sb_uart_s_pt (root_ppn : mword 44) (γ : gname) (γd : uart_names)
-    (off : Z) (Φ : mval -> iProp Σ)
-    (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : gmap regidx (mword 64)) (R S : iProp Σ) {dq : dfrac} :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
-  let lppn := kpt_leaf_ppn uart_vpn in
-  (0 <= off < uart_size)%Z ->
-  (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-     ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
-  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-  autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-  zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
-  zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-  smode_config γ dq -∗
-  tlb_inv_pt root_ppn -∗
-  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-  dev_inv γd -∗
-  R -∗
-  (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
-     uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
-  ( smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗ gpr_file m -∗
-    S -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
-Proof.
-  exact (wp_sb_uart_s_r (kpt_regime root_ppn) γ γd off Φ pc is_rvc rs2 rs1 imm m R S (dq:=dq)).
-Qed.
 
 Lemma wp_lb_uart_s_r (Rg : s_regime) (γ : gname) (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
@@ -611,40 +580,5 @@ Proof.
   iExact "Hfmap".
 Qed.
 
-Lemma wp_lb_uart_s_pt (root_ppn : mword 44) (γ : gname) (γd : uart_names)
-    (off : Z) (Φ : mval -> iProp Σ)
-    (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
-    (m : gmap regidx (mword 64)) (R : iProp Σ) (S : bv 8 -> iProp Σ) {dq : dfrac} :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let ldval := fun (b : bv 8) =>
-        (extend_value is_unsigned (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b) : mword 64) in
-  let lppn := kpt_leaf_ppn uart_vpn in
-  (0 <= off < uart_size)%Z ->
-  uint rd <> 0 ->
-  (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-     ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
-  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-  autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-  zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
-  zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-  smode_config γ dq -∗
-  tlb_inv_pt root_ppn -∗
-  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
-  dev_inv γd -∗
-  R -∗
-  (∀ u b u', ⌜ uart_read u off = Some (b, u') ⌝ -∗
-     uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S b) -∗
-  ( ∀ b : bv 8,
-    smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    gpr_file (<[Regidx rd := regval_into_reg (ldval b)]> m) -∗
-    S b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
-Proof.
-  exact (wp_lb_uart_s_r (kpt_regime root_ppn) γ γd off Φ pc is_rvc is_unsigned rd rs1 imm m R S (dq:=dq)).
-Qed.
 
 End WpSmodePtUart.

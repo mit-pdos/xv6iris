@@ -388,26 +388,6 @@ Section WpPushOffMem.
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 4) s = Some (false, s).
   Hypothesis Hdev : dev_addr pa = false.
 
-  Lemma exec_execute_STORE_4_gpr_S :
-    exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 4))) s
-      = Some (RETIRE_SUCCESS,
-              MState s.(sregs) (write_bytes s.(mem) pa 4
-                (autocast (T := mword) (subrange_vec_dec vrs2 (Z.sub (Z.mul 4 8) 1) 0) : mword 32)) s.(mdev)).
-  Proof.
-    change (execute (STORE (imm, Regidx rs2, Regidx rs1, 4)))
-      with (execute_STORE imm (Regidx rs2) (Regidx rs1) 4).
-    unfold execute_STORE.
-    replace (4 <=? xlen_bytes) with true by (vm_compute; reflexivity).
-    assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:320.28-320.29" : M (true = true)) s
-                   = Some (@eq_refl bool true, s)) by reflexivity.
-    rewrite (exec_bind_Some _ _ _ _ _ Hass).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-    cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _
-      (exec_vmem_write_4_gpr_S rs1 offset _ region satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
-    cbn match.
-    apply exec_returnM.
-  Qed.
   End ExecStoreGS4.
 
   (* ---- width-4 vmem_write_addr WALK (fills the TLB) ---- *)
@@ -619,26 +599,6 @@ Section WpPushOffMem.
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 4) s' = Some (false, s').
   Hypothesis Hdev : dev_addr pa = false.
 
-  Lemma exec_execute_STORE_4_gpr_S_walk :
-    exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 4))) s
-      = Some (RETIRE_SUCCESS,
-              MState s'.(sregs) (write_bytes s.(mem) pa 4
-                (autocast (T := mword) (subrange_vec_dec vrs2 (Z.sub (Z.mul 4 8) 1) 0) : mword 32)) s'.(mdev)).
-  Proof.
-    change (execute (STORE (imm, Regidx rs2, Regidx rs1, 4)))
-      with (execute_STORE imm (Regidx rs2) (Regidx rs1) 4).
-    unfold execute_STORE.
-    replace (4 <=? xlen_bytes) with true by (vm_compute; reflexivity).
-    assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:320.28-320.29" : M (true = true)) s
-                   = Some (@eq_refl bool true, s)) by reflexivity.
-    rewrite (exec_bind_Some _ _ _ _ _ Hass).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-    cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _
-      (exec_vmem_write_4_gpr_S_walk rs1 offset _ region satp0 tlbf s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
-    cbn match.
-    apply exec_returnM.
-  Qed.
   End ExecStoreGS4walk.
 
   (* ---- width-4 load building blocks ---- *)
@@ -900,28 +860,6 @@ Section WpPushOffMem.
   Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-  Lemma exec_execute_LOAD_4_gpr_S :
-    exec (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 4))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value false data2))).
-  Proof.
-    change (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 4)))
-      with (execute_LOAD imm (Regidx rs1) (Regidx rd) false 4).
-    unfold execute_LOAD.
-    replace (4 <=? xlen_bytes) with true by (vm_compute; reflexivity).
-    assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
-    rewrite (exec_bind_Some _ _ _ _ _ Hass).
-    rewrite (exec_bind_Some _ _ _ _ _
-      (exec_vmem_read_4_gpr_S rs1 offset v region satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes)).
-    cbn match.
-    assert (Hw : exec (wX_bits (Regidx rd) (extend_value false data2)) s
-                 = Some (tt, set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                                (regval_into_reg (extend_value false data2)))).
-    { rewrite (exec_wX_bits_gpr rd (extend_value false data2) s).
-      rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
-    rewrite (exec_bind0_Some _ _ _ _ _ Hw).
-    apply exec_returnM.
-  Qed.
   End ExecLoadGS4.
 
   (* ---- width-4 vmem_read_addr WALK ---- *)
@@ -1110,28 +1048,6 @@ Section WpPushOffMem.
   Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-  Lemma exec_execute_LOAD_4_gpr_S_walk :
-    exec (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 4))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value false data2))).
-  Proof.
-    change (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 4)))
-      with (execute_LOAD imm (Regidx rs1) (Regidx rd) false 4).
-    unfold execute_LOAD.
-    replace (4 <=? xlen_bytes) with true by (vm_compute; reflexivity).
-    assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
-    rewrite (exec_bind_Some _ _ _ _ _ Hass).
-    rewrite (exec_bind_Some _ _ _ _ _
-      (exec_vmem_read_4_gpr_S_walk rs1 offset v region satp0 tlbf s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes)).
-    cbn match.
-    assert (Hw : exec (wX_bits (Regidx rd) (extend_value false data2)) s'
-                 = Some (tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
-                                (regval_into_reg (extend_value false data2)))).
-    { rewrite (exec_wX_bits_gpr rd (extend_value false data2) s').
-      rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
-    rewrite (exec_bind0_Some _ _ _ _ _ Hw).
-    apply exec_returnM.
-  Qed.
   End ExecLoadGS4walk.
 
   (* ---- width-4 helper facts for the WP lemmas ---- *)
