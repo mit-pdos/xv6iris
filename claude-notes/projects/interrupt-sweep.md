@@ -17,6 +17,21 @@ any later per-function conversions.  The old `smode_config` engine and its
 SIE=0 leaves stay in parallel until the very end — delete `smode_config` only
 after the boot wiring lands.
 
+The dead old-style whole-function proofs of the converted functions have now
+been removed (~5.3k lines): the terminal `wp_<fn>` theorems at the concrete
+kernel regime (`wp_kalloc`, `wp_kfree`, `wp_mycpu`, `wp_holding_lockinv`,
+`wp_push_off`, `wp_release`, `wp_wakeup`, `wp_memset{,_page}`, `wp_acquire_lock`,
+`wp_pop_off`, `wp_initlock`, …) plus their now-orphaned private leaf/decode
+lemmas — nothing applies them any more.  What deliberately STAYS: the
+regime-parametric `_r` variants (`wp_kalloc_r` etc.), because the not-yet-
+converted page-table cone (`WpWalk`/`KvmSpec`) still reaches them through
+`wp_kalloc_r`; every helper the `WpSconf*` files import (decode facts `wki_*`/
+`poi_*`/…, spec predicates `page_own`/`is_lock`/…, pure algebra); and all
+typeclass instances (`*_persistent`/`*_timeless`/`*Σ`).  The deletion set was
+computed from the `.glob` reference graph with intra-file reachability — the
+same analysis `iris/find_dead.py` automates (heed its caveats: instances,
+hint-DB-only, and self-recursive references are false positives for "dead").
+
 ## Architecture
 
 - `sconf γ` (IntrDefs.v) is the SIE-agnostic S-mode configuration bundle;
