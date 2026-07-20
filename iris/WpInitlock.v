@@ -33,12 +33,11 @@ From iris.program_logic Require Import language weakestpre lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpLoad.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte PtTreeAdue.
-Require Import SmodeCore WpSmodeGpr WpPushOffMem WpAmo WpLock.
-Require Import KptTree SmodeCorePt SRegime WpSmodePtLeaves WpSmodePtMem.
+Require Import SmodePte.
+Require Import SmodeCore WpSmodeGpr WpPushOffMem.
+Require Import KptTree SmodeCorePt SRegime WpSmodePtMem.
 Require Import WpSmodePtAlu WpSmodePtCtl WpSmodePtMemWrap.
 Require Import WpRelease.
 Require Import StackOwn CalleeSaved.

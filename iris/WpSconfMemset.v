@@ -6,7 +6,6 @@
    the disable nesting).  Fuel induction over the remaining byte count
    (the packaged bne-taken leaf hands the step's later out, stripped by
    iNext against the fuel IH — bounded loop, not iLöb). *)
-Require Import WpSmodeLeafBase.
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -14,13 +13,13 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpLoad WpLeafCommon WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
-Require Import SmodeCore WpSmodeGpr.
-Require Import KptTree SmodeCorePt WpSmodePtLeaves SRegime.
-Require Import StackOwn CalleeSaved WpSmodeSret AlignBits KernelText.
-Require Import IntrDefs WpIntrInv WpSmodeIntr.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
+Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import KptTree.
+Require Import StackOwn KernelText.
+Require Import IntrDefs.
+Require Import IntrDefs.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpMemsetS.

@@ -22,7 +22,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SRegime SmodeCore.
-Require Import InstrBytes KernelText WpAuipc.
+Require Import InstrBytes KernelText.
 Require Import WpGpr.
 Require Import WpMycpu.
 Require Import WpLock.
@@ -30,10 +30,11 @@ Require Import WpMmodeLeafBase.
 Require Import CalleeSaved StackOwn.
 Require Import RiscvExtras.
 Require Import KptTree.
-Require Import IntrDefs WpIntrInv WpSmodeIntr WpIntenaBits.
-Require Import VcGen VcGenS.
+Require Import IntrDefs WpIntenaBits.
+Require Import IntrDefs.
+Require Import VcGenS.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSconfAcquire WpSconfRelease WpSconfHolding.
+Require Import WpSconfAcquire WpSconfRelease.
 Require Import WpWakeup WpSconfWakeup WpSconfKfree.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

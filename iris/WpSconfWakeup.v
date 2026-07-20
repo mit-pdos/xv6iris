@@ -16,14 +16,15 @@ From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
-Require Import SRegime SmodeCore.
+Require Import SmodeCore.
 Require Import InstrBytes KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved StackOwn.
 Require Import KptTree.
-Require Import IntrDefs WpIntrInv WpSmodeIntr.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpWakeup.

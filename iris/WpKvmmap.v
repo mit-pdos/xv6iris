@@ -13,24 +13,23 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvExec RiscvFetchExec.
 Require Import InstrBytes.
 Require Import KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore WpSmodeGpr.
-Require Import WpMycpu WpLock.
+Require Import SmodeCore.
+Require Import WpLock.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KallocInv.
-Require Import SmodePte Pt4kWalk CommonWalk PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import PtTree.
 Require Import PtBuild KvmSpec.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap.
-Require Import WpWalk WpMappages UserBits.
+Require Import WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
+Require Import WpSmodePtMemWrap.
+Require Import WpMappages UserBits.
 Require Import KernelRvcDecode WpRvcBridge WpDecode WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 From Kernel Require KernelSyms.
