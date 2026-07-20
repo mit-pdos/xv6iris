@@ -181,6 +181,39 @@ Section stack_own.
       by rewrite (pa_stk_assoc sp 1 y).
   Qed.
 
+  (* Base-anchored enumeration: the same region as [n] slots counted UP
+     from the region's BASE [pa_stk sp n] (slot [j] at base + 8j,
+     j = 0..n-1).  This is the shape an sp-move ledger uses: after
+     [sp' = sp - 8n] the freed region [sp', sp) is exactly the [n]
+     positive-offset words at the NEW sp. *)
+  Lemma pa_stk_base_S (sp : Arch.pa) (n j : nat) :
+    add_vec_int (pa_stk sp (S n)) (8 * Z.of_nat (S j))
+    = add_vec_int (pa_stk sp n) (8 * Z.of_nat j).
+  Proof. unfold pa_stk. rewrite !avi_assoc. f_equal. lia. Qed.
+
+  Lemma stack_own_base (sp : Arch.pa) (n : nat) :
+    stack_own sp n ⊣⊢
+    [∗ list] j ∈ seq 0 n, ∃ w : bv 64,
+      word_pointsto (add_vec_int (pa_stk sp n) (8 * Z.of_nat j)) (DfracOwn 1) w.
+  Proof.
+    induction n as [|n IH].
+    - rewrite stack_own_0. by rewrite big_sepL_nil.
+    - replace (S n) with (n + 1)%nat at 1 by lia.
+      rewrite stack_own_app IH stack_own_1 (pa_stk_assoc sp n 1).
+      replace (n + 1)%nat with (S n) by lia.
+      change (seq 0 (S n)) with (0%nat :: seq 1 n).
+      rewrite big_sepL_cons.
+      change (8 * Z.of_nat 0) with 0. rewrite avi0.
+      rewrite -(fmap_S_seq 0 n) big_sepL_fmap.
+      iSplit.
+      + iIntros "[HL HS]". iFrame "HS".
+        iApply (big_sepL_mono with "HL").
+        intros k y _. by rewrite pa_stk_base_S.
+      + iIntros "[HS HL]". iFrame "HS".
+        iApply (big_sepL_mono with "HL").
+        intros k y _. by rewrite pa_stk_base_S.
+  Qed.
+
   (* ---- directional forms of the split, for [iDestruct] / [iApply] ---- *)
   Lemma stack_own_split_1 (sp : Arch.pa) (a n : nat) :
     (a ≤ n)%nat ->

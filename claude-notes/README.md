@@ -55,6 +55,9 @@ are working on that effort — the relevant `projects/` file.
 
 - **[`interrupt-sweep.md`](projects/interrupt-sweep.md)** — making every S-mode
   execution lemma SIE-agnostic (the interrupt sweep).
+- **[`sie-cap-avail.md`](projects/sie-cap-avail.md)** — folding the free stack
+  into `sie_cap` with an available-slots parameter; sp push/pop specs; VCgen
+  sp-opcode support.
 - **[`kinit-cone.md`](projects/kinit-cone.md)** — the kinit cone (kinit →
   initlock + freerange, over kfree).
 - **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /

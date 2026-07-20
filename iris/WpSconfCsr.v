@@ -49,12 +49,12 @@ Section WpSconfCsr.
 
   Lemma wp_csrr_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
@@ -66,7 +66,7 @@ Section WpSconfCsr.
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
       ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m
-                     !!! Regidx csp_rs1) kv_frame_slots ∗
+                     !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
         ( (⌜ _get_Mstatus_SIE ms = ('b"0" : mword 1) ⌝ ∗
            ghost_var γ (1/4/2)%Qp ('b"0" : mword 1))
         ∨ (⌜ _get_Mstatus_SIE ms = ('b"1" : mword 1) ⌝ ∗
@@ -79,7 +79,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdsp) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
@@ -131,7 +131,7 @@ Section WpSconfCsr.
       by (apply lookup_total_insert_ne; exact Hspne).
     iAssert ( ghost_var γ (1/2) (_get_Mstatus_SIE ms0) ∗
               ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
-                             !!! Regidx csp_rs1) kv_frame_slots ∗
+                             !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
                 ( (⌜ _get_Mstatus_SIE ms0 = ('b"0" : mword 1) ⌝ ∗
                    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1))
                 ∨ (⌜ _get_Mstatus_SIE ms0 = ('b"1" : mword 1) ⌝ ∗
@@ -240,14 +240,14 @@ Section WpSconfCsr.
   (* arm is the idempotent write, ghosts untouched.                       *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_csrci_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (n : nat)
-      (m : gmap regidx (mword 64)) :
+      (pc : mword 64) (rd : mword 5) (k : nat)
+      (m : gmap regidx (mword 64)) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
-    intr_count γ root_ppn n -∗
+    sie_cap γ root_ppn m n -∗
+    intr_count γ root_ppn k -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
@@ -255,8 +255,8 @@ Section WpSconfCsr.
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
-      intr_count γ root_ppn (S n) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n -∗
+      intr_count γ root_ppn (S k) -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
@@ -264,7 +264,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdsp) "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
@@ -324,7 +324,7 @@ Section WpSconfCsr.
                = add_vec_int pc 4).
       { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
-      iDestruct (intr_count_get_off γ root_ppn n with "Hq0 Hcnt") as "(Hq0 & Hc0 & Hres)".
+      iDestruct (intr_count_get_off γ root_ppn k with "Hq0 Hcnt") as "(Hq0 & Hc0 & Hres)".
       iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] [Hstk Hq0]
                             [Hc0 Hres] Htlbinv [$Hpc' $Hnpc] [Hfmap]").
       { exact Hmsf. }
@@ -338,8 +338,8 @@ Section WpSconfCsr.
         iExact "Hfmap". }
     - (* ---- '1' arm: the real flip ---- *)
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
-      iDestruct (intr_count_get_on γ root_ppn n with "Hq1 Hcnt") as "(%Hn0 & Hq1 & Hc1)".
-      subst n.
+      iDestruct (intr_count_get_on γ root_ppn k with "Hq1 Hcnt") as "(%Hn0 & Hq1 & Hc1)".
+      subst k.
       destruct (csrci_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
       (* the trap-vector invariant: open it for the quarter, flip, reseal *)
@@ -536,12 +536,12 @@ Section WpSconfCsr.
      sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
   Lemma wp_csrsi_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     intr_count γ root_ppn 1 -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
@@ -550,7 +550,7 @@ Section WpSconfCsr.
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n -∗
       intr_count γ root_ppn 0 -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
@@ -561,7 +561,7 @@ Section WpSconfCsr.
     iIntros (Hrd Hrdsp)
       "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok (Hhx & Hsepcx & Hscausex & Hstvalx)]".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
@@ -657,10 +657,10 @@ Section WpSconfCsr.
 
   Lemma wp_csrsi_sstatus_x0_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (n : nat) :
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     intr_count γ root_ppn 1 -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
@@ -669,7 +669,7 @@ Section WpSconfCsr.
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       intr_count γ root_ppn 0 -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
@@ -679,7 +679,7 @@ Section WpSconfCsr.
   Proof.
     iIntros "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok (Hhx & Hsepcx & Hscausex & Hstvalx)]".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".

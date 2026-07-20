@@ -71,14 +71,14 @@ Section WpSconfLock.
   Lemma wp_clw_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     pa = lk ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -87,7 +87,7 @@ Section WpSconfLock.
     ( ∀ v : mword 32,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
@@ -96,7 +96,7 @@ Section WpSconfLock.
   Proof.
     intros pa Hpalk Hrd Hrdsp.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hlock Hcont".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc true
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -296,7 +296,7 @@ Section WpSconfLock.
                   = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
       by (symmetry; apply lookup_total_insert_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" $! v with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                           [$Hpc' $Hnpc] [Hfmap]").
     { iFrame "Hhw Hminv Hpriv Hmiex".
@@ -314,14 +314,14 @@ Section WpSconfLock.
   Lemma wp_clw_lockinv_locked_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     pa = lk ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -333,7 +333,7 @@ Section WpSconfLock.
       locked γl -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
@@ -342,7 +342,7 @@ Section WpSconfLock.
   Proof.
     intros pa Hpalk Hrd Hrdsp.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hlock Htok Hcont".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc true
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -544,7 +544,7 @@ Section WpSconfLock.
                   = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
       by (symmetry; apply lookup_total_insert_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" $! v with "[//] Htok Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                           [$Hpc' $Hnpc] [Hfmap]").
     { iFrame "Hhw Hminv Hpriv Hmiex".
@@ -565,12 +565,12 @@ Section WpSconfLock.
   Lemma wp_sw_zero_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     pa = lk ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -580,7 +580,7 @@ Section WpSconfLock.
     R -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
@@ -590,7 +590,7 @@ Section WpSconfLock.
     intros pa Hpalk.
     set (storeval := (mword_of_int 0 : mword 32)).
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hlock Htok HRes Hcont".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -786,21 +786,21 @@ Section WpSconfLock.
   Lemma wp_amoswap_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) :
+      (m : gmap regidx (mword 64)) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (zeros' 64) in
     pa = lk ->
     neq_vec (sign_extend' 64 (amoswap_stored (m !!! Regidx rs2))) zero_reg = true ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    sie_cap γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd)) -∗
     is_lock γl lk R -∗
     ( ∀ w : mword 32,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) -∗
@@ -812,7 +812,7 @@ Section WpSconfLock.
     intros pa Hpalk Hstz Hrd Hrdsp.
     set (a8 := pa). set (ea := pa).
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hlock Hcont".
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg [Hmem Hdev]]".
@@ -1028,7 +1028,7 @@ Section WpSconfLock.
                   = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m !!! Regidx csp_rs1)
       by (symmetry; apply lookup_total_insert_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n Hsp with "Hcap") as "Hcap".
     iNext.
     iApply ("Hcont" $! w with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                           [$Hpc' $Hnpc] [Hfmap] Hbr").

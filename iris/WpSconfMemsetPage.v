@@ -2,11 +2,13 @@
    world.  [wp_memset_page_sconf] is the sconf-native mirror of
    [wp_memset_page] (WpMemsetPage.v): it composes the sconf prefix/loop/suffix
    (WpSconfMemset.v) at the fixed page count N = 4096, threading [sconf] +
-   hart_state + [sie_cap] + [tlb_inv_pt] and a DEEP-2 stack custody
-   [stack_own (pa_stk sp0 kv_frame_slots) 2] (the prefix trades it for memset's
-   own 2-slot save frame via [sie_cap_move_down], the suffix trades it back).
-   memset runs OUTSIDE the interrupt-disabled region, so it must be SIE-blind
-   (interrupts absorbed) -- hence sconf, not the SIE=0 smode_config engine. *)
+   hart_state + [sie_cap γ root_ppn m n] + [tlb_inv_pt].  memset needs 2 of
+   the [n] available stack slots for its own save frame (premise
+   [(2 <= n)%nat]): the prefix's sp push carves them out of the capability,
+   the suffix's sp pop feeds them back, so the caller gets [sie_cap] back at
+   the same avail [n].  memset runs OUTSIDE the interrupt-disabled region, so
+   it must be SIE-blind (interrupts absorbed) -- hence sconf, not the SIE=0
+   smode_config engine. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -42,7 +44,7 @@ Section WpSconfMemsetPage.
   Context `{CID : CpuId}.
 
   Lemma wp_memset_page_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (cval : mword 64) :
+      (m0 : gmap regidx (mword 64)) (n : nat) (cval : mword 64) :
     let a0_idx : mword 5 := mword_of_int 10 in
     let a1_idx : mword 5 := mword_of_int 11 in
     let a2_idx : mword 5 := mword_of_int 12 in
@@ -51,20 +53,19 @@ Section WpSconfMemsetPage.
     let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
     let p := m0 !!! Regidx a0_idx in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    (2 <= n)%nat ->
     page_valid p ->
     m0 !!! Regidx a1_idx = cval ->
     m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m0 -∗ tlb_inv_pt root_ppn -∗
+    sie_cap γ root_ppn m0 n -∗ tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    stack_own (pa_stk sp0 kv_frame_slots) 2 -∗
     page_own p -∗
     ( ∀ mfin,
       sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap γ root_ppn mfin -∗ tlb_inv_pt root_ppn -∗
+      sie_cap γ root_ppn mfin n -∗ tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
-      stack_own (pa_stk sp0 kv_frame_slots) 2 -∗
       page_own p -∗
       gpr_file mfin -∗
       ⌜ callee_saved m0 mfin ⌝ -∗

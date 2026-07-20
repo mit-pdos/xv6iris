@@ -38,7 +38,7 @@ Context `{CID : CpuId}.
 Lemma wp_sb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : gmap regidx (mword 64)) (R S : iProp Σ) :
+    (m : gmap regidx (mword 64)) (n : nat) (R S : iProp Σ) :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
@@ -52,7 +52,7 @@ Lemma wp_sb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
   zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap γ root_ppn m -∗
+  sie_cap γ root_ppn m n -∗
   tlb_inv_pt root_ppn -∗
   pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
   dev_inv γd -∗
@@ -61,7 +61,7 @@ Lemma wp_sb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
      uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
   ( hart_state ↦ᵣ HART_ACTIVE tt -∗
     sconf γ -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗ gpr_file m -∗
     S -∗
@@ -78,7 +78,7 @@ Proof.
   assert (Hident_pt : zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8))
             (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
   { unfold svpn_of. rewrite Hvpn_def. rewrite Hident. symmetry. exact Ha8pa. }
-  iApply (wp_instr_s_sconf γ root_ppn m Φ pc is_rvc
+  iApply (wp_instr_s_sconf γ root_ppn m n Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 1))
             with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -203,7 +203,7 @@ Qed.
 Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
-    (m : gmap regidx (mword 64)) (R : iProp Σ) (S : bv 8 -> iProp Σ) :
+    (m : gmap regidx (mword 64)) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let ldval := fun (b : bv 8) =>
@@ -220,7 +220,7 @@ Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
   zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap γ root_ppn m -∗
+  sie_cap γ root_ppn m n -∗
   tlb_inv_pt root_ppn -∗
   pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
   dev_inv γd -∗
@@ -230,7 +230,7 @@ Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
   ( ∀ b : bv 8,
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sconf γ -∗
-    sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (ldval b)]> m) -∗
+    sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (ldval b)]> m) n -∗
     tlb_inv_pt root_ppn -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     gpr_file (<[Regidx rd := regval_into_reg (ldval b)]> m) -∗
@@ -248,7 +248,7 @@ Proof.
   assert (Hident_pt : zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8))
             (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8).
   { unfold svpn_of. rewrite Hvpn_def. rewrite Hident. symmetry. exact Ha8pa. }
-  iApply (wp_instr_s_sconf γ root_ppn m Φ pc is_rvc
+  iApply (wp_instr_s_sconf γ root_ppn m n Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))
             with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -368,7 +368,7 @@ Proof.
                 = <[Regidx rd := regval_into_reg (ldval b)]> m !!! Regidx csp_rs1)
     by (symmetry; apply lookup_total_insert_ne; exact Hspne).
   iDestruct (sie_cap_retarget γ root_ppn m
-               (<[Regidx rd := regval_into_reg (ldval b)]> m) Hsp with "Hcap") as "Hcap".
+               (<[Regidx rd := regval_into_reg (ldval b)]> m) n Hsp with "Hcap") as "Hcap".
   iApply ("Hcont" $! b with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                         [$Hpc' $Hnpc] [Hfmap] HS").
   { iFrame "Hhw Hminv Hpriv Hmiex".

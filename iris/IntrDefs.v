@@ -12,14 +12,17 @@
      - the SIE-AGNOSTIC v2 bundle (the smode_config successor):
        [sconf_ms_facts] (the SIE-free common fact set), [sconf]
        (SIE unpinned, ghost half tied to the live bit, menvcfg bundled),
-       and the kernel-code capability [sie_cap] -- the '0' arm is the
-       bare quarter token, the '1' arm carries the quarter + the
-       interrupt invariant + the trap-scratch CSRs + the >= 32-slot
-       free-stack bound below sp, i.e. exactly the extra obligations of
+       and the kernel-code capability [sie_cap γ root m avail] -- it owns
+       the [kv_frame_slots + avail] free-stack slots below sp ([avail]
+       of them available to kernel code, the rest reserved for a
+       potential interrupt frame; sp moves trade against [avail] via
+       [sie_cap_push]/[sie_cap_pop]) plus the SIE arm: '0' is the bare
+       quarter token, '1' carries the quarter + the interrupt invariant
+       + the trap-scratch CSRs, i.e. exactly the extra obligations of
        running with interrupts enabled;
      - the conversions [intr_config_of_v2] / [v2_of_intr_config] the
        agnostic engines use to enter/exit the absorbing step engine.   *)
-From Stdlib Require Import ZArith Bool.
+From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_var invariants.
@@ -367,15 +370,19 @@ Section IntrDefs.
 
   (* [sie_cap] -- the kernel-code capability that DISCRIMINATES the SIE
      mode by the ghost QUARTER's value (agreement with [sconf]'s tied
-     half pins the live bit).  The EXACT [kv_frame_slots]-slot free-stack
-     carve below the CURRENT sp is factored OUT of the disjunction: it is
-     held at BOTH arms (harmless -- the ABI never writes below sp, and an
-     exact arm-blind carve is what makes sp-move re-carving deterministic;
-     see [sie_cap_move_down]/[sie_cap_move_up]).  The '1' arm carries the
-     remaining extra obligations of interrupts-enabled execution: the
-     interrupt invariant (handler existential -- no client names the
-     handler) and the trap-scratch CSRs (any trap scribbles them, so
-     enabled code cannot pin their values). *)
+     half pins the live bit).  It owns ALL the free stack below the
+     CURRENT sp -- [kv_frame_slots + avail] slots, factored OUT of the
+     disjunction and held at BOTH arms (harmless: the ABI never writes
+     below sp).  [avail] is the number of slots AVAILABLE to kernel code;
+     the other [kv_frame_slots] are reserved for a potential interrupt
+     frame.  An sp DECREMENT by k slots consumes k from [avail] (k <=
+     avail -- you cannot go below zero) and hands the freed frame region
+     [sp', sp) to the client ([sie_cap_push]); an sp INCREMENT feeds the
+     frame back and returns k to [avail] ([sie_cap_pop]).  The '1' arm
+     carries the remaining extra obligations of interrupts-enabled
+     execution: the interrupt invariant (handler existential -- no client
+     names the handler) and the trap-scratch CSRs (any trap scribbles
+     them, so enabled code cannot pin their values). *)
   (* the kernel-code interrupts-OFF token: between a csrci flip and the
      matching csrsi restore, kernel code holds this eighth; agreement
      with the capability's eighth (or the bundle's tied half) pins the
@@ -394,70 +401,92 @@ Section IntrDefs.
       (∃ v : mword 64, stval ↦ᵣ v)))%I.
 
   Definition sie_cap (γ : gname) (root_ppn : mword 44)
-      (m : gmap regidx (mword 64)) : iProp Σ :=
-    (stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
+      (m : gmap regidx (mword 64)) (avail : nat) : iProp Σ :=
+    (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
      sie_arm γ root_ppn)%I.
 
-  (* generic sp-MOVING transformer: the arm is m-blind, so a caller only
-     re-carves the exact stack slice at the new sp. *)
-  Lemma sie_cap_recarve (γ : gname) (root_ppn : mword 44)
-      (m m' : gmap regidx (mword 64)) :
-    ( stack_own (m !!! Regidx csp_rs1) kv_frame_slots -∗
-      stack_own (m' !!! Regidx csp_rs1) kv_frame_slots ) -∗
-    sie_cap γ root_ppn m -∗ sie_cap γ root_ppn m'.
+  (* the funnel's accessor: split off the exact reserved carve (the
+     [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
+  Lemma sie_cap_acc (γ : gname) (root_ppn : mword 44)
+      (m : gmap regidx (mword 64)) (avail : nat) :
+    sie_cap γ root_ppn m avail ⊣⊢
+    stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
+    stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
+    sie_arm γ root_ppn.
   Proof.
-    iIntros "Hcarve [Hstk Harm]". iFrame "Harm".
-    iApply ("Hcarve" with "Hstk").
+    rewrite /sie_cap stack_own_app. iSplit.
+    - iIntros "[[Hkv Hdeep] Harm]". iFrame.
+    - iIntros "(Hkv & Hdeep & Harm)". iFrame.
   Qed.
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
   Lemma sie_cap_retarget (γ : gname) (root_ppn : mword 44)
-      (m m' : gmap regidx (mword 64)) :
+      (m m' : gmap regidx (mword 64)) (avail : nat) :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
-    sie_cap γ root_ppn m -∗ sie_cap γ root_ppn m'.
+    sie_cap γ root_ppn m avail -∗ sie_cap γ root_ppn m' avail.
   Proof.
     iIntros (Hsp) "[Hstk Harm]". iFrame "Harm". rewrite Hsp. iExact "Hstk".
   Qed.
 
-  (* The canonical DOWNWARD sp move (sp' = sp - 8k, a prologue's frame
-     allocation): feed in k slots adjacent BELOW the current carve; the
-     carve re-anchors at sp' and the top k slots -- the function's new
-     frame region [sp', sp), which sits ABOVE the new sp and is therefore
-     trap-stable -- come OUT. *)
-  Lemma sie_cap_move_down (γ : gname) (root_ppn : mword 44)
-      (m m' : gmap regidx (mword 64)) (k : nat) :
+  (* sp DECREMENT by k slots (sp' = sp - 8k, a prologue's frame
+     allocation): k comes off [avail] (the k <= avail premise is the
+     can't-go-below-zero check) and the freed frame region [sp', sp) --
+     the top k slots, ABOVE the new sp and therefore trap-stable --
+     comes OUT for the client. *)
+  Lemma sie_cap_push (γ : gname) (root_ppn : mword 44)
+      (m m' : gmap regidx (mword 64)) (avail k : nat) :
+    (k <= avail)%nat ->
     m' !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) k ->
-    stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) k -∗
-    sie_cap γ root_ppn m -∗
-    sie_cap γ root_ppn m' ∗ stack_own (m !!! Regidx csp_rs1) k.
+    sie_cap γ root_ppn m avail -∗
+    sie_cap γ root_ppn m' (avail - k) ∗ stack_own (m !!! Regidx csp_rs1) k.
   Proof.
-    iIntros (Hsp') "Hdeep [Hstk Harm]". iFrame "Harm".
-    iAssert (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + k))
-      with "[Hstk Hdeep]" as "Hall".
-    { iApply stack_own_app. iFrame "Hstk Hdeep". }
-    iEval (rewrite (Nat.add_comm kv_frame_slots k)) in "Hall".
-    iDestruct (stack_own_app with "Hall") as "[Htop Hrest]".
+    iIntros (Hk Hsp') "[Hstk Harm]". iFrame "Harm".
+    replace (kv_frame_slots + avail)%nat
+      with (k + (kv_frame_slots + (avail - k)))%nat by lia.
+    iDestruct (stack_own_app with "Hstk") as "[Htop Hrest]".
     iFrame "Htop". rewrite Hsp'. iExact "Hrest".
   Qed.
 
-  (* The canonical UPWARD sp move (sp' = sp + 8k, an epilogue's frame
+  (* sp INCREMENT by k slots (sp' = sp + 8k, an epilogue's frame
      release): the function's frame [sp, sp') = the top k slots at sp'
-     get packed back IN, and the k deepest slots of the carve come out
-     (returning to the caller's deep-stack custody). *)
-  Lemma sie_cap_move_up (γ : gname) (root_ppn : mword 44)
-      (m m' : gmap regidx (mword 64)) (k : nat) :
+     is fed back IN and k returns to [avail]. *)
+  Lemma sie_cap_pop (γ : gname) (root_ppn : mword 44)
+      (m m' : gmap regidx (mword 64)) (avail k : nat) :
     m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
     stack_own (m' !!! Regidx csp_rs1) k -∗
-    sie_cap γ root_ppn m -∗
-    sie_cap γ root_ppn m' ∗
-    stack_own (pa_stk (m' !!! Regidx csp_rs1) kv_frame_slots) k.
+    sie_cap γ root_ppn m avail -∗
+    sie_cap γ root_ppn m' (avail + k).
   Proof.
     iIntros (Hsp) "Hframe [Hstk Harm]". iFrame "Harm".
-    iAssert (stack_own (m' !!! Regidx csp_rs1) (k + kv_frame_slots))
-      with "[Hstk Hframe]" as "Hall".
-    { iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk". }
-    iEval (rewrite (Nat.add_comm k kv_frame_slots)) in "Hall".
-    iDestruct (stack_own_app with "Hall") as "[Htop Hdeep]".
+    replace (kv_frame_slots + (avail + k))%nat
+      with (k + (kv_frame_slots + avail))%nat by lia.
+    iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk".
+  Qed.
+
+  (* custody transfer at the DEEP end (no sp move): absorb k adjacent
+     slots below the owned region into [avail]... *)
+  Lemma sie_cap_grow (γ : gname) (root_ppn : mword 44)
+      (m : gmap regidx (mword 64)) (avail k : nat) :
+    stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
+    sie_cap γ root_ppn m avail -∗
+    sie_cap γ root_ppn m (avail + k).
+  Proof.
+    iIntros "Hdeep [Hstk Harm]". iFrame "Harm".
+    rewrite Nat.add_assoc. iApply stack_own_app. iFrame "Hstk Hdeep".
+  Qed.
+
+  (* ... and release the k deepest slots back out. *)
+  Lemma sie_cap_shrink (γ : gname) (root_ppn : mword 44)
+      (m : gmap regidx (mword 64)) (avail k : nat) :
+    (k <= avail)%nat ->
+    sie_cap γ root_ppn m avail -∗
+    sie_cap γ root_ppn m (avail - k) ∗
+    stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + (avail - k))) k.
+  Proof.
+    iIntros (Hk) "[Hstk Harm]". iFrame "Harm".
+    replace (kv_frame_slots + avail)%nat
+      with ((kv_frame_slots + (avail - k)) + k)%nat by lia.
+    iDestruct (stack_own_app with "Hstk") as "[Htop Hdeep]".
     iFrame "Htop Hdeep".
   Qed.
 

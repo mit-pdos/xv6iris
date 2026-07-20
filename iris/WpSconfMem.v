@@ -88,13 +88,13 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_cld_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : mword 64) {dqm : dfrac} :
+      (m : gmap regidx (mword 64)) (n : nat) (v : mword 64) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -102,7 +102,7 @@ Section WpSconfMem.
     pa ↦₈{ dqm } v -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg v]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg v]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
@@ -114,7 +114,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 8 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc true
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -305,7 +305,7 @@ Section WpSconfMem.
                   = <[Regidx rd := regval_into_reg v]> m !!! Regidx csp_rs1)
       by (symmetry; apply lookup_total_insert_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg v]> m) Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg v]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                           [$Hpc' $Hnpc] [Hfmap] Hbw").
     { iFrame "Hhw Hminv Hpriv Hmiex".
@@ -323,11 +323,11 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_csd_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : mword 64) :
+      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -335,7 +335,7 @@ Section WpSconfMem.
     pa ↦₈ vold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
@@ -347,7 +347,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 8 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc true
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (STORE (imm, Regidx rs2, Regidx rs1, 8))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -537,13 +537,13 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_ld_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : mword 64) {dqm : dfrac} :
+      (m : gmap regidx (mword 64)) (n : nat) (v : mword 64) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -551,7 +551,7 @@ Section WpSconfMem.
     pa ↦₈{ dqm } v -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg v]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg v]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
@@ -563,7 +563,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 8 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -754,7 +754,7 @@ Section WpSconfMem.
                   = <[Regidx rd := regval_into_reg v]> m !!! Regidx csp_rs1)
       by (symmetry; apply lookup_total_insert_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg v]> m) Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg v]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                           [$Hpc' $Hnpc] [Hfmap] Hbw").
     { iFrame "Hhw Hminv Hpriv Hmiex".
@@ -768,11 +768,11 @@ Section WpSconfMem.
 
   Lemma wp_sd_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : mword 64) :
+      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -780,7 +780,7 @@ Section WpSconfMem.
     pa ↦₈ vold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
@@ -792,7 +792,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 8 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 8))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -982,13 +982,13 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_clw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : mword 32) {dqm : dfrac} :
+      (m : gmap regidx (mword 64)) (n : nat) (v : mword 32) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -996,7 +996,7 @@ Section WpSconfMem.
     pa ↦₄{ dqm } v -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
@@ -1008,7 +1008,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 4 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc true
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -1199,7 +1199,7 @@ Section WpSconfMem.
                   = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
       by (symmetry; apply lookup_total_insert_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                           [$Hpc' $Hnpc] [Hfmap] Hbw").
     { iFrame "Hhw Hminv Hpriv Hmiex".
@@ -1214,12 +1214,12 @@ Section WpSconfMem.
 
   Lemma wp_csw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 32) :
+      (m : gmap regidx (mword 64)) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (m !!! Regidx rs2) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -1227,7 +1227,7 @@ Section WpSconfMem.
     pa ↦₄ vold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
@@ -1239,7 +1239,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 4 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc true
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (STORE (imm, Regidx rs2, Regidx rs1, 4))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -1423,13 +1423,13 @@ Section WpSconfMem.
 
   Lemma wp_lw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : mword 32) {dqm : dfrac} :
+      (m : gmap regidx (mword 64)) (n : nat) (v : mword 32) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -1437,7 +1437,7 @@ Section WpSconfMem.
     pa ↦₄{ dqm } v -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
@@ -1449,7 +1449,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 4 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -1640,7 +1640,7 @@ Section WpSconfMem.
                   = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
       by (symmetry; apply lookup_total_insert_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
                           [$Hpc' $Hnpc] [Hfmap] Hbw").
     { iFrame "Hhw Hminv Hpriv Hmiex".
@@ -1655,12 +1655,12 @@ Section WpSconfMem.
 
   Lemma wp_sw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 32) :
+      (m : gmap regidx (mword 64)) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (m !!! Regidx rs2) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -1668,7 +1668,7 @@ Section WpSconfMem.
     pa ↦₄ vold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
@@ -1680,7 +1680,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 4 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 4))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -1901,12 +1901,12 @@ Section WpSconfMem.
 
   Lemma wp_sb_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 8) :
+      (m : gmap regidx (mword 64)) (n : nat) (vold : bv 8) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc8 (m !!! Regidx rs2) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -1914,7 +1914,7 @@ Section WpSconfMem.
     pa ↦ₘ vold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
@@ -1925,7 +1925,7 @@ Section WpSconfMem.
     intros pa storeval.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbyte Hcont".
     iDestruct (mem_ram with "Hbyte") as %Hrampa.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 1))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
@@ -2102,18 +2102,18 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_cldsp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (v : mword 64) {dqm : dfrac} :
+      (m : gmap regidx (mword 64)) (n : nat) (v : mword 64) {dqm : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    sie_cap γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
     pa ↦₈{ dqm } v -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg v]> m) -∗
+      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg v]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
@@ -2125,21 +2125,21 @@ Section WpSconfMem.
     unfold pa.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
-    exact (wp_cld_s_sconf γ root_ppn Φ pc rd csp_rs1 imm m v (dqm:=dqm) Hrd Hrdsp).
+    exact (wp_cld_s_sconf γ root_ppn Φ pc rd csp_rs1 imm m n v (dqm:=dqm) Hrd Hrdsp).
   Qed.
 
   Lemma wp_csdsp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (vold : mword 64) :
+      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+    sie_cap γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
     pa ↦₈ vold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap γ root_ppn m -∗ tlb_inv_pt root_ppn -∗
+      sie_cap γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
@@ -2150,7 +2150,7 @@ Section WpSconfMem.
     unfold pa.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
-    exact (wp_csd_s_sconf γ root_ppn Φ pc rs2 csp_rs1 imm m vold).
+    exact (wp_csd_s_sconf γ root_ppn Φ pc rs2 csp_rs1 imm m n vold).
   Qed.
 
 
@@ -2159,12 +2159,12 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_sd_zero_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : mword 64) :
+      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := (zero_reg : mword 64) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m -∗
+    sie_cap γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -2172,7 +2172,7 @@ Section WpSconfMem.
     pa ↦₈ vold -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m -∗
+      sie_cap γ root_ppn m n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
@@ -2184,7 +2184,7 @@ Section WpSconfMem.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 8 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf γ root_ppn m Φ pc false
+    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc Hsi".
