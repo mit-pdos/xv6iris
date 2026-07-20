@@ -105,7 +105,36 @@ Key facts that made it go:
   `kalloc_avail γk on0`, each kfree increments (`avail_inc`), so after freeing
   `#ps` pages the post is `kalloc_avail γk (avail_inc^#ps on0)`.
 
-## kinit (TODO) — WpSconfKinit.v
+## kinit (DONE, axiom-clean) — WpSconfKinit.v
+
+`wp_kinit_sconf` proved (funext + model platform axioms only).  Straight-line:
+2-slot c.addi frame (like initlock), `jal initlock` (wp_initlock_sconf), the
+newlock ghost, `jal freerange` (wp_freerange_sconf), epilogue.  Decode facts in
+`WpKinitDecode.v` (reuse the shared `mdec_*` from KernelRvcDecode for the common
+compressed instrs; new fdc_ only for c.li/c.slli; fdb_ for the 8 auipc/addi/jal).
+
+Landed lessons:
+- **Mid-WP ghost allocation** needs `iApply fupd_wp` first (the raw `WP Loop`
+  goal does NOT absorb `|==>`/`|={⊤}=>`): `iApply fupd_wp; iMod (own_alloc
+  (Excl () : exclR unitO)) as (γl) ...; iMod (kalloc_avail_alloc 0) as (γk)
+  [Havail Hauth]; build kmem_res via kmem_res_close γk fl nullp []; iMod
+  (inv_alloc lockN ⊤ (lock_inv γl lk (kmem_res γk fl))) as "#Hkmem"; iModIntro`.
+  `is_kmem = is_lock = the inv`; the free ('0') arm holds `locked γl ∗ kmem_res`.
+- `a_cpu` (freerange's per-cpu cell = `lk+16`) IS the lock's `cpu` field, zeroed
+  by initlock — so kinit derives it, doesn't take it separately.
+- Frame geometry: K>=22 (2 frame + 20 = freerange's need, the deeper sub-call);
+  initlock and freerange both run at kinit's post-frame sp, sequentially, so the
+  same K-2 deep slice serves both.  Post gives `∃-free` γl/γk in the continuation,
+  `is_kmem γl γk lk fl`, and `kalloc_avail γk (Some (length ps))`.
+- Keep the epilogue frame cells at `pa_stk sp0 1..2` (do NOT add initlock's
+  add_vec-spr rebuild rewrite — the cells are already in pa_stk form here).
+
+The remaining gap to a self-contained boot: kinit takes `ps + prun PHYSTOP
+s1entry ps + [∗list] page_own` as a precondition; the boot/adequacy still owes
+a generative lemma turning "own every byte of [PGROUNDUP(end), PHYSTOP)" into
+that page big-sep + prun (an induction over the physical page range).
+
+## kinit -- earlier notes (superseded by the DONE section above)
 
 prologue (ra@8/s0@0, 16-byte frame) → auipc/addi set a1="kmem" a0=&kmem →
 `jal initlock` (wp_initlock) → **`newlock` ghost step** building

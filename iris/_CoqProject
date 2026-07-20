@@ -186,3 +186,5 @@ WpUartPutcSyncFull.v
 WpSconfUartPutc.v
 WpFreerangeDecode.v
 WpSconfFreerange.v
+WpKinitDecode.v
+WpSconfKinit.v
