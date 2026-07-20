@@ -23,7 +23,7 @@ Require Import VcGen VcGenS.
 Require Import KallocInv.
 Require Import SmodePte Pt4kWalk CommonWalk PtAdBits PtTree PtTreeAdue SmodeCorePt.
 Require Import PtBuild KvmSpec.
-Require Import WpMappages WpMappagesInstr UserBits.
+Require Import WpMappagesInstr UserBits.
 Require Import WpSconfKfree.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfWalk.

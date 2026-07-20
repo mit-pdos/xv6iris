@@ -10,33 +10,16 @@ PILOT before any mechanical sweep.
 
 ## Current state
 
-The engine, leaf sweep, VCgen, SIE flips, spinlock layer, kalloc cone
-(kfree/kalloc/wakeup + memset), and their whole-function proofs are all
-complete over `sconf`.  What remains is **item 8's boot wiring** (below) and
-any later per-function conversions.  The old `smode_config` engine and its
-SIE=0 leaves stay in parallel until the very end — delete `smode_config` only
-after the boot wiring lands.
+All S-mode whole-function proofs are over `sconf`: the spinlock/kalloc cone
+(mycpu, push/pop_off, holding, acquire, release, kalloc, kfree, wakeup, memset,
+memset_page, initlock) and the page-table cone (`wp_walk_sconf →
+wp_mappages_sconf → wp_kvmmap_sconf`).  From the old S-mode layer, only the
+`smode_config` instruction engine + raw `*_tlbinv_pt` leaves remain — the sconf
+funnel delegates its '0' arm to them, so they stay until boot wiring lands.
 
-The terminal old-style `wp_<fn>` whole-function proofs of the converted
-functions (`wp_kalloc`, `wp_kfree`, `wp_mycpu`, `wp_holding_lockinv`,
-`wp_push_off`, `wp_release`, `wp_wakeup`, `wp_memset{,_page}`, `wp_acquire_lock`,
-`wp_pop_off`, `wp_initlock`, …) and their private leaf/decode lemmas are gone —
-nothing applied them.  What STAYS: every helper the `WpSconf*` files import
-(decode facts `wki_*`/`poi_*`/…, spec predicates `page_own`/`is_lock`/…, pure
-algebra); all typeclass instances (`*_persistent`/`*_timeless`/`*Σ` — invisible
-to `.glob`, so false positives for dead-code tools like `iris/find_dead.py`);
-and the `smode_config` instruction engine + raw `*_tlbinv_pt` leaves the sconf
-funnel delegates its '0' arm to.
-
-The pt cone is already converted (`wp_walk_sconf → wp_mappages_sconf →
-wp_kvmmap_sconf`, independent of the old `_r` engine).  The old regime-parametric
-`_r` layer (`wp_kalloc_r`, `wp_walk_r`, `wp_mappages_r`, `wp_kvmmap_r`, the
-spinlock `_r` chain) is now a dead island: it is referenced only within the old
-`WpWalk → WpMappages → WpKvmmap` chain, which tops out at `wp_kvmmap_r`
-referenced by nobody.  A global-roots reachability pass (vs. per-file) would
-flag the whole layer — a follow-up whole-chain deletion candidate.  The real
-consumer gap is ABOVE kvmmap: kvminit/kinit ([[kinit-cone]], [[kvm-spec]]) and
-item-8 boot wiring do not yet drive `wp_kvmmap_sconf`.
+Remaining work: **item 8's boot wiring** (below) — nothing yet drives the sconf
+whole-function layer; the top consumer gap is above kvmmap (kvminit/kinit,
+[[kinit-cone]] / [[kvm-spec]]).
 
 ## Architecture
 

@@ -31,7 +31,7 @@ Require Import SRegime.
 Require Import SmodeCore.
 Require Import WpMycpu.
 Require Import WpLock.
-Require Import WpAcquireLock WpRelease WpMemsetPage.
+Require Import WpRelease WpMemsetPage.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.

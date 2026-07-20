@@ -74,9 +74,7 @@ SRegime.v
 PtBuild.v
 KvmSpec.v
 WpWalkInstr.v
-WpWalk.v
 WpMappagesInstr.v
-WpMappages.v
 WpKvmmap.v
 InstrBytes.v
 KernelText.v
@@ -159,7 +157,6 @@ WpSconfCsr.v
 WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
-WpCallMycpu.v
 KernelRvcDecode.v
 WpPushOffTop.v
 WpAmo.v
@@ -170,7 +167,6 @@ KallocInv.v
 WpHoldingInv.v
 WpPopOff.v
 WpRelease.v
-WpAcquireLock.v
 WpKallocDecode.v
 WpMemsetPage.v
 WpKalloc.v

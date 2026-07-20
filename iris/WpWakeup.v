@@ -37,7 +37,7 @@ Require Import InstrBytes RiscvFetchExec WpGpr KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import VcGen VcGenS.
-Require Import WpAcquireTop WpAcquireLock WpRelease WpMycpu.
+Require Import WpAcquireTop WpRelease WpMycpu.
 Require Import KernelRvcDecode.
 Require Import CalleeSaved.
 Require Import StackOwn.
