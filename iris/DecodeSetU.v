@@ -418,6 +418,29 @@ Ltac dtp_core :=
   first [ dtp_leaf | dtp_pin | dtp_readreg | dtp_spine
         | dtp_if | dtp_let | dtp_match | dtp_bind | dtp_pure ].
 
+(* The LR/SC decode gate: [and_boolM (currentlyEnabled Ext_Zalrsc)
+   (returnM (lrsc_width_valid width))].  Zalrsc is ON, so its value is
+   [lrsc_width_valid width]; carry that as a Q-rule hypothesis into the
+   Some-leaf so the classified set can pin LR/SC to widths {4,8} rather
+   than the over-approximating {1,2,4,8} (the analog of goodbP_width_wide
+   for the wide AMO width). *)
+Lemma goodbP_zalrsc_gate (width : Z) :
+  goodbP D_u (fun b => implb b (lrsc_width_valid width))
+    (and_boolM (currentlyEnabled Ext_Zalrsc) (returnM (lrsc_width_valid width))) dstateU = true.
+Proof.
+  unfold and_boolM.
+  apply (goodbP_bind_val D_u (fun b => implb b (lrsc_width_valid width))
+           (currentlyEnabled Ext_Zalrsc)
+           (fun l => if l then returnM (lrsc_width_valid width) else returnM false)
+           dstateU true).
+  - apply bval_exec. vm_compute. reflexivity.
+  - apply goodbP_top. solve [repeat dt_step].
+  - cbn match.
+    change (goodbP D_u (fun b => implb b (lrsc_width_valid width)) (returnM (lrsc_width_valid width)) dstateU)
+      with (implb (lrsc_width_valid width) (lrsc_width_valid width)).
+    destruct (lrsc_width_valid width); reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (* §4 decodable_u: the COMPLETE set of instructions reachable by 32-bit   *)
 (*    decode in the xv6 user-mode configuration (discovered by running    *)
@@ -430,9 +453,18 @@ Ltac dtp_core :=
 (*    the xSSE check happens at execute.)                                 *)
 (* ===================================================================== *)
 
+Definition width_ok1248 (width : Z) : bool :=
+  (width =? 1) || (width =? 2) || (width =? 4) || (width =? 8).
+
+(* AMO's width comes through the WIDE mapping (word_width_wide), whose image
+   is {1,2,4,8,16}. *)
+Definition awidth_ok (width : Z) : bool :=
+  (width =? 1) || (width =? 2) || (width =? 4) || (width =? 8) || (width =? 16).
+
 Definition decodable_u (i : instruction) : bool :=
   match i with
-  | ADDIW _ => true | AMO _ => true
+  | ADDIW _ => true
+  | AMO (_,_,_,_,_,width,_) => awidth_ok width
   (* JAL / BTYPE record the PAYLOAD invariant the decoder guarantees:
      the immediate's bit 0 is 0 (encdec appends '0').  [jump_to] ASSERTS
      target bit-0 (a false assert is STUCK, not a trap), so the
@@ -446,7 +478,8 @@ Definition decodable_u (i : instruction) : bool :=
   | ILLEGAL _ => true | ITYPE _ => true
   | JAL (imm, _) => eq_vec (access_vec_dec imm 0) ('b"0")
   | JALR _ => true
-  | LOAD _ => true | LOADRES _ => true
+  | LOAD (_,_,_,_,width) => width_ok1248 width
+  | LOADRES (_,_,_,width,_) => lrsc_width_valid width
   | MRET _ => true | MUL _ => true | MULW _ => true
   | NTL _ => true | PAUSE _ => true
   | REM _ => true | REMW _ => true
@@ -455,7 +488,8 @@ Definition decodable_u (i : instruction) : bool :=
   | SFENCE_INVAL_IR _ => true | SFENCE_VMA _ => true | SFENCE_W_INVAL _ => true
   | SHIFTIOP _ => true | SHIFTIWOP _ => true | SINVAL_VMA _ => true
   | SRET _ => true | SSAMOSWAP _ => true
-  | STORE _ => true | STORECON _ => true
+  | STORE (_,_,_,width) => width_ok1248 width
+  | STORECON (_,_,_,_,width,_) => lrsc_width_valid width
   | UTYPE _ => true | WFI _ => true | WRS _ => true
   | ZBB_RTYPE _ => true | ZBB_RTYPEW _ => true
   | ZICBOM _ => true | ZICBOP _ => true | ZICBOZ _ => true
@@ -468,11 +502,70 @@ Definition decodable_u (i : instruction) : bool :=
 (* §5 The classified totality theorem.                                    *)
 (* ===================================================================== *)
 
+(* The WIDE (AMO) width comes through a MONADIC mapping [width_enc_wide_
+   backwards X : M Z] whose image is {1,2,4,8,16} whenever the decode gate
+   [width_enc_wide_backwards_matches X] holds.  The plain forall-bind rule
+   ([dtp_bind]) would abstract the width to a fresh unconstrained [Z] and
+   lose membership; instead carry it as a Q-rule hypothesis into the leaf. *)
+Lemma goodbP_width_wide (X : mword 3) (s : mstate) :
+  width_enc_wide_backwards_matches X = true ->
+  goodbP D_u awidth_ok (width_enc_wide_backwards X) s = true.
+Proof.
+  unfold width_enc_wide_backwards_matches, width_enc_wide_backwards, awidth_ok.
+  intro H.
+  repeat match goal with
+         | |- context[if ?g then _ else _] => let E := fresh "E" in destruct g eqn:E
+         end;
+    try discriminate H; reflexivity.
+Qed.
+
+Ltac dtp_width_wide :=
+  lazymatch goal with
+  | |- goodbP ?D ?P (Defs.bind (width_enc_wide_backwards ?X) ?k) ?s = true =>
+      apply (goodbP_bind_Q D awidth_ok P (width_enc_wide_backwards X) k s);
+      [ apply goodbP_width_wide;
+        repeat match goal with
+               | H : (let _ := _ in _) = true |- _ => cbv zeta in H
+               | H : andb _ _ = true |- _ => apply andb_prop in H; destruct H
+               end; assumption
+      | let wd := fresh "wd" in let Hwd := fresh "Hwd" in
+        intros wd Hwd; cbv [awidth_ok] in Hwd; cbv beta ]
+  end.
+
+(* The memory-width leaf: after [dtp_leaf] the goal is
+   [decodable_u (LOAD/STORE/LOADRES/STORECON (..., width_enc_backwards X)) = true]
+   (pure width, closed by case-splitting the eq_vec chain), or the AMO leaf
+   [decodable_u (AMO (..., wd)) = true] with [wd] carried by [dtp_width_wide]
+   (closed by the introduced membership hypothesis). *)
+Ltac dtp_width :=
+  lazymatch goal with
+  | |- _ = true =>
+      cbv [decodable_u awidth_ok width_ok1248 width_enc_backwards];
+      first [ assumption
+            | reflexivity
+            | solve [ repeat (match goal with
+                              | |- context[if ?g then _ else _] =>
+                                  let E := fresh "E" in destruct g eqn:E
+                              end);
+                      first [ reflexivity | vm_compute; reflexivity ] ] ]
+  end.
+
+Ltac dtp_lrsc :=
+  lazymatch goal with
+  | |- goodbP ?D ?P (Defs.bind (and_boolM (currentlyEnabled Ext_Zalrsc) (returnM (lrsc_width_valid ?w))) ?k) ?s = true =>
+      apply (goodbP_bind_Q D (fun b => implb b (lrsc_width_valid w)) P
+               (and_boolM (currentlyEnabled Ext_Zalrsc) (returnM (lrsc_width_valid w))) k s);
+      [ apply goodbP_zalrsc_gate
+      | let b := fresh "b" in let Hb := fresh "Hb" in
+        intros b Hb; cbv zeta; destruct b; cbn [implb] in Hb;
+        [ dtp_leaf; cbv [decodable_u]; exact Hb | dtp_leaf ] ]
+  end.
+
 Lemma goodbP_encdec_u (w : mword 32) :
   goodbP D_u decodable_u (ext_decode w) dstateU = true.
 Proof.
   unfold ext_decode, encdec_backwards. cbv beta zeta.
-  repeat dtp_core.
+  repeat (first [ dtp_lrsc | dtp_width_wide | dtp_core | dtp_width ]).
 Qed.
 
 (* Every 32-bit word decodes -- to a SINGLE instruction, shared by every

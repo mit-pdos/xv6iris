@@ -139,7 +139,9 @@ Definition user_hart_ok (hs : HartState) : Prop :=
 Definition user_mstatus_ok (ms : mword 64) : Prop :=
   _get_Mstatus_SXL ms = 'b"10" /\
   eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
-  eq_vec (_get_Mstatus_MXR ms) ('b"0") = true.
+  eq_vec (_get_Mstatus_MXR ms) ('b"0") = true /\
+  eq_vec (_get_Mstatus_FS ms) ('b"00") = true /\
+  eq_vec (_get_Mstatus_VS ms) ('b"00") = true.
 
 (* after the trap: same pins, plus what the trap transform wrote --
    SPP = User (we trapped FROM user) and SIE = 0 (interrupts masked,
@@ -188,6 +190,20 @@ Definition trap_mstatus_ok (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_MXR ms) ('b"0") = true /\
   eq_vec (_get_Mstatus_SPP ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_SIE ms) ('b"1") = false.
+
+(* The post-fetch config facts an execute totality assumes at the fetched
+   state [σf].  Relocated here from the pruned UserExecProducer.v and EXTENDED:
+   the mstatus conjunct is now the full [user_mstatus_ok] (SXL + MPRV=0 + MXR=0
+   + FS/VS=Off, enabling the memory + CSR arms), and [is_aligned_vaddr va 2]
+   is threaded (the producers already hold it) so jump_to's target-bit0
+   premise is dischargeable for JAL/BTYPE/C_J/C_BEQZ/C_BNEZ. *)
+Definition post_fetch_cfg (σf : mstate) (va : mword 64) (miσ : bool) : Prop :=
+  register_lookup PC σf.(sregs) = va /\
+  register_lookup cur_privilege σf.(sregs) = User /\
+  user_mstatus_ok (register_lookup mstatus σf.(sregs)) /\
+  register_lookup menvcfg σf.(sregs) = MENVCFG_S /\
+  is_aligned_vaddr (Virtaddr va) 2 = true /\
+  register_lookup (R_bool minstret_increment) σf.(sregs) = miσ.
 
 (* ===================================================================== *)
 (* §4 The frames and the capstone.                                         *)

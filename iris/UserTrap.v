@@ -499,7 +499,7 @@ Definition utrap_state (s_x : mstate) (c : TrapCause) (info : option (mword 64))
 Lemma utrap_ms_ok (elp0 : mword 1) (ms_v : mword 64) :
   user_mstatus_ok ms_v -> trap_mstatus_ok (utrap_ms elp0 ms_v).
 Proof.
-  intros (HSXL & HMPRV & HMXR).
+  intros (HSXL & HMPRV & HMXR & HFS & HVS).
   split; [ rewrite utrap_ms_SXL; exact HSXL | ].
   split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
   split; [ rewrite utrap_ms_MXR; exact HMXR | ].

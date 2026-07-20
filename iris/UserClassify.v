@@ -46,7 +46,6 @@ Section UserClassify.
        ∃ (st : Step) (s_x : mstate) (g' : gmap regidx (mword 64)) (va' : mword 64),
          ⌜exec (run_hart_active 0) σ = Some (st, s_x)⌝ ∗
          ⌜u_step_outcome st⌝ ∗
-         ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
          ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
             = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
          ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
@@ -146,8 +145,13 @@ Section UserClassify.
       by exact (u_step_pre_intro σ va ms_v b Hmsok Lpriv Lms Lpc (Hdisp b)).
     iMod ("Hob" $! b Hpre with "[Hreg Hmd] Hgpr Hnpc Hupt Hcfg")
       as (st s_x g' va')
-         "(%Hha & %Hout & %Hhart_x & %Hmi_x & %Lnpc_x & [Hreg Hmd] & Hgpr & Hnpc & Hupt & Hcfg)".
+         "(%Hha & %Hout & %Hmi_x & %Lnpc_x & [Hreg Hmd] & Hgpr & Hnpc & Hupt & Hcfg)".
     { unfold s_a, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd". }
+    (* [hart_state s_x = ACTIVE] is re-derived (not demanded of the obligation):
+       the branch retains the hart_state fragment [Hhs] while lending only the
+       reg-interp authority to the obligation, which therefore cannot write
+       hart_state -- so the auth entry is frame-pinned to ACTIVE. *)
+    iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_x.
     (* facts the trap tower needs at s_x (all reads are non-consuming) *)
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".

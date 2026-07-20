@@ -7,11 +7,28 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpGpr UserBits.
-Require Import SmodeCore.
-Require Import UserPtTree UserExec UserStep UserFetch UserFetchPt UserExecProducer UserClassify.
+Require Import MinstretInv WpGpr UserBits.
+Require Import WpLeafCommon WpIntrCore SmodeCore.
+Require Import UserPtTree UserExec UserStep UserTrap UserCompute UserArms UserFetch UserFetchPt UserClassify.
 Local Open Scope Z_scope.
 Import Defs.
+
+(* 4-byte alignment implies 2-byte alignment (4 | va -> 2 | va).  Feeds the
+   4-aligned producer's post_fetch_cfg [is_aligned_vaddr va 2] conjunct. *)
+Lemma is_aligned_vaddr_4_2 (va : mword 64) :
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  is_aligned_vaddr (Virtaddr va) 2 = true.
+Proof.
+  intro Hal.
+  unfold is_aligned_vaddr in Hal |- *.
+  apply Z.eqb_eq in Hal. apply Z.eqb_eq.
+  rewrite uint_unsigned in Hal |- *.
+  pose proof (bv_unsigned_in_range _ va) as Hr.
+  rewrite Z.rem_mod_nonneg in Hal; [ | lia | lia ].
+  rewrite Z.rem_mod_nonneg; [ | lia | lia ].
+  apply Z.mod_divide in Hal; [ | lia ]. apply Z.mod_divide; [ lia | ].
+  destruct Hal as [q Hq]. exists (2 * q). lia.
+Qed.
 
 Section UserExecProducerU.
   Context `{!riscvGS Σ}.
@@ -39,14 +56,15 @@ Section UserExecProducerU.
                   /\ exec (execute other) (set_reg σf nextPC (add_vec_int va 4)) = Some (r, s_x))⌝ ∗
            ⌜u_result_ok r⌝ ∗
            ⌜match r with ExecuteAs _ => False | _ => True end⌝ ∗
-           ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
            ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
               = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
            ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
            mstate_interp s_x ∗ gpr_file g' ∗ nextPC ↦ᵣ va' ∗ user_pt_inv pt ∗ user_cfg C)%I.
 
-  (* 5-way RVC totality: decode_compressed h -> instr; execute -> ExecuteAs
-     other; execute other -> r with u_result_ok r. *)
+  (* 5-way RVC totality: decode_compressed h -> instr; execute either
+     DIRECTLY (C_NOP/C_NTL/ZCMOP/C_NOT/C_ZEXT_B/C_ILLEGAL) or via one
+     ExecuteAs redirect -> r with u_result_ok r.  Disjunction, mirroring
+     base_exec_total_u. *)
   Definition rvc_exec_total_u (E : coPset) (σ : mstate) (va : mword 64)
       (g : gmap regidx (mword 64)) : iProp Σ :=
     (∀ (h : mword 16) (σf : mstate),
@@ -55,16 +73,17 @@ Section UserExecProducerU.
        mstate_interp (set_reg σf nextPC (add_vec_int va 2)) -∗
        gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
        |={E}=>
-         ∃ (instr other : instruction) (r : ExecutionResult) (s_x : mstate)
+         ∃ (instr : instruction) (r : ExecutionResult) (s_x : mstate)
            (g' : gmap regidx (mword 64)) (va' : mword 64),
            ⌜exec (ext_decode_compressed h) σf = Some (instr, σf)⌝ ∗
            ⌜exec (currentlyEnabled Ext_Zca) σf = Some (true, σf)⌝ ∗
-           ⌜exec (execute instr) (set_reg σf nextPC (add_vec_int va 2))
-              = Some (ExecuteAs other, set_reg σf nextPC (add_vec_int va 2))⌝ ∗
-           ⌜exec (execute other) (set_reg σf nextPC (add_vec_int va 2)) = Some (r, s_x)⌝ ∗
+           ⌜exec (execute instr) (set_reg σf nextPC (add_vec_int va 2)) = Some (r, s_x)
+            \/ (exists other,
+                  exec (execute instr) (set_reg σf nextPC (add_vec_int va 2))
+                    = Some (ExecuteAs other, set_reg σf nextPC (add_vec_int va 2))
+                  /\ exec (execute other) (set_reg σf nextPC (add_vec_int va 2)) = Some (r, s_x))⌝ ∗
            ⌜u_result_ok r⌝ ∗
            ⌜match r with ExecuteAs _ => False | _ => True end⌝ ∗
-           ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
            ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
               = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
            ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
@@ -76,7 +95,8 @@ Section UserExecProducerU.
     register_lookup cur_privilege σ.(sregs) = User ->
     exec (dispatchInterrupt User) σ = Some (None, σ) ->
     register_lookup PC σ.(sregs) = va ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    user_mstatus_ok (register_lookup mstatus σ.(sregs)) ->
+    is_aligned_vaddr (Virtaddr va) 2 = true ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     (forall r : register, register_beq r tlb = false ->
@@ -92,23 +112,25 @@ Section UserExecProducerU.
       ∃ (st : Step) (s_x : mstate) (g' : gmap regidx (mword 64)) (va' : mword 64),
         ⌜exec (run_hart_active 0) σ = Some (st, s_x)⌝ ∗
         ⌜u_step_outcome st⌝ ∗
-        ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
         ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
         mstate_interp s_x ∗ gpr_file g' ∗ nextPC ↦ᵣ va' ∗ user_pt_inv pt ∗ user_cfg C.
   Proof.
-    intros Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch.
+    intros Hcp Hdisp Lpc Hmsok_s Hva2 Hmenv Help Tr Hfetch.
     iIntros "#Hhw Htb Htr Hint2 Hgpr2 Hnpc2 Hupt2 Hcfg2".
     iDestruct "Hint2" as "(Hreg & Hgh & Hdev)".
     iDestruct "Hupt2" as "(Hutlb & Hudata & %Hcov & %Hwf)".
+    assert (Hmsokf : user_mstatus_ok (register_lookup mstatus σf.(sregs)))
+      by (rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmsok_s).
     assert (Hcfgf : post_fetch_cfg σf va (register_lookup (R_bool minstret_increment) σ.(sregs))).
-    { unfold post_fetch_cfg. repeat split.
-      - rewrite (Tr PC ltac:(vm_compute; reflexivity)); exact Lpc.
-      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
-      - rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact HSXL.
-      - rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv.
-      - apply Tr; vm_compute; reflexivity. }
+    { unfold post_fetch_cfg.
+      split; [rewrite (Tr PC ltac:(vm_compute; reflexivity)); exact Lpc |].
+      split; [rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp |].
+      split; [exact Hmsokf |].
+      split; [rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv |].
+      split; [exact Hva2 |].
+      apply Tr; vm_compute; reflexivity. }
     assert (LelpF : eq_vec (register_lookup elp σf.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false)
       by (rewrite (Tr elp ltac:(vm_compute; reflexivity)); exact Help).
     assert (LpcF : register_lookup PC σf.(sregs) = va) by (rewrite (Tr PC ltac:(vm_compute; reflexivity)); exact Lpc).
@@ -117,12 +139,18 @@ Section UserExecProducerU.
       iMod (reg_update _ nextPC _ (add_vec_int va 2) with "Hreg Hnpc2") as "[Hreg Hnpc2]".
       iMod ("Htr" $! (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0) σf Hcfgf
               with "Hhw [Hreg Hgh Hdev] Hgpr2 Hnpc2 [Hutlb Hudata] Hcfg2")
-        as (instr other r s_x g' va') "(%Hdec & %Hzca & %Hex1 & %Hex2 & %Hok & %Hnex & %Hhx & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
+        as (instr r s_x g' va') "(%Hdec & %Hzca & %Hexd & %Hok & %Hnex & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
       { unfold mstate_interp; cbn [sregs mem mdev]. iFrame "Hreg Hgh Hdev". }
       { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
-      pose proof (exec_hart_active_progress_RVC_gen User σ σf s_x
-                    (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
-                    instr other va r Hcp Hdisp Hfetch Hdec LelpF LpcF Hzca Hex1 Hex2) as Hrun.
+      assert (Hrun : exec (run_hart_active 0) σ
+                = Some (Step_Execute (r, zero_extend' 32 (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)), s_x)).
+      { destruct Hexd as [Hexd | (other & Hex1 & Hex2)].
+        - exact (exec_hart_active_progress_RVC_direct_gen User σ σf s_x
+                   (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                   instr va r Hcp Hdisp Hfetch Hdec LelpF LpcF Hzca Hexd Hnex).
+        - exact (exec_hart_active_progress_RVC_gen User σ σf s_x
+                   (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+                   instr other va r Hcp Hdisp Hfetch Hdec LelpF LpcF Hzca Hex1 Hex2). }
       iModIntro.
       iExists (Step_Execute (r, zero_extend' 32 (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0))), s_x, g', va'.
       iFrame "Hint Hgpr Hnpc Hupt Hcfg".
@@ -132,7 +160,7 @@ Section UserExecProducerU.
       iMod (reg_update _ nextPC _ (add_vec_int va 4) with "Hreg Hnpc2") as "[Hreg Hnpc2]".
       iMod ("Htb" $! (autocast (T := mword) iw) σf Hcfgf
               with "Hhw [Hreg Hgh Hdev] Hgpr2 Hnpc2 [Hutlb Hudata] Hcfg2")
-        as (instr r s_x g' va') "(%Hdec & %Hlpad & %Hexd & %Hok & %Hnex & %Hhx & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
+        as (instr r s_x g' va') "(%Hdec & %Hlpad & %Hexd & %Hok & %Hnex & %Hmix & %Lnpcx & Hint & Hgpr & Hnpc & Hupt & Hcfg)".
       { unfold mstate_interp; cbn [sregs mem mdev]. iFrame "Hreg Hgh Hdev". }
       { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
       assert (Hrun : exec (run_hart_active 0) σ
@@ -160,14 +188,16 @@ Section UserExecProducerU.
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    user_mstatus_ok (register_lookup mstatus σ.(sregs)) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     hw_config -∗
     base_exec_total_u E σ va g -∗ rvc_exec_total_u E σ va g -∗
     active_step_obligation C pt E σ va g.
   Proof.
-    intros Hum Hleaf Hal Hcanon Hmisa Hmenv Hhtif HSXL Hall Help.
+    intros Hum Hleaf Hal Hcanon Hmisa Hmenv Hhtif Hmsok_s Hall Help.
+    pose proof (proj1 Hmsok_s) as HSXL.
+    assert (Hva2 : is_aligned_vaddr (Virtaddr va) 2 = true) by (apply is_aligned_vaddr_4_2; exact Hal).
     iIntros "#Hhw Htb Htr %Hpre Hint Hgpr Hnpc Hupt Hcfg".
     destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
     iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
@@ -181,7 +211,7 @@ Section UserExecProducerU.
     { intros r Hne. destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
         [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
     iApply (user_exec_step_from_fetch_u E σ σf va g iw
-              Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch
+              Hcp Hdisp Lpc Hmsok_s Hva2 Hmenv Help Tr Hfetch
               with "Hhw Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg").
     - unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev".
     - unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption.
@@ -212,7 +242,6 @@ Section UserFetchFaultActive.
     iExists (Step_Fetch_Failure (Virtaddr va, E_Fetch_Addr_Align tt)), σ, g, va.
     iSplitR; [iPureIntro; exact Hrun|].
     iSplitR; [iPureIntro; right; exists (E_Fetch_Addr_Align tt), va; split; reflexivity|].
-    iSplitR; [iPureIntro; exact Hhart|].
     iSplitR; [iPureIntro; reflexivity|].
     iSplitR; [iPureIntro; exact Lnpc|].
     unfold mstate_interp; cbn [sregs mem mdev]. iFrame "Hreg Hgh Hdev Hgpr Hnpc Hupt Hcfg".
@@ -242,7 +271,6 @@ Section UserFetchFaultActive.
     iExists (Step_Fetch_Failure (Virtaddr va, E_Fetch_Page_Fault tt)), σ, g, va.
     iSplitR; [iPureIntro; exact Hrun|].
     iSplitR; [iPureIntro; right; exists (E_Fetch_Page_Fault tt), va; split; reflexivity|].
-    iSplitR; [iPureIntro; exact Hhart|].
     iSplitR; [iPureIntro; reflexivity|].
     iSplitR; [iPureIntro; exact Lnpc|].
     unfold mstate_interp, user_pt_inv; cbn [sregs mem mdev].
@@ -278,7 +306,6 @@ Section UserFetchFaultActive.
     iExists (Step_Fetch_Failure (Virtaddr va, E_Fetch_Page_Fault tt)), σ, g, va.
     iSplitR; [iPureIntro; exact Hrun|].
     iSplitR; [iPureIntro; right; exists (E_Fetch_Page_Fault tt), va; split; reflexivity|].
-    iSplitR; [iPureIntro; exact Hhart|].
     iSplitR; [iPureIntro; reflexivity|].
     iSplitR; [iPureIntro; exact Lnpc|].
     unfold mstate_interp, user_pt_inv; cbn [sregs mem mdev].
@@ -304,7 +331,7 @@ Section UserFetchFaultActive.
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    user_mstatus_ok (register_lookup mstatus σ.(sregs)) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     hw_config -∗
@@ -312,7 +339,8 @@ Section UserFetchFaultActive.
     active_step_obligation C pt E σ va g.
   Proof.
     intros Hum Hleaf Hflavor Hal2 Hbit0 Hbit1 Hnal4 Hcanon Hhart
-           Hmisa Hmenv Hhtif HSXL Hall Help.
+           Hmisa Hmenv Hhtif Hmsok_s Hall Help.
+    pose proof (proj1 Hmsok_s) as HSXL.
     iIntros "#Hhw Htb Htr %Hpre Hint Hgpr Hnpc Hupt Hcfg".
     destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
     iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
@@ -333,7 +361,7 @@ Section UserFetchFaultActive.
                  else F_Base (autocast (T := mword) iw)), σ')).
       { rewrite Hsub HisRVC. exact Hfr. }
       iApply (user_exec_step_from_fetch_u C pt E σ σ' va g iw
-                Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch2
+                Hcp Hdisp Lpc Hmsok_s Hal2 Hmenv Help Tr Hfetch2
                 with "Hhw Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg").
       { unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev". }
       { unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
@@ -346,7 +374,6 @@ Section UserFetchFaultActive.
       iExists (Step_Fetch_Failure (Virtaddr (add_vec_int va 2), E_Fetch_Page_Fault tt)), σ', g, va.
       iSplitR; [iPureIntro; exact Hrun|].
       iSplitR; [iPureIntro; right; exists (E_Fetch_Page_Fault tt), (add_vec_int va 2); split; reflexivity|].
-      iSplitR; [iPureIntro; rewrite (Tr hart_state ltac:(vm_compute; reflexivity)); exact Hhart|].
       iSplitR; [iPureIntro; apply Tr; vm_compute; reflexivity|].
       iSplitR; [iPureIntro; exact Lnpc|].
       unfold mstate_interp, user_pt_inv; cbn [sregs mem mdev]. rewrite Hmdev.
@@ -378,7 +405,7 @@ Section UserExecProducer2U.
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    user_mstatus_ok (register_lookup mstatus σ.(sregs)) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     eq_vec (register_lookup elp σ.(sregs)) (landing_pad_bits_backwards LP_EXPECTED) = false ->
     hw_config -∗
@@ -386,7 +413,8 @@ Section UserExecProducer2U.
     active_step_obligation C pt E σ va g.
   Proof.
     intros Hum Hleaf Humh Hleafh Hal2 Hal2h Hbit0 Hbit1 Hnal4 Hcanon Hcanonh
-           Hmisa Hmenv Hhtif HSXL Hall Help.
+           Hmisa Hmenv Hhtif Hmsok_s Hall Help.
+    pose proof (proj1 Hmsok_s) as HSXL.
     iIntros "#Hhw Htb Htr %Hpre Hint Hgpr Hnpc Hupt Hcfg".
     destruct Hpre as (Hdisp & Hcp & Lpc & Hmsok).
     iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
@@ -397,7 +425,7 @@ Section UserExecProducer2U.
             with "Hreg Hgh Hutlb Hudata")
       as (iw σf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hgh & Hutlb & Hudata)".
     iApply (user_exec_step_from_fetch_u C pt E σ σf va g iw
-              Hcp Hdisp Lpc HSXL Hmenv Help Tr Hfetch
+              Hcp Hdisp Lpc Hmsok_s Hal2 Hmenv Help Tr Hfetch
               with "Hhw Htb Htr [Hreg Hgh Hdev] Hgpr Hnpc [Hutlb Hudata] Hcfg").
     - unfold mstate_interp; cbn [sregs mem mdev]. rewrite Hmdev. iFrame "Hreg Hgh Hdev".
     - unfold user_pt_inv. iFrame "Hutlb Hudata". iPureIntro; split; assumption.

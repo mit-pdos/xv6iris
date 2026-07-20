@@ -728,6 +728,49 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(* §6b The DIRECT RVC progress composer: a 2-byte compressed instruction  *)
+(* whose execute returns its result DIRECTLY (no [ExecuteAs] expansion --  *)
+(* C_NOP / C_NTL / ZCMOP / C_NOT / C_ZEXT_B / C_ILLEGAL).  The F_RVC analog *)
+(* of [exec_hart_active_progress_base_gen]: mirrors [_RVC_gen] up to the    *)
+(* nextPC write, then takes the base direct-execute tail.                  *)
+(* ===================================================================== *)
+Lemma exec_hart_active_progress_RVC_direct_gen
+    (priv : Privilege) (s s_f s_x : mstate) (h : mword 16) (instr : instruction)
+    (pc : mword 64) (resf : ExecutionResult) :
+  register_lookup cur_privilege s.(sregs) = priv ->
+  exec (dispatchInterrupt priv) s = Some (None, s) ->
+  exec (fetch tt) s = Some (F_RVC h, s_f) ->
+  exec (ext_decode_compressed h) s_f = Some (instr, s_f) ->
+  eq_vec (register_lookup elp s_f.(sregs))
+         (landing_pad_bits_backwards LP_EXPECTED) = false ->
+  register_lookup PC s_f.(sregs) = pc ->
+  exec (currentlyEnabled Ext_Zca) s_f = Some (true, s_f) ->
+  exec (execute instr) (set_reg s_f nextPC (add_vec_int pc 2)) = Some (resf, s_x) ->
+  (match resf with ExecuteAs _ => False | _ => True end) ->
+  exec (run_hart_active 0) s = Some (Step_Execute (resf, zero_extend' 32 h), s_x).
+Proof.
+  intros Hpriv Hdisp Hfetch Hdec Hlpad HpcF Hzca Hexec Hnotexec.
+  unfold run_hart_active.
+  rewrite exec_catch_early_return.
+  rewrite execR_bind execR_liftR exec_read_reg Hpriv. cbn match.
+  rewrite execR_bind execR_liftR Hdisp. cbn match.
+  rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
+  rewrite execR_liftR Hfetch. cbn match. cbn match.
+  unfold ext_fetch_hook. cbn match. cbn beta iota.
+  rewrite execR_bind execR_liftR Hdec. cbn match.
+  unfold get_config_print_instr. cbn match.
+  rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
+  rewrite execR_liftR exec_is_landing_pad Hlpad. cbn match.
+  rewrite execR_bind execR_liftR Hzca. cbn match.
+  rewrite execR_bind execR_liftR (exec_read_reg PC) HpcF. cbn match.
+  rewrite execR_bind. rewrite execR_bind0 execR_liftR (exec_write_reg nextPC). cbn match.
+  rewrite execR_liftR Hexec. cbn match. cbn match.
+  rewrite execR_bind.
+  destruct resf; cbn in Hnotexec; try contradiction;
+    cbn match; rewrite execR_returnR; cbn match; rewrite execR_returnR; reflexivity.
+Qed.
+
+(* ===================================================================== *)
 (* §7 The ENTER-WAIT step: an ACTIVE hart executes a WRS and suspends.     *)
 (* hart_state := HART_WAITING; NO pc tick, NO minstret bump (the epilogue  *)
 (* only ticks/bumps a hart that ends the step ACTIVE) -- so PC stays at    *)
