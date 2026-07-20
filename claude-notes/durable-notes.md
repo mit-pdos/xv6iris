@@ -20,6 +20,27 @@ on top of it. Spend the rework; keep the specs clean. The failure mode to avoid
 is complexity accreting (hit/miss × width × compressed × fault-arm cross-products)
 past the point where a clean abstraction can still be retrofitted.
 
+## Orchestration: model roles and division of labor
+
+This work is split between a top-level orchestration agent and the subagents it
+spawns, and the split matters. The **top-level agent should run on a powerful
+model (e.g. Fable)** and owns the high-level thinking: writing the specifications,
+the overall design and approach, and the abstractions. It does the work the
+guiding principle above is about — getting the spec and abstraction shapes right
+before anything is built on them. It must **spawn subagents on Opus or Sonnet to
+do the lower-level, mundane work** — the actual proofs, mechanical ports, and
+similar tasks — rather than doing that itself.
+
+When a subagent hits a problem doing its proof or other task, that is a signal
+back to the orchestrator, not just a local obstacle: the **top-level agent should
+help resolve it**, and where the difficulty comes from the shape of the work, it
+should revise the design, architecture, abstractions, or specifications as needed
+rather than pushing the subagent to force a proof through an awkward interface.
+Difficulty at the proof level might indicate that the spec or abstraction needs
+rework (see the guiding principle): if the difficulty points out some aspect in
+which the specs or abstractions aren't quite right, the orchestrator should revise
+the specifications, designs, abstractions, etc. accordingly.
+
 ## Maintaining these notes
 
 Any project memory worth keeping goes in `claude-notes/`, committed in the repo —
