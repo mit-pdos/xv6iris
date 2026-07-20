@@ -313,15 +313,14 @@ Section WpSconfAcquire.
       rewrite /A2 lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite /A1 lookup_total_insert_ne; [| vm_compute; discriminate].
       exact HcspA0. }
-    iApply (wp_push_off_sconf γ root_ppn Φ A3 noffv intena_old cpuv n
+    iApply (wp_push_off_sconf γ root_ppn Φ A3 (av - 4)%nat noffv intena_old cpuv n
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               ltac:(rewrite HtpA3; reflexivity)
-              with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile [Hdeep6] [Hnoff] [Hint] [-]").
-    { iEval (rewrite HcspA3). iExact "Hdeep6". }
+              ltac:(lia)
+              with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile [Hnoff] [Hint] [-]").
     { iExact "Hnoff". }
     { iExact "Hint". }
-    iIntros (ms mp) "%Hmsf Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmp Hdeep6 Hnoff Hint Hcnt".
-    iEval (rewrite HcspA3) in "Hdeep6".
+    iIntros (ms mp) "%Hmsf Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmp Hnoff Hint Hcnt".
     destruct Hmp as (Hcspp & Htpp & Hs0p & Hs1p & Hs2p & Hs3p & Hs4p & Hs5p & Hs6p & Hs7p & Hs8p & Hs9p & Hs10p & Hs11p).
     iEval (rewrite lookup_total_insert) in "Hpc".
     assert (Hpc10 : update_vec_dec (add_vec (add_vec_int (mword_of_int (AQ + 0x0c) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")

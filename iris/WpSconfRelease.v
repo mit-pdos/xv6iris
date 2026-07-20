@@ -181,7 +181,7 @@ Section WpSconfRelease.
     iEval (rewrite Hpc0a) in "Hpc".
     (* ---- 0x0a: c.mv s1,a0 ---- *)
     iApply (wp_cmv_s_sconf γ root_ppn Φ (mword_of_int (RL + 0x0a)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
-              R1
+              R1 (av - 4)%nat
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi0a [-]").
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
@@ -294,7 +294,7 @@ Section WpSconfRelease.
     assert (HcspM1 : M1 !!! Regidx csp_rs1 = spr).
     { rewrite /M1 lookup_total_insert_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspR3. }
-    iApply (wp_pop_off_sconf γ root_ppn Φ M1 noffv intenav n (av - 4)%nat (dqi := dqi)
+    iApply (wp_pop_off_sconf γ root_ppn Φ M1 (av - 4)%nat noffv intenav n (dqi := dqi)
               Hcoup Hnoffpos
               ltac:(rewrite lookup_total_insert; vm_compute; reflexivity)
               ltac:(lia)
