@@ -17,32 +17,26 @@ any later per-function conversions.  The old `smode_config` engine and its
 SIE=0 leaves stay in parallel until the very end — delete `smode_config` only
 after the boot wiring lands.
 
-The dead old-style whole-function proofs of the converted functions have now
-been removed (~5.3k lines): the terminal `wp_<fn>` theorems at the concrete
-kernel regime (`wp_kalloc`, `wp_kfree`, `wp_mycpu`, `wp_holding_lockinv`,
+The terminal old-style `wp_<fn>` whole-function proofs of the converted
+functions (`wp_kalloc`, `wp_kfree`, `wp_mycpu`, `wp_holding_lockinv`,
 `wp_push_off`, `wp_release`, `wp_wakeup`, `wp_memset{,_page}`, `wp_acquire_lock`,
-`wp_pop_off`, `wp_initlock`, …) plus their now-orphaned private leaf/decode
-lemmas — nothing applies them any more.  What STAYS: every helper the
-`WpSconf*` files import (decode facts `wki_*`/`poi_*`/…, spec predicates
-`page_own`/`is_lock`/…, pure algebra); all typeclass instances
-(`*_persistent`/`*_timeless`/`*Σ`); and the `smode_config` instruction engine +
-raw `*_tlbinv_pt` leaves the sconf funnel delegates its '0' arm to.  The
-deletion set was computed from the `.glob` reference graph with intra-file
-reachability — the same analysis `iris/find_dead.py` automates (heed its
-caveats: instances, hint-DB-only, and self-recursive references are false
-positives for "dead").
+`wp_pop_off`, `wp_initlock`, …) and their private leaf/decode lemmas are gone —
+nothing applied them.  What STAYS: every helper the `WpSconf*` files import
+(decode facts `wki_*`/`poi_*`/…, spec predicates `page_own`/`is_lock`/…, pure
+algebra); all typeclass instances (`*_persistent`/`*_timeless`/`*Σ` — invisible
+to `.glob`, so false positives for dead-code tools like `iris/find_dead.py`);
+and the `smode_config` instruction engine + raw `*_tlbinv_pt` leaves the sconf
+funnel delegates its '0' arm to.
 
-This pass conservatively KEPT the regime-parametric `_r` whole-function proofs
-(`wp_kalloc_r`, `wp_walk_r`, `wp_mappages_r`, `wp_kvmmap_r`, the spinlock `_r`
-layer, …) because the per-file analysis saw them referenced — but only from the
-OLD page-table island `WpWalk → WpMappages → WpKvmmap`, which tops out at
-`wp_kvmmap_r` referenced by NOBODY.  The pt cone itself is already converted
-(`wp_walk_sconf → wp_mappages_sconf → wp_kvmmap_sconf`, independent of the old
-`_r` engine), so that whole old `_r` layer is now a dead island — a follow-up
-whole-file/whole-chain deletion candidate that a global-roots reachability
-(vs. per-file) would flag.  The genuine remaining consumer gap is the layer
-ABOVE kvmmap: kvminit/kinit ([[kinit-cone]], [[kvm-spec]]) and item-8 boot
-wiring do not yet drive `wp_kvmmap_sconf`.
+The pt cone is already converted (`wp_walk_sconf → wp_mappages_sconf →
+wp_kvmmap_sconf`, independent of the old `_r` engine).  The old regime-parametric
+`_r` layer (`wp_kalloc_r`, `wp_walk_r`, `wp_mappages_r`, `wp_kvmmap_r`, the
+spinlock `_r` chain) is now a dead island: it is referenced only within the old
+`WpWalk → WpMappages → WpKvmmap` chain, which tops out at `wp_kvmmap_r`
+referenced by nobody.  A global-roots reachability pass (vs. per-file) would
+flag the whole layer — a follow-up whole-chain deletion candidate.  The real
+consumer gap is ABOVE kvmmap: kvminit/kinit ([[kinit-cone]], [[kvm-spec]]) and
+item-8 boot wiring do not yet drive `wp_kvmmap_sconf`.
 
 ## Architecture
 
