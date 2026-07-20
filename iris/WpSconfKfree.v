@@ -104,6 +104,12 @@ Section WpSconfKfree.
     let po_noff_a5 := sign_extend' 64 (subrange_vec_dec
         (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let po_noff_store := (autocast (T := mword) (subrange_vec_dec po_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
+    (* release's noff-decrement store value (its pop_off restores noff = noffv);
+       returned in the [a_noff] cell so a repeated caller can re-thread it. *)
+    let noff_ret := (autocast (T := mword) (subrange_vec_dec
+        (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store)
+            (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
+        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
     (14 <= K)%nat ->
     eq_vec (cpuold : mword 64) cpuv = false ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
@@ -136,10 +142,13 @@ Section WpSconfKfree.
       gpr_file mr -∗
       ⌜ callee_saved m mr ⌝ -∗
       kalloc_avail γk (avail_inc on) -∗
+      a_cpu ↦₈ (zero_reg : mword 64) -∗
+      a_noff ↦₄ noff_ret -∗
+      (∃ iv : mword 32, a_int ↦₄ iv) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pcE p sp0 ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store
+    intros pcE p sp0 ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store noff_ret
       HK Hcpune Hretm Hlk Hfl Hnoff_lvl Hnoffpos Hintena0.
     iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile #Hkmem Hpre Havail Hqnoff Hqint Hqcpu Hcont".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -815,7 +824,13 @@ Section WpSconfKfree.
     assert (Hretf : update_vec_dec (add_vec (Q5c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HQ5cra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! Q5c with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] Havail").
+    iApply ("Hcont" $! Q5c with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] Havail [Hcpu2] [Hnoff2] [Hint2]").
+    2:{ (* a_cpu ↦₈ zero_reg -- release cleared lk->cpu *)
+        iEval (rewrite HRrela0 -Hlk) in "Hcpu2". iExact "Hcpu2". }
+    2:{ (* a_noff ↦₄ noff_ret -- release's pop_off restored noff *)
+        iEval (rewrite HRreltp) in "Hnoff2". iExact "Hnoff2". }
+    2:{ (* a_int ↦₄ (existential scratch) *)
+        iEval (rewrite HRreltp) in "Hint2". iExists _. iExact "Hint2". }
     { (* callee_saved m Q5c *)
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                 c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->

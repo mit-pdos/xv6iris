@@ -184,3 +184,5 @@ KernelDataInv.v
 WpUartPutcSync.v
 WpUartPutcSyncFull.v
 WpSconfUartPutc.v
+WpFreerangeDecode.v
+WpSconfFreerange.v
