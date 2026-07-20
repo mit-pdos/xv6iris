@@ -20,12 +20,13 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeGpr KernelText WpMemsetS.
+Require Import SmodeCore KernelText WpMemsetS.
 Require Import WpMemsetInstr WpMemsetPage.
 Require Import CalleeSaved.
 Require Import StackOwn.
-Require Import WpLock KallocInv.
-Require Import IntrDefs WpIntrInv WpSmodeIntr.
+Require Import KallocInv.
+Require Import IntrDefs.
+Require Import IntrDefs.
 Require Import WpSconfMemset.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

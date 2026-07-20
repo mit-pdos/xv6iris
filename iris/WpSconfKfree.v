@@ -21,14 +21,15 @@ Require Import InstrBytes.
 Require Import KernelText WpAuipc.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime SmodeCore.
+Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.
 Require Import WpMycpu WpLock.
 Require Import VcGen.
 Require Import KptTree.
-Require Import IntrDefs WpIntrInv WpSmodeIntr.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpIntenaBits.
 Require Import WpSconfMemsetPage WpSconfAcquire WpSconfRelease.
