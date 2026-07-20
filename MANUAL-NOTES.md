@@ -26,6 +26,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - kpt_regime: unified Bare + Sv39 page-table configurations
 - needed axioms about load_reservation and cancel_reservation, which aren't specified in Sail model
 - push_off returns intr_count counting token, which is needed to call pop_off to ensure no panic
+- use fable to state specs, opus to prove them
 
 Big things that still need to be done/explored:
 
