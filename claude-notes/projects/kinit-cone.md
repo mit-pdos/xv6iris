@@ -69,45 +69,43 @@ Address gotcha: `release`'s `m` is `Rrel` (not kfree's m), so its post cells are
 keyed on `Rrel!!!{4,10}` — convert with the same facts kfree used to pass them
 IN (`rewrite HRrela0 -Hlk` for cpu; `rewrite HRreltp -Ha0fcpu` for noff/int).
 
-## freerange (TODO — the hard loop) @ 0x80000ab2, 30 instrs (+0x00..+0x46)
+## freerange (DONE, axiom-clean) — WpSconfFreerange.v, over sconf
 
-Shape: prologue saves ra@40/s0@32/s1@24 (48-byte frame); computes
-`s1 = PGROUNDUP(pa_start)+PGSIZE` (c.lui a5,1 / addi a4,-1 / add / c.lui
-a4,0xfffff mask / c.and / c.add); `bltu a1,s1` (+0x1a) SKIPS the loop to the
-epilogue when no full page fits — the CONDITIONAL s2/s3/s4 saves (+0x1e..+0x28)
-and the loop live only on the fall-through; loop body (+0x2a..+0x34):
-`a0 = s1+s4 = p` (s4 = -PGSIZE mask), `jal kfree`, `s1 += PGSIZE`, `bgeu s2,s1`
-back edge; then restore s2/s3/s4; epilogue.  s1 holds `p+PGSIZE` throughout;
-a0 = s1-PGSIZE = the page freed.
+`wp_freerange_sconf` proved (funext + model platform axioms only).  Also in the
+file: the strengthened `wp_kfree_sconf` post now RETURNS the three per-CPU cells
+(WpSconfKfree.v: `a_cpu ↦₈ 0`, `a_noff ↦₄ noff_ret`, `∃iv a_int ↦₄ iv`); the
+decode layer `WpFreerangeDecode.v` (`fri_00..fri_46`, obtained by
+`Eval vm_compute in decode_c_pure/ext_decode` probes); four new leaves
+(`wp_bltu_taken`/`wp_bgeu_fall`/`wp_bgeu_taken`/`wp_cand_s_sconf`).
 
-- BOUNDED loop ⇒ fuel induction (NOT iLöb — packaged leaves strip the ▷).
-  Fuel = length of the remaining page list.  Two exit paths (loop-skipped vs
-  loop-ran) converge at the epilogue with DIFFERENT s2/s3/s4 states (skipped:
-  never saved, unchanged ⇒ callee_saved trivially; ran: saved+restored).
-- Spec: `is_kmem γ γk lk fl` (persistent) ∗ `smode_config`+ghost SIE+`sr_inv` ∗
-  a page big-sep `[∗ list] p ∈ ps, page_own p` where `ps` = the pages
-  PGROUNDUP(pa_start)..(pa_end, PGSIZE-step), each `page_valid` ∗ a DEEP
-  `stack_own` slice (≥14 slots below freerange's sp) to LEND kfree (kfree's
-  sp0 = freerange's post-frame sp) ∗ the three per-CPU cells ∗ the boot count
-  token `kalloc_avail γk (Some n0)`.  Post = `callee_saved` + cells back +
-  stack back (pages consumed into the lock) + `kalloc_avail γk (Some (n0 +
-  length ps))` — each kfree call threads `on := Some i` and returns
-  `avail_inc`, so the loop invariant carries `Some (n0 + #freed)`; this is the
-  exact budget later boot allocations spend via guaranteed-success kalloc
-  before `kalloc_avail_seal` flips to the persistent `None` mode.
-- Cell-threading resolutions (all make side conditions vm_computable):
-  require `qnoff = zeros' 32` (noff=0 at boot-time kinit) ⇒ `q_noff_ret(0)=0`
-  and `q_int_ret(0)=0` are CONCRETE (vm_compute), so the loop is stable at
-  noff=0/intena=0.  `initlock` zeroes `lk->cpu` BEFORE freerange runs, so
-  freerange enters with `q_cpu = zero_reg`; every kfree returns `q_cpu =
-  zero_reg`, so the loop is stable there too — and kfree's `Hcpune`
-  (`qcpuold ≠ mycpu`) reduces to the STANDING hypothesis `eq_vec zero_reg
-  (mycpu_ret (m!!!Regidx 4)) = false` (mycpu is a nonzero .bss address;
-  `mycpu_ret` is symbolic in tp, so take it as a freerange/kinit hypothesis,
-  discharged ultimately from the boot cpus-array address).  Callee-saved pins
-  across the kfree call: s0,s1,s2,s3,s4 (the loop registers).
+Key facts that made it go:
+- **`prun pa_end s1 ps`** Fixpoint = the page-run predicate: `[]` ⇒
+  `zopz0zI_u pa_end s1 = true`; `p::rest` ⇒ fits (`= false`) ∗ `p = s1 - PGSIZE`
+  ∗ `page_valid p` ∗ `prun pa_end (s1+PGSIZE) rest`.  `zge_negb_zlt`
+  (`x >=u y = negb (x <u y)`) ties the bgeu back-edge to the bltu entry.
+- Fuel induction over `ps`; frame = 6 slots (ra/s0/s1 always, s2/s3/s4
+  conditionally on the loop path); K>=20 (6 frame + 14 kfree deep).  The two
+  exit paths (bltu-skip / bgeu-loop-exit) funnel through **`frepi`** (a
+  TOP-LEVEL epilogue lemma, 0x3e-0x46), which BOTH must reach with s2/s3/s4 =
+  orig and slots 4-6 existential.
+- **intr_count literal-0 fold trap** (see auto-memory `intr-count-literal-fold`):
+  `intr_count γ root 0` iota-reduces at `iIntros`, so it stops unifying with a
+  sub-lemma's folded `intr_count γ root 0` premise.  Fix: freerange & frepi take
+  a VARIABLE `ncnt` + premise `ncnt = 0%nat`; couplings discharged via the Coq
+  hyp.  Never write `intr_count γ root 0` in a resource position.
+- Cell threading: `noff_ret` at noffv=`zeros' 32` = `zeros' 32` (assert the
+  ISOLATED closed value + `apply bv_eq; vm_compute` — a `vm_compute` ON the
+  hyp diverges on the symbolic `mycpu_ret (m!!!4)` address).  a_cpu stays
+  `zero_reg` (initlock zeroed lk->cpu, kfree returns 0).  `mycpu≠0` is the
+  standing hypothesis `eq_vec zero_reg (mycpu_ret (m!!!4)) = false`.
+- **`kalloc_avail` count token** (added on main by the "kalloc page-count
+  ghost" commit): kfree now takes `kalloc_avail γk on` and returns
+  `kalloc_avail γk (avail_inc on)`; `is_lock` carries `kmem_res γk fl`.
+  freerange threads it through the loop invariant: enter with
+  `kalloc_avail γk on0`, each kfree increments (`avail_inc`), so after freeing
+  `#ps` pages the post is `kalloc_avail γk (avail_inc^#ps on0)`.
 
-## kinit (TODO)
+## kinit (TODO) — WpSconfKinit.v
 
 prologue (ra@8/s0@0, 16-byte frame) → auipc/addi set a1="kmem" a0=&kmem →
 `jal initlock` (wp_initlock) → **`newlock` ghost step** building
