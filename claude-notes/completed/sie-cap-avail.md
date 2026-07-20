@@ -110,16 +110,6 @@ Conversion recipe (mechanical, in `scratchpad/RECIPE.md`): every leaf takes
 splitting/recombining and `sie_cap_move_down/_up` all DELETED; sub-calls just
 thread the reduced avail and discharge their `K'≤·` premise by `ltac:(lia)`.
 
-### Follow-up (cosmetic, not blocking)
-
-- **WpSconfFreerange.v inlines its own `wp_bltu_fall_s_sconf`** (+ the `Local`
-  `exec_execute_BTYPE_BLTU_fall`) instead of importing the exported one from
-  WpSconfWalk. This was a build-isolation workaround while Walk was still
-  unconverted; Walk is now on the 4-arg interface, so freerange could restore
-  `Require Import WpSconfWalk` and drop the ~40-line inline — or, cleaner, the
-  BLTU-fall leaf could be hoisted to WpSconfBtype.v (shared branch leaves) and
-  imported by both. Either de-dups; left as-is to keep the green push minimal.
-
 ## Gotchas discovered
 
 - `wp_csrci_sstatus_s_sconf` (WpSconfCsr.v) used `n` for the `intr_count`

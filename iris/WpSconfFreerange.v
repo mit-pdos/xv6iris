@@ -39,11 +39,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* ---- Model-level BTYPE facts for BLTU (fall/taken) and BGEU (fall/taken).
-   The BLTU-fall model lemma and its [wp_bltu_fall_s_sconf] leaf used to be
-   imported from WpSconfWalk, but that module is not yet on the 4-arg [sie_cap]
-   interface; to keep freerange self-contained we inline both here (converted).
-   [rvv] and the cmp-helper shape mirror WpSconfBtype/WpSconfWalk (Local). ---- *)
+(* ---- Model-level BTYPE facts for BLTU-taken and BGEU (fall/taken), used by
+   this file's own branch leaves below.  The BLTU-fall leaf [wp_bltu_fall_s_sconf]
+   is imported from WpSconfBtype (the shared branch-leaf home).
+   [rvv] and the cmp-helper shape mirror WpSconfBtype (Local). ---- *)
 Local Definition rvv (r : mword 5) (s : mstate) : mword 64 :=
     if Z.eqb (uint r) 0 then zero_reg
     else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s.(sregs).
@@ -70,17 +69,6 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
   apply exec_returnM.
-Qed.
-
-Local Lemma exec_execute_BTYPE_BLTU_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
-  zopz0zI_u (rvv rs1 s) (rvv rs2 s) = false ->
-  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))) s
-    = Some (RETIRE_SUCCESS, s).
-Proof.
-  intro Hfall.
-  unfold execute. cbn match. unfold execute_BTYPE.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BLTU rs2 rs1 s)).
-  rewrite Hfall. apply exec_returnM.
 Qed.
 
 Local Lemma exec_execute_BTYPE_BGEU_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
@@ -371,52 +359,6 @@ Section WpSconfFreerange.
     intros s_pc Hnpc Hva Hvb.
     rewrite (exec_execute_RTYPE_AND_gpr rs2 rd rd s_pc Hrd).
     unfold gpr_and_val. rewrite Hva Hvb. reflexivity.
-  Qed.
-
-  (* BLTU-fall (the loop entry: at least one full page fits).  Inlined here
-     (converted to 4-arg [sie_cap]) in place of the WpSconfWalk import. *)
-  Lemma wp_bltu_fall_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) (n : nat) :
-    uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU)) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrs1 Hrs2 Hcmp) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
-              (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
-    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
-    iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
-    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
-    iModIntro. iExists s_pc.
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply exec_execute_BTYPE_BLTU_fall. unfold rvv. rewrite Lva Lvb. exact Hcmp. }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
-      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' Hsc Hcap Htlbinv [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
   (* ================================================================= *)

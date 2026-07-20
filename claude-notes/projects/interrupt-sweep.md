@@ -10,33 +10,42 @@ PILOT before any mechanical sweep.
 
 ## Current state
 
-All S-mode whole-function proofs are over `sconf`: the spinlock/kalloc cone
-(mycpu, push/pop_off, holding, acquire, release, kalloc, kfree, wakeup, memset,
-memset_page, initlock) and the page-table cone (`wp_walk_sconf →
-wp_mappages_sconf → wp_kvmmap_sconf`).  From the old S-mode layer, only the
-`smode_config` instruction engine + raw `*_tlbinv_pt` leaves remain — the sconf
-funnel delegates its '0' arm to them, so they stay until boot wiring lands.
+All S-mode whole-function proofs are over `sconf`, on the sie-cap-avail
+interface ([[sie-cap-avail]], full clean build green): the spinlock/kalloc cone
+(mycpu, push/pop_off, holding, acquire, release, kalloc, kfree, wakeup,
+wakeup_loop, memset, memset_page, initlock), the page-table cone (`wp_walk_sconf
+→ wp_mappages_sconf → wp_kvmmap_sconf`), AND the kinit cone (`wp_freerange_sconf`,
+`wp_kinit_sconf`).  From the old S-mode layer, only the `smode_config`
+instruction engine + raw `*_tlbinv_pt` leaves remain — the sconf funnel
+delegates its '0' arm to them, so they stay until boot wiring lands.
 
-Remaining work: **item 8's boot wiring** (below) — nothing yet drives the sconf
-whole-function layer; the top consumer gap is above kvmmap (kvminit/kinit,
-[[kinit-cone]] / [[kvm-spec]]).
+Remaining work: (a) **item 8's boot wiring** (below) — nothing yet DRIVES the
+sconf whole-function layer; the top consumer gap is now above kinit (kvminit /
+`main`→`trapinithart`, [[kvm-spec]]).  (b) **vcgen-to-sconf** — wire the built
+`wp_vc_block_s_sconf` into use (the sconf functions leaf-chain today); the only
+remaining `wp_vc_block_s` (SIE-0) consumer is the kernelvec handler
+`WpKernelvecNew.v` (`kv_store_prog`/`kv_load_prog` blocks).
 
 ## Architecture
 
 - `sconf γ` (IntrDefs.v) is the SIE-agnostic S-mode configuration bundle;
-  `sie_cap γ root m` carries the per-instruction arm witness (exact-32,
-  arm-factored) plus a stack carve; `intr_count γ root n` is the per-function
-  counting token mirroring noff nesting.  `sconf`/`smode_config` are
-  INDEPENDENT (no bridge lemma, intentionally).
+  `sie_cap γ root m avail` carries the per-instruction arm witness
+  (arm-factored) plus the free-stack capability — `stack_own (m!!!sp)
+  (kv_frame_slots + avail)`, the reserved 32-slot carve plus `avail` slots
+  available to kernel code (see [[sie-cap-avail]] / `design/interrupts.md`);
+  `intr_count γ root n` is the per-function counting token mirroring noff
+  nesting.  `sconf`/`smode_config` are INDEPENDENT (no bridge lemma,
+  intentionally).
 - The engine funnel `wp_instr_s_sconf` (WpSmodeIntr.v) + gpr-write engines
   `wp_gpr_write_s_sconf{,_base,_base_pc,_cap}` case-split on `sie_cap` by ghost
   agreement and delegate each arm to its existing SIE-0/SIE-1 engine (no
   fetch-drive duplication).  The raw-cell `wp_instr_s_config_tlbinv_pt` is the
   '0' arm's body and the mycpu fraction-island's entry — it STAYS.
 - Leaf layer: WpSconf{Alu,Btype,Ctl,Mem,Lock,Uart,Csr}.v; VCgen `WpSconfVc.v`
-  (`wp_vc_block_s_sconf`, guarded by `vblock_no_sp prog = true`).  Whole
-  functions: WpSconf{Mycpu,PushOff,Holding,Release,Acquire,Kalloc,Kfree,
-  Wakeup,WakeupLoop,Memset,MemsetPage}.v.
+  (`wp_vc_block_s_sconf` — now sp-AWARE via the `vsstate` push/pop ledger, no
+  `vblock_no_sp` guard).  Whole functions: WpSconf{Mycpu,PushOff,Holding,
+  Release,Acquire,Kalloc,Kfree,Wakeup,WakeupLoop,Memset,MemsetPage,Initlock,
+  Walk,Mappages,Kvmmap,Freerange,Kinit}.v.
 - Import direction: leaf files import IntrDefs/WpSmodeIntr; WpIntrInv imports no
   leaf file; WpKernelvecSpec does — keep the kernelvec cap on top.
 - Perf: keep per-file compile times within ~10% (optimization.md rules apply;
@@ -44,22 +53,26 @@ whole-function layer; the top consumer gap is above kvmmap (kvminit/kinit,
 
 ## Conventions for remaining conversions
 
-- **Deep-custody frame trade.** A function threads `stack_own (pa_stk sp0
-  kv_frame_slots) K` (K = frame depth + deepest sub-call's need; DEEP slots
-  adjacent below the cap's carve) alongside `sie_cap`.  The prologue sp-move
-  (`wp_caddi_sp_s_sconf` fed a `sie_cap_move_down k` transformer) trades top-k
-  deep slots for the frame region above the new sp; the epilogue `sie_cap_move_up
-  k` trades back.  Split/recombine the deep-K around each sub-call via
-  `stack_own_split_1/_2` + `stack_own_split_2`.  Deepest sub-call
-  (acquire/release) wants 10; memset wants 2.
-- **`sie_cap` re-carve on sp-move.** The cap engine `wp_gpr_write_s_sconf_cap`
-  takes a caller-supplied TRANSFORMER `(sie_cap γ root m -∗ sie_cap γ root m')`
-  instead of an `rd ≠ sp` retarget premise; `wp_caddi_sp_s_sconf` /
-  `wp_caddi16sp_s_sconf` sit on it.  `sie_cap_recarve` (IntrDefs.v) builds the
-  transformer from pure stack splitting — the '0' arm is m-blind, only the '1'
-  arm's ≥32-slot bound at the new sp is owed.  So VCgen SPLITS blocks at
-  sp-moves (`vblock_no_sp`) and uses the WpSconfAlu sp-mover leaves between
-  blocks.
+- **Avail-param frame push/pop (the sie-cap-avail interface, [[sie-cap-avail]]).**
+  A function threads `sie_cap γ root m K` with a single pure premise `K' ≤ K`
+  (K' = its own frame depth + deepest sub-call's need) — NO separate deep
+  `stack_own` conjunct.  The prologue push is `wp_caddi{,16}sp_push_s_sconf …
+  m K k ltac:(lia) Hpush` (`k ≤ K`, hands out the freed frame region
+  `stack_own (m!!!sp) k`, cap → `K−k`); the epilogue pop is
+  `wp_caddi{,16}sp_pop_s_sconf … m (K−k) k Hpop` fed the reassembled
+  `stack_own sp0 k` (cap → `(K−k)+k`, restore to `K` by `replace`).  Between
+  them every leaf threads `(K−k)`; sub-calls thread `(K−k)` and discharge their
+  own `K'' ≤ ·` premise by `ltac:(lia)`.  Deepest sub-call (acquire/release)
+  wants 10; memset_page wants 2.  Movers `sie_cap_push`/`_pop`/`_grow`/
+  `_shrink`/`_acc`/`_retarget` (IntrDefs.v) — `sie_cap_move_down`/`_up`/
+  `_recarve` and the deep-custody `stack_own_split` dance are GONE.
+- **VCgen sp-moves.** The sp-aware S-executor `vc_block_sp_s`/`wp_vc_block_s_sconf`
+  (WpSconfVc.v) handles push/pop opcodes INSIDE a block via a concrete
+  pushed-depth + frame ledger (see `design/smode-and-vcgen.md`); the leaf-based
+  push/pop above is for hand-written leaf chains.  NOTE: `wp_vc_block_s_sconf`
+  is built and on the avail interface but NOT YET wired into any whole-function
+  proof — the sconf functions currently leaf-chain (see the vcgen-to-sconf
+  follow-up).
 - **`intr_count` net-zero threading.** Each acquire→critical-section→release
   function threads `intr_count γ root n` NET-ZERO: n in and out; acquire
   increments to `S n` inside the disabled region (push_off inside), release
