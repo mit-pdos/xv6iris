@@ -82,16 +82,16 @@ Proof.
 Qed.
 
 Section WpSconfKfree.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
 
   Notation KF := KernelSyms.kfree.
 
   Lemma wp_kfree_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lk fl : mword 64)
+      (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : gmap regidx (mword 64))
       (cpuold : mword 64) (noffv intena_old : mword 32)
-      (n : nat) (K : nat) :
+      (on : option nat) (n : nat) (K : nat) :
     let pcE : mword 64 := mword_of_int KF in
     let p := m !!! Regidx (mword_of_int 10 : mword 5) in
     let sp0 := m !!! Regidx csp_rs1 in
@@ -116,30 +116,34 @@ Section WpSconfKfree.
        (if eq_vec (sign_extend' 64 noffv) zero_reg then (zeros' 32) else intena_old)) zero_reg = true ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m K -∗
+    sie_cap γ root_ppn m -∗
     intr_count γ root_ppn n -∗
     tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    is_lock γl lk (kmem_res fl) -∗
+    is_lock γl lk (kmem_res γk fl) -∗
     kfree_pre p -∗
+    kalloc_avail γk on -∗
+    stack_own (pa_stk sp0 kv_frame_slots) K -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄ intena_old -∗
     a_cpu ↦₈ cpuold -∗
     ( ∀ mr,
       sconf γ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap γ root_ppn mr K -∗
+      sie_cap γ root_ppn mr -∗
       intr_count γ root_ppn n -∗
       tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       gpr_file mr -∗
       ⌜ callee_saved m mr ⌝ -∗
+      kalloc_avail γk (avail_inc on) -∗
+      stack_own (pa_stk sp0 kv_frame_slots) K -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pcE p sp0 ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store
       HK Hcpune Hretm Hlk Hfl Hnoff_lvl Hnoffpos Hintena0.
-    iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile #Hkmem Hpre Hqnoff Hqint Hqcpu Hcont".
+    iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile #Hkmem Hpre Havail Hdeep Hqnoff Hqint Hqcpu Hcont".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     (* the caller-supplied page precondition: validity + full ownership *)
     iDestruct "Hpre" as "[%Hpv Hpown]".
@@ -176,15 +180,19 @@ Section WpSconfKfree.
     iPoseProof (kfi_30 with "Htext") as "Hi30".
     (* ===== PROLOGUE: 4-slot frame trade + saves ===== *)
     set (R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
-    assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 4).
-    { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    (* +0x00 c.addi16sp sp,-32 -- the frame push (k := 4) *)
-    iApply (wp_caddi_sp_push_s_sconf γ root_ppn Φ pcE (mword_of_int 32 : mword 6) m K 4 ltac:(lia) Hpush
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi00 [-]").
+    assert (Hsp1 : R1 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite /R1 lookup_total_insert. unfold regval_into_reg, pa_stk, add_vec_int. apply f_equal.
+      apply bv_eq; vm_compute; reflexivity. }
+    (* split the deep custody: top-4 feeds move_down, the rest [K-4] is lent to
+       the sub-calls (memset/acquire/release) at the frame sp [spr]. *)
+    iDestruct (stack_own_split_1 (pa_stk sp0 kv_frame_slots) 4 K ltac:(lia) with "Hdeep") as "[Hd4 Hdeep]".
+    (* +0x00 c.addi16sp sp,-32 -- the frame trade *)
+    iApply (wp_caddi_sp_s_sconf γ root_ppn Φ pcE (mword_of_int 32 : mword 6) m (stack_own sp0 4)
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi00 [Hd4] [-]").
+    { iIntros "Hcap".
+      iDestruct (sie_cap_move_down γ root_ppn m R1 4 Hsp1 with "Hd4 Hcap") as "[Hcap Hframe]".
+      iFrame "Hcap Hframe". }
     iIntros "Hhs Hsc Hcap Hframe Htlbinv Hpc Hfile".
-    iEval (rewrite Hspm) in "Hframe".
-    change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
       by (rewrite /R1 lookup_total_insert; reflexivity).
     (* frame cells at [pa_stk sp0 1..4] *)
@@ -578,7 +586,7 @@ Section WpSconfKfree.
       rewrite Hp10. apply add_vec_zero_l. }
     (* split off deep-10 for acquire *)
     iDestruct (stack_own_split_1 (pa_stk spr kv_frame_slots) 10 (K-4) ltac:(lia) with "Hdeep") as "[Hd10 Hrest]".
-    iApply (wp_acquire_sconf γ root_ppn Φ γl (kmem_res fl) Kacq
+    iApply (wp_acquire_sconf γ root_ppn Φ γl (kmem_res γk fl) Kacq
               cpuold noffv intena_old n
               ltac:(rewrite HKacqtp; exact Hcpune)
               ltac:(rewrite HKacqra; vm_compute; reflexivity)
@@ -604,7 +612,7 @@ Section WpSconfKfree.
     iPoseProof (kfi_44 with "Htext") as "Hi44".
     iPoseProof (kfi_48 with "Htext") as "Hi48".
     iPoseProof (kfi_4a with "Htext") as "Hi4a".
-    iDestruct "HRres" as (head pages) "[Hflw Hchain]".
+    iDestruct "HRres" as (head pages) "(Hflw & Hchain & Hauth)".
     assert (Hldaddr : add_vec (macq !!! Regidx (mword_of_int 18 : mword 5)) (sign_extend' 64 (mword_of_int 0x18 : mword 12)) = fl).
     { rewrite Hs2km Hfl. apply bv_eq; vm_compute; reflexivity. }
     (* +0x44 ld a5,24(s2) : a5 := head *)
@@ -650,9 +658,10 @@ Section WpSconfKfree.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hflw".
     iEval (rewrite Hsdaddr2) in "Hflw".
     iEval (rewrite HRlds1) in "Hflw".
-    (* refold the freelist invariant with [p] pushed *)
-    iAssert (kmem_res fl) with "[Hflw Hrun Hchain]" as "HRres".
-    { iApply (kmem_res_push fl p head pages Hpv). rewrite /word_at. iFrame "Hflw Hrun Hchain". }
+    (* refold the freelist invariant with [p] pushed; the count ghost-steps up *)
+    iMod (kmem_res_push γk fl p head pages on Hpv with "Havail [Hflw] Hrun Hchain Hauth")
+      as "[Havail HRres]".
+    { rewrite /word_at. iExact "Hflw". }
     assert (Hpp4e : add_vec_int (mword_of_int (KF + 0x4a) : mword 64) 4 = mword_of_int (KF + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4e) in "Hpc".
     iPoseProof (kfi_4e with "Htext") as "Hi4e".
@@ -699,7 +708,7 @@ Section WpSconfKfree.
     { rewrite Hnv1eq. exact Hnoff_lvl. }
     (* split off deep-10 for release *)
     iDestruct (stack_own_split_1 (pa_stk spr kv_frame_slots) 10 (K-4) ltac:(lia) with "Hdeep") as "[Hd10 Hrest]".
-    iApply (wp_release_sconf γ root_ppn Φ γl lk (kmem_res fl) Rrel
+    iApply (wp_release_sconf γ root_ppn Φ γl lk (kmem_res γk fl) Rrel
               (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
               po_noff_store
               (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
@@ -827,7 +836,7 @@ Section WpSconfKfree.
     assert (Hretf : update_vec_dec (add_vec (Q5c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HQ5cra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! Q5c with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] Hdeep").
+    iApply ("Hcont" $! Q5c with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] Havail Hdeep").
     { (* callee_saved m Q5c *)
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                 c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->

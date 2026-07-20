@@ -13,6 +13,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - swtch spec
 - acquire/release separation logic spec (standard, but does work)
 - kalloc/kfree separation-logic-style specs
+- kalloc spec tracks number of free pages, for early-boot tracking; then switches to None
 - re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
 - background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)

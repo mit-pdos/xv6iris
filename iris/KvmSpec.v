@@ -98,7 +98,7 @@ Import Defs.
 (* ===================================================================== *)
 
 Section KvmSpecs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
   Variable R : s_regime.
 
@@ -111,12 +111,17 @@ Section KvmSpecs.
      the caller's thread pointer (callee-saved, never written by the
      kvm chain).  The 0-not-mycpu fact rides along so the bundle
      re-establishes after kalloc zeroes the cpu field. *)
+  (* The kvm chain runs in the allocator's STEADY STATE: the bundled count
+     ghost is the persistent sealed witness [kalloc_avail γk None] (count
+     unknown, kalloc may fail), so every kalloc call threads [on := None] and
+     the bundle trivially re-establishes. *)
   Definition kalloc_env (γ : gname) (tp : mword 64) : iProp Σ :=
-    (∃ (qint : mword 32) (qcpu : mword 64),
+    (∃ (γk : gname * gname) (qint : mword 32) (qcpu : mword 64),
       ⌜eq_vec qcpu (mycpu_ret tp) = false⌝ ∗
       ⌜eq_vec (zero_reg : mword 64) (mycpu_ret tp) = false⌝ ∗
       is_lock γ (mword_of_int KernelSyms.kmem)
-        (kmem_res (mword_of_int (KernelSyms.kmem + 24))) ∗
+        (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
+      kalloc_avail γk None ∗
       add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 120 : mword 12))
         ↦₄ (zeros' 32 : mword 32) ∗
       add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 124 : mword 12))

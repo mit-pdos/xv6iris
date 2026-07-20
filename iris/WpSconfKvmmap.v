@@ -34,7 +34,7 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 Section WpSconfKvmmap.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
 
   Notation KM := KernelSyms.kvmmap.
