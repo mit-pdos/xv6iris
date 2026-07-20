@@ -465,8 +465,8 @@ Proof.
   rewrite bv_or_unsigned. apply Z.lor_spec.
 Qed.
 
-Local Notation mask2c := (not_vec (zero_extend' 64 (mword_of_int 2 : mword 5)) : mword 64).
-Local Notation mask2s := (zero_extend' 64 (mword_of_int 2 : mword 5) : mword 64).
+Local Definition mask2c : mword 64 := not_vec (zero_extend' 64 (mword_of_int 2 : mword 5)).
+Local Definition mask2s : mword 64 := zero_extend' 64 (mword_of_int 2 : mword 5).
 
 (* per-field transparency/forcing through the AND mask (csrci) *)
 Local Ltac schase_and :=
