@@ -55,8 +55,6 @@ are working on that effort — the relevant `projects/` file.
 
 - **[`interrupt-sweep.md`](projects/interrupt-sweep.md)** — making every S-mode
   execution lemma SIE-agnostic (the interrupt sweep).
-- **[`kinit-cone.md`](projects/kinit-cone.md)** — the kinit cone (kinit →
-  initlock + freerange, over kfree).
 - **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
   mappages / walk proofs (`KvmSpec.v`).
 - **[`user-mode-exec-v2.md`](projects/user-mode-exec-v2.md)** — arbitrary
@@ -67,6 +65,10 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`kinit-cone.md`](completed/kinit-cone.md)** — the kinit cone (kinit →
+  initlock + freerange, over kfree), all proved axiom-clean over sconf. The
+  page-count token is threaded through to kinit's postcondition; the caller
+  supplies the pages precondition.
 - **[`user-mode-ptree-port.md`](completed/user-mode-ptree-port.md)** — porting
   user-mode execution onto the ptree page-table layer (UserPt → `utlb_inv_pt`);
   the port and its cleanup are done. The remaining execution-side hypotheses

@@ -129,10 +129,9 @@ Landed lessons:
 - Keep the epilogue frame cells at `pa_stk sp0 1..2` (do NOT add initlock's
   add_vec-spr rebuild rewrite — the cells are already in pa_stk form here).
 
-The remaining gap to a self-contained boot: kinit takes `ps + prun PHYSTOP
-s1entry ps + [∗list] page_own` as a precondition; the boot/adequacy still owes
-a generative lemma turning "own every byte of [PGROUNDUP(end), PHYSTOP)" into
-that page big-sep + prun (an induction over the physical page range).
+kinit takes `ps` + `prun PHYSTOP s1entry ps` + `[∗ list] page_own` as a
+precondition; the caller (the boot initialization sequence) supplies them when
+its proof reaches the kinit call.
 
 ## kinit -- earlier notes (superseded by the DONE section above)
 
