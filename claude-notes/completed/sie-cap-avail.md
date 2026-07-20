@@ -77,63 +77,48 @@ multiples of 8 only). New S-executor in WpSconfVc.v (VcGenS.v untouched;
 - Out of scope for v1 (noted, not blocking): 4-byte stores into fresh frame
   slots (would need an 8-byte-junk → 2×4-byte split); loads of junk.
 
-## Status / worklist
+## Status — COMPLETE (full clean build green, axiom-clean)
 
-Dependency tiers (each tier compiles against the previous; leaf tier files
-are mutually independent — parallelizable):
+All six stages landed; the whole project rebuilds from scratch with zero
+errors. `sie_cap` now carries the `avail` slot count end-to-end (see
+`design/interrupts.md` §sconf/sie_cap and the sp leaves in `WpSconfAlu.v`).
 
-- [x] **Stage 1 — IntrDefs.v**: `sie_cap` avail param + new mover set. DONE.
-- [x] **Stage 2 — WpSmodeIntr.v**: funnel `wp_instr_s_sconf` splits/reassembles
-      kv+n; `wp_gpr_write_s_sconf{,_base}`, pilots thread n. DONE.
-- [x] **Stage 3 — leaf tier**: WpSconfAlu.v (cap engine generalized to
-      n→n'; transformer movers kept; NEW direct
-      `wp_caddi{_sp,16sp}_{push,pop}_s_sconf`), WpSconfMem.v, WpSconfCsr.v,
-      WpSconfBtype.v, WpSconfCtl.v, WpSconfUart.v, WpSconfLock.v. All compile.
-- [x] **Stage 4 — VCgen**: DONE. StackOwn.v gained `stack_own_base` (+
-      `pa_stk_base_S`) — base-anchored enumeration. WpSconfVc.v REPLACED
-      the no-sp executor lemma: new state `vsstate` (`VSS vsb vsn vsf` =
-      vstate + avail + frame ledger), executor `vc_block_sp_s`/
-      `vc_step_sp_s` (sp push/pop via `vc_step_sp_move`, 8-byte
-      store-to-ledger via `vc_store8_sp`, everything else delegates via
-      `lift_base` to `vc_step_s`; rd = sp writes elsewhere rejected;
-      `vblock_no_sp` is gone), WP invariant `vframe_own`, block lemma
-      `wp_vc_block_s_sconf` (same name, new interface: threads
-      `sie_cap … (vsn st)` + `vframe_own ρ (vsf st)`; sp-free callers
-      pass `VSS st n []` + `vframe_own_nil`). Helper algebra:
-      `vframe_own_{nil,app,remove,of_stack}`, `vheap_own_{delete,snoc}`,
-      `pop_absorb_sound`, `stack_of_absorbed`, arithmetic bridges
-      `push_addr_eq`/`pop_addr_eq`/`div8_exact`/`mword_of_int_mod64`.
-      No function file used the old VCgen-sconf lemma yet, so no ripple.
-- [ ] **Stage 5 — function tier** (specs: drop deep-stack conjunct, add
-      `K ≤ n`; proofs: prologue/epilogue via push/pop leaves). Waves:
-      - [x] wave 1: Mycpu, Memset, UartPutc, Wakeup — DONE (compiled).
-      - wave 2: MemsetPage [x], Holding [x compiled], PushOff (in progress,
-        the hard one: `intr_count n` collides with avail, so avail binder is
-        `av`; delegated).
-      - wave 3: Acquire [edited, blocked on push_off sig], Release [edited,
-        blocked on pop_off sig].  Both use avail binder `av` (n = intr_count),
-        K=10, push 4 → sub-calls thread `(av-4)` → pop 4.  The lock-layer
-        sub-calls (push_off/pop_off) are the ONLY parts pending PushOff's
-        final signature — reconcile the 2 call sites once it lands.
-      - wave 4: Kfree, Initlock [x edited, uses K as avail, push2/pop2, plus a
-        local `wp_sw_zero_s_sconf` leaf that just threads n], WakeupLoop.
-      - wave 5: Kalloc → wave 6: Walk → wave 7: Mappages → Kvmmap.
-      Conversion recipe (mechanical, validated on Holding): every leaf takes
-      `(n:nat)` right after its register-map arg; prologue push via
-      `wp_caddi{,16}sp_push_s_sconf … m n k ltac:(lia) Hpush`; epilogue pop via
-      `wp_caddi{,16}sp_pop_s_sconf … m (n-k) k Hpop` fed the reassembled
-      `stack_own sp0 k` (then `replace ((n-k)+k) with n`).  Frame push hands
-      out `stack_own (m!!!csp) k`; fold to `sp0` with a refl `Hspm`.  Deep
-      custody splitting/recombining and `sie_cap_move_down/_up` all DELETED;
-      sub-calls just thread the reduced avail and discharge their `K'≤·`
-      premise by `ltac:(lia)`.  Full recipe: scratchpad/RECIPE.md.
-- [ ] **Stage 6 — full build**, update `claude-notes/design/interrupts.md`
-      (§sconf/sie_cap bullet) + `design/smode-and-vcgen.md` (VCgen sp ops),
-      move this file to completed/ when done.
+- **Stages 1–4** — IntrDefs.v (`sie_cap` avail + movers `sie_cap_push`/`_pop`/
+  `_grow`/`_shrink`/`_acc`/`_retarget`), WpSmodeIntr.v funnel, the leaf tier
+  (WpSconfAlu/Mem/Csr/Btype/Ctl/Uart/Lock — every leaf takes `(n:nat)` after
+  its map; new direct `wp_caddi{_sp,16sp}_{push,pop}_s_sconf`), and the
+  sp-aware VCgen executor (`vsstate`/`vc_step_sp_s`/`wp_vc_block_s_sconf` +
+  `stack_own_base`).
+- **Stage 5 — function tier (all Qed):** Mycpu, Memset, UartPutc, Wakeup,
+  MemsetPage, Holding, PushOff (the hard one — `intr_count n` collides with
+  avail, so its avail binder is `av`), Acquire, Release (av=K−? via the
+  push_off/pop_off `av` args), Kfree, Initlock, WakeupLoop, Kalloc, Walk,
+  Mappages, Kvmmap — plus the kinit cone the effort merged in over three
+  upstream pulls (Kfree gained the `kalloc_avail` page-count ghost; then
+  Freerange; then kinit). Per-function `K ≤ n` frame bounds: mycpu 2, initlock
+  2, kvmmap 2, kfree/kalloc 4 (→14), holding/acquire/release/push-off-shape 4
+  (→10), walk 8 (→22), mappages 10 (→32), freerange 6 (→20), kinit 2 (→22).
+- **Stage 6** — full clean build green; docs updated (`design/interrupts.md`,
+  `design/smode-and-vcgen.md`).
 
-Per-function frame sizes for the `K ≤ n` premises (from current specs):
-mycpu 2, push_off 4(+2 epi), pop_off 2, memset 0?, uartputc/kalloc/kfree…
-read each file's current `stack_own … K` bound when converting.
+Conversion recipe (mechanical, in `scratchpad/RECIPE.md`): every leaf takes
+`(n:nat)` right after its register-map arg; prologue push via
+`wp_caddi{,16}sp_push_s_sconf … m n k ltac:(lia) Hpush`; epilogue pop via
+`wp_caddi{,16}sp_pop_s_sconf … m (n−k) k Hpop` fed the reassembled
+`stack_own sp0 k` (then `replace ((n−k)+k) with n`). Frame push hands out
+`stack_own (m!!!csp) k`; fold to `sp0` with a refl `Hspm`. Deep-custody
+splitting/recombining and `sie_cap_move_down/_up` all DELETED; sub-calls just
+thread the reduced avail and discharge their `K'≤·` premise by `ltac:(lia)`.
+
+### Follow-up (cosmetic, not blocking)
+
+- **WpSconfFreerange.v inlines its own `wp_bltu_fall_s_sconf`** (+ the `Local`
+  `exec_execute_BTYPE_BLTU_fall`) instead of importing the exported one from
+  WpSconfWalk. This was a build-isolation workaround while Walk was still
+  unconverted; Walk is now on the 4-arg interface, so freerange could restore
+  `Require Import WpSconfWalk` and drop the ~40-line inline — or, cleaner, the
+  BLTU-fall leaf could be hoisted to WpSconfBtype.v (shared branch leaves) and
+  imported by both. Either de-dups; left as-is to keep the green push minimal.
 
 ## Gotchas discovered
 
