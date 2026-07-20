@@ -22,15 +22,27 @@ been removed (~5.3k lines): the terminal `wp_<fn>` theorems at the concrete
 kernel regime (`wp_kalloc`, `wp_kfree`, `wp_mycpu`, `wp_holding_lockinv`,
 `wp_push_off`, `wp_release`, `wp_wakeup`, `wp_memset{,_page}`, `wp_acquire_lock`,
 `wp_pop_off`, `wp_initlock`, …) plus their now-orphaned private leaf/decode
-lemmas — nothing applies them any more.  What deliberately STAYS: the
-regime-parametric `_r` variants (`wp_kalloc_r` etc.), because the not-yet-
-converted page-table cone (`WpWalk`/`KvmSpec`) still reaches them through
-`wp_kalloc_r`; every helper the `WpSconf*` files import (decode facts `wki_*`/
-`poi_*`/…, spec predicates `page_own`/`is_lock`/…, pure algebra); and all
-typeclass instances (`*_persistent`/`*_timeless`/`*Σ`).  The deletion set was
-computed from the `.glob` reference graph with intra-file reachability — the
-same analysis `iris/find_dead.py` automates (heed its caveats: instances,
-hint-DB-only, and self-recursive references are false positives for "dead").
+lemmas — nothing applies them any more.  What STAYS: every helper the
+`WpSconf*` files import (decode facts `wki_*`/`poi_*`/…, spec predicates
+`page_own`/`is_lock`/…, pure algebra); all typeclass instances
+(`*_persistent`/`*_timeless`/`*Σ`); and the `smode_config` instruction engine +
+raw `*_tlbinv_pt` leaves the sconf funnel delegates its '0' arm to.  The
+deletion set was computed from the `.glob` reference graph with intra-file
+reachability — the same analysis `iris/find_dead.py` automates (heed its
+caveats: instances, hint-DB-only, and self-recursive references are false
+positives for "dead").
+
+This pass conservatively KEPT the regime-parametric `_r` whole-function proofs
+(`wp_kalloc_r`, `wp_walk_r`, `wp_mappages_r`, `wp_kvmmap_r`, the spinlock `_r`
+layer, …) because the per-file analysis saw them referenced — but only from the
+OLD page-table island `WpWalk → WpMappages → WpKvmmap`, which tops out at
+`wp_kvmmap_r` referenced by NOBODY.  The pt cone itself is already converted
+(`wp_walk_sconf → wp_mappages_sconf → wp_kvmmap_sconf`, independent of the old
+`_r` engine), so that whole old `_r` layer is now a dead island — a follow-up
+whole-file/whole-chain deletion candidate that a global-roots reachability
+(vs. per-file) would flag.  The genuine remaining consumer gap is the layer
+ABOVE kvmmap: kvminit/kinit ([[kinit-cone]], [[kvm-spec]]) and item-8 boot
+wiring do not yet drive `wp_kvmmap_sconf`.
 
 ## Architecture
 
