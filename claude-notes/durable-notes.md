@@ -16,10 +16,9 @@ shape.** Prefer one general lemma over N special cases — abstract over the var
 axis (privilege, access type, width, A/D bits, leaf predicate, …) rather than
 cloning; lift shared structure into a base; and when a spec becomes hard to state
 or an abstraction starts to leak, stop and fix the shape before building further
-on top of it. The v1 user-mode attempt was rolled back for exactly this failure:
-complexity accreted (hit/miss × width × compressed × fault-arm cross-products)
-past the point where a clean abstraction could still be retrofitted. Spend the
-rework; keep the specs clean.
+on top of it. Spend the rework; keep the specs clean. The failure mode to avoid
+is complexity accreting (hit/miss × width × compressed × fault-arm cross-products)
+past the point where a clean abstraction can still be retrofitted.
 
 ## Maintaining these notes
 
@@ -67,4 +66,4 @@ change that produced it.
 
 - **Cleaner specs and abstractions beat avoiding rework** (see the guiding principle at the top of this file). Refactor or rewrite freely to reach a better shape; do NOT keep near-duplicate lemma families, awkward interfaces, or leaky abstractions merely because they already compile. Prefer one parametric lemma over a cross-product of special cases.
 - A `stack_own` (or any) resource bound must be the function's own max depth as a CONSTANT, stated `∀ n, (K ≤ n) → … stack_own sp n` — never a value coupled to the function's arguments.
-- Avoid ad-hoc argument couplings in preconditions (e.g. `eq_vec (m0!!!a2) zero_reg = Nat.eqb N 0` was rejected as "horrible"). Prefer deriving branch conditions internally / a natural contract; if a coupling is genuinely unavoidable, flag it and confirm the form before building it out.
+- Avoid ad-hoc argument couplings in preconditions (e.g. a precondition like `eq_vec (m0!!!a2) zero_reg = Nat.eqb N 0` that ties an argument to a branch condition). Prefer deriving branch conditions internally / a natural contract; if a coupling is genuinely unavoidable, flag it and confirm the form before building it out.
