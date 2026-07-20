@@ -35,7 +35,7 @@ Require Import IntrDefs.
 Require Import VcGenS.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSconfAcquire WpSconfRelease.
-Require Import WpWakeup WpSconfWakeup WpSconfKfree.
+Require Import WpWakeup WpSconfWakeup WpKalloc.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

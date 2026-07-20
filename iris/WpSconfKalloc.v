@@ -35,7 +35,6 @@ Require Import IntrDefs.
 Require Import WpIntenaBits.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfMemsetPage WpSconfAcquire WpSconfRelease.
-Require Import WpSconfKfree.
 Require Import WpKalloc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
