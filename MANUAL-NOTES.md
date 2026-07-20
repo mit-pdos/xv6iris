@@ -9,11 +9,12 @@ Some high-level ideas that might be interesting for some eventual paper:
 - minstret_inv (invariant counting retired instructions in minstret register), clock_inv
 - fupd-style spec for stepping one cycle, which enables opening inv like minstret_inv
 - interrupt handling with a WP for the address in stvec (kernelvec)
-- intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts; requires stack_own of at least 32 for kernelvec
+- intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts
+- sie_inv owns free stack locations, requires sufficient depth for interrupt/kernelvec
 - swtch spec
 - acquire/release separation logic spec (standard, but does work)
 - kalloc/kfree separation-logic-style specs
-- kalloc spec tracks number of free pages, for early-boot tracking; then switches to None
+- kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None
 - re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
 - background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)
