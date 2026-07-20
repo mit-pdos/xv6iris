@@ -40,16 +40,16 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 Section WpSconfKalloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
 
   Notation AK := KernelSyms.kalloc.
 
   Lemma wp_kalloc_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (fl : mword 64)
+      (γl : gname) (γk : gname * gname) (fl : mword 64)
       (m : gmap regidx (mword 64))
       (cpuold : mword 64) (noffv intena_old : mword 32)
-      (n : nat) (K : nat) :
+      (on : option nat) (n : nat) (K : nat) :
     let pcE : mword 64 := mword_of_int AK in
     let sp0 := m !!! Regidx csp_rs1 in
     let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -78,7 +78,8 @@ Section WpSconfKalloc.
     intr_count γ root_ppn n -∗
     tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    is_lock γl (mword_of_int KernelSyms.kmem) (kmem_res fl) -∗
+    is_lock γl (mword_of_int KernelSyms.kmem) (kmem_res γk fl) -∗
+    kalloc_avail γk on -∗
     stack_own (pa_stk sp0 kv_frame_slots) K -∗
     a_noff ↦₄ noffv -∗
     a_int ↦₄ intena_old -∗
@@ -92,7 +93,7 @@ Section WpSconfKalloc.
       pc_is ret_tgt -∗
       gpr_file mr -∗
       ⌜ callee_saved m mr ⌝ -∗
-      kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      kalloc_post γk on (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       stack_own (pa_stk sp0 kv_frame_slots) K -∗
       a_cpu ↦₈ (zero_reg : mword 64) -∗
       a_noff ↦₄ noff_ret -∗
@@ -102,7 +103,7 @@ Section WpSconfKalloc.
   Proof.
     intros pcE sp0 ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store noff_ret
       HK Hcpune Hretm Hfl Hnoff_lvl Hnoffpos Hintena0.
-    iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile #Hlock Hdeep Hqnoff Hqint Hqcpu Hcont".
+    iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile #Hlock Havail Hdeep Hqnoff Hqint Hqcpu Hcont".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (kai_00 with "Htext") as "Hi00".
     iPoseProof (kai_02 with "Htext") as "Hi02".
@@ -219,7 +220,7 @@ Section WpSconfKalloc.
     { assert (Hda : pa_stk (pa_stk sp0 kv_frame_slots) 4 = pa_stk spr kv_frame_slots).
       { unfold spr, sp0, pa_stk, add_vec_int, kv_frame_slots. rewrite !add_vec_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
       iEval (rewrite Hda) in "Hdeep". iExact "Hdeep". }
-    iApply (wp_acquire_sconf γ root_ppn Φ γl (kmem_res fl) mA
+    iApply (wp_acquire_sconf γ root_ppn Φ γl (kmem_res γk fl) mA
               cpuold noffv intena_old n
               ltac:(rewrite HmAtp; exact Hcpune)
               ltac:(rewrite HmAra; vm_compute; reflexivity)
@@ -258,7 +259,7 @@ Section WpSconfKalloc.
     assert (Hpp1a : add_vec_int (mword_of_int (AK + 0x16) : mword 64) 4 = mword_of_int (AK + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a ld s1,-2038(s1) : s1 := head *)
-    iDestruct "HRres" as (head pages) "[Hflw Hchain]".
+    iDestruct "HRres" as (head pages) "(Hflw & Hchain & Hauth)".
     assert (Hldaddr : add_vec (R6 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fc : mword 12)) = fl).
     { rewrite Hs1R6 Hfl. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_ld_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x1a)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x7fc : mword 12)
@@ -287,9 +288,11 @@ Section WpSconfKalloc.
       assert (Htgtbeq : add_vec (mword_of_int (AK + 0x1e) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 23 : mword 8) ('b"0")))) = mword_of_int (AK + 0x4c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtbeq) in "Hpc".
-      iAssert (kmem_res fl) with "[Hflw]" as "HRres".
-      { iApply (kmem_res_close fl head []). rewrite /word_at.
-        iSplitL "Hflw"; [ iExact "Hflw" | iPureIntro; exact Hhead ]. }
+      (* the empty list pins the caller's count (if any) to 0 *)
+      iDestruct (kalloc_avail_zero γk on with "Havail Hauth") as %Hzero.
+      iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HRres".
+      { iApply (kmem_res_close γk fl head []). rewrite /word_at.
+        iFrame "Hflw Hauth". iPureIntro. exact Hhead. }
       iPoseProof (kai_4c with "Htext") as "Hi4c".
       iPoseProof (kai_50 with "Htext") as "Hi50".
       iPoseProof (kai_54 with "Htext") as "Hi54".
@@ -346,7 +349,7 @@ Section WpSconfKalloc.
       iAssert (intr_count γ root_ppn (S n)) with "[Htok0 HsepA HscaA HstvA]" as "Hcnt".
       { iApply (intr_count_pack_S γ root_ppn n with "Htok0").
         iApply (intr_restore_intro γ root_ppn hA with "HiA HsA HsepA HscaA HstvA"). }
-      iApply (wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) (kmem_res fl) E3
+      iApply (wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) (kmem_res γk fl) E3
                 (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
                 po_noff_store
                 (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
@@ -489,7 +492,7 @@ Section WpSconfKalloc.
       assert (Hretf : update_vec_dec (add_vec (P45 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
         by (rewrite HP45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iApply ("Hcont" $! P45 with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] [] Hdeep [Hcpu2] [Hnoff2] [Hint2]").
+      iApply ("Hcont" $! P45 with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] [Havail] Hdeep [Hcpu2] [Hnoff2] [Hint2]").
       3:{ iEval (rewrite HE3a0) in "Hcpu2". iExact "Hcpu2". }
       3:{ iEval (rewrite HE3tp) in "Hnoff2". iExact "Hnoff2". }
       3:{ iEval (rewrite HE3tp) in "Hint2". iExists _. iExact "Hint2". }
@@ -523,10 +526,14 @@ Section WpSconfKalloc.
           rewrite /P44 lookup_total_insert.
           rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
         repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
-      { rewrite /kalloc_post. iLeft. iPureIntro. exact HP45a0. }
+      { rewrite /kalloc_post. iLeft. iFrame "Havail".
+        iSplit; iPureIntro; [exact HP45a0 | exact Hzero]. }
     - (* ===== NONEMPTY: head=pg, pop + release + memset(p,5,4096) ===== *)
       iDestruct "Hchain" as "(-> & %Hpv & Hrun)".
       iDestruct "Hrun" as (nxt) "[Hrun Hchain]".
+      (* the pop's ghost step: count S (length ps) -> length ps *)
+      iEval (cbn [length]) in "Hauth".
+      iMod (kmem_avail_dec γk on (length ps) with "Havail Hauth") as "[Havail Hauth]".
       iApply (wp_cbeqz_fall_s_sconf γ root_ppn Φ (mword_of_int (AK + 0x1e)) (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 1)) (mword_of_int 9 : mword 5)
                 R7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hs1R7; apply eq_vec_false_iff; intro Hpz;
@@ -574,8 +581,8 @@ Section WpSconfKalloc.
       { iEval (rewrite -Hstaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
       iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hflw".
       rewrite Ha5R9. iEval (rewrite Hstaddr) in "Hflw".
-      iAssert (kmem_res fl) with "[Hflw Hchain]" as "HRres".
-      { iApply (kmem_res_close fl nxt ps). rewrite /word_at. iFrame "Hflw Hchain". }
+      iAssert (kmem_res γk fl) with "[Hflw Hchain Hauth]" as "HRres".
+      { iApply (kmem_res_close γk fl nxt ps). rewrite /word_at. iFrame "Hflw Hchain Hauth". }
       iAssert (page_own pg) with "[Hpnext Hprest]" as "Hpage".
       { iApply (run_page_page_own pg nxt). rewrite /run_page /word_at. iFrame "Hpnext Hprest". }
       assert (Hpp2a : add_vec_int (mword_of_int (AK + 0x26) : mword 64) 4 = mword_of_int (AK + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -623,7 +630,7 @@ Section WpSconfKalloc.
       { rewrite /R12 /R11 /R10 /R9 /R8;
         repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]); exact Hs1R7. }
       iDestruct (stack_own_split_1 (pa_stk spr kv_frame_slots) 10 (K-4) ltac:(lia) with "Hdeep") as "[Hd10 Hrest]".
-      iApply (wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) (kmem_res fl) R12
+      iApply (wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) (kmem_res γk fl) R12
                 (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
                 po_noff_store
                 (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
@@ -838,7 +845,7 @@ Section WpSconfKalloc.
       assert (Hretf : update_vec_dec (add_vec (Q45 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
         by (rewrite HQ45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iApply ("Hcont" $! Q45 with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] [Hpage] Hdeep [Hcpu2] [Hnoff2] [Hint2]").
+      iApply ("Hcont" $! Q45 with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile [%] [Hpage Havail] Hdeep [Hcpu2] [Hnoff2] [Hint2]").
       3:{ iEval (rewrite HR12a0) in "Hcpu2". iExact "Hcpu2". }
       3:{ iEval (rewrite HR12tp) in "Hnoff2". iExact "Hnoff2". }
       3:{ iEval (rewrite HR12tp) in "Hint2". iExists _. iExact "Hint2". }
@@ -875,7 +882,7 @@ Section WpSconfKalloc.
           rewrite /Q44 lookup_total_insert.
           rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
         repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
-      { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage". iPureIntro. exact Hpv. }
+      { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage Havail". iPureIntro. exact Hpv. }
   Qed.
 
 End WpSconfKalloc.

@@ -31,7 +31,7 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 Section WpSconfMappages.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
 
   Notation MP := KernelSyms.mappages.

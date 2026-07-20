@@ -89,7 +89,7 @@ Proof.
 Qed.
 
 Section WpSconfWalk.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
 
   Notation WK := KernelSyms.walk.
@@ -1222,7 +1222,7 @@ Section WpSconfWalk.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
     (* ---- kalloc() through the env bundle ---- *)
-    iDestruct "Henv" as (qint qcpu) "(%Hqne & %H0ne & #Hlock & Hnoff & Hint & Hqcpu)".
+    iDestruct "Henv" as (γk qint qcpu) "(%Hqne & %H0ne & #Hlock & #Havail & Hnoff & Hint & Hqcpu)".
     assert (HspJ : J !!! Regidx csp_rs1 = spr).
     { rewrite /J. rewrite lookup_total_insert_ne; [| reg_neq]. exact Hsp. }
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
@@ -1231,8 +1231,8 @@ Section WpSconfWalk.
       by (rewrite /J lookup_total_insert; reflexivity).
     assert (Hretk : eq_vec (access_vec_dec (update_vec_dec (add_vec (J !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true).
     { rewrite HJ1. vm_compute. reflexivity. }
-    iApply (wp_kalloc_sconf γ root_ppn Φ γa (mword_of_int (KernelSyms.kmem + 24))
-              J qcpu (zeros' 32 : mword 32) qint lvl (K - 8)%nat
+    iApply (wp_kalloc_sconf γ root_ppn Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
+              J qcpu (zeros' 32 : mword 32) qint None lvl (K - 8)%nat
               ltac:(lia)
               ltac:(rewrite HJ4; exact Hqne)
               Hretk
@@ -1240,7 +1240,7 @@ Section WpSconfWalk.
               ltac:(split; [intros _; exact Hlvl | intros _; vm_compute; reflexivity])
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile [Hlock] [Hdeep] [Hnoff] [Hint] [Hqcpu] [-]").
+              with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile [Hlock] Havail [Hdeep] [Hnoff] [Hint] [Hqcpu] [-]").
     { iExact "Hlock". }
     { iEval (rewrite HspJ). iExact "Hdeep". }
     { iEval (rewrite HJ4). iExact "Hnoff". }
@@ -1272,16 +1272,16 @@ Section WpSconfWalk.
     iDestruct "Hint2" as (qint2) "Hint2".
     iAssert (kalloc_env γa (mm !!! Regidx (mword_of_int 4)))
       with "[Hcpu2 Hnoff2 Hint2]" as "Henv".
-    { iExists qint2, (zero_reg : mword 64).
+    { iExists γk, qint2, (zero_reg : mword 64).
       iSplitR. { iPureIntro. exact H0ne. }
       iSplitR. { iPureIntro. exact H0ne. }
-      iFrame "Hlock".
+      iFrame "Hlock". iFrame "Havail".
       iSplitL "Hnoff2".
       { iEval (rewrite HJ4 Hnr) in "Hnoff2". iExact "Hnoff2". }
       iSplitL "Hint2". { iEval (rewrite HJ4) in "Hint2". iExact "Hint2". }
       iExact "Hcpu2". }
     (* +0x7c c.beqz a0: the null/success split *)
-    iDestruct "Hkpost" as "[%Hnull | [%Hpv Hpage]]".
+    iDestruct "Hkpost" as "[(%Hnull & _ & _) | (%Hpv & Hpage & _)]".
     { (* ---- NULL: exit through the epilogue with a0 = 0 ---- *)
       assert (HN1a0 : N1 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10 : mword 5)).
       { rewrite /N1. rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
