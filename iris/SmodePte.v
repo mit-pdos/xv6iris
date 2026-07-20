@@ -233,38 +233,6 @@ Proof.
   change (2 ^ 6) with 64. lia.
 Qed.
 
-(* =================================================================== *)
-(* GENERIC TLB consistency, parametric in the set of LEGAL entries.       *)
-(* This is the forward-compatible shape for the eventual all-4KB kernel   *)
-(* page table (where every resident slot holds its OWN distinct 4KB leaf  *)
-(* entry, not one shared superpage): consistency = every resident entry    *)
-(* is a legal entry the page table can produce, i.e. satisfies [P].       *)
-(* The current identity-superpage kernel is the instance [P := (= the      *)
-(* superpage entry)]; a kernel that also maps the UART is                  *)
-(* [P := (= superpage) \/ (= uart leaf)]; a full 4KB kernel is             *)
-(* [P := (fun e => exists vpn, e = <leaf the walk of vpn installs>)].      *)
-(* =================================================================== *)
-Definition tlb_consistent (P : TLB_Entry -> Prop)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) : Prop :=
-  forall i, 0 <= i < 2 ^ 6 ->
-    vec_access_dec tlbvec i = None \/
-    (exists e, vec_access_dec tlbvec i = Some e /\ P e).
-
-(* a fill installs a legal entry, preserving consistency *)
-Lemma tlb_consistent_fill (P : TLB_Entry -> Prop)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (e : TLB_Entry) (j : Z) :
-  0 <= j < 2 ^ 6 ->
-  P e ->
-  tlb_consistent P tlbvec ->
-  tlb_consistent P (vec_update_dec tlbvec j (Some e)).
-Proof.
-  intros Hj HPe Hc i Hi.
-  rewrite (vec64_access_update tlbvec j i _ ltac:(lia)).
-  destruct (Z.eqb i j).
-  - right. exists e. split; [ reflexivity | exact HPe ].
-  - apply Hc. exact Hi.
-Qed.
-
 (* ---- [tlb]-register set laws: a TLB fill writes only the [tlb] cell, so     *)
 (* nested/idempotent [set_reg .. tlb ..] collapse.  Used to flatten the         *)
 (* possibly-double-filled fetch state to a single [set_reg σ tlb tlbvec2].      *)

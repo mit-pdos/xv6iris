@@ -395,31 +395,6 @@ Proof.
   left. exact (ram_svpn_range a Hram).
 Qed.
 
-(* the three-way slot fact [exec_translate_tramp] consumes, from generic
-   consistency at [P_kpt] (RAM-va instance) *)
-Lemma kpt_slot_disj (root : mword 44) (a : mword 64)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
-  addr_is_ram a ->
-  tlb_consistent (P_kpt root) tlbvec ->
-  vec_access_dec tlbvec (tlb_hash (__id 39) (svpn_of a)) = None \/
-  (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) (svpn_of a)) = Some ent /\
-               match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) (svpn_of a)) = false) \/
-  (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) (svpn_of a))
-                = Some (tlb4k_entry (mword_of_int 0) (svpn_of a) (kpt_leaf_ppn (svpn_of a))
-                          (mk_pte (kpt_leaf_ppn (svpn_of a)) PTE_RAM) ptea)).
-Proof.
-  intros Hram Hcons.
-  destruct (Hcons (tlb_hash (__id 39) (svpn_of a))
-              (tlb_hash_range (svpn_of a))) as [Hn | (e & He & HPe)].
-  - left. exact Hn.
-  - destruct (P_kpt_disc root a e Hram HPe) as [-> | Hnm].
-    + right. right. exists (kpt_slot0_pa root (svpn_of a)).
-      rewrite He. unfold kpt_tlb_ent, kpt_leaf_pte.
-      rewrite (dram_lflags (svpn_of a) (ram_svpn_range a Hram)).
-      reflexivity.
-    + right. left. exists e. split; [exact He | exact Hnm].
-Qed.
-
 (* ===================================================================== *)
 (* 7. Flag-byte facts for the two leaf kinds (A/D preset).                *)
 (* ===================================================================== *)
@@ -990,27 +965,6 @@ Lemma P_kpt_ad_ram (adf : kpt_adf) (root : mword 44) (a : mword 64) :
 Proof.
   intros Hram. exists (svpn_of a). split; [| reflexivity].
   left. exact (ram_svpn_range a Hram).
-Qed.
-
-Lemma kpt_slot_disj_ad (adf : kpt_adf) (root : mword 44) (a : mword 64)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
-  addr_is_ram a ->
-  tlb_consistent (P_kpt_ad adf root) tlbvec ->
-  vec_access_dec tlbvec (tlb_hash (__id 39) (svpn_of a)) = None \/
-  (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) (svpn_of a)) = Some ent /\
-               match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) (svpn_of a)) = false) \/
-  (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) (svpn_of a))
-                = Some (tlb4k_entry (mword_of_int 0) (svpn_of a) (kpt_leaf_ppn (svpn_of a))
-                          (mk_pte (kpt_leaf_ppn (svpn_of a)) (kpt_lflags_ad adf (svpn_of a))) ptea)).
-Proof.
-  intros Hram Hcons.
-  destruct (Hcons (tlb_hash (__id 39) (svpn_of a))
-              (tlb_hash_range (svpn_of a))) as [Hn | (e & He & HPe)].
-  - left. exact Hn.
-  - destruct (P_kpt_ad_disc adf root a e Hram HPe) as [-> | Hnm].
-    + right. right. exists (kpt_slot0_pa root (svpn_of a)).
-      rewrite He. reflexivity.
-    + right. left. exists e. split; [exact He | exact Hnm].
 Qed.
 
 (* ===================================================================== *)
