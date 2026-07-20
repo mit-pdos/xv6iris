@@ -118,26 +118,23 @@ uservec's return switch reuses TransPt's pt2 window with roles swapped
 (`Sp := upt_tree_spec uroot tfp um`, `Sc := kpt_tree_spec kroot`);
 `wp_userret_pt`'s post hands back `pt_frame (kpt_tree_spec kroot)`.
 
-### Remaining work
+### Status
 
-- **AMO EXECUTE reduction** (`execute_AMO`, execute-level, borders assembly): its
-  own pre-translation alignment check (misaligned → E_SAMO_Access_Fault via
-  `GlobalMisalignedExceptions_amo = AccessFault`), then translate + mem_write_ea +
-  mem_read + mem_write_value + the per-op result computation (AMOCAS
-  special-cased) + wX; the mem-level facts are `user_pt_amo_data_4`.
-- Wire the fault wrappers into `fetch_fault_obligation` / the memory-trap arms,
-  then the UserClassify assembly.
-- Concrete-witness stage: a real process table satisfying `upt_tree_spec` /
-  `upt_acc_wf` — meets KvmSpec.v.
+The port is complete: the AMO-execute reduction and the fault-wrapper /
+UserClassify assembly are done, and the arbitrary user-mode execution WP is
+closed (`wp_user_exec_closed`, UserExecClose.v — axiom-clean, no totality
+hypotheses). Its two open hypotheses (the `user_inv` discharge at boot/userret
+and the uservec `stvec_handler_wp` proof) are the remaining execution-side work
+and are tracked in [user-mode-exec-v2.md](user-mode-exec-v2.md).
 
 ### Remaining cleanup
 
-- Post-UserPt sweep: UserPt was the last consumer of several KptPt P_kpt/_ad
-  iris-side instances and SmodePte's `tlb_consistent` — verify dead and delete.
-  KEEP KptPt §12's `_ad` CLASSIFICATION lemmas (the live A/D-variance bridge
-  KptTree consumes).
-- WpIntrCore's commented-out U-side region (§5b/§6 porting stock) can be retired
-  once the flipped chain covers its intent.
+- Delete SmodePte's `tlb_consistent` (+ `tlb_consistent_fill`) and its only
+  consumers `kpt_slot_disj` / `kpt_slot_disj_ad` (KptPt.v) — verified dead (no
+  external uses; outside KptPt, `tlb_consistent`/`tlb_inv_gen` survive only in
+  comments). KEEP KptPt §12's `_ad` CLASSIFICATION lemmas (`kpt_leaf_pte_ad`,
+  `kpt_lflags_ad`, `kpt_inv_red_ad`, …) — the live A/D-variance bridge KptTree
+  consumes.
 
 ### Tricky cases / gotchas
 
