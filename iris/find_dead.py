@@ -21,11 +21,21 @@ Caveats (why a "dead" hit may be a false positive):
     indistinguishable from dead code by this analysis -- that's the judgment
     call this tool is meant to surface, not make.
 
+The run also ends with a whole-FILE report: modules (.v files) that no OTHER
+module in the project Require's. Build LEAVES / top-level targets (adequacy,
+the current top theorem, Print-Assumptions/smoke files) legitimately appear
+there; a non-target module that appears is a dead-FILE candidate. This is read
+from the Require graph of the .v sources (not the .glob refs), so a file
+imported only for side effects -- an Export shim, an instance/notation/hint-only
+module -- still counts as imported.
+
 Usage:
   python3 find_dead.py                 # analyse ./ (dir holding the .glob files)
   python3 find_dead.py --dir .         # same
   python3 find_dead.py --all           # include implicit (inst/not/ind/...) too
   python3 find_dead.py --kinds prf,def # restrict to given glob kinds
+  python3 find_dead.py --files-only    # ONLY list .v files imported by nothing
+  python3 find_dead.py --no-files      # skip the unreferenced-.v-file report
 """
 import argparse, bisect, os, re, sys
 
@@ -50,6 +60,74 @@ def coqproject_modules(dirpath):
         if line.endswith(".v") and not line.startswith("-"):
             mods.add(os.path.basename(line)[:-2])
     return mods
+
+# ---------------------------------------------------------------------------
+# Whole-FILE dead check: modules (.v files) that nothing else Require's.
+# Detected from the Require graph of the .v sources (NOT the .glob refs), so a
+# file imported only for side effects -- an Export shim, an instance/notation/
+# hint-only module -- still counts as imported. Only intra-project (xv6iris)
+# requires count: an external `From Kernel Require Import X` never marks an iris
+# module named X as imported.
+# ---------------------------------------------------------------------------
+_MODTOKEN = r"[A-Za-z_][\w']*(?:\.[A-Za-z_][\w']*)*"
+_REQUIRE_RE = re.compile(
+    r"(?:From\s+(" + _MODTOKEN + r")\s+)?"
+    r"Require\s+(?:(?:Import|Export)\s+)?"
+    r"(" + _MODTOKEN + r"(?:\s+" + _MODTOKEN + r")*)\s*\.")
+
+def strip_coq_comments(text):
+    """Drop (possibly nested) (* ... *) comments so a 'Require' mentioned inside
+    a comment is not counted as a real dependency."""
+    out, depth, i, n = [], 0, 0, len(text)
+    while i < n:
+        two = text[i:i+2]
+        if two == "(*":
+            depth += 1; i += 2; continue
+        if two == "*)" and depth > 0:
+            depth -= 1; i += 2; continue
+        if depth == 0:
+            out.append(text[i])
+        i += 1
+    return "".join(out)
+
+def module_set(dirpath, only_mods):
+    """The project's module basenames: from _CoqProject if present, else every
+    *.v in the directory."""
+    if only_mods is not None:
+        return only_mods
+    return {f[:-2] for f in os.listdir(dirpath) if f.endswith(".v")}
+
+def unimported_modules(dirpath, modset):
+    """Sorted modules in `modset` that no OTHER module in `modset` Require's."""
+    imported = set()
+    for mod in sorted(modset):
+        vp = os.path.join(dirpath, mod + ".v")
+        try:
+            text = strip_coq_comments(open(vp, encoding="utf-8").read())
+        except OSError:
+            continue
+        for m in _REQUIRE_RE.finditer(text):
+            from_pfx = m.group(1) or ""
+            if from_pfx not in ("", "xv6iris"):
+                continue                       # requires from an external tree
+            for tok in m.group(2).split():
+                parts = tok.split(".")
+                base, tok_pfx = parts[-1], ".".join(parts[:-1])
+                if tok_pfx not in ("", "xv6iris"):
+                    continue                   # externally-qualified module
+                if base in modset and base != mod:
+                    imported.add(base)
+    return sorted(m for m in modset if m not in imported)
+
+def print_unimported(dirpath, modset):
+    unimp = unimported_modules(dirpath, modset)
+    print(f"\n== {len(unimp)} module file(s) imported by nothing else "
+          f"(of {len(modset)}) ==")
+    print("   Expected here: build LEAVES / top-level targets -- adequacy, "
+          "whole-system theorems, Print-Assumptions/smoke files. A module that "
+          "is NOT a deliberate top-level target is a dead-FILE candidate.")
+    for m in unimp:
+        print(f"  {m}.v")
 
 def line_index(vpath):
     """Byte-offset -> 1-based line lookup for a .v file."""
@@ -78,10 +156,20 @@ def main():
     ap.add_argument("--kinds", default="", help="comma list of glob kinds to report")
     ap.add_argument("--triage", action="store_true",
                     help="group by heuristic category instead of by file")
+    ap.add_argument("--files-only", action="store_true",
+                    help="only list .v files imported by nothing else (skip the "
+                         "per-definition analysis)")
+    ap.add_argument("--no-files", action="store_true",
+                    help="skip the trailing unreferenced-.v-file report")
     args = ap.parse_args()
     d = args.dir
 
     only_mods = coqproject_modules(d)
+
+    if args.files_only:
+        print_unimported(d, module_set(d, only_mods))
+        return
+
     globs = sorted(g for g in os.listdir(d) if g.endswith(".glob"))
     if only_mods is not None:
         globs = [g for g in globs if g[:-5] in only_mods]
@@ -194,6 +282,9 @@ def main():
     print("NB: heuristic categories are hints, not verdicts. Instances/Notations, "
           "hint-DB-only lemmas, and not-yet-consumed top-level theorems can appear "
           "here. Use --all for implicit kinds, drop --triage for by-file view.")
+
+    if not args.no_files:
+        print_unimported(d, module_set(d, only_mods))
 
 TOPLEVEL_RE = re.compile(
     r"^(wp_acquire$|wp_holding|wp_kernel$|wp_kernelvec$|wp_spin$|wp_start$|wp_memset_s|"
