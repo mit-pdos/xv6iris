@@ -27,10 +27,12 @@ not in local per-session memory files. Put it in the right file: durable rules
 here; performance/build tuning in [`optimization.md`](optimization.md); subsystem
 design under [`design/`](design/); an in-flight worklist or plan under
 [`projects/`](projects/) (one file per project, so an agent working on one task
-never has to read another task's worklist). Add a pointer line to
-[`README.md`](README.md) when you create a new file, and delete a project file
-once its work has landed and its durable lessons have been lifted into the design
-or durable notes.
+never has to read another task's worklist); a finished project — no remaining
+work and no cleanup — moves to [`completed/`](completed/). Add a pointer line to
+[`README.md`](README.md) when you create a new file. When a project is fully
+done, move its file from `projects/` to `completed/` (rather than deleting it),
+so its durable design notes, gotchas, and reusable recipes stay available; lift
+any broadly-applicable lessons up into the design or durable notes as well.
 
 Record only what is useful for **future** development: architecture, conventions,
 gotchas, and techniques that will recur. Do NOT record narratives of refactorings

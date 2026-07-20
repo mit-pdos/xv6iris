@@ -59,11 +59,19 @@ are working on that effort — the relevant `projects/` file.
   initlock + freerange, over kfree).
 - **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
   mappages / walk proofs (`KvmSpec.v`).
-- **[`user-mode-ptree-port.md`](projects/user-mode-ptree-port.md)** — porting
-  user-mode execution onto the ptree page-table layer (UserPt → `utlb_inv_pt`).
 - **[`user-mode-exec-v2.md`](projects/user-mode-exec-v2.md)** — arbitrary
   user-mode execution (v2: `UserPt.v` / `UserExec.v`).
 
-When a project lands, delete its file here after lifting any durable lessons
-into `durable-notes.md` or the relevant `design/` file (see "Maintaining these
-notes" in `durable-notes.md`).
+### `completed/` — finished projects, archived for reference
+
+Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
+their durable design notes, gotchas, and reusable recipes.
+
+- **[`user-mode-ptree-port.md`](completed/user-mode-ptree-port.md)** — porting
+  user-mode execution onto the ptree page-table layer (UserPt → `utlb_inv_pt`);
+  the port and its cleanup are done. The remaining execution-side hypotheses
+  (`user_inv` discharge + `stvec_handler_wp`) live in `user-mode-exec-v2.md`.
+
+When a project is fully finished — no remaining work and no cleanup — move its
+file from `projects/` to `completed/` (rather than deleting it), so its durable
+lessons stay available. See "Maintaining these notes" in `durable-notes.md`.

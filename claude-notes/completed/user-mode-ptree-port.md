@@ -125,16 +125,7 @@ UserClassify assembly are done, and the arbitrary user-mode execution WP is
 closed (`wp_user_exec_closed`, UserExecClose.v — axiom-clean, no totality
 hypotheses). Its two open hypotheses (the `user_inv` discharge at boot/userret
 and the uservec `stvec_handler_wp` proof) are the remaining execution-side work
-and are tracked in [user-mode-exec-v2.md](user-mode-exec-v2.md).
-
-### Remaining cleanup
-
-- Delete SmodePte's `tlb_consistent` (+ `tlb_consistent_fill`) and its only
-  consumers `kpt_slot_disj` / `kpt_slot_disj_ad` (KptPt.v) — verified dead (no
-  external uses; outside KptPt, `tlb_consistent`/`tlb_inv_gen` survive only in
-  comments). KEEP KptPt §12's `_ad` CLASSIFICATION lemmas (`kpt_leaf_pte_ad`,
-  `kpt_lflags_ad`, `kpt_inv_red_ad`, …) — the live A/D-variance bridge KptTree
-  consumes.
+and are tracked in [user-mode-exec-v2.md](../projects/user-mode-exec-v2.md).
 
 ### Tricky cases / gotchas
 
