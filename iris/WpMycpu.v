@@ -720,54 +720,5 @@ Section WpMycpu.
       unfold mycpu_ret, mycpu_a5. reflexivity.
   Qed.
 
-  Lemma wp_mycpu (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64))
-      (n : nat)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let tp_idx : mword 5 := mword_of_int 4 in
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let sp0 := m0 !!! Regidx csp_rs1 in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (2 ≤ n)%nat ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (* the single "PMP TOR entry 0 covers all of RAM" config fact *)
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    stack_own sp0 n -∗
-    (* ∀-continuation form: the returned register file is abstract [m'],
-       constrained only by [callee_saved] + the [a0] return value.  (The
-       concrete m1..m11 write-chain is a private detail of the proof below,
-       not part of this interface.) *)
-    ( ∀ m' : gmap regidx (mword 64),
-      hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗ gpr_file m' -∗
-      ⌜ callee_saved m0 m' /\
-        m' !!! Regidx a0_idx = mycpu_ret (m0 !!! Regidx tp_idx) ⌝ -∗
-      stack_own sp0 n -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_mycpu_r (kpt_regime root_ppn) Φ m0 n mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
-  Qed.
 
 End WpMycpu.

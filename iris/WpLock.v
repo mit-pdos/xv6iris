@@ -69,25 +69,6 @@ Section Lock.
 
   (* lock construction: a FREE physical lock word plus the resource it is to
      protect become a lock (spin_lock.v's [newlock]). *)
-  Lemma newlock E (lk : mword 64) (R : iProp Σ) :
-    lock_word lk (mword_of_int 0) -∗ R ={E}=∗ ∃ γ, is_lock γ lk R.
-  Proof.
-    iIntros "Hw HR".
-    iMod (own_alloc (Excl ())) as (γ) "Htok"; first done.
-    iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hw HR Htok]") as "#Hinv".
-    { iNext. iExists (mword_of_int 0). iFrame "Hw". iLeft. by iFrame. }
-    iModIntro. iExists γ. iExact "Hinv".
-  Qed.
 
   (* a lock created in the HELD state: the creator keeps token + R *)
-  Lemma newlock_held E (lk : mword 64) (v : mword 32) (R : iProp Σ) :
-    neq_vec (sign_extend' 64 v) zero_reg = true ->
-    lock_word lk v ={E}=∗ ∃ γ, is_lock γ lk R ∗ locked γ.
-  Proof.
-    iIntros (Hnz) "Hw".
-    iMod (own_alloc (Excl ())) as (γ) "Htok"; first done.
-    iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hw]") as "#Hinv".
-    { iNext. iExists v. iFrame "Hw". iRight. by iPureIntro. }
-    iModIntro. iExists γ. iFrame "Htok". iExact "Hinv".
-  Qed.
 End Lock.

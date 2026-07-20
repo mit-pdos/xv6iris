@@ -74,50 +74,7 @@ Section Kalloc.
 
 
 
-  Lemma wp_cbeqz_fall_s_config_scfg_pt_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    creg2reg_idx rs = Regidx rd1 ->
-    uint rd1 <> 0 ->
-    eq_vec (m !!! Regidx rd1) zero_reg = false ->
-    smode_config γ dq -∗ sr_inv R -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ)) -∗
-    ( smode_config γ dq -∗ sr_inv R -∗
-      pc_is (add_vec_int pc 2) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrs Hrd1 Hcmp) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_cbeqz_fall_s_config_r R Φ pc imm8 rs rd1 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs Hrd1 Hcmp
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
 
-  Lemma wp_cbeqz_fall_s_config_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    creg2reg_idx rs = Regidx rd1 ->
-    uint rd1 <> 0 ->
-    eq_vec (m !!! Regidx rd1) zero_reg = false ->
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ)) -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cbeqz_fall_s_config_scfg_pt_r (kpt_regime root_ppn) γ Φ pc imm8 rs rd1 m (dq:=dq)).
-  Qed.
 
   (* local wp_gpr_write_s_config_base_scfg_pt engine copy removed (unused). *)
   (* ============================================================= *)
@@ -1040,71 +997,5 @@ Section Kalloc.
       { rewrite /kalloc_post HQ45a0. iRight. iFrame "Hpage". iPureIntro. exact Hpv. }
   Qed.
 
-  Lemma wp_kalloc (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γ : gname)
-      (m : gmap regidx (mword 64))
-      (qcpuold : bv 64)
-      (qnoff qintena_old : mword 32) (a0f fl : mword 64)
-      (γc : gname) (bsie : mword 1)
-      (n : nat)
-      :
-    let pcE : mword 64 := mword_of_int AK in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m in
-    let R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1 in
-    let R3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (AK + 0x0a) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R2 in
-    let R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x7f0 : mword 12)))]> R3 in
-    let mA := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)]> R4 in
-    let lkA := mA !!! Regidx (mword_of_int 10 : mword 5) in
-    let q_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let q_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let q_cpu := add_vec lkA (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let q_storeval32 := (zeros' 32 : mword 32) in
-    let q_noff_a5 := sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 qnoff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
-    let q_noff_store := (autocast (T := mword) (subrange_vec_dec q_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let q_ret_tgt := update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let q_noff_ret := (autocast (T := mword) (subrange_vec_dec
-        (sign_extend' 64 (subrange_vec_dec
-           (add_vec (sign_extend' 64 q_noff_store)
-              (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
-        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let q_int_ret := (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old) in
-    (14 <= n)%nat ->
-    eq_vec (qcpuold : mword 64) (mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    eq_vec (access_vec_dec q_ret_tgt 0) ('b"0") = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    fl = mword_of_int (KernelSyms.kmem + 24) ->
-    a0f = mycpu_ret (mA !!! Regidx (mword_of_int 4 : mword 5)) ->
-    zopz0zKzJ_s zero_reg (sign_extend' 64 q_noff_store) = false ->
-    eq_vec (sign_extend' 64
-       (if eq_vec (sign_extend' 64 qnoff) zero_reg then q_storeval32 else qintena_old)) zero_reg = true ->
-    smode_config γc (DfracOwn 1) -∗
-    ghost_var γc (1/2) bsie -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    stack_own sp0 n -∗
-    q_noff ↦₄ qnoff -∗
-    q_intena ↦₄ qintena_old -∗
-    is_lock γ lkA (kmem_res fl) -∗
-    q_cpu ↦₈ qcpuold -∗
-    ( ∀ (mr : gmap regidx (mword 64)),
-      smode_config γc (DfracOwn 1) -∗
-      ghost_var γc (1/2) bsie -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mr -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      kalloc_post (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      stack_own sp0 n -∗
-      q_cpu ↦₈ (zero_reg : mword 64) -∗
-      q_noff ↦₄ q_noff_ret -∗
-      q_intena ↦₄ q_int_ret -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_kalloc_r (kpt_regime root_ppn) Φ γ m qcpuold qnoff qintena_old a0f fl γc bsie n).
-  Qed.
 
 End Kalloc.

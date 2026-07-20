@@ -101,56 +101,6 @@ Section WpCallMycpu.
       rewrite -Htp. exact Ha0.
   Qed.
 
-  Lemma wp_call_mycpu (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (P : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec P (sign_extend' 64 jimm) = pcE ->
-    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
-    mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is P -∗ gpr_file m -∗
-    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-    ( ∀ mo,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-      ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
-      mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mo -∗
-      ⌜ callee_saved m mo /\
-        mo !!! Regidx (mword_of_int 10 : mword 5)
-          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_call_mycpu_r (kpt_regime root_ppn) γ Φ P jimm m mstatus0 mie_v mdv0 menvcfg0).
-  Qed.
 
   (* jal->mycpu->return block, [smode_config] view with the ABSTRACT
      callee_saved post (mirrors the raw [wp_call_mycpu]).  For concrete-
@@ -205,36 +155,5 @@ Section WpCallMycpu.
     iPureIntro. exact Hcs.
   Qed.
 
-  Lemma wp_call_mycpu_scfg_cs (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (P : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
-      :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec P (sign_extend' 64 jimm) = pcE ->
-    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γ (DfracOwn 1) -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is P -∗ gpr_file m -∗
-    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-    ( ∀ mo,
-      smode_config γ (DfracOwn 1) -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mo -∗
-      ⌜ callee_saved m mo /\
-        mo !!! Regidx (mword_of_int 10 : mword 5)
-          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_call_mycpu_scfg_cs_r (kpt_regime root_ppn) γ Φ P jimm m).
-  Qed.
 
 End WpCallMycpu.

@@ -162,28 +162,7 @@ Qed.
 (* BGE fall-through execute.                                              *)
 (* ===================================================================== *)
 
-Lemma exec_BTYPE_cmp_BGE (rs2 rs1 : mword 5) s :
-  exec (Defs.bind (rX_bits (Regidx rs1))
-          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
-             (fun w3 => returnM (zopz0zKzJ_s w2 w3)))) s
-    = Some (zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s), s).
-Proof.
-  unfold rvv.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  apply exec_returnM.
-Qed.
 
-Lemma exec_execute_BTYPE_BGE_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
-  zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s) = false ->
-  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))) s
-    = Some (RETIRE_SUCCESS, s).
-Proof.
-  intro Hfall.
-  unfold execute. cbn match. unfold execute_BTYPE.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BGE rs2 rs1 s)).
-  rewrite Hfall. apply exec_returnM.
-Qed.
 
 (* ===================================================================== *)
 (* FENCE rw,w execute (a no-op barrier at Supervisor with FIOM = 0).      *)
@@ -353,21 +332,6 @@ End WpPopOffInstr.
 
 (* BEQ-taken tolerating a bit1 = 1 target under Zca (twin of
    WpMemsetS.exec_execute_BTYPE_BNE_taken_zca). *)
-Lemma exec_execute_BTYPE_BEQ_taken_zca (imm : mword 13) (rs2 rs1 : mword 5) s :
-  eq_vec (rvv rs1 s) (rvv rs2 s) = true ->
-  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))) s
-    = Some (RETIRE_SUCCESS,
-            set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
-Proof.
-  intros Htaken Halign Hzca.
-  unfold execute. cbn match. unfold execute_BTYPE.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BEQ rs2 rs1 s)).
-  rewrite Htaken.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-  exact (exec_jump_to_zca _ s Halign Hzca).
-Qed.
 
 (* c.bnez / c.beqz TAKEN with only 2-aligned targets (Zca from hw_config). *)
 Section WpPopOffTakenZca.
@@ -609,56 +573,6 @@ Section WpPopOffTopSec.
       rewrite -Htp. exact Ha0.
   Qed.
 
-  Lemma wp_call_mycpu_vc (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (P : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec P (sign_extend' 64 jimm) = pcE ->
-    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-    WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
-    mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is P -∗ gpr_file m -∗
-    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-    ( ∀ mo,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-      ghost_var γc (1/2) (_get_Mstatus_SIE mstatus0) -∗
-      mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mo -∗
-      ⌜ callee_saved m mo /\
-        mo !!! Regidx (mword_of_int 10 : mword 5)
-          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_call_mycpu_vc_r (kpt_regime root_ppn) γc Φ P jimm m mstatus0 mie_v mdv0 menvcfg0).
-  Qed.
 
   (* [smode_config] view of the pure sstatus read (csrrs rd,sstatus,x0): mstatus
      is untouched, and the value read into [rd] is exposed only through the ghost
@@ -731,37 +645,6 @@ Section WpPopOffTopSec.
     exact Hmc.
   Qed.
 
-  Lemma wp_call_mycpu_vc_scfg (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (P : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
-      :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec P (sign_extend' 64 jimm) = pcE ->
-    eq_vec (access_vec_dec pcE 0) ('b"0") = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is P -∗ gpr_file m -∗
-    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-    ( ∀ mo,
-      smode_config γc (DfracOwn 1) -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mo -∗
-      ⌜ callee_saved m mo /\
-        mo !!! Regidx (mword_of_int 10 : mword 5)
-          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      stack_own (m0 !!! Regidx csp_rs1) 2 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_call_mycpu_vc_scfg_r (kpt_regime root_ppn) γc Φ P jimm m).
-  Qed.
 
   Lemma wp_pop_off_r (R : s_regime) (γc : gname) (Φ : mval -> iProp Σ)
       (m : gmap regidx (mword 64))
@@ -1582,48 +1465,6 @@ Section WpPopOffTopSec.
       { unfold callee_saved. repeat split; assumption. }
   Qed.
 
-  Lemma wp_pop_off (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64))
-      (noffv intenav : mword 32)
-      (n : nat)
-      {dqi : dfrac} :
-    let pcE : mword 64 := mword_of_int PP in
-    let a0v := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec a0v (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec a0v (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
-    let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (4 ≤ n)%nat ->
-    (* S-mode config facts + the interrupt-off sstatus fact are folded into
-       [smode_config γc] below. *)
-    (* noff >= 1 (signed) *)
-    zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
-    (* saved intena is 0 *)
-    eq_vec (sign_extend' 64 intenav) zero_reg = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    (* pop_off's whole 4-slot frame (2 own p8/p0 + 2 mycpu) as
-       [stack_own (m!!!csp) n] (n>=4). *)
-    stack_own (m !!! Regidx csp_rs1) n -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄{ dqi } intenav -∗
-    ( ∀ mf,
-      smode_config γc (DfracOwn 1) -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mf -∗
-      ⌜ callee_saved m mf ⌝ -∗
-      a_noff ↦₄ storeval -∗
-      a_int ↦₄{ dqi } intenav -∗
-      stack_own (m !!! Regidx csp_rs1) n -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_pop_off_r (kpt_regime root_ppn) γc Φ m noffv intenav n (dqi:=dqi)).
-  Qed.
 
 
 

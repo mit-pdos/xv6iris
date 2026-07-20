@@ -172,34 +172,6 @@ End WpReleaseInstr.
 (* JAL with a 2-mod-4 target, legal under Zca (pop_off sits at 0x...c3a). *)
 (* ===================================================================== *)
 
-Lemma exec_execute_JAL_gpr_zca (imm : mword 21) (rd : mword 5) s :
-  uint rd <> 0 ->
-  eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-  exec (execute_JAL imm (Regidx rd)) s
-  = Some (RETIRE_SUCCESS,
-          set_reg (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
-                  (R_bitvector_64 (gpr_of_Z (uint rd)))
-                  (regval_into_reg (register_lookup nextPC s.(sregs)))).
-Proof.
-  intros Hrd Halign Hzca.
-  unfold execute_JAL, get_next_pc.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg nextPC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to_zca _ s Halign Hzca)).
-  cbn match.
-  match goal with |- context[Defs.bind0 ?wx _] =>
-    assert (Hwx : exec wx (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
-                  = Some (tt, set_reg (set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)))
-                                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                                (regval_into_reg (register_lookup nextPC s.(sregs)))))
-  end.
-  { rewrite (exec_wX_bits_gpr rd (register_lookup nextPC s.(sregs)) _).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    reflexivity. }
-  rewrite (exec_bind0_Some _ _ _ _ _ Hwx).
-  apply exec_returnm.
-Qed.
 
 Section WpJalZca.
   Context `{!riscvGS Σ}.
@@ -217,31 +189,6 @@ End WpJalZca.
 (* ===================================================================== *)
 (* [mword1_zero_of_ne_one] is a pure bitvector fact -- now in RiscvExtras. *)
 
-Lemma sstatus_sie_clear_neq (m : mword 64) :
-  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
-  neq_vec (and_vec (sstatus_read m)
-             (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false.
-Proof.
-  intro HSIE.
-  unfold neq_vec. apply negb_false_iff. apply eq_vec_true_iff.
-  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1))
-    by (apply mword1_zero_of_ne_one; exact HSIE).
-  assert (Hb1 : Z.testbit (bv_unsigned (sstatus_read m)) 1 = false).
-  { unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
-    apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz. }
-  assert (Hmask : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)) : mword 64) = 2)
-    by (vm_compute; reflexivity).
-  assert (Hzr : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  apply bv_eq. rewrite WpGprCsrwC.and_vec_unsigned. rewrite Hmask. rewrite Hzr.
-  apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec. rewrite Z.bits_0.
-  destruct (decide (j = 1)) as [->|Hne].
-  - rewrite Hb1. reflexivity.
-  - assert (Ht2 : Z.testbit 2 j = false).
-    { destruct (Z.eq_dec j 0) as [->|Hj0].
-      - reflexivity.
-      - apply Z.bits_above_log2; [lia|]. change (Z.log2 2) with 1. lia. }
-    rewrite Ht2. apply andb_false_r.
-Qed.
 
 (* ===================================================================== *)
 (* wp_release -- the CSL release spec: the caller supplies the lock       *)
@@ -289,20 +236,6 @@ Section WpReleaseTop.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hbw").
   Qed.
 
-  Lemma wp_sd_zero_s_scfg (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
-    ea ↦₈ vold -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗ ea ↦₈ (zero_reg : mword 64) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_sd_zero_s_scfg_r (kpt_regime root_ppn) γ Φ pc rs1 imm m vold (dq:=dq)).
-  Qed.
 
   Lemma wp_sw_zero_lockinv_scfg_r (Rg : s_regime) (γc : gname) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
@@ -335,22 +268,6 @@ Section WpReleaseTop.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-  Lemma wp_sw_zero_lockinv_scfg (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (γ : gname) (lk : mword 64) (R : iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    ea = lk ->
-    smode_config γc dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
-    is_lock γ lk R -∗ locked γ -∗ R -∗
-    ( smode_config γc dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_sw_zero_lockinv_scfg_r (kpt_regime root_ppn) γc Φ γ lk R pc rs1 imm m (dq:=dq)).
-  Qed.
 
   Lemma wp_release_r (Rg : s_regime) (Φ : mval -> iProp Σ)
       (γ : gname) (γc : gname) (b : mword 1) (lka : mword 64) (R : iProp Σ)
@@ -947,60 +864,5 @@ Section WpReleaseTop.
     }
   Qed.
 
-  Lemma wp_release (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γ : gname) (γc : gname) (b : mword 1) (lka : mword 64) (R : iProp Σ)
-      (m : gmap regidx (mword 64))
-      (cpuold : mword 64) (noffv intenav : mword 32)
-      (n : nat)
-      {dqi : dfrac} :
-    let pcE : mword 64 := mword_of_int RL in
-    let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
-    let storeval_noff := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (10 <= n)%nat ->
-    (* the lock word (through the invariant) and the data slots *)
-    add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-    (* lk/cpu/noff/int slot geometry DERIVED in the leaves/pop_off from the
-       lock invariant and the owned points-to -- no po_slot_geom premise. *)
-    (* THIS cpu holds the lock: lk->cpu = mycpu() *)
-    eq_vec cpuold cpuv = true ->
-    (* pop_off preconditions (the sstatus SIE-bit fact is derived from the
-       SIE=0 fact folded into smode_config, so mstatus0 stays hidden) *)
-    zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
-    eq_vec (sign_extend' 64 intenav) zero_reg = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    ghost_var γc (1/2) b -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    is_lock γ lka R -∗
-    locked γ -∗
-    R -∗
-    a_cpu ↦₈ cpuold -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄{ dqi } intenav -∗
-    stack_own sp0 n -∗
-    ( ∀ mr,
-      smode_config γc (DfracOwn 1) -∗
-      ghost_var γc (1/2) b -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mr -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      a_cpu ↦₈ (zero_reg : mword 64) -∗
-      a_noff ↦₄ storeval_noff -∗
-      a_int ↦₄{ dqi } intenav -∗
-      stack_own sp0 n -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_release_r (kpt_regime root_ppn) Φ γ γc b lka R m cpuold noffv intenav n (dqi:=dqi)).
-  Qed.
 
 End WpReleaseTop.

@@ -69,241 +69,16 @@ Section WpHoldingInv.
      rebundles.  The sstatus-reading leaves (cret/cbnez_fall/cbnez_taken_zca…)
      reuse the wrappers exported by WpPopOff. ---- *)
 
-  Lemma wp_csdsp_gpr_s_scfg_pt_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
-    smode_config γ dq -∗ sr_inv Rg -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc true (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) -∗
-    ea ↦₈ vold -∗
-    ( smode_config γ dq -∗ sr_inv Rg -∗
-      pc_is (add_vec_int pc 2) -∗ gpr_file m -∗
-      ea ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    intros ea.
-    iIntros "Hsm Htlbinv Hpc Hfile Hinstr Hbw Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_csdsp_gpr_s_r Rg Φ pc uimm rs2 m vold mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hbw").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hbw").
-  Qed.
-
-  Lemma wp_csdsp_gpr_s_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc true (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx rs2, sp, 8)) -∗
-    ea ↦₈ vold -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗ gpr_file m -∗
-      ea ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_csdsp_gpr_s_scfg_pt_r (kpt_regime root_ppn) γ Φ pc uimm rs2 m vold (dq:=dq)).
-  Qed.
-
-  Lemma wp_cldsp_gpr_s_scfg_pt_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (uimm : mword 6) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (v : bv 64) {dq dqm : dfrac} :
-    let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
-    uint rd <> 0 ->
-    smode_config γ dq -∗ sr_inv Rg -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc true (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), sp, Regidx rd, false, 8)) -∗
-    ea ↦₈{ dqm } v -∗
-    ( smode_config γ dq -∗ sr_inv Rg -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ea ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    intros ea Hrd.
-    iIntros "Hsm Htlbinv Hpc Hfile Hinstr Hbw Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_cldsp_gpr_s_r Rg Φ pc uimm rd m v mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=dqm)
- Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hbw").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hbw".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hbw").
-  Qed.
-
-  Lemma wp_cldsp_gpr_s_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (uimm : mword 6) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (v : bv 64) {dq dqm : dfrac} :
-    let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
-    uint rd <> 0 ->
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
-    instr pc true (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), sp, Regidx rd, false, 8)) -∗
-    ea ↦₈{ dqm } v -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ea ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cldsp_gpr_s_scfg_pt_r (kpt_regime root_ppn) γ Φ pc uimm rd m v (dq:=dq) (dqm:=dqm)).
-  Qed.
 
 
-  Lemma wp_cmv_gpr_s_config_scfg_pt_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗ sr_inv Rg -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) -∗
-    ( smode_config γ dq -∗ sr_inv Rg -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (add_vec zero_reg (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_cmv_gpr_s_config_r Rg Φ pc rd rs2 m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
 
-  Lemma wp_cmv_gpr_s_config_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (add_vec zero_reg (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_cmv_gpr_s_config_scfg_pt_r (kpt_regime root_ppn) γ Φ pc rd rs2 m (dq:=dq)).
-  Qed.
 
-  Lemma wp_caddi_gpr_s_config_scfg_pt_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗ sr_inv Rg -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)) -∗
-    ( smode_config γ dq -∗ sr_inv Rg -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg
-        (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_caddi_gpr_s_config_r Rg Φ pc rd imm m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
 
-  Lemma wp_caddi_gpr_s_config_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)) -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg
-        (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_caddi_gpr_s_config_scfg_pt_r (kpt_regime root_ppn) γ Φ pc rd imm m (dq:=dq)).
-  Qed.
 
-  Lemma wp_caddi4spn_gpr_s_config_scfg_pt_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    creg2reg_idx rdc = Regidx rd ->
-    uint rd <> 0 ->
-    smode_config γ dq -∗ sr_inv Rg -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI)) -∗
-    ( smode_config γ dq -∗ sr_inv Rg -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg
-        (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrdc Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_caddi4spn_gpr_s_config_r Rg Φ pc rdc nzimm rd m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrdc Hrd
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
 
-  Lemma wp_caddi4spn_gpr_s_config_scfg_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    creg2reg_idx rdc = Regidx rd ->
-    uint rd <> 0 ->
-    smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI)) -∗
-    ( smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg
-        (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_caddi4spn_gpr_s_config_scfg_pt_r (kpt_regime root_ppn) γ Φ pc rdc nzimm rd m (dq:=dq)).
-  Qed.
+
+
+
 
 
 
@@ -341,24 +116,6 @@ Section WpHoldingInv.
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
   Qed.
 
-  Lemma wp_clw_lockinv_scfg (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (γ : gname) (lk : mword 64) (R : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    ea = lk -> uint rd <> 0 ->
-    smode_config γc dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    is_lock γ lk R -∗
-    ( ∀ v : mword 32,
-      smode_config γc dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_clw_lockinv_scfg_r (kpt_regime root_ppn) γc Φ γ lk R pc rd rs1 imm m (dq:=dq)).
-  Qed.
 
   Lemma wp_clw_lockinv_locked_scfg_r (Rg : s_regime) (γc : gname) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
@@ -396,26 +153,6 @@ Section WpHoldingInv.
     exact Hneq.
   Qed.
 
-  Lemma wp_clw_lockinv_locked_scfg (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (γ : gname) (lk : mword 64) (R : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    ea = lk -> uint rd <> 0 ->
-    smode_config γc dq -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    is_lock γ lk R -∗ locked γ -∗
-    ( ∀ v : mword 32,
-      ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ -∗
-      locked γ -∗
-      smode_config γc dq -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_clw_lockinv_locked_scfg_r (kpt_regime root_ppn) γc Φ γ lk R pc rd rs1 imm m (dq:=dq)).
-  Qed.
 
   Lemma wp_holding_lockinv_r (Rg : s_regime) (γc : gname) (Φ : mval -> iProp Σ)
       (γ : gname) (lka : mword 64) (R : iProp Σ)
@@ -977,60 +714,6 @@ Section WpHoldingInv.
       iExists vp24, vp16, vp8, vfra, vfs0. iFrame "Hh24 Hh16 Hh8 Hfra Hfs0".
   Qed.
 
-  Lemma wp_holding_lockinv (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (γ : gname) (lka : mword 64) (R : iProp Σ)
-      (m : gmap regidx (mword 64))
-      (cpuold : mword 64)
-      (vp24 vp16 vp8 vfra vfs0 : bv 64)
-      {dqc : dfrac} :
-    let pcE : mword 64 := mword_of_int KernelSyms.holding in
-    let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_lk := add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) in
-    let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let spdh := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let a_h24 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_h16 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_h8  := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let mc_sp := add_vec spdh (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a_fra := add_vec mc_sp (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_fs0 := add_vec mc_sp (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    a_lk = lka ->
-    (* data-slot geometry is DERIVED in the leaves from the lock invariant
-       (a_lk) and the owned [a_cpu ↦₈ _] -- no po_slot_geom premise. *)
-    (* the lock is not held by THIS cpu *)
-    eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    (* return target alignment *)
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    is_lock γ lka R -∗
-    a_cpu ↦₈{ dqc } cpuold -∗
-    a_h24 ↦₈ vp24 -∗
-    a_h16 ↦₈ vp16 -∗
-    a_h8 ↦₈ vp8 -∗
-    a_fra ↦₈ vfra -∗
-    a_fs0 ↦₈ vfs0 -∗
-    ( ∀ mh,
-      smode_config γc (DfracOwn 1) -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      gpr_file mh -∗
-      ⌜ callee_saved m mh /\
-        mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) ⌝ -∗
-      a_cpu ↦₈{ dqc } cpuold -∗
-      (∃ (w24 w16 w8 wra ws0 : bv 64),
-        a_h24 ↦₈ w24 ∗
-        a_h16 ↦₈ w16 ∗
-        a_h8 ↦₈ w8 ∗
-        a_fra ↦₈ wra ∗
-        a_fs0 ↦₈ ws0) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_holding_lockinv_r (kpt_regime root_ppn) γc Φ γ lka R m cpuold vp24 vp16 vp8 vfra vfs0 (dqc:=dqc)).
-  Qed.
 
   Lemma wp_holding_lockinv_locked_r (Rg : s_regime) (γc : gname) (Φ : mval -> iProp Σ)
       (γ : gname) (lka : mword 64) (R : iProp Σ)
@@ -1550,61 +1233,5 @@ Section WpHoldingInv.
       iExists _, _, _, _, _. iFrame "Hh24 Hh16 Hh8 Hfra Hfs0".
   Qed.
 
-  Lemma wp_holding_lockinv_locked (root_ppn : mword 44) (γc : gname) (Φ : mval -> iProp Σ)
-      (γ : gname) (lka : mword 64) (R : iProp Σ)
-      (m : gmap regidx (mword 64))
-      (cpuold : mword 64)
-      (vp24 vp16 vp8 vfra vfs0 : bv 64)
-      {dqc : dfrac} :
-    let pcE : mword 64 := mword_of_int KernelSyms.holding in
-    let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_lk := add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) in
-    let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let spdh := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    let a_h24 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) in
-    let a_h16 := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) in
-    let a_h8  := add_vec spdh (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let mc_sp := add_vec spdh (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) in
-    let a_fra := add_vec mc_sp (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) in
-    let a_fs0 := add_vec mc_sp (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    a_lk = lka ->
-    (* data-slot geometry is DERIVED in the leaves from the lock invariant
-       (a_lk) and the owned [a_cpu ↦₈ _] -- no po_slot_geom premise. *)
-    (* the lock IS held by THIS cpu *)
-    eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = true ->
-    (* return target alignment *)
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m -∗
-    is_lock γ lka R -∗
-    locked γ -∗
-    a_cpu ↦₈{ dqc } cpuold -∗
-    a_h24 ↦₈ vp24 -∗
-    a_h16 ↦₈ vp16 -∗
-    a_h8 ↦₈ vp8 -∗
-    a_fra ↦₈ vfra -∗
-    a_fs0 ↦₈ vfs0 -∗
-    ( ∀ mh,
-      smode_config γc (DfracOwn 1) -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      locked γ -∗
-      gpr_file mh -∗
-      ⌜ callee_saved m mh /\
-        mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
-      a_cpu ↦₈{ dqc } cpuold -∗
-      (∃ (w24 w16 w8 wra ws0 : bv 64),
-        a_h24 ↦₈ w24 ∗
-        a_h16 ↦₈ w16 ∗
-        a_h8 ↦₈ w8 ∗
-        a_fra ↦₈ wra ∗
-        a_fs0 ↦₈ ws0) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_holding_lockinv_locked_r (kpt_regime root_ppn) γc Φ γ lka R m cpuold vp24 vp16 vp8 vfra vfs0 (dqc:=dqc)).
-  Qed.
 
 End WpHoldingInv.

@@ -50,61 +50,13 @@ Import Defs.
    this map-independent form lets callers whose acquire-entry map is existential
    (e.g. kfree, whose acquire runs after memset) name it in release's
    precondition. *)
-Definition acq_intena_store (mstatus0 : mword 64) : mword 32 :=
-  (autocast (T := mword)
-     (subrange_vec_dec
-        (and_vec
-           (shift_bits_right (add_vec zero_reg (sstatus_read mstatus0))
-              (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))
-           (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
-        (Z.sub (Z.mul 4 8) 1) 0) : mword 32).
 
 (* ===================================================================== *)
 (* SIE=0 (folded into smode_config) collapses the saved interrupt-enable  *)
 (* store to 0, so wp_acquire_lock's intena postcondition needs no          *)
 (* mstatus0.  Bridges mirror WpRelease's sstatus_sie_clear_neq.            *)
 (* ===================================================================== *)
-Lemma acq_sstatus_bit1_sie (m : mword 64) :
-  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
-  Z.testbit (bv_unsigned (sstatus_read m)) 1 = false.
-Proof.
-  intro HSIE.
-  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1)) by (apply mword1_zero_of_ne_one; exact HSIE).
-  unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
-  apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz.
-Qed.
 
-Lemma acq_intena_store_zero (m : mword 64) :
-  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
-  acq_intena_store m = zeros' 32.
-Proof.
-  intro HSIE.
-  pose proof (acq_sstatus_bit1_sie m HSIE) as Hb1.
-  assert (Hshamt : int_of_mword false (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0) = 1)
-    by (vm_compute; reflexivity).
-  assert (Hmask : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)) : mword 64) = 1)
-    by (vm_compute; reflexivity).
-  assert (Hsh0 : Z.testbit (bv_unsigned (shiftr (sstatus_read m) 1)) 0 = false).
-  { unfold shiftr, with_word, MachineWord.logical_shift_right.
-    rewrite bv_shiftr_unsigned.
-    assert (Hn1 : bv_unsigned (MachineWord.N_to_word (MachineWord.Z_idx 64) (MachineWord.Z_idx 1)) = 1)
-      by (vm_compute; reflexivity).
-    rewrite Hn1. rewrite (Z.shiftr_spec (bv_unsigned (sstatus_read m)) 1 0 ltac:(lia)). simpl (0 + 1)%Z. exact Hb1. }
-  assert (Hand0 : and_vec (shift_bits_right (add_vec zero_reg (sstatus_read m))
-                    (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))
-                    (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) = (zeros' 64 : mword 64)).
-  { rewrite aq_addv_zero_l. unfold shift_bits_right. rewrite Hshamt.
-    apply bv_eq.
-    assert (Hz64 : bv_unsigned (zeros' 64 : mword 64) = 0) by (vm_compute; reflexivity).
-    rewrite Hz64. rewrite WpGprCsrwC.and_vec_unsigned. rewrite Hmask.
-    apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec. rewrite Z.bits_0.
-    destruct (decide (j = 0)) as [->|Hne].
-    - rewrite Hsh0. reflexivity.
-    - assert (Ht1 : Z.testbit 1 j = false)
-        by (apply Z.bits_above_log2; [lia| change (Z.log2 1) with 0; lia]).
-      rewrite Ht1. apply andb_false_r. }
-  unfold acq_intena_store. rewrite Hand0. apply bv_eq. vm_compute. reflexivity.
-Qed.
 
 Section WpAcquireLock.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
@@ -257,50 +209,6 @@ Section WpAcquireLock.
                 with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hcont").
   Qed.
 
-  Lemma wp_acquire_lock_loop (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γ : gname) (R : iProp Σ)
-      (M0 : gmap regidx (mword 64)) (a5v lk : mword 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      :
-    let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    (* fetch geometry over the loop body: a single X-bit fact + RAM coverage;
-       the RAM/PMP fetch geometry is derived internally from instr_bytes *)
-    (* the lock word's data-slot geometry is DERIVED inside [wp_amoswap_lockinv_pt]
-       from the lock invariant -- no premise. *)
-    (* the amoswap.w PMA side-condition is DERIVED inside [wp_amoswap_lockinv_pt]
-       from [pma_allows_all] (which pins [PMA_atomic_support] to [AMOSwap]) --
-       no premise. *)
-    (* the loop-invariant register facts *)
-    M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
-    M0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-    mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is (mword_of_int (AQ + 0x1a)) -∗
-    gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) -∗
-    is_lock γ lk R -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mstatus0 -∗
-      mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (mword_of_int (AQ + 0x24)) -∗
-      gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) -∗
-      locked γ -∗ R -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_acquire_lock_loop_r (kpt_regime root_ppn) Φ γ R M0 a5v lk mstatus0 mie_v mdv0 menvcfg0).
-  Qed.
 
   (* [smode_config] view of the amoswap retry loop: unbundle -> raw loop ->
      rebundle.  The loop returns [mstatus0] unchanged, so the bundle round-trips
@@ -342,28 +250,6 @@ Section WpAcquireLock.
     iApply ("Hcont" with "Hcfg Htlbinv Hpc Hfile Htok HRes").
   Qed.
 
-  Lemma wp_acquire_lock_loop_scfg (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γc γ : gname) (R : iProp Σ)
-      (M0 : gmap regidx (mword 64)) (a5v lk : mword 64)
-      :
-    let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
-    M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
-    M0 !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk ->
-    smode_config γc (DfracOwn 1) -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is (mword_of_int (AQ + 0x1a)) -∗
-    gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) -∗
-    is_lock γ lk R -∗
-    ( smode_config γc (DfracOwn 1) -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (mword_of_int (AQ + 0x24)) -∗
-      gpr_file (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) -∗
-      locked γ -∗ R -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_acquire_lock_loop_scfg_r (kpt_regime root_ppn) Φ γc γ R M0 a5v lk).
-  Qed.
 
   (* [smode_config] leaf wrapper for the generic 8-byte RAM store. *)
 
@@ -1153,78 +1039,5 @@ Section WpAcquireLock.
     iExact "Hintena".
   Qed.
 
-  Lemma wp_acquire_lock (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γ : gname) (R : iProp Σ)
-      (m : gmap regidx (mword 64))
-      (cpuold : bv 64)
-      (n : nat)
-      (noff intena_old : mword 32) (a0f : mword 64)
-      (γc : gname) (bsie : mword 1)
-      :
-    let AQw : mword 64 := mword_of_int AQ in
-    let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    (* acquire's own frame slots (ra/s0/s1 saves at spd+24/+16/+8) *)
-    (* push_off's frame below (its sp is spd): slots at spd-8/-16/-24 *)
-    (* mycpu's frame under push_off: slots at spd-40/-48 *)
-    (* the per-cpu noff/intena words *)
-    let a_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    (* the spinlock's fields *)
-    let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    (* prologue register chain *)
-    (* push_off's entry map (after the jal's link write) *)
-    (* push_off's internal register chain (mirrors wp_push_off's lets) *)
-    (* push_off's internal register chain PN2..PN8 + po_storeval32 (which
-       read [sstatus_read mstatus0]) are reconstructed inside the proof over
-       the unbundled mstatus0; they are not needed in the statement. *)
-    let po_noff_a5 := sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
-    let po_noff_store := (autocast (T := mword) (subrange_vec_dec po_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    (* the return target *)
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (10 <= n)%nat ->
-    (* S-mode configuration is now folded into [smode_config γc] below. *)
-    (* ---- the amoswap.w PMA side-condition is DERIVED inside
-       [wp_amoswap_lockinv_pt] from [pma_allows_all] -- no premise. ---- *)
-    (* ---- push_off's mycpu calls return &cpus[cpuid]; the per-map a0f pins
-       are DERIVED inside the proof from this single tp-only fact (the a0
-       output of po_mycpu_out depends on x4 alone -- po_mycpu_out_a0). ---- *)
-    mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
-    (* ---- fetch geometry: a single X-bit fact threaded to every instruction
-       (covers acquire, push_off, holding, and both mycpu call sites); the
-       RAM/PMP fetch geometry is derived internally from instr_bytes ---- *)
-    (* ---- the lock is not already held by THIS cpu (no panic) ---- *)
-    eq_vec (cpuold : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    (* ---- data-slot geometry is DERIVED in the leaves from the owned points-to
-       (noff/intena/cpu) and the lock invariant (lk) -- no premise. ---- *)
-    (* ---- the return target is well-aligned ---- *)
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γc (DfracOwn 1) -∗
-    ghost_var γc (1/2) bsie -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is AQw -∗ gpr_file m -∗
-    stack_own sp0 n -∗
-    a_noff ↦₄ noff -∗
-    a_intena ↦₄ intena_old -∗
-    is_lock γ lk R -∗
-    a_cpu ↦₈ cpuold -∗
-    ( ∀ mfin,
-      smode_config γc (DfracOwn 1) -∗
-      ghost_var γc (1/2) bsie -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      locked γ -∗ R -∗
-      gpr_file mfin -∗
-      ⌜ callee_saved m mfin ⌝ -∗
-      stack_own sp0 n -∗
-      a_noff ↦₄ po_noff_store -∗
-      a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg then (zeros' 32) else intena_old) -∗
-      a_cpu ↦₈ (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_acquire_lock_r (kpt_regime root_ppn) Φ γ R m cpuold n noff intena_old a0f γc bsie).
-  Qed.
 
 End WpAcquireLock.

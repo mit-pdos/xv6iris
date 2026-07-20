@@ -61,55 +61,14 @@ Qed.
 Lemma ms_pa_ms_addr (p : mword 64) (j : nat) : ms_pa (ms_addr p j) = pa_add p j.
 Proof. rewrite ms_pa_id. apply ms_addr_pa_add. Qed.
 
-Lemma ms_a8_ms_addr (p : mword 64) (j : nat) : ms_a8 (ms_addr p j) = pa_add p j.
-Proof. rewrite ms_a8_id. apply ms_addr_pa_add. Qed.
 
 (* ---- page validity gives RAM residency for the base and every byte ---- *)
 
-Lemma page_valid_ram (p : mword 64) : page_valid p -> addr_is_ram p.
-Proof.
-  intros [_ [Hlo Hhi]]. unfold addr_is_ram, kmem_lo, kmem_hi in *.
-  unfold ram_base, ram_size. lia.
-Qed.
 
-Lemma uint_pa_add_page (p : mword 64) (j : nat) :
-  page_valid p -> (j < 4096)%nat -> uint (pa_add p j) = uint p + Z.of_nat j.
-Proof.
-  intros Hpv Hj. pose proof (page_valid_ram p Hpv) as Hr.
-  apply uint_pa_add.
-  destruct Hr as [_ Hhi]. unfold ram_base, ram_size in Hhi. lia.
-Qed.
 
-Lemma page_valid_ram_j (p : mword 64) (j : nat) :
-  page_valid p -> (j < 4096)%nat -> addr_is_ram (pa_add p j).
-Proof.
-  intros Hpv Hj. pose proof Hpv as [_ [Hlo Hhi]].
-  unfold kmem_lo, kmem_hi in *.
-  unfold addr_is_ram. rewrite (uint_pa_add_page p j Hpv Hj).
-  unfold ram_base, ram_size. lia.
-Qed.
 
 (* STEP 3 (the crux): adding an in-page offset [j < 4096] to a 4096-aligned RAM
    base leaves the Sv39 VPN unchanged, because it only touches bits [11:0]. *)
-Lemma svpn_pa_add_same (p : mword 64) (j : nat) :
-  page_valid p -> (j < 4096)%nat -> svpn_of (pa_add p j) = svpn_of p.
-Proof.
-  intros Hpv Hj.
-  pose proof (page_valid_ram p Hpv) as Hrp.
-  pose proof (page_valid_ram_j p j Hpv Hj) as Hrj.
-  apply bv_eq.
-  rewrite (svpn_of_unsigned _ Hrj) (svpn_of_unsigned _ Hrp).
-  rewrite (uint_pa_add_page p j Hpv Hj).
-  destruct Hpv as [Hal _]. unfold page_aligned, PGSIZE in Hal.
-  rewrite (Z.shiftr_div_pow2 (uint p + Z.of_nat j) 12 ltac:(lia))
-          (Z.shiftr_div_pow2 (uint p) 12 ltac:(lia)).
-  change (2 ^ 12) with 4096.
-  apply Z.mod_divide in Hal; [| lia]. destruct Hal as [q Hq]. rewrite Hq.
-  rewrite (Z.div_add_l q 4096 (Z.of_nat j) ltac:(lia)).
-  rewrite (Z.div_small (Z.of_nat j) 4096 ltac:(lia)).
-  rewrite Z.add_0_r.
-  rewrite (Z.div_mul q 4096 ltac:(lia)). reflexivity.
-Qed.
 
 (* the end pointer [p + 4096] compared against [p + (j+1)]: no 2^64 wraparound
    inside a valid page, so equality of the compared pointers is equality of the
@@ -369,43 +328,5 @@ Section WpMemsetPage.
       exact Hcs.
   Qed.
 
-  Lemma wp_memset_page (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (cval : mword 64) (n : nat)
-      (γ : gname) {dq : dfrac} :
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let a1_idx : mword 5 := mword_of_int 11 in
-    let a2_idx : mword 5 := mword_of_int 12 in
-    let pcE := mword_of_int KernelSyms.memset in
-    let sp0 := m0 !!! Regidx csp_rs1 in
-    let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
-    let p := m0 !!! Regidx a0_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (* memset's 2-slot save frame [sp0-16, sp0) is a single [stack_own sp0 n] (n >= 2) *)
-    (2 <= n)%nat ->
-    (* the page being filled: RAM-resident, 4096-aligned, in [end, PHYSTOP) *)
-    page_valid p ->
-    (* argument setup by the caller before the [jal memset] *)
-    m0 !!! Regidx a1_idx = cval ->
-    m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
-    (* the caller's return target's low bit is clear (2-aligned target OK: Zca return) *)
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    stack_own sp0 n -∗
-    page_own p -∗
-    ( ∀ mfin,
-      smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      stack_own sp0 n -∗
-      page_own p -∗
-      gpr_file mfin -∗
-      ⌜ callee_saved m0 mfin ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-    Proof.
-    exact (wp_memset_page_r (kpt_regime root_ppn) Φ m0 cval n γ (dq:=dq)).
-  Qed.
 
 End WpMemsetPage.
