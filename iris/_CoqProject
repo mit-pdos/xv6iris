@@ -95,6 +95,7 @@ PtTreeAdue.v
 KptTree.v
 SmodeCorePt.v
 WpSmodeGpr.v
+WpSmodeMemGen.v
 WpMemsetS.v
 WpSmodeSret.v
 WpTimerinit.v
