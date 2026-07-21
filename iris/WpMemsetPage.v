@@ -64,33 +64,9 @@ Proof. rewrite ms_pa_id. apply ms_addr_pa_add. Qed.
 (* STEP 3 (the crux): adding an in-page offset [j < 4096] to a 4096-aligned RAM
    base leaves the Sv39 VPN unchanged, because it only touches bits [11:0]. *)
 
-(* the end pointer [p + 4096] compared against [p + (j+1)]: no 2^64 wraparound
-   inside a valid page, so equality of the compared pointers is equality of the
-   byte offsets. *)
-Lemma ms_cmp_page (p : mword 64) (j : nat) :
-  page_valid p -> (j < 4096)%nat ->
-  neq_vec (ms_addr p (S j)) (add_vec (mword_of_int 4096 : mword 64) p)
-    = negb (Nat.eqb (S j) 4096).
-Proof.
-  intros Hpv Hj.
-  pose proof Hpv as [_ [Hplo Hphi]]. unfold kmem_lo, kmem_hi in *.
-  assert (Hup : bv_unsigned p = uint p) by (rewrite uint_unsigned; reflexivity).
-  assert (HxL : bv_unsigned (ms_addr p (S j)) = uint p + Z.of_nat (S j)).
-  { rewrite ms_addr_pa_add. unfold pa_add, add_vec_int.
-    rewrite add_vec_unsigned moi_unsigned. rewrite Hup.
-    rewrite (bv_wrap_small 64 (Z.of_nat (S j)) ltac:(unfold bv_modulus; simpl; lia)).
-    apply bv_wrap_small. unfold bv_modulus; simpl. lia. }
-  assert (HeL : bv_unsigned (add_vec (mword_of_int 4096 : mword 64) p) = uint p + 4096).
-  { rewrite add_vec_unsigned moi_unsigned. rewrite Hup.
-    rewrite (bv_wrap_small 64 4096 ltac:(unfold bv_modulus; simpl; lia)).
-    rewrite (Z.add_comm 4096 (uint p)).
-    apply bv_wrap_small. unfold bv_modulus; simpl. lia. }
-  unfold neq_vec. f_equal.
-  destruct (Nat.eqb_spec (S j) 4096) as [He | Hne].
-  - apply eq_vec_true_iff. apply bv_eq. rewrite HxL HeL He. reflexivity.
-  - apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
-    rewrite HxL HeL in Hc. lia.
-Qed.
+(* The end-pointer loop compare is now handled generically by [ms_cmp_bound]
+   (WpMemsetArray.v), over an arbitrary byte count rather than a fixed page;
+   the page users derive the [uint p + len < 2^64] bound from [page_valid]. *)
 
 Section WpMemsetPage.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.

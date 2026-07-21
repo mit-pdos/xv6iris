@@ -82,7 +82,7 @@ Qed.
 
 (* the loop's end-pointer compare [p+(j+1) =? p+len] reflects the offset
    compare [(j+1) =? len] as long as the whole array [p .. p+len) does not
-   wrap the 64-bit address space -- the [len]-general form of [ms_cmp_page]. *)
+   wrap the 64-bit address space. *)
 Lemma ms_cmp_bound (p : mword 64) (len j : nat) :
   uint p + Z.of_nat len < 2 ^ 64 -> (j < len)%nat ->
   neq_vec (ms_addr p (S j)) (add_vec (mword_of_int (Z.of_nat len) : mword 64) p)
