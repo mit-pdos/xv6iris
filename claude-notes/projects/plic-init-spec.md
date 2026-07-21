@@ -1,9 +1,10 @@
-# plicinit / plicinithart — specs & proofs
+# The PLIC function proofs — specs & proofs
 
-Whole-function WP specs and proofs for `plicinit` and `plicinithart`
-(xv6-riscv/kernel/plic.c), plus the `cpuid` proof they need and the width-4
-PLIC S-mode device-store infrastructure. All of it is proved and green; what
-remains is consumer-side wiring (see "Remaining" at the end).
+Whole-function WP specs and proofs for all four of xv6-riscv/kernel/plic.c's
+functions — `plicinit`, `plicinithart`, `plic_claim`, `plic_complete` — plus the
+`cpuid` proof they need and the width-4 PLIC S-mode device access
+infrastructure (both directions). All of it is proved and green; what remains is
+consumer-side wiring (see "Remaining" at the end).
 
 These are S-mode functions run from `main()` after `kvminithart()` (paging on),
 so their PLIC MMIO writes are **S-mode 32-bit (`sw`, width 4) stores through the
@@ -32,6 +33,16 @@ kernel page table's PLIC identity mapping** (`kpt_dev_vpn`, KptPt.v maps
   leaves and `riscv_device_adequacy` all thread it (the last takes it as a
   hypothesis on the initial state — a reset PLIC satisfies it,
   `plic_senable_ok_zero`).
+- **`plic_complete` is a no-op on the plan, `plic_claim` is where the plan pays
+  off.** The completion write clears a `p_claimed` bit, which `plic_ok` does not
+  mention, so plic_complete's spec says nothing about the PLIC and requires
+  nothing of its irq argument. A claim READ, though, mutates the device (takes
+  the best pending enabled source) *and* returns its id — and since the plan
+  says a hart's context can only ever enable the machine's own two sources, the
+  id read back is 0, `uart_irq_id` or `virtio_irq_id` and nothing else
+  (`plic_claim_ret`, via `plic_best_spec` + `plic_enabled_srcs`). That is what
+  makes `devintr()`'s three-way branch exhaustive, and it is the one substantive
+  fact the loose shared invariant is strong enough to deliver.
 - **plicinithart's postcondition says nothing about the PLIC** — under a loose
   shared invariant there is nothing a hart could retain. It is still not vacuous:
   the proof must show both addresses decode to real PLIC context registers for
@@ -81,8 +92,14 @@ Specs (interface only — Require the definitional layer, never a proof file):
   `exec_vmem_write_addr_4_S_walk_dev` → `exec_vmem_write_4_gpr_S_walk_dev` →
   `exec_execute_STORE_4_gpr_S_walk_dev`, and PLIC geometry (`dev_addr_plic`,
   `dev_write_plic`, `plic_pmp_match4`, `within_{clint,sig}_plic`).
-- **`WpPlic.v`** — the two Iris store WPs over `sconf`, both width 4 at a
-  general PLIC address, sharing everything but the ghost reconciliation:
+- **`PlicHart.v`** — the per-hart PLIC context ADDRESSES (`ph_shl`, `ph_senb`,
+  `ph_sthb`, `ph_a8`), their geometry (`ph_geom_ok` + the `ph_{senable,sthresh,
+  sclaim}_geom` bundles and named projections), and what an access at each does
+  to the PLIC state (`ph_{senable,sthresh,sclaim}_write`, `ph_sclaim_read`).
+  Iris-free. This is where `hart_cases` / `z_lt8_cases` / `sext32_id_hart` live,
+  so no function proof imports another's.
+- **`WpPlic.v`** — the Iris access WPs over `sconf`, all width 4 at a general
+  PLIC address, sharing everything but the ghost reconciliation:
   - `wp_sw_plic_s_sconf` — raw `plic_frag p` in / `plic_frag p'` out
     (plicinit). Pulls `plic_auth` out of `state_interp`'s `dev_interp`,
     `plic_agree`s it against the caller's half, `dev_interp_update_plic`.
@@ -91,11 +108,15 @@ Specs (interface only — Require the definitional layer, never a proof file):
     callback's step (exactly as the UART store does), and takes the universal
     obligation `∀ p, plic_ok p → ∃ p', plic_write p off wv = Some p' ∧ plic_ok p'`.
     Nothing PLIC-shaped survives into the continuation.
+  - `wp_lw_plic_dev_s_sconf` — the LOAD dual: also opens `dev_inv` (a claim read
+    mutates the device), writes `rd` and retargets the capability, and lets the
+    caller name a property `P` of the value read that holds at every state the
+    plan admits — that is how plic_claim learns its result is a real irq id.
 
 Whole-function proofs (functor/`_body`/seal discipline, design/spec-modules.md):
-`WpSconfCpuid.v` + `LinkCpuid.v`, `WpSconfPlicinit.v` + `LinkPlicinit.v`,
-`WpSconfPlicinithart.v` (`Module PlicinithartProof (Cpuid : CPUID)`) +
-`LinkPlicinithart.v`.
+`WpSconfCpuid.v` + `LinkCpuid.v`, `WpSconfPlicinit.v` + `LinkPlicinit.v`, and —
+each a `Module …Proof (Cpuid : CPUID)` — `WpSconfPlicinithart.v`,
+`WpSconfPlicClaim.v`, `WpSconfPlicComplete.v` with their `Link*.v`.
 
 Shared leaves added for these proofs (at their proper altitude, NOT in the
 function files): `wp_lui_s_sconf` and `wp_slliw_s_sconf` in `WpSconfAlu.v`,
@@ -104,6 +125,23 @@ function files): `wp_lui_s_sconf` and `wp_slliw_s_sconf` in `WpSconfAlu.v`,
 slot IS `zero_reg` — needed to read the `zero` source of `addi a4,zero,1026`
 and `sw zero,0(a5)`; both hand the resource back, since `iDestruct … as %…`
 does not retain a single spatial input).
+
+## Gotchas worth keeping
+
+- **Never `vm_compute` an equation mentioning `plic_claim`/`plic_best`.** The
+  fold over `plic_srcs` (31 sources) against a SYMBOLIC state does not normalise
+  in useful time. Take the decode apart by its numeric GUARDS instead — that is
+  what `plic_read_sclaim` / `plic_write_sclaim` / `ph_sclaim_decode` are for.
+- **`rewrite a b c` (spaces) is ssreflect.** It only works in files that import
+  the iris proofmode. `PlicPlan.v`, `PlicHart.v`, `KernelRvcDecode.v` and
+  `KernelBaseDecode.v` are iris-free: use commas and no `!` there.
+- **`apply` can diverge where `refine` does not**: `apply plic_fold_best` with an
+  un-instantiated accumulator hung; `refine (plic_fold_best … None …)` is
+  instant. Instantiate the fold's accumulator explicitly.
+- The three hart-context functions build the same address with the `lui`
+  constant and the shifted hart id in OPPOSITE operand order (`add a5,a5,a0` vs
+  `add a5,a5,a4`), so one of them lands on the mirror image of `ph_sthb` —
+  `ph_add_comm` bridges it.
 
 ## Remaining
 

@@ -356,4 +356,172 @@ Proof.
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
 Qed.
 
+(* The width-4 PLIC MMIO LOAD, dual to [wp_sw_plic_dev_s_sconf].  A PLIC read
+   can MUTATE the device (a claim takes a source: it clears that source's
+   pending bit and marks it claimed), so it too runs with [dev_inv] open across
+   the step.  The caller's obligation is again universal over every state the
+   kernel's plan admits, and in exchange it may name a property [P] of the value
+   read that holds at all of them -- that is how [plic_claim] learns its result
+   is one of the machine's own interrupt ids. *)
+Lemma wp_lw_plic_dev_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
+    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) :
+  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+  let ldval := fun (v : bv 32) =>
+        (extend_value is_unsigned
+           (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) v) : mword 64) in
+  (plic_base <= uint a8 < plic_base + plic_size)%Z ->
+  is_aligned_vaddr (Virtaddr a8) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+  kpt_dev_vpn (svpn_of a8) ->
+  zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8)) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
+  uint rd <> 0 ->
+  rd <> csp_rs1 ->
+  (forall p, plic_ok p ->
+     exists v p', plic_read p (uint a8 - plic_base)%Z = Some (v, p') /\ plic_ok p' /\ P v) ->
+  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+  sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+  pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
+  dev_inv γd -∗
+  ( ∀ v : bv 32,
+    ⌜ P v ⌝ -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+    sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (ldval v)]> m) n -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+Proof.
+  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hident Hrd Hrdsp Hread.
+  iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv Hcont".
+  iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
+  iApply (wp_instr_s_sconf γ root_ppn m n Φ pc is_rvc
+            (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
+            with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
+  iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc Hsi".
+  iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+  iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
+  pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+  iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+  iPoseProof "Hhw" as "#Hhwc".
+  iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+  destruct (Hpma_all a8 4) as (region_ld & Hmatch_ld & _ & Hread_ld & _ & _).
+  iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+  iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
+  iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
+  iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
+  iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
+  iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
+  iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+  iDestruct "Hdev" as "[Hua Hpldev]".
+  iInv "Hdinv" as ">Hdbody" "Hdclose".
+  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg & %Hpok)".
+  iDestruct (plic_agree with "Hpldev Hplf") as %Hpeq.
+  destruct (Hread p Hpok) as (v & p' & Hrd_p & Hpok' & HPv).
+  iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+  set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
+  iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+  iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
+  iDestruct ("Hfb1" with "Hspc") as "Hfmap".
+  assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor) by (unfold s_pc; tmig; exact Lpriv).
+  assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0) by (unfold s_pc; tmig; exact Lms).
+  assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0) by (unfold s_pc; tmig; exact Lmenv).
+  assert (Lpma_pc : register_lookup pma_regions s_pc.(sregs) = pmar0) by (unfold s_pc; tmig; exact Lpma).
+  assert (Lhtif_pc : register_lookup htif_tohost_base s_pc.(sregs) = None) by (unfold s_pc; tmig; exact Lhtif).
+  assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0) by (unfold s_pc; tmig; exact Lmisa).
+  assert (Lmisa_pc' : register_lookup misa s_pc.(sregs) = MISA_C) by (rewrite Lmisa_pc; exact Hmisa_val0).
+  assert (Lmenv_pc' : register_lookup menvcfg s_pc.(sregs) = MENVCFG_S) by (rewrite Lmenv_pc; exact Hmenvval0).
+  assert (LSXL_pc : _get_Mstatus_SXL (register_lookup mstatus s_pc.(sregs)) = 'b"10") by (rewrite Lms_pc; exact HSXL).
+  assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs))) by (rewrite Lpma_pc; exact Hpma_all).
+  iDestruct (sr_transform (kpt_regime root_ppn) (Load Data)
+               (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                         else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
+                        (sign_extend' 64 imm))
+               s_pc (or_intror (or_introl eq_refl)) Lpriv_pc LSXL_pc
+               (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
+                  ltac:(rewrite Lms_pc; exact HMPRV))
+               (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
+                  ltac:(rewrite Lmenv_pc; exact Hpmm))
+               with "Hreg Htlbinv") as %Htea.
+  iMod (sr_absorb_dev (kpt_regime root_ppn) (Load Data) a8 s_pc
+          (or_introl eq_refl) Hdevvpn Hcanon Hident
+          Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+          (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
+             ltac:(rewrite Lms_pc; exact HMPRV))
+          (exec_is_shadow_stack_load s_pc)
+          Lpma_pc' with "Hreg Hmem Htlbinv")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+  destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
+  pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
+  assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
+    by (rewrite (Hprestr cur_privilege ltac:(vm_compute; reflexivity)); exact Lpriv_pc).
+  assert (Lms_tr : register_lookup mstatus s_tr.(sregs) = mstatus0)
+    by (rewrite (Hprestr mstatus ltac:(vm_compute; reflexivity)); exact Lms_pc).
+  assert (Lpma_tr : register_lookup pma_regions s_tr.(sregs) = pmar0)
+    by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
+  assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
+    by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
+  assert (Hdrd_plic : dev_read s_tr.(mdev) a8 4 = Some (v, set_dplic σ.(mdev) p')).
+  { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+    apply (dev_read_plic σ.(mdev) a8 v p' Hrange).
+    rewrite <- Hpeq. exact Hrd_p. }
+  pose (d' := set_dplic σ.(mdev) p').
+  pose (s_x := set_reg (MState s_tr.(sregs) s_tr.(mem) d')
+                 (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (ldval v))).
+  assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))) s_pc
+                  = Some (RETIRE_SUCCESS, s_x)).
+  { subst s_x. unfold ldval.
+    apply (exec_execute_LOAD_4_gpr_S_walk_dev rs1 rd imm is_unsigned v d' region_ld s_pc s_tr
+             Hrd Htea
+             ltac:(rewrite !Lva; exact Halign)
+             ltac:(cbn [bits_of_virtaddr]; rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Htr0)
+             Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
+             HA1 Hord1
+             ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; apply plic_pmp_match4; [exact Hrange | exact Hcov1])
+             HR1
+             ltac:(rewrite Lpma_tr !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Hmatch_ld)
+             ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Halign)
+             Hread_ld
+             ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; apply within_clint_plic; [exact Hrange | lia])
+             ltac:(apply within_sig_plic)
+             ltac:(apply within_htif_false; exact Lhtif_tr)
+             ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; apply dev_addr_plic; exact Hrange)
+             ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Hdrd_plic)). }
+  iMod (dev_interp_update_plic σ.(mdev) p p' with "[$Hua $Hpldev] Hplf") as "[Hdev' Hp']".
+  iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (ldval v)) with "Hfmap") as "[Hrdc Hfins]".
+  rewrite (gpr_pt_nz rd _ Hrd).
+  iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ldval v)) with "Hreg Hrdc") as "[Hreg Hrdc]".
+  iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
+  { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+  iMod ("Hdclose" with "[Huf Hp' Hg]") as "_".
+  { iNext. iExists u, p'. iFrame. iPureIntro. exact Hpok'. }
+  iModIntro. iExists s_x.
+  iSplitR.
+  { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hload. }
+  iSplitL "Hreg Hmem Hdev'".
+  { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev'". }
+  iIntros "Hhs' Hpc'".
+  assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
+  { unfold s_x, set_reg; cbn [sregs]. tmig.
+    rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
+    unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+  iEval (rewrite Lnpc) in "Hpc'".
+  assert (Hsp : m !!! Regidx csp_rs1
+                = <[Regidx rd := regval_into_reg (ldval v)]> m !!! Regidx csp_rs1)
+    by (symmetry; apply upd_ne; congruence).
+  iDestruct (sie_cap_retarget γ root_ppn m
+               (<[Regidx rd := regval_into_reg (ldval v)]> m) n Hsp with "Hcap") as "Hcap".
+  iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
+  iApply ("Hcont" $! v with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcg Htlbinv
+                        [$Hpc' $Hnpc]").
+  { exact HPv. }
+  { iFrame "Hhw Hminv Hpriv Hmiex".
+    iSplitL "Hms Hhalf".
+    { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+    iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+Qed.
+
 End WpPlic.

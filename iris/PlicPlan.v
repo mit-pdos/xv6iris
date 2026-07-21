@@ -22,9 +22,10 @@
    [plicinithart] writes exactly [(1 << uart_irq_id) | (1 << virtio_irq_id)],
    so its write lands inside the permitted set no matter what was there
    before. *)
-From Stdlib Require Import ZArith.
+From Stdlib Require Import ZArith List Bool.
 From stdpp Require Import bitvector.definitions.
 Require Import DevModel.
+Import ListNotations.
 Local Open Scope Z_scope.
 
 (* the only S-context enable bits the kernel ever intends to set *)
@@ -81,3 +82,104 @@ Proof. unfold plic_senable_ok. vm_compute. reflexivity. Qed.
 (* a reset PLIC (all enables clear) satisfies the plan *)
 Lemma plic_senable_ok_zero : plic_senable_ok (Z_to_bv 32 0).
 Proof. unfold plic_senable_ok. vm_compute. reflexivity. Qed.
+
+(* ===================================================================== *)
+(*  What the plan buys the CLAIM/COMPLETE pair.                           *)
+(* ===================================================================== *)
+
+(* A claim read returns the id of the source it took, or 0 for "nothing to
+   serve".  Under the plan the only source a hart's context can ever have
+   enabled is one of the machine's two, so those are the only ids a claim can
+   hand back -- which is exactly what lets [devintr]'s three-way branch on the
+   result be exhaustive. *)
+Definition plic_claim_ret_ok (v : bv 32) : Prop :=
+  v = Z_to_bv 32 0 \/
+  v = Z_to_bv 32 (Z.of_N uart_irq_id) \/
+  v = Z_to_bv 32 (Z.of_N virtio_irq_id).
+
+(* [plic_best] is a fold that only ever returns an element of the list it
+   folded over, and only a candidate one.  Generalised over the accumulator so
+   the induction goes through. *)
+Lemma plic_fold_best (p : plic_state) (h : nat) :
+  forall (l : list N) (acc : option N) (i : N),
+    incl l plic_srcs ->
+    (forall j, acc = Some j -> In j plic_srcs /\ plic_cand p h j = true) ->
+    fold_left (fun best k =>
+                 if plic_cand p h k then
+                   match best with
+                   | None => Some k
+                   | Some j => if plic_better p k j then Some k else Some j
+                   end
+                 else best) l acc = Some i ->
+    In i plic_srcs /\ plic_cand p h i = true.
+Proof.
+  induction l as [|k l IH]; intros acc i Hincl Hacc Hfold; cbn [fold_left] in Hfold.
+  - exact (Hacc i Hfold).
+  - eapply IH; [ intros x Hx; apply Hincl; right; exact Hx | | exact Hfold ].
+    destruct (plic_cand p h k) eqn:Hk; [ | exact Hacc ].
+    intros j Hj. destruct acc as [j0|].
+    + destruct (plic_better p k j0); injection Hj as <-.
+      * split; [ apply Hincl; left; reflexivity | exact Hk ].
+      * exact (Hacc j0 eq_refl).
+    + injection Hj as <-. split; [ apply Hincl; left; reflexivity | exact Hk ].
+Qed.
+
+
+Lemma plic_best_spec (p : plic_state) (h : nat) (i : N) :
+  plic_best p h = Some i -> In i plic_srcs /\ plic_cand p h i = true.
+Proof.
+  unfold plic_best. intro H.
+  refine (plic_fold_best p h plic_srcs None i (incl_refl _) _ H).
+  intros j Hj. discriminate Hj.
+Qed.
+
+(* the plan, read off one enabled source: an enabled real source IS one of the
+   machine's two.  [i] ranges over [plic_srcs] (1..31), so the bit test is
+   decided by case analysis on the thirty-one concrete ids. *)
+Lemma plic_enabled_srcs (p : plic_state) (h : nat) (i : N) :
+  plic_ok p -> In i plic_srcs -> plic_enabled p h i = true ->
+  i = uart_irq_id \/ i = virtio_irq_id.
+Proof.
+  intros Hplan Hin Hen.
+  assert (Hbit : Z.testbit plic_dev_irq_mask (Z.of_N i) = true).
+  { unfold plic_enabled in Hen. unfold plic_ok, plic_senable_ok in Hplan.
+    rewrite <- (Hplan h) in Hen. rewrite Z.land_spec in Hen.
+    apply andb_prop in Hen as [_ Hen]. exact Hen. }
+  vm_compute in Hin.
+  repeat (destruct Hin as [Hin|Hin]); try (exfalso; exact Hin);
+    subst i; vm_compute in Hbit;
+    first [ discriminate Hbit | left; reflexivity | right; reflexivity ].
+Qed.
+
+Lemma plic_claim_ret (p : plic_state) (h : nat) :
+  plic_ok p -> plic_claim_ret_ok (fst (plic_claim p h)).
+Proof.
+  intro Hplan. unfold plic_claim.
+  destruct (plic_best p h) as [i|] eqn:Hbest; cbn [fst]; [ | left; reflexivity ].
+  destruct (plic_best_spec p h i Hbest) as [Hin Hcand].
+  assert (Hen : plic_enabled p h i = true).
+  { unfold plic_cand in Hcand.
+    apply andb_prop in Hcand as [Hc _]. apply andb_prop in Hc as [_ Hc]. exact Hc. }
+  destruct (plic_enabled_srcs p h i Hplan Hin Hen) as [-> | ->];
+    [ right; left; reflexivity | right; right; reflexivity ].
+Qed.
+
+(* Claiming touches only pending/claimed, so the plan survives it. *)
+Lemma plic_ok_claim (p : plic_state) (h : nat) :
+  plic_ok p -> plic_ok (snd (plic_claim p h)).
+Proof.
+  intro Hplan. unfold plic_claim.
+  destruct (plic_best p h); cbn [snd]; [ | exact Hplan ].
+  intro k. cbn [p_enable]. exact (Hplan k).
+Qed.
+
+(* Completing touches only claimed, so it is a no-op as far as the plan is
+   concerned -- which is the whole content of plic_complete's spec. *)
+Lemma plic_ok_complete (p : plic_state) (i : N) :
+  plic_ok p -> plic_ok (plic_complete p i).
+Proof.
+  intro Hplan. unfold plic_complete.
+  destruct ((1 <=? Z.of_N i) && (Z.of_N i <? Z.of_nat plic_nsrc))%Z;
+    [ | exact Hplan ].
+  intro k. cbn [p_enable]. exact (Hplan k).
+Qed.

@@ -470,3 +470,366 @@ Proof.
   unfold within_sig, plat_have_sig, __id. cbn [Riscv.rv64d.not negb].
   apply exec_returnm.
 Qed.
+
+(* ===================================================================== *)
+(* (F)  width-4 device read_ram + pmaCheck leaves (the LOAD twins of (A)). *)
+(* ===================================================================== *)
+
+(* read_ram at a device address (width 4): the MemRead outcome is serviced
+   by the device -- the value comes from [dev_read], and the device state
+   advances (a PLIC claim pops the pending bit). *)
+Lemma exec_read_dev_4 (pa : Arch.pa) (b : bv 32) (d' : dev_state) s :
+  dev_addr pa = true ->
+  dev_read s.(mdev) pa 4 = Some (b, d') ->
+  exec (read_ram rv64d_types.Read_plain (Physaddr pa) 4 false) s
+    = Some ((b, default_meta), MState s.(sregs) s.(mem) d').
+Proof.
+  intros Hdev Hrd.
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead_dev; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  rewrite Hrd.
+  reflexivity.
+Qed.
+
+(* pmaCheck for a 4-byte Load Data in a readable device PMA region.  The
+   width-1 twin used the trivial [is_aligned_paddr_1]; at width 4 we thread
+   the alignment hypothesis explicitly. *)
+Lemma exec_pmaCheck_dev_load_4 (pa : Arch.pa) (pbmt : page_based_mem_type)
+    (region : PMA_Region) s :
+  is_aligned_paddr (Physaddr pa) 4 = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 4
+    = Some region ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (pmaCheck (Physaddr pa) 4 (Load Data) pbmt false) s = Some (None, s).
+Proof.
+  intros Halign Hmatch Hread.
+  unfold pmaCheck.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
+  rewrite Hmatch.
+  destruct region as [rbase rsize rattr rdtree].
+  cbn [PMA_Region_attributes] in Hread |- *.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
+  cbn match beta.
+  change (assert_exp' true "sys/mem.sail:103.61-103.62" >>=
+          (fun _ : true = true => returnM (PMA_readable (override_PMA rattr pbmt))))
+    with (returnM (PMA_readable (override_PMA rattr pbmt)) : M bool).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
+  rewrite Hread. cbn match.
+  apply exec_returnM.
+Qed.
+
+(* ===================================================================== *)
+(* (G)  width-4 S-mode device checked_mem_read + mem_read leaves.          *)
+(*      = WpSmodeUart's width-1 dev LOAD leaves at width 4 (TOR grant       *)
+(*      width 4, is_aligned_paddr threaded, exec_pmaCheck_dev_load_4 /      *)
+(*      exec_read_dev_4).                                                   *)
+(* ===================================================================== *)
+
+Lemma exec_checked_mem_read_dev_4_S (pbmt : page_based_mem_type) (pa : Arch.pa)
+    (region : PMA_Region) (b : bv 32) (d' : dev_state) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 4 = Some region ->
+  is_aligned_paddr (Physaddr pa) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_clint (Physaddr pa) 4) s = Some (false, s) ->
+  exec (within_sig (Physaddr pa) 4) s = Some (false, s) ->
+  exec (within_htif_readable (Physaddr pa) 4) s = Some (false, s) ->
+  dev_addr pa = true ->
+  dev_read s.(mdev) pa 4 = Some (b, d') ->
+  exec (checked_mem_read (Load Data) pbmt Supervisor (Physaddr pa) 4 false false false false)
+       s = Some (Ok (b, default_meta), MState s.(sregs) s.(mem) d').
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hrd.
+  unfold checked_mem_read.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
+  2:{ unfold phys_access_check.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_supervisor_grant_load_data pa 4 s HA Hord Hrange HR)).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_dev_load_4 pa pbmt region s Halign Hmatch Hread)).
+      cbn match. apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (within_mmio_readable (Physaddr pa) 4) s = Some (false, s))).
+  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s))).
+  2:{ unfold read_kind_of_flags. apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_dev_4 pa b d' s Hdev Hrd)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_mem_read_dev_4_S (pbmt : page_based_mem_type) (pa : Arch.pa)
+    (region : PMA_Region) (b : bv 32) (d' : dev_state) (m : mword 64) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 4 = Some region ->
+  is_aligned_paddr (Physaddr pa) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  exec (within_clint (Physaddr pa) 4) s = Some (false, s) ->
+  exec (within_sig (Physaddr pa) 4) s = Some (false, s) ->
+  exec (within_htif_readable (Physaddr pa) 4) s = Some (false, s) ->
+  dev_addr pa = true ->
+  dev_read s.(mdev) pa 4 = Some (b, d') ->
+  register_lookup mstatus s.(sregs) = m ->
+  eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  exec (mem_read (Load Data) pbmt (Physaddr pa) 4 false false false)
+       s = Some (Ok b, MState s.(sregs) s.(mem) d').
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hrd Hms Hmprv Hpriv.
+  unfold mem_read.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
+  rewrite Hpriv.
+  rewrite Hms.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_load_S m s Hmprv)).
+  unfold mem_read_priv.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (mem_read_priv_meta _ _ _ _ 4 _ _ _ _) s
+                   = Some (Ok (b, default_meta), MState s.(sregs) s.(mem) d'))).
+  2:{ unfold mem_read_priv_meta. cbn [orb andb].
+      rewrite (exec_bind_Some _ _ _ _ _
+                (_ : exec (checked_mem_read _ _ _ _ 4 _ _ _ _) s
+                       = Some (Ok (b, default_meta), MState s.(sregs) s.(mem) d'))).
+      2:{ cbn match. apply exec_checked_mem_read_dev_4_S with (region := region); assumption. }
+      cbn match. unfold mem_read_callback. apply exec_returnM. }
+  cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
+Qed.
+
+(* ===================================================================== *)
+(* (H)  device width-4 LOAD towers (S-mode-walk-pt).  The LOAD twins of    *)
+(*      (D): the translation WALKS and the device read ADVANCES the        *)
+(*      device, so the post-state carries [d'].                            *)
+(* ===================================================================== *)
+
+(* ---- vmem_read_addr reduction ---- *)
+Section RWS4walkDev.
+Variable a : mword 64.
+Variable v : bv 32.
+Variable d' : dev_state.
+Variable region : PMA_Region.
+Variable s s' : mstate.
+Let pa := zero_extend' 64 (add_vec_int a (0 * 4)).
+Let data2 : mword (8*1*4) :=
+  update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) v.
+Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 4 = true.
+Hypothesis Hcp' : register_lookup cur_privilege s'.(sregs) = Supervisor.
+Hypothesis Hmprv' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false.
+Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * 4))) (Load Data)) s
+                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
+Hypothesis HA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) = TOR.
+Hypothesis Hord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0) = false.
+Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match.
+Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) ('b"1") = true.
+Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s'.(sregs)) (Physaddr pa) 4 = Some region.
+Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
+Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.
+Hypothesis Hc : exec (within_clint (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hsig : exec (within_sig (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hdev : dev_addr pa = true.
+Hypothesis Hdrd : dev_read s'.(mdev) pa 4 = Some (v, d').
+
+Lemma exec_vmem_read_addr_4_S_walk_dev :
+  exec (vmem_read_addr (Virtaddr a) 4 (Load Data) false false false) s
+    = Some (Ok data2, MState s'.(sregs) s'.(mem) d').
+Proof.
+  unfold vmem_read_addr.
+  rewrite exec_catch_early_return.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  assert (Hinner : execR (returnR (result (mword (8 * 4)) ExecutionResult) tt >>
+                          liftR (split_misaligned (Virtaddr a) 4)) s = Some (inr (1, 4), s)).
+  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_g 4 (Virtaddr a) s Halign). reflexivity. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
+  rewrite misaligned_order_1.
+  match goal with
+  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (data2, true, 0), MState s'.(sregs) s'.(mem) d'))
+  end.
+  { eapply execR_untilMT_1.
+    - reflexivity.
+    - cbn match.
+      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+      rewrite (execR_liftR_seq _ _ _ _ _ Htr).
+      cbn [bits_of_virtaddr] in *. cbn match.
+      match goal with
+      | |- execR (Defs.bind ?mrm ?post) s' = _ =>
+        assert (Hmrm : execR mrm s' = Some (inr data2, MState s'.(sregs) s'.(mem) d'))
+      end.
+      { rewrite (execR_liftR_seq _ _ _ _ _
+          (exec_mem_read_dev_4_S PBMT_PMA pa region v d' (register_lookup mstatus s'.(sregs)) s'
+             HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hdrd eq_refl Hmprv' Hcp')).
+        cbn match.
+        rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt (MState s'.(sregs) s'.(mem) d'))).
+        rewrite autocast_id. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
+      cbn. apply execR_returnR_fwd.
+    - apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu).
+  cbn. rewrite autocast_id. reflexivity.
+Qed.
+End RWS4walkDev.
+
+(* ---- vmem_read (gpr) reduction ---- *)
+Section RWgS4walkDev.
+Variable rs1 : mword 5.
+Variable offset : mword 64.
+Variable v : bv 32.
+Variable d' : dev_state.
+Variable region : PMA_Region.
+Variable s s' : mstate.
+Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
+Let pa := zero_extend' 64 (add_vec_int a8 (0 * 4)).
+Let data2 : mword (8*1*4) :=
+  update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) v.
+Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Load Data)) s
+                  = Some (Virtaddr ea, s).
+Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 4 = true.
+Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 4))) (Load Data)) s
+                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
+Hypothesis Hcp' : register_lookup cur_privilege s'.(sregs) = Supervisor.
+Hypothesis Hmprv' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false.
+Hypothesis HA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) = TOR.
+Hypothesis Hord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0) = false.
+Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match.
+Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) ('b"1") = true.
+Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s'.(sregs)) (Physaddr pa) 4 = Some region.
+Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
+Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.
+Hypothesis Hc : exec (within_clint (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hsig : exec (within_sig (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hdev : dev_addr pa = true.
+Hypothesis Hdrd : dev_read s'.(mdev) pa 4 = Some (v, d').
+
+Lemma exec_vmem_read_4_gpr_S_walk_dev :
+  exec (vmem_read (Regidx rs1) offset 4 (Load Data) false false false) s
+    = Some (Ok data2, MState s'.(sregs) s'.(mem) d').
+Proof.
+  unfold vmem_read. rewrite exec_catch_early_return.
+  assert (Ha8ea : a8 = ea) by (unfold a8; rewrite subrange_id; apply sign_extend'_id).
+  assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Load Data) 4) s
+                 = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
+  { unfold get_transformed_data_addr.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Load Data) 4 s)).
+    cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ Htea).
+    rewrite Ha8ea. apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
+  cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
+  rewrite execR_liftR.
+  rewrite (exec_vmem_read_addr_4_S_walk_dev a8 v d' region s s' Halign Hcp' Hmprv' Htr HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hdrd).
+  reflexivity.
+Qed.
+End RWgS4walkDev.
+
+(* ---- execute LOAD retire ---- *)
+Section ExecLoadGS4walkDev.
+Variable rs1 rd : mword 5.
+Variable imm : mword 12.
+Variable is_unsigned : bool.
+Variable v : bv 32.
+Variable d' : dev_state.
+Variable region : PMA_Region.
+Variable s s' : mstate.
+Let offset := sign_extend' 64 imm.
+Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
+Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
+Let pa := zero_extend' 64 (add_vec_int a8 (0 * 4)).
+Let data2 : mword (8*1*4) :=
+  update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) v.
+Hypothesis Hrd : uint rd <> 0.
+Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Load Data)) s
+                  = Some (Virtaddr ea, s).
+Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 4 = true.
+Hypothesis Htr : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a8)) (0 * 4))) (Load Data)) s
+                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
+Hypothesis Hcp' : register_lookup cur_privilege s'.(sregs) = Supervisor.
+Hypothesis Hmprv' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false.
+Hypothesis HA : pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) = TOR.
+Hypothesis Hord : zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0) = false.
+Hypothesis Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s'.(sregs)) 0)) 4)
+    (uint pa) (uint (to_bits 64 4)) = PMP_Match.
+Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s'.(sregs)) 0)) ('b"1") = true.
+Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s'.(sregs)) (Physaddr pa) 4 = Some region.
+Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
+Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.
+Hypothesis Hc : exec (within_clint (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hsig : exec (within_sig (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 4) s' = Some (false, s').
+Hypothesis Hdev : dev_addr pa = true.
+Hypothesis Hdrd : dev_read s'.(mdev) pa 4 = Some (v, d').
+
+Lemma exec_execute_LOAD_4_gpr_S_walk_dev :
+  exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value is_unsigned data2))).
+Proof.
+  change (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)))
+    with (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned 4).
+  unfold execute_LOAD.
+  replace (4 <=? xlen_bytes) with true by (vm_compute; reflexivity).
+  assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (exec_bind_Some _ _ _ _ _ Hass).
+  rewrite (exec_bind_Some _ _ _ _ _
+    (exec_vmem_read_4_gpr_S_walk_dev rs1 offset v d' region s s' Htea Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hdrd)).
+  cbn match.
+  assert (Hw : exec (wX_bits (Regidx rd) (extend_value is_unsigned data2)) (MState s'.(sregs) s'.(mem) d')
+               = Some (tt, set_reg (MState s'.(sregs) s'.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (extend_value is_unsigned data2)))).
+  { rewrite (exec_wX_bits_gpr rd (extend_value is_unsigned data2) (MState s'.(sregs) s'.(mem) d')).
+    rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hw).
+  apply exec_returnM.
+Qed.
+End ExecLoadGS4walkDev.
+
+(* a width-4 PLIC MMIO read, at the fabric level, routes to plic_read *)
+Lemma dev_read_plic (d : dev_state) (pa : mword 64) (v : bv 32) (p' : plic_state) :
+  plic_base <= uint pa < plic_base + plic_size ->
+  plic_read (dplic d) (uint pa - plic_base) = Some (v, p') ->
+  dev_read d pa 4 = Some (v, set_dplic d p').
+Proof.
+  intros Hrange Hrd. unfold dev_read.
+  assert (Hnu : in_uart (uint pa) = false).
+  { unfold in_uart. apply andb_false_intro1. apply Z.leb_gt.
+    unfold uart_base, plic_base, plic_size in *. lia. }
+  rewrite Hnu.
+  assert (Hin : in_plic (uint pa) = true).
+  { unfold in_plic. apply andb_true_intro.
+    split; [apply Z.leb_le; lia | apply Z.ltb_lt; lia]. }
+  rewrite Hin.
+  rewrite Hrd. reflexivity.
+Qed.

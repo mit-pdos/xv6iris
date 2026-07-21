@@ -32,3 +32,16 @@ Lemma bdec_00012517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00012517 : mword 32)) s
   = Some (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
+
+(* slliw a0,a0,0xd -- plicinithart +0x1e, plic_claim +0x0c *)
+Lemma bdec_00d5151b s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00d5151b : mword 32)) s
+  = Some (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10),
+                     Regidx (mword_of_int 10), SLLIW), s).
+Proof. decode_bridge_ms. Qed.
+
+(* lui a5,0xc201 -- plicinithart +0x22, plic_claim +0x10 *)
+Lemma bdec_0c2017b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0c2017b7 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0xc201 : mword 20, Regidx (mword_of_int 15), LUI), s).
+Proof. decode_bridge_ms. Qed.

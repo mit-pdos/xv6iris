@@ -269,6 +269,7 @@ LinkUartinit.v
 SpecCpuid.v
 SpecPlicinit.v
 SpecPlicinithart.v
+PlicHart.v
 WpPlicExec.v
 WpSconfCpuid.v
 LinkCpuid.v
@@ -277,3 +278,9 @@ WpSconfPlicinit.v
 LinkPlicinit.v
 WpSconfPlicinithart.v
 LinkPlicinithart.v
+SpecPlicComplete.v
+SpecPlicClaim.v
+WpSconfPlicComplete.v
+LinkPlicComplete.v
+WpSconfPlicClaim.v
+LinkPlicClaim.v
