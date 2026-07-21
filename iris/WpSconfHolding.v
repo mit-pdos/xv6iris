@@ -53,10 +53,10 @@ Section WpSconfHolding.
   Context `{CID : CpuId}.
 
   Lemma wp_holding_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lka : mword 64) (R : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile) (n : nat)
       (cpuold : mword 64) {dqc : dfrac}
-    : wp_holding_lockinv_s_sconf_body γ root_ppn Φ γl lka R m n cpuold dqc.
+    : wp_holding_lockinv_s_sconf_body γ root_ppn Φ γl lka s R m n cpuold dqc.
   Proof.
     cbv beta delta [wp_holding_lockinv_s_sconf_body].
     intros pcE lk a_cpu ret_tgt Hlka Hnotmine Hal0 Hn.
@@ -65,7 +65,7 @@ Section WpSconfHolding.
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
-    iApply (wp_clw_lockinv_s_sconf γ root_ppn Φ γl lka R pcE (mword_of_int 15) (mword_of_int 10)
+    iApply (wp_clw_lockinv_s_sconf γ root_ppn Φ γl lka s R pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n
               Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi00 Hlock [-]").
@@ -511,10 +511,10 @@ Section WpSconfHolding.
   Qed.
 
   Lemma wp_holding_lockinv_locked_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lka : mword 64) (R : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile) (n : nat)
       (cpuold : mword 64) {dqc : dfrac}
-    : wp_holding_lockinv_locked_s_sconf_body γ root_ppn Φ γl lka R m n cpuold dqc.
+    : wp_holding_lockinv_locked_s_sconf_body γ root_ppn Φ γl lka s R m n cpuold dqc.
   Proof.
     cbv beta delta [wp_holding_lockinv_locked_s_sconf_body].
     intros pcE lk a_cpu ret_tgt Hlka Hmine Hal0 Hn.
@@ -523,7 +523,7 @@ Section WpSconfHolding.
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
-    iApply (wp_clw_lockinv_locked_s_sconf γ root_ppn Φ γl lka R pcE (mword_of_int 15) (mword_of_int 10)
+    iApply (wp_clw_lockinv_locked_s_sconf γ root_ppn Φ γl lka s R pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n
               Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi00 Hlock Htok [-]").

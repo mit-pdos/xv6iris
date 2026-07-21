@@ -25,7 +25,7 @@ Import Defs.
 Notation RL := KernelSyms.release.
 
 Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) (dqi : dfrac) :=
+    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) (dqi : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
@@ -46,7 +46,7 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   sie_cap_gpr γ root_ppn m av -∗
   tlb_inv_pt root_ppn -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lka R -∗
+  is_lock γl lka s R -∗
   locked γl -∗
   R -∗
   a_cpu ↦₈ cpuold -∗
@@ -70,6 +70,6 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
 Module Type RELEASE.
   Parameter wp_release_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) {dqi : dfrac},
-      wp_release_sconf_body γ root_ppn Φ γl lka R m cpuold noffv intenav n av dqi.
+      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) {dqi : dfrac},
+      wp_release_sconf_body γ root_ppn Φ γl lka s R m cpuold noffv intenav n av dqi.
 End RELEASE.

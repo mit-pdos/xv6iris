@@ -68,7 +68,7 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   intr_count γ root_ppn ncnt -∗
   tlb_inv_pt root_ppn -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lk (kmem_res γk fl) -∗
+  is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
   a_noff ↦₄ (zeros' 32 : mword 32) -∗
   (∃ iv : mword 32, a_int ↦₄ iv) -∗

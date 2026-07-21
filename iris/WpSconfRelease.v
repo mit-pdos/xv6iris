@@ -55,10 +55,10 @@ Section WpSconfRelease.
   Context `{CID : CpuId}.
 
   Lemma wp_release_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lka : mword 64) (R : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile)
       (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) {dqi : dfrac}
-    : wp_release_sconf_body γ root_ppn Φ γl lka R m cpuold noffv intenav n av dqi.
+    : wp_release_sconf_body γ root_ppn Φ γl lka s R m cpuold noffv intenav n av dqi.
   Proof.
     cbv beta delta [wp_release_sconf_body].
     intros pcE lk0 a_cpu cpuv a_noff a_int nv1 storeval_noff ret_tgt
@@ -182,7 +182,7 @@ Section WpSconfRelease.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_ne; [| vm_compute; discriminate].
       exact HcspR0. }
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ root_ppn Φ γl lka R R3 (av - 4)%nat cpuold (dqc := DfracOwn 1)
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ root_ppn Φ γl lka s R R3 (av - 4)%nat cpuold (dqc := DfracOwn 1)
               ltac:(rewrite Ha0R3; exact Hlka)
               ltac:(rewrite HtpR3; exact Hmine)
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
@@ -232,7 +232,7 @@ Section WpSconfRelease.
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iPoseProof (rli_1a with "Htext") as "Hi1a".
-    iApply (wp_sw_zero_lockinv_s_sconf γ root_ppn Φ γl lka R (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
+    iApply (wp_sw_zero_lockinv_s_sconf γ root_ppn Φ γl lka s R (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) mh (av - 4)%nat
               ltac:(rewrite Hs1mh; exact Hlka)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi1a Hlock Htoken HR [-]").

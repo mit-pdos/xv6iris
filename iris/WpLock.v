@@ -45,11 +45,38 @@ Section Lock.
        (⌜v = (mword_of_int 0 : mword 32)⌝ ∗ locked γ ∗ R
         ∨ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
 
-  Definition is_lock (γ : gname) (lk : mword 64) (R : iProp Σ) : iProp Σ :=
-    inv lockN (lock_inv γ lk R).
+  (* the lock's NAME: [lk->name] (the 8-byte pointer field at +8) holds the
+     address of a NUL-terminated string [s].  initlock writes the field once
+     and nothing ever writes it again, so both the field and the string it
+     points at are held at [DfracDiscarded] -- [lock_name] is PERSISTENT, and
+     therefore rides along inside the (persistent) lock predicate at no
+     ownership cost: no proof has to thread the name field, and every holder
+     of the lock knows which lock it is by name. *)
+  Definition lock_name_field (lk : mword 64) : mword 64 :=
+    add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)).
 
-  Global Instance is_lock_persistent γ lk R : Persistent (is_lock γ lk R).
+  Definition lock_name (lk : mword 64) (s : string) : iProp Σ :=
+    (∃ p : mword 64, lock_name_field lk ↦₈□ p ∗ p ↦ₛ□ s)%I.
+
+  Global Instance lock_name_persistent lk s : Persistent (lock_name lk s).
   Proof. apply _. Qed.
+
+  (* a lock is its (immutable) name plus the invariant over its word. *)
+  Definition is_lock (γ : gname) (lk : mword 64) (s : string) (R : iProp Σ) : iProp Σ :=
+    (lock_name lk s ∗ inv lockN (lock_inv γ lk R))%I.
+
+  Global Instance is_lock_persistent γ lk s R : Persistent (is_lock γ lk s R).
+  Proof. apply _. Qed.
+
+  (* the two projections + the introduction rule (the only interface the
+     lock leaves and [newlock] need). *)
+  Lemma is_lock_name γ lk s R : is_lock γ lk s R -∗ lock_name lk s.
+  Proof. iIntros "[$ _]". Qed.
+  Lemma is_lock_inv γ lk s R : is_lock γ lk s R -∗ inv lockN (lock_inv γ lk R).
+  Proof. iIntros "[_ $]". Qed.
+  Lemma is_lock_intro γ lk s R :
+    lock_name lk s -∗ inv lockN (lock_inv γ lk R) -∗ is_lock γ lk s R.
+  Proof. iIntros "#Hn #Hi". by iFrame "Hn Hi". Qed.
 
   Global Instance locked_timeless γ : Timeless (locked γ).
   Proof. apply _. Qed.

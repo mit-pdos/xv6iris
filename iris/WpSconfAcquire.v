@@ -40,7 +40,7 @@ Section WpSconfAcquire.
   (* genuine Löb loop -- the c.bnez back edge hands its step's later out. *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_acquire_lock_loop_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (R : iProp Σ)
+      (γl : gname) (s : string) (R : iProp Σ)
       (M0 : regfile) (n : nat) (a5v lk : mword 64) :
     let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
     M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
@@ -50,7 +50,7 @@ Section WpSconfAcquire.
     sie_cap_gpr γ root_ppn (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) n -∗
     tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is (mword_of_int (AQ + 0x1a)) -∗
-    is_lock γl lk R -∗
+    is_lock γl lk s R -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
       sie_cap_gpr γ root_ppn (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n -∗
@@ -103,7 +103,7 @@ Section WpSconfAcquire.
                      ((<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
                         !!! Regidx (mword_of_int 15 : mword 5)))) zero_reg = true)
       by (rewrite upd_eq Hst1; vm_compute; reflexivity).
-    iApply (wp_amoswap_lockinv_s_sconf γ root_ppn Φ γl lk R (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
+    iApply (wp_amoswap_lockinv_s_sconf γ root_ppn Φ γl lk s R (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) n
               HPAlk HSTZ
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -152,10 +152,10 @@ Section WpSconfAcquire.
   Qed.
 
   Lemma wp_acquire_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (R : iProp Σ)
+      (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
       (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat)
-    : wp_acquire_sconf_body γ root_ppn Φ γl R m cpuold noffv intena_old n av.
+    : wp_acquire_sconf_body γ root_ppn Φ γl s R m cpuold noffv intena_old n av.
   Proof.
     cbv beta delta [wp_acquire_sconf_body].
     intros pcE lk0 a_cpu cpuv a_noff a_int po_noff_a5 po_noff_store ret_tgt Hnotmine Hal0 Hav.
@@ -334,7 +334,7 @@ Section WpSconfAcquire.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (Holding.wp_holding_lockinv_s_sconf γ root_ppn Φ γl lk0 R B2 (av - 4)%nat cpuold (dqc := DfracOwn 1)
+    iApply (Holding.wp_holding_lockinv_s_sconf γ root_ppn Φ γl lk0 s R B2 (av - 4)%nat cpuold (dqc := DfracOwn 1)
               Hlkb
               ltac:(rewrite HtpB2; exact Hnotmine)
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
@@ -387,7 +387,7 @@ Section WpSconfAcquire.
     { intros f k. apply functional_extensionality; intro j.
       unfold insert, regfile_insert, rf_upd, regval_into_reg, lookup_total, regfile_lookup_total.
       case_bool_decide as Heq; [subst; reflexivity | reflexivity]. }
-    iApply (wp_acquire_lock_loop_sconf γ root_ppn Φ γl R B3 (av - 4)%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0
+    iApply (wp_acquire_lock_loop_sconf γ root_ppn Φ γl s R B3 (av - 4)%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0
               HB3a4 HB3s1
               with "Hsc Hhs [Hcg] Htlbinv Htext Hpc Hlock [-]").
     { rewrite (Hupd_id B3 (Regidx (mword_of_int 15 : mword 5))). iExact "Hcg". }

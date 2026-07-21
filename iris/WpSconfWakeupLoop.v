@@ -382,7 +382,7 @@ Section WpSconfWakeupLoop.
         { rewrite /M42 upd_ne; [| vm_compute; discriminate].
           rewrite /M40 upd_ne; [| vm_compute; discriminate]. exact Hmret4. }
         (* acquire(&proc[k]->lock): intr_count lvl -> S lvl; returns locked + proc_lock_res. *)
-        iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γk (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) M42
+        iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γk "proc"%string (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) M42
                   (zero_reg : mword 64) noffv iv lvl av
                   ltac:(rewrite HM42tp; exact Hmycpu_nz)
                   ltac:(rewrite HM42ra; vm_compute; reflexivity)
@@ -499,7 +499,7 @@ Section WpSconfWakeupLoop.
           assert (Hal5 : eq_vec (access_vec_dec (update_vec_dec (add_vec (Mr2c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
             by (rewrite HMr2c_ra; vm_compute; reflexivity).
           (* release(&proc[k]->lock): intr_count S lvl -> lvl. *)
-          iApply (Release.wp_release_sconf γ root_ppn Φ γk (proc_addr k) (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) Mr2c
+          iApply (Release.wp_release_sconf γ root_ppn Φ γk (proc_addr k) "proc"%string (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) Mr2c
                     (mycpu_ret rtp) nacq ivc
                     lvl av (dqi:=DfracOwn 1)
                     Hlka2 Hmine2 Hrel_coup Hnf_pos Hal5 ltac:(lia)

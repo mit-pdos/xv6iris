@@ -176,7 +176,7 @@ Section WpSconfKalloc.
     { rewrite /mA upd_ne; [| vm_compute; discriminate]. exact HR4a0. }
     assert (HmAra : mA !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γl (kmem_res γk fl) mA
+    iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γl "kmem"%string (kmem_res γk fl) mA
               cpuold noffv intena_old n (K - 4)%nat
               ltac:(rewrite HmAtp; exact Hcpune)
               ltac:(rewrite HmAra; vm_compute; reflexivity)
@@ -301,7 +301,7 @@ Section WpSconfKalloc.
       iAssert (intr_count γ root_ppn (S n)) with "[Htok0 HsepA HscaA HstvA]" as "Hcnt".
       { iApply (intr_count_pack_S γ root_ppn n with "Htok0").
         iApply (intr_restore_intro γ root_ppn hA with "HiA HsA HsepA HscaA HstvA"). }
-      iApply (Release.wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) (kmem_res γk fl) E3
+      iApply (Release.wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
                 (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
                 po_noff_store
                 (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
@@ -576,7 +576,7 @@ Section WpSconfKalloc.
       assert (HR12s1 : R12 !!! Regidx (mword_of_int 9 : mword 5) = pg).
       { rewrite /R12 /R11 /R10 /R9 /R8;
         repeat (rewrite upd_ne; [| vm_compute; discriminate]); exact Hs1R7. }
-      iApply (Release.wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) (kmem_res γk fl) R12
+      iApply (Release.wp_release_sconf γ root_ppn Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
                 (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
                 po_noff_store
                 (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)

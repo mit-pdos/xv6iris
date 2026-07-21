@@ -57,4 +57,23 @@ Section KernelDataInv.
     apply Hbytes. exact Hlt.
   Qed.
 
+  (* Extract a NUL-terminated STRING literal from the image: the string
+     points-to [↦ₛ□] whose bytes the image holds at [A .. A+|s|].  The
+     read-only-globals analogue of [kernel_data_window] for the one kind of
+     global whose length is not a machine word -- a C string constant (the
+     names the kernel passes to [initlock], say).  Persistent, so the string
+     never has to be threaded. *)
+  Lemma kernel_data_string (A : Z) (s : string) (a : mword 64) :
+    a = mword_of_int A ->
+    (forall j b, cstring_bytes s !! j = Some b ->
+       KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some b) ->
+    kernel_data -∗ a ↦ₛ□ s.
+  Proof.
+    iIntros (-> Hbytes) "#Hd". rewrite /string_pointsto.
+    iApply big_sepL_intro. iIntros "!>" (j b Hj).
+    rewrite pa_add_mword.
+    iApply (big_sepM_lookup _ _ (A + Z.of_nat j)%Z b with "Hd").
+    by apply Hbytes.
+  Qed.
+
 End KernelDataInv.

@@ -15,8 +15,9 @@ Require Import WpGpr InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KptTree.
 Require Import StackOwn CalleeSaved.
-Require Import KernelText.
+Require Import KernelText KernelDataInv.
 Require Import IntrDefs WpSmodeIntr.
+Require Import WpLock.
 Require Import SpecInitlock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -28,26 +29,27 @@ Notation PK := KernelSyms.printkinit.
    its own, so it is spelled out here (see kernel.asm: 80007028 <etext+0x28>). *)
 Definition pr_name_str : Z := 0x80007028%Z.
 
-(* printkinit() = initlock(&pr.lock, "pr").  It takes no arguments and touches no
-   state beyond the three fields of the global [pr.lock]: the caller hands those
-   in raw and gets them back initialized (locked = 0, name = &"pr", cpu = 0).
-   Whether the lock then becomes an [is_lock] over some printk resource is the
-   caller's ghost step, not printkinit's -- so this spec stays at points-to. *)
+(* printkinit() = initlock(&pr.lock, "pr").  It takes no arguments and touches
+   no state beyond the three fields of the global [pr.lock]: the caller hands
+   the word and the cpu field in raw and gets them back zeroed, and the name
+   field comes back sealed as the persistent [lock_name lk "pr"].  Whether the
+   lock then becomes an [is_lock] over some printk resource is the caller's
+   ghost step, not printkinit's -- it need only add the invariant
+   ([is_lock_intro]).  The "pr" literal itself is read out of [kernel_data]. *)
 Definition wp_printkinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.printkinit in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let lk : mword 64 := mword_of_int KernelSyms.pr in
-  let c_name := add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)) in
+  let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let name : mword 64 := mword_of_int pr_name_str in
   (4 <= K)%nat ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m K -∗
   tlb_inv_pt root_ppn -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
@@ -59,7 +61,7 @@ Definition wp_printkinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    c_name ↦₈ name -∗
+    lock_name lk "pr"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

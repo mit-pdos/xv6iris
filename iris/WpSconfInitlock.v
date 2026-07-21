@@ -31,7 +31,7 @@ Require Import KernelText.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpInitlock.
+Require Import WpInitlock WpLock.
 Require Import SRegime.
 Require Import RegFile.
 From Kernel Require KernelSyms.
@@ -57,15 +57,15 @@ Section WpSconfInitlock.
   (* ============================================================= *)
   Lemma wp_initlock_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : regfile)
-      (vlock : bv 32) (vname vcpu : bv 64)
+      (vlock : bv 32) (vname vcpu : bv 64) (s : string)
       (K : nat)
-    : wp_initlock_sconf_body γ root_ppn Φ m vlock vname vcpu K.
+    : wp_initlock_sconf_body γ root_ppn Φ m vlock vname vcpu s K.
   Proof.
     cbv beta delta [wp_initlock_sconf_body].
     intros pcE lk name ret_tgt c_name c_cpu HK Hretm.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hlock Hname Hcpu Hcont".
+    iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc #Hstr Hlock Hname Hcpu Hcont".
     iPoseProof (ini_00 with "Htext") as "Hi00".
     iPoseProof (ini_02 with "Htext") as "Hi02".
     iPoseProof (ini_04 with "Htext") as "Hi04".
@@ -134,7 +134,7 @@ Section WpSconfInitlock.
     iEval (rewrite Hpp08) in "Hpc".
     (* +0x08 c.sd a1,8(a0):  lk->name := a1 *)
     assert (Hea_name : add_vec (R2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))) = c_name).
-    { rewrite HR2a0. unfold c_name. f_equal; apply bv_eq; vm_compute; reflexivity. }
+    { rewrite HR2a0. unfold c_name, lock_name_field. f_equal; apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_csd_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) R2 (K - 2)%nat vname
               with "Hsc Hhs Hcg Htlbinv Hpc Hi08 [Hname] [-]").
@@ -233,7 +233,13 @@ Section WpSconfInitlock.
     assert (Hretf : update_vec_dec (add_vec (R5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HR5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! R5 with "Hsc Hhs Hcg Htlbinv Hpc [%] Hlock Hname Hcpu").
+    (* the name field is now written for good: discard its fraction, so what
+       the caller gets back is the persistent [lock_name lk s]. *)
+    iApply fupd_wp.
+    iMod (word_pointsto_persist with "Hname") as "#Hnamep".
+    iModIntro.
+    iApply ("Hcont" $! R5 with "Hsc Hhs Hcg Htlbinv Hpc [%] Hlock [] Hcpu").
+    2:{ iExists name. iFrame "Hnamep Hstr". }
     (* callee_saved m R5 *)
     assert (Hthread : forall c : mword 5, c <> csp_rs1 -> c <> mword_of_int 8 -> c <> mword_of_int 1 ->
                 R5 !!! Regidx c = m !!! Regidx c).

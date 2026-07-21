@@ -2,9 +2,10 @@
    SIE-agnostic sconf world.  printkinit() = initlock(&pr.lock, "pr"), and
    nothing else: a 16-byte frame, the two auipc/addi pairs that materialize
    &"pr" and &pr, one jal sub-call, and the epilogue.  Straight-line, no loop and
-   no ghost step -- the three [pr.lock] fields go in raw and come back
-   initialized, and it is the caller who decides whether to turn them into an
-   [is_lock]. *)
+   no ghost step -- the three [pr.lock] fields go in raw, the word and the cpu
+   field come back zeroed and the name field comes back sealed as the
+   persistent [lock_name lk "pr"], and it is the caller who decides whether to
+   turn them into an [is_lock]. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -19,9 +20,10 @@ Require Import WpGpr InstrBytes WpMmodeLeafBase WpAuipc.
 Require Import SmodeCore.
 Require Import KptTree.
 Require Import StackOwn CalleeSaved.
-Require Import KernelText.
+Require Import KernelText KernelDataInv.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import WpLock.
 Require Import WpInitlock SpecInitlock.
 Require Import WpPrintkinitDecode.
 From Kernel Require KernelSyms.
@@ -44,13 +46,23 @@ Section WpSconfPrintkinit.
     : wp_printkinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
   Proof.
     cbv beta delta [wp_printkinit_sconf_body].
-    intros pcE ret_tgt lk c_name c_cpu name HK Hretm.
+    intros pcE ret_tgt lk c_name c_cpu HK Hretm.
     (* [sp0] is proof-local shorthand, not spec vocabulary: the statement says
        nothing about the incoming sp beyond what [sie_cap_gpr]/[callee_saved]
        already say, so it has no business being a [let] in the spec. *)
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
+    (* &"pr" is proof-local too: the spec speaks of the lock's NAME, not of the
+       address the image happens to keep the literal at. *)
+    pose (name := (mword_of_int pr_name_str : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hlock Hname Hcpu Hcont".
+    iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
+    (* the "pr" string literal, read out of the kernel's data image *)
+    iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl
+                  ltac:(intros j b Hj;
+                        do 3 (destruct j as [|j];
+                              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+                        vm_compute in Hj; discriminate)
+                  with "Hkdata") as "#Hstr".
     assert (Hspr2 : spr = pa_stk sp0 2).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
@@ -182,16 +194,17 @@ Section WpSconfPrintkinit.
     assert (HR7ra : R7 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (PK + 0x18) : mword 64) 4)
       by (rewrite /R7; apply upd_eq).
     (* initlock(&pr.lock, "pr") : owns lk's 3 struct fields, returns them init'd *)
-    iApply (Initlock.wp_initlock_sconf γ root_ppn Φ R7 vlock vname vcpu (K - 2)
+    iApply (Initlock.wp_initlock_sconf γ root_ppn Φ R7 vlock vname vcpu "pr"%string (K - 2)
               ltac:(lia)
               ltac:(rewrite HR7ra; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Htext Hpc [Hlock] [Hname] [Hcpu]").
+              with "Hsc Hhs Hcg Htlbinv Htext Hpc [] [Hlock] [Hname] [Hcpu]").
+    { iEval (rewrite HR7a1). iExact "Hstr". }
     { iEval (rewrite HR7a0). iExact "Hlock". }
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
-    iIntros (mil) "Hsc Hhs Hcg Htlbinv Hpc %Hilcs Hlock Hname Hcpu".
+    iIntros (mil) "Hsc Hhs Hcg Htlbinv Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
-    iEval (rewrite HR7a0 HR7a1) in "Hname".
+    iEval (rewrite HR7a0) in "Hlname".
     iEval (rewrite HR7a0) in "Hcpu".
     assert (Hpcil : update_vec_dec (add_vec (R7 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (PK + 0x1c)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
@@ -261,7 +274,7 @@ Section WpSconfPrintkinit.
     assert (Hretf : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! E3 with "Hsc Hhs Hcg Htlbinv Hpc [%] Hlock Hname Hcpu").
+    iApply ("Hcont" $! E3 with "Hsc Hhs Hcg Htlbinv Hpc [%] Hlock Hlname Hcpu").
     (* callee_saved m E3: the sub-call preserves s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

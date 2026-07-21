@@ -27,7 +27,7 @@ Import Defs.
 Notation AQ := KernelSyms.acquire.
 
 Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat) :=
+    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
@@ -47,7 +47,7 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   intr_count γ root_ppn n -∗
   tlb_inv_pt root_ppn -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lk0 R -∗
+  is_lock γl lk0 s R -∗
   a_cpu ↦₈ cpuold -∗
   a_noff ↦₄ noffv -∗
   a_int ↦₄ intena_old -∗
@@ -71,6 +71,6 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
 Module Type ACQUIRE.
   Parameter wp_acquire_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat),
-      wp_acquire_sconf_body γ root_ppn Φ γl R m cpuold noffv intena_old n av.
+      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat),
+      wp_acquire_sconf_body γ root_ppn Φ γl s R m cpuold noffv intena_old n av.
 End ACQUIRE.

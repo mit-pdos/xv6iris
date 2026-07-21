@@ -495,7 +495,7 @@ Section WpSconfKfree.
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       rewrite /R5 upd_ne; [| vm_compute; discriminate].
       rewrite Hp10. apply add_vec_zero_l. }
-    iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γl (kmem_res γk fl) Kacq
+    iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γl "kmem"%string (kmem_res γk fl) Kacq
               cpuold noffv intena_old n (K - 4)%nat
               ltac:(rewrite HKacqtp; exact Hcpune)
               ltac:(rewrite HKacqra; vm_compute; reflexivity)
@@ -612,7 +612,7 @@ Section WpSconfKfree.
     { exact (kfree_nv1_cancel_pure noffv). }
     assert (kfree_nv1_cancel : neq_vec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)) zero_reg = false <-> n = 0%nat).
     { rewrite Hnv1eq. exact Hnoff_lvl. }
-    iApply (Release.wp_release_sconf γ root_ppn Φ γl lk (kmem_res γk fl) Rrel
+    iApply (Release.wp_release_sconf γ root_ppn Φ γl lk "kmem"%string (kmem_res γk fl) Rrel
               (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
               po_noff_store
               (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)

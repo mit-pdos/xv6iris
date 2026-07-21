@@ -62,7 +62,7 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   intr_count γ root_ppn n -∗
   tlb_inv_pt root_ppn -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl (mword_of_int KernelSyms.kmem) (kmem_res γk fl) -∗
+  is_lock γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
   a_noff ↦₄ noffv -∗
   a_int ↦₄ intena_old -∗

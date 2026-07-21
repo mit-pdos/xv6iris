@@ -186,6 +186,9 @@ Notation "a ↦₈{ dq } w" := (word_pointsto a dq w)
   (at level 20, format "a  ↦₈{ dq }  w") : bi_scope.
 Notation "a ↦₈ w" := (word_pointsto a (DfracOwn 1) w)
   (at level 20, format "a  ↦₈  w") : bi_scope.
+(* discarded (persistent, duplicable) read-only ownership of the doubleword. *)
+Notation "a ↦₈□ w" := (word_pointsto a DfracDiscarded w)
+  (at level 20, format "a  ↦₈□  w") : bi_scope.
 
 Section word_pointsto.
   Context `{!riscvGS Σ}.
@@ -221,6 +224,9 @@ Notation "a ↦₄{ dq } w" := (word4_pointsto a dq w)
   (at level 20, format "a  ↦₄{ dq }  w") : bi_scope.
 Notation "a ↦₄ w" := (word4_pointsto a (DfracOwn 1) w)
   (at level 20, format "a  ↦₄  w") : bi_scope.
+(* discarded (persistent, duplicable) read-only ownership of the word. *)
+Notation "a ↦₄□ w" := (word4_pointsto a DfracDiscarded w)
+  (at level 20, format "a  ↦₄□  w") : bi_scope.
 
 Section word4_pointsto.
   Context `{!riscvGS Σ}.
@@ -242,6 +248,63 @@ Section word4_pointsto.
     ([∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ{dq} nth_byte w j).
   Proof. reflexivity. Qed.
 End word4_pointsto.
+
+(* ---------------------------------------------------------------------- *)
+(* string points-to: a NUL-terminated C string [s] resident byte-by-byte at
+   consecutive addresses starting at [a].  Built DIRECTLY on the single-byte
+   memory points-to [↦ₘ] -- character [j] of [s] at [a+j], the terminating NUL
+   at [a+|s|] -- with no alignment side condition, a C string being
+   byte-addressed (this is what distinguishes it from [↦₈]/[↦₄]).
+
+   The intended fraction is [DfracDiscarded]: the kernel's string literals are
+   read-only image bytes that nothing ever writes, so [a ↦ₛ□ s] is PERSISTENT
+   and hence freely DUPLICABLE -- it can be passed to a callee and kept, and it
+   can sit inside a persistent predicate.  That is what lets a lock carry its
+   own name ([lock_name], WpLock.v) at no ownership cost.                     *)
+(* ---------------------------------------------------------------------- *)
+
+(* the characters of [s] as bytes (no terminator) *)
+Fixpoint string_bytes (s : string) : list (bv 8) :=
+  match s with
+  | String.EmptyString => []
+  | String.String c s' => Z_to_bv 8 (Z.of_N (Ascii.N_of_ascii c)) :: string_bytes s'
+  end.
+
+(* the C representation of [s]: its characters followed by the NUL byte *)
+Definition cstring_bytes (s : string) : list (bv 8) :=
+  string_bytes s ++ [Z_to_bv 8 0].
+
+Definition string_pointsto `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac)
+    (s : string) : iProp Σ :=
+  ([∗ list] j ↦ b ∈ cstring_bytes s, mem_pointsto (pa_add a j) dq b)%I.
+Notation "a ↦ₛ{ dq } s" := (string_pointsto a dq s)
+  (at level 20, format "a  ↦ₛ{ dq }  s") : bi_scope.
+(* discarded (persistent, duplicable) read-only ownership -- the default for a
+   kernel string literal. *)
+Notation "a ↦ₛ□ s" := (string_pointsto a DfracDiscarded s)
+  (at level 20, format "a  ↦ₛ□  s") : bi_scope.
+Notation "a ↦ₛ s" := (string_pointsto a (DfracOwn 1) s)
+  (at level 20, format "a  ↦ₛ  s") : bi_scope.
+
+Section string_pointsto.
+  Context `{!riscvGS Σ}.
+
+  Global Instance string_pointsto_persistent a s : Persistent (a ↦ₛ□ s).
+  Proof. rewrite /string_pointsto /mem_pointsto. apply _. Qed.
+
+  Lemma string_pointsto_bytes a dq s :
+    string_pointsto a dq s ⊣⊢
+    [∗ list] j ↦ b ∈ cstring_bytes s, (pa_add a j) ↦ₘ{dq} b.
+  Proof. reflexivity. Qed.
+
+  (* the terminating NUL is the last byte owned *)
+  Lemma cstring_bytes_length s :
+    length (cstring_bytes s) = S (String.length s).
+  Proof.
+    rewrite /cstring_bytes length_app /=.
+    induction s as [|c s IH]; simpl; [reflexivity | rewrite IH; reflexivity].
+  Qed.
+End string_pointsto.
 
 (* ---------------------------------------------------------------------- *)
 (* 2. The bridge: an existential register map agreeing with [regstate].    *)
@@ -514,6 +577,48 @@ Section Bridge.
   Proof. iIntros "#H". by iSplitR. Qed.
 
 End Bridge.
+
+(* ---------------------------------------------------------------------- *)
+(* Persisting a MULTI-byte cell: [mem_pointsto_persist] lifted over the byte
+   windows of [↦₈] / [↦₄] / [↦ₛ].  Discarding the fraction turns a cell
+   read-only forever and hence duplicable -- how a freshly-initialised
+   immutable structure (a lock's name field, a string) becomes a persistent
+   resource that no longer has to be threaded through every WP.              *)
+(* ---------------------------------------------------------------------- *)
+Section pointsto_persist.
+  Context `{!riscvGS Σ}.
+
+  Global Instance word_pointsto_discarded_persistent a w : Persistent (a ↦₈□ w).
+  Proof. rewrite /word_pointsto. apply _. Qed.
+  Global Instance word4_pointsto_discarded_persistent a w : Persistent (a ↦₄□ w).
+  Proof. rewrite /word4_pointsto. apply _. Qed.
+
+  Lemma word_pointsto_persist a dq w : a ↦₈{dq} w ==∗ a ↦₈□ w.
+  Proof.
+    iIntros "[%Hal Hbs]".
+    iAssert (|==> [∗ list] j ∈ seq 0 8,
+               (pa_add a j) ↦ₘ□ nth_byte w j)%I with "[Hbs]" as ">Hbs".
+    { iApply big_sepL_bupd. iApply (big_sepL_mono with "Hbs").
+      iIntros (k j _) "H". by iApply mem_pointsto_persist. }
+    iModIntro. by iFrame.
+  Qed.
+
+  Lemma word4_pointsto_persist a dq w : a ↦₄{dq} w ==∗ a ↦₄□ w.
+  Proof.
+    iIntros "[%Hal Hbs]".
+    iAssert (|==> [∗ list] j ∈ seq 0 4,
+               (pa_add a j) ↦ₘ□ nth_byte w j)%I with "[Hbs]" as ">Hbs".
+    { iApply big_sepL_bupd. iApply (big_sepL_mono with "Hbs").
+      iIntros (k j _) "H". by iApply mem_pointsto_persist. }
+    iModIntro. by iFrame.
+  Qed.
+
+  Lemma string_pointsto_persist a dq s : a ↦ₛ{dq} s ==∗ a ↦ₛ□ s.
+  Proof.
+    iIntros "Hs". iApply big_sepL_bupd. iApply (big_sepL_mono with "Hs").
+    iIntros (k b _) "H". by iApply mem_pointsto_persist.
+  Qed.
+End pointsto_persist.
 
 (* Seal [mem_pointsto] for typeclass (Frame) resolution: without this, [iFrame]
    over a large memory region unfolds every [a ↦ₘ v] into its [pointsto ∗ ⌜..⌝]

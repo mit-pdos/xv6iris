@@ -505,7 +505,7 @@ Section ProcInv.
      [proc_lock_res]. *)
   Definition procs_inv (γs : list gname) : iProp Σ :=
     (⌜length γs = NPROC⌝ ∗
-     [∗ list] i ↦ γ ∈ γs, is_lock γ (proc_addr i) (proc_lock_res γ (proc_addr i)))%I.
+     [∗ list] i ↦ γ ∈ γs, is_lock γ (proc_addr i) "proc"%string (proc_lock_res γ (proc_addr i)))%I.
 
   Global Instance procs_inv_persistent γs : Persistent (procs_inv γs).
   Proof. apply _. Qed.
@@ -513,7 +513,7 @@ Section ProcInv.
   (* the per-proc [is_lock] extracted from the global invariant. *)
   Lemma procs_inv_lookup (γs : list gname) (i : nat) (γ : gname) :
     γs !! i = Some γ ->
-    procs_inv γs -∗ is_lock γ (proc_addr i) (proc_lock_res γ (proc_addr i)).
+    procs_inv γs -∗ is_lock γ (proc_addr i) "proc"%string (proc_lock_res γ (proc_addr i)).
   Proof.
     iIntros (Hi) "[_ Hbig]".
     by iDestruct (big_sepL_lookup with "Hbig") as "$".

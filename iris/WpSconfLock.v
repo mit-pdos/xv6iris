@@ -70,7 +70,7 @@ Section WpSconfLock.
   Context `{CID : CpuId}.
 
   Lemma wp_clw_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lk : mword 64) (R : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -83,7 +83,7 @@ Section WpSconfLock.
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    is_lock γl lk R -∗
+    is_lock γl lk s R -∗
     ( ∀ v : mword 32,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
@@ -95,6 +95,7 @@ Section WpSconfLock.
   Proof.
     intros pa Hpalk Hrd Hrdsp.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Hcont".
+    iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
@@ -111,7 +112,7 @@ Section WpSconfLock.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all pa 4) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlkinv") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (v) "[>Hbytes Hbr]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
@@ -306,7 +307,7 @@ Section WpSconfLock.
      is refuted by token exclusivity, so the read provably sees a
      nonzero word and the token rides through untouched.               *)
   Lemma wp_clw_lockinv_locked_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lk : mword 64) (R : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -319,7 +320,7 @@ Section WpSconfLock.
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    is_lock γl lk R -∗
+    is_lock γl lk s R -∗
     locked γl -∗
     ( ∀ v : mword 32,
       ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ -∗
@@ -334,6 +335,7 @@ Section WpSconfLock.
   Proof.
     intros pa Hpalk Hrd Hrdsp.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Htok Hcont".
+    iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
@@ -350,7 +352,7 @@ Section WpSconfLock.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all pa 4) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlkinv") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (v) "[>Hbytes Hbr]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
@@ -550,7 +552,7 @@ Section WpSconfLock.
   (* token and R go back in with the zeroed word.                         *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_sw_zero_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lk : mword 64) (R : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -561,7 +563,7 @@ Section WpSconfLock.
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
-    is_lock γl lk R -∗
+    is_lock γl lk s R -∗
     locked γl -∗
     R -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -575,6 +577,7 @@ Section WpSconfLock.
     intros pa Hpalk.
     set (storeval := (mword_of_int 0 : mword 32)).
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Htok HRes Hcont".
+    iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
@@ -590,7 +593,7 @@ Section WpSconfLock.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     destruct (Hpma_all pa 4) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlkinv") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes _]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
@@ -767,7 +770,7 @@ Section WpSconfLock.
   (* swapped-in nonzero mark reseals the invariant.                       *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_amoswap_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (γl : gname) (lk : mword 64) (R : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rd rs2 rs1 : mword 5)
       (m : regfile) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (zeros' 64) in
@@ -779,7 +782,7 @@ Section WpSconfLock.
     sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗
     instr pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd)) -∗
-    is_lock γl lk R -∗
+    is_lock γl lk s R -∗
     ( ∀ w : mword 32,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
@@ -794,6 +797,7 @@ Section WpSconfLock.
     intros pa Hpalk Hstz Hrd Hrdsp.
     set (a8 := pa). set (ea := pa).
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Hcont".
+    iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
@@ -812,7 +816,7 @@ Section WpSconfLock.
               ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
               AMOSWAP 4 = true)
       by (rewrite Hatomic_supp_amo; vm_compute; reflexivity).
-    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]";
+    iMod (inv_acc (⊤ ∖ ↑minstretN) lockN with "Hlkinv") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (w) "[>Hbytes Hbr]".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".

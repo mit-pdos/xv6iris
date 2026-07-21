@@ -15,7 +15,7 @@ Require Import WpGpr InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KptTree.
 Require Import StackOwn CalleeSaved.
-Require Import KernelText.
+Require Import KernelText KernelDataInv.
 Require Import WpMycpu WpLock.
 Require Import KallocInv.
 Require Import IntrDefs WpSmodeIntr.
@@ -35,7 +35,7 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
   let lk : mword 64 := mword_of_int KernelSyms.kmem in
   let fl : mword 64 := mword_of_int (KernelSyms.kmem + 24) in
-  let c_name := add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)) in
+  let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   let endaddr : mword 64 := mword_of_int 0x80023558 in
   let phystop : mword 64 := mword_of_int 0x88000000 in
@@ -50,7 +50,9 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   sie_cap_gpr γ root_ppn m K -∗
   intr_count γ root_ppn ncnt -∗
   tlb_inv_pt root_ppn -∗
-  kernel_text -∗ pc_is pcE -∗
+  (* [kernel_data] supplies the "kmem" string literal kinit's [auipc a1 /
+     addi a1] points at -- the name it hands to initlock. *)
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
@@ -70,7 +72,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
     kalloc_avail γk (Some (length ps)) -∗
     a_noff ↦₄ (zeros' 32 : mword 32) -∗
     (∃ iv : mword 32, a_int ↦₄ iv) -∗
-    (∃ nm : mword 64, c_name ↦₈ nm) -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

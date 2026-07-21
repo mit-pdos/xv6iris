@@ -120,7 +120,7 @@ Section KvmSpecs.
     (∃ (γk : gname * gname) (qint : mword 32) (qcpu : mword 64),
       ⌜eq_vec qcpu (mycpu_ret tp) = false⌝ ∗
       ⌜eq_vec (zero_reg : mword 64) (mycpu_ret tp) = false⌝ ∗
-      is_lock γ (mword_of_int KernelSyms.kmem)
+      is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
       kalloc_avail γk None ∗
       add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 120 : mword 12))

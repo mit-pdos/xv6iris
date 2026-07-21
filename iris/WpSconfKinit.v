@@ -20,7 +20,7 @@ Require Import WpGpr InstrBytes WpMmodeLeafBase WpAuipc.
 Require Import SmodeCore.
 Require Import KptTree.
 Require Import StackOwn CalleeSaved.
-Require Import KernelText.
+Require Import KernelText KernelDataInv.
 Require Import WpMycpu WpLock.
 Require Import KallocInv.
 Require Import IntrDefs WpSmodeIntr.
@@ -53,7 +53,14 @@ Section WpSconfKinit.
       HK Hncnt Hmycpu Hretm Hprun.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc Hlock Hname Hcpu Hflw Hpages Hqnoff Hqint Hcont".
+    iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hqnoff Hqint Hcont".
+    (* the "kmem" string literal, read out of the kernel's data image *)
+    iPoseProof (kernel_data_string 0x80007040 "kmem"%string _ eq_refl
+                  ltac:(intros j b Hj;
+                        do 5 (destruct j as [|j];
+                              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+                        vm_compute in Hj; discriminate)
+                  with "Hkdata") as "#Hstr".
     assert (Hspr2 : spr = pa_stk sp0 2).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
@@ -141,6 +148,9 @@ Section WpSconfKinit.
               with "Hsc Hhs Hcg Htlbinv Hpc Hi0c [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     set (R4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1342 : mword 12)))]> R3).
+    (* a1 now holds &"kmem" -- the string initlock is about to store *)
+    assert (HR4a1 : R4 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007040 : mword 64)).
+    { rewrite /R4 upd_eq. rewrite /R3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (Hpp10 : add_vec_int (mword_of_int (KI + 0x0c) : mword 64) 4 = mword_of_int (KI + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 auipc a0,0x12 *)
@@ -186,6 +196,10 @@ Section WpSconfKinit.
     iEval (rewrite Htgtil) in "Hpc".
     assert (HR7a0 : R7 !!! Regidx (mword_of_int 10 : mword 5) = lk)
       by (rewrite /R7 upd_ne; [exact HR6a0 | vm_compute; discriminate]).
+    assert (HR7a1 : R7 !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int 0x80007040 : mword 64)).
+    { rewrite /R7 upd_ne; [| vm_compute; discriminate].
+      rewrite /R6 upd_ne; [| vm_compute; discriminate].
+      rewrite /R5 upd_ne; [exact HR4a1 | vm_compute; discriminate]. }
     assert (HR7sp : R7 !!! Regidx csp_rs1 = spr)
       by (rewrite /R7 upd_ne; [exact HR6sp | vm_compute; discriminate]).
     assert (HR7ra : R7 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KI + 0x18) : mword 64) 4)
@@ -193,15 +207,16 @@ Section WpSconfKinit.
     assert (HR7tp : R7 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5))
       by (rewrite /R7 upd_ne; [exact HR6tp | vm_compute; discriminate]).
     (* initlock(&kmem.lock, "kmem") : owns lk's 3 struct fields, returns them init'd *)
-    iApply (Initlock.wp_initlock_sconf γ root_ppn Φ R7 vlock vname vcpu (K - 2)
+    iApply (Initlock.wp_initlock_sconf γ root_ppn Φ R7 vlock vname vcpu "kmem"%string (K - 2)
               ltac:(lia)
               ltac:(rewrite HR7ra; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Htext Hpc [Hlock] [Hname] [Hcpu]").
+              with "Hsc Hhs Hcg Htlbinv Htext Hpc [] [Hlock] [Hname] [Hcpu]").
+    { iEval (rewrite HR7a1). iExact "Hstr". }
     { iEval (rewrite HR7a0). iExact "Hlock". }
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
-    iIntros (mil) "Hsc Hhs Hcg Htlbinv Hpc %Hilcs Hlock Hname Hcpu".
-    iEval (rewrite HR7a0) in "Hlock". iEval (rewrite HR7a0) in "Hname". iEval (rewrite HR7a0) in "Hcpu".
+    iIntros (mil) "Hsc Hhs Hcg Htlbinv Hpc %Hilcs Hlock Hlname Hcpu".
+    iEval (rewrite HR7a0) in "Hlock". iEval (rewrite HR7a0) in "Hlname". iEval (rewrite HR7a0) in "Hcpu".
     assert (Hpcil : update_vec_dec (add_vec (R7 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KI + 0x1c)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
@@ -212,9 +227,12 @@ Section WpSconfKinit.
     iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HR".
     { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
       iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
-    iMod (inv_alloc lockN ⊤ (lock_inv γl lk (kmem_res γk fl)) with "[Hlock Hlocked HR]") as "#Hkmem".
+    iMod (inv_alloc lockN ⊤ (lock_inv γl lk (kmem_res γk fl)) with "[Hlock Hlocked HR]") as "#Hkinv".
     { iNext. iExists (mword_of_int 0 : mword 32). rewrite /lock_word.
       iSplitL "Hlock"; [iExact "Hlock" |]. iLeft. iSplit; [done |]. iFrame "Hlocked HR". }
+    (* the lock = its (persistent) name + the invariant over its word *)
+    iAssert (is_kmem γl γk lk fl) with "[Hlname]" as "#Hkmem".
+    { rewrite /is_kmem. iApply (is_lock_intro with "Hlname Hkinv"). }
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.
     destruct Hilcs as (Hilsp & Hiltp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).
@@ -375,8 +393,7 @@ Section WpSconfKinit.
     assert (Hretf : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! γl γk E3 with "Hsc Hhs Hcg Hcnt Htlbinv Hpc [%] Hkmem Havail Hqnoff Hqint [Hname] Hqcpu").
-    2:{ iExists _; iExact "Hname". }
+    iApply ("Hcont" $! γl γk E3 with "Hsc Hhs Hcg Hcnt Htlbinv Hpc [%] Hkmem Havail Hqnoff Hqint Hqcpu").
     (* callee_saved m E3: the two sub-calls preserve s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
