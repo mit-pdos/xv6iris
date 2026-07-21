@@ -87,12 +87,12 @@ their durable design notes, gotchas, and reusable recipes.
   the complete WP with no totality hypotheses; the userret → `user_inv` bridge is
   built. Only the kernel-side uservec proof (E-uservec, which would discharge the
   assumed `stvec_handler_wp`) is left, and it is not user-mode-execution work.
-- **[`regfile-migration.md`](completed/regfile-migration.md)** — replaced the
-  register map `gmap regidx (mword 64)` with a function `regfile := regidx →
-  mword 64` (`RegFile.v`), killing the funnel `iApply`s' lookup-peel cost (~17×
-  on the hot path). Whole tree ported. Keeps the per-file recipe, the `rf_upd`
-  transparency / async-`Qed` hazard, and when to prefer lemma-based `peel_reg`
-  over `reg_lookup`.
+- **[`regfile-migration.md`](completed/regfile-migration.md)** — the register
+  file is a function `regfile := regidx → mword 64` (`RegFile.v`), not a `gmap`;
+  whole tree on it (~30× on funnel lookups). Keeps the `RegFile` interface, the
+  `rf_upd` transparency / async-`Qed` hazard (always discharge with
+  `reg_lookup`), when to prefer the lemma-based `peel_reg` instead, and what to
+  do in a new file that threads register maps.
 - **[`interrupt-sweep.md`](completed/interrupt-sweep.md)** — made every S-mode
   execution lemma SIE-agnostic; all S-mode whole-function proofs are over `sconf`
   on the sie-cap-avail interface. Keeps the `sconf`/`sie_cap`/`intr_count`
