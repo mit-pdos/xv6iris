@@ -22,7 +22,7 @@ Require Import WpLoad.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import UserMemAccess UserMemPt.
+Require Import MemAccessGen.
 Require Import WpSmodeGpr.
 Local Open Scope Z_scope.
 Import Defs.

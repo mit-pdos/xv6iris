@@ -42,6 +42,7 @@ WpGprMret.v
 WpGprMretWp.v
 ZicondGpr.v
 WpMmodeLeafBase.v
+MemAccessGen.v
 WpMmodeItype.v
 WpMmodeAddiw.v
 WpMmodeRtype.v

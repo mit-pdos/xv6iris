@@ -35,6 +35,7 @@ Require Import SmodePte.
 Require Import SRegime.
 Require Import WpLoad.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import MemAccessGen.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -56,12 +57,6 @@ Axiom exec_cancel_reservation :
 (*    chunk); the [width|4096] etc. constraints are not needed here.       *)
 (* ===================================================================== *)
 
-Lemma exec_split_misaligned_aligned_g (width : Z) (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr width = true ->
-  exec (split_misaligned vaddr width) s = Some ((1, width), s).
-Proof.
-  intro H. unfold split_misaligned. rewrite H. cbn [orb]. apply exec_returnm.
-Qed.
 
 Lemma exec_vmem_read_addr_aligned (width : Z) (va pa : mword 64) (v : mword (8 * width))
     (acc : MemoryAccessType mem_payload) (aq rl res : bool) (s s' : mstate) :
@@ -128,71 +123,6 @@ Qed.
 (*     absorbs whatever value lands (contents existential).                *)
 (* ===================================================================== *)
 
-Lemma exec_vmem_write_addr_aligned_store (width : Z) (va pa : mword 64) (dat : mword (8*width))
-    (s s' : mstate) :
-  let wv := autocast (T := mword) (subrange_vec_dec dat (8*(0+1)*width-1) (8*0*width))
-            : mword (8 * width) in
-  is_aligned_vaddr (Virtaddr va) width = true ->
-  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (Store Data)) s
-    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
-  exec (mem_write_ea (Physaddr pa) width false false false) s' = Some (Ok tt, s') ->
-  exec (mem_write_value (Physaddr pa) width wv (Store Data) PBMT_PMA false false false) s'
-    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)) ->
-  exec (vmem_write_addr (Virtaddr va) width dat (Store Data) false false false) s
-    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)).
-Proof.
-  intros wv Halign Htr Hea Hwv.
-  set (sw := MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)).
-  unfold vmem_write_addr.
-  rewrite exec_catch_early_return.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
-                          liftR (split_misaligned (Virtaddr va) width)) s = Some (inr (1, width), s)).
-  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_g width (Virtaddr va) s Halign). reflexivity. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-  rewrite misaligned_order_1.
-  match goal with
-  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (true, 0%Z, true), sw))
-  end.
-  { eapply execR_untilMT_1.
-    - reflexivity.
-    - cbn match.
-      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-      rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-      cbn [bits_of_virtaddr] in *. cbn match.
-      assert (Hsc : exec (assert_exp (Bool.eqb false (is_store_conditional (Store Data)))
-                            "sys/vmem_utils.sail:197.50-197.51") s' = Some (tt, s')) by reflexivity.
-      assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data)))
-                              "sys/vmem_utils.sail:197.50-197.51")
-                            : Defs.monadR (result bool ExecutionResult) exception unit) s'
-                     = Some (inr tt, s'))
-        by (rewrite execR_liftR; rewrite Hsc; reflexivity).
-      match goal with
-      | |- context [ Defs.bind (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) ?post ] =>
-          assert (Hwrloop : execR (Defs.bind0 (Defs.liftR asrt) Nbody) s' = Some (inr true, sw))
-      end.
-      { match goal with
-        | |- execR (Defs.bind0 _ ?Nbody) s' = _ => set (NN := Nbody)
-        end.
-        rewrite (execR_bind0_Some _ _ _ _ Hscm).
-        unfold NN; clear NN.
-        match goal with
-        | |- execR (match _ as x in bool return @?P x with | true => _ | false => ?B end) ?ss = ?R =>
-            change (execR B ss = R)
-        end.
-        rewrite (execR_liftR_seq _ _ _ _ _ Hea).
-        cbn match.
-        rewrite (execR_liftR_seq _ _ _ _ _ Hwv).
-        cbn match. apply execR_returnR_fwd. }
-      rewrite (execR_bind_Some _ _ _ _ _ Hwrloop).
-      cbn. apply execR_returnR_fwd.
-    - apply execR_returnR_fwd. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hu).
-  cbn. reflexivity.
-Qed.
 
 
 (* ===================================================================== *)
@@ -290,14 +220,6 @@ Proof.
   cbn. reflexivity.
 Qed.
 
-Lemma exec_mem_write_ea_g (width : Z) (addr : mword 64) s :
-  exec (mem_write_ea (Physaddr addr) width false false false) s = Some (Ok tt, s).
-Proof.
-  unfold mem_write_ea. cbn [orb andb].
-  rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (write_kind_of_flags false false false) s = Some (rv64d_types.Write_plain, s))).
-  2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-  apply exec_returnM.
-Qed.
 
 (* ===================================================================== *)
 (* §2 The WIDTH-GENERIC bundle composers: LOAD and STORE at an aligned,    *)

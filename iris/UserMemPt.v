@@ -36,6 +36,7 @@ Require Import UserPtTree.
 Require Import UserBits.
 Require Import WpMmodeLeafBase.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import MemAccessGen.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -140,54 +141,7 @@ Qed.
 (* §3 The width-generic pma checks (the width is never scrutinized).       *)
 (* ===================================================================== *)
 
-Lemma exec_pmaCheck_ram_load_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
-    (region : PMA_Region) s :
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k
-    = Some region ->
-  is_aligned_paddr (Physaddr addr) k = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  exec (pmaCheck (Physaddr addr) k (Load Data) pbmt false) s = Some (None, s).
-Proof.
-  intros Hmatch Halign Hread.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
-  destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hread |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:103.61-103.62" >>=
-          (fun _ : true = true => returnM (PMA_readable (override_PMA rattr pbmt))))
-    with (returnM (PMA_readable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hread. cbn match.
-  apply exec_returnM.
-Qed.
 
-Lemma exec_pmaCheck_ram_store_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
-    (region : PMA_Region) s :
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
-  is_aligned_paddr (Physaddr addr) k = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  exec (pmaCheck (Physaddr addr) k (Store Data) pbmt false) s = Some (None, s).
-Proof.
-  intros Hmatch Halign Hwrite.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
-  destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hwrite |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:106.61-106.62" >>=
-          (fun _ : true = true => returnM (PMA_writable (override_PMA rattr pbmt))))
-    with (returnM (PMA_writable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hwrite. cbn match.
-  apply exec_returnM.
-Qed.
 
 (* ===================================================================== *)
 (* §4 The per-width plain-RAM bricks -- the only width-TYPED pieces.       *)
@@ -243,50 +197,8 @@ Proof.
     exact (Hbytes j Hj).
 Qed.
 
-Lemma exec_write_ram_plain_1 (addr : mword 64) (data : bv 8) s :
-  dev_addr addr = false ->
-  exec (write_ram rv64d_types.Write_plain (Physaddr addr) 1 data tt) s
-  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 1 data) s.(mdev)).
-Proof.
-  intros Hdev.
-  unfold write_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_write. cbn beta zeta iota match.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  cbn match.
-  rewrite exec_MemWrite; last exact Hdev.
-  reflexivity.
-Qed.
 
-Lemma exec_write_ram_plain_2 (addr : mword 64) (data : bv 16) s :
-  dev_addr addr = false ->
-  exec (write_ram rv64d_types.Write_plain (Physaddr addr) 2 data tt) s
-  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 2 data) s.(mdev)).
-Proof.
-  intros Hdev.
-  unfold write_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_write. cbn beta zeta iota match.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  cbn match.
-  rewrite exec_MemWrite; last exact Hdev.
-  reflexivity.
-Qed.
 
-Lemma exec_write_ram_plain_4 (addr : mword 64) (data : bv 32) s :
-  dev_addr addr = false ->
-  exec (write_ram rv64d_types.Write_plain (Physaddr addr) 4 data tt) s
-  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
-Proof.
-  intros Hdev.
-  unfold write_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_write. cbn beta zeta iota match.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  cbn match.
-  rewrite exec_MemWrite; last exact Hdev.
-  reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* §4b The width-free ghost window update (a store re-picks the           *)
