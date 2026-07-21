@@ -21,7 +21,7 @@ Require Import CalleeSaved.
 Require Import StackOwn.
 Require Import KallocInv.
 Require Import IntrDefs.
-Require Import SpecMemset.
+Require Import SpecMemsetParts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KptTree.

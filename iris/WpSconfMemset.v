@@ -25,7 +25,7 @@ Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpMemsetS.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import SpecMemset.
+Require Import SpecMemsetParts.
 Import Defs.
 
 

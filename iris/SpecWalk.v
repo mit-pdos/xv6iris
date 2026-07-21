@@ -27,7 +27,7 @@ Require Import PtBuild KvmSpec.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpMemsetS.
-Require Import SpecMemset.
+Require Import SpecMemsetParts.
 Require Import SpecKalloc.
 Require Import WpWalkInstr UserBits.
 Require Import WpMemsetPage.

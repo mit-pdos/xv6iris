@@ -2,6 +2,6 @@
    proofs.  Sealed, so this is the only place the two ever meet. *)
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import SpecWalk SpecKalloc SpecMemset.
-Require Import LinkKalloc LinkMemset WpSconfWalk.
+Require Import LinkKalloc LinkMemsetArray WpSconfWalk.
 
-Module Walk := WalkProof Kalloc Memset.
+Module Walk := WalkProof Kalloc MemsetArray.

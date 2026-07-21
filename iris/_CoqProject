@@ -157,9 +157,12 @@ LinkRelease.v
 SpecAcquire.v
 WpSconfAcquire.v
 LinkAcquire.v
-SpecMemset.v
+SpecMemsetParts.v
 WpSconfMemset.v
 LinkMemset.v
+SpecMemset.v
+WpMemsetArray.v
+LinkMemsetArray.v
 SpecMemsetPage.v
 WpSconfMemsetPage.v
 LinkMemsetPage.v
