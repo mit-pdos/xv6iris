@@ -43,7 +43,7 @@ Proof.
   apply avi0.
 Qed.
 
-Module MemsetProof : MEMSET.
+Module MemsetProof : MEMSET_PARTS.
 
 Section WpSconfMemset.
   Context `{!riscvGS Σ, !sieG Σ}.

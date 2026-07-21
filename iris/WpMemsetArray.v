@@ -111,7 +111,7 @@ Proof.
     rewrite HxL HeL in Hc. lia.
 Qed.
 
-Module MemsetArrayProof (Memset : MEMSET) : MEMSET_ARRAY.
+Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
 
 Section WpMemsetArray.
   Context `{!riscvGS Σ, !sieG Σ}.

@@ -41,7 +41,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 
-Module WalkProof (Kalloc : KALLOC) (MemsetArray : MEMSET_ARRAY) : WALK.
+Module WalkProof (Kalloc : KALLOC) (MemsetArray : MEMSET) : WALK.
 
 Section WpSconfWalk.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.

@@ -1,6 +1,6 @@
 (* WpSconfMemsetPage.v -- the PAGE-LEVEL memset WP over the SIE-agnostic sconf
    world.  [wp_memset_page_sconf] is now a THIN WRAPPER over the general
-   whole-function memset spec [MEMSET_ARRAY.wp_memset_sconf] (WpMemsetArray.v)
+   whole-function memset spec [MEMSET.wp_memset_sconf] (WpMemsetArray.v)
    instantiated at the fixed page count len = 4096: it bridges [page_own p] to
    memset's per-byte buffer, derives the general spec's bound preconditions
    (nonzero count, 32-bit count, no 2^64 wraparound) from [page_valid p], and
@@ -35,7 +35,7 @@ Require Import SpecMemsetPage.
 Import Defs.
 
 
-Module MemsetPageProof (MemsetArray : MEMSET_ARRAY) : MEMSETPAGE.
+Module MemsetPageProof (MemsetArray : MEMSET) : MEMSETPAGE.
 
 Section WpSconfMemsetPage.
   Context `{!riscvGS Σ, !sieG Σ}.

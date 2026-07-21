@@ -65,10 +65,10 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
-Module Type MEMSET_ARRAY.
+Module Type MEMSET.
   Parameter wp_memset_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8),
       wp_memset_sconf_body γ root_ppn Φ m0 n len cval olds.
-End MEMSET_ARRAY.
+End MEMSET.

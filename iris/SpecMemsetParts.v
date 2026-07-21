@@ -1,7 +1,7 @@
 (* SpecMemsetParts.v -- the PIECEMEAL interface of Memset (the prefix/loop/suffix
    parts), used internally to compose the general whole-function spec in
    SpecMemset.v.  This is NOT the external contract -- callers should use
-   SpecMemset (MEMSET_ARRAY) instead.  Requires only the definitional layer --
+   SpecMemset (MEMSET) instead.  Requires only the definitional layer --
    never a whole-function proof file -- so every function proof can be checked
    in parallel. *)
 From Stdlib Require Import ZArith Lia List.
@@ -138,7 +138,7 @@ Definition wp_memset_suffix_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
-Module Type MEMSET.
+Module Type MEMSET_PARTS.
   Parameter wp_memset_prefix_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (imm_entry shamt_l shamt_r : mword 6) (nzimm_s0 imm8_beqz : mword 8) (wval_add : mword 64),
@@ -151,4 +151,4 @@ Module Type MEMSET.
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (M : regfile) (n : nat) (ra0e s00e : mword 64),
       wp_memset_suffix_sconf_body γ root_ppn Φ M n ra0e s00e.
-End MEMSET.
+End MEMSET_PARTS.
