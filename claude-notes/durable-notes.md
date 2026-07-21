@@ -78,6 +78,34 @@ change that produced it.
 - **Profiling:** per-file times via `make TIMED=1` (or `make proofs TIMING=1 JOBS=32` → per-sentence `*.v.timing`, parse `Chars A-B [snip] T secs`, map offset→line); per-command via `coqc -time` (a stall right after a lemma's last tactic = stuck in `Qed`). Optimize the longest Require chain, not `-j`. Delete `*.v.timing` after (don't commit). Measure any `vm_compute`/decode tactic ONE variant per `coqc` process — the 2nd variant in a process wins ~35% from bytecode-cache reuse (fabricates false savings).
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
+## Proof coverage report
+
+`tools/proof_coverage.py` answers "what of the kernel is proved?" — a hierarchy
+of xv6 source file → functions → status (proven / assumed / partial / none),
+with the byte-weighted percentages, the file:line of each spec, and the admits
+and axioms each proven function rests on. `--format text|md|html|json`.
+
+- The kernel side comes from the **tracked** `kernel-rocq/KernelSyms.v` +
+  `KernelInstrs.v` (a symbol is a function iff an instruction starts at its
+  address; its size runs to the next function entry), never from a freshly
+  built ELF — `xv6-riscv/` is a gitignored tree whose build routinely drifts
+  from the image the proofs are about. Only source-file *attribution* uses
+  `nm` on `xv6-riscv/kernel/*.o`, by name, with a `*.c`/`*.S` scan as fallback.
+- The proof side is derived from the spec-module shape
+  ([`design/spec-modules.md`](design/spec-modules.md)): a `_body` whose entry
+  `pc_is` is `KernelSyms.<f>` at offset 0 and whose continuation `pc_is` is the
+  ra-derived return address is a whole-function spec; it counts as proven once
+  a `Link*.v` instantiates a functor sealed by its `Module Type`. **So keeping
+  a new proof in that shape is what keeps it visible to the report** — nothing
+  needs to be registered.
+- The whole-function proofs that predate the shape (M-mode boot and the
+  assembly: `_entry`, `start`, `timerinit`, `spin`, `swtch`, `kernelvec`,
+  `userret`) name their entry pc through a local `Definition`, so they are
+  listed in the script's `MANIFEST_PROVEN`, as are the deliberately-assumed
+  contracts (`myproc`, `panic`, `kerneltrap`) in `MANIFEST_ASSUMED`. Every
+  entry is verified against the tree and a stale one is reported as a manifest
+  error rather than silently counted — fix those when they appear.
+
 ## Proofmode & bitvector gotchas (recur across files)
 
 - In iris proofmode: `rewrite a b c` uses SPACES not commas (`rewrite H1, H2.` fails); `rewrite lem by tac` does NOT parse (ssreflect clash) — use `rewrite lem; [|tac]` / `rewrite (lem args ltac:(tac))` / `assert … by tac`. iris-FREE files can use `rewrite … by`. Rewrite a proofmode HYP with `iEval (rewrite H) in "Hpc"` — bare `rewrite H` rewrites the WHOLE `envs_entails Δ P` (hyps AND goal) and desyncs them.

@@ -15,8 +15,8 @@ are working on that effort — the relevant `projects/` file.
 
 - **[`durable-notes.md`](durable-notes.md)** — the always-relevant core: guiding
   principle (clean specs over rework), how to maintain these notes, build /
-  opam / profiling instructions, proofmode & bitvector gotchas, and durable
-  spec-design preferences.
+  opam / profiling instructions, the `tools/proof_coverage.py` coverage report,
+  proofmode & bitvector gotchas, and durable spec-design preferences.
 - **[`optimization.md`](optimization.md)** — proof performance rules: the
   performance pitfalls and the tactics/patterns that fix them (apply proactively
   when writing new proofs).
