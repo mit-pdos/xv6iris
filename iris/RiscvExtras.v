@@ -220,7 +220,7 @@ Proof.
   eapply Z.lt_trans; [exact Hlt | reflexivity].
 Qed.
 
-(* Sv39 canonicality of any RAM address: since [uint a < 0x90000000 < 2^38],
+(* Sv39 canonicality of any RAM address: since [uint a < 0x88000000 < 2^38],
    bit 38 (and every bit >= 39) is 0, so sign-extending the low 39 bits back
    to 64 returns [a] unchanged.  This is exactly the [neq_vec ... = false]
    canonicality check the S-mode [translateAddr] lemmas demand. *)

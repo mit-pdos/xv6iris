@@ -4,14 +4,14 @@
      - the UART   (va = pa = 0x10000000, R|W, one page),
      - the VIRTIO (va = pa = 0x10001000, R|W, one page),
      - the PLIC   (va = pa = [0x0c000000, 0x10000000), R|W, 64 MB), and
-     - all of DRAM (va = pa = [0x80000000, 0x90000000) = the model's whole
+     - all of DRAM (va = pa = [0x80000000, 0x88000000) = the model's whole
        RAM window, R|W|X).
    Table PAGES sit at consecutive ppns from the (abstract) root:
      root+0   = the root (level-2) table:   [0] -> l1_dev, [2] -> l1_dram
      root+1   = l1_dev  (level-1, vpn2=0):  [96+k] -> l0_dev k, k in [0,33)
      root+2+k = l0_dev k (level-0):         PLIC leaves (k<32); k=32 holds
                 the UART leaf (slot 0) and the VIRTIO leaf (slot 1)
-     root+35  = l1_dram (level-1, vpn2=2):  [j] -> l0_dram j, j in [0,128)
+     root+35  = l1_dram (level-1, vpn2=2):  [j] -> l0_dram j, j in [0,64)
      root+36+j = l0_dram j (level-0):       512 identity DRAM leaves each.
    Deliberate DEVIATIONS from kvmmake (kept to avoid touching the spec
    layer above the leaves; see iris/CLAUDE.md):
@@ -51,7 +51,7 @@ Import Defs.
 Definition PTE_RAM : Z := 0xCF.   (* D A - - X W R V *)
 Definition PTE_DEV : Z := 0xC7.   (* D A - - - W R V *)
 
-Definition kpt_pages : Z := 164.
+Definition kpt_pages : Z := 100.
 
 Definition kpt_page (root : mword 44) (k : Z) : mword 44 :=
   add_vec root (mword_of_int k).
@@ -73,7 +73,7 @@ Definition kpt_ok (root : mword 44) : Prop :=
 Definition vpn1_of (vpn : mword 27) : mword 9 := subrange_vec_dec vpn 17 9.
 Definition vpn0_of (vpn : mword 27) : mword 9 := subrange_vec_dec vpn 8 0.
 
-Definition kpt_dram_vpn (vpn : mword 27) : Prop := 0x80000 <= bv_unsigned vpn < 0x90000.
+Definition kpt_dram_vpn (vpn : mword 27) : Prop := 0x80000 <= bv_unsigned vpn < 0x88000.
 Definition kpt_dev_vpn  (vpn : mword 27) : Prop := 0xC000 <= bv_unsigned vpn < 0x10002.
 Definition kpt_mapped (vpn : mword 27) : Prop := kpt_dram_vpn vpn \/ kpt_dev_vpn vpn.
 
@@ -218,7 +218,7 @@ Qed.
 
 (* the mapped-DRAM vpn range from an owned RAM address *)
 Lemma ram_svpn_range (a : mword 64) :
-  addr_is_ram a -> 0x80000 <= bv_unsigned (svpn_of a) < 0x90000.
+  addr_is_ram a -> 0x80000 <= bv_unsigned (svpn_of a) < 0x88000.
 Proof.
   intros Hram. pose proof Hram as [Hlo Hhi].
   rewrite uint_unsigned in Hlo, Hhi.
@@ -232,15 +232,15 @@ Proof.
   - apply Z.div_lt_upper_bound; lia.
 Qed.
 
-(* DRAM vpn1 lands in [0,128) *)
+(* DRAM vpn1 lands in [0,64) *)
 Lemma dram_vpn1_range (vpn : mword 27) :
-  kpt_dram_vpn vpn -> bv_unsigned (vpn1_of vpn) < 128.
+  kpt_dram_vpn vpn -> bv_unsigned (vpn1_of vpn) < 64.
 Proof.
   intros [Hlo Hhi]. unfold vpn1_of.
   rewrite subrange27_unsigned_17_9.
   rewrite Z.shiftr_div_pow2 by lia.
   change (2 ^ 9) with 512 in *.
-  assert (Hd : 1024 <= bv_unsigned vpn / 512 < 1152).
+  assert (Hd : 1024 <= bv_unsigned vpn / 512 < 1088).
   { split.
     - apply Z.div_le_lower_bound; lia.
     - apply Z.div_lt_upper_bound; lia. }
@@ -444,7 +444,7 @@ Definition kpt_mem (s : mstate) (root : mword 44) : Prop :=
   /\ (forall i : mword 9, 96 <= bv_unsigned i < 129 ->
         kpt_slot_in s (pte_addr_at (kpt_l1_dev root) i)
           (mk_pte (kpt_l0_dev root (bv_unsigned i - 96)) PTE_PTR))
-  /\ (forall i : mword 9, bv_unsigned i < 128 ->
+  /\ (forall i : mword 9, bv_unsigned i < 64 ->
         kpt_slot_in s (pte_addr_at (kpt_l1_dram root) i)
           (mk_pte (kpt_l0_dram root (bv_unsigned i)) PTE_PTR))
   /\ (forall vpn : mword 27, kpt_mapped vpn ->
@@ -748,7 +748,7 @@ Definition kpt_mem_ad (adf : kpt_adf) (s : mstate) (root : mword 44) : Prop :=
   /\ (forall i : mword 9, 96 <= bv_unsigned i < 129 ->
         kpt_slot_in s (pte_addr_at (kpt_l1_dev root) i)
           (mk_pte (kpt_l0_dev root (bv_unsigned i - 96)) PTE_PTR))
-  /\ (forall i : mword 9, bv_unsigned i < 128 ->
+  /\ (forall i : mword 9, bv_unsigned i < 64 ->
         kpt_slot_in s (pte_addr_at (kpt_l1_dram root) i)
           (mk_pte (kpt_l0_dram root (bv_unsigned i)) PTE_PTR))
   /\ (forall vpn : mword 27, kpt_mapped vpn ->

@@ -104,11 +104,12 @@ Notation "r ↦ᵣ v" := (reg_pointsto r (DfracOwn 1) v)
 Notation "r ↦ᵣ□ v" := (reg_pointsto r DfracDiscarded v)
   (at level 20, format "r  ↦ᵣ□  v") : bi_scope.
 (* The concrete physical RAM of the platform: a single DRAM bank of
-   [ram_size] bytes based at [ram_base] (0x80000000), matching the executable
-   RAM-region PMA and the QEMU/xv6 memory map.  We fix the size at 256 MiB
-   for now. *)
+   [ram_size] bytes based at [ram_base] (0x80000000), matching the Sail
+   model's RAM-region PMA (model-xv6iris/sail-config-rv64d.json) and the
+   xv6 memory map: 128 MiB, so that [ram_base + ram_size] = xv6's PHYSTOP
+   = 0x88000000 (kernel/memlayout.h; QEMU runs with `-m 128M`). *)
 Definition ram_base : Z := 0x80000000.       (* 2147483648 *)
-Definition ram_size : Z := 0x10000000.       (* 268435456 = 256 MiB *)
+Definition ram_size : Z := 0x8000000.        (* 134217728 = 128 MiB *)
 
 (* A physical byte address is "real" RAM iff it lies inside that DRAM bank.
    This is STRICTLY stronger than merely being outside the platform MMIO

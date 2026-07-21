@@ -323,6 +323,9 @@
         "include_in_device_tree": false
       },
       // RAM
+      // xv6iris: 128 MiB (upstream default: 0x80000000 = 2 GiB), matching
+      // xv6's PHYSTOP = KERNBASE + 128MB (kernel/memlayout.h) and the
+      // QEMU invocation `-m 128M` in xv6-riscv/Makefile.
       {
         "base": {
           "len": 64,
@@ -330,7 +333,7 @@
         },
         "size": {
           "len": 64,
-          "value": "0x80000000"
+          "value": "0x8000000"
         },
         "attributes": {
           "mem_type": "MainMemory",
