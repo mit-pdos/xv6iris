@@ -59,6 +59,8 @@ are working on that effort — the relevant `projects/` file.
 
 - **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
   mappages / walk proofs (`KvmSpec.v`).
+- **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
+  specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 
 ### `completed/` — finished projects, archived for reference
 

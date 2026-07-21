@@ -54,7 +54,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import WireInv.
-Require Import WpUart.
+Require Import PlicPlan WpUart.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Ghost-state preconditions: what [Σ] must contain before allocation.  *)
@@ -288,7 +288,11 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ} (g : gstate)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
     (* [dev_inv] freezes DLAB, so the initial UART must already have it clear
        -- i.e. the invariant is allocated after the divisor latch is set. *)
-    (Hdlab : uart_dlab g.(gdev).(duart) = false) :
+    (Hdlab : uart_dlab g.(gdev).(duart) = false)
+    (* [dev_inv] also maintains the kernel's PLIC plan (PlicPlan.v), so the
+       initial PLIC must already satisfy it -- a reset PLIC (all S-context
+       enable words clear) does. *)
+    (Hplic : plic_ok g.(gdev).(dplic)) :
   forall t2 g2 e2,
     rtc erased_step (cpu_pool [], g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -302,7 +306,7 @@ Proof.
   iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
   iMod (dev_inv_alloc _ γ with "[Huf Hpf Hacc Hout Htx Hdl]") as "#Hinv".
   { rewrite /dev_inv_body.
-    iExists g.(gdev).(duart), g.(gdev).(dplic). iFrame. }
+    iExists g.(gdev).(duart), g.(gdev).(dplic). iFrame. iPureIntro. exact Hplic. }
   iMod (wire_inv_alloc _ (fun c => register_lookup sig_seip (g.(gregs) c))
           (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hwires]")
     as "#Hwinv".

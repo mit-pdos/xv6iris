@@ -435,6 +435,20 @@ Section IntrDefs.
     sie_cap γ root_ppn m avail -∗ gpr_file m -∗ sie_cap_gpr γ root_ppn m avail.
   Proof. iIntros "Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
 
+  (* the [gpr_file_x0] fact at the bundled altitude: a whole-function proof
+     threading [sie_cap_gpr] can read the map's x0 slot and keep the bundle. *)
+  Lemma sie_cap_gpr_x0 γ root_ppn m avail (i : mword 5) :
+    uint i = 0 ->
+    sie_cap_gpr γ root_ppn m avail -∗
+    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr γ root_ppn m avail.
+  Proof.
+    intro Hi. iIntros "Hcg".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
+    iDestruct (gpr_file_x0 m i Hi with "Hfile") as "[%Hx Hfile]".
+    iSplitR; [ iPureIntro; exact Hx | ].
+    iApply (sie_cap_gpr_join with "Hcap Hfile").
+  Qed.
+
   (* the funnel's accessor: split off the exact reserved carve (the
      [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
   Lemma sie_cap_acc (γ : gname) (root_ppn : mword 44)

@@ -157,7 +157,7 @@ Section WpSconfUartinit.
     (* ===== BODY: address setup + 7 device stores ===== *)
     (* +0x08 lui a5,0x10000 *)
     iApply (wp_lui_s_sconf γ root_ppn Φ (mword_of_int (UI + 0x08)) (mword_of_int 15 : mword 5) (mword_of_int 0x10000 : mword 20)
-              R2 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              (luival (mword_of_int 0x10000 : mword 20)) R2 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) eq_refl
               with "Hsc Hhs Hcg Htlbinv Hpc Hi08 [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     set (R3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> R2).
@@ -190,7 +190,7 @@ Section WpSconfUartinit.
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 lui a4,0x10000 *)
     iApply (wp_lui_s_sconf γ root_ppn Φ (mword_of_int (UI + 0x10)) (mword_of_int 14 : mword 5) (mword_of_int 0x10000 : mword 20)
-              R3 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              (luival (mword_of_int 0x10000 : mword 20)) R3 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) eq_refl
               with "Hsc Hhs Hcg Htlbinv Hpc Hi10 [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     set (R4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> R3).
@@ -237,7 +237,7 @@ Section WpSconfUartinit.
     iEval (rewrite Hpp1e) in "Hpc".
     (* +0x1e lui a2,0x10000 *)
     iApply (wp_lui_s_sconf γ root_ppn Φ (mword_of_int (UI + 0x1e)) (mword_of_int 12 : mword 5) (mword_of_int 0x10000 : mword 20)
-              R6 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              (luival (mword_of_int 0x10000 : mword 20)) R6 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) eq_refl
               with "Hsc Hhs Hcg Htlbinv Hpc Hi1e [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     set (R7 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> R6).

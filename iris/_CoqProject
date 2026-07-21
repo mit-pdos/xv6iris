@@ -107,6 +107,7 @@ WpMemsetInstr.v
 WpKernelvecNew.v
 WpIntrBits.v
 WpIntrCore.v
+PlicPlan.v
 WpUart.v
 RiscvAdequacy.v
 CommonWalk.v
@@ -253,3 +254,14 @@ WpUartinitDecode.v
 SpecUartinit.v
 WpSconfUartinit.v
 LinkUartinit.v
+SpecCpuid.v
+SpecPlicinit.v
+SpecPlicinithart.v
+WpPlicExec.v
+WpSconfCpuid.v
+LinkCpuid.v
+WpPlic.v
+WpSconfPlicinit.v
+LinkPlicinit.v
+WpSconfPlicinithart.v
+LinkPlicinithart.v

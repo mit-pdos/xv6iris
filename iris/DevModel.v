@@ -418,6 +418,12 @@ Record plic_state := PlicState {
 
 Definition plic_nsrc : nat := 32%nat.
 
+(* the second interrupt source this machine has (the virtio disk); the UART is
+   [uart_irq_id] = 10.  Which device sits on which PLIC source is a property of
+   the machine, hence here; what the KERNEL intends to do with those sources
+   lives in the software layer (PlicPlan.v). *)
+Definition virtio_irq_id : N := 1%N.   (* VIRTIO0_IRQ *)
+
 (* pointwise function updates *)
 Definition nupd {A} (f : N -> A) (i : N) (x : A) : N -> A :=
   fun j => if N.eqb j i then x else f j.

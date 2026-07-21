@@ -79,7 +79,7 @@ Context `{CID : CpuId}.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
   iDestruct "Hdev" as "[Hua Hpldev]".
   iInv "Hdinv" as ">Hdbody" "Hdclose".
-  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg)".
+  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg & %Hpok)".
   iDestruct (uart_agree with "Hua Huf") as %Hduart.
   destruct (uart_write_total u off storebyte Hoff) as [u' Hwrite_u].
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -156,7 +156,7 @@ Context `{CID : CpuId}.
   iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev] Huf") as "[Hdev' Huf']".
   iMod ("Hacc" $! u u' with "[//] Hg HR") as "[Hg' HS]".
   iMod ("Hdclose" with "[Huf' Hplf Hg']") as "_".
-  { iNext. iExists u', p. iFrame. }
+  { iNext. iExists u', p. iFrame. iPureIntro. exact Hpok. }
   iModIntro. iExists s_x.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hstore. }
@@ -355,7 +355,7 @@ Qed.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
   iDestruct "Hdev" as "[Hua Hpldev]".
   iInv "Hdinv" as ">Hdbody" "Hdclose".
-  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg)".
+  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg & %Hpok)".
   iDestruct (uart_agree with "Hua Huf") as %Hduart.
   destruct (uart_read_total u off Hoff) as (b & u' & Hread_u).
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -434,7 +434,7 @@ Qed.
   iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
   { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
   iMod ("Hdclose" with "[Huf' Hplf Hg']") as "_".
-  { iNext. iExists u', p. iFrame. }
+  { iNext. iExists u', p. iFrame. iPureIntro. exact Hpok. }
   iModIntro. iExists s_x.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hload. }

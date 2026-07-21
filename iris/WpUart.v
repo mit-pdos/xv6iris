@@ -30,7 +30,7 @@ From iris.algebra.lib Require Import mono_list dfrac_agree.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import DevModel.
+Require Import DevModel PlicPlan.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 (* re-import the model AFTER Base so the model's names (read_kind/Read_plain/
    write_kind/...) win over SailStdpp's homonyms -- same order as WpLoad.v. *)
@@ -546,9 +546,15 @@ Section DevLoop.
     iDestruct (uart_dlab_auth_stable _ u u' Hd with "Hdl") as "$".
   Qed.
 
+  (* The PLIC half carries [plic_ok] (DevModel.v): every hart's S-context
+     enable word names only the sources this machine has.  It is the loosest
+     property that still lets a device-interrupt proof rule out a bogus
+     enable bit, and it is per-hart-local enough that a hart running
+     [plicinithart] concurrently with the others re-establishes it from its
+     own write alone. *)
   Definition dev_inv_body (γ : uart_names) : iProp Σ :=
     (∃ (u : uart_state) (p : plic_state),
-       uart_frag u ∗ plic_frag p ∗ uart_ghosts γ u)%I.
+       uart_frag u ∗ plic_frag p ∗ uart_ghosts γ u ∗ ⌜ plic_ok p ⌝)%I.
 
   Global Instance uart_frag_timeless u : Timeless (uart_frag u).
   Proof. rewrite /uart_frag. apply _. Qed.
@@ -622,7 +628,7 @@ Section DevLoop.
     iIntros (gr d) "[Hgr Hdev]".
     iInv "Hinv" as ">Hbody" "Hclose".
     iInv "Hwinv" as ">Hwbody" "Hwclose".
-    iDestruct "Hbody" as (u p) "(Hu & Hp & Hg)".
+    iDestruct "Hbody" as (u p) "(Hu & Hp & Hg & %Hpok)".
     iDestruct "Hwbody" as (seip meip) "Hwires".
     iDestruct (dev_interp_agree with "Hdev Hu Hp") as %[Hu Hp].
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
@@ -648,7 +654,7 @@ Section DevLoop.
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
       iMod ("Hclose" with "[Hu' Hp Hacc Hout Htx Hdl]") as "_".
-      { iNext. iExists u', p. rewrite /uart_ghosts. iFrame. }
+      { iNext. iExists u', p. rewrite /uart_ghosts. iFrame. iPureIntro. exact Hpok. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* a byte arrives from the outside world: rx only, trace untouched *)
       rewrite Hu in Hrx.
@@ -661,14 +667,15 @@ Section DevLoop.
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
       iMod ("Hclose" with "[Hu' Hp Hg]") as "_".
-      { iNext. iExists u', p. iFrame. }
+      { iNext. iExists u', p. iFrame. iPureIntro. exact Hpok. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* the gateway latches the UART's interrupt level: the UART is untouched *)
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
       iMod ("Hclose" with "[Hu Hp' Hg]") as "_".
-      { iNext. iExists u, p'. iFrame. }
+      { iNext. iExists u, p'. iFrame. iPureIntro.
+        apply (plic_ok_latch p p'); [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
       iModIntro. iFrame "Hgr Hdev'". iApply "IH".
     - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
       iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
@@ -691,7 +698,7 @@ Section DevLoop.
         rewrite /seip' decide_False; [ done | ].
         intros ->. apply Hne, elem_of_singleton. reflexivity. }
       iMod ("Hclose" with "[Hu Hp Hg]") as "_".
-      { iNext. iExists u, p. iFrame. }
+      { iNext. iExists u, p. iFrame. iPureIntro. exact Hpok. }
       iModIntro. iFrame "Hgr' Hdev". iApply "IH".
   Qed.
 End DevLoop.

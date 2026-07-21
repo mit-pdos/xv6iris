@@ -474,6 +474,70 @@ Section WpSconfAlu.
       iApply ("Hcont" with "Hhs' Hsc' Hcg' Htlbinv' Hpc'").
   Qed.
 
+  (* base (4-byte) LUI: same value function as [wp_clui_s_sconf], 4-byte pc bump. *)
+  Lemma wp_lui_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 20) (wval : mword 64)
+      (m : regfile) (n : nat) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    luival imm = wval ->
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rd rd
+              (UTYPE (imm, Regidx rd, LUI)) wval m n
+              Hrd Hrdsp _
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
+    - intros s_pc Hnpc _ _.
+      rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      rewrite Hwval. reflexivity.
+    - iIntros "Hhs' Hsc' Hcap' Htlbinv' Hpc' Hfile'".
+      iDestruct (sie_cap_gpr_join with "Hcap' Hfile'") as "Hcg'".
+      iApply ("Hcont" with "Hhs' Hsc' Hcg' Htlbinv' Hpc'").
+  Qed.
+
+  (* SLLIW: shift the source's low 32 bits by a 5-bit shamt, sign-extend back. *)
+  Lemma wp_slliw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
+      (m : regfile) (n : nat) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sign_extend' 64 (shift_bits_left (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32) shamt) = wval ->
+    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    pc_is pc -∗ instr pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW)) -∗
+    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
+      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      tlb_inv_pt root_ppn -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rs1 rs1
+              (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW)) wval m n
+              Hrd Hrdsp _
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
+    - intros s_pc Hnpc Hva _.
+      rewrite (exec_execute_SHIFTIWOP_SLLIW_gpr rs1 rd shamt s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_slliw_val, gpr_src. rewrite Hva Hwval. reflexivity.
+    - iIntros "Hhs' Hsc' Hcap' Htlbinv' Hpc' Hfile'".
+      iDestruct (sie_cap_gpr_join with "Hcap' Hfile'") as "Hcg'".
+      iApply ("Hcont" with "Hhs' Hsc' Hcg' Htlbinv' Hpc'").
+  Qed.
+
   Lemma wp_caddiw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : regfile) (n : nat) :
@@ -1159,40 +1223,6 @@ Section WpSconfAlu.
     intros s_pc Hnpc Hva Hvb.
     rewrite (exec_execute_RTYPE_OR_gpr rs2 rs1 rd s_pc Hrd).
     unfold gpr_or_val. rewrite Hva Hvb Hwval. reflexivity.
-  Qed.
-
-  (* =================================================================== *)
-  (*  LUI: the base gpr-write leaf, over the base engine + register-       *)
-  (*  generic execute facts (WpMmodeLeafBase).  (ANDI is above.)           *)
-  (* =================================================================== *)
-  Lemma wp_lui_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 20)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (luival imm)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rd rd
-              (UTYPE (imm, Regidx rd, LUI)) (luival imm) m n
-              Hrd Hrdsp _
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    - intros s_pc Hnpc _ _.
-      rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      reflexivity.
-    - iIntros "Hhs' Hsc' Hcap' Htlbinv' Hpc' Hfile'".
-      iDestruct (sie_cap_gpr_join with "Hcap' Hfile'") as "Hcg'".
-      iApply ("Hcont" with "Hhs' Hsc' Hcg' Htlbinv' Hpc'").
   Qed.
 
 End WpSconfAlu.

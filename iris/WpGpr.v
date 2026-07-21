@@ -149,6 +149,23 @@ Section GprFile.
     - iDestruct (reg_valid_dq with "Hreg Hpt") as %L. iPureIntro. exact L.
   Qed.
 
+  (* x0 is hardwired zero, and its [gpr_file] entry owns nothing but that
+     fact — so the map's value at index 0 IS [zero_reg].  Callers need this to
+     read a store's (or an [addi rd,zero,imm]'s) source operand when the
+     instruction names x0.  The [gpr_file] is handed back alongside the fact,
+     so a whole-function proof can read the slot mid-stream. *)
+  Lemma gpr_file_x0 (f : regfile) (i : mword 5) :
+    uint i = 0 -> gpr_file f -∗ ⌜ f !!! Regidx i = zero_reg ⌝ ∗ gpr_file f.
+  Proof.
+    intro Hi. iIntros "Hf".
+    iDestruct (gpr_file_lookup_acc f (Regidx i) with "Hf") as "[Hpt Hclose]".
+    unfold gpr_pt; cbn match.
+    replace (Z.eqb (uint i) 0) with true by (symmetry; apply Z.eqb_eq; exact Hi).
+    iDestruct "Hpt" as %Hv.
+    iSplitR; [ iPureIntro; exact Hv | ].
+    iApply "Hclose". iPureIntro. exact Hv.
+  Qed.
+
   (* For a nonzero index the [gpr_pt] entry IS the register points-to. *)
   Lemma gpr_pt_nz (i : mword 5) (v : mword 64) :
     uint i <> 0 ->

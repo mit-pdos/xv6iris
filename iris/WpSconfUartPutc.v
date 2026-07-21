@@ -185,7 +185,8 @@ Section WpSconfUartPutc.
     iPoseProof (upi_38 with "Ht") as "Hi38".
     (* 0x20  lui a4,0x10000 *)
     iApply (wp_lui_s_sconf γ root_ppn Φ (mword_of_int (UPS + 0x20)) (mword_of_int 14) (mword_of_int 0x10000 : mword 20)
-              m n ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              (luival (mword_of_int 0x10000 : mword 20)) m n
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) eq_refl
               with "Hsc Hhs Hcg Htlbinv Hpc Hi20").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     iEval (rewrite P24) in "Hpc".
@@ -212,7 +213,8 @@ Section WpSconfUartPutc.
     iEval (rewrite P34) in "Hpc".
     (* 0x34  lui a5,0x10000 *)
     iApply (wp_lui_s_sconf γ root_ppn Φ (mword_of_int (UPS + 0x34)) (mword_of_int 15) (mword_of_int 0x10000 : mword 20)
-              (ppc_f5' m b) n ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              (luival (mword_of_int 0x10000 : mword 20)) (ppc_f5' m b) n
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) eq_refl
               with "Hsc Hhs Hcg Htlbinv Hpc Hi34").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     iEval (change (<[Regidx (mword_of_int 15) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> (ppc_f5' m b))

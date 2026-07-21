@@ -24,6 +24,21 @@ Proof.
   rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm.
 Qed.
 
+(* the 32-bit (W) shift-immediate: the source is truncated to 32 bits, shifted
+   by a 5-bit shamt, and the 32-bit result is sign-extended back to 64. *)
+Lemma exec_execute_SHIFTIWOP_SLLIW (shamt : mword 5) (rs1 rd : regidx) (a : mword 64) s s' :
+  exec (rX_bits rs1) s = Some (a, s) ->
+  exec (wX_bits rd (sign_extend' 64 (shift_bits_left (subrange_vec_dec a 31 0 : mword 32) shamt)))
+       s = Some (tt, s') ->
+  exec (execute (SHIFTIWOP (shamt, rs1, rd, SLLIW))) s = Some (RETIRE_SUCCESS, s').
+Proof.
+  intros Ha Hw.
+  change (execute (SHIFTIWOP (shamt, rs1, rd, SLLIW))) with (execute_SHIFTIWOP shamt rs1 rd SLLIW).
+  unfold execute_SHIFTIWOP. cbn match.
+  rewrite (exec_bind_Some _ _ _ a s Ha).
+  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm.
+Qed.
+
 Lemma exec_execute_SHIFTIOP_SRLI (shamt : mword 6) (rs1 rd : regidx) (a : mword 64) s s' :
   exec (rX_bits rs1) s = Some (a, s) ->
   exec (wX_bits rd (shift_bits_right a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))) s = Some (tt, s') ->
@@ -55,6 +70,21 @@ Lemma exec_execute_SHIFTIOP_SLLI_gpr (rs1 rd : mword 5) (shamt : mword 6) s :
 Proof.
   unfold gpr_slli_val, gpr_src.
   eapply exec_execute_SHIFTIOP_SLLI.
+  - apply (exec_rX_bits_gpr rs1 s).
+  - apply (exec_wX_bits_gpr rd _ s).
+Qed.
+
+Definition gpr_slliw_val (rs1 : mword 5) (shamt : mword 5) (s : mstate) : mword 64 :=
+  sign_extend' 64 (shift_bits_left (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32) shamt).
+
+Lemma exec_execute_SHIFTIWOP_SLLIW_gpr (rs1 rd : mword 5) (shamt : mword 5) s :
+  exec (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (gpr_slliw_val rs1 shamt s))).
+Proof.
+  unfold gpr_slliw_val, gpr_src.
+  eapply exec_execute_SHIFTIWOP_SLLIW.
   - apply (exec_rX_bits_gpr rs1 s).
   - apply (exec_wX_bits_gpr rd _ s).
 Qed.
