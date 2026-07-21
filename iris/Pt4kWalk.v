@@ -347,15 +347,6 @@ Qed.
 (* 4. currentlyEnabled Ext_Svnapot (level-0 walks probe it; misa.S=1).    *)
 (* ===================================================================== *)
 
-Lemma exec_hartSupports_Svnapot s : exec (hartSupports Ext_Svnapot) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Svnapot) 0) with true by reflexivity. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)).
-  replace (andb true (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
-  apply exec_returnM.
-Qed.
 
 
 (* ===================================================================== *)
