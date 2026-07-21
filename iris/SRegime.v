@@ -148,6 +148,21 @@ Definition s_acc_ok (acc : MemoryAccessType mem_payload) : Prop :=
   acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
   acc = Atomic (AMOSWAP, Data, Data).
 
+(* the per-access region predicate the absorption premise dispatches on: a
+   fetch must land in the executable (text) region, a store/AMO in the
+   writable (data) region, a load anywhere in RAM.  [sr_absorb]'s old
+   uniform [addr_is_ram va] premise becomes [sr_addr_ok] over the regime's
+   three predicate fields, so the permission split (kernel text R|X, data
+   R|W) is reflected at the absorption interface. *)
+Definition sr_addr_ok (fetch_ok load_ok store_ok : mword 64 -> Prop)
+    (acc : MemoryAccessType mem_payload) (va : mword 64) : Prop :=
+  match acc with
+  | InstructionFetch _ => fetch_ok va
+  | Store _ => store_ok va
+  | Atomic _ => store_ok va
+  | _ => load_ok va
+  end.
+
 (* the PMP grant facts at a state: the kernel TOR entry 0 covering RAM
    with R/W/X (what every post-translate memory access checks) *)
 Definition pmp_grant_facts (σ : mstate) : Prop :=
@@ -165,9 +180,28 @@ Section SRegimeDef.
 
   Record s_regime := SRegime {
     sr_inv : iProp Σ;
+    (* per-access region predicates: fetch → executable region, load →
+       readable (all of RAM), store/AMO → writable region. *)
+    sr_fetch_ok : mword 64 -> Prop;
+    sr_load_ok : mword 64 -> Prop;
+    sr_store_ok : mword 64 -> Prop;
+    (* every RAM address is loadable (readable): the load leaves keep
+       deriving [addr_is_ram] from ownership and lift it through this law,
+       so no load call site changes. *)
+    sr_load_ram : forall va : mword 64, addr_is_ram va -> sr_load_ok va;
+    (* a kernel-text address is fetch-legal: the fetch engine extracts
+       [addr_in_text pc] from the [instr] resource (all kernel code lives in
+       [KERNBASE, etext)) and lifts it through this law, so no fetch call
+       site changes. *)
+    sr_fetch_text : forall va : mword 64, addr_in_text va -> sr_fetch_ok va;
+    (* a kernel-data address is store-legal: store call sites discharge
+       [addr_in_data] (vm_compute for globals/locks, [page_in_range] for
+       kalloc pages, the bundled [stack_in_data] premise for stack slots)
+       and lift it through this law. *)
+    sr_store_data : forall va : mword 64, addr_in_data va -> sr_store_ok va;
     sr_absorb : forall (acc : MemoryAccessType mem_payload) (va : mword 64) (σ : mstate),
       s_acc_ok acc ->
-      addr_is_ram va ->
+      sr_addr_ok sr_fetch_ok sr_load_ok sr_store_ok acc va ->
       register_lookup misa σ.(sregs) = MISA_C ->
       register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
       register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -248,7 +282,7 @@ Section SRegimeDef.
   (* ------------------------------------------------------------------- *)
   Lemma kpt_absorb (root_ppn : mword 44) :
     forall acc va σ, s_acc_ok acc ->
-      addr_is_ram va ->
+      sr_addr_ok addr_in_text addr_is_ram addr_in_data acc va ->
       register_lookup misa σ.(sregs) = MISA_C ->
       register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
       register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -268,7 +302,7 @@ Section SRegimeDef.
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
   Proof.
-    intros acc va σ Hacc Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    intros acc va σ Hacc Hok Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     iIntros "Hri Hgh Hinv".
     iAssert (|==> ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -278,18 +312,19 @@ Section SRegimeDef.
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn)%I
       with "[Hri Hgh Hinv]" as ">H".
-    { destruct Hacc as [-> | [-> | [-> | ->]]].
-      - iApply (tlb_inv_pt_translateAddr_fetch root_ppn va σ Hram
+    { destruct Hacc as [-> | [-> | [-> | ->]]]; cbn [sr_addr_ok] in Hok.
+      - iApply (tlb_inv_pt_translateAddr_fetch root_ppn va σ Hok
                   Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv").
-      - iApply (tlb_inv_pt_translateAddr_load root_ppn va σ Hram
+      - iApply (tlb_inv_pt_translateAddr_load root_ppn va σ Hok
                   Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv").
-      - iApply (tlb_inv_pt_translateAddr_store root_ppn va σ Hram
+      - iApply (tlb_inv_pt_translateAddr_store root_ppn va σ Hok
                   Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv").
       - iApply (tlb_inv_pt_translateAddr (Atomic (AMOSWAP, Data, Data)) root_ppn va σ
-                  (fun a d mxr do_sum => kpt_variant_check_amo (svpn_of va) a d mxr do_sum)
-                  (or_introl (ram_svpn_range va Hram))
-                  (RiscvExtras.ram_canonical va Hram)
-                  (ram_ident_4k va Hram)
+                  (fun a d mxr do_sum => kpt_variant_check_amo (svpn_of va) a d mxr do_sum
+                                           (data_svpn_not_text va Hok))
+                  (or_introl (ram_svpn_range va (addr_in_data_ram va Hok)))
+                  (RiscvExtras.ram_canonical va (addr_in_data_ram va Hok))
+                  (ram_ident_4k va (addr_in_data_ram va Hok))
                   Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv"). }
     iDestruct "H" as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
     iDestruct (tlb_inv_pt_grant_facts root_ppn σ' with "Hri Hinv") as %Hpmp.
@@ -364,7 +399,9 @@ Section SRegimeDef.
   Qed.
 
   Definition kpt_regime (root_ppn : mword 44) : s_regime :=
-    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn) (kpt_transform root_ppn)
+    SRegime (tlb_inv_pt root_ppn) addr_in_text addr_is_ram addr_in_data
+            (fun _ H => H) (fun _ H => H) (fun _ H => H)
+            (kpt_absorb root_ppn) (kpt_transform root_ppn)
             (kpt_absorb_dev root_ppn).
 
   (* ------------------------------------------------------------------- *)
@@ -378,7 +415,7 @@ Section SRegimeDef.
 
   Lemma bare_absorb :
     forall acc va σ, s_acc_ok acc ->
-      addr_is_ram va ->
+      sr_addr_ok addr_is_ram addr_is_ram addr_is_ram acc va ->
       register_lookup misa σ.(sregs) = MISA_C ->
       register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
       register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -479,6 +516,8 @@ Section SRegimeDef.
   Qed.
 
   Definition bare_regime : s_regime :=
-    SRegime bare_inv bare_absorb bare_transform bare_absorb_dev.
+    SRegime bare_inv addr_is_ram addr_is_ram addr_is_ram
+            (fun _ H => H) addr_in_text_ram addr_in_data_ram
+            bare_absorb bare_transform bare_absorb_dev.
 
 End SRegimeDef.

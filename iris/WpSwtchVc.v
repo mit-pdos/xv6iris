@@ -48,6 +48,7 @@ From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import WpDecodeBridge.
 Local Open Scope Z_scope.
 Require Import WpSmodePtCtl.
+Require Import KptExecMap.
 Import Defs.
 
 (* ====================================================================== *)
@@ -260,6 +261,34 @@ Fixpoint seg_cells (breg : nat) (off : Z) (ws : list nat) : list (sval * sval) :
   | [] => []
   | w :: rest => (SX breg off, SX w 0) :: seg_cells breg (off + 8) rest
   end.
+
+(* every cell address of a struct-context segment based at [c] lands in the
+   writable DATA region.  Phrased on the base address [c] alone (independent of
+   the saved values), so it can travel as a pure premise / [valid_context]
+   conjunct.  [ctx_indata c] covers all 14 fields at offsets 0,8,..,104. *)
+Fixpoint seg_indata (c : mword 64) (off : Z) (n : nat) : Prop :=
+  match n with
+  | O => True
+  | S k => addr_in_data (add_vec c (mword_of_int off)) /\ seg_indata c (off + 8) k
+  end.
+Definition ctx_indata (c : mword 64) : Prop := seg_indata c 0 14.
+
+(* [seg_indata] discharges [sval_indata] for a [seg_cells] segment whose base
+   register denotes [c]: each cell address is [add_vec c (off)], all in DATA. *)
+Lemma seg_cells_sval_indata (rho : nat -> mword 64) (breg : nat) (c : mword 64)
+    (off : Z) (ws : list nat) :
+  rho breg = c ->
+  seg_indata c off (length ws) ->
+  sval_indata rho (seg_cells breg off ws).
+Proof.
+  intro Hc. unfold sval_indata. revert off.
+  induction ws as [|w rest IH]; intros off Hind.
+  - constructor.
+  - cbn [length seg_indata] in Hind. destruct Hind as [Hhd Htl].
+    cbn [seg_cells]. constructor.
+    + cbn [fst sval_den]. rewrite Hc. exact Hhd.
+    + apply IH. exact Htl.
+Qed.
 
 (* initial heap: old's 14 cells (base a0 = SX 10) hold arbitrary values
    SX 46..59; new's 14 (base a1 = SX 11) hold the saved values SX 32..45. *)
@@ -476,6 +505,7 @@ Section WpSwtchVc.
     (∃ vs : list (mword 64),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ctx_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
+      ⌜ctx_indata c⌝ ∗
       ctx_cells c vs ∗
       (∀ (m : regfile),
          ⌜callee_img m = vs⌝ -∗ sc -∗
@@ -541,6 +571,7 @@ Section WpSwtchVc.
       m0 !!! Regidx (mword_of_int 10) = oldc ->
       m0 !!! Regidx (mword_of_int 11) = newc ->
       eq_vec (access_vec_dec (ctx_pc (m0 !!! Regidx (mword_of_int 1))) 0) ('b"0") = true ->
+      ctx_indata oldc ->
       kernel_text -∗
       sconf -∗ pc_is (mword_of_int KernelSyms.swtch) -∗ gpr_file m0 -∗
       ctx_cells oldc old_vs -∗
@@ -553,7 +584,7 @@ Section WpSwtchVc.
          WP (Loop : expr riscv_lang) {{ Phi }}) -∗
       WP (Loop : expr riscv_lang) {{ Phi }}.
     Proof.
-      iIntros (Hlen_old Holdc Hnewc Hal_old)
+      iIntros (Hlen_old Holdc Hnewc Hal_old Holdindata)
         "#Ht Hconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
       iEval (rewrite /sconf) in "Hconf".
       iDestruct "Hconf" as "(Hsm & Hgc & Htlbinv)".
@@ -567,7 +598,7 @@ Section WpSwtchVc.
         "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
       iEval (rewrite (valid_context_unfold sconf Phi P newc) /valid_context_pre) in "Hvalidnew".
       iDestruct "Hvalidnew" as (new_vs)
-        "(%Hlen_new & %Hal_new & Hnewcells & Hnewwand)".
+        "(%Hlen_new & %Hal_new & %Hindata_new & Hnewcells & Hnewwand)".
       (* the symbolic environment: 0..31 = current file m0; 32..45 = new's saved
          values; 46..59 = old's arbitrary current cell contents. *)
       iDestruct (gpr_file_dom with "Hfile") as "[%Hdom Hfile]".
@@ -593,12 +624,21 @@ Section WpSwtchVc.
         apply (list14_nth new_vs (mword_of_int 0) Hlen_new). }
       iDestruct (swtch_code with "Ht") as "Hcode".
       iEval (rewrite -Hden) in "Hfile".
+      (* every cell address of the pre-block heap (old's cells based at [oldc],
+         new's at [newc]) lands in the writable DATA region -- the pure side
+         condition each store step of the VC block discharges. *)
+      assert (Hdata0 : sval_indata rho swtch_heap0).
+      { unfold sval_indata, swtch_heap0. rewrite Forall_app. split.
+        - apply (seg_cells_sval_indata rho 10 oldc 0 _ Hrho10). exact Holdindata.
+        - apply (seg_cells_sval_indata rho 11 newc 0 _ Hrho11). exact Hindata_new. }
+      assert (Hdata40 : sval_indata rho (@nil (sval * sval32))).
+      { unfold sval_indata. constructor. }
       (* ---- run the 28-instruction straight-line block ---- *)
       iApply (wp_vc_block_s_den_r R swtch_prog Phi
                 (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
                 (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
                 rho mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
+ HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run Hdata0 Hdata40
                 with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                       Hpc Hfile Hcode [Holdcells Hnewcells] []").
       { rewrite /vheap_own /swtch_heap0 big_sepL_app.
@@ -633,6 +673,8 @@ Section WpSwtchVc.
                         = m0 !!! Regidx (mword_of_int 1 : mword 5))
             by (unfold callee_img, ctx_regs; cbn; reflexivity).
           rewrite Hn0. exact Hal_old. }
+        iSplit.
+        { iPureIntro. exact Holdindata. }
         rewrite -/(ctx_cells oldc (callee_img m0)).
         iFrame "Holdpart". iExact "Hwold". }
       (* ---- the trailing c.ret returns to new's saved return address ---- *)

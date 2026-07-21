@@ -42,6 +42,9 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (10 <= av)%nat ->
+  addr_in_data lk0 ->
+  addr_in_data a_cpu ->
+  addr_in_data a_noff ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m av -∗

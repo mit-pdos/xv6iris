@@ -29,6 +29,7 @@ Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (2 <= n)%nat ->
+  stack_in_data sp0 2 ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m0 n -∗

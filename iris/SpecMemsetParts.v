@@ -47,6 +47,7 @@ Definition wp_memset_prefix_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5 in
   (2 <= n)%nat ->
   sp' = pa_stk sp0 2 ->
+  stack_in_data sp0 2 ->
   eq_vec (m0 !!! Regidx a2_idx) zero_reg = false ->
   add_vec (m5 !!! Regidx a2_idx) (m5 !!! Regidx a0_idx) = wval_add ->
   sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -92,6 +93,7 @@ Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (⊢ kernel_text -∗ instr pc0 false (STORE (mword_of_int 0, Regidx ra1, Regidx ra5, 1))) ->
   (⊢ kernel_text -∗ instr pc4 true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx ra5, Regidx ra5, ADDI))) ->
   (⊢ kernel_text -∗ instr pc6 false (BTYPE (imm_bne, Regidx ra4, Regidx ra5, BNE))) ->
+  (forall j : nat, (j < N)%nat -> addr_in_data (ms_pa (ms_addr p j))) ->
   forall (rem off : nat) (m : regfile),
   (off + rem = N)%nat -> (1 <= rem)%nat ->
   m !!! Regidx ra5 = ms_addr p off ->
@@ -119,6 +121,7 @@ Definition wp_memset_suffix_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let sp0up := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) in
   let ret_tgt := update_vec_dec (add_vec ra0e (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  stack_in_data sp0up 2 ->
   sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn M n -∗ tlb_inv_pt root_ppn -∗
   instr (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1 : mword 5), false, 8)) -∗

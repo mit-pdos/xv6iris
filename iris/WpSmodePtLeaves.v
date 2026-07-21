@@ -490,7 +490,7 @@ Section WpSmodePtLoad.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
     iMod (sr_absorb R (Load Data) a8 s_pc
-            (or_intror (or_introl eq_refl)) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            (or_intror (or_introl eq_refl)) (sr_load_ram R _ Hrampa) Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
@@ -818,6 +818,7 @@ Section WpSmodePtStore.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
+    sr_store_ok R a8 ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -844,7 +845,7 @@ Section WpSmodePtStore.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hstok.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] Hfile Hinstr Hbytes Hcont".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
@@ -923,7 +924,7 @@ Section WpSmodePtStore.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
     iMod (sr_absorb R (Store Data) a8 s_pc
-            (or_intror (or_intror (or_introl eq_refl))) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            (or_intror (or_intror (or_introl eq_refl))) Hstok Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)

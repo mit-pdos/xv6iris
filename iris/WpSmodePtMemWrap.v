@@ -86,6 +86,7 @@ Section WpSmodePtMemWrap.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
+    sr_store_ok R ea ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -104,13 +105,14 @@ Section WpSmodePtMemWrap.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    intros imm ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hstok.
     unfold pa, a8, ea.
     rewrite <- sext9_12_64.
+    unfold a8, ea in Hstok. rewrite <- sext9_12_64 in Hstok.
     change sp with (Regidx csp_rs1).
     exact (wp_csd_s_r R Φ pc rs2 csp_rs1 imm m vold
              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
-             HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0).
+             HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hstok).
   Qed.
 
 

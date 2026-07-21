@@ -141,7 +141,7 @@ Section WpSconfCsr.
                    (∃ v : mword 64, scause ↦ᵣ v) ∗
                    (∃ v : mword 64, stval ↦ᵣ v)) ) ) )%I
       with "[Hcap Hhalf]" as "[Hhalf Harm]".
-    { iDestruct "Hcap" as "[Hstk [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]".
+    { iDestruct "Hcap" as "[Hstk [%Hsid [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]]".
       - iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb.
         iFrame "Hhalf". iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
         iLeft. iFrame "Hq0". iPureIntro. exact Hb.
@@ -290,7 +290,7 @@ Section WpSconfCsr.
     assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
                   = m !!! Regidx csp_rs1)
       by (apply upd_ne; congruence).
-    iDestruct "Hcap" as "[Hstk [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]".
+    iDestruct "Hcap" as "[Hstk [%Hsid [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]]".
     - (* ---- '0' arm: the idempotent write; ghosts untouched ---- *)
       iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
       assert (Hcollapse : legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2)) = ms0)
@@ -324,6 +324,7 @@ Section WpSconfCsr.
       iAssert (sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n)
         with "[Hstk Hq0]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
+        iSplitR; [iPureIntro; rewrite Hsp; exact Hsid|].
         iLeft. iExact "Hq0". }
       iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
       iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] Hcg
@@ -388,6 +389,7 @@ Section WpSconfCsr.
       iAssert (sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n)
         with "[Hstk Hq]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
+        iSplitR; [iPureIntro; rewrite Hsp; exact Hsid|].
         iLeft. iExact "Hq". }
       iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
       iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] Hcg
@@ -522,7 +524,7 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    iDestruct "Hcap" as "[Hstk [Hq0 | (Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx')]]".
+    iDestruct "Hcap" as "[Hstk [%Hsid [Hq0 | (Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx')]]]".
     2:{ (* already enabled: impossible -- the payload's sepc cell and the
            '1' arm's sepc cell cannot coexist *)
         iDestruct "Hsepcx" as (v1) "Hsepc1".
@@ -563,6 +565,7 @@ Section WpSconfCsr.
     iAssert (sie_cap γ root_ppn m n)
       with "[Hqcap Hsepcx Hscausex Hstvalx Hstk]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
+      iSplitR; [iPureIntro; exact Hsid|].
       iRight. iFrame "Hqcap Hsepcx Hscausex Hstvalx".
       iExists handler. iSplit; [iPureIntro; exact Htvd |].
       iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }

@@ -52,6 +52,7 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  (forall j : nat, (j < len)%nat -> addr_in_data (pa_add p j)) ->
   sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m0 n -∗ tlb_inv_pt root_ppn -∗
   kernel_text -∗ pc_is pcE -∗

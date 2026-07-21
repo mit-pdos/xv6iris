@@ -443,6 +443,8 @@ Section WpKernelvecNew.
       (m : regfile)
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 : bv 64)
       {dq : dfrac} :
+    (forall i : nat, (i < 32)%nat ->
+       addr_in_data (add_vec (m !!! Regidx csp_rs1) (mword_of_int (8 * Z.of_nat i)))) ->
     smode_config γ dq -∗
     tlb_inv_pt root_ppn -∗
     pc_is (mword_of_int (KV + 0x2)) -∗
@@ -489,7 +491,7 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros.
+    intros Hsave.
     iIntros "Hsm Htlbinv
              Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     iDestruct "Hfile" as "(%Hdomm & Hfilemap)".
@@ -573,12 +575,21 @@ Section WpKernelvecNew.
     assert (HVr30 : ρ 30%nat = m !!! Regidx (mword_of_int 30 : mword 5)) by reflexivity.
     assert (HVr31 : ρ 31%nat = m !!! Regidx (mword_of_int 31 : mword 5)) by reflexivity.
     iDestruct (kv_store_instrs with "Htext") as "Hbi".
+    assert (Hind0 : sval_indata ρ kv_store_heap0).
+    { unfold sval_indata, kv_store_heap0.
+      do 17 (apply Forall_cons; [
+        first [exact (Hsave 0%nat ltac:(lia))|exact (Hsave 2%nat ltac:(lia))|exact (Hsave 4%nat ltac:(lia))
+              |exact (Hsave 5%nat ltac:(lia))|exact (Hsave 6%nat ltac:(lia))|exact (Hsave 9%nat ltac:(lia))
+              |exact (Hsave 10%nat ltac:(lia))|exact (Hsave 11%nat ltac:(lia))|exact (Hsave 12%nat ltac:(lia))
+              |exact (Hsave 13%nat ltac:(lia))|exact (Hsave 14%nat ltac:(lia))|exact (Hsave 15%nat ltac:(lia))
+              |exact (Hsave 16%nat ltac:(lia))|exact (Hsave 27%nat ltac:(lia))|exact (Hsave 28%nat ltac:(lia))
+              |exact (Hsave 29%nat ltac:(lia))|exact (Hsave 30%nat ltac:(lia))] |]); apply Forall_nil. }
     iApply (wp_vc_block_s root_ppn kv_store_prog Φ
               (VSt (KV + 0x2) kv_store_regs0 kv_store_heap0 [])
               (VSt (KV + 0x24) kv_store_regs0 kv_store_heap1 [])
               ρ m γ
               (dq:=dq)
- kv_store_run HmS
+ kv_store_run HmS Hind0 (Forall_nil _)
               with "Hsm Htlbinv
                     Hpc Hfile Hbi [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
@@ -608,6 +619,8 @@ Section WpKernelvecNew.
       (m : regfile)
       (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : bv 64)
       {dq : dfrac} :
+    (forall i : nat, (i < 32)%nat ->
+       addr_in_data (add_vec (m !!! Regidx csp_rs1) (mword_of_int (8 * Z.of_nat i)))) ->
     smode_config γ dq -∗
     tlb_inv_pt root_ppn -∗
     pc_is (mword_of_int (KV + 0x28)) -∗
@@ -654,7 +667,7 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros.
+    intros Hsave.
     iIntros "Hsm Htlbinv
              Hpc Hfile #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     iDestruct "Hfile" as "(%Hdomm & Hfilemap)".
@@ -704,12 +717,21 @@ Section WpKernelvecNew.
     assert (HVw16 : ρ 48%nat = (w16 : mword 64)) by reflexivity.
     assert (HVw17 : ρ 49%nat = (w17 : mword 64)) by reflexivity.
     iDestruct (kv_load_instrs with "Htext") as "Hbi".
+    assert (Hind0 : sval_indata ρ kv_store_heap0).
+    { unfold sval_indata, kv_store_heap0.
+      do 17 (apply Forall_cons; [
+        first [exact (Hsave 0%nat ltac:(lia))|exact (Hsave 2%nat ltac:(lia))|exact (Hsave 4%nat ltac:(lia))
+              |exact (Hsave 5%nat ltac:(lia))|exact (Hsave 6%nat ltac:(lia))|exact (Hsave 9%nat ltac:(lia))
+              |exact (Hsave 10%nat ltac:(lia))|exact (Hsave 11%nat ltac:(lia))|exact (Hsave 12%nat ltac:(lia))
+              |exact (Hsave 13%nat ltac:(lia))|exact (Hsave 14%nat ltac:(lia))|exact (Hsave 15%nat ltac:(lia))
+              |exact (Hsave 16%nat ltac:(lia))|exact (Hsave 27%nat ltac:(lia))|exact (Hsave 28%nat ltac:(lia))
+              |exact (Hsave 29%nat ltac:(lia))|exact (Hsave 30%nat ltac:(lia))] |]); apply Forall_nil. }
     iApply (wp_vc_block_s root_ppn kv_load_prog Φ
               (VSt (KV + 0x28) kv_load_regs0 kv_store_heap0 [])
               (VSt (KV + 0x4a) kv_load_regs1 kv_store_heap0 [])
               ρ m γ
               (dq:=dq)
- kv_load_run HmL
+ kv_load_run HmL Hind0 (Forall_nil _)
               with "Hsm Htlbinv
                     Hpc Hfile Hbi [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
@@ -855,6 +877,8 @@ Section WpKernelvecNew.
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12
        vold13 vold14 vold15 vold16 vold17 : bv 64)
       (Φ : mval -> iProp Σ) :
+    (forall i : nat, (i < 32)%nat ->
+       addr_in_data (add_vec (kv_sp1 m) (mword_of_int (8 * Z.of_nat i)))) ->
     smode_config γ (DfracOwn (1/2)) -∗
     tlb_inv_pt root_ppn -∗
     pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
@@ -901,7 +925,7 @@ Section WpKernelvecNew.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros.
+    intros Hsave.
     iIntros "Hsm Htlbinv Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     (* ---- #1: c.addi16sp sp,-256 @ 0x800053e0 (fetch page-walk, fills slot 5) ---- *)
@@ -1003,10 +1027,13 @@ Section WpKernelvecNew.
     iEval (rewrite Heqw15) in "Hw15".
     iEval (rewrite Heqw16) in "Hw16".
     iEval (rewrite Heqw17) in "Hw17".
+    assert (Hsave1 : forall i : nat, (i < 32)%nat ->
+              addr_in_data (add_vec (kv_m1 m !!! Regidx csp_rs1) (mword_of_int (8 * Z.of_nat i)))).
+    { intros i Hi. rewrite Hm1sp. exact (Hsave i Hi). }
     iApply (wp_kv_store_block_vc root_ppn γ Φ (kv_m1 m)
               vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17
               (dq := DfracOwn (1/2))
-
+              Hsave1
               with "Hsm Htlbinv Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     (* convert the block's result cells back to the prologue's address/value shape *)
@@ -1063,6 +1090,8 @@ Section WpKernelvecNew.
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
     sret_newpriv mstatus0 = Supervisor ->
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
+    (forall i : nat, (i < 32)%nat ->
+       addr_in_data (add_vec spv (mword_of_int (8 * Z.of_nat i)))) ->
     hw_config -∗ minstret_inv -∗
     smode_config γ (DfracOwn (1/2)) -∗
     hart_state ↦ᵣ{DfracOwn (1/2)} HART_ACTIVE tt -∗
@@ -1124,7 +1153,7 @@ Section WpKernelvecNew.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-      Hsp0 HTSR Hsup Hlpe0.
+      Hsp0 HTSR Hsup Hlpe0 Hsave.
     iIntros "#Hhw #Hinv Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hsepc Hpc Hfile
              #Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17 Hcont".
     (* ---- #20..#36: the 17 c.ldsp register restores, as ONE VCgen block ---- *)
@@ -1179,10 +1208,13 @@ Section WpKernelvecNew.
     iEval (rewrite Heqv15) in "Hv15".
     iEval (rewrite Heqv16) in "Hv16".
     iEval (rewrite Heqv17) in "Hv17".
+    assert (Hsave1 : forall i : nat, (i < 32)%nat ->
+              addr_in_data (add_vec (mt !!! Regidx csp_rs1) (mword_of_int (8 * Z.of_nat i)))).
+    { intros i Hi. rewrite Hsp0. exact (Hsave i Hi). }
     iApply (wp_kv_load_block_vc root_ppn γ Φ mt
               v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17
               (dq := DfracOwn (1/2))
-
+              Hsave1
               with "Hsm Htlbinv Hpc Hfile Htext Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17").
     iIntros "Hsm Htlbinv Hpc Hfile Hv1 Hv2 Hv3 Hv4 Hv5 Hv6 Hv7 Hv8 Hv9 Hv10 Hv11 Hv12 Hv13 Hv14 Hv15 Hv16 Hv17".
     (* convert the block's result cells back to the epilogue's address shape *)
@@ -1264,6 +1296,8 @@ Section WpKernelvecNew.
     _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
     eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
     WpGprCsrwCommon.legalize_sstatus_val mstatus0 (WpGprCsrwCommon.sstatus_write_val mstatus0 (mword_of_int 2)) = mstatus0 ->
+    (forall i : nat, (i < 32)%nat ->
+       addr_in_data (add_vec (kv_sp1 m) (mword_of_int (8 * Z.of_nat i)))) ->
     hw_config -∗ minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -1325,7 +1359,7 @@ Section WpKernelvecNew.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm
-      HTSR Hsup Hlpe0 Hfiom Hleg.
+      HTSR Hsup Hlpe0 Hfiom Hleg Hsave.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     (* the SIE ghost half rides in from the precondition (the ambient S-mode
@@ -1347,7 +1381,7 @@ Section WpKernelvecNew.
     (* ---- instrs #1..#19: prologue (fills + saves + jal) ---- *)
     iApply (wp_kv_prologue root_ppn γ m
               vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 Φ
-
+              Hsave
               with "Hsm Htlbinv Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
@@ -1384,7 +1418,7 @@ Section WpKernelvecNew.
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
               Φ
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-              Hsp'' HTSR Hsup Hlpe0
+              Hsp'' HTSR Hsup Hlpe0 Hsave
               with "Hhw Hinv Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hsepc Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".

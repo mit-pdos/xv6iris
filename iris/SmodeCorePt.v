@@ -74,6 +74,7 @@ Section SmodeCorePt.
     register_lookup htif_tohost_base σ.(sregs) = None ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    addr_in_text pc /\ addr_in_text (add_vec_int pc 2) ->
     mstate_interp σ -∗
     sr_inv R -∗
     instr_bytes pc r ==∗
@@ -85,7 +86,7 @@ Section SmodeCorePt.
       mstate_interp σf ∗
       sr_inv R.
   Proof.
-    intros Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma.
+    intros Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma Hftext.
     iIntros "[Hreg [Hmem Hdev]] Hinv Hbytes".
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
       by (rewrite Lmisa; vm_compute; reflexivity).
@@ -108,7 +109,7 @@ Section SmodeCorePt.
           iDestruct (mem_ram with "Hb3") as %Hr3. iPureIntro.
           unfold pa_add in Hr3 |- *. change (Z.of_nat 3) with 3 in Hr3 |- *. exact Hr3. }
         iMod (sr_absorb R (InstructionFetch tt) pc σ
-                (or_introl eq_refl) Hram Lmisa Lmenv Lhtif Lpriv LSXL
+                (or_introl eq_refl) (sr_fetch_text R pc (proj1 Hftext)) Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
@@ -188,7 +189,7 @@ Section SmodeCorePt.
         destruct (Lpma (add_vec_int pc 2) 2) as (regh & Hmh0 & Hxh & _ & _).
         (* --- low chunk: σ -> s1 --- *)
         iMod (sr_absorb R (InstructionFetch tt) pc σ
-                (or_introl eq_refl) Hraml Lmisa Lmenv Lhtif Lpriv LSXL
+                (or_introl eq_refl) (sr_fetch_text R pc (proj1 Hftext)) Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
@@ -219,7 +220,7 @@ Section SmodeCorePt.
           iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         (* --- high chunk: s1 -> s2 --- *)
         iMod (sr_absorb R (InstructionFetch tt) (add_vec_int pc 2) s1
-                (or_introl eq_refl) Hramh L1misa L1menv L1htif L1priv L1SXL
+                (or_introl eq_refl) (sr_fetch_text R (add_vec_int pc 2) (proj2 Hftext)) L1misa L1menv L1htif L1priv L1SXL
                 (exec_effectivePrivilege_fetch _ _ s1)
                 (exec_is_shadow_stack_fetch s1)
                 L1pma with "Hreg Hmem Hinv")
@@ -298,7 +299,7 @@ Section SmodeCorePt.
           iDestruct (mem_ram with "Hb3") as %Hr3. iPureIntro.
           unfold pa_add in Hr3 |- *. change (Z.of_nat 3) with 3 in Hr3 |- *. exact Hr3. }
         iMod (sr_absorb R (InstructionFetch tt) pc σ
-                (or_introl eq_refl) Hram Lmisa Lmenv Lhtif Lpriv LSXL
+                (or_introl eq_refl) (sr_fetch_text R pc (proj1 Hftext)) Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
@@ -355,7 +356,7 @@ Section SmodeCorePt.
           iDestruct (mem_ram with "Hb1") as %Hr1. iPureIntro.
           unfold pa_add in Hr1 |- *. change (Z.of_nat 1) with 1 in Hr1 |- *. exact Hr1. }
         iMod (sr_absorb R (InstructionFetch tt) pc σ
-                (or_introl eq_refl) Hram Lmisa Lmenv Lhtif Lpriv LSXL
+                (or_introl eq_refl) (sr_fetch_text R pc (proj1 Hftext)) Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ)
                 (exec_is_shadow_stack_fetch σ)
                 Lpma with "Hreg Hmem Hinv")
@@ -434,7 +435,7 @@ Section SmodeCorePt.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iDestruct "Hinstr" as "[%Hnlpad Hr]".
+    iDestruct "Hinstr" as "[%Htext [%Hnlpad Hr]]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iAssert (⌜ match r with F_Base _ => True | F_RVC _ => True | _ => False end ⌝)%I as %Hrok.
     { iEval (rewrite /instr_bytes) in "Hbytes".
@@ -464,7 +465,7 @@ Section SmodeCorePt.
       by (rewrite Lpma0; exact Hpma_all).
     (* the unified fetch through the tree invariant (may write A/D back) *)
     iMod (s_regime_fetch R σ pc r
-            Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
+            Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma Htext
             with "[$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
     (* decode agreement + its side conditions, at σf *)
@@ -577,7 +578,7 @@ Section SmodeCorePt.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
-    iDestruct "Hinstr" as "[%Hnlpad Hr]".
+    iDestruct "Hinstr" as "[%Htext [%Hnlpad Hr]]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iAssert (⌜ match r with F_Base _ => True | F_RVC _ => True | _ => False end ⌝)%I as %Hrok.
     { iEval (rewrite /instr_bytes) in "Hbytes".
@@ -604,7 +605,7 @@ Section SmodeCorePt.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     iMod (s_regime_fetch R σ pc r
-            Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
+            Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma Htext
             with "[$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
@@ -669,6 +670,7 @@ Section SmodeCorePt.
     register_lookup htif_tohost_base σ.(sregs) = None ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    addr_in_text pc /\ addr_in_text (add_vec_int pc 2) ->
     mstate_interp σ -∗
     tlb_inv_pt root_ppn -∗
     instr_bytes pc r ==∗

@@ -61,8 +61,9 @@ Definition kpt_adf_of (a d : mword 1) : kpt_adf :=
 
 Lemma kpt_lflags_bound (vpn : mword 27) : 0 <= kpt_lflags vpn < 1024.
 Proof.
-  unfold kpt_lflags, PTE_RAM, PTE_DEV.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn)); lia.
+  unfold kpt_lflags, PTE_TEXT, PTE_DATA, PTE_DEV.
+  destruct (Z.leb 0x80000 (bv_unsigned vpn));
+    [destruct (Z.ltb (bv_unsigned vpn) etext_vpn) |]; lia.
 Qed.
 
 (* an A/D variant of the canonical kernel leaf IS the §12 leaf at the
@@ -78,10 +79,11 @@ Proof.
                      (Z.lor (Z.shiftl (bv_unsigned a) 6)
                             (Z.shiftl (bv_unsigned d) 7))) : mword 10)
                = mword_of_int (kpt_lflags_ad (kpt_adf_of a d) vpn)).
-  { unfold kpt_lflags_ad, kpt_lflags, PTE_RAM_ad, PTE_DEV_ad, PTE_RAM, PTE_DEV,
-      kpt_ad_bits, kpt_adf_of.
+  { unfold kpt_lflags_ad, kpt_lflags, PTE_TEXT_ad, PTE_DATA_ad, PTE_DEV_ad,
+      PTE_TEXT, PTE_DATA, PTE_DEV, kpt_ad_bits, kpt_adf_of.
     destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
-      destruct (Z.leb 0x80000 (bv_unsigned vpn));
+      (destruct (Z.leb 0x80000 (bv_unsigned vpn));
+       [ destruct (Z.ltb (bv_unsigned vpn) etext_vpn) | ]);
       apply bv_eq; vm_compute; reflexivity. }
   rewrite Hz. reflexivity.
 Qed.
@@ -143,9 +145,10 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
-(* permission checks pass regardless of A/D (fetch needs the DRAM base) *)
+(* permission checks pass regardless of A/D (fetch needs the TEXT base;
+   stores/AMOs need W, i.e. any base but TEXT) *)
 Lemma kpt_variant_check_fetch (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
-  kpt_dram_vpn vpn ->
+  kpt_text_vpn vpn ->
   pte_check_ok (InstructionFetch tt) Supervisor mxr do_sum
     (pte_set_ad (kpt_leaf_pte vpn) a d).
 Proof.
@@ -164,36 +167,47 @@ Proof.
 Qed.
 
 Lemma kpt_variant_check_store (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
+  ~ kpt_text_vpn vpn ->
   pte_check_ok (Store Data) Supervisor mxr do_sum
     (pte_set_ad (kpt_leaf_pte vpn) a d).
 Proof.
-  intros s. unfold Mk_PTE_Flags.
+  intros Hnt s. unfold Mk_PTE_Flags.
   rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_check_store_ad.
+  apply kpt_check_store_ad. exact Hnt.
 Qed.
 
 (* AMO variants of KptPt's check lemmas (A/D-variant leaf passes the
    check for amoswap.w at Supervisor). *)
 Lemma kpt_check_amo_ad (adf : kpt_adf) (vpn : mword 27) :
+  ~ kpt_text_vpn vpn ->
   forall (mxr do_sum : bool) s',
   exec (check_PTE_permission (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
           (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn)))
           (Mk_PTE_Ext (mword_of_int 0)) tt) s'
   = Some (PTE_Check_Success tt, s').
 Proof.
-  intros mxr do_sum s'.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
+  intros Hnt mxr do_sum s'.
+  unfold kpt_lflags_ad, PTE_TEXT_ad, PTE_DATA_ad, PTE_DEV_ad, kpt_ad_bits.
+  destruct (Z.leb 0x80000 (bv_unsigned vpn)) eqn:Hleb.
+  - (* 0x80000 <= vpn; not-text forces vpn >= etext_vpn (the DATA leaf) *)
+    assert (Hge : etext_vpn <= bv_unsigned vpn).
+    { apply Z.leb_le in Hleb.
+      destruct (Z_lt_le_dec (bv_unsigned vpn) etext_vpn) as [Hlt | Hge]; [| exact Hge].
+      exfalso. apply Hnt. split; [exact Hleb | exact Hlt]. }
+    rewrite (proj2 (Z.ltb_ge (bv_unsigned vpn) etext_vpn) Hge).
+    destruct (adf vpn) as [a d]; destruct a, d, mxr, do_sum; vm_compute; reflexivity.
+  - (* vpn < 0x80000: the DEV leaf *)
     destruct (adf vpn) as [a d]; destruct a, d, mxr, do_sum; vm_compute; reflexivity.
 Qed.
 
 Lemma kpt_variant_check_amo (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
+  ~ kpt_text_vpn vpn ->
   pte_check_ok (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
     (pte_set_ad (kpt_leaf_pte vpn) a d).
 Proof.
-  intros s. unfold Mk_PTE_Flags.
+  intros Hnt s. unfold Mk_PTE_Flags.
   rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_check_amo_ad.
+  apply kpt_check_amo_ad. exact Hnt.
 Qed.
 
 (* update_PTE_Bits: no write-back is needed exactly when A (and D, for
@@ -1118,14 +1132,17 @@ Section KptTranslateIrisAcc.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
+  (* fetches come only from the TEXT region; the premise weakens from
+     [addr_is_ram] to [addr_in_text] (discharged by vm_compute at the
+     concrete kernel pcs). *)
   Definition tlb_inv_pt_translateAddr_fetch :=
-    fun root_ppn va σ (Hram : addr_is_ram va) =>
+    fun root_ppn va σ (Htext : addr_in_text va) =>
       tlb_inv_pt_translateAddr (InstructionFetch tt) root_ppn va σ
         (fun a d mxr do_sum => kpt_variant_check_fetch (svpn_of va) a d mxr do_sum
-                                 (ram_svpn_range va Hram))
-        (or_introl (ram_svpn_range va Hram))
-        (RiscvExtras.ram_canonical va Hram)
-        (ram_ident_4k va Hram).
+                                 (text_svpn_range va Htext))
+        (or_introl (ram_svpn_range va (addr_in_text_ram va Htext)))
+        (RiscvExtras.ram_canonical va (addr_in_text_ram va Htext))
+        (ram_ident_4k va (addr_in_text_ram va Htext)).
 
   Definition tlb_inv_pt_translateAddr_load :=
     fun root_ppn va σ (Hram : addr_is_ram va) =>
@@ -1135,13 +1152,17 @@ Section KptTranslateIrisAcc.
         (RiscvExtras.ram_canonical va Hram)
         (ram_ident_4k va Hram).
 
+  (* stores land only in the DATA region (kernel text is R|X): the premise
+     strengthens to [addr_in_data] (discharged by vm_compute for globals /
+     from [page_in_range] for kalloc pages). *)
   Definition tlb_inv_pt_translateAddr_store :=
-    fun root_ppn va σ (Hram : addr_is_ram va) =>
+    fun root_ppn va σ (Hdata : addr_in_data va) =>
       tlb_inv_pt_translateAddr (Store Data) root_ppn va σ
-        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum)
-        (or_introl (ram_svpn_range va Hram))
-        (RiscvExtras.ram_canonical va Hram)
-        (ram_ident_4k va Hram).
+        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum
+                                 (data_svpn_not_text va Hdata))
+        (or_introl (ram_svpn_range va (addr_in_data_ram va Hdata)))
+        (RiscvExtras.ram_canonical va (addr_in_data_ram va Hdata))
+        (ram_ident_4k va (addr_in_data_ram va Hdata)).
 
   (* DEVICE-side instantiations: same absorption route for any kpt-mapped
      device vpn (e.g. the UART page); membership/canonicality/identity are
@@ -1160,7 +1181,8 @@ Section KptTranslateIrisAcc.
   Definition tlb_inv_pt_translateAddr_store_dev :=
     fun root_ppn va σ (Hdev : kpt_dev_vpn (svpn_of va)) =>
       tlb_inv_pt_translateAddr (Store Data) root_ppn va σ
-        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum)
+        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum
+                                 (dev_not_text (svpn_of va) Hdev))
         (or_intror Hdev).
 
 End KptTranslateIrisAcc.

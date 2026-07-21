@@ -78,7 +78,7 @@ Section WpSconfMemset.
   Proof.
     cbv beta delta [wp_memset_loop_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
-      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hext0 Hext4 Hext6.
+      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hext0 Hext4 Hext6 Hdata.
     induction rem as [|rem' IH]; intros off m Hoff Hrem Hcur Hm4 Hm1;
       [ exfalso; lia | ].
     iIntros "Hsc Hhs Hcg Htlbinv
@@ -93,7 +93,10 @@ Section WpSconfMemset.
     rewrite big_sepL_cons.
     iDestruct "Hbuf" as "[Hb0 Hbuf]".
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
-    iApply (wp_sb_s_sconf γ root_ppn Φ pc0 ra1 ra5 (mword_of_int 0) m n (olds off)
+    assert (Hpadata : addr_in_data
+              (add_vec (m !!! Regidx ra5) (sign_extend' 64 (mword_of_int 0 : mword 12)))).
+    { rewrite Hcur. rewrite <- ms_pa_sb_pa. exact (Hdata off HoffN). }
+    iApply (wp_sb_s_sconf γ root_ppn Φ pc0 ra1 ra5 (mword_of_int 0) m n (olds off) Hpadata
               with "Hsc Hhs Hcg Htlbinv Hpc Hi0 [Hb0]").
     { rewrite Hcur. rewrite -ms_pa_sb_pa. iExact "Hb0". }
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hb0".
@@ -181,7 +184,7 @@ Section WpSconfMemset.
     : wp_memset_suffix_sconf_body γ root_ppn Φ M n ra0e s00e.
   Proof.
     cbv beta delta [wp_memset_suffix_sconf_body].
-    intros spd sp0up ret_tgt Hal0.
+    intros spd sp0up ret_tgt Hal0 Hstk.
     set (M4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg ra0e]> M).
     set (M5 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg s00e]> M4).
     set (M6 := <[Regidx csp_rs1 := regval_into_reg
@@ -230,8 +233,11 @@ Section WpSconfMemset.
                     = add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))).
     { unfold sp0up, pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hfsid : stack_in_data (add_vec (M5 !!! Regidx csp_rs1)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
+      by (rewrite Hwv; exact Hstk).
     iApply (wp_caddi_sp_pop_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x22)) (mword_of_int 16 : mword 6) M5
-              n 2 Hpop
+              n 2 Hpop Hfsid
               with "Hsc Hhs Hcg Htlbinv Hpc Hi2c [Hp8 Hp0] [-]").
     { iEval (rewrite Hwv).
       iApply (stack_own_2_intro with "[Hp8] [Hp0]").
@@ -277,7 +283,7 @@ Section WpSconfMemset.
   Proof.
     cbv beta delta [wp_memset_prefix_sconf_body].
     intros ra_idx s0_idx a0_idx a2_idx a4_idx a5_idx pcE sp0 sp' pa_ra pa_s0
-      ra0 s00 m1 m2 m3 m4 m5 m6 Hn2 Hsp' Hn0 Hvalue_add.
+      ra0 s00 m1 m2 m3 m4 m5 m6 Hn2 Hsp' Hstk Hn0 Hvalue_add.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hi00 Hi02 Hi04 Hi06 Hi08 Hi0a Hi0c Hi0e Hi10 Hcont".
     assert (Hcsp1 : m1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     (* ---- 0x00: c.addi sp,-16 -- the frame push ---- *)
@@ -296,13 +302,19 @@ Section WpSconfMemset.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr8
+    assert (Hd1 : addr_in_data (add_vec (m1 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))))).
+    { rewrite Hpa1. exact (Hstk 1%nat ltac:(lia)). }
+    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr8 Hd1
               with "Hsc Hhs Hcg Htlbinv Hpc Hi02 Hbra [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (MS + 0x02) : mword 64) 2 = mword_of_int (MS + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs0
+    assert (Hd2 : addr_in_data (add_vec (m1 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))).
+    { rewrite Hpa2. exact (Hstk 2%nat ltac:(lia)). }
+    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs0 Hd2
               with "Hsc Hhs Hcg Htlbinv Hpc Hi04 Hbs0 [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (MS + 0x04) : mword 64) 2 = mword_of_int (MS + 0x06)) by (apply bv_eq; vm_compute; reflexivity).

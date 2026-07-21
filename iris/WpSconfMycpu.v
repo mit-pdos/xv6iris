@@ -40,7 +40,7 @@ Section WpSconfMycpu.
     : wp_mycpu_sconf_body γ root_ppn Φ m0 n.
   Proof.
     cbv beta delta [wp_mycpu_sconf_body].
-    intros ra_idx tp_idx a0_idx pcE sp0 ra0 ret_tgt Hal0 Hn.
+    intros ra_idx tp_idx a0_idx pcE sp0 ra0 ret_tgt Hal0 Hn Hstk.
     (* the per-instruction register-map chain (private to the proof) *)
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a5_idx := (mword_of_int 15 : mword 5)).
@@ -103,13 +103,19 @@ Section WpSconfMycpu.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr24
+    assert (Hd1 : addr_in_data (add_vec (m1 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))))).
+    { rewrite Hpa1. exact (Hstk 1%nat ltac:(lia)). }
+    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr24 Hd1
               with "Hsc Hhs Hcg Htlbinv Hpc Hi02 Hbra [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.mycpu + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.mycpu + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs16
+    assert (Hd2 : addr_in_data (add_vec (m1 !!! Regidx csp_rs1)
+                    (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))))).
+    { rewrite Hpa2. exact (Hstk 2%nat ltac:(lia)). }
+    iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs16 Hd2
               with "Hsc Hhs Hcg Htlbinv Hpc Hi04 Hbs0 [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.mycpu + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.mycpu + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
@@ -220,8 +226,11 @@ Section WpSconfMycpu.
     iEval (rewrite Hm9sp Hpa2') in "Hbs0".
     iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
+    assert (Hfsid : stack_in_data (add_vec (m10 !!! Regidx csp_rs1)
+              (sign_extend' 64 (sign_extend' 12 imm_dealloc))) 2)
+      by (rewrite Hwv; exact Hstk).
     iApply (wp_caddi_sp_pop_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x1c)) imm_dealloc m10
-              (n - 2)%nat 2 Hpop
+              (n - 2)%nat 2 Hpop Hfsid
               with "Hsc Hhs Hcg Htlbinv Hpc Hi1c Hframe [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
@@ -283,13 +292,21 @@ Section WpSconfMycpu.
     cbv beta delta [wp_call_mycpu_sconf_cs_body].
     intros ra_idx m0 pcE ra0 ret_tgt Htarget Halpce Hal0 Hn.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hjal Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
+    iDestruct (sie_cap_sid with "Hcap") as "[%Hsidc Hcap]".
+    iDestruct (sie_cap_gpr_join with "Hcap Hfile") as "Hcg".
+    assert (Hstk0 : stack_in_data (m0 !!! Regidx csp_rs1) 2).
+    { assert (Hsp_eq : m0 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
+        by (unfold m0; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
+      rewrite Hsp_eq.
+      apply (stack_in_data_mono _ (kv_frame_slots + n)); [unfold kv_frame_slots; lia | exact Hsidc]. }
     iApply (wp_jal_s_sconf γ root_ppn Φ P (mword_of_int 1) jimm m n
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rewrite Htarget; exact Halpce)
               with "Hsc Hhs Hcg Htlbinv Hpc Hjal [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     iEval (rewrite Htarget) in "Hpc".
-    iApply (wp_mycpu_sconf γ root_ppn Φ m0 n Hal0 Hn
+    iApply (wp_mycpu_sconf γ root_ppn Φ m0 n Hal0 Hn Hstk0
               with "Hsc Hhs Hcg Htlbinv Htext Hpc [-]").
     iIntros (m') "Hhs Hsc Hcg Htlbinv Hpc %Hcs".
     iApply ("Hcont" $! m' with "Hhs Hsc Hcg Htlbinv Hpc [%]").

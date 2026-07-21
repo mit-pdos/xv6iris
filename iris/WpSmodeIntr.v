@@ -101,7 +101,7 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hpc0 Hmenvval0) "#Hintr Hhs Hcfg Hpc Hfile HF Hinstr H".
-    iDestruct "Hinstr" as "[%Hnlpad Hr]".
+    iDestruct "Hinstr" as "[%Htext [%Hnlpad Hr]]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iAssert (⌜ match r with F_Base _ => True | F_RVC _ => True | _ => False end ⌝)%I as %Hrok.
     { iEval (rewrite /instr_bytes) in "Hbytes".
@@ -139,7 +139,7 @@ Section WpSmodeIntr.
       by (rewrite Lpma0; exact Hpma_all).
     (* the unified fetch through the tree invariant (may write A/D back) *)
     iMod (tlb_inv_pt_fetch root_ppn σ pc r
-            Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
+            Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma Htext
             with "[$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
     (* decode agreement + its side conditions, at σf *)
@@ -229,7 +229,7 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr H".
-    iDestruct "Hcap" as "[Hstk [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]".
+    iDestruct "Hcap" as "[Hstk [%Hsid [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]]".
     - (* ---- quarter-'0': the dispatch-None engine, SIE=0 from ghost ---- *)
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
       iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
@@ -256,7 +256,7 @@ Section WpSmodeIntr.
         { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
-      { iFrame "Hstk". iLeft. iExact "Hq0". }
+      { iFrame "Hstk". iSplitR; [iPureIntro; exact Hsid|]. iLeft. iExact "Hq0". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
       iFrame "Hsi'". iExact "Hcont".
@@ -267,7 +267,7 @@ Section WpSmodeIntr.
       iDestruct "Hstk" as "[Hstk Hdeep]".
       iDestruct "Hhx" as (handler) "#Hintr".
       iAssert (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝)%I as %Hal2.
-      { iDestruct "Hinstr" as "[%Hnlpad Hr]".
+      { iDestruct "Hinstr" as "[%Htext [%Hnlpad Hr]]".
         iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
         iEval (rewrite /instr_bytes) in "Hbytes".
         iDestruct "Hbytes" as "[%H2al _]". iPureIntro. exact H2al. }
@@ -278,9 +278,10 @@ Section WpSmodeIntr.
       iApply (wp_instr_s_intr γ handler root_ppn MENVCFG_S m Φ pc is_rvc i
                 Hpc0 eq_refl
                 with "Hintr Hhs Hic Hpc Hfile [Hmenv Htlbinv Hstk] Hinstr").
-      { iFrame "Hmenv Htlbinv Hstk". }
+      { iFrame "Hmenv Htlbinv Hstk". iPureIntro.
+        apply (stack_in_data_mono _ (kv_frame_slots + n)); [lia | exact Hsid]. }
       iIntros (σ Hpceq) "Hic Hfile HF Hnpc Hsi".
-      iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
+      iDestruct "HF" as "(Hmenv & Htlbinv & Hstk & %Hsid2)".
       iDestruct (v2_of_intr_config with "Hic Hmenv")
         as "(Hsc & Hsepcx & Hscausex & Hstvalx)".
       iMod ("H" $! σ Hpceq
@@ -288,6 +289,7 @@ Section WpSmodeIntr.
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iSplitL "Hstk Hdeep".
         { iApply stack_own_app. iFrame "Hstk Hdeep". }
+        iSplitR; [iPureIntro; exact Hsid|].
         iRight. iFrame "Hq1 Hsepcx Hscausex Hstvalx".
         iExists handler. iExact "Hintr". }
       iModIntro. iExists s_exec.

@@ -120,6 +120,8 @@ Section KvmSpecs.
     (∃ (γk : gname * gname) (qint : mword 32) (qcpu : mword 64),
       ⌜eq_vec qcpu (mycpu_ret tp) = false⌝ ∗
       ⌜eq_vec (zero_reg : mword 64) (mycpu_ret tp) = false⌝ ∗
+      ⌜addr_in_data (add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 120 : mword 12)))⌝ ∗
+      ⌜addr_in_data (add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 124 : mword 12)))⌝ ∗
       is_lock γ (mword_of_int KernelSyms.kmem)
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
       kalloc_avail γk None ∗
@@ -300,10 +302,17 @@ Section KvmSpecs.
   (* tuples so the kvmmap posts chain definitionally; defined at proof     *)
   (* time next to the witness, not here.                                   *)
   (* NOTE for the boot introduction (out of scope here): [kpt_tree_spec]   *)
-  (* currently claims uniform-RWX DRAM leaves (the KptPt deviation); the   *)
-  (* real table is text-RX / data-RW, so that spec gets REVISED to the     *)
-  (* true per-region flags when [tlb_inv_pt] is first established from     *)
-  (* [pt_rep t kvm_map] at kvminithart.                                    *)
+  (* now maps the DRAM range with the true text-RX / data-RW split         *)
+  (* (kpt_lflags dispatches 3-way on [etext_vpn]); the boot introduction    *)
+  (* establishes [tlb_inv_pt] from [pt_rep t kvm_map] at kvminithart, with  *)
+  (* [kvm_map]'s text pages carrying perm R|X and its data pages R|W.       *)
   (* ------------------------------------------------------------------- *)
 
 End KvmSpecs.
+
+(* [KptExecMap.etext_vpn] is a literal (the pure region layer cannot see the
+   kernel dump); cross-check it against the authoritative KernelSyms symbol
+   here, where both are visible (via SmodeCore's [Require ... KptPt] chain
+   re-exporting [KptExecMap], and [From Kernel Require KernelSyms]). *)
+Lemma etext_vpn_matches : etext_vpn * 4096 = KernelSyms.etext.
+Proof. vm_compute. reflexivity. Qed.

@@ -62,7 +62,7 @@ Section WpSconfInitlock.
     : wp_initlock_sconf_body γ root_ppn Φ m vlock vname vcpu K.
   Proof.
     cbv beta delta [wp_initlock_sconf_body].
-    intros pcE lk name sp0 ret_tgt c_name c_cpu HK Hretm.
+    intros pcE lk name sp0 ret_tgt c_name c_cpu HK Hretm Hstk Hlkd Hnmd Hcpud.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hlock Hname Hcpu Hcont".
     iPoseProof (ini_00 with "Htext") as "Hi00".
@@ -100,16 +100,20 @@ Section WpSconfInitlock.
     assert (Hpp02 : add_vec_int pcE 2 = mword_of_int (IL + 0x02)) by (unfold pcE; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     (* +0x02 c.sdsp ra,8(sp) *)
+    assert (Hd1 : addr_in_data (add_vec (R1 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))))
+      by (rewrite HspR1 Hb1; exact (Hstk 1%nat ltac:(lia))).
     iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
-              R1 (K - 2)%nat vra0 with "Hsc Hhs Hcg Htlbinv Hpc Hi02 [Hras] [-]").
+              R1 (K - 2)%nat vra0 Hd1 with "Hsc Hhs Hcg Htlbinv Hpc Hi02 [Hras] [-]").
     { iEval (rewrite HspR1). iExact "Hras". }
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hras".
     iEval (rewrite HspR1) in "Hras".
     assert (Hpp04 : add_vec_int (mword_of_int (IL + 0x02) : mword 64) 2 = mword_of_int (IL + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* +0x04 c.sdsp s0,0(sp) *)
+    assert (Hd2 : addr_in_data (add_vec (R1 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))))
+      by (rewrite HspR1 Hb2; exact (Hstk 2%nat ltac:(lia))).
     iApply (wp_csdsp_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
-              R1 (K - 2)%nat vs00 with "Hsc Hhs Hcg Htlbinv Hpc Hi04 [Hs0s] [-]").
+              R1 (K - 2)%nat vs00 Hd2 with "Hsc Hhs Hcg Htlbinv Hpc Hi04 [Hs0s] [-]").
     { iEval (rewrite HspR1). iExact "Hs0s". }
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hs0s".
     iEval (rewrite HspR1) in "Hs0s".
@@ -134,8 +138,11 @@ Section WpSconfInitlock.
     (* +0x08 c.sd a1,8(a0):  lk->name := a1 *)
     assert (Hea_name : add_vec (R2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))) = c_name).
     { rewrite HR2a0. unfold c_name. f_equal; apply bv_eq; vm_compute; reflexivity. }
+    assert (Hdn : addr_in_data (add_vec (R2 !!! Regidx (mword_of_int 10 : mword 5))
+                    (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))))))
+      by (rewrite Hea_name; exact Hnmd).
     iApply (wp_csd_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 10 : mword 5)
-              (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) R2 (K - 2)%nat vname
+              (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) R2 (K - 2)%nat vname Hdn
               with "Hsc Hhs Hcg Htlbinv Hpc Hi08 [Hname] [-]").
     { iEval (rewrite Hea_name). iExact "Hname". }
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hname".
@@ -145,8 +152,11 @@ Section WpSconfInitlock.
     (* +0x0a sw zero,0(a0):  lk->locked := 0 *)
     assert (Hea_lock : add_vec (R2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lk).
     { rewrite HR2a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
+    assert (Hdl : addr_in_data (add_vec (R2 !!! Regidx (mword_of_int 10 : mword 5))
+                    (sign_extend' 64 (mword_of_int 0 : mword 12))))
+      by (rewrite Hea_lock; exact Hlkd).
     iApply (wp_sw_zero_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x0a)) (mword_of_int 10 : mword 5)
-              (mword_of_int 0 : mword 12) R2 (K - 2)%nat vlock
+              (mword_of_int 0 : mword 12) R2 (K - 2)%nat vlock Hdl
               with "Hsc Hhs Hcg Htlbinv Hpc Hi0a [Hlock] [-]").
     { iEval (rewrite Hea_lock). iExact "Hlock". }
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hlock".
@@ -156,8 +166,11 @@ Section WpSconfInitlock.
     (* +0x0e sd zero,16(a0):  lk->cpu := 0 *)
     assert (Hea_cpu : add_vec (R2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x10 : mword 12)) = c_cpu).
     { rewrite HR2a0. reflexivity. }
+    assert (Hdc : addr_in_data (add_vec (R2 !!! Regidx (mword_of_int 10 : mword 5))
+                    (sign_extend' 64 (mword_of_int 0x10 : mword 12))))
+      by (rewrite Hea_cpu; exact Hcpud).
     iApply (wp_sd_zero_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x0e)) (mword_of_int 10 : mword 5)
-              (mword_of_int 0x10 : mword 12) R2 (K - 2)%nat vcpu
+              (mword_of_int 0x10 : mword 12) R2 (K - 2)%nat vcpu Hdc
               with "Hsc Hhs Hcg Htlbinv Hpc Hi0e [Hcpu] [-]").
     { iEval (rewrite Hea_cpu). iExact "Hcpu". }
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hcpu".
@@ -208,7 +221,10 @@ Section WpSconfInitlock.
       iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|].
       done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x16)) (mword_of_int 16 : mword 6) R4 (K - 2)%nat 2 Hpop
+    assert (Hfsid : stack_in_data (add_vec (R4 !!! Regidx csp_rs1)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
+      by (rewrite Hwv; exact Hstk).
+    iApply (wp_caddi_sp_pop_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x16)) (mword_of_int 16 : mword 6) R4 (K - 2)%nat 2 Hpop Hfsid
               with "Hsc Hhs Hcg Htlbinv Hpc Hi16 Hframe [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     assert (Hnk : ((K - 2) + 2)%nat = K) by lia.

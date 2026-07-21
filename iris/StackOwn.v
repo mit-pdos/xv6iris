@@ -31,6 +31,7 @@ Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
+Require Import KptExecMap.
 Local Open Scope Z_scope.
 
 (* [pa_stk sp k] is the address [8*k] bytes below [sp] -- the base of the [k]-th
@@ -39,6 +40,17 @@ Local Open Scope Z_scope.
 Definition pa_stk (sp : Arch.pa) (k : nat) : Arch.pa :=
   add_vec_int sp (- (8 * Z.of_nat k)).
 
+
+(* Every stack slot at or above depth [n] below [sp] lands in the writable
+   DATA region.  Bundled premise threaded through the whole-function specs
+   that store to their stack frame (the [sr_store_ok]/[addr_in_data]
+   obligation at each c.sdsp / sd of a callee-saved register). *)
+Definition stack_in_data (sp : Arch.pa) (n : nat) : Prop :=
+  forall i : nat, (i <= n)%nat -> addr_in_data (pa_stk sp i).
+
+Lemma stack_in_data_mono (sp : Arch.pa) (n n' : nat) :
+  (n' <= n)%nat -> stack_in_data sp n -> stack_in_data sp n'.
+Proof. intros Hle H i Hi. apply H. lia. Qed.
 
 (* stacking two downward shifts adds the depths: sp minus 8a minus 8b is sp
    minus 8(a+b).  This is the address-geometry heart of [stack_own_app]. *)
@@ -51,6 +63,24 @@ Qed.
 Lemma pa_stk_shift (sp : Arch.pa) (a i : nat) :
   pa_stk sp (S (a + i)) = pa_stk (pa_stk sp a) (S i).
 Proof. rewrite pa_stk_assoc. f_equal. lia. Qed.
+
+(* the frame carved [k] slots below [sp] is itself in-data: a downward sp
+   move [sp' = pa_stk sp k] keeps the deeper region in-data. *)
+Lemma stack_in_data_shift (sp : Arch.pa) (k n : nat) :
+  stack_in_data sp (k + n) -> stack_in_data (pa_stk sp k) n.
+Proof. intros H i Hi. rewrite pa_stk_assoc. apply H. lia. Qed.
+
+(* re-attaching a popped frame [k] slots above a deeper in-data region. *)
+Lemma stack_in_data_app (sp : Arch.pa) (k n : nat) :
+  stack_in_data sp k -> stack_in_data (pa_stk sp k) n -> stack_in_data sp (k + n).
+Proof.
+  intros Hk Hn i Hi. destruct (Nat.le_gt_cases i k) as [Hik|Hik].
+  - apply Hk; lia.
+  - assert (Hj : ((i - k)%nat <= n)%nat) by lia.
+    pose proof (Hn (i - k)%nat Hj) as Hd.
+    rewrite pa_stk_assoc in Hd.
+    replace (k + (i - k))%nat with i in Hd by lia. exact Hd.
+Qed.
 
 (* Address-arithmetic bridge for converting a proof's raw SP-relative slot
    spelling [add_vec (add_vec sp Cframe) Coffset] into [pa_stk sp k].  These

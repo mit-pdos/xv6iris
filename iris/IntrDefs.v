@@ -237,7 +237,15 @@ Section IntrDefs.
       (m : regfile) : iProp Σ :=
     (menvcfg ↦ᵣ menvcfg0 ∗
      tlb_inv_pt root_ppn ∗
-     stack_own (m !!! Regidx csp_rs1) kv_frame_slots)%I.
+     stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
+     ⌜stack_in_data (m !!! Regidx csp_rs1) kv_frame_slots⌝)%I.
+
+  (* the frame region is in the writable DATA half of RAM: extract the pure
+     fact (persistent, keeps the frame) to discharge a store's [addr_in_data]. *)
+  Lemma intr_frame_sid (root_ppn : mword 44) (menvcfg0 : mword 64) (m : regfile) :
+    intr_frame root_ppn menvcfg0 m -∗
+    ⌜stack_in_data (m !!! Regidx csp_rs1) kv_frame_slots⌝ ∗ intr_frame root_ppn menvcfg0 m.
+  Proof. iIntros "(Hmenv & Htlb & Hstk & %Hsid)". iFrame "Hmenv Htlb Hstk". done. Qed.
 
   (* [intr_frame] depends on [m] only through sp: any register write that
      PRESERVES sp transports the frame to the new map.  (An sp-moving
@@ -247,8 +255,8 @@ Section IntrDefs.
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
     intr_frame root_ppn menvcfg0 m -∗ intr_frame root_ppn menvcfg0 m'.
   Proof.
-    iIntros (Hsp) "(Hmenv & Htlbinv & Hstk)".
-    iFrame "Hmenv Htlbinv". rewrite Hsp. iExact "Hstk".
+    iIntros (Hsp) "(Hmenv & Htlbinv & Hstk & %Hsid)".
+    iFrame "Hmenv Htlbinv". rewrite Hsp. iFrame "Hstk". rewrite -Hsp. done.
   Qed.
 
   Definition intr_handler_spec (handler : mword 64)
@@ -404,6 +412,7 @@ Section IntrDefs.
   Definition sie_cap (γ : gname) (root_ppn : mword 44)
       (m : regfile) (avail : nat) : iProp Σ :=
     (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
+     ⌜stack_in_data (m !!! Regidx csp_rs1) (kv_frame_slots + avail)⌝ ∗
      sie_arm γ root_ppn)%I.
 
   (* [sie_cap_gpr] bundles [sie_cap] with the register file [gpr_file m], so a
@@ -435,6 +444,15 @@ Section IntrDefs.
     sie_cap γ root_ppn m avail -∗ gpr_file m -∗ sie_cap_gpr γ root_ppn m avail.
   Proof. iIntros "Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
 
+  (* the whole reserved stack region is in the writable DATA half of RAM;
+     extract the pure fact (persistent, keeps [sie_cap]) to discharge the
+     [addr_in_data] obligation on any store into the frame. *)
+  Lemma sie_cap_sid (γ : gname) (root_ppn : mword 44) (m : regfile) (avail : nat) :
+    sie_cap γ root_ppn m avail -∗
+    ⌜stack_in_data (m !!! Regidx csp_rs1) (kv_frame_slots + avail)⌝ ∗
+    sie_cap γ root_ppn m avail.
+  Proof. iIntros "(Hstk & %Hsid & Harm)". iFrame "Hstk Harm". done. Qed.
+
   (* the funnel's accessor: split off the exact reserved carve (the
      [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
   Lemma sie_cap_acc (γ : gname) (root_ppn : mword 44)
@@ -442,11 +460,12 @@ Section IntrDefs.
     sie_cap γ root_ppn m avail ⊣⊢
     stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
+    ⌜stack_in_data (m !!! Regidx csp_rs1) (kv_frame_slots + avail)⌝ ∗
     sie_arm γ root_ppn.
   Proof.
     rewrite /sie_cap stack_own_app. iSplit.
-    - iIntros "[[Hkv Hdeep] Harm]". iFrame.
-    - iIntros "(Hkv & Hdeep & Harm)". iFrame.
+    - iIntros "[[Hkv Hdeep] (%Hsid & Harm)]". iFrame. done.
+    - iIntros "(Hkv & Hdeep & %Hsid & Harm)". iFrame. done.
   Qed.
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
@@ -455,7 +474,8 @@ Section IntrDefs.
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
     sie_cap γ root_ppn m avail -∗ sie_cap γ root_ppn m' avail.
   Proof.
-    iIntros (Hsp) "[Hstk Harm]". iFrame "Harm". rewrite Hsp. iExact "Hstk".
+    iIntros (Hsp) "(Hstk & %Hsid & Harm)". iFrame "Harm". rewrite Hsp. iFrame "Hstk".
+    rewrite -Hsp. done.
   Qed.
 
   (* sp DECREMENT by k slots (sp' = sp - 8k, a prologue's frame
@@ -470,11 +490,17 @@ Section IntrDefs.
     sie_cap γ root_ppn m avail -∗
     sie_cap γ root_ppn m' (avail - k) ∗ stack_own (m !!! Regidx csp_rs1) k.
   Proof.
-    iIntros (Hk Hsp') "[Hstk Harm]". iFrame "Harm".
+    iIntros (Hk Hsp') "(Hstk & %Hsid & Harm)".
+    rewrite /sie_cap.
+    replace (kv_frame_slots + avail)%nat
+      with (k + (kv_frame_slots + (avail - k)))%nat in Hsid by lia.
     replace (kv_frame_slots + avail)%nat
       with (k + (kv_frame_slots + (avail - k)))%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hrest]".
-    iFrame "Htop". rewrite Hsp'. iExact "Hrest".
+    iSplitR "Htop".
+    - iFrame "Harm". rewrite Hsp'. iFrame "Hrest". iPureIntro.
+      apply stack_in_data_shift. exact Hsid.
+    - iExact "Htop".
   Qed.
 
   (* sp INCREMENT by k slots (sp' = sp + 8k, an epilogue's frame
@@ -483,26 +509,32 @@ Section IntrDefs.
   Lemma sie_cap_pop (γ : gname) (root_ppn : mword 44)
       (m m' : regfile) (avail k : nat) :
     m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
+    stack_in_data (m' !!! Regidx csp_rs1) k ->
     stack_own (m' !!! Regidx csp_rs1) k -∗
     sie_cap γ root_ppn m avail -∗
     sie_cap γ root_ppn m' (avail + k).
   Proof.
-    iIntros (Hsp) "Hframe [Hstk Harm]". iFrame "Harm".
+    iIntros (Hsp Hfsid) "Hframe (Hstk & %Hsid & Harm)". rewrite /sie_cap. iFrame "Harm".
     replace (kv_frame_slots + (avail + k))%nat
       with (k + (kv_frame_slots + avail))%nat by lia.
-    iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk".
+    iSplitL.
+    - iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk".
+    - iPureIntro. apply stack_in_data_app; [exact Hfsid|]. rewrite -Hsp. exact Hsid.
   Qed.
 
   (* custody transfer at the DEEP end (no sp move): absorb k adjacent
      slots below the owned region into [avail]... *)
   Lemma sie_cap_grow (γ : gname) (root_ppn : mword 44)
       (m : regfile) (avail k : nat) :
+    stack_in_data (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k ->
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
     sie_cap γ root_ppn m avail -∗
     sie_cap γ root_ppn m (avail + k).
   Proof.
-    iIntros "Hdeep [Hstk Harm]". iFrame "Harm".
-    rewrite Nat.add_assoc. iApply stack_own_app. iFrame "Hstk Hdeep".
+    iIntros (Hdsid) "Hdeep (Hstk & %Hsid & Harm)". rewrite /sie_cap. iFrame "Harm".
+    rewrite Nat.add_assoc. iSplitL.
+    - iApply stack_own_app. iFrame "Hstk Hdeep".
+    - iPureIntro. apply stack_in_data_app; [exact Hsid | exact Hdsid].
   Qed.
 
   (* ... and release the k deepest slots back out. *)
@@ -513,11 +545,14 @@ Section IntrDefs.
     sie_cap γ root_ppn m (avail - k) ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + (avail - k))) k.
   Proof.
-    iIntros (Hk) "[Hstk Harm]". iFrame "Harm".
+    iIntros (Hk) "(Hstk & %Hsid & Harm)". rewrite /sie_cap. iFrame "Harm".
     replace (kv_frame_slots + avail)%nat
       with ((kv_frame_slots + (avail - k)) + k)%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hdeep]".
-    iFrame "Htop Hdeep".
+    iSplitR "Hdeep".
+    - iFrame "Htop". iPureIntro. apply (stack_in_data_mono _ (kv_frame_slots + avail)); [lia|].
+      exact Hsid.
+    - iExact "Hdeep".
   Qed.
 
   (* =================================================================== *)

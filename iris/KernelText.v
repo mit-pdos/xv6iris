@@ -17,6 +17,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import KptExecMap.
 Require Import InstrBytes.
 (* for [MISA_C], which [close_dec] reads misa bits out of *)
 Require Import RiscvFetchExec.
@@ -185,7 +186,7 @@ Ltac close_dec decname :=
 Ltac mk_rvc A h pc ast decname expname :=
   let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
   let Hrvc := fresh "Hrvc" in let Hsub := fresh "Hsub" in
-  let Hbytes := fresh "Hbytes" in
+  let Hbytes := fresh "Hbytes" in let Htext := fresh "Htext" in
   assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
   assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
   assert (Hrvc : isRVC h = true) by (vm_compute; reflexivity);
@@ -195,7 +196,11 @@ Ltac mk_rvc A h pc ast decname expname :=
       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte (kb_word_at A) j))
     by (intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+  assert (Htext : addr_in_text pc /\ addr_in_text (add_vec_int pc 2))
+    by (split; unfold addr_in_text; rewrite RiscvExtras.uint_unsigned;
+        vm_compute (bv_unsigned _); unfold ram_base, ram_size, etext_vpn; lia);
   iIntros "#Ht"; rewrite /instr;
+  iSplitR; [iPureIntro; exact Htext|];
   iSplitR; [iPureIntro; exact Hlpad|];
   iExists (F_RVC h);
   iSplitR; [iPureIntro; reflexivity|];
@@ -210,6 +215,7 @@ Ltac mk_rvc A h pc ast decname expname :=
 Ltac mk_base A w pc ast decname :=
   let Hlpad := fresh "Hlpad" in let H2al := fresh "H2al" in
   let Hnrvc := fresh "Hnrvc" in let Hbytes := fresh "Hbytes" in
+  let Htext := fresh "Htext" in
   assert (Hlpad : is_lpad_instruction ast = false) by (vm_compute; reflexivity);
   assert (H2al : is_aligned_vaddr (Virtaddr pc) 2 = true) by (vm_compute; reflexivity);
   assert (Hnrvc : isRVC (subrange_vec_dec w 15 0) = false) by (vm_compute; reflexivity);
@@ -217,7 +223,11 @@ Ltac mk_base A w pc ast decname :=
       KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j))
     by (intros j Hj;
         do 4 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity|]); lia);
+  assert (Htext : addr_in_text pc /\ addr_in_text (add_vec_int pc 2))
+    by (split; unfold addr_in_text; rewrite RiscvExtras.uint_unsigned;
+        vm_compute (bv_unsigned _); unfold ram_base, ram_size, etext_vpn; lia);
   iIntros "#Ht"; rewrite /instr;
+  iSplitR; [iPureIntro; exact Htext|];
   iSplitR; [iPureIntro; exact Hlpad|];
   iExists (F_Base w);
   iSplitR; [iPureIntro; reflexivity|];

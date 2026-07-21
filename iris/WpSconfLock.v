@@ -555,6 +555,7 @@ Section WpSconfLock.
       (m : regfile) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     pa = lk ->
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -572,7 +573,7 @@ Section WpSconfLock.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa Hpalk.
+    intros pa Hpalk Hdatapa.
     set (storeval := (mword_of_int 0 : mword 32)).
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Htok HRes Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
@@ -667,7 +668,7 @@ Section WpSconfLock.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -772,6 +773,7 @@ Section WpSconfLock.
       (m : regfile) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (zeros' 64) in
     pa = lk ->
+    addr_in_data pa ->
     neq_vec (sign_extend' 64 (amoswap_stored (m !!! Regidx rs2))) zero_reg = true ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
@@ -791,7 +793,7 @@ Section WpSconfLock.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa Hpalk Hstz Hrd Hrdsp.
+    intros pa Hpalk Hdatapa Hstz Hrd Hrdsp.
     set (a8 := pa). set (ea := pa).
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
@@ -899,7 +901,8 @@ Section WpSconfLock.
       by (rewrite Hea_pc subrange_id sign_extend'_id; reflexivity).
     iMod (tlb_inv_pt_translateAddr (Atomic (AMOSWAP, Data, Data))
             root_ppn a8 s_pc
-            (fun a d mxr do_sum => kpt_variant_check_amo (svpn_of a8) a d mxr do_sum)
+            (fun a d mxr do_sum => kpt_variant_check_amo (svpn_of a8) a d mxr do_sum
+                                     (data_svpn_not_text a8 Hdatapa))
             (or_introl (ram_svpn_range a8 Hrampa))
             (RiscvExtras.ram_canonical a8 Hrampa)
             (ram_ident_4k a8 Hrampa)

@@ -37,6 +37,8 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
   mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
   (6 <= av)%nat ->
+  addr_in_data a_noff ->
+  addr_in_data a_intena ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m av -∗
@@ -76,6 +78,7 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (4 <= av)%nat ->
+  addr_in_data a_noff ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m av -∗

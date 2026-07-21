@@ -15,6 +15,7 @@ Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
+Require Import KptExecMap.
 Local Open Scope Z_scope.
 
 Section InstrBytes.
@@ -527,7 +528,8 @@ Section InstrBytes.
      ([instr_lift] holds cur_privilege = Machine and weakens it to membership;
      an S-mode lift does the same from Supervisor). *)
   Definition instr (pc : mword 64) (is_rvc : bool) (i : instruction) : iProp Σ :=
-    (⌜ is_lpad_instruction i = false ⌝ ∗
+    (⌜ addr_in_text pc /\ addr_in_text (add_vec_int pc 2) ⌝ ∗
+     ⌜ is_lpad_instruction i = false ⌝ ∗
      ∃ r : FetchResult,
        ⌜ fetch_is_rvc r = is_rvc ⌝ ∗
        instr_bytes pc r ∗
@@ -580,7 +582,7 @@ Section InstrBytes.
              is_lpad_instruction i = false ⌝.
   Proof.
     iIntros (Hpmp Hpma HmisaC HmisaA Hmisaval Hmseccfgval) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hinstr".
-    iDestruct "Hinstr" as "[%Hnlpad Hr]".
+    iDestruct "Hinstr" as "[%Htext [%Hnlpad Hr]]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iDestruct (state_interp_reg_dq σ cur_privilege dqp Machine
                  with "Hsi Hpriv") as %Lpriv.

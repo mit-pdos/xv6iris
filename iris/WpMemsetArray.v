@@ -122,7 +122,7 @@ Section WpMemsetArray.
     : wp_memset_sconf_body γ root_ppn Φ m0 n len cval olds.
   Proof.
     cbv beta delta [wp_memset_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt cbyte Hn Hlen0 Hlen32 Hnw Hcval Ha2 Hret0.
+    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt cbyte Hn Hlen0 Hlen32 Hnw Hcval Ha2 Hret0 Hdata.
     set (ra_idx := (mword_of_int 1 : mword 5)).
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a4_idx := (mword_of_int 14 : mword 5)).
@@ -148,6 +148,9 @@ Section WpMemsetArray.
     { rewrite moi_unsigned. apply bv_wrap_small.
       unfold bv_modulus; simpl. split; [ lia | apply (Z.lt_trans _ (2 ^ 32)); [ lia | vm_compute; reflexivity ] ]. }
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hbuf0 Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
+    iDestruct (sie_cap_sid with "Hcap") as "[%Hsid Hcap]".
+    iDestruct (sie_cap_gpr_join with "Hcap Hfile") as "Hcg".
     (* --- bridge the [pa_add]-indexed buffer to memset's [ms_pa (ms_addr)] one --- *)
     iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ olds j)%I
       with "[Hbuf0]" as "Hbuf".
@@ -193,7 +196,9 @@ Section WpMemsetArray.
       apply bv_eq; vm_compute; reflexivity. }
     (* --- PREFIX: 0x00..0x10 --- *)
     iApply (Memset.wp_memset_prefix_sconf γ root_ppn Φ m0 n imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
-              wval_add Hn Hsp' Hn0 Hvalue_add
+              wval_add Hn Hsp'
+              (stack_in_data_mono _ (kv_frame_slots + n) 2 ltac:(unfold kv_frame_slots; lia) Hsid)
+              Hn0 Hvalue_add
               with "Hsc Hhs Hcg Htlbinv Hpc
                     Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 [-]").
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hbra Hbs0".
@@ -229,6 +234,7 @@ Section WpMemsetArray.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               minstr_cce minstr_cd2 minstr_cd4
+              ltac:(intros j Hj; rewrite ms_pa_ms_addr; exact (Hdata j Hj))
               len 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hbuf [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbuf".
@@ -245,8 +251,21 @@ Section WpMemsetArray.
     { unfold m7, m6, m5, m4, m3, m2, m1.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold ra0; reflexivity. }
+    assert (Hup : add_vec (m7 !!! Regidx csp_rs1)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0).
+    { rewrite Hsuf_sp Hsp'. unfold pa_stk, add_vec_int. rewrite pa_stk_off2.
+      assert (Hz : bv_wrap 64 (uint (mword_of_int (- (8 * Z.of_nat 2)) : mword 64)
+                    + uint (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)) = 0%Z)
+        by (vm_compute; reflexivity).
+      rewrite Hz.
+      change (add_vec sp0 (mword_of_int 0%Z)) with (add_vec_int sp0 0%Z).
+      apply avi0. }
+    assert (Hsuf_sid : stack_in_data (add_vec (m7 !!! Regidx csp_rs1)
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
+    { rewrite Hup. apply (stack_in_data_mono _ (kv_frame_slots + n) 2);
+        [unfold kv_frame_slots; lia | exact Hsid]. }
     iApply (Memset.wp_memset_suffix_sconf γ root_ppn Φ m7 (n - 2)%nat ra0 s00
-              Hret0
+              Hret0 Hsuf_sid
               with "Hsc Hhs Hcg Htlbinv HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }

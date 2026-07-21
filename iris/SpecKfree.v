@@ -63,6 +63,8 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   zopz0zKzJ_s zero_reg (sign_extend' 64 po_noff_store) = false ->
   eq_vec (sign_extend' 64
      (if eq_vec (sign_extend' 64 noffv) zero_reg then (zeros' 32) else intena_old)) zero_reg = true ->
+  addr_in_data a_noff ->
+  addr_in_data a_int ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m K -∗

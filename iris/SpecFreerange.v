@@ -63,6 +63,8 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   prun pa_end s1entry ps ->
+  addr_in_data a_noff ->
+  addr_in_data a_int ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m K -∗

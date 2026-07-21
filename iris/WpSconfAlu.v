@@ -942,6 +942,7 @@ Section WpSconfAlu.
     let sp0 := m !!! Regidx csp_rs1 in
     let wval := add_vec sp0 (sign_extend' 64 (sign_extend' 12 imm)) in
     sp0 = pa_stk wval k ->
+    stack_in_data wval k ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗
@@ -955,16 +956,19 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros sp0 wval.
-    iIntros (Hw) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hframe Hcont".
+    iIntros (Hw Hfsid) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hframe Hcont".
     assert (Hsp : m !!! Regidx csp_rs1
                   = pa_stk (<[Regidx csp_rs1 := regval_into_reg wval]> m
                             !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
+    assert (Hfsid' : stack_in_data (<[Regidx csp_rs1 := regval_into_reg wval]> m
+                            !!! Regidx csp_rs1) k)
+      by (rewrite upd_eq; exact Hfsid).
     iApply (wp_caddi_sp_s_sconf γ root_ppn Φ pc imm m n (n + k) emp%I
               with "Hsc Hhs Hcg Htlbinv Hpc Hinstr [Hframe] [Hcont]").
     { iIntros "Hcap".
       iSplitL; [| done].
-      iApply (sie_cap_pop γ root_ppn m _ n k Hsp with "[Hframe] Hcap").
+      iApply (sie_cap_pop γ root_ppn m _ n k Hsp Hfsid' with "[Hframe] Hcap").
       rewrite upd_eq. iExact "Hframe". }
     iIntros "Hhs Hsc Hcg _ Htlbinv Hpc".
     iApply ("Hcont" with "Hhs Hsc Hcg Htlbinv Hpc").
@@ -1010,6 +1014,7 @@ Section WpSconfAlu.
     let sp0 := m !!! Regidx csp_rs1 in
     let wval := add_vec sp0 (sign_extend' 64 (caddi16sp_imm imm6)) in
     sp0 = pa_stk wval k ->
+    stack_in_data wval k ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗
@@ -1023,16 +1028,19 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros sp0 wval.
-    iIntros (Hw) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hframe Hcont".
+    iIntros (Hw Hfsid) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hframe Hcont".
     assert (Hsp : m !!! Regidx csp_rs1
                   = pa_stk (<[Regidx csp_rs1 := regval_into_reg wval]> m
                             !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
+    assert (Hfsid' : stack_in_data (<[Regidx csp_rs1 := regval_into_reg wval]> m
+                            !!! Regidx csp_rs1) k)
+      by (rewrite upd_eq; exact Hfsid).
     iApply (wp_caddi16sp_s_sconf γ root_ppn Φ pc imm6 m n (n + k) emp%I
               with "Hsc Hhs Hcg Htlbinv Hpc Hinstr [Hframe] [Hcont]").
     { iIntros "Hcap".
       iSplitL; [| done].
-      iApply (sie_cap_pop γ root_ppn m _ n k Hsp with "[Hframe] Hcap").
+      iApply (sie_cap_pop γ root_ppn m _ n k Hsp Hfsid' with "[Hframe] Hcap").
       rewrite upd_eq. iExact "Hframe". }
     iIntros "Hhs Hsc Hcg _ Htlbinv Hpc".
     iApply ("Hcont" with "Hhs Hsc Hcg Htlbinv Hpc").

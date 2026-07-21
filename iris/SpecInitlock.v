@@ -37,6 +37,10 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (2 <= K)%nat ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  stack_in_data sp0 2 ->
+  addr_in_data lk ->
+  addr_in_data c_name ->
+  addr_in_data c_cpu ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   sie_cap_gpr γ root_ppn m K -∗

@@ -451,6 +451,7 @@ Section WpSconfMem.
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -467,7 +468,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa.
+    intros pa Hdatapa.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hbytes Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
@@ -565,7 +566,7 @@ Section WpSconfMem.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -666,6 +667,7 @@ Section WpSconfMem.
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -682,7 +684,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa.
+    intros pa Hdatapa.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hbytes Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
@@ -780,7 +782,7 @@ Section WpSconfMem.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -883,6 +885,7 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (m !!! Regidx rs2) in
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -899,7 +902,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa storeval.
+    intros pa storeval Hdatapa.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hbytes Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
@@ -995,7 +998,7 @@ Section WpSconfMem.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -1094,6 +1097,7 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (m !!! Regidx rs2) in
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -1110,7 +1114,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa storeval.
+    intros pa storeval Hdatapa.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hbytes Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
@@ -1206,7 +1210,7 @@ Section WpSconfMem.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -1340,6 +1344,7 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 8) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc8 (m !!! Regidx rs2) in
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -1356,7 +1361,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa storeval.
+    intros pa storeval Hdatapa.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hbyte Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct (mem_ram with "Hbyte") as %Hrampa.
@@ -1439,7 +1444,7 @@ Section WpSconfMem.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -1568,6 +1573,7 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
+    addr_in_data pa ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗
@@ -1580,11 +1586,12 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm pa.
+    intros imm pa Hdatapa.
     unfold pa.
     rewrite <- sext9_12_64.
+    unfold pa in Hdatapa. rewrite <- sext9_12_64 in Hdatapa.
     change sp with (Regidx csp_rs1).
-    exact (wp_csd_s_sconf γ root_ppn Φ pc rs2 csp_rs1 imm m n vold).
+    exact (wp_csd_s_sconf γ root_ppn Φ pc rs2 csp_rs1 imm m n vold Hdatapa).
   Qed.
 
 
@@ -1596,6 +1603,7 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := (zero_reg : mword 64) in
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -1612,7 +1620,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa storeval.
+    intros pa storeval Hdatapa.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hbytes Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
@@ -1705,7 +1713,7 @@ Section WpSconfMem.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -1804,6 +1812,7 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := (mword_of_int 0 : mword 32) in
+    addr_in_data pa ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap_gpr γ root_ppn m n -∗
@@ -1820,7 +1829,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pa storeval.
+    intros pa storeval Hdatapa.
     iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hbytes Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
@@ -1911,7 +1920,7 @@ Section WpSconfMem.
     assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs)))
       by (rewrite Lpma_pc; exact Hpma_all).
     iMod (tlb_inv_pt_translateAddr_store root_ppn pa s_pc
-            Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+            Hdatapa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)

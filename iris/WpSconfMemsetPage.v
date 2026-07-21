@@ -61,6 +61,7 @@ Section WpSconfMemsetPage.
     (* --- apply the general memset spec at len = 4096 --- *)
     iApply (MemsetArray.wp_memset_sconf γ root_ppn Φ m0 n 4096 cval olds
               Hn ltac:(lia) ltac:(vm_compute; reflexivity) Hnw Hcval Ha2' Hret0
+              ltac:(intros j Hj; exact (KallocInv.page_in_range_addr_in_data p j Hpv Hj))
               with "Hsc Hhs Hcg Htlbinv Htext Hpc [Hbuf] [-]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (mfin) "Hsc Hhs Hcg Htlbinv Hpc Hbuf %Hcs".

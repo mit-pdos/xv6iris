@@ -20,7 +20,8 @@ From iris.base_logic.lib Require Import ghost_var invariants.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
+Require Import InstrBytes.
 Require Import RegFile.
 Require Import MinstretInv.
 Require Import WpMmodeLeafBase StackOwn.
@@ -98,7 +99,7 @@ Section WpKernelvecSpec.
     iIntros (elp_v ms pc0 mie_v mdv0 m Φ)
       "%Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hpc Hfile HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
-    iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
+    iDestruct "HF" as "(Hmenv & Htlbinv & Hstk & %Hsid)".
     (* re-address kernelvec's 17 sparse save windows as [pa_stk] slots *)
     pose proof (kv_slot_addr0 m) as Hb32.
     assert (Hb30 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 30)
@@ -174,6 +175,18 @@ Section WpKernelvecSpec.
     iMod (ghost_var_alloc (_get_Mstatus_SIE (trap_ms elp_v ms))) as (γk) "Hg".
     iEval (rewrite -Qp.half_half) in "Hg".
     iDestruct (ghost_var_split with "Hg") as "[Hsie _]".
+    assert (Hsave : forall i : nat, (i < 32)%nat ->
+              addr_in_data (add_vec (kv_sp1 m) (mword_of_int (8 * Z.of_nat i)))).
+    { intros i Hi.
+      assert (Haddr : add_vec (kv_sp1 m) (mword_of_int (8 * Z.of_nat i))
+                      = pa_stk (m !!! Regidx csp_rs1) (32 - i)).
+      { rewrite kv_slot_addr0. unfold pa_stk.
+        change (add_vec (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat 32)))
+                  (mword_of_int (8 * Z.of_nat i)))
+          with (add_vec_int (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat 32)))
+                  (8 * Z.of_nat i)).
+        rewrite avi_assoc. f_equal. lia. }
+      rewrite Haddr. apply Hsid. unfold kv_frame_slots. apply Nat.le_sub_l. }
     iApply (wp_kernelvec root_ppn γk m (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
               w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 Φ
               (trap_ms_SIE_false elp_v ms)
@@ -187,6 +200,7 @@ Section WpKernelvecSpec.
               Hlpe0
               HFIOM
               Hleg_trap
+              Hsave
               with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc
                     Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
@@ -217,7 +231,8 @@ Section WpKernelvecSpec.
       as "Hstk".
     2:{ iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hpc Hfile [Hmenv Htlbinv Hstk]").
         { iExists pc0. iFrame "Hsepc". }
-        iFrame "Hmenv Htlbinv". iExact "Hstk". }
+        iFrame "Hmenv Htlbinv". iSplitL "Hstk"; [iExact "Hstk"|].
+        iPureIntro. exact Hsid. }
     rewrite /kv_frame_slots stack_own_slots. cbn [seq].
     iSplitL "S1"; [iExact "S1" |].
     iSplitL "Hw17"; [by iExists _ |].
