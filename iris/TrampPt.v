@@ -35,6 +35,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 From Kernel Require KernelSyms.
+Require Export KptExecMap.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -45,11 +46,10 @@ Import Defs.
 Definition TRAMPOLINE : Z := 0x3FFFFFF000.
 Definition TRAPFRAME  : Z := 0x3FFFFFE000.
 
-Definition tramp_vpn : mword 27 := mword_of_int 0x3FFFFFF.
 Definition tf_vpn    : mword 27 := mword_of_int 0x3FFFFFE.
 
-(* the trampoline page's physical page number (KernelSyms.trampoline >> 12). *)
-Definition tramp_ppn : mword 44 := mword_of_int 0x80006.
+(* [tramp_vpn]/[tramp_ppn] now live in KptExecMap.v (re-exported below) so the
+   region/exec-map layer sits below InstrBytes; consumers see them unchanged. *)
 
 
 (* The generic 4KB PTE layer ([mk_pte]/[pte_addr_at]), the 3-level walk

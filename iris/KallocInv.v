@@ -58,7 +58,7 @@ From iris.base_logic.lib Require Import own ghost_var.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvPtsto WpLock.
+Require Import RiscvModelBytes RiscvPtsto WpLock KptExecMap.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -118,6 +118,74 @@ Section Kalloc.
     rewrite Hrem.
     apply Z.mod_divide in Hal; [| lia]. apply Z.mod_divide; [lia|].
     apply (Z.divide_trans 8 4096); [ exists 512; reflexivity | exact Hal ].
+  Qed.
+
+  (* --- bridge to the kernel data region (KptExecMap's [addr_in_data]) ---
+
+     [uint]/[bv_unsigned] bridge and the additive-offset fact for [pa_add],
+     re-derived here rather than pulled from SmodePte.v (which drags in the
+     whole InstrBytes/WP stack) -- see [uint_unsigned]/[uint_pa_add] in
+     SmodePte.v / WpSmodeGpr.v for the upstream originals; this is the same
+     one-line proof, kept local so KallocInv's Require chain stays light. *)
+  Local Lemma kalloc_uint_unsigned (a : mword 64) : uint a = bv_unsigned a.
+  Proof.
+    pose proof (bv_unsigned_in_range _ a) as Hr.
+    unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+    rewrite Z2N.id; [ reflexivity | lia ].
+  Qed.
+
+  Local Lemma kalloc_uint_pa_add (a : mword 64) (j : nat) :
+    (uint a + Z.of_nat j < 18446744073709551616)%Z ->
+    uint (pa_add a j) = uint a + Z.of_nat j.
+  Proof.
+    intro Hlt. rewrite !kalloc_uint_unsigned in Hlt |- *.
+    unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
+      Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+    unfold MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned.
+    assert (Hj : bv_unsigned (mword_of_int (Z.of_nat j) : mword 64) = Z.of_nat j).
+    { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+      rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+      pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
+      assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+      split.
+      - apply Nat2Z.is_nonneg.
+      - apply Z.le_lt_trans with (bv_unsigned a + Z.of_nat j).
+        + rewrite <- (Z.add_0_l (Z.of_nat j)) at 1. apply Z.add_le_mono_r. exact Har.
+        + exact Hlt. }
+    rewrite Hj.
+    apply bv_wrap_small.
+    pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
+    assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+    split.
+    - apply Z.add_nonneg_nonneg. exact Har. apply Nat2Z.is_nonneg.
+    - exact Hlt.
+  Qed.
+
+  (* THE BRIDGE LEMMA: every byte of a kalloc page lies in the kernel data
+     region [KptExecMap.addr_in_data] = [etext, PHYSTOP).  Pure arithmetic on
+     the concrete literals: [kmem_lo] (0x80023558) > [etext_vpn]*4096
+     (0x80007000), and [kmem_hi] (0x88000000) = [ram_base]+[ram_size] =
+     PHYSTOP.  Page-alignment of both [p] and [kmem_hi] is what keeps
+     [uint p + j] strictly below [kmem_hi] for every in-page offset [j] --
+     [page_in_range] alone (without [page_aligned]) is not enough. *)
+  Lemma page_in_range_addr_in_data (p : mword 64) (j : nat) :
+    page_valid p -> (j < 4096)%nat -> addr_in_data (pa_add p j).
+  Proof.
+    intros [Hal [Hlo Hhi]] Hj.
+    assert (Hlit : etext_vpn * 4096 <= kmem_lo) by (unfold etext_vpn, kmem_lo; lia).
+    assert (Hhilit : kmem_hi = ram_base + ram_size)
+      by (unfold kmem_hi, ram_base, ram_size; lia).
+    assert (Hhimod : kmem_hi mod 4096 = 0) by (unfold kmem_hi; vm_compute; reflexivity).
+    (* [uint p] is a multiple of 4096 (from [page_aligned]) strictly below
+       [kmem_hi], itself a multiple of 4096, so [uint p <= kmem_hi - 4096]. *)
+    assert (Hstep : uint p <= kmem_hi - 4096).
+    { unfold page_aligned, PGSIZE in Hal.
+      apply Z.mod_divide in Hal; [ | lia ]. apply Z.mod_divide in Hhimod; [ | lia ].
+      destruct Hal as [ka Hka]. destruct Hhimod as [kb Hkb]. lia. }
+    assert (Hno : (uint p + Z.of_nat j < 18446744073709551616)%Z)
+      by (unfold kmem_hi in Hhi; lia).
+    unfold addr_in_data. rewrite (kalloc_uint_pa_add p j Hno). lia.
   Qed.
 
   (* the little-endian 64-bit word built from 8 bytes reproduces those bytes *)

@@ -12,6 +12,7 @@ DevModel.v
 RiscvLang.v
 RegFile.v
 RiscvPtsto.v
+KptExecMap.v
 RiscvExec.v
 MinstretInv.v
 WireInv.v
