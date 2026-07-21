@@ -224,7 +224,12 @@ WpSconfMyproc.v
 LinkMyproc.v
 SpecSched.v
 WpSchedDecode.v
+WpSconfSched.v
+LinkSched.v
 SpecYield.v
+WpYieldDecode.v
+WpSconfYield.v
+LinkYield.v
 WpWakeup.v
 SpecWakeupLoop.v
 WpSconfWakeupLoop.v

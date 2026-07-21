@@ -249,16 +249,27 @@ All three carry `m !!! Regidx x4 = cid_word`.
       Require Export ProcGeom; axiom renamed wp_myproc_sconf_any; loop
       lemmas dropped the dead Rreg/γc/bsie/dq params; the ▷-slot change was
       fully mechanical — no later-strip needed anywhere in wakeup).
-- [ ] S3: myproc: WpMyprocDecode.v, WpSconfMyproc.v, LinkMyproc.v (agent
-      running).
-- [ ] S4: sched: WpSchedDecode.v, WpSconfSched.v, LinkSched.v (agent
-      running; SpecSched.v done).
-- [ ] S5: yield: WpYieldDecode.v, WpSconfYield.v, LinkYield.v (SpecYield.v
-      done).  `own_ctx` currently lives in SpecSched.v — move to SwtchCtx.v
-      at the next SwtchCtx touch.
-- [ ] S6: full clean build green; lift durable lessons into
-      design/kernel-proofs.md (new invariant shapes; retire superseded
-      WpWakeup ProcInv notes).
+- [x] S3: myproc PROVEN (WpMyprocDecode/WpSconfMyproc/LinkMyproc; no spec
+      friction; noff_push_pop_id exact with no bounds; load-address
+      reconciliation = assoc/comm + one vm_compute pid_lock+48 = cpus).
+- [x] S4: sched PROVEN (WpSchedDecode/WpSconfSched/LinkSched; no spec
+      friction — the p_sched round trip closed exactly as designed; the
+      reconciliation core is `sched_reconcile{,2}` pulling `mycpu_a5
+      cid_word` out front so the rest closes by vm_compute on constants;
+      arity note: p_sched/cpu_cells/proc_held take only γs-side args,
+      procs_inv/proc_lock_res/sched_vc take (γ root_ppn Φ γs)).
+- [x] S5: yield PROVEN (WpYieldDecode/WpSconfYield/LinkYield; no
+      Admitted/Axiom).  `own_ctx` currently lives in SpecSched.v — move to
+      SwtchCtx.v at the next SwtchCtx touch.
+- [x] S6: full clean build green (make -j16, zero Errors); durable lessons
+      lifted into design/kernel-proofs.md (new swtch/valid_context shape,
+      scheduler-chain protocol, ▷-slot lock invariant, cur_proc/cid_word,
+      set-chain peel + named-assert callee_saved discipline).
+
+Remaining cleanup (small, unowned): move `own_ctx` from SpecSched.v into
+SwtchCtx.v; consider a `wp_cret_s_zca_r_later_pt` wrapper and a
+swconf-across-iNext helper (see S2b notes); check SpecCpuid (landed
+upstream mid-project) against the tp = cid_word convention.
 
 Future (out of scope): the scheduler() loop proof (consumes p_sched's first
 disjunct / supplies the second), sleep(), wiring cur_proc through wakeup to

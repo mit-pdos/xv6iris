@@ -201,7 +201,7 @@ into the separately-compilable `WpMemsetArray`.
   (`Import` is not transitive, so it must require the Spec directly).
 - **Pure spec vocabulary moves down into the Spec file.** `PGSIZEv`,
   `negPGSIZEv` and `prun` moved out of `WpSconfFreerange`'s section, and the
-  `wp_myproc_sconf` axiom out of `WpSconfWakeup`, because callers' *statements*
+  `wp_myproc_sconf_any` axiom out of `WpSconfWakeup`, because callers' *statements*
   mention them.
 - Spec files must not `Require Export` (the ssreflect-`by` propagation hazard in
   [`code-organization.md`](code-organization.md) applies here too).
