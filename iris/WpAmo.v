@@ -284,74 +284,9 @@ Section AmoTranslate.
     repeat f_equal; (try apply bv_eq); vm_compute; reflexivity.
   Qed.
 
-  Lemma exec_translate_TLB_miss_amo (vpn : mword 27) (mxr do_sum : bool) (asid : mword 16)
-        (region : PMA_Region) (menvcfg0 : mword 64) s :
-    subrange_vec_dec vpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec vpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out vpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    dev_addr (pte_paddr root_ppn) = false ->
-    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
-    register_lookup menvcfg s.(sregs) = menvcfg0 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec (translate_TLB_miss 39 asid root_ppn vpn
-            (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum tt) s
-      = Some (Ok (sdata_ppn_out vpn, PBMT_PMA, tt),
-              set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
-                               (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn asid)))).
-  Proof.
-    intros Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
-    unfold translate_TLB_miss. cbn zeta.
-    rewrite (exec_bind_Some _ _ _ _ _
-               (exec_pt_walk_amo_super vpn mxr do_sum region menvcfg0 s
-                  Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE)).
-    cbn match.
-    match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
-      assert (Hupd : exec (update_and_write_pte a wd p ac) s = Some (Ok None, s)) end.
-    { unfold update_and_write_pte.
-      match goal with |- context[update_PTE_Bits ?p ?ac] =>
-        replace (update_PTE_Bits p ac) with (@None (mword 64)) by (vm_compute; reflexivity) end.
-      cbn match. apply exec_returnm. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hupd). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_add_to_TLB_store_super root_ppn vpn asid s Hmvpn Hmppn)).
-    apply exec_returnm.
-  Qed.
 
 
 
-  Lemma exec_translate_TLB_hit_amo_super (vpn : mword 27) (mxr do_sum : bool) s :
-    exec (translate_TLB_hit 39 (mword_of_int 0 : mword 16) vpn (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
-            tt (tlb_hash (__id 39) vpn) (pw_tlb_entry root_ppn (mword_of_int 0))) s
-      = Some (Ok (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn, PBMT_PMA, tt), s).
-  Proof.
-    unfold translate_TLB_hit. cbn zeta.
-    match goal with |- context[check_PTE_permission ?ac ?pr ?mx ?ds ?fl ?ex ?ep] =>
-      assert (Hchk : exec (check_PTE_permission ac pr mx ds fl ex ep) s = Some (PTE_Check_Success tt, s))
-        by (destruct mxr, do_sum; vm_compute; reflexivity) end.
-    rewrite (exec_bind_Some _ _ _ _ _ Hchk). cbn match.
-    match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
-      assert (Hupd : exec (update_and_write_pte a wd p ac) s = Some (Ok None, s)) end.
-    { unfold update_and_write_pte.
-      match goal with |- context[update_PTE_Bits ?p ?ac] =>
-        replace (update_PTE_Bits p ac) with (@None (mword 64)) by (vm_compute; reflexivity) end.
-      cbn match. apply exec_returnm. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hupd). cbn match.
-    assert (Hpbmt : exec (tlb_get_pbmt (pw_tlb_entry root_ppn (mword_of_int 0))) s = Some (PBMT_PMA, s))
-      by (vm_compute; reflexivity).
-    rewrite (exec_bind_Some _ _ _ _ _ Hpbmt). apply exec_returnm.
-  Qed.
 
 
 

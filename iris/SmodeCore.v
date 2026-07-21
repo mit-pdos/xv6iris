@@ -457,25 +457,11 @@ Proof.
   f_equal. ring.
 Qed.
 
-Lemma bv_signed_testbit_low (n : N) (b : bv n) (i : Z) :
-  0 <= i < Z.of_N n ->
-  Z.testbit (bv_signed b) i = Z.testbit (bv_unsigned b) i.
-Proof.
-  intros Hi.
-  unfold bv_signed.
-  rewrite <- (Z.mod_pow2_bits_low (bv_swrap n (bv_unsigned b)) (Z.of_N n) i) by lia.
-  rewrite <- (Z.mod_pow2_bits_low (bv_unsigned b) (Z.of_N n) i) by lia.
-  f_equal.
-  pose proof (bv_swrap_mod n (bv_unsigned b)) as Hm.
-  unfold bv_modulus in Hm. exact Hm.
-Qed.
 
 (* The (symbolic) Sv39 output ppn for a 1GB superpage leaf with PTE ppn
    0x80000, for ANY in-region vpn: concat(0x80000[43:18], vpn[17:0]); the
    identity within the superpage.  (Local copy of WpSmodeGpr's sdata_ppn_out,
    which lives downstream of this file.) *)
-Definition sfetch_ppn_out (vpn : mword 27) : mword 44 :=
-  concat_vec (subrange_vec_dec (mword_of_int 0x80000 : mword 44) 43 18) (subrange_vec_dec vpn 17 0).
 
 (* [tlb_get_ppn] on the identity-superpage entry equals [sfetch_ppn_out].
    (Local copy of WpSmodeGpr's tlb_get_ppn_pw.) *)

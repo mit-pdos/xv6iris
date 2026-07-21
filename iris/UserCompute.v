@@ -72,26 +72,5 @@ Section UserCompute.
      premises are engine-supplied (transported to the post-increment
      state the engine instantiates [σ] at); the arm keeps PC and the
      untouched CSR fragments.  [E] is the ambient mask. *)
-  Definition retire_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      (g : regfile) : iProp Σ :=
-    (⌜u_step_pre σ va⌝ -∗
-     mstate_interp σ -∗
-     gpr_file g -∗
-     nextPC ↦ᵣ va -∗
-     user_pt_inv pt -∗
-     user_cfg C -∗
-     |={E}=>
-       ∃ (ib : mword 32) (s_x : mstate) (g' : regfile)
-         (va' : mword 64),
-         ⌜exec (run_hart_active 0) σ = Some (Step_Execute (Retire_Success tt, ib), s_x)⌝ ∗
-         ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
-         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
-            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
-         ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
-         mstate_interp s_x ∗
-         gpr_file g' ∗
-         nextPC ↦ᵣ va' ∗
-         user_pt_inv pt ∗
-         user_cfg C)%I.
 
 End UserCompute.

@@ -78,14 +78,6 @@ Proof.
 Qed.
 
 (* Sequencing with unit-result first action. *)
-Lemma run_bind0 {X} (m : M unit) (n : M X) s x s' :
-  run (Defs.bind0 m n) s x s' <->
-  (exists s1, run m s tt s1 /\ run n s1 x s').
-Proof.
-  unfold Defs.bind0. rewrite run_bind. split.
-  - intros (y & s1 & Hm & Hn). destruct y. eauto.
-  - intros (s1 & Hm & Hn). exists tt, s1. auto.
-Qed.
 
 
 

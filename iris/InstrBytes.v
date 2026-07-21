@@ -733,33 +733,7 @@ Section InstrBytes.
     iPureIntro. exact (Eqdep_dec.inj_pair2_eq_dec _ Decidable_eq_register _ r v1 v2 Heq).
   Qed.
 
-  Lemma mmode_config_split_half :
-    mmode_config (DfracOwn 1) ⊢
-      mmode_config (DfracOwn (1/2)) ∗ mmode_config (DfracOwn (1/2)).
-  Proof.
-    iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL)".
-    iDestruct "Hhs" as "[Hhs1 Hhs2]".
-    iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
-    iDestruct "Hms" as "[Hms1 Hms2]".
-    iSplitL "Hhs1 Hpriv1 Hms1".
-    - iFrame "Hhw Hinv Hhs1 Hpriv1". iExists ms0. iFrame "Hms1 %".
-    - iFrame "Hhw Hinv Hhs2 Hpriv2". iExists ms0. iFrame "Hms2 %".
-  Qed.
 
-  Lemma mmode_config_combine_half :
-    mmode_config (DfracOwn (1/2)) -∗ mmode_config (DfracOwn (1/2)) -∗
-    mmode_config (DfracOwn 1).
-  Proof.
-    iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1) (_ & _ & Hhs2 & Hpriv2 & Hmst2)".
-    iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL)".
-    iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
-    iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %<-.
-    iCombine "Hhs1 Hhs2" as "Hhs".
-    iCombine "Hpriv1 Hpriv2" as "Hpriv".
-    iCombine "Hms1 Hms2" as "Hms".
-    iFrame "Hhw Hinv Hhs Hpriv". iExists ms0. iFrame "Hms %".
-  Qed.
 
   (* mmode_config_unbundle: expose the raw cells (and the mstatus invariant
      facts) of an [mmode_config].  Trivial destructuring -- provided so chains

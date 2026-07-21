@@ -452,38 +452,6 @@ Section WpSmodeIntr.
   (* proof is identical at either SIE value, and needs NO sret-target or  *)
   (* menvcfg premises (both derived inside the funnel).                   *)
   (* =================================================================== *)
-  Lemma wp_addi_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = wval ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m n -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp Hwval) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rs1 rs1
-              (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) wval m n
-              Hrd Hrdsp _
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_addi_val. rewrite Hva Hwval. reflexivity.
-  Qed.
 
   Lemma wp_cli_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6) (wval : mword 64)

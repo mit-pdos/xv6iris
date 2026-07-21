@@ -796,45 +796,6 @@ End UserMemPtInstances.
 (*    [udata_own] with [udata_own_store_4].                               *)
 (* ===================================================================== *)
 
-Lemma exec_pmpCheck_user_grant_amo (a : mword 64) (width : Z) s :
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-    (uint a) (uint (to_bits 64 width)) = PMP_Match ->
-  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  exec (pmpCheck (Physaddr a) width (Atomic (AMOSWAP, Data, Data)) User) s = Some (None, s).
-Proof.
-  intros HA Hord Hrange HR HW.
-  unfold pmpCheck. rewrite exec_catch_early_return.
-  replace (Z.eqb sys_pmp_count 0) with false by (vm_compute; reflexivity). cbn zeta.
-  rewrite execR_bind0.
-  match goal with |- context[foreach_ZM_up ?F ?T ?S ?V ?B] =>
-    assert (Hfe : execR (foreach_ZM_up F T S V B) s = Some (inl None, s)) end.
-  { unfold foreach_ZM_up. cbn [foreach_ZM_up'].
-    rewrite execR_bind.
-    rewrite execR_bind. rewrite execR_returnR. cbn match.
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pmpcfg_n s)). cbn beta.
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpReadAddrReg_val 0 s)). cbn beta.
-    rewrite (execR_liftR_seq _ _ _ _ _
-               (exec_pmpMatchAddr_TOR_match a (to_bits 64 width)
-                  (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
-                  (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)
-                  (zeros' 64) s HA Hord Hrange)). cbn beta.
-    cbn match.
-    unfold or_boolM.
-    rewrite execR_bind.
-    rewrite (execR_liftR_seq _ _ _ _ _
-               (_ : exec (pmpCheckRWX (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
-                            (Atomic (AMOSWAP, Data, Data))) s = Some (true, s))).
-    2:{ unfold pmpCheckRWX. cbn match. rewrite HR HW. apply exec_returnm. }
-    cbn match. rewrite execR_returnR. cbn beta.
-    cbn match. rewrite execR_bind. rewrite execR_returnR. cbn match.
-    unfold early_return, throw. cbn [execR]. cbn match. reflexivity. }
-  rewrite Hfe. cbn match. reflexivity.
-Qed.
 
 Section UserMemPtAmo.
   Context `{!riscvGS Σ}.

@@ -216,77 +216,6 @@ Section WpPushOffMem.
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 4) s = Some (false, s).
   Hypothesis Hdev : dev_addr pa = false.
 
-  Lemma exec_vmem_write_addr_4_S :
-    exec (vmem_write_addr (Virtaddr a) 4 data (Store Data) false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 4 data) s.(mdev)).
-  Proof.
-    unfold vmem_write_addr.
-    rewrite exec_catch_early_return.
-    rewrite Halign. cbn [Riscv.rv64d.not negb].
-    assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
-                            liftR (split_misaligned (Virtaddr a) 4)) s = Some (inr (1, 4), s)).
-    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_4 (Virtaddr a) s Halign). reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-    rewrite misaligned_order_1.
-    match goal with
-    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-      assert (Hu : execR (Defs.untilMT vs m c b) s
-                   = Some (inr (true, 0%Z, true), MState s.(sregs) (write_bytes s.(mem) pa 4 data) s.(mdev)))
-    end.
-    { eapply execR_untilMT_1.
-      - reflexivity.
-      - cbn match.
-        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-        cbn [bits_of_virtaddr] in *. cbn match.
-        assert (Hsc : exec (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") s
-                      = Some (tt, s)) by reflexivity.
-        assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51")
-                              : Defs.monadR (result bool ExecutionResult) exception unit) s = Some (inr tt, s))
-          by (rewrite execR_liftR; rewrite Hsc; reflexivity).
-        match goal with
-        | |- context [ Defs.bind (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) ?post ] =>
-            assert (Hwrloop : execR (Defs.bind0 (Defs.liftR asrt) Nbody) s
-                             = Some (inr true, MState s.(sregs) (write_bytes s.(mem) pa 4 data) s.(mdev)))
-        end.
-        { match goal with
-          | |- execR (Defs.bind0 _ ?Nbody) s = _ => set (NN := Nbody)
-          end.
-          rewrite (execR_bind0_Some _ _ _ _ Hscm).
-          unfold NN; clear NN.
-          match goal with
-          | |- execR (match _ as x in bool return @?P x with | true => _ | false => ?B end) ?ss = ?R =>
-              change (execR B ss = R)
-          end.
-          rewrite (execR_liftR_seq _ _ _ _ _ (exec_mem_write_ea_4 (zero_extend' 64 (add_vec_int a (0*4))) s)).
-          cbn match.
-          match goal with
-          | |- context [ mem_write_value ?pp 4 ?D (Store Data) ?pb false false false ] =>
-              replace D with data
-          end.
-          2: { symmetry.
-               change (4*(0+1)*8-1) with 31. change (4*0*8) with 0. change (4*8) with 32.
-               change (31 - 0 + 1) with 32. rewrite autocast_id.
-               unfold subrange_vec_dec. change (31 - 0 + 1) with 32. rewrite autocast_id.
-               unfold to_word_idx, to_word, get_word, MachineWord.slice.
-               rewrite MachineWord.cast_idx_refl.
-               apply bv_eq. rewrite bv_extract_unsigned.
-               change (Z.of_N (MachineWord.Z_idx 0)) with 0. rewrite Z.shiftr_0_r.
-               apply bv_wrap_bv_unsigned. }
-          rewrite (execR_liftR_seq _ _ _ _ _
-            (exec_mem_write_value_4_S PBMT_PMA (zero_extend' 64 (add_vec_int a (0*4))) region data
-               (register_lookup mstatus s.(sregs)) s HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev eq_refl Hmprv Hcp)).
-          cbn match.
-          apply execR_returnR_fwd. }
-        rewrite (execR_bind_Some _ _ _ _ _ Hwrloop).
-        cbn.
-        apply execR_returnR_fwd.
-      - apply execR_returnR_fwd. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hu).
-    cbn. reflexivity.
-  Qed.
   End SWS4.
 
   (* ---- width-4 register-generic vmem_write (HIT) ---- *)
@@ -398,79 +327,6 @@ Section WpPushOffMem.
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 4) s' = Some (false, s').
   Hypothesis Hdev : dev_addr pa = false.
 
-  Lemma exec_vmem_write_addr_4_S_walk :
-    exec (vmem_write_addr (Virtaddr a) 4 data (Store Data) false false false) s
-      = Some (Ok true, MState s'.(sregs) (write_bytes s.(mem) pa 4 data) s'.(mdev)).
-  Proof.
-    unfold vmem_write_addr.
-    rewrite exec_catch_early_return.
-    rewrite Halign. cbn [Riscv.rv64d.not negb].
-    assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
-                            liftR (split_misaligned (Virtaddr a) 4)) s = Some (inr (1, 4), s)).
-    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_4 (Virtaddr a) s Halign). reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-    rewrite misaligned_order_1.
-    match goal with
-    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-      assert (Hu : execR (Defs.untilMT vs m c b) s
-                   = Some (inr (true, 0%Z, true), MState s'.(sregs) (write_bytes s.(mem) pa 4 data) s'.(mdev)))
-    end.
-    { eapply execR_untilMT_1.
-      - reflexivity.
-      - cbn match.
-        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-        cbn [bits_of_virtaddr] in *. cbn match.
-        assert (Hsc : exec (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") s'
-                      = Some (tt, s')) by reflexivity.
-        assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51")
-                              : Defs.monadR (result bool ExecutionResult) exception unit) s' = Some (inr tt, s'))
-          by (rewrite execR_liftR; rewrite Hsc; reflexivity).
-        match goal with
-        | |- context [ Defs.bind (Defs.bind0 (Defs.liftR ?asrt) ?Nbody) ?post ] =>
-            assert (Hwrloop : execR (Defs.bind0 (Defs.liftR asrt) Nbody) s'
-                             = Some (inr true, MState s'.(sregs) (write_bytes s.(mem) pa 4 data) s'.(mdev)))
-        end.
-        { match goal with
-          | |- execR (Defs.bind0 _ ?Nbody) s' = _ => set (NN := Nbody)
-          end.
-          rewrite (execR_bind0_Some _ _ _ _ Hscm).
-          unfold NN; clear NN.
-          match goal with
-          | |- execR (match _ as x in bool return @?P x with | true => _ | false => ?B end) ?ss = ?R =>
-              change (execR B ss = R)
-          end.
-          rewrite (execR_liftR_seq _ _ _ _ _ (exec_mem_write_ea_4 (zero_extend' 64 (add_vec_int a (0*4))) s')).
-          cbn match.
-          match goal with
-          | |- context [ mem_write_value ?pp 4 ?D (Store Data) ?pb false false false ] =>
-              replace D with data
-          end.
-          2: { symmetry.
-               change (4*(0+1)*8-1) with 31. change (4*0*8) with 0. change (4*8) with 32.
-               change (31 - 0 + 1) with 32. rewrite autocast_id.
-               unfold subrange_vec_dec. change (31 - 0 + 1) with 32. rewrite autocast_id.
-               unfold to_word_idx, to_word, get_word, MachineWord.slice.
-               rewrite MachineWord.cast_idx_refl.
-               apply bv_eq. rewrite bv_extract_unsigned.
-               change (Z.of_N (MachineWord.Z_idx 0)) with 0. rewrite Z.shiftr_0_r.
-               apply bv_wrap_bv_unsigned. }
-          assert (Hmem' : s'.(mem) = s.(mem)) by reflexivity.
-          rewrite (execR_liftR_seq _ _ _ _ _
-            (exec_mem_write_value_4_S PBMT_PMA (zero_extend' 64 (add_vec_int a (0*4))) region data
-               (register_lookup mstatus s'.(sregs)) s' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev eq_refl Hmprv Hcp)).
-          cbn match.
-          rewrite Hmem'.
-          apply execR_returnR_fwd. }
-        rewrite (execR_bind_Some _ _ _ _ _ Hwrloop).
-        cbn.
-        apply execR_returnR_fwd.
-      - apply execR_returnR_fwd. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hu).
-    cbn. reflexivity.
-  Qed.
   End SWS4walk.
 
   (* ---- width-4 register-generic vmem_write WALK ---- *)
@@ -676,46 +532,6 @@ Section WpPushOffMem.
   Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-  Lemma exec_vmem_read_addr_4_S :
-    exec (vmem_read_addr (Virtaddr a) 4 (Load Data) false false false) s
-      = Some (Ok data2, s).
-  Proof.
-    unfold vmem_read_addr.
-    rewrite exec_catch_early_return.
-    rewrite Halign. cbn [Riscv.rv64d.not negb].
-    assert (Hinner : execR (returnR (result (mword (4 * 8)) ExecutionResult) tt >>
-                            liftR (split_misaligned (Virtaddr a) 4)) s = Some (inr (1, 4), s)).
-    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_4 (Virtaddr a) s Halign). reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-    rewrite misaligned_order_1.
-    match goal with
-    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (data2, true, 0), s))
-    end.
-    { eapply execR_untilMT_1.
-      - reflexivity.
-      - cbn match.
-        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-        cbn [bits_of_virtaddr] in *. cbn match.
-        match goal with
-        | |- execR (Defs.bind ?mrm ?post) s = _ =>
-          assert (Hmrm : execR mrm s = Some (inr data2, s))
-        end.
-        { rewrite (execR_liftR_seq _ _ _ _ _
-            (exec_mem_read_load_4_S PBMT_PMA pa region v (register_lookup mstatus s.(sregs)) s
-               HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes eq_refl Hmprv Hcp)).
-          cbn match.
-          rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-          rewrite autocast_id. apply execR_returnR_fwd. }
-        rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
-        cbn. apply execR_returnR_fwd.
-      - apply execR_returnR_fwd. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hu).
-    cbn. rewrite autocast_id. reflexivity.
-  Qed.
   End RWS4.
 
   (* ---- width-4 register-generic vmem_read (HIT) ---- *)
@@ -836,48 +652,6 @@ Section WpPushOffMem.
   Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-  Lemma exec_vmem_read_addr_4_S_walk :
-    exec (vmem_read_addr (Virtaddr a) 4 (Load Data) false false false) s
-      = Some (Ok data2, s').
-  Proof.
-    assert (Hbytes' : forall j : nat, (N.of_nat j < 4)%N ->
-              s'.(mem) !! (pa_add pa j) = Some (nth_byte v j)) by exact Hbytes.
-    unfold vmem_read_addr.
-    rewrite exec_catch_early_return.
-    rewrite Halign. cbn [Riscv.rv64d.not negb].
-    assert (Hinner : execR (returnR (result (mword (4 * 8)) ExecutionResult) tt >>
-                            liftR (split_misaligned (Virtaddr a) 4)) s = Some (inr (1, 4), s)).
-    { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-      rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_4 (Virtaddr a) s Halign). reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-    rewrite misaligned_order_1.
-    match goal with
-    | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (data2, true, 0), s'))
-    end.
-    { eapply execR_untilMT_1.
-      - reflexivity.
-      - cbn match.
-        assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-        rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-        rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-        cbn [bits_of_virtaddr] in *. cbn match.
-        match goal with
-        | |- execR (Defs.bind ?mrm ?post) s' = _ =>
-          assert (Hmrm : execR mrm s' = Some (inr data2, s'))
-        end.
-        { rewrite (execR_liftR_seq _ _ _ _ _
-            (exec_mem_read_load_4_S PBMT_PMA pa region v (register_lookup mstatus s'.(sregs)) s'
-               HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes' eq_refl Hmprv' Hcp')).
-          cbn match.
-          rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s')).
-          rewrite autocast_id. apply execR_returnR_fwd. }
-        rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
-        cbn. apply execR_returnR_fwd.
-      - apply execR_returnR_fwd. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hu).
-    cbn. rewrite autocast_id. reflexivity.
-  Qed.
   End RWS4walk.
 
   (* ---- width-4 register-generic vmem_read WALK ---- *)
@@ -990,11 +764,6 @@ Section WpPushOffMem.
       iModIntro. iFrame "Ha Hrest Hm".
   Qed.
 
-  Lemma upd_window_4 (mm : _) (pa : Arch.pa) (vnew vold : bv 32) :
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ ([∗ list] j ∈ seq 0 4, (pa_add pa j) ↦ₘ nth_byte vold j) ==∗
-    gen_heap_interp (hG:=riscv_memGS) (write_bytes mm pa 4 vnew)
-      ∗ ([∗ list] j ∈ seq 0 4, (pa_add pa j) ↦ₘ nth_byte vnew j).
-  Proof. unfold write_bytes. change (N.to_nat 4) with 4%nat. apply upd_window_bw. Qed.
 
   (* ------------------------------------------------------------------- *)
   (* c.sw rs2, imm(rs1) -- 4-byte store through a GENERAL base register,   *)

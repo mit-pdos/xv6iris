@@ -92,31 +92,6 @@ Section UserArms.
   (* The post-execute nextPC [va'] is whatever execute left there (the      *)
   (* trap tower overwrites it with the handler base).                       *)
   (* ------------------------------------------------------------------- *)
-  Definition execute_trap_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      (g : regfile) : iProp Σ :=
-    (⌜u_step_pre σ va⌝ -∗
-     mstate_interp σ -∗
-     gpr_file g -∗
-     nextPC ↦ᵣ va -∗
-     user_pt_inv pt -∗
-     user_cfg C -∗
-     |={E}=>
-       ∃ (ib : mword 32) (s_x : mstate) (g' : regfile)
-         (e : ExceptionType) (xv pcx va' : mword 64),
-         ⌜exec (run_hart_active 0) σ
-            = Some (Step_Execute
-                      (rv64d_types.Trap (User, make_sync_exception e xv, pcx), ib),
-                    s_x)⌝ ∗
-         ⌜user_exc e = true⌝ ∗
-         ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
-         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
-            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
-         ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
-         mstate_interp s_x ∗
-         gpr_file g' ∗
-         nextPC ↦ᵣ va' ∗
-         user_pt_inv pt ∗
-         user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
   (* The EXECUTE-TRAP arm: run the delegated trap tower at the             *)
@@ -133,23 +108,6 @@ Section UserArms.
   (* borrowed for the reads.  The ADUE-sensitive flavor corollaries        *)
   (* (UserFetch.v) are what discharge this; the arm below is cause-generic.*)
   (* ------------------------------------------------------------------- *)
-  Definition fetch_fault_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      : iProp Σ :=
-    (⌜u_step_pre σ va⌝ -∗
-     mstate_interp σ -∗
-     user_pt_inv pt -∗
-     user_cfg C -∗
-     |={E}=>
-       ∃ (s_f : mstate) (e : ExceptionType) (xv : mword 64),
-         ⌜exec (run_hart_active 0) σ
-            = Some (Step_Fetch_Failure (Virtaddr xv, e), s_f)⌝ ∗
-         ⌜user_exc e = true⌝ ∗
-         ⌜register_lookup hart_state s_f.(sregs) = HART_ACTIVE tt⌝ ∗
-         ⌜register_lookup (R_bool minstret_increment) s_f.(sregs)
-            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
-         mstate_interp s_f ∗
-         user_pt_inv pt ∗
-         user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
   (* The FETCH-FAULT arm: [handle_exception] runs the same delegated trap  *)
@@ -166,25 +124,6 @@ Section UserArms.
   (* FIXED (E_Illegal_Instr, delegated by [uc_del]); the tval is the       *)
   (* instruction bits, supplied by try_step's dedicated arm.               *)
   (* ------------------------------------------------------------------- *)
-  Definition illegal_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      : iProp Σ :=
-    (⌜u_step_pre σ va⌝ -∗
-     mstate_interp σ -∗
-     nextPC ↦ᵣ va -∗
-     user_pt_inv pt -∗
-     user_cfg C -∗
-     |={E}=>
-       ∃ (ib : mword 32) (s_x : mstate) (va' : mword 64),
-         ⌜exec (run_hart_active 0) σ
-            = Some (Step_Execute (Illegal_Instruction tt, ib), s_x)⌝ ∗
-         ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗
-         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
-            = register_lookup (R_bool minstret_increment) σ.(sregs)⌝ ∗
-         ⌜register_lookup nextPC s_x.(sregs) = va'⌝ ∗
-         mstate_interp s_x ∗
-         nextPC ↦ᵣ va' ∗
-         user_pt_inv pt ∗
-         user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
   (* The ILLEGAL arm: try_step's Illegal_Instruction arm runs the          *)
@@ -200,22 +139,6 @@ Section UserArms.
   (* shape, the gpr file is untouched but nextPC moved (the pre-execute    *)
   (* write) and the fetch may have filled the TLB.                         *)
   (* ------------------------------------------------------------------- *)
-  Definition enter_wait_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      : iProp Σ :=
-    (⌜u_step_pre σ va⌝ -∗
-     mstate_interp σ -∗
-     nextPC ↦ᵣ va -∗
-     user_pt_inv pt -∗
-     user_cfg C -∗
-     |={E}=>
-       ∃ (wr : WaitReason) (ib : mword 32) (s_x : mstate) (va' : mword 64),
-         ⌜exec (run_hart_active 0) σ
-            = Some (Step_Execute (Enter_Wait wr, ib), s_x)⌝ ∗
-         ⌜wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO⌝ ∗
-         mstate_interp s_x ∗
-         nextPC ↦ᵣ va' ∗
-         user_pt_inv pt ∗
-         user_cfg C)%I.
 
   (* ------------------------------------------------------------------- *)
   (* The ENTER-WAIT arm: hart_state := HART_WAITING (wr, ib); NO pc tick,  *)

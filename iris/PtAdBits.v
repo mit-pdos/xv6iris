@@ -169,32 +169,8 @@ Proof.
 Qed.
 
 (* the R/W/X flags are untouched, hence so is leaf-ness *)
-Lemma pte_set_ad_flag_R (w : mword 64) (a d : mword 1) :
-  _get_PTE_Flags_R (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
-  = _get_PTE_Flags_R (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
-Proof.
-  unfold _get_PTE_Flags_R, Mk_PTE_Flags,
-    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
-  mw_prep. tb1.
-Qed.
 
-Lemma pte_set_ad_flag_W (w : mword 64) (a d : mword 1) :
-  _get_PTE_Flags_W (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
-  = _get_PTE_Flags_W (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
-Proof.
-  unfold _get_PTE_Flags_W, Mk_PTE_Flags,
-    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
-  mw_prep. tb1.
-Qed.
 
-Lemma pte_set_ad_flag_X (w : mword 64) (a d : mword 1) :
-  _get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
-  = _get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
-Proof.
-  unfold _get_PTE_Flags_X, Mk_PTE_Flags,
-    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
-  mw_prep. tb1.
-Qed.
 
 Lemma pte_set_ad_flag_G (w : mword 64) (a d : mword 1) :
   _get_PTE_Flags_G (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))

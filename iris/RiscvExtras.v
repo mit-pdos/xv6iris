@@ -310,56 +310,8 @@ Qed.
 
 (* svpn[26:18] = 2 for a RAM address (a[38:30] = 2), i.e. it selects the
    level-2 gigapage PTE slot 2 for the identity map. *)
-Lemma ram_svpn2 (a : mword 64) :
-  addr_is_ram a ->
-  subrange_vec_dec (svpn_of a) 26 18 = (mword_of_int 2 : mword 9).
-Proof.
-  intros Hram. pose proof Hram as [Hlo Hhi].
-  rewrite uint_unsigned in Hlo, Hhi. unfold ram_base, ram_size in *.
-  apply bv_eq.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  change (MachineWord.MachineWord.Z_idx 18) with 18%N.
-  rewrite bv_extract_unsigned.
-  rewrite (svpn_of_unsigned a Hram).
-  change (MachineWord.MachineWord.Z_idx (26 - 18 + 1)) with 9%N.
-  assert (Hrhs : bv_unsigned (mword_of_int 2 : mword 9) = 2) by (vm_compute; reflexivity).
-  rewrite Hrhs. rewrite uint_unsigned.
-  rewrite (Z.shiftr_shiftr (bv_unsigned a) 12 18 ltac:(lia)).
-  change (12 + 18) with 30.
-  rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 30 ltac:(lia)).
-  change (2 ^ 30) with 1073741824.
-  assert (bv_unsigned a / 1073741824 = 2) as ->.
-  { assert (2 <= bv_unsigned a / 1073741824) by (apply Z.div_le_lower_bound; lia).
-    assert (bv_unsigned a / 1073741824 < 3) by (apply Z.div_lt_upper_bound; lia). lia. }
-  vm_compute. reflexivity.
-Qed.
 
 (* clearing the low 18 bits of a value < 2^27 keeps only bits [26:18]. *)
-Lemma land_clear_low18 (y : Z) :
-  0 <= y < 134217728 ->
-  Z.land y 133955584 = Z.shiftl (Z.shiftr y 18) 18.
-Proof.
-  intros Hy. apply Z.bits_inj'. intros i Hi.
-  assert (Hmm : 133955584 = Z.shiftl (Z.ones 9) 18) by (vm_compute; reflexivity).
-  rewrite Hmm.
-  rewrite Z.land_spec.
-  rewrite (Z.shiftl_spec (Z.ones 9) 18 i ltac:(lia)).
-  rewrite (Z.shiftl_spec (Z.shiftr y 18) 18 i ltac:(lia)).
-  destruct (Z.leb_spec 18 i) as [Hge|Hlt].
-  - rewrite (Z.shiftr_spec y 18 (i - 18) ltac:(lia)).
-    replace (i - 18 + 18) with i by lia.
-    rewrite (Z.testbit_ones_nonneg 9 (i - 18) ltac:(lia) ltac:(lia)).
-    destruct (i - 18 <? 9) eqn:Hb.
-    + apply andb_true_r.
-    + rewrite andb_false_r. symmetry. apply Z.ltb_ge in Hb.
-      assert (Hylt : y < 2 ^ 27) by (change (2 ^ 27) with 134217728; lia).
-      exact (proj1 (Z.bounded_iff_bits_nonneg 27 y ltac:(lia) ltac:(lia)) Hylt i ltac:(lia)).
-  - rewrite (Z.testbit_neg_r (Z.ones 9) (i - 18) ltac:(lia)).
-    rewrite (Z.testbit_neg_r (Z.shiftr y 18) (i - 18) ltac:(lia)).
-    apply andb_false_r.
-Qed.
 
 (* superpage mask fact (VPN side): masking svpn's in-superpage bits gives the
    0x80000 gigapage prefix. *)
@@ -370,27 +322,6 @@ Qed.
    it 8-aligned -- used to derive every non-slot-0 saved-register-slot
    address's alignment from slot 0's (kernelvec/kerneltrap), instead of
    requiring each slot's alignment as an independent hypothesis. *)
-Lemma align8_add_offset_unsigned (x off : mword 64) (k : Z) :
-  bv_unsigned off = 8 * k ->
-  Z.rem (bv_unsigned x) 8 = 0 ->
-  Z.rem (bv_unsigned (add_vec x off)) 8 = 0.
-Proof.
-  intros Hoff H.
-  apply Zrem_divides in H. destruct H as [k' Hk'].
-  cbv [add_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word to_word get_word MachineWord.MachineWord.add].
-  apply Zrem_divides.
-  rewrite bv_add_unsigned. unfold bv_wrap, bv_modulus.
-  rewrite Hk' Hoff.
-  replace (8 * k' + 8 * k) with (8 * (k' + k)) by ring.
-  change (Z.of_N 64) with 64.
-  replace (2 ^ 64) with (8 * 2305843009213693952) by (vm_compute; reflexivity).
-  assert (Hmm : (8 * (k' + k)) mod (8 * 2305843009213693952)
-                = 8 * ((k' + k) mod 2305843009213693952)).
-  { apply Z.mul_mod_distr_l; lia. }
-  rewrite Hmm.
-  eexists. reflexivity.
-Qed.
 
 
 
@@ -487,10 +418,6 @@ Qed.
 (* Leaf 2: rX / rX_bits read leaf for x2 (sp), mirroring run_rX_x10.        *)
 
 (* --- x2 (sp) register-write leaves (shared by AUIPC and LOAD, both write rd=x2). --- *)
-Lemma wX_x2_eq (v : mword 64) :
-  wX (Regno 2) v
-  = Defs.bind0 (Defs.write_reg (R_bitvector_64 x2) (regval_into_reg v)) (returnM tt).
-Proof. reflexivity. Qed.
 
 
 

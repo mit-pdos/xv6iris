@@ -221,23 +221,6 @@ Lemma exec_csr_id_write_callback_mscratch (d : mword 64) s :
   exec (csr_id_write_callback csr_mscratch d) s = Some (tt, s).
 Proof. assert (H : csr_id_write_callback csr_mscratch d = returnM tt) by (vm_compute; reflexivity).
   rewrite H. apply exec_returnM. Qed.
-Lemma exec_execute_csrw_mscratch (rs1 : mword 5) s :
-  uint rs1 <> 0 -> register_lookup cur_privilege s.(sregs) = Machine ->
-  exec (execute_CSRReg csr_mscratch (Regidx rs1) zreg CSRRW) s
-    = Some (RETIRE_SUCCESS, set_reg s mscratch (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))).
-Proof. intros Hrs1 Hpriv.
-  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-    with (if Z.eqb (uint rs1) 0 then zero_reg
-          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-    by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
-  apply (exec_execute_csrw_gpr csr_mscratch rs1 s _
-           (if Z.eqb (uint rs1) 0 then zero_reg
-            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))).
-  - exact Hpriv.
-  - apply (exec_check_CSR_result_csrw_pure csr_mscratch s);
-      [ vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity ].
-  - vm_compute; reflexivity. - vm_compute; reflexivity. - vm_compute; reflexivity.
-  - apply exec_write_CSR_mscratch. - apply exec_csr_id_write_callback_mscratch. Qed.
 
 Lemma exec_hartSupports_Sv32 s : exec (hartSupports Ext_Sv32) s = Some (false, s).
 Proof.

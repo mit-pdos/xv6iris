@@ -6590,53 +6590,6 @@ Qed.
 (* ===================================================================== *)
 (* Width-generic AMO read DENY (op != AMOSWAP): mem_read = Err, no bytes.  *)
 (* ===================================================================== *)
-Lemma exec_mem_read_amo_deny (op : amoop) (aq rl : bool) (width : Z) (pbmt : page_based_mem_type) (addr : mword 64)
-    (region : PMA_Region) s :
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-    (uint addr) (uint (to_bits 64 width)) = PMP_Match ->
-  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) width = Some region ->
-  is_aligned_paddr (Physaddr addr) width = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support) = AMOSwap ->
-  generic_eq op AMOSWAP = false ->
-  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
-  register_lookup cur_privilege s.(sregs) = User ->
-  exec (mem_read (Atomic (op, Data, Data)) pbmt (Physaddr addr) width aq (andb aq rl) true) s
-    = Some (Err (E_SAMO_Access_Fault tt), s).
-Proof.
-  intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hsupp Hsw Hmprv Hpriv.
-  unfold mem_read.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite Hpriv.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_amo_nm op _ _ s Hmprv)).
-  unfold mem_read_priv.
-  assert (Hcmr : exec (checked_mem_read (Atomic (op, Data, Data)) pbmt User (Physaddr addr) width aq (andb aq rl) true false) s
-                 = Some (Err (E_SAMO_Access_Fault tt), s)).
-  { unfold checked_mem_read.
-    assert (Hpac : exec (phys_access_check (Atomic (op, Data, Data)) pbmt User (Physaddr addr) width true) s
-                   = Some (Some (E_SAMO_Access_Fault tt), s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_amo_g width op addr s HA Hord Hrange HR HW)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_amo_gk width op addr pbmt region s Hmatch Halign Hread Hwrite Hsupp)).
-      rewrite Hsw. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac). cbn match. apply exec_returnM. }
-  assert (Hmrpm : exec (mem_read_priv_meta (Atomic (op, Data, Data)) pbmt User (Physaddr addr) width aq (andb aq rl) true false) s
-                 = Some (Err (E_SAMO_Access_Fault tt), s)).
-  { unfold mem_read_priv_meta.
-    destruct aq;
-      (rewrite Halign; cbn [Riscv.rv64d.not negb orb andb]; cbn match;
-       rewrite (exec_bind_Some _ _ _ _ _ Hcmr); cbn match; apply exec_returnM). }
-  rewrite (exec_bind_Some _ _ _ _ _ Hmrpm).
-  cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
-Qed.
 
 (* ===================================================================== *)
 (* addr_is_ram at any data address (from udata_own), + width-16 deny.      *)
@@ -6645,18 +6598,6 @@ Section AmoDeny16.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Lemma udata_ram_at (data : gset Arch.pa) (a : Arch.pa) :
-    a ∈ data ->
-    udata_own data -∗ ⌜addr_is_ram a⌝.
-  Proof.
-    intros Hin. iIntros "Hdata".
-    iDestruct "Hdata" as (dm) "[%Hdom Hbytes]".
-    assert (Hex : exists b, dm !! a = Some b).
-    { apply elem_of_dom. rewrite Hdom. exact Hin. }
-    destruct Hex as (b & Hb).
-    iDestruct (big_sepM_lookup _ _ a b Hb with "Hbytes") as "Ha".
-    iDestruct (mem_ram with "Ha") as %Hr. iPureIntro. exact Hr.
-  Qed.
 
 
 End AmoDeny16.

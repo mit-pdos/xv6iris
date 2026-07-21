@@ -75,9 +75,6 @@ Section WpMemsetS.
   (* =================================================================== *)
 
   (* register value as [rX_bits] reads it (x0 -> zero_reg). *)
-  Definition rvv (r : mword 5) (s : mstate) : mword 64 :=
-    if Z.eqb (uint r) 0 then zero_reg
-    else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s.(sregs).
 
   (* the comparison prefix of [execute_BTYPE] for BNE / BEQ evaluates to the
      boolean [taken], leaving the state unchanged. *)

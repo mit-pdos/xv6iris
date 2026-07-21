@@ -137,10 +137,6 @@ Proof.
 Qed.
 
 (* same represented map: what walk's tree-growing preserves *)
-Definition ptree_same_rep (t t' : ptree) : Prop :=
-  pt_base t' = pt_base t /\
-  (forall v p2 p1 p0, ptree_maps t v p2 p1 p0 <-> ptree_maps t' v p2 p1 p0) /\
-  (forall v, ptree_blocks t v <-> ptree_blocks t' v).
 
 
 

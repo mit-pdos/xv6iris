@@ -227,23 +227,6 @@ Proof.
 Qed.
 
 (* WpGprLogic.v : exec_execute_RTYPE_XOR_gpr *)
-Lemma exec_execute_RTYPE_XOR_gpr (rs2 rs1 rd : mword 5) s :
-  uint rd <> 0 ->
-  exec (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, XOR))) s
-  = Some (RETIRE_SUCCESS,
-          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-            (regval_into_reg (gpr_xor_val rs2 rs1 s))).
-Proof.
-  intro Hrd. unfold gpr_xor_val.
-  change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, XOR)))
-    with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) XOR).
-  eapply exec_execute_RTYPE_XOR.
-  - apply (exec_rX_bits_gpr rs1 s).
-  - apply (exec_rX_bits_gpr rs2 s).
-  - rewrite exec_wX_bits_gpr.
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    reflexivity.
-Qed.
 
 (* WpGprLogic.v-style : RTYPE SRL (register shift -- walk's loop-variable
    shift amount) *)
@@ -338,18 +321,6 @@ Proof.
 Qed.
 
 (* WpGprLogic.v : exec_execute_ITYPE_XORI_gpr *)
-Lemma exec_execute_ITYPE_XORI_gpr (rs1 rd : mword 5) (imm : mword 12) s :
-  exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, XORI))) s
-  = Some (RETIRE_SUCCESS,
-          if Z.eqb (uint rd) 0 then s
-          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (gpr_xori_val rs1 imm s))).
-Proof.
-  unfold gpr_xori_val.
-  eapply exec_execute_ITYPE_XORI.
-  - apply (exec_rX_bits_gpr rs1 s).
-  - apply (exec_wX_bits_gpr rd _ s).
-Qed.
 
 (* ====================================================================== *)
 (* The register-GENERIC RTYPE logic WPs: `<op> rd,rs1,rs2`, ANY triple     *)
@@ -1167,70 +1138,11 @@ Definition jalr_target (vrs1 : mword 64) (imm : mword 12) : mword 64 :=
    writes rd := link (nextPC), sets nextPC := target.  ANY rs1 (x0->zero_reg), rd<>0. *)
 
 (* WpGprJalr.v : exec_execute_JALR_gpr *)
-Lemma exec_execute_JALR_gpr (imm : mword 12) (rs1 rd : mword 5) s :
-  uint rd <> 0 ->
-  exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s) ->
-  eq_vec (access_vec_dec (jalr_target (jbase rs1 s) imm) 0) ('b"0") = true ->
-  bit_to_bool (access_vec_dec (jalr_target (jbase rs1 s) imm) 1) = false ->
-  exec (execute_JALR imm (Regidx rs1) (Regidx rd)) s
-  = Some (RETIRE_SUCCESS,
-          set_reg (set_reg s nextPC (jalr_target (jbase rs1 s) imm))
-                  (R_bitvector_64 (gpr_of_Z (uint rd)))
-                  (regval_into_reg (register_lookup nextPC s.(sregs)))).
-Proof.
-  intros Hrd Hzic Halign Hbit1. unfold jalr_target, jbase in *.
-  unfold execute_JALR.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.bind0 (update_elp_state (Regidx rs1)) (get_next_pc tt)) s
-                 = Some (register_lookup nextPC s.(sregs), s))).
-  2:{ rewrite (exec_bind0_Some _ _ _ _ _
-                (_ : exec (update_elp_state (Regidx rs1)) s = Some (tt, s))).
-      2:{ unfold update_elp_state. rewrite (exec_bind_Some _ _ _ _ _ Hzic). cbn match. apply exec_returnm. }
-      unfold get_next_pc. exact (exec_read_reg nextPC s). }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to _ s Halign Hbit1)).
-  cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _
-            (exec_wX_bits_gpr rd (register_lookup nextPC s.(sregs))
-                (set_reg s nextPC (update_vec_dec (add_vec
-                   (if Z.eqb (uint rs1) 0 then zero_reg
-                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-                   (sign_extend' 64 imm)) 0 ('b"0"))))).
-  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-  apply exec_returnm.
-Qed.
 
 (* ret = jalr x0, 0(ra): rd = x0 (uint 0) => NO link write; just PC := target.
    Kept as an exec-level fact (representation-independent). *)
 
 (* WpGprJalr.v : exec_execute_JALR_ret *)
-Lemma exec_execute_JALR_ret (imm : mword 12) (rs1 rdz : mword 5) s :
-  uint rs1 <> 0 -> uint rdz = 0 ->
-  exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s) ->
-  eq_vec (access_vec_dec (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0")) 0) ('b"0") = true ->
-  bit_to_bool (access_vec_dec (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0")) 1) = false ->
-  exec (execute_JALR imm (Regidx rs1) (Regidx rdz)) s
-  = Some (RETIRE_SUCCESS,
-          set_reg s nextPC (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0"))).
-Proof.
-  intros Hrs1 Hrdz Hzic Halign Hbit1.
-  unfold execute_JALR.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (Defs.bind0 (update_elp_state (Regidx rs1)) (get_next_pc tt)) s
-                 = Some (register_lookup nextPC s.(sregs), s))).
-  2:{ rewrite (exec_bind0_Some _ _ _ _ _
-                (_ : exec (update_elp_state (Regidx rs1)) s = Some (tt, s))).
-      2:{ unfold update_elp_state. rewrite (exec_bind_Some _ _ _ _ _ Hzic). cbn match. apply exec_returnm. }
-      unfold get_next_pc. exact (exec_read_reg nextPC s). }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to _ s Halign Hbit1)).
-  cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _
-            (exec_wX_bits_gpr rdz (register_lookup nextPC s.(sregs))
-                (set_reg s nextPC (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0"))))).
-  rewrite Hrdz. cbn match. apply exec_returnm.
-Qed.
 
 (* [exec_execute_JALR_ret] for a merely 2-aligned return target under the C
    extension: the model's misalignment check reduces via [exec_jump_to_zca],

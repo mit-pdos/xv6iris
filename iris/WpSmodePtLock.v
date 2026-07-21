@@ -22,21 +22,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* Local width-4 helpers (Local in WpSmodeLoad.v, so re-proved here). *)
-Local Lemma avi0_mul4 (a : mword 64) : add_vec_int a (0 * 4) = a.
-Proof. change (0 * 4) with 0. apply avi0. Qed.
 
-Local Lemma data2_id_4 (v : mword 32) :
-    update_subrange_vec_dec (zeros' (4*1*8)) (4*(0+1)*8-1) (4*0*8) v = v.
-Proof.
-    apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
-    erewrite bv_concat_unsigned by (cbn; lia).
-    erewrite bv_concat_unsigned by (cbn; lia).
-    rewrite !bv_unsigned_N_0.
-    rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r. rewrite Z.lor_0_r. rewrite Z.lor_0_l.
-    reflexivity.
-Qed.
 
 Section ExecAmoGS4walkPt.
   Variable rs2 rs1 rd : mword 5.
