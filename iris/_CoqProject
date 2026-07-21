@@ -220,7 +220,10 @@ WpSwtchSconf.v
 SchedCtx.v
 SpecMyproc.v
 WpMyprocDecode.v
+WpSconfMyproc.v
+LinkMyproc.v
 SpecSched.v
+WpSchedDecode.v
 SpecYield.v
 WpWakeup.v
 SpecWakeupLoop.v
