@@ -137,7 +137,6 @@ Local Lemma exec_execute_JALR_ret_zca (imm : mword 12) (rs1 rdz : mword 5) s :
 
 
 (* ---- Local helpers copied from WpSmodeCsr.v ---- *)
-Local Definition csr_sstatus : mword 12 := Ox"100".
 
 (* helper: exec_csr_id_write_callback_sstatus *)
 
@@ -164,88 +163,16 @@ Proof.
 Qed.
 
 (* helper: exec_have_nominal_privLevel *)
-Local Lemma exec_have_nominal_privLevel (priv : mword 2) s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (have_nominal_privLevel priv) s = Some (have_nom_val priv, s).
-Proof.
-  intros HU HS. unfold have_nominal_privLevel, have_nom_val.
-  destruct (eq_vec priv ('b"00")) eqn:E0.
-  - exact (exec_currentlyEnabled_U s HU).
-  - destruct (eq_vec priv ('b"01")) eqn:E1.
-    + rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
-    + apply exec_returnM.
-Qed.
 
 (* helper: exec_lowest_supported_privLevel *)
-Local Lemma exec_lowest_supported_privLevel s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (lowest_supported_privLevel tt) s = Some (User, s).
-Proof.
-  intro HU. unfold lowest_supported_privLevel.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_U s HU)). cbn match.
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_read_CSR_sstatus *)
 
 (* helper: exec_virtual_memory_supported *)
-Local Lemma exec_virtual_memory_supported s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (virtual_memory_supported tt) s = Some (true, s).
-Proof.
-  intro HS. unfold virtual_memory_supported. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_virtual_memory_supported]. unfold Defs.assert_exp'.
-  replace (Z.geb 3 0) with true by reflexivity. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  (* or_boolM (rec cE Sv32 2) (...) : reduce Sv32 -> false inline *)
-  match goal with |- context[_rec_currentlyEnabled Ext_Sv32 ?k ?a] =>
-    assert (H32 : exec (_rec_currentlyEnabled Ext_Sv32 k a) s = Some (false, s)) end.
-  { match goal with |- exec (_rec_currentlyEnabled Ext_Sv32 ?k ?a) s = _ => destruct a end.
-    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-    replace (Z.geb (Z.sub 3 1) 0) with true by reflexivity. cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Sv32 s)). reflexivity. }
-  rewrite (exec_or_boolM_Some _ _ _ _ _ H32). cbn match.
-  (* or_boolM (rec cE Sv39 2) (...) : reduce Sv39 -> true inline *)
-  match goal with |- context[_rec_currentlyEnabled Ext_Sv39 ?k ?a] =>
-    assert (H39 : exec (_rec_currentlyEnabled Ext_Sv39 k a) s = Some (true, s)) end.
-  { match goal with |- exec (_rec_currentlyEnabled Ext_Sv39 ?k ?a) s = _ => destruct a end.
-    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-    replace (Z.geb (Z.sub 3 1) 0) with true by reflexivity. cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Sv39 s)). cbn match.
-    (* rec cE S at reclimit 1 inline *)
-    match goal with |- context[_rec_currentlyEnabled Ext_S ?k ?a] =>
-      assert (HSm : exec (_rec_currentlyEnabled Ext_S k a) s
-                    = Some (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1"), s)) end.
-    { match goal with |- exec (_rec_currentlyEnabled Ext_S ?k ?a) s = _ => destruct a end.
-      cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-      replace (Z.geb (Z.sub (Z.sub 3 1) 1) 0) with true by reflexivity. cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_S s)). cbn match.
-      rewrite (exec_and_boolM_Some _ _ s
-                 (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) s).
-      2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s)). apply exec_returnM. }
-      destruct (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) eqn:Hb.
-      - match goal with |- context[_rec_currentlyEnabled Ext_Zicsr ?k2 ?a2] =>
-          exact (exec_rec_cE_Zicsr_any k2 a2 s ltac:(reflexivity)) end.
-      - reflexivity. }
-    rewrite HSm. rewrite HS. reflexivity. }
-  rewrite (exec_or_boolM_Some _ _ _ _ _ H39). reflexivity.
-Qed.
 
 (* helper: register_set_bv64_id *)
 
 (* helper: exec_currentlyEnabled_H_false *)
-Local Lemma exec_currentlyEnabled_H_false s : exec (currentlyEnabled Ext_H) s = Some (false, s).
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_H) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_H s)). reflexivity.
-Qed.
 
 (* helper: exec_legalize_mstatus *)
 

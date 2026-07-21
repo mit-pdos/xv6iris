@@ -518,48 +518,6 @@ Section TrampWalk.
     rewrite !autocast_id. reflexivity.
   Qed.
 
-  Lemma exec_rec_pt_walk_l1 (acc : Acc (Zwf 0) 1) :
-    exec (_rec_pt_walk 39 vpn access Supervisor mxr do_sum p1 1 false tt 1 acc) s
-    = Some (Ok (tramp_walk_out, tt), s).
-  Proof.
-    destruct acc.
-    cbn [_rec_pt_walk].
-    rewrite exec_catch_early_return.
-    assert (Hae1 : exec (Defs.assert_exp' (1 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
-      by (unfold Defs.assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
-      by (unfold Defs.assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
-    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
-      replace a with a1 by reflexivity;
-      replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_liftR_seq _ _ _ _ _
-               (exec_read_pte_S a1 region1 pte1 s
-                  HA Hord Hrange1 HR Hmatch1 (pte_addr_at_aligned8 p1 idx1) Hpte1 Hc1 Hsig1 Hh1 Hdev1 Hbytes1)).
-    match goal with |- context[Mk_PTE_Flags (@subrange_vec_dec ?w _ 7 0)] =>
-      change w with 64 end.
-    rewrite (mk_pte_flags p0 PTE_PTR ltac:(unfold PTE_PTR; lia)).
-    unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
-    rewrite (mk_pte_ext p0 PTE_PTR ltac:(unfold PTE_PTR; lia)).
-    assert (Hinv : exec (pte_is_invalid (Mk_PTE_Flags (mword_of_int PTE_PTR)) (Mk_PTE_Ext (mword_of_int 0))) s = Some (false, s))
-      by (vm_compute; reflexivity).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hinv).
-    cbn match.
-    replace (pte_is_non_leaf (Mk_PTE_Flags (mword_of_int PTE_PTR : mword 8))) with true
-      by (vm_compute; reflexivity).
-    cbv iota beta.
-    change (Z.gtb 1 0) with true. cbv iota beta.
-    replace (orb false (eq_vec (_get_PTE_Flags_G (Mk_PTE_Flags (mword_of_int PTE_PTR : mword 8))) ('b"1"))) with false
-      by (vm_compute; reflexivity).
-    unfold PPN_of_PTE. change (Z.eqb 64 32) with false. cbv iota beta.
-    rewrite (mk_pte_ppn_field p0 PTE_PTR ltac:(unfold PTE_PTR; lia)).
-    rewrite !autocast_id.
-    change (Z.sub 1 1) with 0.
-    rewrite execR_liftR.
-    rewrite exec_rec_pt_walk_l0.
-    reflexivity.
-  Qed.
 
 
   (* the whole 3-level walk. *)
