@@ -57,9 +57,6 @@ Qed.
 (* the byte offset for saved-register slot 0 (register index 0) is the
    literal 0, so adding it to any base is a noop -- used by the
    [kernelvec]/[kerneltrap] slot-0 (sp+0) address computation. *)
-Lemma add_vec_slot0_zero (x : mword 64) :
-  add_vec x (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = x.
-Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
 (* A 1-bit word that is not 1 is 0 -- the two-element case analysis on a
    [mword 1] (e.g. an [Mstatus.SIE]/[Mstatus.MIE] bit known to be not-set).
@@ -366,100 +363,8 @@ Qed.
 
 (* superpage mask fact (VPN side): masking svpn's in-superpage bits gives the
    0x80000 gigapage prefix. *)
-Lemma ram_mask (a : mword 64) :
-  addr_is_ram a ->
-  and_vec (sign_extend' (57 - 12) (svpn_of a)) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45).
-Proof.
-  intros Hram. pose proof Hram as [Hlo Hhi].
-  rewrite uint_unsigned in Hlo, Hhi. unfold ram_base, ram_size in *.
-  apply bv_eq.
-  cbv [and_vec sign_extend' not_vec
-       Operators_mwords.sign_extend Operators_mwords.exts_vec
-       Operators_mwords.word_binop Operators_mwords.word_unop
-       Operators_mwords.with_word' SailStdpp.Values.with_word to_word get_word
-       MachineWord.MachineWord.sign_extend MachineWord.MachineWord.and MachineWord.MachineWord.not].
-  rewrite bv_and_unsigned.
-  rewrite bv_sign_extend_unsigned.
-  rewrite bv_not_unsigned.
-  unfold bv_signed.
-  rewrite (svpn_of_unsigned a Hram).
-  rewrite uint_unsigned.
-  assert (Hlit1 : bv_unsigned (mword_of_int 262143 : mword 45) = 262143) by (vm_compute; reflexivity).
-  rewrite Hlit1.
-  assert (Hlit2 : bv_unsigned (mword_of_int 524288 : mword 45) = 524288) by (vm_compute; reflexivity).
-  rewrite Hlit2.
-  assert (Hmask45 : bv_wrap (MachineWord.MachineWord.Z_idx (57 - 12)) (Z.lnot 262143)
-                    = Z.shiftl (Z.ones 27) 18) by (vm_compute; reflexivity).
-  rewrite Hmask45.
-  set (x := Z.shiftr (bv_unsigned a) 12).
-  assert (Hxlo : 0 <= x) by (unfold x; apply Z.shiftr_nonneg; lia).
-  assert (Hxhi : x < 589824).
-  { unfold x. rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 12 ltac:(lia)).
-    change (2 ^ 12) with 4096. apply Z.div_lt_upper_bound. lia. lia. }
-  assert (Hsw : bv_swrap (MachineWord.MachineWord.Z_idx 27) x = x).
-  { apply bv_swrap_small.
-    assert (bv_half_modulus (MachineWord.MachineWord.Z_idx 27) = 67108864) as -> by (vm_compute; reflexivity).
-    lia. }
-  rewrite Hsw.
-  assert (Hw : bv_wrap (MachineWord.MachineWord.Z_idx (57 - 12)) x = x).
-  { apply bv_wrap_small.
-    assert (bv_modulus (MachineWord.MachineWord.Z_idx (57 - 12)) = 35184372088832) as -> by (vm_compute; reflexivity).
-    lia. }
-  rewrite Hw.
-  assert (Hx18 : Z.shiftr x 18 = 2).
-  { unfold x. rewrite (Z.shiftr_shiftr (bv_unsigned a) 12 18 ltac:(lia)). change (12 + 18) with 30.
-    rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 30 ltac:(lia)). change (2 ^ 30) with 1073741824.
-    assert (2 <= bv_unsigned a / 1073741824) by (apply Z.div_le_lower_bound; lia).
-    assert (bv_unsigned a / 1073741824 < 3) by (apply Z.div_lt_upper_bound; lia). lia. }
-  change 524288 with (2 ^ 19).
-  apply Z.bits_inj'. intros i Hi.
-  rewrite Z.land_spec.
-  rewrite (Z.shiftl_spec (Z.ones 27) 18 i Hi).
-  rewrite (Z.pow2_bits_eqb 19 i ltac:(lia)).
-  destruct (Z.ltb_spec i 18) as [Hlt | Hge].
-  - rewrite (Z.testbit_neg_r (Z.ones 27) (i - 18) ltac:(lia)).
-    rewrite andb_false_r.
-    destruct (Z.eqb_spec 19 i); [lia | reflexivity].
-  - assert (Hxi : Z.testbit x i = Z.testbit 2 (i - 18)).
-    { replace i with ((i - 18) + 18) at 1 by lia.
-      rewrite <- (Z.shiftr_spec x 18 (i - 18) ltac:(lia)). rewrite Hx18. reflexivity. }
-    rewrite Hxi.
-    rewrite (Z.testbit_ones_nonneg 27 (i - 18) ltac:(lia) ltac:(lia)).
-    change 2 with (2 ^ 1). rewrite (Z.pow2_bits_eqb 1 (i - 18) ltac:(lia)).
-    destruct (Z.eqb_spec 1 (i - 18)) as [He | Hne].
-    + assert (i = 19) by lia. subst.
-      rewrite (proj2 (Z.ltb_lt (19 - 18) 27) ltac:(lia)).
-      destruct (Z.eqb_spec 19 19); [reflexivity | lia].
-    + cbn [andb]. destruct (Z.eqb_spec 19 i); [lia | reflexivity].
-Qed.
 
 (* superpage mask fact, raw-VPN form. *)
-Lemma ram_mvpn (a : mword 64) :
-  addr_is_ram a ->
-  sign_extend' 45 (and_vec (svpn_of a) (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45).
-Proof.
-  intros Hram. pose proof Hram as [Hlo Hhi]. rewrite uint_unsigned in Hlo, Hhi. unfold ram_base, ram_size in *.
-  assert (Hand : and_vec (svpn_of a) (not_vec (zero_extend' 27 (ones 18))) = (mword_of_int 0x80000 : mword 27)).
-  { apply bv_eq.
-    cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word' SailStdpp.Values.with_word
-         to_word get_word MachineWord.MachineWord.and].
-    rewrite bv_and_unsigned.
-    rewrite (svpn_of_unsigned a Hram).
-    assert (HM : bv_unsigned (not_vec (zero_extend' 27 (ones 18)) : mword 27) = 133955584) by (vm_compute; reflexivity).
-    rewrite HM. rewrite uint_unsigned.
-    assert (Hrhs : bv_unsigned (mword_of_int 0x80000 : mword 27) = 524288) by (vm_compute; reflexivity).
-    rewrite Hrhs.
-    rewrite land_clear_low18.
-    2:{ rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 12 ltac:(lia)). change (2^12) with 4096.
-        split. apply Z.div_pos. lia. lia. apply Z.div_lt_upper_bound. lia. lia. }
-    rewrite (Z.shiftr_shiftr (bv_unsigned a) 12 18 ltac:(lia)). change (12 + 18) with 30.
-    rewrite (Z.shiftr_div_pow2 (bv_unsigned a) 30 ltac:(lia)). change (2 ^ 30) with 1073741824.
-    assert (bv_unsigned a / 1073741824 = 2) as ->.
-    { assert (2 <= bv_unsigned a / 1073741824) by (apply Z.div_le_lower_bound; lia).
-      assert (bv_unsigned a / 1073741824 < 3) by (apply Z.div_lt_upper_bound; lia). lia. }
-    vm_compute. reflexivity. }
-  rewrite Hand. apply bv_eq. vm_compute. reflexivity.
-Qed.
 
 (* adding an offset that's a multiple of 8 to an 8-aligned vaddr/paddr keeps
    it 8-aligned -- used to derive every non-slot-0 saved-register-slot
@@ -487,15 +392,6 @@ Proof.
   eexists. reflexivity.
 Qed.
 
-Lemma align8_vaddr_add_offset (x off : mword 64) (k : Z) :
-  bv_unsigned off = 8 * k ->
-  is_aligned_vaddr (Virtaddr x) 8 = true ->
-  is_aligned_vaddr (Virtaddr (add_vec x off)) 8 = true.
-Proof.
-  unfold is_aligned_vaddr. intros Hoff H%Z.eqb_eq.
-  rewrite uint_unsigned in H. rewrite uint_unsigned.
-  apply Z.eqb_eq. apply (align8_add_offset_unsigned x off k Hoff H).
-Qed.
 
 
 (* is_aligned_vaddr and is_aligned_paddr are the same check on the same
@@ -596,20 +492,7 @@ Lemma wX_x2_eq (v : mword 64) :
   = Defs.bind0 (Defs.write_reg (R_bitvector_64 x2) (regval_into_reg v)) (returnM tt).
 Proof. reflexivity. Qed.
 
-Lemma run_wX_x2 s (v : mword 64) :
-  run (wX (Regno 2) v) s tt (set_reg s (R_bitvector_64 x2) (regval_into_reg v)).
-Proof.
-  rewrite wX_x2_eq. apply run_bind0.
-  exists (set_reg s (R_bitvector_64 x2) (regval_into_reg v)). split; split; reflexivity.
-Qed.
 
-Lemma exec_wX_x2 s (v : mword 64) :
-  exec (wX (Regno 2) v) s = Some (tt, set_reg s (R_bitvector_64 x2) (regval_into_reg v)).
-Proof.
-  rewrite wX_x2_eq.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bitvector_64 x2) _ s)).
-  apply exec_returnm.
-Qed.
 
 
 

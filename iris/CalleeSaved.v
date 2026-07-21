@@ -63,8 +63,6 @@ Lemma is_cs_idx_true_neq (k c : mword 5) :
   is_cs_idx k = false -> is_cs_idx c = true -> Regidx k <> Regidx c.
 Proof. intros Hk Hc Heq. injection Heq as Heq'. subst c. rewrite Hc in Hk. discriminate. Qed.
 
-Lemma Regidx_ne_of_ne (c k : mword 5) : c <> k -> Regidx c <> Regidx k.
-Proof. intros H Heq. apply H. injection Heq as ->. reflexivity. Qed.
 
 (* Project one register out of a [callee_saved] fact, uniformly for ANY
    callee-saved index [c] (decided by [is_cs_idx c = true]).  A caller that
@@ -132,9 +130,6 @@ Fixpoint outer_write (c : mword 5) (ws : list (mword 5 * mword 64)) : option (mw
 
 (* Reduce [outer_write] one step, keys only -- never forces the (heavy) values,
    so it is safe over a write-list built from a whole-function's register map. *)
-Lemma outer_write_cons_ne (c k : mword 5) (v : mword 64) ws :
-  k <> c -> outer_write c ((k,v)::ws) = outer_write c ws.
-Proof. intros Hk. cbn [outer_write]. rewrite bool_decide_eq_false_2 by exact Hk. reflexivity. Qed.
 
 Lemma outer_write_cons_eq (c k : mword 5) (v : mword 64) ws :
   k = c -> outer_write c ((k,v)::ws) = Some v.
@@ -143,15 +138,6 @@ Proof. intros ->. cbn [outer_write]. rewrite bool_decide_eq_true_2 by reflexivit
 (* A register whose index is not written at all has no outer write.  The premise
    [c ∉ map fst ws] is over the KEY list (values dropped by [map fst]), so it is
    discharged by [cbn [map fst]] + concrete membership -- again values-blind. *)
-Lemma outer_write_notin (c : mword 5) ws :
-  c ∉ map fst ws -> outer_write c ws = None.
-Proof.
-  induction ws as [|[k v] ws IH]; [reflexivity|].
-  intros Hni. cbn [outer_write]. cbn [map fst] in Hni.
-  apply not_elem_of_cons in Hni as [Hkc Hni].
-  rewrite bool_decide_eq_false_2 by (intro; apply Hkc; congruence).
-  apply IH, Hni.
-Qed.
 
 Lemma apply_writes_lookup (ws : list (mword 5 * mword 64)) m (c : mword 5) :
   (apply_writes ws m) !!! Regidx c

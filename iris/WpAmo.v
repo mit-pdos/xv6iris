@@ -198,27 +198,6 @@ Proof.
   apply exec_returnM.
 Qed.
 
-Lemma exec_transform_effective_address_amo_S (ea : mword 64) (satp0 : mword 64) s :
-  register_lookup cur_privilege s.(sregs) = Supervisor ->
-  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
-  register_lookup satp s.(sregs) = satp0 ->
-  _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
-  eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
-  pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg s.(sregs))) = PMM_Disabled ->
-  exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, Data, Data))) s
-    = Some (pm_transform_VA (Virtaddr ea) 0, s).
-Proof.
-  intros Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm. unfold transform_effective_address.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite Hcp.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_amo_S _ s Hmprv)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_get_pmlen_amo_S s Hmxr Hpmm)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_translationMode_S_sv39 satp0 s HSXL Hsatp Hmode)).
-  replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity). cbn match.
-  apply exec_returnM.
-Qed.
 
 (* ===================================================================== *)
 (* Part 4 -- Sv39 translation of the AMO data address in the 1GB identity *)
@@ -350,43 +329,6 @@ Section AmoTranslate.
     apply exec_returnm.
   Qed.
 
-  Lemma exec_translate_amo_walk (vpn : mword 27) (mxr do_sum : bool) (asid : mword 16)
-        (region : PMA_Region) (menvcfg0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
-    register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None ->
-    subrange_vec_dec vpn 26 18 = (mword_of_int 2 : mword 9) ->
-    sign_extend' 45 (and_vec vpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out vpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    dev_addr (pte_paddr root_ppn) = false ->
-    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
-    register_lookup menvcfg s.(sregs) = menvcfg0 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec (translate 39 asid root_ppn vpn
-            (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum tt) s
-      = Some (Ok (sdata_ppn_out vpn, PBMT_PMA, tt),
-              set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn asid)))).
-  Proof.
-    intros Htlb Hvec Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
-    unfold translate.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_miss_data vpn asid tlbvec s Htlb Hvec)).
-    cbn match.
-    rewrite <- Htlb.
-    apply (exec_translate_TLB_miss_amo vpn mxr do_sum asid region menvcfg0 s
-             Hvpn2 Hmvpn Hmppn HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE).
-  Qed.
 
 
   Lemma exec_translate_TLB_hit_amo_super (vpn : mword 27) (mxr do_sum : bool) s :
@@ -411,20 +353,6 @@ Section AmoTranslate.
     rewrite (exec_bind_Some _ _ _ _ _ Hpbmt). apply exec_returnm.
   Qed.
 
-  Lemma exec_translate_amo_hit (vpn : mword 27) (mxr do_sum : bool)
-        (base_ppn : mword 44) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
-    register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some (pw_tlb_entry root_ppn (mword_of_int 0)) ->
-    and_vec (sign_extend' (57 - 12) vpn) (not_vec (mword_of_int 0x3FFFF : mword 45)) = (mword_of_int 0x80000 : mword 45) ->
-    exec (translate 39 (mword_of_int 0 : mword 16) base_ppn vpn (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum tt) s
-      = Some (Ok (tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn, PBMT_PMA, tt), s).
-  Proof.
-    intros Htlb Hvec Hmask.
-    unfold translate.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_hit_data root_ppn vpn tlbvec s Htlb Hvec Hmask)).
-    cbn match.
-    apply exec_translate_TLB_hit_amo_super.
-  Qed.
 
 
 End AmoTranslate.

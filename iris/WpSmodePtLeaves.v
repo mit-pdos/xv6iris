@@ -318,59 +318,8 @@ Section WpSmodePtItype.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_addi_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
-      (m : regfile) {dq : dfrac} :
-    uint rd <> 0 ->
-    add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = wval ->
-    smode_config γ dq -∗ sr_inv R -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
-    ( smode_config γ dq -∗ sr_inv R -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg_regime R γ Φ pc rd rs1 rs1
-              (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) wval m (dq:=dq)
- Hrd _
-              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_addi_val. rewrite Hva Hwval. reflexivity.
-  Qed.
 
 
-  Lemma wp_cli_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 6) (wval : mword 64)
-      (m : regfile) {dq : dfrac} :
-    uint rd <> 0 ->
-    add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) = wval ->
-    smode_config γ dq -∗ sr_inv R -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) -∗
-    ( smode_config γ dq -∗ sr_inv R -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hwval) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_scfg_regime R γ Φ pc rd
-              (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
-              (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m (dq:=dq)
- Hrd _
-              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
-    rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) rd (sign_extend' 12 imm) s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_addi_val.
-    replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
-      by (vm_compute; reflexivity).
-    rewrite Hwval. reflexivity.
-  Qed.
 
 
 End WpSmodePtItype.
@@ -1424,77 +1373,6 @@ Section WpSmodePtGprGamma.
     exact (wp_caddi16sp_gpr_s_r (kpt_regime root_ppn) γ Φ pc imm6 m q).
   Qed.
 
-  Lemma wp_jal_gpr_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 21)
-      (m : regfile)
-      (q : Qp) :
-    uint rd <> 0 ->
-    is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
-    smode_config γ (DfracOwn q) -∗
-    sr_inv R -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc false (JAL (imm, Regidx rd)) -∗
-    ( smode_config γ (DfracOwn q) -∗
-      sr_inv R -∗
-      pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Halign)
-      "Hsm Htlbinv [Hpc Hnpc] Hfile Hinstr Hcont".
-    destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iApply (wp_instr_s_regime R γ Φ pc false (JAL (imm, Regidx rd))
-
-
-              with "Hsm Htlbinv Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    assert (Hpcv : register_lookup PC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { unfold set_reg; cbn [sregs].
-      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    assert (Hlink : register_lookup nextPC
-             (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
-            with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (add_vec_int pc 4)) with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg (add_vec_int pc 4))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                        nextPC (add_vec pc (sign_extend' 64 imm)))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg (add_vec_int pc 4))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (JAL (imm, Regidx rd))) with (execute_JAL imm (Regidx rd)).
-      rewrite (exec_execute_JAL_gpr imm rd (set_reg σ nextPC (add_vec_int pc 4))
-                 Hrd).
-      - rewrite Hpcv. rewrite Hlink. reflexivity.
-      - rewrite Hpcv. exact Hal0.
-      - rewrite Hpcv. exact Hal1. }
-    iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
-    iIntros "Hsm' Htlbinv' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                         nextPC (add_vec pc (sign_extend' 64 imm)))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg (add_vec_int pc 4))).(sregs)
-             = add_vec pc (sign_extend' 64 imm)).
-    { unfold set_reg; cbn [sregs].
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hsm' Htlbinv' [$Hpc' $Hnpc] Hfile").
-  Qed.
 
 
 End WpSmodePtGprGamma.

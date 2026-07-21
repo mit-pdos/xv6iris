@@ -105,34 +105,7 @@ Section KernelText.
     iExact "Hw".
   Qed.
 
-  Lemma instr_bytes_rvc4 (pc : mword 64) (h : mword 16) (w : mword 32) :
-    is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    isRVC h = true ->
-    subrange_vec_dec w 15 0 = h ->
-    ([∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j) -∗
-    instr_bytes pc (F_RVC h).
-  Proof.
-    iIntros (H2 H4 Hr Hs) "Hw". rewrite /instr_bytes. iEval (cbv beta iota).
-    rewrite H4.
-    iSplitR; [iPureIntro; exact H2|].
-    iSplitR; [iPureIntro; exact Hr|].
-    iExists w. iSplitR; [iPureIntro; exact Hs|]. iExact "Hw".
-  Qed.
 
-  Lemma instr_bytes_rvc2 (pc : mword 64) (h : mword 16) :
-    is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    is_aligned_vaddr (Virtaddr pc) 4 = false ->
-    isRVC h = true ->
-    ([∗ list] j ∈ seq 0 2, (pa_add pc j) ↦ₘ□ nth_byte h j) -∗
-    instr_bytes pc (F_RVC h).
-  Proof.
-    iIntros (H2 H4 Hr) "Hw". rewrite /instr_bytes. iEval (cbv beta iota).
-    rewrite H4.
-    iSplitR; [iPureIntro; exact H2|].
-    iSplitR; [iPureIntro; exact Hr|].
-    iExact "Hw".
-  Qed.
 
   (* ---- ALIGNMENT-AGNOSTIC RVC introduction (the one clients should use) ----
      [instr_bytes] asks for 4 bytes at a 4-aligned pc and only 2 at a merely

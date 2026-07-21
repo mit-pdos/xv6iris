@@ -130,14 +130,6 @@ Qed.
 
 
 (* The TOR-entry-0 facts of the page walk's 8-byte PTE read (R instead of X). *)
-Definition pmp_tor0_pte_read (cfg : type_of_register pmpcfg_n)
-    (addrs : type_of_register pmpaddr_n) (a : mword 64) : Prop :=
-  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg 0)) = TOR
-  /\ zopz0zKzJ_u (zeros' 64) (vec_access_dec addrs 0) = false
-  /\ pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-       (Z.mul (uint (vec_access_dec addrs 0)) 4)
-       (uint a) (uint (to_bits 64 8)) = PMP_Match
-  /\ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec cfg 0)) ('b"1") = true.
 
 (* ===================================================================== *)
 (* 4. S-mode fetch memory reads (widths 2 and 4) + the 8-byte PTE read.    *)

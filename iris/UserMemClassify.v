@@ -516,28 +516,10 @@ Section AlignedClassifyInstances.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Definition user_pt_vmem_read_addr_load_classify_8 :=
-    user_pt_vmem_read_addr_load_classify 8 ltac:(lia) ltac:(lia)
-      ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity) exec_read_ram_plain_8.
-  Definition user_pt_vmem_read_addr_load_classify_4 :=
-    user_pt_vmem_read_addr_load_classify 4 ltac:(lia) ltac:(lia)
-      ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity) exec_read_ram_plain_4.
-  Definition user_pt_vmem_read_addr_load_classify_2 :=
-    user_pt_vmem_read_addr_load_classify 2 ltac:(lia) ltac:(lia)
-      ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity) exec_read_ram_plain_2.
   Definition user_pt_vmem_read_addr_load_classify_1 :=
     user_pt_vmem_read_addr_load_classify 1 ltac:(lia) ltac:(lia)
       ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity) exec_read_ram_plain_1.
 
-  Definition user_pt_vmem_write_addr_store_classify_8 :=
-    user_pt_vmem_write_addr_store_classify 8 ltac:(lia) ltac:(lia)
-      ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity) exec_write_ram_plain_8.
-  Definition user_pt_vmem_write_addr_store_classify_4 :=
-    user_pt_vmem_write_addr_store_classify 4 ltac:(lia) ltac:(lia)
-      ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity) exec_write_ram_plain_4.
-  Definition user_pt_vmem_write_addr_store_classify_2 :=
-    user_pt_vmem_write_addr_store_classify 2 ltac:(lia) ltac:(lia)
-      ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity) exec_write_ram_plain_2.
   Definition user_pt_vmem_write_addr_store_classify_1 :=
     user_pt_vmem_write_addr_store_classify 1 ltac:(lia) ltac:(lia)
       ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity) exec_write_ram_plain_1.
@@ -6676,95 +6658,6 @@ Section AmoDeny16.
     iDestruct (mem_ram with "Ha") as %Hr. iPureIntro. exact Hr.
   Qed.
 
-  Lemma user_pt_amo_deny_16 (op : amoop) (aq rl : bool)
-      (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
-      (w va : mword 64) (σ : mstate) :
-    generic_eq op AMOSWAP = false ->
-    um !! svpn_of va = Some w ->
-    uleaf_ok (Atomic (op, Data, Data)) w ->
-    udata_cov um data ->
-    is_aligned_vaddr (Virtaddr va) 16 = true ->
-    neq_vec (bits_of_virtaddr (Virtaddr va))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = User ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1") = false ->
-    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
-    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
-    ∃ σ' : mstate,
-      ⌜exec (translateAddr (Virtaddr va) (Atomic (op, Data, Data))) σ
-        = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw), σ')⌝ ∗
-      ⌜exec (mem_write_ea (Physaddr (u_walk_pa w va)) 16 (andb aq rl) rl true) σ'
-        = Some (Ok tt, σ')⌝ ∗
-      ⌜exec (mem_read (Atomic (op, Data, Data)) PBMT_PMA
-               (Physaddr (u_walk_pa w va)) 16 aq (andb aq rl) true) σ'
-        = Some (Err (E_SAMO_Access_Fault tt), σ')⌝ ∗
-      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
-      ⌜(σ'.(sregs) = σ.(sregs) \/
-        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
-      utlb_inv_pt uroot tfp um ∗ udata_own data.
-  Proof.
-    intros Hsw Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
-    iIntros "Hri Hgh Hinv Hdata".
-    iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
-      as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (Atomic (op, Data, Data)) uroot tfp um w va
-            (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
-            Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_amo_nm op (register_lookup mstatus σ.(sregs)) User σ Hmprv)
-            (exec_is_shadow_stack_u_acc (Atomic (op, Data, Data)) σ
-               (or_intror (or_intror (or_intror (or_intror (or_intror
-                  (ex_intro _ op eq_refl))))))) Hall
-            with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
-    { intros r Hne. destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    set (pa := u_walk_pa w va) in *.
-    assert (Hcovj : forall j : nat, (j < 16)%nat -> pa_add pa j ∈ data).
-    { intros j Hj.
-      unfold pa. rewrite (u_walk_pa_window_div 16 _ _ _ ltac:(first [ apply Z.ltb_lt; reflexivity | apply Z.leb_le; reflexivity | apply Nat.ltb_lt; reflexivity | reflexivity ]) ltac:(exists 256; reflexivity) Hal Hj).
-      exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
-    iAssert (⌜addr_is_ram pa⌝)%I as %Hram0.
-    { rewrite -(pa_add_0 pa).
-      iApply (udata_ram_at data (pa_add pa 0) (Hcovj 0%nat ltac:(first [ apply Z.ltb_lt; reflexivity | apply Z.leb_le; reflexivity | apply Nat.ltb_lt; reflexivity | reflexivity ])) with "Hdata"). }
-    iAssert (⌜addr_is_ram (pa_add pa 15)⌝)%I as %Hram7.
-    { iApply (udata_ram_at data (pa_add pa 15) (Hcovj 15%nat ltac:(first [ apply Z.ltb_lt; reflexivity | apply Z.leb_le; reflexivity | apply Nat.ltb_lt; reflexivity | reflexivity ])) with "Hdata"). }
-    destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 16)
-      as (region & Hpmam & _ & Hrd & Hwrat).
-    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
-              (uint pa) (uint (to_bits 64 16)) = PMP_Match).
-    { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-      exact (ram_fetch_pmp_g pa _ 16 15 ltac:(first [ apply Z.ltb_lt; reflexivity | apply Z.leb_le; reflexivity | apply Nat.ltb_lt; reflexivity | reflexivity ]) ltac:(first [ apply Z.ltb_lt; reflexivity | apply Z.leb_le; reflexivity | apply Nat.ltb_lt; reflexivity | reflexivity ]) ltac:(vm_compute; reflexivity) ltac:(first [ apply Z.ltb_lt; reflexivity | apply Z.leb_le; reflexivity | apply Nat.ltb_lt; reflexivity | reflexivity ])
-               Hram0 Hram7 Hcovp). }
-    assert (Halp : is_aligned_paddr (Physaddr pa) 16 = true)
-      by (exact (pa_aligned_div _ va 16 ltac:(first [ apply Z.ltb_lt; reflexivity | apply Z.leb_le; reflexivity | apply Nat.ltb_lt; reflexivity | reflexivity ]) ltac:(exists 256; reflexivity) Hal)).
-    iModIntro. iExists σ'.
-    iSplit; [ iPureIntro; exact Htr | ].
-    iSplit; [ iPureIntro | ].
-    { exact (exec_mem_write_ea_sc_g aq rl 16 pa σ' Halp). }
-    iSplit; [ iPureIntro | ].
-    { exact (exec_mem_read_amo_deny op aq rl 16 PBMT_PMA pa region σ'
-               (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
-               (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
-               Hrange
-               (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HR))
-               (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))
-               Hpmam Halp Hrd (proj1 Hwrat) (proj2 Hwrat) Hsw
-               (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
-               (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
-    iSplit; [ iPureIntro; exact Hmdev | ].
-    iSplit; [ iPureIntro; exact Hsregs | ].
-    iFrame "Hri Hgh Hinv Hdata".
-  Qed.
 
 End AmoDeny16.
 

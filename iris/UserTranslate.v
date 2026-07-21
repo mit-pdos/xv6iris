@@ -39,35 +39,8 @@ Import Defs.
 (* MMU is in Sv39 -- the head of every translateAddr reduction.            *)
 (* ===================================================================== *)
 
-Lemma exec_get_satp_39 (satp0 : mword 64) s :
-  register_lookup satp s.(sregs) = satp0 ->
-  exec (get_satp 39) s = Some (autocast (T := mword) satp0, s).
-Proof.
-  intro Hsatp.
-  unfold get_satp.
-  assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
-                        "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
-  { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true
-      by (vm_compute; reflexivity).
-    unfold assert_exp'. cbn match. apply exec_returnm. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hae).
-  change (Z.eqb 39 32) with false. cbn match.
-  unfold autocast_m.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
-  rewrite Hsatp. apply exec_returnm.
-Qed.
 
-Lemma exec_satp_mode_width_39 s :
-  exec (satp_mode_width_forwards Sv39) s = Some (39, s).
-Proof. cbn. apply exec_returnm. Qed.
 
-Lemma exec_assert_vmem431 s :
-  exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
-          "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s).
-Proof.
-  replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
-  unfold assert_exp'. cbn match. apply exec_returnm.
-Qed.
 
 Lemma exec_translationMode_U_sv39 (satp0 : mword 64) s :
   _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->

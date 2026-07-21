@@ -236,13 +236,6 @@ Lemma exec_read_CSR_csrr s :
 Proof. exact (exec_read_reg (R_bitvector_64 mhartid) s). Qed.
 
 (* wX to x0 is a no-op (write discarded).  Twin of [exec_rX_bits_x0]. *)
-Lemma exec_wX_bits_x0 (i : mword 5) (v : mword 64) s :
-  uint i = 0 -> exec (wX_bits (Regidx i) v) s = Some (tt, s).
-Proof.
-  intro H. unfold wX_bits, wX. rewrite H.
-  cbv zeta. replace (Z.eqb 0 0) with true by reflexivity.
-  cbn match. apply exec_returnM.
-Qed.
 
 (* JAL with rd = x0 (zreg): the jump retires with NO link write, so the only
    state change is nextPC := target.  Instantiate the rd-generic [exec_execute_JAL]

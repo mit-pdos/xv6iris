@@ -109,9 +109,6 @@ Section Kalloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Notation AK := KernelSyms.kalloc.
-  Notation AQ := KernelSyms.acquire.
-  Notation PO := KernelSyms.push_off.
 
   (* ===== [smode_config] leaf wrappers kalloc's body needs ===== *)
 

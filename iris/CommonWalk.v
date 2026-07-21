@@ -303,29 +303,6 @@ Section UserWalk.
     apply exec_returnm.
   Qed.
 
-  Lemma exec_translate_walk_user (asid : mword 16) (menvcfg0 : mword 64)
-        (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
-    register_lookup misa s.(sregs) = MISA_C ->
-    register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None ->
-    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = None ->
-    exec (read_pte (Physaddr addr2) 8) s = Some (Ok pte2, s) ->
-    exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
-    exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
-    register_lookup menvcfg s.(sregs) = menvcfg0 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec (translate 39 asid root vpn acc p mxr do_sum tt) s
-      = Some (Ok (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44), PBMT_PMA, tt),
-              set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
-                               (Some (u_walk_entry asid)))).
-  Proof.
-    intros Hmisa Htlb Hvec Hnoupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE.
-    unfold translate.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_miss vpn asid tlbvec s Htlb Hvec)).
-    cbn match.
-    rewrite <- Htlb.
-    apply (exec_translate_TLB_miss_user asid menvcfg0 s Hmisa Hnoupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE).
-  Qed.
 
   (* miss via hash collision: the slot holds a NON-matching entry *)
   Lemma exec_lookup_TLB_nomatch (asid : mword 16) (ent' : TLB_Entry)
@@ -343,30 +320,6 @@ Section UserWalk.
 
   (* miss via hash collision: same as [exec_translate_walk_user], but the
      slot holds a NON-matching entry instead of being empty *)
-  Lemma exec_translate_walk_user_nomatch (asid : mword 16) (menvcfg0 : mword 64)
-        (ent' : TLB_Entry) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
-    register_lookup misa s.(sregs) = MISA_C ->
-    register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' ->
-    match_TLB_Entry ent' asid (sign_extend' (57 - 12) vpn) = false ->
-    update_PTE_Bits (autocast (T := mword) pte0 : mword 64) acc = None ->
-    exec (read_pte (Physaddr addr2) 8) s = Some (Ok pte2, s) ->
-    exec (read_pte (Physaddr addr1) 8) s = Some (Ok pte1, s) ->
-    exec (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s) ->
-    register_lookup menvcfg s.(sregs) = menvcfg0 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec (translate 39 asid root vpn acc p mxr do_sum tt) s
-      = Some (Ok (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : mword 44), PBMT_PMA, tt),
-              set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
-                               (Some (u_walk_entry asid)))).
-  Proof.
-    intros Hmisa Htlb Hvec Hnm Hnoupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE.
-    unfold translate.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_nomatch asid ent' tlbvec s Htlb Hvec Hnm)).
-    cbn match.
-    rewrite <- Htlb.
-    apply (exec_translate_TLB_miss_user asid menvcfg0 s Hmisa Hnoupd Hrd2 Hrd1 Hrd0 Hmenv HPBMTE).
-  Qed.
 
   (* the translated physical address a level-0 walk yields for [va] *)
   Definition u_walk_pa (va : mword 64) : mword 64 :=

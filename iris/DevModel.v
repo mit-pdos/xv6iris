@@ -396,21 +396,6 @@ Qed.
 
    This is what makes "polled THRE, therefore the write will not be dropped"
    sound in the presence of a concurrently draining device and other harts. *)
-Lemma uart_tx_still_empty (u u2 : uart_state) (l : list (bv 8)) :
-  uart_acc u = l ->
-  u_tx u = [] ->
-  uart_acc u2 = l ->
-  l `prefix_of` u_out u2 ->
-  u_tx u2 = [].
-Proof.
-  unfold uart_acc. intros Hacc Htx Hacc2 [k Hk].
-  (* |u_out u2| = |l| + |k|, and |u_out u2| + |u_tx u2| = |l| *)
-  assert (Hlen : (length (u_out u2) + length (u_tx u2) = length l)%nat).
-  { rewrite <- length_app, Hacc2. reflexivity. }
-  rewrite Hk in Hlen. rewrite length_app in Hlen.
-  assert (Htx2 : length (u_tx u2) = 0%nat) by lia.
-  by apply nil_length_inv.
-Qed.
 
 (* The same conclusion phrased at ONE state: if the accepted trace is [l] and
    [l] has already all been transmitted, the FIFO is empty.  This is the form a

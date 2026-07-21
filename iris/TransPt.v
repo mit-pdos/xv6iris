@@ -815,10 +815,6 @@ Section Pt2TrampEngines.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Definition pt2_tramp_fetch (rc : mword 44) (Sp Sc : ptree -> Prop)
-      (HSp : pt2_tramp_spec Sp) (HSc : pt2_tramp_spec Sc)
-      (Hbc : forall t, Sc t -> pt_base t = rc) :=
-    tramp_fetch_pt (tlb_inv_pt2 rc Sp Sc) (pt2_tramp_fetch_habs rc Sp Sc HSp HSc Hbc).
 
   Definition wp_instr_pt2_tramp (rc : mword 44) (Sp Sc : ptree -> Prop)
       (HSp : pt2_tramp_spec Sp) (HSc : pt2_tramp_spec Sc)

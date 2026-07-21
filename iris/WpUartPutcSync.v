@@ -311,12 +311,6 @@ Section WpUartPutcSync.
 
   (* THRE-ready path: after [lbu (LSR)] + [andi ...,32], a5 masks to bit5 = 32,
      so the loop's [c.beqz a5] falls through. *)
-  Lemma uart_thre_beqz (u : uart_state) :
-    uart_thre u = true -> lsr_thre_clear (uart_lsr u) = false.
-  Proof.
-    intro H. unfold lsr_thre_clear, lsr_ldval_of, uart_lsr. rewrite H.
-    destruct (uart_rx_ready u); vm_compute; reflexivity.
-  Qed.
 
   (* the converse: THRE clear really does take the branch, so the two cases of
      the poll are exactly [uart_thre u] *)
@@ -470,8 +464,6 @@ Section WpUartPutcSync.
   Definition ppc_f5 (m : regfile) (u : uart_state) : regfile :=
     <[Regidx (mword_of_int 10) := regval_into_reg (and_vec (ppc_f4 m u !!! Regidx (mword_of_int 9))
         (sign_extend' 64 (mword_of_int 255 : mword 12)))]> (ppc_f4 m u).
-  Definition ppc_f6 (m : regfile) (u : uart_state) : regfile :=
-    <[Regidx (mword_of_int 15) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> (ppc_f5 m u).
 
   (* the three call-site register lookups the leaves need. *)
   Lemma ppc_f2_a4 (m : regfile) :

@@ -198,32 +198,8 @@ Qed.
 
 (* update_PTE_Bits: no write-back is needed exactly when A (and D, for
    stores) is already set in the variant *)
-Lemma kpt_variant_upd_fetch (vpn : mword 27) (a d : mword 1) :
-  eq_vec a ('b"1") = true ->
-  update_PTE_Bits (pte_set_ad (kpt_leaf_pte vpn) a d) (InstructionFetch tt) = None.
-Proof.
-  intros Ha.
-  rewrite pte_set_ad_kpt_leaf. unfold kpt_leaf_pte_ad.
-  apply kpt_upd_fetch_ad. cbn. exact Ha.
-Qed.
 
-Lemma kpt_variant_upd_load (vpn : mword 27) (a d : mword 1) :
-  eq_vec a ('b"1") = true ->
-  update_PTE_Bits (pte_set_ad (kpt_leaf_pte vpn) a d) (Load Data) = None.
-Proof.
-  intros Ha.
-  rewrite pte_set_ad_kpt_leaf. unfold kpt_leaf_pte_ad.
-  apply kpt_upd_load_ad. cbn. exact Ha.
-Qed.
 
-Lemma kpt_variant_upd_store (vpn : mword 27) (a d : mword 1) :
-  eq_vec a ('b"1") = true -> eq_vec d ('b"1") = true ->
-  update_PTE_Bits (pte_set_ad (kpt_leaf_pte vpn) a d) (Store Data) = None.
-Proof.
-  intros Ha Hd.
-  rewrite pte_set_ad_kpt_leaf. unfold kpt_leaf_pte_ad.
-  apply kpt_upd_store_ad; cbn; assumption.
-Qed.
 
 (* ===================================================================== *)
 (* §2b The TRAMPOLINE leaf.  The kernel table (and every user table) maps  *)

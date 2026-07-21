@@ -356,17 +356,6 @@ Proof.
 Qed.
 
 (* contrapositive form: two distinct vpns differ in some chunk *)
-Lemma vpn_idx_cases (x y : mword 27) :
-  x <> y ->
-  vpn_idx 2 x <> vpn_idx 2 y \/ vpn_idx 1 x <> vpn_idx 1 y \/
-  vpn_idx 0 x <> vpn_idx 0 y.
-Proof.
-  intros Hne.
-  destruct (decide (vpn_idx 2 x = vpn_idx 2 y)); [| tauto].
-  destruct (decide (vpn_idx 1 x = vpn_idx 1 y)); [| tauto].
-  destruct (decide (vpn_idx 0 x = vpn_idx 0 y)); [| tauto].
-  exfalso. apply Hne. apply vpn_idx_inj; assumption.
-Qed.
 
 (* ---- projection laws of the two updates ----------------------------- *)
 
@@ -1061,10 +1050,6 @@ Lemma tlb_ok_pt2_prev (asid : mword 16) (tp tc : ptree)
   tlb_ok_pt asid tp tlbvec -> tlb_ok_pt2 asid tp tc tlbvec.
 Proof. intros Hok vpn' ent Hget. left. exact (Hok vpn' ent Hget). Qed.
 
-Lemma tlb_ok_pt2_cur (asid : mword 16) (tp tc : ptree)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
-  tlb_ok_pt asid tc tlbvec -> tlb_ok_pt2 asid tp tc tlbvec.
-Proof. intros Hok vpn' ent Hget. right. exact (Hok vpn' ent Hget). Qed.
 
 (* walk-induced fills: the walker consults the CURRENT table, but the
    hit-refresh path re-fills from the entry's own provenance, so both
@@ -1399,118 +1384,6 @@ End PtHit.
 Section PtTranslateAddr.
   Context (acc : MemoryAccessType mem_payload).
 
-  Lemma exec_translateAddr_pt (vpn : mword 27) (root : mword 44)
-        (p2 p1 p0 : mword 64) (satp0 menvcfg0 va pa : mword 64)
-        (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
-    pte_valid p2 -> pte_ptr p2 ->
-    pte_valid p1 -> pte_ptr p1 ->
-    pte_valid p0 -> pte_leaf p0 -> pte_no_napot p0 ->
-    (forall mxr do_sum, pte_check_ok acc Supervisor mxr do_sum p0) ->
-    update_PTE_Bits (autocast (T := mword) p0 : mword 64) acc = None ->
-    exec (read_pte (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 8) s
-      = Some (Ok p2, s) ->
-    exec (read_pte (Physaddr (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9))) 8) s
-      = Some (Ok p1, s) ->
-    exec (read_pte (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8) s
-      = Some (Ok p0, s) ->
-    register_lookup misa s.(sregs) = MISA_C ->
-    register_lookup menvcfg s.(sregs) = menvcfg0 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    register_lookup tlb s.(sregs) = tlbvec ->
-    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-     (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent /\
-                  match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) vpn) = false) \/
-     (exists q2 q1 q0,
-        vec_access_dec tlbvec (tlb_hash (__id 39) vpn)
-          = Some (u_walk_entry vpn q2 q1 q0 (mword_of_int 0)) /\
-        (forall mxr do_sum, pte_check_ok acc Supervisor mxr do_sum q0) /\
-        update_PTE_Bits (autocast (T := mword) q0 : mword 64) acc = None /\
-        pte_pbmt0 q0 /\
-        PPN_of_PTE (q0 : mword 64) = PPN_of_PTE (p0 : mword 64))) ->
-    exec (effectivePrivilege acc (register_lookup mstatus s.(sregs)) Supervisor) s
-      = Some (Supervisor, s) ->
-    exec (is_shadow_stack_access acc) s = Some (false, s) ->
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
-    register_lookup satp s.(sregs) = satp0 ->
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root ->
-    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
-    neq_vec (bits_of_virtaddr (Virtaddr va))
-      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-    autocast (T := mword) (subrange_vec_dec
-      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = vpn ->
-    zero_extend' 64 (concat_vec
-      ((autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (p0 : mword 64))) : mword 44)) : mword 44)
-      (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
-    exists s',
-      exec (translateAddr (Virtaddr va) acc) s
-      = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s')
-      /\ (s' = s \/
-          s' = set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
-                                (Some (u_walk_entry vpn p2 p1 p0 (mword_of_int 0))))).
-  Proof.
-    intros Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hchk Hupd Hrd2 Hrd1 Hrd0
-           Hmisa Hmenv HPBMTE Htlb Hslot
-           Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid Hcanon Hvpn_def Hident.
-    set (mxr := eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"1")).
-    set (do_sum := eq_vec (_get_Mstatus_SUM (register_lookup mstatus s.(sregs))) ('b"1")).
-    destruct (exec_translate_pt acc Supervisor mxr do_sum vpn root p2 p1 p0
-                menvcfg0 tlbvec s
-                Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap (Hchk mxr do_sum) Hupd
-                Hrd2 Hrd1 Hrd0 Hmisa Hmenv HPBMTE Htlb)
-      as (s' & Htr & Hcase).
-    { destruct Hslot as [Hnone | [ (ent & Hent & Hnm) | (q2 & q1 & q0 & Hhit & Hchk' & Hupd' & Hpb' & Hppn') ]].
-      - left. exact Hnone.
-      - right. left. exists ent. tauto.
-      - right. right. exists q2, q1, q0.
-        split; [exact Hhit|]. split; [exact (Hchk' mxr do_sum)|]. tauto. }
-    exists s'. split; [| exact Hcase].
-    unfold translateAddr.
-    rewrite exec_catch_early_return.
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)).
-    rewrite Hcp.
-    rewrite (execR_liftR_seq _ _ _ _ _ Heff).
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_S_sv39 satp0 s HSXL Hsatp Hmode)).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hss).
-    unfold Defs.bind0.
-    replace (generic_eq Sv39 Bare) with false by (vm_compute; reflexivity).
-    rewrite execR_bind. rewrite execR_returnR. cbn match.
-    assert (Hwidth : exec (satp_mode_width_forwards Sv39) s = Some (39, s))
-      by (cbn; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hwidth).
-    assert (Hgs : exec (get_satp 39) s = Some (autocast (T := mword) satp0, s)).
-    { unfold get_satp.
-      assert (Hae : exec (Defs.assert_exp' (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64))
-                            "sys/vmem.sail:395.30-395.31") s = Some (eq_refl, s)).
-      { replace (orb (Z.eqb (__id 39) 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
-        unfold assert_exp'. cbn match. apply exec_returnm. }
-      rewrite (exec_bind_Some _ _ _ _ _ Hae).
-      change (Z.eqb 39 32) with false. cbn match.
-      unfold autocast_m.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg satp s)).
-      rewrite Hsatp. apply exec_returnm. }
-    rewrite (execR_liftR_seq _ _ _ _ _ Hgs).
-    assert (Hae2 : exec (Defs.assert_exp' (orb (Z.eqb 39 32) (Z.eqb xlen 64))
-                          "sys/vmem.sail:431.36-431.37") s = Some (eq_refl, s)).
-    { replace (orb (Z.eqb 39 32) (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
-      unfold assert_exp'. cbn match. apply exec_returnm. }
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
-    rewrite Hcanon. cbn match.
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)).
-    match goal with |- context[translate 39 ?asidx ?bppn ?vpnx _ _ _ _ _] =>
-      replace vpnx with vpn by (symmetry; exact Hvpn_def);
-      replace bppn with root by (symmetry; exact Hppn);
-      replace asidx with (mword_of_int 0 : mword 16) by (symmetry; exact Hasid) end.
-    rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-    cbn match.
-    rewrite execR_returnR. cbn match.
-    match goal with |- context[Physaddr ?e] =>
-      replace e with pa by (symmetry; exact Hident) end.
-    reflexivity.
-  Qed.
 
 End PtTranslateAddr.
 

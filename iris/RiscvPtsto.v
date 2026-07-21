@@ -193,9 +193,6 @@ Section word_pointsto.
   Lemma word_pointsto_aligned_p a dq w :
     word_pointsto a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 8 = true⌝.
   Proof. iIntros "[$ _]". Qed.
-  Lemma word_pointsto_aligned_v a dq w :
-    word_pointsto a dq w ⊢ ⌜is_aligned_vaddr (Virtaddr a) 8 = true⌝.
-  Proof. iIntros "[%H _]". iPureIntro. exact H. Qed.
   Lemma word_pointsto_bytes a dq w :
     word_pointsto a dq w ⊢ [∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ{dq} nth_byte w j.
   Proof. iIntros "[_ $]". Qed.
@@ -231,9 +228,6 @@ Section word4_pointsto.
   Lemma word4_pointsto_aligned_p a dq w :
     word4_pointsto a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 4 = true⌝.
   Proof. iIntros "[$ _]". Qed.
-  Lemma word4_pointsto_aligned_v a dq w :
-    word4_pointsto a dq w ⊢ ⌜is_aligned_vaddr (Virtaddr a) 4 = true⌝.
-  Proof. iIntros "[%H _]". iPureIntro. exact H. Qed.
   Lemma word4_pointsto_bytes a dq w :
     word4_pointsto a dq w ⊢ [∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ{dq} nth_byte w j.
   Proof. iIntros "[_ $]". Qed.

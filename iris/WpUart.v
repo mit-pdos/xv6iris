@@ -57,15 +57,6 @@ Section DevGhost.
     done.
   Qed.
 
-  Lemma dev_interp_update d u p u' p' :
-    dev_interp d -∗ uart_frag u -∗ plic_frag p ==∗
-      dev_interp (DevState u' p') ∗ uart_frag u' ∗ plic_frag p'.
-  Proof.
-    iIntros "[Hua Hpa] Hu Hp".
-    iMod (uart_update with "Hua Hu") as "[$ $]".
-    iMod (plic_update with "Hpa Hp") as "[$ $]".
-    done.
-  Qed.
 
   (* uart-only update (the plic component rides along) *)
   Lemma dev_interp_update_uart d u u' :
@@ -456,12 +447,6 @@ Section DevLoop.
     iDestruct "Ha" as "[$ $]".
   Qed.
 
-  Lemma uart_sent_prefix γ u l :
-    uart_sent_auth γ u -∗ uart_sent γ l -∗ ⌜ l `prefix_of` uart_acc u ⌝.
-  Proof.
-    iIntros "Ha Hl". rewrite /uart_sent_auth /uart_sent.
-    by iDestruct (own_valid_2 with "Ha Hl") as %?%mono_list_both_valid_L.
-  Qed.
 
   Lemma uart_sent_update γ u u' :
     uart_acc u `prefix_of` uart_acc u' ->

@@ -46,9 +46,6 @@ Lemma utrap_ms_SIE (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_SIE (utrap_ms elp_v ms) = ('b"0" : mword 1).
 Proof. unfold utrap_ms, _get_Mstatus_SIE; cbn zeta; mw_prep; tb1. Qed.
 
-Lemma utrap_ms_SPIE (elp_v : mword 1) (ms : mword 64) :
-  _get_Mstatus_SPIE (utrap_ms elp_v ms) = _get_Mstatus_SIE ms.
-Proof. unfold utrap_ms, _get_Mstatus_SPIE, _get_Mstatus_SIE; cbn zeta; mw_prep; tb1. Qed.
 
 Lemma utrap_ms_SPP (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_SPP (utrap_ms elp_v ms) = ('b"0" : mword 1).

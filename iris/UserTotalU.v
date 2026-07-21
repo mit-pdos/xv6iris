@@ -318,22 +318,6 @@ Section UserTotalU.
        = register_lookup (R_bool minstret_increment) sigma.(sregs)).
 
   (* RETIRE class: an ITYPE (add/andi/... at U). *)
-  Lemma arm_ITYPE (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : regfile) (w : mword 32)
-      (imm : mword 12) (i1 ird : mword 5) (op : iop) :
-    Lmi_ty sigma sigma_f ->
-    exec (ext_decode w) sigma_f = Some (ITYPE (imm, Regidx i1, Regidx ird, op), sigma_f) ->
-    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 4)) -∗
-    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 4 -∗ user_pt_inv pt -∗ user_cfg C -∗
-    base_post E sigma sigma_f va w g.
-  Proof.
-    intros Lmi Hdec.
-    destruct (exec_execute_ITYPE_total imm i1 ird op
-                (set_reg sigma_f nextPC (add_vec_int va 4))) as (v & Hexec).
-    iApply (finish_gprwrite E sigma sigma_f va g
-              (ITYPE (imm, Regidx i1, Regidx ird, op)) ird v w
-              Lmi Hdec eq_refl Hexec).
-  Qed.
 
   (* ILLEGAL class: a bare ILLEGAL word (state-unchanged illegal). *)
   Lemma arm_ILLEGAL (E : coPset) (sigma sigma_f : mstate) (va : mword 64)

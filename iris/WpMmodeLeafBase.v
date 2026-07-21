@@ -1551,19 +1551,6 @@ Qed.
    from the owned points-to ([ram_base <= uint a], [uint a + 8 <= ram top]
    from owning all 8 bytes) plus the single "PMP covers RAM" config fact. *)
 
-Lemma ram_pmp_match (a : mword 64) (pmpaddr0 : mword 64) :
-  ram_base <= uint a ->
-  uint a + 8 <= ram_base + ram_size ->
-  ram_base + ram_size <= uint pmpaddr0 * 4 ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4) (Z.mul (uint pmpaddr0) 4)
-    (uint a) (uint (to_bits 64 8)) = PMP_Match.
-Proof.
-  intros Hlo Hfit Hcov.
-  assert (Hz : uint (zeros' 64 : mword 64) = 0) by (vm_compute; reflexivity).
-  assert (Hw : uint (to_bits 64 8) = 8) by (vm_compute; reflexivity).
-  rewrite Hz Hw. rewrite Z.mul_0_l.
-  apply pmpRangeMatch_full; unfold ram_base, ram_size in *; lia.
-Qed.
 
 (* pmpMatchAddr, entry-0 TOR shape (prev = zeros): the access [a, a+w) fully
    inside [0, uint paddr * 4) is a (full) PMP_Match, with no state change. *)

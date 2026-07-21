@@ -81,29 +81,7 @@ Section WpMemsetS.
 
   (* the comparison prefix of [execute_BTYPE] for BNE / BEQ evaluates to the
      boolean [taken], leaving the state unchanged. *)
-  Lemma exec_BTYPE_cmp_BNE (rs2 rs1 : mword 5) s :
-    exec (Defs.bind (rX_bits (Regidx rs1))
-            (fun w2 => Defs.bind (rX_bits (Regidx rs2))
-               (fun w3 => returnM (neq_vec w2 w3)))) s
-      = Some (neq_vec (rvv rs1 s) (rvv rs2 s), s).
-  Proof.
-    unfold rvv.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-    apply exec_returnM.
-  Qed.
 
-  Lemma exec_BTYPE_cmp_BEQ (rs2 rs1 : mword 5) s :
-    exec (Defs.bind (rX_bits (Regidx rs1))
-            (fun w2 => Defs.bind (rX_bits (Regidx rs2))
-               (fun w3 => returnM (eq_vec w2 w3)))) s
-      = Some (eq_vec (rvv rs1 s) (rvv rs2 s), s).
-  Proof.
-    unfold rvv.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-    apply exec_returnM.
-  Qed.
 
 
   (* jump_to variant allowing a 2-aligned (bit1 = 1) target under the C

@@ -410,15 +410,6 @@ Qed.
    (c.addi16sp sp,-16 ; c.sdsp ra,8(sp) ; c.ldsp ra,8(sp) ;
     c.addi16sp sp,16 -- net zero: heap, ledger and depth all return
     to the entry state; the high-water mark records the 2-slot frame.) *)
-Example vc_block_sp_pilot_run :
-  vc_block_sp_s
-    (VSS (VSt 0 vregs_init [] []) 0%nat 0%nat [])
-    [VScaddi16sp (mword_of_int 63);
-     VScsdsp (mword_of_int 1) (mword_of_int 1);
-     VScldsp (mword_of_int 1) (mword_of_int 1);
-     VScaddi16sp (mword_of_int 1)]
-  = Some (VSS (VSt 8 vregs_init [] []) 0%nat 2%nat []).
-Proof. vm_compute. reflexivity. Qed.
 
 Section WpSconfVc.
   Context `{!riscvGS Σ}.

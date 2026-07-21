@@ -229,26 +229,6 @@ Local Lemma qVS_uVS (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_VS w x) 
 Proof. qu_same. Qed.
 
 (* row SD *)
-Local Lemma qSD_uSIE (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_SIE w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uSPIE (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_SPIE w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uSPP (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_SPP w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uVS (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_VS w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uFS (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_FS w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uXS (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_XS w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uSUM (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_SUM w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uMXR (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_MXR w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uSPELP (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_SPELP w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
-Local Lemma qSD_uUXL (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_UXL w x) = _get_Mstatus_SD w.
-Proof. qu_disj. Qed.
 Local Lemma qSD_uSD (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_SD w x) = x.
 Proof. qu_same. Qed.
 
@@ -318,8 +298,6 @@ Proof. qu_disj. Qed.
 Local Lemma qSXL_uSPELP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SPELP w x) = _get_Mstatus_SXL w.
 Proof. qu_disj. Qed.
 Local Lemma qSXL_uMPELP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPELP w x) = _get_Mstatus_SXL w.
-Proof. qu_disj. Qed.
-Local Lemma qSXL_uUXL (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_UXL w x) = _get_Mstatus_SXL w.
 Proof. qu_disj. Qed.
 
 (* ---- L4: fields of [mstatus_legalized o v] ---- *)
@@ -415,10 +393,6 @@ Local Lemma lift_TSR (m s : mword 64) :
 Proof. unfold lift_sstatus. cbn zeta.
   rewrite qTSR_uSIE qTSR_uSPIE qTSR_uSPP qTSR_uVS qTSR_uFS qTSR_uXS qTSR_uSUM qTSR_uMXR qTSR_uSPELP qTSR_uUXL qTSR_uSD. reflexivity. Qed.
 
-Local Lemma lift_XS (m s : mword 64) :
-  _get_Mstatus_XS (lift_sstatus m s) = _get_Sstatus_XS s.
-Proof. unfold lift_sstatus. cbn zeta.
-  rewrite qXS_uSIE qXS_uSPIE qXS_uSPP qXS_uVS qXS_uFS qXS_uXS. reflexivity. Qed.
 
 Local Lemma lift_FS (m s : mword 64) :
   _get_Mstatus_FS (lift_sstatus m s) = _get_Sstatus_FS s.

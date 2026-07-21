@@ -368,14 +368,6 @@ Proof.
 Qed.
 
 (* 32-bit "+0 is identity" (the twin of avi0). *)
-Lemma avi0_32 (a : mword 32) : add_vec a (mword_of_int 0) = a.
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-         SailStdpp.Values.with_word, mword_of_int,
-         MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
-  apply bv_eq. rewrite bv_add_unsigned Z_to_bv_unsigned.
-  rewrite bv_wrap_0 Z.add_0_r. apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
 (* sval32 offset arithmetic tracks 32-bit add_vec. *)
 Lemma sval32_den_addZ (ρ : nat -> mword 64) (v : sval32) (d : Z) :

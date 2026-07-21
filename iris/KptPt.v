@@ -106,17 +106,6 @@ Definition P_kpt (root : mword 44) (e : TLB_Entry) : Prop :=
 (* 3. vpn subrange arithmetic (27-bit clones of TrampPt's 64-bit facts).  *)
 (* ===================================================================== *)
 
-Lemma subrange27_unsigned_26_18 (x : mword 27) :
-  bv_unsigned (subrange_vec_dec x 26 18) = (bv_unsigned x ≫ 18) `mod` 2 ^ 9.
-Proof.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
-  rewrite bv_extract_unsigned.
-  change (Z.of_N (MachineWord.MachineWord.Z_idx 18)) with 18.
-  change (MachineWord.MachineWord.Z_idx (26 - 18 + 1)) with 9%N.
-  unfold bv_wrap, bv_modulus. reflexivity.
-Qed.
 
 Lemma subrange27_unsigned_17_9 (x : mword 27) :
   bv_unsigned (subrange_vec_dec x 17 9) = (bv_unsigned x ≫ 9) `mod` 2 ^ 9.
@@ -130,19 +119,6 @@ Proof.
   unfold bv_wrap, bv_modulus. reflexivity.
 Qed.
 
-Lemma subrange27_unsigned_8_0 (x : mword 27) :
-  bv_unsigned (subrange_vec_dec x 8 0) = bv_unsigned x `mod` 2 ^ 9.
-Proof.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
-  rewrite bv_extract_unsigned.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  change (Z.of_N 0) with 0.
-  rewrite Z.shiftr_0_r.
-  change (MachineWord.MachineWord.Z_idx (8 - 0 + 1)) with 9%N.
-  unfold bv_wrap, bv_modulus. reflexivity.
-Qed.
 
 Lemma subrange64_unsigned_11_0 (x : mword 64) :
   bv_unsigned (subrange_vec_dec x 11 0) = bv_unsigned x `mod` 2 ^ 12.
@@ -375,25 +351,8 @@ Qed.
 
 (* every legal kernel-PT entry either IS this RAM va's own entry or fails
    to match its tag *)
-Lemma P_kpt_disc (root : mword 44) (a : mword 64) (e : TLB_Entry) :
-  addr_is_ram a ->
-  P_kpt root e ->
-  e = kpt_tlb_ent root (svpn_of a) \/
-  match_TLB_Entry e (mword_of_int 0) (sign_extend' (57 - 12) (svpn_of a)) = false.
-Proof.
-  intros Hram (vpn & Hm & ->).
-  destruct (decide (vpn = svpn_of a)) as [-> | Hne].
-  - left. reflexivity.
-  - right. unfold kpt_tlb_ent. apply match_tlb4k_other. exact Hne.
-Qed.
 
 (* every RAM va's own entry is legal *)
-Lemma P_kpt_ram (root : mword 44) (a : mword 64) :
-  addr_is_ram a -> P_kpt root (kpt_tlb_ent root (svpn_of a)).
-Proof.
-  intros Hram. exists (svpn_of a). split; [| reflexivity].
-  left. exact (ram_svpn_range a Hram).
-Qed.
 
 (* ===================================================================== *)
 (* 7. Flag-byte facts for the two leaf kinds (A/D preset).                *)
@@ -422,12 +381,6 @@ Proof.
     [ unfold PTE_RAM; lia | vm_compute; reflexivity | vm_compute; reflexivity ].
 Qed.
 
-Lemma update_PTE_Bits_kpt_dev (p : mword 44) (access : MemoryAccessType mem_payload) :
-  update_PTE_Bits (mk_pte p PTE_DEV) access = None.
-Proof.
-  apply update_PTE_Bits_mk_pte_AD;
-    [ unfold PTE_DEV; lia | vm_compute; reflexivity | vm_compute; reflexivity ].
-Qed.
 
 (* ===================================================================== *)
 (* 8. The PT's memory image, as a pure predicate over an [mstate]'s mem.  *)
@@ -452,21 +405,7 @@ Definition kpt_mem (s : mstate) (root : mword 44) : Prop :=
 
 
 (* mword_of_int round-trips on the unsigned value (9- and 27-bit). *)
-Lemma mword_of_int_unsigned_9 (x : mword 9) : mword_of_int (bv_unsigned x) = x.
-Proof.
-  apply bv_eq.
-  cbv [mword_of_int Values.mword_of_int MachineWord.MachineWord.Z_to_word].
-  rewrite Z_to_bv_unsigned.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
-Lemma mword_of_int_unsigned_27 (x : mword 27) : mword_of_int (bv_unsigned x) = x.
-Proof.
-  apply bv_eq.
-  cbv [mword_of_int Values.mword_of_int MachineWord.MachineWord.Z_to_word].
-  rewrite Z_to_bv_unsigned.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
 (* ===================================================================== *)
 (* 9. Concrete-flag reductions for the DRAM leaf (PTE_RAM = 0xCF).        *)
@@ -491,23 +430,8 @@ Proof. vm_compute; reflexivity. Qed.
 
 (* check_PTE_permission at the R|W|X U=0 leaf succeeds in S-mode for all
    three access kinds, any mxr / do_sum *)
-Lemma kpt_ram_check_fetch : forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (InstructionFetch tt) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int PTE_RAM)) (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof. intros mxr do_sum s'. destruct mxr, do_sum; vm_compute; reflexivity. Qed.
 
-Lemma kpt_ram_check_load : forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (Load Data) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int PTE_RAM)) (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof. intros mxr do_sum s'. destruct mxr, do_sum; vm_compute; reflexivity. Qed.
 
-Lemma kpt_ram_check_store : forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (Store Data) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int PTE_RAM)) (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof. intros mxr do_sum s'. destruct mxr, do_sum; vm_compute; reflexivity. Qed.
 
 (* ===================================================================== *)
 (* 10. PMA / PMP per-slot facts.                                          *)
@@ -595,117 +519,10 @@ Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcf
 Hypothesis Hcov : ram_base + ram_size <= uint pmpaddr0 * 4.
 Hypothesis Hpma : pma_allows_pte_read (register_lookup pma_regions s.(sregs)).
 
-Lemma exec_translateAddr_kpt_ram (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
-  register_lookup tlb s.(sregs) = tlbvec ->
-  (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-   (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent /\
-                match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) vpn) = false) \/
-   (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) vpn)
-                 = Some (tlb4k_entry (mword_of_int 0) vpn (kpt_leaf_ppn vpn)
-                           (mk_pte (kpt_leaf_ppn vpn) PTE_RAM) ptea))) ->
-  exists s',
-    exec (translateAddr (Virtaddr va) access) s
-    = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), s')
-    /\ (s' = s \/
-        s' = set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
-                              (Some (kpt_tlb_ent root vpn)))).
-Proof.
-  intros Htlb Hslot.
-  pose proof (ram_svpn_range va Hram) as Hvr.
-  assert (Hdram : kpt_dram_vpn vpn) by (exact Hvr).
-  pose proof (dram_vpn1_range vpn Hdram) as Hv1.
-  (* the three table pages *)
-  set (p1 := kpt_l1_dram root).
-  set (p0 := kpt_l0_of root vpn).
-  set (lppn := kpt_leaf_ppn vpn).
-  (* per-slot byte-presence, at the walk's slot addresses *)
-  destruct Hmem as (Hmr0 & Hmr2 & Hmdev & Hml1 & Hml0).
-  assert (Hb2 : forall j : nat, (N.of_nat j < 8)%N ->
-            s.(mem) !! (pa_add (pte_addr_at root (subrange_vec_dec vpn 26 18)) j)
-            = Some (nth_byte (mk_pte p1 PTE_PTR) j)).
-  { rewrite (ram_svpn2 va Hram). exact Hmr2. }
-  assert (Hb1 : forall j : nat, (N.of_nat j < 8)%N ->
-            s.(mem) !! (pa_add (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) j)
-            = Some (nth_byte (mk_pte p0 PTE_PTR) j)).
-  { unfold p0. rewrite (dram_l0_of root vpn Hdram).
-    exact (Hml1 (subrange_vec_dec vpn 17 9) Hv1). }
-  assert (Hb0 : forall j : nat, (N.of_nat j < 8)%N ->
-            s.(mem) !! (pa_add (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) j)
-            = Some (nth_byte (mk_pte lppn PTE_RAM) j)).
-  { pose proof (Hml0 vpn (or_introl Hdram)) as H0.
-    unfold kpt_slot0_pa, vpn0_of in H0.
-    unfold kpt_leaf_pte in H0. rewrite (dram_lflags vpn Hdram) in H0.
-    exact H0. }
-  (* per-slot RAM-ness *)
-  assert (Hram2 : addr_is_ram (pte_addr_at root (subrange_vec_dec vpn 26 18)) /\
-                  addr_is_ram (pa_add (pte_addr_at root (subrange_vec_dec vpn 26 18)) 7)).
-  { rewrite <- (kpt_page_0 root) at 1 2.
-    apply (kpt_slot_ram root 0); [exact Hok | unfold kpt_pages; lia]. }
-  assert (Hram1 : addr_is_ram (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) /\
-                  addr_is_ram (pa_add (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) 7)).
-  { apply (kpt_slot_ram root 35); [exact Hok | unfold kpt_pages; lia]. }
-  assert (Hram0 : addr_is_ram (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) /\
-                  addr_is_ram (pa_add (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) 7)).
-  { unfold p0. rewrite (dram_l0_of root vpn Hdram). unfold kpt_l0_dram.
-    apply (kpt_slot_ram root (36 + bv_unsigned (vpn1_of vpn)));
-      [exact Hok | ].
-    pose proof (bv_unsigned_in_range _ (vpn1_of vpn)) as Hnn.
-    unfold kpt_pages. lia. }
-  destruct Hram2 as [Hram2 Hram2']. destruct Hram1 as [Hram1 Hram1']. destruct Hram0 as [Hram0 Hram0'].
-  (* per-slot PMP range matches *)
-  pose proof (ram_pte_pmp8 _ pmpaddr0 Hram2 Hram2' Hcov) as Hrange2.
-  pose proof (ram_pte_pmp8 _ pmpaddr0 Hram1 Hram1' Hcov) as Hrange1.
-  pose proof (ram_pte_pmp8 _ pmpaddr0 Hram0 Hram0' Hcov) as Hrange0.
-  (* per-slot PMA regions *)
-  destruct (Hpma (pte_addr_at root (subrange_vec_dec vpn 26 18))) as (region2 & Hmatch2 & Hpte2).
-  destruct (Hpma (pte_addr_at p1 (subrange_vec_dec vpn 17 9))) as (region1 & Hmatch1 & Hpte1).
-  destruct (Hpma (pte_addr_at p0 (subrange_vec_dec vpn 8 0))) as (region0 & Hmatch0 & Hpte0).
-  (* per-slot MMIO / device disjointness *)
-  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram2) ltac:(lia)) as Hc2.
-  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram1) ltac:(lia)) as Hc1.
-  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)) as Hc0.
-  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram2) ltac:(lia)) as Hsig2.
-  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram1) ltac:(lia)) as Hsig1.
-  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)) as Hsig0.
-  pose proof (within_htif_false (pte_addr_at root (subrange_vec_dec vpn 26 18)) 8 s Hhtif) as Hh2.
-  pose proof (within_htif_false (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) 8 s Hhtif) as Hh1.
-  pose proof (within_htif_false (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) 8 s Hhtif) as Hh0.
-  pose proof (addr_is_ram_not_dev _ Hram2) as Hdev2.
-  pose proof (addr_is_ram_not_dev _ Hram1) as Hdev1.
-  pose proof (addr_is_ram_not_dev _ Hram0) as Hdev0.
-  destruct (exec_translateAddr_tramp access vpn root p1 p0 lppn PTE_RAM
-              region2 region1 region0 menvcfg0 s
-              ltac:(unfold PTE_RAM; lia) kpt_ram_inv_red kpt_ram_nonleaf_red Hchk0
-              kpt_extN_red kpt_ram_G_red HmisaS HA Hord HR Hmenv HPBMTE
-              Hrange2 Hmatch2 Hpte2 Hc2 Hsig2 Hh2 Hdev2 Hb2
-              Hrange1 Hmatch1 Hpte1 Hc1 Hsig1 Hh1 Hdev1 Hb1
-              Hrange0 Hmatch0 Hpte0 Hc0 Hsig0 Hh0 Hdev0 Hb0
-              (update_PTE_Bits_kpt_ram lppn access)
-              satp0 va va
-              Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
-              (ram_canonical va Hram) eq_refl (ram_ident_4k va Hram)
-              tlbvec Htlb Hslot)
-    as (s' & Htr & Hcase).
-  exists s'. split; [exact Htr|].
-  destruct Hcase as [-> | ->].
-  - left. reflexivity.
-  - right.
-    unfold tramp_tlb_ent, kpt_tlb_ent, kpt_leaf_pte, kpt_slot0_pa, vpn0_of.
-    rewrite (dram_lflags vpn Hdram).
-    unfold p0, lppn. reflexivity.
-Qed.
 
 End KptRamTranslate.
 
 (* transport [kpt_mem] across a memory-preserving state change *)
-Lemma kpt_mem_eq (s s' : mstate) (root : mword 44) :
-  s'.(mem) = s.(mem) -> kpt_mem s root -> kpt_mem s' root.
-Proof.
-  intros Hm (H0 & H2 & Hdev & Hl1 & Hl0).
-  unfold kpt_mem, kpt_slot_in in *.
-  rewrite Hm.
-  repeat split; assumption.
-Qed.
 
 (* ===================================================================== *)
 (* 12. ARBITRARY A/D BITS.  The layer above fixes every leaf's A/D bits   *)
@@ -769,24 +586,7 @@ Lemma kpt_tlb_ent_adf1 (root : mword 44) (vpn : mword 27) :
   kpt_tlb_ent_ad kpt_adf1 root vpn = kpt_tlb_ent root vpn.
 Proof. unfold kpt_tlb_ent_ad, kpt_tlb_ent. rewrite kpt_leaf_pte_adf1. reflexivity. Qed.
 
-Lemma P_kpt_adf1 (root : mword 44) (e : TLB_Entry) :
-  P_kpt_ad kpt_adf1 root e <-> P_kpt root e.
-Proof.
-  split; intros (vpn & Hm & ->); exists vpn; (split; [exact Hm|]).
-  - apply kpt_tlb_ent_adf1.
-  - symmetry; apply kpt_tlb_ent_adf1.
-Qed.
 
-Lemma kpt_mem_adf1 (s : mstate) (root : mword 44) :
-  kpt_mem_ad kpt_adf1 s root <-> kpt_mem s root.
-Proof.
-  unfold kpt_mem_ad, kpt_mem.
-  split; intros (H0 & H2 & Hdev & Hl1 & Hl0);
-    refine (conj H0 (conj H2 (conj Hdev (conj Hl1 _))));
-    intros vpn Hv; specialize (Hl0 vpn Hv).
-  - rewrite (kpt_leaf_pte_adf1 vpn) in Hl0. exact Hl0.
-  - rewrite (kpt_leaf_pte_adf1 vpn). exact Hl0.
-Qed.
 
 (* ---- parametric flag-byte facts (any A/D) ---- *)
 
@@ -948,24 +748,7 @@ Qed.
 
 (* ---- generalized discrimination / slot facts ---- *)
 
-Lemma P_kpt_ad_disc (adf : kpt_adf) (root : mword 44) (a : mword 64) (e : TLB_Entry) :
-  addr_is_ram a ->
-  P_kpt_ad adf root e ->
-  e = kpt_tlb_ent_ad adf root (svpn_of a) \/
-  match_TLB_Entry e (mword_of_int 0) (sign_extend' (57 - 12) (svpn_of a)) = false.
-Proof.
-  intros Hram (vpn & Hm & ->).
-  destruct (decide (vpn = svpn_of a)) as [-> | Hne].
-  - left. reflexivity.
-  - right. unfold kpt_tlb_ent_ad. apply match_tlb4k_other. exact Hne.
-Qed.
 
-Lemma P_kpt_ad_ram (adf : kpt_adf) (root : mword 44) (a : mword 64) :
-  addr_is_ram a -> P_kpt_ad adf root (kpt_tlb_ent_ad adf root (svpn_of a)).
-Proof.
-  intros Hram. exists (svpn_of a). split; [| reflexivity].
-  left. exact (ram_svpn_range a Hram).
-Qed.
 
 (* ===================================================================== *)
 (* 13. THE arbitrary-A/D RAM-va translate: [exec_translateAddr_kpt_ram]   *)
@@ -1012,116 +795,9 @@ Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcf
 Hypothesis Hcov : ram_base + ram_size <= uint pmpaddr0 * 4.
 Hypothesis Hpma : pma_allows_pte_read (register_lookup pma_regions s.(sregs)).
 
-Lemma exec_translateAddr_kpt_ram_ad (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
-  register_lookup tlb s.(sregs) = tlbvec ->
-  (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-   (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent /\
-                match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) vpn) = false) \/
-   (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) vpn)
-                 = Some (tlb4k_entry (mword_of_int 0) vpn (kpt_leaf_ppn vpn)
-                           (mk_pte (kpt_leaf_ppn vpn) (kpt_lflags_ad adf vpn)) ptea))) ->
-  exists s',
-    exec (translateAddr (Virtaddr va) access) s
-    = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), s')
-    /\ (s' = s \/
-        s' = set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
-                              (Some (kpt_tlb_ent_ad adf root vpn)))).
-Proof.
-  intros Htlb Hslot.
-  pose proof (ram_svpn_range va Hram) as Hvr.
-  assert (Hdram : kpt_dram_vpn vpn) by (exact Hvr).
-  pose proof (dram_vpn1_range vpn Hdram) as Hv1.
-  (* the three table pages *)
-  set (p1 := kpt_l1_dram root).
-  set (p0 := kpt_l0_of root vpn).
-  set (lppn := kpt_leaf_ppn vpn).
-  set (lflags := kpt_lflags_ad adf vpn).
-  (* per-slot byte-presence, at the walk's slot addresses *)
-  destruct Hmem as (Hmr0 & Hmr2 & Hmdev & Hml1 & Hml0).
-  assert (Hb2 : forall j : nat, (N.of_nat j < 8)%N ->
-            s.(mem) !! (pa_add (pte_addr_at root (subrange_vec_dec vpn 26 18)) j)
-            = Some (nth_byte (mk_pte p1 PTE_PTR) j)).
-  { rewrite (ram_svpn2 va Hram). exact Hmr2. }
-  assert (Hb1 : forall j : nat, (N.of_nat j < 8)%N ->
-            s.(mem) !! (pa_add (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) j)
-            = Some (nth_byte (mk_pte p0 PTE_PTR) j)).
-  { unfold p0. rewrite (dram_l0_of root vpn Hdram).
-    exact (Hml1 (subrange_vec_dec vpn 17 9) Hv1). }
-  assert (Hb0 : forall j : nat, (N.of_nat j < 8)%N ->
-            s.(mem) !! (pa_add (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) j)
-            = Some (nth_byte (mk_pte lppn lflags) j)).
-  { pose proof (Hml0 vpn (or_introl Hdram)) as H0.
-    unfold kpt_slot0_pa, vpn0_of, kpt_leaf_pte_ad in H0.
-    exact H0. }
-  (* per-slot RAM-ness *)
-  assert (Hram2 : addr_is_ram (pte_addr_at root (subrange_vec_dec vpn 26 18)) /\
-                  addr_is_ram (pa_add (pte_addr_at root (subrange_vec_dec vpn 26 18)) 7)).
-  { rewrite <- (kpt_page_0 root) at 1 2.
-    apply (kpt_slot_ram root 0); [exact Hok | unfold kpt_pages; lia]. }
-  assert (Hram1 : addr_is_ram (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) /\
-                  addr_is_ram (pa_add (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) 7)).
-  { apply (kpt_slot_ram root 35); [exact Hok | unfold kpt_pages; lia]. }
-  assert (Hram0 : addr_is_ram (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) /\
-                  addr_is_ram (pa_add (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) 7)).
-  { unfold p0. rewrite (dram_l0_of root vpn Hdram). unfold kpt_l0_dram.
-    apply (kpt_slot_ram root (36 + bv_unsigned (vpn1_of vpn)));
-      [exact Hok | ].
-    pose proof (bv_unsigned_in_range _ (vpn1_of vpn)) as Hnn.
-    unfold kpt_pages. lia. }
-  destruct Hram2 as [Hram2 Hram2']. destruct Hram1 as [Hram1 Hram1']. destruct Hram0 as [Hram0 Hram0'].
-  (* per-slot PMP range matches *)
-  pose proof (ram_pte_pmp8 _ pmpaddr0 Hram2 Hram2' Hcov) as Hrange2.
-  pose proof (ram_pte_pmp8 _ pmpaddr0 Hram1 Hram1' Hcov) as Hrange1.
-  pose proof (ram_pte_pmp8 _ pmpaddr0 Hram0 Hram0' Hcov) as Hrange0.
-  (* per-slot PMA regions *)
-  destruct (Hpma (pte_addr_at root (subrange_vec_dec vpn 26 18))) as (region2 & Hmatch2 & Hpte2).
-  destruct (Hpma (pte_addr_at p1 (subrange_vec_dec vpn 17 9))) as (region1 & Hmatch1 & Hpte1).
-  destruct (Hpma (pte_addr_at p0 (subrange_vec_dec vpn 8 0))) as (region0 & Hmatch0 & Hpte0).
-  (* per-slot MMIO / device disjointness *)
-  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram2) ltac:(lia)) as Hc2.
-  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram1) ltac:(lia)) as Hc1.
-  pose proof (within_clint_false _ 8 s (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)) as Hc0.
-  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram2) ltac:(lia)) as Hsig2.
-  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram1) ltac:(lia)) as Hsig1.
-  pose proof (within_sig_false _ 8 s (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)) as Hsig0.
-  pose proof (within_htif_false (pte_addr_at root (subrange_vec_dec vpn 26 18)) 8 s Hhtif) as Hh2.
-  pose proof (within_htif_false (pte_addr_at p1 (subrange_vec_dec vpn 17 9)) 8 s Hhtif) as Hh1.
-  pose proof (within_htif_false (pte_addr_at p0 (subrange_vec_dec vpn 8 0)) 8 s Hhtif) as Hh0.
-  pose proof (addr_is_ram_not_dev _ Hram2) as Hdev2.
-  pose proof (addr_is_ram_not_dev _ Hram1) as Hdev1.
-  pose proof (addr_is_ram_not_dev _ Hram0) as Hdev0.
-  destruct (exec_translateAddr_tramp access vpn root p1 p0 lppn lflags
-              region2 region1 region0 menvcfg0 s
-              (kpt_lflags_ad_bound adf vpn) (kpt_inv_red_ad adf vpn)
-              (kpt_nonleaf_red_ad adf vpn) Hchk0
-              kpt_extN_red (kpt_G_red_ad adf vpn) HmisaS HA Hord HR Hmenv HPBMTE
-              Hrange2 Hmatch2 Hpte2 Hc2 Hsig2 Hh2 Hdev2 Hb2
-              Hrange1 Hmatch1 Hpte1 Hc1 Hsig1 Hh1 Hdev1 Hb1
-              Hrange0 Hmatch0 Hpte0 Hc0 Hsig0 Hh0 Hdev0 Hb0
-              Hupd0
-              satp0 va va
-              Heff Hss Hcp HSXL Hsatp Hmode Hppn Hasid
-              (ram_canonical va Hram) eq_refl (ram_ident_4k va Hram)
-              tlbvec Htlb Hslot)
-    as (s' & Htr & Hcase).
-  exists s'. split; [exact Htr|].
-  destruct Hcase as [-> | ->].
-  - left. reflexivity.
-  - right.
-    unfold tramp_tlb_ent, kpt_tlb_ent_ad, kpt_leaf_pte_ad, kpt_slot0_pa, vpn0_of.
-    unfold p0, lppn, lflags. reflexivity.
-Qed.
 
 End KptRamTranslateAD.
 
-Lemma kpt_mem_ad_eq (adf : kpt_adf) (s s' : mstate) (root : mword 44) :
-  s'.(mem) = s.(mem) -> kpt_mem_ad adf s root -> kpt_mem_ad adf s' root.
-Proof.
-  intros Hm (H0 & H2 & Hdev & Hl1 & Hl0).
-  unfold kpt_mem_ad, kpt_slot_in in *.
-  rewrite Hm.
-  repeat split; assumption.
-Qed.
 
 (* ===================================================================== *)
 (* 14. EXISTENTIALLY-QUANTIFIED A/D BITS (per PT entry).                  *)
@@ -1157,24 +833,6 @@ Proof.
   exists vpn, (adf vpn). split; [exact Hm | apply kpt_tlb_ent_ad_b].
 Qed.
 
-Lemma P_kpt_to_e (root : mword 44) (e : TLB_Entry) :
-  P_kpt root e -> P_kpt_e root e.
-Proof.
-  intros HP. apply (P_kpt_ad_to_e kpt_adf1).
-  destruct HP as (vpn & Hm & ->).
-  exists vpn. split; [exact Hm | symmetry; apply kpt_tlb_ent_adf1].
-Qed.
 
 (* per-entry discrimination: ANY-bits entries still discriminate by vpn
    tag alone, so the fetch/data chains work over [P_kpt_e]-consistent TLBs *)
-Lemma P_kpt_e_disc (root : mword 44) (a : mword 64) (e : TLB_Entry) :
-  addr_is_ram a ->
-  P_kpt_e root e ->
-  (exists ad, e = kpt_tlb_ent_b root (svpn_of a) ad) \/
-  match_TLB_Entry e (mword_of_int 0) (sign_extend' (57 - 12) (svpn_of a)) = false.
-Proof.
-  intros Hram (vpn & ad & Hm & ->).
-  destruct (decide (vpn = svpn_of a)) as [-> | Hne].
-  - left. exists ad. reflexivity.
-  - right. unfold kpt_tlb_ent_b, kpt_tlb_ent_ad. apply match_tlb4k_other. exact Hne.
-Qed.

@@ -318,20 +318,6 @@ Section UptTreeInv.
     iExists usatp, tlbvec, t. iFrame "Hsatp Htlb Ht Hpmp". iPureIntro. tauto.
   Qed.
 
-  Lemma utlb_inv_pt_open (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
-    utlb_inv_pt uroot tfp um -∗
-    ∃ (usatp : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree),
-      satp ↦ᵣ usatp ∗
-      ⌜ _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ⌝ ∗
-      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
-      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ⌝ ∗
-      tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt (mword_of_int 0) t tlbvec ⌝ ∗
-      ⌜ upt_tree_spec uroot tfp um t ⌝ ∗
-      ⌜ upt_map_wf um ⌝ ∗
-      ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
-      ptree_own 2 (DfracOwn 1) t ∗
-      pmp_config uroot.
-  Proof. iIntros "H". iExact "H". Qed.
 
 End UptTreeInv.
 

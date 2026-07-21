@@ -97,37 +97,6 @@ Proof. reflexivity. Qed.
 (* ---- JAL to a 2-byte-aligned target with the C extension enabled (the
    kerneltrap entry 0x800026a2 is NOT 4-aligned): copied from the archived
    WpKvJal.v -- the misalignment check (bit1 && not Zca) is false. ---- *)
-Lemma kv_exec_jump_to_zca (target : mword 64) s :
-  eq_vec (access_vec_dec target 0) ('b"0") = true ->
-  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-  exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
-Proof.
-  intros Halign Hzca.
-  unfold jump_to. rewrite exec_catch_early_return.
-  change (ext_control_check_pc target) with (@None unit). cbv iota beta.
-  rewrite (execR_bind_Some _ _ _ false s).
-  2:{ unfold Defs.bind0.
-      erewrite execR_bind_Some.
-      2:{ erewrite execR_bind_Some.
-          2:{ apply execR_returnR_fwd. }
-          rewrite execR_liftR. unfold assert_exp. rewrite Halign. cbn match.
-          rewrite exec_returnm. reflexivity. }
-      unfold and_boolM.
-      rewrite (execR_bind_Some _ _ _ (bit_to_bool (access_vec_dec target 1)) s).
-      2:{ apply execR_returnR_fwd. }
-      destruct (bit_to_bool (access_vec_dec target 1)).
-      - cbv iota beta.
-        rewrite (execR_bind_Some _ _ _ true s).
-        2:{ rewrite execR_liftR. rewrite Hzca. reflexivity. }
-        cbv iota beta. apply execR_returnR_fwd.
-      - cbv iota beta. apply execR_returnR_fwd. }
-  cbv iota beta.
-  unfold Defs.bind0.
-  rewrite (execR_bind_Some _ _ _ tt (set_reg s nextPC target)).
-  2:{ rewrite execR_liftR. rewrite exec_set_next_pc. reflexivity. }
-  rewrite (execR_returnR_fwd RETIRE_SUCCESS (set_reg s nextPC target)).
-  reflexivity.
-Qed.
 
 
 (* sp after the prologue c.addi16sp (the value the whole frame is based on). *)
@@ -467,21 +436,6 @@ Section WpKernelvecNew.
 
   (* hw_config is persistent and bundled inside [smode_config]: peel a copy
      without disturbing the bundle. *)
-  Lemma smode_config_hw (γ : gname) (dq : dfrac) :
-    smode_config γ dq -∗ hw_config ∗ smode_config γ dq.
-  Proof.
-    iIntros "Hsm".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (ms0) "(Hms & Hsie & %H1 & %H2 & %H3 & %H4 & %H5)".
-    iDestruct "Hmieb" as (mv dv) "(Hmie & Hmdl & %H6)".
-    iDestruct "Hmenvb" as (menv0) "(Hmenv & %H7 & %H8 & %H9 & %H10 & %H11)".
-    iSplitR "Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv".
-    { iApply "Hhw". }
-    iApply (smode_config_rebuild γ dq ms0 mv dv menv0
-              H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11
-              with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv").
-  Qed.
 
 
   (* the 17-instruction register-save run, as ONE block; STRENGTHENED to

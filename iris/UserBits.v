@@ -229,21 +229,6 @@ Proof.
   f_equal. f_equal. lia.
 Qed.
 
-Lemma nth_byte_assemble2 (bs : list (bv 8)) (j : nat) :
-  length bs = 2%nat -> (j < 2)%nat ->
-  nth_byte (Z_to_bv 16 (assemble_bytes bs) : mword 16) j = bs !!! j.
-Proof.
-  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
-  rewrite Z_to_bv_unsigned.
-  pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite Hlen in Hhi. simpl in Hhi.
-  assert (Hws : bv_wrap 16 (assemble_bytes bs) = assemble_bytes bs).
-  { apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
-  rewrite Hws.
-  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
-    by (apply assemble_bytes_byte; lia).
-  rewrite <- Hab.
-  f_equal. f_equal. lia.
-Qed.
 
 (* a 4-aligned va translates to a 4-aligned pa (the page offset carries
    the low bits) *)
@@ -321,93 +306,11 @@ Proof.
   exact Hal.
 Qed.
 
-Lemma off2_bound (va : mword 64) :
-  is_aligned_vaddr (Virtaddr va) 2 = true ->
-  uint (subrange_vec_dec va 11 0) + 2 <= 4096.
-Proof.
-  intro Hal.
-  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
-  rewrite uint_subrange11.
-  rewrite !(uint_unsigned_n _) in Hal |- *.
-  pose proof (bv_unsigned_in_range _ va) as Hr.
-  rewrite Z.rem_mod_nonneg in Hal by lia.
-  assert (Hoff2 : (bv_unsigned va mod 4096) mod 2 = 0).
-  { rewrite <- Znumtheory.Zmod_div_mod; [ exact Hal | lia | lia | ].
-    exists 2048. reflexivity. }
-  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
-  apply Z.mod_divide in Hoff2; [ | lia ]. destruct Hoff2 as [q Hq].
-  lia.
-Qed.
 
 (* a 2-aligned va translates to a 2-aligned pa *)
-Lemma pa2_aligned (p : mword 44) (va : mword 64) :
-  is_aligned_vaddr (Virtaddr va) 2 = true ->
-  is_aligned_paddr (Physaddr (zero_extend' 64
-    (concat_vec p (subrange_vec_dec va 11 0)))) 2 = true.
-Proof.
-  intro Hal.
-  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
-  unfold is_aligned_paddr. apply Z.eqb_eq.
-  rewrite !(uint_unsigned_n _) in Hal |- *.
-  pose proof (bv_unsigned_in_range _ va) as Hr.
-  rewrite Z.rem_mod_nonneg in Hal by lia.
-  rewrite zext64_concat44_12_unsigned.
-  rewrite bv_subrange11.
-  pose proof (bv_unsigned_in_range _ p) as Hp.
-  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
-  rewrite Z.rem_mod_nonneg by lia.
-  rewrite <- Z.add_mod_idemp_l by lia.
-  replace ((bv_unsigned p * 4096) mod 2) with 0.
-  2:{ symmetry. apply Z.mod_divide; [ lia | ].
-      exists (bv_unsigned p * 2048). lia. }
-  rewrite Z.add_0_l.
-  rewrite <- Znumtheory.Zmod_div_mod; [ | lia | lia | exists 2048; reflexivity ].
-  exact Hal.
-Qed.
 
-Lemma off8_bound (va : mword 64) :
-  is_aligned_vaddr (Virtaddr va) 8 = true ->
-  uint (subrange_vec_dec va 11 0) + 8 <= 4096.
-Proof.
-  intro Hal.
-  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
-  rewrite uint_subrange11.
-  rewrite !(uint_unsigned_n _) in Hal |- *.
-  pose proof (bv_unsigned_in_range _ va) as Hr.
-  rewrite Z.rem_mod_nonneg in Hal by lia.
-  assert (Hoff8 : (bv_unsigned va mod 4096) mod 8 = 0).
-  { rewrite <- Znumtheory.Zmod_div_mod; [ exact Hal | lia | lia | ].
-    exists 512. reflexivity. }
-  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
-  apply Z.mod_divide in Hoff8; [ | lia ]. destruct Hoff8 as [q Hq].
-  lia.
-Qed.
 
 (* an 8-aligned va translates to an 8-aligned pa *)
-Lemma pa8_aligned (p : mword 44) (va : mword 64) :
-  is_aligned_vaddr (Virtaddr va) 8 = true ->
-  is_aligned_paddr (Physaddr (zero_extend' 64
-    (concat_vec p (subrange_vec_dec va 11 0)))) 8 = true.
-Proof.
-  intro Hal.
-  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
-  unfold is_aligned_paddr. apply Z.eqb_eq.
-  rewrite !(uint_unsigned_n _) in Hal |- *.
-  pose proof (bv_unsigned_in_range _ va) as Hr.
-  rewrite Z.rem_mod_nonneg in Hal by lia.
-  rewrite zext64_concat44_12_unsigned.
-  rewrite bv_subrange11.
-  pose proof (bv_unsigned_in_range _ p) as Hp.
-  pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hb.
-  rewrite Z.rem_mod_nonneg by lia.
-  rewrite <- Z.add_mod_idemp_l by lia.
-  replace ((bv_unsigned p * 4096) mod 8) with 0.
-  2:{ symmetry. apply Z.mod_divide; [ lia | ].
-      exists (bv_unsigned p * 512). lia. }
-  rewrite Z.add_0_l.
-  rewrite <- Znumtheory.Zmod_div_mod; [ | lia | lia | exists 512; reflexivity ].
-  exact Hal.
-Qed.
 
 
 (* ===================================================================== *)

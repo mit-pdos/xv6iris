@@ -230,10 +230,6 @@ Lemma sie_rdval_set_nextPC (s : mstate) (v : mword 64) :
   sie_rdval (set_reg s nextPC v) = sie_rdval s.
 Proof. unfold sie_rdval, set_reg; cbn [sregs].
   do 2 (rewrite irrelevant_register_set; [| vm_compute; reflexivity]). reflexivity. Qed.
-Lemma time_rdval_set_nextPC (s : mstate) (v : mword 64) :
-  time_rdval (set_reg s nextPC v) = time_rdval s.
-Proof. unfold time_rdval, set_reg; cbn [sregs].
-  rewrite irrelevant_register_set; [ reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* ====================================================================== *)
 (* Register-generic csrr WPs for arbitrary readable CSRs (mstatus /          *)

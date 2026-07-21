@@ -31,8 +31,6 @@ Section WpPushOffMem.
   (* 32 bits sign-extended to 64).                                           *)
   (* ===================================================================== *)
 
-  Lemma avi0_mul4 (a : mword 64) : add_vec_int a (0 * 4) = a.
-  Proof. change (0 * 4) with 0. apply avi0. Qed.
 
   (* ---- width-4 store primitives ---- *)
   Lemma exec_write_ram_plain_4 (addr : mword 64) (data : bv 32) s :
@@ -328,25 +326,6 @@ Section WpPushOffMem.
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 4) s = Some (false, s).
   Hypothesis Hdev : dev_addr pa = false.
 
-  Lemma exec_vmem_write_4_gpr_S :
-    exec (vmem_write (Regidx rs1) offset 4 data (Store Data) false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) pa 4 data) s.(mdev)).
-  Proof.
-    unfold vmem_write. rewrite exec_catch_early_return.
-    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Store Data) 4) s
-                   = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
-    { unfold get_transformed_data_addr.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Store Data) 4 s)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_store_S ea satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm)).
-      apply exec_returnM. }
-    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
-    cbn match.
-    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
-    rewrite execR_liftR.
-    rewrite (exec_vmem_write_addr_4_S a8 data region s Halign Hcp Hmprv Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev).
-    reflexivity.
-  Qed.
   End VWgS4.
 
   (* ---- width-4 register-generic STORE execute (HIT) ---- *)
@@ -535,25 +514,6 @@ Section WpPushOffMem.
   Hypothesis Hh : exec (within_htif_writable (Physaddr pa) 4) s' = Some (false, s').
   Hypothesis Hdev : dev_addr pa = false.
 
-  Lemma exec_vmem_write_4_gpr_S_walk :
-    exec (vmem_write (Regidx rs1) offset 4 data (Store Data) false false false) s
-      = Some (Ok true, MState s'.(sregs) (write_bytes s.(mem) pa 4 data) s'.(mdev)).
-  Proof.
-    unfold vmem_write. rewrite exec_catch_early_return.
-    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Store Data) 4) s
-                   = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
-    { unfold get_transformed_data_addr.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Store Data) 4 s)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_store_S ea satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm)).
-      apply exec_returnM. }
-    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
-    cbn match.
-    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
-    rewrite execR_liftR.
-    rewrite (exec_vmem_write_addr_4_S_walk a8 data region tlbf s Halign Hcp' Hmprv' Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev).
-    reflexivity.
-  Qed.
   End VWgS4walk.
 
   (* ---- width-4 register-generic STORE execute WALK ---- *)
@@ -798,24 +758,6 @@ Section WpPushOffMem.
   Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-  Lemma exec_vmem_read_4_gpr_S :
-    exec (vmem_read (Regidx rs1) offset 4 (Load Data) false false false) s = Some (Ok data2, s).
-  Proof.
-    unfold vmem_read. rewrite exec_catch_early_return.
-    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Load Data) 4) s
-                   = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
-    { unfold get_transformed_data_addr.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Load Data) 4 s)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_load_S ea satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm)).
-      apply exec_returnM. }
-    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
-    cbn match.
-    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
-    rewrite execR_liftR.
-    rewrite (exec_vmem_read_addr_4_S a8 v region s Halign Hcp Hmprv Htr HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes).
-    reflexivity.
-  Qed.
   End RWgS4.
 
   (* ---- width-4 register-generic LOAD execute (HIT) ---- *)
@@ -982,24 +924,6 @@ Section WpPushOffMem.
   Hypothesis Hdev : dev_addr pa = false.
   Hypothesis Hbytes : forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-  Lemma exec_vmem_read_4_gpr_S_walk :
-    exec (vmem_read (Regidx rs1) offset 4 (Load Data) false false false) s = Some (Ok data2, s').
-  Proof.
-    unfold vmem_read. rewrite exec_catch_early_return.
-    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) offset (Load Data) 4) s
-                   = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
-    { unfold get_transformed_data_addr.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 offset (Load Data) 4 s)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_load_S ea satp0 s Hcp HSXL Hsatp Hmode Hmprv Hmxr Hpmm)).
-      apply exec_returnM. }
-    rewrite (execR_liftR_seq _ _ _ _ _ Hgta).
-    cbn match.
-    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
-    rewrite execR_liftR.
-    rewrite (exec_vmem_read_addr_4_S_walk a8 v region tlbf s Halign Hcp' Hmprv' Htr HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes).
-    reflexivity.
-  Qed.
   End RWgS4walk.
 
   (* ---- width-4 register-generic LOAD execute WALK ---- *)
@@ -1051,18 +975,6 @@ Section WpPushOffMem.
   End ExecLoadGS4walk.
 
   (* ---- width-4 helper facts for the WP lemmas ---- *)
-  Lemma data2_id_4 (v : mword 32) :
-    update_subrange_vec_dec (zeros' (4*1*8)) (4*(0+1)*8-1) (4*0*8) v = v.
-  Proof.
-    apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
-    erewrite bv_concat_unsigned by (cbn; lia).
-    erewrite bv_concat_unsigned by (cbn; lia).
-    rewrite !bv_unsigned_N_0.
-    rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r. rewrite Z.lor_0_r. rewrite Z.lor_0_l.
-    reflexivity.
-  Qed.
 
   Lemma upd_window_bw {k : N} (mm : _) (pa : Arch.pa) (vnew vold : bv k)
       (l : list nat) :

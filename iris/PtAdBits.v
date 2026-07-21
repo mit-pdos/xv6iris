@@ -205,14 +205,6 @@ Proof.
   mw_prep. tb1.
 Qed.
 
-Lemma pte_set_ad_nonleaf (w : mword 64) (a d : mword 1) :
-  pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
-  = pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
-Proof.
-  unfold pte_is_non_leaf.
-  rewrite pte_set_ad_flag_R, pte_set_ad_flag_W, pte_set_ad_flag_X.
-  reflexivity.
-Qed.
 
 (* the V flag reads bit 0 of the word: bit 0 clear means V = 0 (what
    makes the C walk's raw V-bit test agree with the model's classifier) *)

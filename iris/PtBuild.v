@@ -142,25 +142,8 @@ Definition ptree_same_rep (t t' : ptree) : Prop :=
   (forall v p2 p1 p0, ptree_maps t v p2 p1 p0 <-> ptree_maps t' v p2 p1 p0) /\
   (forall v, ptree_blocks t v <-> ptree_blocks t' v).
 
-Lemma ptree_same_rep_refl (t : ptree) : ptree_same_rep t t.
-Proof. split; [reflexivity | split; tauto]. Qed.
 
-Lemma ptree_same_rep_trans (t t' t'' : ptree) :
-  ptree_same_rep t t' -> ptree_same_rep t' t'' -> ptree_same_rep t t''.
-Proof.
-  intros (Hb & Hm & Hbl) (Hb' & Hm' & Hbl').
-  split; [congruence |].
-  split; intros; [rewrite Hm; apply Hm' | rewrite Hbl; apply Hbl'].
-Qed.
 
-Lemma pt_rep_same (t t' : ptree) (m : gmap (mword 27) (mword 64)) :
-  ptree_same_rep t t' -> pt_rep t m -> pt_rep t' m.
-Proof.
-  intros (Hb & Hm & Hbl) (Hmap & Hblk). split.
-  - intros vpn w Hl. destruct (Hmap vpn w Hl) as (p2 & p1 & Hp).
-    exists p2, p1. apply Hm. exact Hp.
-  - intros vpn Hl. apply Hbl. exact (Hblk vpn Hl).
-Qed.
 
 (* the pointer path down to [vpn]'s L0 slot, whose current word is [w0]
    ([ptree_maps] minus the leaf classification -- walk's return value) *)
@@ -2012,13 +1995,6 @@ Qed.
 
 (* ---- prologue / loop-body glue -------------------------------------- *)
 
-Local Lemma pb_sub_vec_unsigned (x y : mword 64) :
-  bv_unsigned (sub_vec x y) = bv_wrap 64 (bv_unsigned x - bv_unsigned y).
-Proof.
-  unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
-  rewrite bv_sub_unsigned. reflexivity.
-Qed.
 
 (* adding [pa - va] to the k-th va lands on the k-th pa *)
 Lemma mappages_pa_of_va (va pa : mword 64) (k : nat) :

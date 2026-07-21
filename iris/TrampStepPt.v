@@ -649,10 +649,6 @@ Section TrampFetchInst.
   Qed.
 
   (* the two instantiated trampoline fetches *)
-  Definition ktramp_fetch_pt (root_ppn : mword 44) :=
-    tramp_fetch_pt (tlb_inv_pt root_ppn) (ktramp_fetch_habs root_ppn).
-  Definition utramp_fetch_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :=
-    tramp_fetch_pt (utlb_inv_pt uroot tfp um) (utramp_fetch_habs uroot tfp um).
 
   (* ... and the two instantiated step engines: the KERNEL-phase trampoline
      step (userret's first two instructions) and the USER-phase step (the

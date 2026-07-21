@@ -110,8 +110,6 @@ Section Kfree.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Notation KF := KernelSyms.kfree.
-  Notation PO := KernelSyms.push_off.
 
   (* ============================================================= *)
   (* kfree: whole-function S-mode WP.  COMPLETE (Qed, no admits).     *)

@@ -479,72 +479,6 @@ Definition sfetch_ppn_out (vpn : mword 27) : mword 44 :=
 
 (* [tlb_get_ppn] on the identity-superpage entry equals [sfetch_ppn_out].
    (Local copy of WpSmodeGpr's tlb_get_ppn_pw.) *)
-Lemma sfetch_tlb_get_ppn (root_ppn : mword 44) (vpn : mword 27) :
-  tlb_get_ppn 39 (pw_tlb_entry root_ppn (mword_of_int 0)) vpn = sfetch_ppn_out vpn.
-Proof.
-  unfold tlb_get_ppn, pw_tlb_entry, sfetch_ppn_out.
-  cbn [TLB_Entry_levelMask TLB_Entry_ppn].
-  cbv [trunc vector_truncate slice or_vec and_vec sign_extend' zero_extend'
-       concat_vec subrange_vec_dec Operators_mwords.sign_extend Operators_mwords.zero_extend
-       Operators_mwords.exts_vec Operators_mwords.extz_vec
-       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
-  cbn.
-  change (43 - 18 + 1) with 26.
-  change (17 - 0 + 1) with 18.
-  cbn.
-  change (Z.of_N (26 + 18)) with 44.
-  change ((26 + 18)%N) with 44%N.
-  cbn.
-  change (26 + 18) with 44.
-  cbn.
-  cbv [MachineWord.slice MachineWord.or MachineWord.and MachineWord.zero_extend
-       MachineWord.sign_extend MachineWord.concat MachineWord.Z_to_word mword_of_int
-       Values.mword_of_int].
-  apply bv_eq.
-  rewrite bv_extract_unsigned.
-  rewrite bv_or_unsigned.
-  rewrite bv_and_unsigned.
-  rewrite (@bv_zero_extend_unsigned 44 64 _ ltac:(lia)).
-  rewrite (@bv_zero_extend_unsigned 45 64 _ ltac:(lia)).
-  rewrite bv_sign_extend_unsigned.
-  rewrite (@bv_concat_unsigned 26 44 18 _ _ eq_refl).
-  rewrite !bv_extract_unsigned.
-  rewrite !Z_to_bv_unsigned.
-  rewrite (bv_wrap_small (MachineWord.Z_idx 44) 524288
-             ltac:(vm_compute; split; [discriminate | reflexivity])).
-  rewrite (bv_wrap_small (MachineWord.Z_idx (57 - 12)) 262143
-             ltac:(vm_compute; split; [discriminate | reflexivity])).
-  rewrite !Z.shiftr_0_r.
-  replace (bv_wrap 26 (Z.shiftr 524288 (Z.of_N 18))) with 2 by (vm_compute; reflexivity).
-  apply Z.bits_inj'. intros i Hi.
-  rewrite (bv_wrap_spec _ _ i Hi).
-  rewrite !Z.lor_spec. rewrite Z.land_spec.
-  rewrite (Z.shiftl_spec _ _ i Hi).
-  rewrite (bv_wrap_spec 18 _ i Hi).
-  change 2 with (Z.pow 2 1).
-  rewrite (Z.pow2_bits_eqb 1 (i - Z.of_N 18) ltac:(lia)).
-  change 262143 with (Z.ones 18).
-  rewrite (Z.testbit_ones_nonneg 18 i ltac:(lia) Hi).
-  change (MachineWord.Z_idx 44) with 44%N.
-  destruct (Z.ltb_spec i 18) as [Hlt | Hge].
-  - rewrite (bv_wrap_spec 64 _ i Hi).
-    rewrite (bv_signed_testbit_low 27 _ i ltac:(lia)).
-    rewrite !andb_true_r.
-    destruct (Z.eqb_spec 1 (i - Z.of_N 18)); [lia |].
-    cbn [orb].
-    rewrite (bool_decide_true (i < Z.of_N 44) ltac:(lia)).
-    rewrite (bool_decide_true (i < Z.of_N 18) ltac:(lia)).
-    rewrite (bool_decide_true (i < Z.of_N 64) ltac:(lia)).
-    cbn [andb orb]. reflexivity.
-  - rewrite !andb_false_r.
-    rewrite (bool_decide_false (i < Z.of_N 18) ltac:(lia)).
-    cbn [andb orb].
-    rewrite !orb_false_r.
-    destruct (Z.eqb_spec 1 (i - Z.of_N 18)) as [He | Hne].
-    + rewrite (bool_decide_true (i < Z.of_N 44) ltac:(lia)). reflexivity.
-    + rewrite andb_false_r. reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* Local RAM-geometry lemmas needed to DERIVE the S-mode fetch geometry    *)
@@ -1379,7 +1313,6 @@ End SmodeCoreIris.
    (encoding 0x7111; the 4-aligned 4-byte fetch window also covers the
    following c.sdsp's low half 0xe006). *)
 Definition kv_h1 : mword 16 := mword_of_int 0x7111.
-Definition kv_w1 : mword 32 := mword_of_int 0xe0067111.
 Definition kv_imm1 : mword 6 :=
   concat_vec (subrange_vec_dec kv_h1 12 12)
     (concat_vec (subrange_vec_dec kv_h1 4 3)

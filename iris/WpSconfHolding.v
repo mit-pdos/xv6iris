@@ -45,18 +45,6 @@ Proof.
   apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.
 
-Local Lemma hd_up_cancel (X : mword 64) :
-  pa_stk (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4 = X.
-Proof.
-  unfold pa_stk, add_vec_int.
-  rewrite pa_stk_off2.
-  assert (Hz : bv_wrap 64 (uint (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-                           + uint (mword_of_int (- (8 * Z.of_nat 4)) : mword 64)) = 0%Z)
-    by (vm_compute; reflexivity).
-  rewrite Hz.
-  change (add_vec X (mword_of_int 0)) with (add_vec_int X 0).
-  apply avi0.
-Qed.
 
 Section WpSconfHolding.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.

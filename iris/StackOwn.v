@@ -39,8 +39,6 @@ Local Open Scope Z_scope.
 Definition pa_stk (sp : Arch.pa) (k : nat) : Arch.pa :=
   add_vec_int sp (- (8 * Z.of_nat k)).
 
-Lemma pa_stk_0 (sp : Arch.pa) : pa_stk sp 0 = sp.
-Proof. unfold pa_stk. change (- (8 * Z.of_nat 0)) with 0. apply avi0. Qed.
 
 (* stacking two downward shifts adds the depths: sp minus 8a minus 8b is sp
    minus 8(a+b).  This is the address-geometry heart of [stack_own_app]. *)

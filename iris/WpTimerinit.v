@@ -489,18 +489,6 @@ Local Ltac ti_unfold :=
 (* timerinit obeys the callee-saved ABI: it spills+reloads ra/s0, restores sp,
    and clobbers only the caller-saved temporaries a4/a5 -- every callee-saved
    register (sp, tp, s0, s1, s2..s11) holds its entry value on return. *)
-Lemma ti_mout_callee_saved
-    (m : regfile) (sp0 menv0 mtime0 ra0 s00 : mword 64)
-    (mcen0 : mword 32) :
-  m !!! Regidx csp_rs1 = sp0 ->
-  m !!! Regidx ti_s0 = s00 ->
-  callee_saved m (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00).
-Proof.
-  intros Hsp Hs0. unfold callee_saved. repeat split;
-    first [ rewrite Hsp; ti_unfold; ti_look
-          | rewrite Hs0; ti_unfold; ti_look
-          | ti_unfold; ti_look ].
-Qed.
 
 (* ===================================================================== *)
 (* THE THEOREM: the whole timerinit() body, one Qed, at a generic         *)

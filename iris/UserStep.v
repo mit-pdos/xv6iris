@@ -153,26 +153,6 @@ Qed.
 
 (* the no-pending corollary: with the S-destined set empty AT THIS STEP,
    the dispatcher is a no-op and the step proceeds to fetch/execute *)
-Lemma exec_dispatchInterrupt_U_none (s : mstate)
-    (mip_v mie_v mdv_v : mword 64) (meip seip : mword 1) :
-  exec (currentlyEnabled Ext_S) s = Some (true, s) ->
-  register_lookup mip s.(sregs) = mip_v ->
-  register_lookup sig_meip s.(sregs) = meip ->
-  register_lookup sig_seip s.(sregs) = seip ->
-  register_lookup mie s.(sregs) = mie_v ->
-  register_lookup mideleg s.(sregs) = mdv_v ->
-  and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
-  and_vec (s_mip_bits mip_v meip seip) (and_vec mie_v mdv_v) = zeros' 64 ->
-  exec (dispatchInterrupt User) s = Some (None, s).
-Proof.
-  intros HES Hmip Hmeip Hseip Hmie Hmdl Hmm Hs0.
-  rewrite (exec_dispatchInterrupt_U_reduce s mip_v mie_v mdv_v meip seip
-             HES Hmip Hmeip Hseip Hmie Hmdl Hmm).
-  unfold u_dispatch, s_pending. rewrite Hs0.
-  assert (Hnq : neq_vec (zeros' 64 : mword 64) (zeros' 64) = false)
-    by (vm_compute; reflexivity).
-  rewrite Hnq. reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* §1b The WAITING-hart step (a user WRS.STO/NTO suspended the core).      *)
@@ -388,33 +368,6 @@ Section UserStepIris.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Lemma dispatch_U_from_regs (σ : mstate)
-      (mip_v mie_v mdv_v : mword 64) (meip seip : mword 1)
-      {dqp dqe1 dqe2 dqi dqd : dfrac} :
-    and_vec mie_v (not_vec mdv_v) = zeros' 64 ->
-    hw_config -∗
-    mstate_interp σ -∗
-    mip ↦ᵣ{ dqp } mip_v -∗
-    sig_meip ↦ᵣ{ dqe1 } meip -∗
-    sig_seip ↦ᵣ{ dqe2 } seip -∗
-    mie ↦ᵣ{ dqi } mie_v -∗
-    mideleg ↦ᵣ{ dqd } mdv_v -∗
-    ⌜exec (dispatchInterrupt User) σ
-       = Some (u_dispatch mip_v meip seip mie_v mdv_v, σ)⌝.
-  Proof.
-    iIntros (Hmm) "Hhw [Hreg [Hmem Hdev]] Hmip Hmeip Hseip Hmie Hmdl".
-    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hmip")  as %Lmip.
-    iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
-    iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip.
-    iDestruct (reg_valid_dq with "Hreg Hmie")  as %Lmie.
-    iDestruct (reg_valid_dq with "Hreg Hmdl")  as %Lmdl.
-    iPureIntro.
-    apply exec_dispatchInterrupt_U_reduce; try assumption.
-    rewrite exec_currentlyEnabled_S. rewrite Lmisa. rewrite HmisaS. reflexivity.
-  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* The WAITING-hart step arm: one machine step from a WRS-suspended      *)
@@ -671,17 +624,7 @@ Qed.
    run_hart_active dispatch discharges for every decodable word *)
 Require Import DecodeSetU.
 
-Lemma decodable_u_not_lpad (i : instruction) :
-  decodable_u i = true -> is_lpad_instruction i = false.
-Proof.
-  intro Hd. destruct i; first [ reflexivity | discriminate Hd ].
-Qed.
 
-Lemma decodable_c_not_lpad (i : instruction) :
-  decodable_c i = true -> is_lpad_instruction i = false.
-Proof.
-  intro Hd. destruct i; first [ reflexivity | discriminate Hd ].
-Qed.
 
 (* ===================================================================== *)
 (* §6 The BASE one-redirection progress composer: a 4-byte instruction    *)
