@@ -12,11 +12,8 @@ Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
-Require Import WpLoad.
+Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import WpGpr.
-Require Import WpMmodeLeafBase.
-Require Import WpSmodeGpr.
 Local Open Scope Z_scope.
 Import Defs.
 

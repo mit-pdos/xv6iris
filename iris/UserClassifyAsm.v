@@ -7,9 +7,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WpGpr UserBits RegFile.
-Require Import WpLeafCommon WpIntrCore SmodeCore.
-Require Import UserPtTree UserExec UserStep UserTrap UserCompute UserArms UserFetch UserFetchPt UserClassify.
+Require Import WpGpr UserBits RegFile.
+Require Import SmodeCore.
+Require Import UserPtTree UserExec UserStep UserFetch UserFetchPt UserClassify.
 Local Open Scope Z_scope.
 Import Defs.
 

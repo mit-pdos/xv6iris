@@ -13,7 +13,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpLeafCommon WpGpr RegFile.
 Require Import SRegime.
 Require Import SmodeCore.
-Require Import KptTree SmodeCorePt.
+Require Import SmodeCorePt.
 Import Defs.
 
 (* ---- Local helpers copied from WpSmodeBtype.v ---- *)

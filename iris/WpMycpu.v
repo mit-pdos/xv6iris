@@ -27,24 +27,17 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Values.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import InstrBytes.
 Require Import WpDecode WpLeafCommon KernelText WpAuipc.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime.
 Require Import KernelRvcDecode.
 Require Import WpRvcBridge.
-Require Import StackOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Import VcGen VcGenS.
-Require Import CalleeSaved.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
-Require Import KptTree.
-Require Import WpSmodePtAlu WpSmodePtCtl.
 Import Defs.
 
 (* mycpu's balanced frame: entry [addi sp,sp,-16] (imm 48 = -16 in 6-bit) and

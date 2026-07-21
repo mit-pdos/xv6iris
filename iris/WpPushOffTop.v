@@ -12,29 +12,20 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import WpGprCsrwCommon.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode WpLeafCommon KernelText.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime.
 Require Import SmodeCore WpMemsetS WpSpinNew.
-Require Import WpPushOffCsr WpMycpu.
-Require Import StackOwn.
-Require Import CalleeSaved.
+Require Import WpPushOffCsr.
 Require Import WpRvcBridge KernelRvcDecode.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for the saved-intena = 0 fact. *)
-Require WpGprCsrwC.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 Local Open Scope Z_scope.
-Require Import KptTree.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap.
 Import Defs.
 
 (* ===================================================================== *)

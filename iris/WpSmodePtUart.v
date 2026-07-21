@@ -21,7 +21,7 @@ Require Import KptPt SmodeCore.
 Require Import WpLoad WpGpr.
 Require Import WpMmodeLeafBase WpSmodeGpr.
 Require Import WpUart WpSmodeUart.
-Require Import KptTree SmodeCorePt SRegime.
+Require Import SmodeCorePt SRegime.
 Require Import RegFile.
 Local Open Scope Z_scope.
 Import Defs.

@@ -11,9 +11,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
-Require Import WpGprCsrwCommon WpGprCsrwB.
-Require Import SmodePte.
+Require Import RiscvModelBytes RiscvLang RiscvExec RiscvExtras.
 Local Open Scope Z_scope.
 Import Defs.
 

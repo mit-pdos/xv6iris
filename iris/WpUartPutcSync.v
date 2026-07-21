@@ -33,7 +33,6 @@ Require Import CalleeSaved.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
-Require Import KptTree.
 Require Import SRegime.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
 Require Import WpSmodePtMemWrap WpSmodePtUart.

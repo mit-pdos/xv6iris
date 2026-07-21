@@ -28,7 +28,7 @@ Require Import WpGpr.
 Require Import WpMycpu.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
-Require Import CalleeSaved StackOwn.
+Require Import CalleeSaved.
 Require Import RiscvExtras.
 Require Import KptTree.
 Require Import IntrDefs WpIntenaBits.

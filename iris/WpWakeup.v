@@ -37,20 +37,14 @@ Require Import RegFile.
 Require Import InstrBytes RiscvFetchExec WpGpr KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
-Require Import VcGen VcGenS.
-Require Import WpAcquireTop WpRelease WpMycpu.
+Require Import VcGen.
 Require Import KernelRvcDecode.
-Require Import CalleeSaved.
-Require Import StackOwn.
 Require Import WpSwtchVc.
-Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge WpKallocDecode WpAuipc.
+Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge WpKallocDecode.
 From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 Local Open Scope Z_scope.
-Require Import KptTree.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMemWrap.
 Import Defs.
 
 (* ======================================================================= *)

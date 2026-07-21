@@ -17,8 +17,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import WpLoad WpLeafCommon WpGpr WpMmodeLeafBase.
-Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree TrampPt.
-Require Import SmodeCore SmodeCorePt WpSmodeGpr KptTree UptTree.
+Require Import SmodePte Pt4kWalk TrampPt.
+Require Import SmodeCore SmodeCorePt WpSmodeGpr UptTree.
 Require Import TrampStepPt.
 Require Import UserretDefs WpSmodeSret WpDecode WpGprMret.
 Require Import RegFile.

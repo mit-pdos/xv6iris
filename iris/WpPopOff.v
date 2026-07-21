@@ -35,26 +35,19 @@ Require Import WpGprCsrwCommon.
 Require WpGprCsrwC.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes.
+Require Import InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime.
 Require Import SmodeCore WpMemsetS.
-Require Import WpPushOffCsr WpMycpu.
-Require Import StackOwn.
-Require Import CalleeSaved.
+Require Import WpPushOffCsr.
 Require Import WpRvcBridge KernelRvcDecode.
-Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
-Require Import KptTree.
-Require Import WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMemWrap.
 Import Defs.
 
 (* ===================================================================== *)

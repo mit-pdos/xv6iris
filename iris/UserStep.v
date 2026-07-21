@@ -622,7 +622,6 @@ Qed.
 (* the U-mode decode image contains no landing-pad instruction (the
    Zicfilp gate is off at dstateU), so the lpad side condition of the
    run_hart_active dispatch discharges for every decodable word *)
-Require Import DecodeSetU.
 
 
 

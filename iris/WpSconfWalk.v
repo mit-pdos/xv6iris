@@ -12,29 +12,29 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import InstrBytes.
-Require Import KernelText WpAuipc.
+Require Import KernelText.
 Require Import RegFile.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime SmodeCore.
+Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KallocInv WpKallocDecode.
-Require Import WpMycpu WpLock.
+Require Import KallocInv.
+Require Import WpLock.
 Require Import VcGen.
-Require Import SmodePte Pt4kWalk CommonWalk PtAdBits PtTree PtTreeAdue KptTree SmodeCorePt.
+Require Import CommonWalk PtTree KptTree.
 Require Import PtBuild KvmSpec.
-Require Import IntrDefs WpIntrInv WpSmodeIntr.
-Require Import WpIntenaBits.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpMemsetS WpMemsetInstr.
-Require Import WpSconfMemsetPage WpSconfMemset.
+Require Import WpSconfMemset.
 Require Import WpSconfKalloc.
 Require Import WpWalkInstr UserBits.
-Require Import WpKalloc WpMemsetPage.
+Require Import WpMemsetPage.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import RiscvExec RiscvTryStep RiscvFetchExec WpLeafCommon.
+Require Import RiscvExec RiscvTryStep.
 Import Defs.
 Local Open Scope Z_scope.
 

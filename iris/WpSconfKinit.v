@@ -14,24 +14,21 @@ From iris.base_logic.lib Require Import ghost_var gen_heap invariants own.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import WpLoad.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpGpr InstrBytes WpMmodeLeafBase WpAuipc.
-Require Import SmodePte PtTreeAdue.
-Require Import SmodeCore WpSmodeGpr.
-Require Import KptTree SmodeCorePt WpSmodePtLeaves WpSmodePtMem.
+Require Import SmodeCore.
+Require Import KptTree.
 Require Import StackOwn CalleeSaved.
 Require Import KernelText.
 Require Import WpMycpu WpLock.
 Require Import KallocInv.
-Require Import IntrDefs WpIntrInv WpSmodeIntr.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpInitlock WpSconfInitlock WpSconfFreerange.
 Require Import WpKinitDecode.
-Require Import SRegime.
 From Kernel Require KernelSyms.
-Require Import RiscvExec RiscvTryStep RiscvFetchExec WpLeafCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.

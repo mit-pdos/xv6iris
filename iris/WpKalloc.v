@@ -20,21 +20,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import InstrBytes.
-Require Import KernelText WpAuipc.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime.
 Require Import SmodeCore.
-Require Import WpMycpu.
 Require Import WpLock.
-Require Import WpRelease WpMemsetPage.
-Require Import StackOwn.
-Require Import CalleeSaved.
-Require Import KallocInv WpKallocDecode.
-Require Import KptTree.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMemWrap.
 Require Import VcGen.
 Require Export WpSmodeLeafBase.
 From Kernel Require KernelInstrs.

@@ -34,9 +34,7 @@ Require Import SmodeCore.
 Require Import UptTree.
 Require Import UserPtTree.
 Require Import UserBits.
-Require Import WpLoad.
 Require Import WpMmodeLeafBase.
-Require Import MemAmo4.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.

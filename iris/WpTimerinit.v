@@ -62,7 +62,6 @@ From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Import CalleeSaved.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

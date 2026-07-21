@@ -27,9 +27,8 @@ From iris.base_logic.lib Require Import ghost_var.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpLeafCommon.
 Require Import WpGpr.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.

@@ -14,8 +14,8 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import SRegime.
 Require Import SmodeCore WpAuipc.
-Require Import WpMmodeLeafBase WpMmodeShiftiop.
-Require Import KptTree WpSmodePtLeaves.
+Require Import WpMmodeLeafBase.
+Require Import WpSmodePtLeaves.
 Require Import RegFile.
 Import Defs.
 

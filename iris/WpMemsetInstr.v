@@ -13,24 +13,18 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode WpLeafCommon.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime.
 Require Import SmodeCore KernelText WpMemsetS.
-Require Import StackOwn.
 Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Import CalleeSaved.
 Local Open Scope Z_scope.
-Require Import KptTree.
 Import Defs.
 
 (* ===================================================================== *)

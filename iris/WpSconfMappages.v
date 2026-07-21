@@ -13,19 +13,19 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
-Require Import SRegime SmodeCore.
-Require Import InstrBytes KernelText WpAuipc.
-Require Import WpGpr WpMycpu WpLock WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import InstrBytes KernelText.
+Require Import WpGpr WpLock WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import KptTree.
-Require Import IntrDefs WpIntrInv WpSmodeIntr WpIntenaBits.
-Require Import VcGen VcGenS.
+Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
+Require Import VcGen.
 Require Import KallocInv.
-Require Import SmodePte Pt4kWalk CommonWalk PtAdBits PtTree PtTreeAdue SmodeCorePt.
+Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import WpMappagesInstr UserBits.
-Require Import WpSconfKfree.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfWalk.
 From Kernel Require KernelSyms.

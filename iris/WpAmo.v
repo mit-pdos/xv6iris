@@ -23,7 +23,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WpDecode.
 Require Import WpGpr.
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodePte.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

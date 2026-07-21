@@ -22,22 +22,9 @@ From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvExtras.
-Require Import InstrBytes.
-Require Import KernelText WpAuipc.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SRegime.
 Require Import SmodeCore.
-Require Import WpMycpu.
 Require Import WpLock.
-Require Import WpRelease WpMemsetPage.
-Require Import StackOwn.
-Require Import CalleeSaved.
-Require Import KallocInv WpKallocDecode.
-Require Import KptTree.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype WpSmodePtCtl.
-Require Import WpSmodePtMem WpSmodePtMemWrap.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
