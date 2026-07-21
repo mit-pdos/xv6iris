@@ -516,6 +516,29 @@ Definition pt_graft1 (t : ptree) (vpn : mword 27) (b : mword 44) : ptree :=
   | None => t
   end.
 
+(* LEVEL-GENERIC graft: attach a zeroed page [b] under slot [i] of node [t]
+   and write the pointer PTE into slot [i].  [pt_graft2 t vpn b] is
+   [pt_graft t (vpn_idx 2 vpn) b] and [pt_graft1_kid c1 vpn b] is
+   [pt_graft c1 (vpn_idx 1 vpn) b] (both hold definitionally). *)
+Definition pt_graft (t : ptree) (i : mword 9) (b : mword 44) : ptree :=
+  pt_upd_kid (pt_upd_ent t i (pt_ptr_pte b)) i (Some (pt_empty_node b)).
+
+Lemma pt_graft_base (t : ptree) (i : mword 9) (b : mword 44) :
+  pt_base (pt_graft t i b) = pt_base t.
+Proof. reflexivity. Qed.
+Lemma pt_graft_kid (t : ptree) (i : mword 9) (b : mword 44) :
+  pt_kids (pt_graft t i b) i = Some (pt_empty_node b).
+Proof. unfold pt_graft. rewrite pt_upd_kid_same. reflexivity. Qed.
+Lemma pt_graft_ent (t : ptree) (i : mword 9) (b : mword 44) :
+  pt_ents (pt_graft t i b) i = pt_ptr_pte b.
+Proof. unfold pt_graft. rewrite pt_upd_kid_ents. cbn. case_decide; [reflexivity | contradiction]. Qed.
+Lemma pt_graft_kids_other (t : ptree) (i j : mword 9) (b : mword 44) :
+  j <> i -> pt_kids (pt_graft t i b) j = pt_kids t j.
+Proof. intros Hne. unfold pt_graft. rewrite pt_upd_kid_other; [ reflexivity | exact Hne ]. Qed.
+Lemma pt_graft_ents_other (t : ptree) (i j : mword 9) (b : mword 44) :
+  j <> i -> pt_ents (pt_graft t i b) j = pt_ents t j.
+Proof. intros Hne. unfold pt_graft. rewrite pt_upd_kid_ents. cbn. case_decide; [ contradiction | reflexivity ]. Qed.
+
 (* ---- projection laws ------------------------------------------------- *)
 
 Lemma pt_graft2_base (t : ptree) (vpn : mword 27) (b : mword 44) :
@@ -1054,6 +1077,60 @@ Section PtBuildIris.
     iSplitL "Hpg1"; [iExact "Hpg1" |].
     iApply "Hks1".
     iSplitL "Hpg0 Hs0"; [(iApply "Hpg0"; iExact "Hs0") | iExact "Hemp"].
+  Qed.
+
+  (* ===================================================================== *)
+  (* LEVEL-GENERIC single-step descent accessors -- the reusable layer the  *)
+  (* fuel-inducted walk loop needs.  [ptree_own_slot2_ro]/[slot1_ro],        *)
+  (* [ptree_own_graft2]/[graft1] are the level-2/level-1 specializations.    *)
+  (* ===================================================================== *)
+
+  (* read node [t]'s own slot [i] (read-only), at ANY level [S lvl] *)
+  Lemma ptree_own_cell_ro (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) :
+    ptree_own (S lvl) dq t ⊢
+      u_pte_addr (pt_base t) i ↦₈{dq} pt_ents t i ∗
+      (u_pte_addr (pt_base t) i ↦₈{dq} pt_ents t i -∗ ptree_own (S lvl) dq t).
+  Proof.
+    iIntros "[Hpg Hks]".
+    iDestruct (pt_page_own_acc_ro dq t i with "Hpg") as "[Hs Hclose]".
+    iFrame "Hs". iIntros "Hs". rewrite ptree_own_S.
+    iSplitL "Hclose Hs"; [ iApply "Hclose"; iExact "Hs" | iExact "Hks" ].
+  Qed.
+
+  (* descend one level into an existing kid [c] at slot [i], frame-preserving:
+     the closing wand takes ANY replacement child back (covers the pure descend
+     AND a subtree modified deeper down). *)
+  Lemma ptree_own_descend (lvl : nat) (dq : dfrac) (t c : ptree) (i : mword 9) :
+    pt_kids t i = Some c ->
+    ptree_own (S lvl) dq t ⊢
+      ptree_own lvl dq c ∗
+      (∀ c' : ptree, ptree_own lvl dq c' -∗ ptree_own (S lvl) dq (pt_upd_kid t i (Some c'))).
+  Proof.
+    intros Hk. rewrite ptree_own_S. iIntros "[Hpg Hks]".
+    iDestruct (pt_kids_own_acc lvl dq t i c Hk with "Hks") as "[Hc Hclose]".
+    iFrame "Hc". iIntros (c') "Hc'". rewrite ptree_own_S.
+    iSplitL "Hpg"; [ iExact "Hpg" | iApply "Hclose"; iExact "Hc'" ].
+  Qed.
+
+  (* allocate under an EMPTY slot [i] (the walk's alloc arm), at ANY level *)
+  Lemma ptree_own_graft (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) :
+    pt_kids t i = None ->
+    ptree_own (S lvl) dq t ⊢
+      u_pte_addr (pt_base t) i ↦₈{dq} pt_ents t i ∗
+      (∀ b : mword 44,
+         u_pte_addr (pt_base t) i ↦₈{dq} pt_ptr_pte b -∗
+         ptree_own lvl dq (pt_empty_node b) -∗
+         ptree_own (S lvl) dq (pt_graft t i b)).
+  Proof.
+    intros Hk. rewrite ptree_own_S. iIntros "[Hpg Hks]".
+    iDestruct (pt_page_own_acc dq t i with "Hpg") as "[Hs Hpgc]".
+    iFrame "Hs". iIntros (b) "Hs Hc".
+    iSpecialize ("Hpgc" $! (pt_ptr_pte b) with "Hs").
+    iDestruct (pt_kids_own_ins lvl dq (pt_upd_ent t i (pt_ptr_pte b)) i with "Hks") as "Hins".
+    { exact Hk. }
+    iSpecialize ("Hins" $! (pt_empty_node b) with "Hc").
+    rewrite ptree_own_S. unfold pt_graft.
+    iSplitL "Hpgc"; [ iExact "Hpgc" | iExact "Hins" ].
   Qed.
 
 End PtBuildIris.
