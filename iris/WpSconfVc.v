@@ -233,6 +233,55 @@ Proof.
   destruct r as [b'|]; intro H; [injection H as <-; auto | discriminate].
 Qed.
 
+Lemma sp_move_inv (st : vsstate) (pc' d : Z) (st1 : vsstate) :
+  vc_step_sp_move st pc' d = Some st1 ->
+  exists v, (vsb st).(vregs) !! Regidx csp_rs1 = Some v /\ sval_is64 v = true /\
+    (0 <= d) /\ (d < vsp_wrap) /\ d <> 0 /\
+    (( d < vsp_half /\ d mod 8 = 0 /\ (Z.to_nat (d / 8) <= vsu st)%nat /\
+       exists h' fr',
+         pop_absorb (vsb st).(vheap) (vsf st) v (seq 0 (Z.to_nat (d / 8)))
+           = Some (h', fr') /\
+         st1 = VSS (VSt pc' (<[Regidx csp_rs1 := sval_addZ v d]> (vsb st).(vregs))
+                            h' (vsb st).(vheap4))
+                   (vsu st - Z.to_nat (d / 8))%nat (vsx st) fr' )
+     \/
+     ( vsp_half <= d /\ (vsp_wrap - d) mod 8 = 0 /\
+         st1 = VSS (VSt pc' (<[Regidx csp_rs1 := sval_addZ v d]> (vsb st).(vregs))
+                            (vsb st).(vheap) (vsb st).(vheap4))
+                   (vsu st + Z.to_nat ((vsp_wrap - d) / 8))%nat
+                   (Nat.max (vsx st) (vsu st + Z.to_nat ((vsp_wrap - d) / 8)))
+                   (((fun j => sval_addZ (sval_addZ v d) (8 * Z.of_nat j))
+                       <$> seq 0 (Z.to_nat ((vsp_wrap - d) / 8))) ++ vsf st) )).
+Proof.
+  unfold vc_step_sp_move.
+  destruct ((vsb st).(vregs) !! Regidx csp_rs1) as [v|] eqn:Hrs1; [|discriminate].
+  destruct (sval_is64 v) eqn:H64; cbn [negb]; [|discriminate].
+  destruct (andb (Z.leb 0 d) (Z.ltb d vsp_wrap)) eqn:Hrange; cbn [negb]; [|discriminate].
+  apply andb_prop in Hrange; destruct Hrange as [Hd0 HdW].
+  apply Z.leb_le in Hd0. apply Z.ltb_lt in HdW.
+  destruct (Z.eqb d 0) eqn:Hdz; [discriminate|]. apply Z.eqb_neq in Hdz.
+  destruct (Z.ltb d vsp_half) eqn:Hdir.
+  - apply Z.ltb_lt in Hdir.
+    destruct (Z.eqb (d mod 8) 0) eqn:Hmod; cbn [negb]; [|discriminate].
+    apply Z.eqb_eq in Hmod.
+    destruct (Nat.leb (Z.to_nat (d / 8)) (vsu st)) eqn:Hk; cbn [negb]; [|discriminate].
+    apply Nat.leb_le in Hk.
+    destruct (pop_absorb (vsb st).(vheap) (vsf st) v (seq 0 (Z.to_nat (d / 8))))
+      as [[h' fr']|] eqn:Habs; [|discriminate].
+    intro HS; injection HS as <-. exists v.
+    split;[reflexivity|]. split;[exact H64|]. split;[exact Hd0|].
+    split;[exact HdW|]. split;[exact Hdz|].
+    left. split;[exact Hdir|]. split;[exact Hmod|]. split;[exact Hk|].
+    exists h', fr'. split;[exact Habs|reflexivity].
+  - apply Z.ltb_ge in Hdir.
+    destruct (Z.eqb ((vsp_wrap - d) mod 8) 0) eqn:Hmod; cbn [negb]; [|discriminate].
+    apply Z.eqb_eq in Hmod.
+    intro HS; injection HS as <-. exists v.
+    split;[reflexivity|]. split;[exact H64|]. split;[exact Hd0|].
+    split;[exact HdW|]. split;[exact Hdz|].
+    right. split;[exact Hdir|]. split;[exact Hmod|reflexivity].
+Qed.
+
 Lemma vc_store8_sp_ux (st : vsstate) (pc' : Z) (a v2 : sval) (st1 : vsstate) :
   vc_store8_sp st pc' a v2 = Some st1 -> vsu st1 = vsu st /\ vsx st1 = vsx st.
 Proof.
@@ -983,16 +1032,11 @@ Section WpSconfVc.
           iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                     (agree_off_step Hao)
                     with "Hsc Hhs Hcap Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hfr Hcont").
-      + (* VScaddi16sp : an sp move *)
-        unfold vc_step_sp_move in Hstep; cbn [vsb vsu vsx vsf] in Hstep.
-        destruct (vregs b !! Regidx csp_rs1) as [v|] eqn:Hrs1; [|discriminate].
-        destruct (sval_is64 v) eqn:H64; cbn [negb] in Hstep; [|discriminate].
+      + (* VScaddi16sp : an sp move -- invert over abstract d (sp_move_inv) *)
         set (d := zimm12 (caddi16sp_imm imm6)) in *.
-        destruct (andb (Z.leb 0 d) (Z.ltb d vsp_wrap)) eqn:Hrange;
-          cbn [negb] in Hstep; [|discriminate].
-        apply andb_prop in Hrange; destruct Hrange as [Hd0 HdW].
-        apply Z.leb_le in Hd0. apply Z.ltb_lt in HdW.
-        destruct (Z.eqb d 0) eqn:Hdz; [discriminate|].
+        apply sp_move_inv in Hstep.
+        cbn [vsb vsu vsx vsf] in Hstep.
+        destruct Hstep as (v & Hrs1 & H64 & Hd0 & HdW & Hdz & Hcase).
         pose proof (Hmatch _ _ Hrs1) as Hm1.
         assert (Hval : regval_into_reg
                     (add_vec (m !!! Regidx csp_rs1)
@@ -1001,17 +1045,10 @@ Section WpSconfVc.
         { unfold regval_into_reg.
           rewrite (sval_den_addZ ρ v d H64) Hm1.
           unfold d, zimm12. rewrite stk_mword_of_int_uint. reflexivity. }
-        destruct (Z.ltb d vsp_half) eqn:Hdir.
+        destruct Hcase as [ (Hdir & Hmod & Hku0 & h' & fr' & Habs & ->)
+                          | (Hdir & Hmod & ->) ].
         * (* POP: sp += d *)
-          destruct (Z.eqb (d mod 8) 0) eqn:Hmod; cbn [negb] in Hstep;
-            [|discriminate].
-          apply Z.eqb_eq in Hmod.
           set (k := Z.to_nat (d / 8)) in *.
-          destruct (Nat.leb k u) eqn:Hku0; cbn [negb] in Hstep; [|discriminate].
-          apply Nat.leb_le in Hku0.
-          destruct (pop_absorb (vheap b) fr v (seq 0 k)) as [[h' fr']|] eqn:Habs;
-            [|discriminate].
-          injection Hstep as <-.
           cbn [vsu vsx] in Hux1, Hxmono.
           assert (Hek : 8 * Z.of_nat k = d)
             by (unfold k; apply div8_exact; [lia | exact Hmod]).
@@ -1038,12 +1075,7 @@ Section WpSconfVc.
                     (agree_off_step Hao)
                     with "Hsc Hhs Hcap Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hfr Hcont").
         * (* PUSH: sp -= 2^64 - d *)
-          apply Z.ltb_ge in Hdir.
-          destruct (Z.eqb ((vsp_wrap - d) mod 8) 0) eqn:Hmod; cbn [negb] in Hstep;
-            [|discriminate].
-          apply Z.eqb_eq in Hmod.
           set (k := Z.to_nat ((vsp_wrap - d) / 8)) in *.
-          injection Hstep as <-.
           cbn [vsu vsx] in Hux1, Hxmono.
           assert (Hkle0 : (k <= n - u)%nat) by lia.
           assert (Hek : 8 * Z.of_nat k = vsp_wrap - d)
