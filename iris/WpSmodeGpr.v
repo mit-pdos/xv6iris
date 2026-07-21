@@ -240,103 +240,11 @@ Section SDataTranslate.
   Definition sdata_ppn_out (vpn : mword 27) : mword 44 :=
     concat_vec (subrange_vec_dec (mword_of_int 0x80000 : mword 44) 43 18) (subrange_vec_dec vpn 17 0).
 
-  Lemma exec_pt_walk_store_super (vpn : mword 27) (mxr do_sum : bool)
-        (region : PMA_Region) (menvcfg0 : mword 64) s :
-    subrange_vec_dec vpn 26 18 = (mword_of_int 2 : mword 9) ->
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint (pte_paddr root_ppn : mword 64)) (uint (to_bits 64 8)) = PMP_Match ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr (pte_paddr root_ppn)) 8 = Some region ->
-    is_aligned_paddr (Physaddr (pte_paddr root_ppn)) 8 = true ->
-    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-    exec (within_clint (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    exec (within_sig (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr (pte_paddr root_ppn)) 8) s = Some (false, s) ->
-    dev_addr (pte_paddr root_ppn) = false ->
-    (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add (pte_paddr root_ppn) j) = Some (nth_byte pte_super j)) ->
-    register_lookup menvcfg s.(sregs) = menvcfg0 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec (pt_walk 39 vpn (Store Data) Supervisor mxr do_sum
-            root_ppn 2 false tt) s
-      = Some (Ok (Build_PTW_Output 39 (sdata_ppn_out vpn) (autocast (T := mword) pte_super)
-                    (Physaddr (pte_paddr root_ppn)) 2 PBMT_PMA false, tt), s).
-  Proof.
-    intros Hvpn2 HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes Hmenv HPBMTE.
-    unfold pt_walk, Zwf_guarded.
-    cbn [_rec_pt_walk].
-    rewrite exec_catch_early_return.
-    assert (Hae1 : exec (Defs.assert_exp' (2 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
-      by (unfold assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
-      by (unfold assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
-    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
-      replace a with (pte_paddr root_ppn : mword 64) by
-        (unfold pte_paddr; rewrite Hvpn2; reflexivity);
-      replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_liftR_seq _ _ _ _ _
-               (exec_read_pte_S (pte_paddr root_ppn) region pte_super s
-                  HA Hord Hrange HR Hmatch Halign Hpte Hc Hsig Hh Hdev Hbytes)).
-    assert (Hinv : exec (pte_is_invalid (Mk_PTE_Flags (subrange_vec_dec pte_super 7 0))
-                           (ext_bits_of_PTE pte_super)) s = Some (false, s))
-      by (vm_compute; reflexivity).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hinv).
-    match goal with |- context[pte_is_non_leaf ?f] =>
-      replace (pte_is_non_leaf f) with false by (vm_compute; reflexivity) end.
-    cbv iota beta.
-    match goal with |- context[neq_vec ?a ?b] =>
-      replace (neq_vec a b) with false by (vm_compute; reflexivity) end.
-    cbv iota beta.
-    change (2 >? 0) with true. cbv iota beta.
-    assert (Hchk : exec (check_PTE_permission (Store Data) Supervisor mxr do_sum
-                     (Mk_PTE_Flags (subrange_vec_dec pte_super 7 0)) (ext_bits_of_PTE pte_super) tt) s
-                   = Some (PTE_Check_Success tt, s))
-      by (destruct mxr, do_sum; vm_compute; reflexivity).
-    match goal with |- context[Defs.bind0 ?A ?B] =>
-      assert (HAB : execR (Defs.bind0 A B) s = Some (inr (PTE_Check_Success tt), s)) end.
-    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
-      rewrite execR_liftR. rewrite Hchk. cbn match. reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ HAB).
-    cbv iota beta. cbn match.
-    change (2 >? 0) with true. cbv iota beta.
-    match goal with |- context[eq_vec (_get_PTE_Ext_N ?e) ?b] =>
-      replace (eq_vec (_get_PTE_Ext_N e) b) with false by (vm_compute; reflexivity) end.
-    cbv iota beta.
-    rewrite execR_bind. rewrite execR_returnR. cbn match.
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg menvcfg s)).
-    rewrite Hmenv. rewrite HPBMTE. cbv iota beta.
-    rewrite execR_bind. rewrite execR_returnR. cbn match.
-    rewrite execR_returnR. cbn match.
-    unfold sdata_ppn_out.
-    repeat f_equal; (try apply bv_eq); vm_compute; reflexivity.
-  Qed.
 
   (* The masked superpage base for any in-region vpn equals 0x80000 -- taken
      as bitvector hypotheses.  With these the installed entry is exactly
      pw_tlb_entry (the same superpage entry the fetch installs), only at the
      symbolic index tlb_hash vpn. *)
-  Lemma exec_add_to_TLB_store_super (vpn : mword 27) (asid : mword 16) s :
-    sign_extend' 45 (and_vec vpn (not_vec (zero_extend' 27 (ones 18)))) = (mword_of_int 0x80000 : mword 45) ->
-    zero_extend' 44 (and_vec (sdata_ppn_out vpn) (not_vec (zero_extend' 44 (ones 18)))) = (mword_of_int 0x80000 : mword 44) ->
-    exec (add_to_TLB 39 asid vpn (sdata_ppn_out vpn) (autocast (T := mword) pte_super)
-            (Physaddr (pte_paddr root_ppn)) 2 false) s
-      = Some (tt, set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
-                                   (tlb_hash (__id 39) vpn) (Some (pw_tlb_entry root_ppn asid)))).
-  Proof.
-    intros Hmvpn Hmppn.
-    unfold add_to_TLB. cbn zeta.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_reg tlb _ s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb _)).
-    rewrite exec_returnm.
-    do 5 f_equal. unfold pw_tlb_entry.
-    f_equal; first [ exact Hmvpn | exact Hmppn | vm_compute; reflexivity ].
-  Qed.
 
 
 
@@ -392,18 +300,6 @@ Proof.
 Qed.
 
 (* testbit of bv_signed below the width = testbit of bv_unsigned. *)
-Lemma bv_signed_testbit_low (n : N) (b : bv n) (i : Z) :
-  0 <= i < Z.of_N n ->
-  Z.testbit (bv_signed b) i = Z.testbit (bv_unsigned b) i.
-Proof.
-  intros Hi.
-  unfold bv_signed.
-  rewrite <- (Z.mod_pow2_bits_low (bv_swrap n (bv_unsigned b)) (Z.of_N n) i) by lia.
-  rewrite <- (Z.mod_pow2_bits_low (bv_unsigned b) (Z.of_N n) i) by lia.
-  f_equal.
-  pose proof (bv_swrap_mod n (bv_unsigned b)) as Hm.
-  unfold bv_modulus in Hm. exact Hm.
-Qed.
 
 
 (* ---------------------------------------------------------------------- *)

@@ -449,13 +449,6 @@ Definition pw_tlb_entry (rp : mword 44) (asid : mword 16) : TLB_Entry := {|
 |}.
 
 (* (Local copies of two bitvector helpers that live downstream in WpSmodeGpr.) *)
-Lemma bv_swrap_mod (n : N) (z : Z) :
-  (bv_swrap n z) mod (bv_modulus n) = z mod (bv_modulus n).
-Proof.
-  unfold bv_swrap, bv_wrap.
-  rewrite Zminus_mod_idemp_l.
-  f_equal. ring.
-Qed.
 
 
 (* The (symbolic) Sv39 output ppn for a 1GB superpage leaf with PTE ppn

@@ -122,87 +122,8 @@ Proof.
 Qed.
 
 
-Lemma exec_checked_mem_read_ram_amo_4 (op : amoop) (p : Privilege) (pbmt : page_based_mem_type) (addr : mword 64)
-    (region : PMA_Region) (w : bv 32) s :
-  exec (pmpCheck (Physaddr addr) 4 (Atomic (op, Data, Data)) p) s = Some (None, s) ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  pma_allows_atomic_op ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support))
-    op 4 = true ->
-  exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
-  exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
-  exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s) ->
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (checked_mem_read (Atomic (op, Data, Data)) pbmt p (Physaddr addr) 4 true false true false)
-       s = Some (Ok (w, default_meta), s).
-Proof.
-  intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ Hpmp).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_amo_4 op addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
-      cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_RISCV_reserved_acquire, s))).
-  2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resacq_4 addr w s Hdev Hbytes)).
-  apply exec_returnM.
-Qed.
 
 
-Lemma exec_checked_mem_write_ram_amo_4 (op : amoop) (p : Privilege) (pbmt : page_based_mem_type) (addr : mword 64)
-    (region : PMA_Region) (data : bv 32) s :
-  exec (pmpCheck (Physaddr addr) 4 (Atomic (op, Data, Data)) p) s = Some (None, s) ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  pma_allows_atomic_op ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support))
-    op 4 = true ->
-  exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
-  exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
-  exec (within_htif_writable (Physaddr addr) 4) s = Some (false, s) ->
-  dev_addr addr = false ->
-  exec (checked_mem_write (Physaddr addr) 4 data (Atomic (op, Data, Data)) pbmt p tt false false true) s
-    = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
-Proof.
-  intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev.
-  unfold checked_mem_write.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ Hpmp).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_amo_4 op addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
-      cbn match. apply exec_returnM. }
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_writable (Physaddr addr) 4) s = Some (false, s))).
-  2:{ unfold within_mmio_writable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (write_kind_of_flags false false true) s
-                 = Some (rv64d_types.Write_RISCV_conditional, s))).
-  2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_4 addr data s Hdev)).
-  apply exec_returnM.
-Qed.
 
 
 Section ExecAmoGS4.

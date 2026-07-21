@@ -458,9 +458,6 @@ Section WpUartPutcSync.
         (sign_extend' 64 (sign_extend' 12 (mword_of_int 5 : mword 6))))]> (ppc_f1 m).
   Definition ppc_f3 (m : regfile) (u : uart_state) : regfile :=
     <[Regidx (mword_of_int 15) := regval_into_reg (uart_lsr_ldval u)]> (ppc_f2 m).
-  Definition ppc_f4 (m : regfile) (u : uart_state) : regfile :=
-    <[Regidx (mword_of_int 15) := regval_into_reg (and_vec (ppc_f3 m u !!! Regidx (mword_of_int 15))
-        (sign_extend' 64 (mword_of_int 32 : mword 12)))]> (ppc_f3 m u).
 
   (* the three call-site register lookups the leaves need. *)
   Lemma ppc_f2_a4 (m : regfile) :

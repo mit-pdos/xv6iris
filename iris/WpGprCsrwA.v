@@ -210,17 +210,6 @@ Qed.
 
 (* ===== mscratch (0x340): pure direct write, _pure check ===== *)
 Definition csr_mscratch : mword 12 := mword_of_int 0x340.
-Lemma exec_write_CSR_mscratch (v : mword 64) s :
-  exec (write_CSR csr_mscratch v) s = Some (Ok v, set_reg s mscratch v).
-Proof. unfold write_CSR.
-  skip_csr_false_clauses.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mscratch v s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mscratch (set_reg s mscratch v))).
-  rewrite register_lookup_set. apply exec_returnM. Qed.
-Lemma exec_csr_id_write_callback_mscratch (d : mword 64) s :
-  exec (csr_id_write_callback csr_mscratch d) s = Some (tt, s).
-Proof. assert (H : csr_id_write_callback csr_mscratch d = returnM tt) by (vm_compute; reflexivity).
-  rewrite H. apply exec_returnM. Qed.
 
 Lemma exec_hartSupports_Sv32 s : exec (hartSupports Ext_Sv32) s = Some (false, s).
 Proof.

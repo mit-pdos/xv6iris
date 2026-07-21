@@ -115,14 +115,6 @@ Proof. intros Ha Hb Hw. unfold execute_RTYPE. cbn match.
   rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
 
 (* WpGprLogic.v : exec_execute_RTYPE_XOR *)
-Lemma exec_execute_RTYPE_XOR (rs2 rs1 rd : regidx) (a b : mword 64) s s' :
-  exec (rX_bits rs1) s = Some (a, s) -> exec (rX_bits rs2) s = Some (b, s) ->
-  exec (wX_bits rd (xor_vec a b)) s = Some (tt, s') ->
-  exec (execute_RTYPE rs2 rs1 rd XOR) s = Some (RETIRE_SUCCESS, s').
-Proof. intros Ha Hb Hw. unfold execute_RTYPE. cbn match.
-  rewrite (exec_bind_Some _ _ _ (xor_vec a b) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha). rewrite (exec_bind_Some _ _ _ _ _ Hb). apply exec_returnm. }
-  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
 
 (* WpGprLogic.v : exec_execute_ITYPE_ORI *)
 Lemma exec_execute_ITYPE_ORI (imm : mword 12) (rs1 rd : regidx) (a : mword 64) s s' :
@@ -149,16 +141,6 @@ Proof. intros Ha Hw.
   rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
 
 (* WpGprLogic.v : exec_execute_ITYPE_XORI *)
-Lemma exec_execute_ITYPE_XORI (imm : mword 12) (rs1 rd : regidx) (a : mword 64) s s' :
-  exec (rX_bits rs1) s = Some (a, s) ->
-  exec (wX_bits rd (xor_vec a (sign_extend' 64 imm))) s = Some (tt, s') ->
-  exec (execute (ITYPE (imm, rs1, rd, XORI))) s = Some (RETIRE_SUCCESS, s').
-Proof. intros Ha Hw.
-  change (execute (ITYPE (imm, rs1, rd, XORI))) with (execute_ITYPE imm rs1 rd XORI).
-  unfold execute_ITYPE. cbn match.
-  rewrite (exec_bind_Some _ _ _ (xor_vec a (sign_extend' 64 imm)) s).
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha). apply exec_returnm. }
-  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* File-generic value + execute for each op (mirror [gpr_addi_val] /       *)
@@ -182,11 +164,6 @@ Definition gpr_and_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)).
 
 (* WpGprLogic.v : gpr_xor_val *)
-Definition gpr_xor_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
-  xor_vec (if Z.eqb (uint rs1) 0 then zero_reg
-           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-          (if Z.eqb (uint rs2) 0 then zero_reg
-           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)).
 
 (* WpGprLogic.v : exec_execute_RTYPE_OR_gpr *)
 Lemma exec_execute_RTYPE_OR_gpr (rs2 rs1 rd : mword 5) s :
@@ -287,10 +264,6 @@ Definition gpr_andi_val (rs1 : mword 5) (imm : mword 12) (s : mstate) : mword 64
           (sign_extend' 64 imm).
 
 (* WpGprLogic.v : gpr_xori_val *)
-Definition gpr_xori_val (rs1 : mword 5) (imm : mword 12) (s : mstate) : mword 64 :=
-  xor_vec (if Z.eqb (uint rs1) 0 then zero_reg
-           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-          (sign_extend' 64 imm).
 
 (* WpGprLogic.v : exec_execute_ITYPE_ORI_gpr *)
 Lemma exec_execute_ITYPE_ORI_gpr (rs1 rd : mword 5) (imm : mword 12) s :
@@ -1124,15 +1097,10 @@ Qed.
 (* base register value read by JALR, uniform over rs1 (x0 -> zero_reg). *)
 
 (* WpGprJalr.v : jbase *)
-Definition jbase (rs1 : mword 5) (s : mstate) : mword 64 :=
-  if Z.eqb (uint rs1) 0 then zero_reg
-  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs).
 
 (* Target of the JALR jump: (rs1 + sign_extend imm) with the low bit forced 0. *)
 
 (* WpGprJalr.v : jalr_target *)
-Definition jalr_target (vrs1 : mword 64) (imm : mword 12) : mword 64 :=
-  update_vec_dec (add_vec vrs1 (sign_extend' 64 imm)) 0 ('b"0").
 
 (* register-generic JALR execute: target = (rX rs1 + imm) with bit0 cleared;
    writes rd := link (nextPC), sets nextPC := target.  ANY rs1 (x0->zero_reg), rd<>0. *)

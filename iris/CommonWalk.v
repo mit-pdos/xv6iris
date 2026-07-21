@@ -305,18 +305,6 @@ Section UserWalk.
 
 
   (* miss via hash collision: the slot holds a NON-matching entry *)
-  Lemma exec_lookup_TLB_nomatch (asid : mword 16) (ent' : TLB_Entry)
-        (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
-    register_lookup tlb s.(sregs) = tlbvec ->
-    vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent' ->
-    match_TLB_Entry ent' asid (sign_extend' (57 - 12) vpn) = false ->
-    exec (lookup_TLB 39 asid vpn) s = Some (None, s).
-  Proof.
-    intros Htlb Hvec Hnm.
-    unfold lookup_TLB.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
-    rewrite Htlb. rewrite Hvec. rewrite Hnm. apply exec_returnm.
-  Qed.
 
   (* miss via hash collision: same as [exec_translate_walk_user], but the
      slot holds a NON-matching entry instead of being empty *)

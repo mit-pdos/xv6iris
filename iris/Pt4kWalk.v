@@ -1041,37 +1041,6 @@ Section TrampTranslate.
   Qed.
 
   (* combined hit-or-walk translate at asid 0 through base table p2. *)
-  Lemma exec_translate_tramp (mxr do_sum : bool) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
-    register_lookup tlb s.(sregs) = tlbvec ->
-    (vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None \/
-     (exists ent, vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent /\
-                  match_TLB_Entry ent (mword_of_int 0) (sign_extend' (57 - 12) vpn) = false) \/
-     (exists ptea, vec_access_dec tlbvec (tlb_hash (__id 39) vpn)
-                   = Some (tlb4k_entry (mword_of_int 0) vpn lppn (mk_pte lppn lflags) ptea))) ->
-    exists s',
-      exec (translate 39 (mword_of_int 0 : mword 16) p2 vpn access Supervisor mxr do_sum tt) s
-      = Some (Ok (lppn, PBMT_PMA, tt), s')
-      /\ (s' = s \/
-          s' = set_reg s tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn) (Some tramp_tlb_ent))).
-  Proof.
-    intros Htlb Hslot.
-    unfold translate.
-    destruct Hslot as [Hnone | [ (ent & Hent & Hnm) | (ptea & Hhit) ]].
-    - eexists. split.
-      + rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_miss vpn (mword_of_int 0) tlbvec s Htlb Hnone)).
-        cbn match. rewrite <- Htlb. apply exec_translate_TLB_miss_4k.
-      + right. rewrite Htlb. reflexivity.
-    - eexists. split.
-      + rewrite (exec_bind_Some _ _ _ _ _ (exec_lookup_TLB_nonmatch vpn (mword_of_int 0) tlbvec ent s Htlb Hent Hnm)).
-        cbn match. rewrite <- Htlb. apply exec_translate_TLB_miss_4k.
-      + right. rewrite Htlb. reflexivity.
-    - eexists. split.
-      + rewrite (exec_bind_Some _ _ _ _ _
-                   (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ s Htlb Hhit
-                      (match_tlb4k_self vpn lppn (mk_pte lppn lflags) ptea))).
-        cbn match. apply (exec_translate_TLB_hit_4k mxr do_sum (mword_of_int 0) ptea).
-      + left. reflexivity.
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (* translateAddr: front matter differs per access type; the reductions *)

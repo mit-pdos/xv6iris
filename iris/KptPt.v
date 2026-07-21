@@ -93,9 +93,6 @@ Definition kpt_slot0_pa (root : mword 44) (vpn : mword 27) : mword 64 :=
   pte_addr_at (kpt_l0_of root vpn) (vpn0_of vpn).
 
 (* the TLB entry the walk of a mapped [vpn] installs *)
-Definition kpt_tlb_ent (root : mword 44) (vpn : mword 27) : TLB_Entry :=
-  tlb4k_entry (mword_of_int 0) vpn (kpt_leaf_ppn vpn) (kpt_leaf_pte vpn)
-    (kpt_slot0_pa root vpn).
 
 (* THE legal-TLB-entry set of the kernel page table (the [P] of
    [tlb_consistent] / [tlb_inv_gen]): any mapped vpn's own 4KB leaf entry. *)
@@ -105,17 +102,6 @@ Definition kpt_tlb_ent (root : mword 44) (vpn : mword 27) : TLB_Entry :=
 (* ===================================================================== *)
 
 
-Lemma subrange27_unsigned_17_9 (x : mword 27) :
-  bv_unsigned (subrange_vec_dec x 17 9) = (bv_unsigned x ≫ 9) `mod` 2 ^ 9.
-Proof.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
-  rewrite bv_extract_unsigned.
-  change (Z.of_N (MachineWord.MachineWord.Z_idx 9)) with 9.
-  change (MachineWord.MachineWord.Z_idx (17 - 9 + 1)) with 9%N.
-  unfold bv_wrap, bv_modulus. reflexivity.
-Qed.
 
 
 Lemma subrange64_unsigned_11_0 (x : mword 64) :
@@ -136,28 +122,6 @@ Qed.
 (* 4. Page / slot address arithmetic and RAM-ness.                        *)
 (* ===================================================================== *)
 
-Lemma kpt_page_unsigned (root : mword 44) (k : Z) :
-  0 <= k ->
-  bv_unsigned root + k < 2 ^ 44 ->
-  bv_unsigned (kpt_page root k) = bv_unsigned root + k.
-Proof.
-  intros Hk Hnw. unfold kpt_page.
-  cbv [add_vec Operators_mwords.word_binop Operators_mwords.with_word' to_word
-       get_word SailStdpp.Values.with_word].
-  unfold MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned.
-  cbv [mword_of_int Values.mword_of_int MachineWord.MachineWord.Z_to_word].
-  rewrite Z_to_bv_unsigned.
-  pose proof (bv_unsigned_in_range _ root) as Hr.
-  change (MachineWord.MachineWord.Z_idx 44) with 44%N in *.
-  assert (Hkr : bv_wrap 44 k = k).
-  { apply bv_wrap_small. unfold bv_modulus.
-    change (Z.of_N 44%N) with 44. lia. }
-  rewrite Hkr.
-  apply bv_wrap_small. unfold bv_modulus.
-  change (Z.of_N 44%N) with 44.
-  unfold bv_modulus in Hr. change (Z.of_N 44%N) with 44 in Hr. lia.
-Qed.
 
 (* a slot of any PT page is (both ends) in RAM *)
 
@@ -257,16 +221,6 @@ Qed.
 (* ===================================================================== *)
 
 (* (local copy of CommonWalk's [u_sext45_inj]; CommonWalk sits above us) *)
-Lemma kpt_sext45_inj (x y : mword 27) :
-  sign_extend' (57 - 12) x = sign_extend' (57 - 12) y -> x = y.
-Proof.
-  intros H.
-  apply (f_equal bv_signed) in H.
-  cbv [sign_extend' Operators_mwords.sign_extend exts_vec to_word get_word
-       MachineWord.MachineWord.sign_extend] in H.
-  rewrite !bv_sign_extend_signed in H; [| apply N.leb_le; vm_compute; reflexivity ..].
-  apply bv_eq_signed. exact H.
-Qed.
 
 
 (* every legal kernel-PT entry either IS this RAM va's own entry or fails
@@ -279,20 +233,6 @@ Qed.
 (* ===================================================================== *)
 
 (* A/D preset => the walk never needs a PTE write-back, for ANY access *)
-Lemma update_PTE_Bits_mk_pte_AD (p : mword 44) (f : Z)
-    (access : MemoryAccessType mem_payload) :
-  0 <= f < 256 ->
-  eq_vec (_get_PTE_Flags_D (Mk_PTE_Flags (mword_of_int f : mword 8))) ('b"0") = false ->
-  eq_vec (_get_PTE_Flags_A (Mk_PTE_Flags (mword_of_int f : mword 8))) ('b"0") = false ->
-  update_PTE_Bits (mk_pte p f) access = None.
-Proof.
-  intros Hf HD HA.
-  unfold update_PTE_Bits.
-  rewrite (mk_pte_flags p f Hf).
-  cbn zeta.
-  rewrite HD, HA.
-  cbn [andb orb]. reflexivity.
-Qed.
 
 
 
@@ -431,8 +371,6 @@ Definition kpt_tlb_ent_ad (adf : kpt_adf) (root : mword 44) (vpn : mword 27) : T
   tlb4k_entry (mword_of_int 0) vpn (kpt_leaf_ppn vpn) (kpt_leaf_pte_ad adf vpn)
     (kpt_slot0_pa root vpn).
 
-Definition P_kpt_ad (adf : kpt_adf) (root : mword 44) (e : TLB_Entry) : Prop :=
-  exists vpn, kpt_mapped vpn /\ e = kpt_tlb_ent_ad adf root vpn.
 
 Definition kpt_mem_ad (adf : kpt_adf) (s : mstate) (root : mword 44) : Prop :=
   kpt_slot_in s (pte_addr_at root (mword_of_int 0)) (mk_pte (kpt_l1_dev root) PTE_PTR)
@@ -454,8 +392,6 @@ Proof.
   destruct (Z.leb 0x80000 (bv_unsigned vpn)); reflexivity.
 Qed.
 
-Lemma kpt_leaf_pte_adf1 (vpn : mword 27) : kpt_leaf_pte_ad kpt_adf1 vpn = kpt_leaf_pte vpn.
-Proof. unfold kpt_leaf_pte_ad, kpt_leaf_pte. rewrite kpt_lflags_adf1. reflexivity. Qed.
 
 
 
@@ -534,51 +470,9 @@ Qed.
 
 (* A/D update conditions: A=1 suffices for non-writing accesses (D free);
    stores additionally need D=1. *)
-Lemma update_PTE_Bits_mk_pte_fetch (p : mword 44) (f : Z) :
-  0 <= f < 256 ->
-  eq_vec (_get_PTE_Flags_A (Mk_PTE_Flags (mword_of_int f : mword 8))) ('b"0") = false ->
-  update_PTE_Bits (mk_pte p f) (InstructionFetch tt) = None.
-Proof.
-  intros Hf HA.
-  unfold update_PTE_Bits.
-  rewrite (mk_pte_flags p f Hf).
-  cbn zeta.
-  rewrite HA.
-  rewrite andb_false_r. cbn [andb orb]. reflexivity.
-Qed.
 
-Lemma update_PTE_Bits_mk_pte_load (p : mword 44) (f : Z) :
-  0 <= f < 256 ->
-  eq_vec (_get_PTE_Flags_A (Mk_PTE_Flags (mword_of_int f : mword 8))) ('b"0") = false ->
-  update_PTE_Bits (mk_pte p f) (Load Data) = None.
-Proof.
-  intros Hf HA.
-  unfold update_PTE_Bits.
-  rewrite (mk_pte_flags p f Hf).
-  cbn zeta.
-  rewrite HA.
-  rewrite andb_false_r. cbn [andb orb]. reflexivity.
-Qed.
 
-Lemma kpt_A_red_ad (adf : kpt_adf) (vpn : mword 27) :
-  fst (adf vpn) = true ->
-  eq_vec (_get_PTE_Flags_A (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn) : mword 8))) ('b"0") = false.
-Proof.
-  intro Ha.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; cbn in Ha; subst a; destruct d; vm_compute; reflexivity.
-Qed.
 
-Lemma kpt_D_red_ad (adf : kpt_adf) (vpn : mword 27) :
-  snd (adf vpn) = true ->
-  eq_vec (_get_PTE_Flags_D (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn) : mword 8))) ('b"0") = false.
-Proof.
-  intro Hd.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; cbn in Hd; subst d; destruct a; vm_compute; reflexivity.
-Qed.
 
 
 
@@ -656,12 +550,7 @@ Definition kpt_tlb_ent_b (root : mword 44) (vpn : mword 27) (ad : bool * bool) :
   kpt_tlb_ent_ad (fun _ => ad) root vpn.
 
 (* per-entry existential legal set: any mapped vpn's leaf, ANY A/D bits *)
-Definition P_kpt_e (root : mword 44) (e : TLB_Entry) : Prop :=
-  exists vpn ad, kpt_mapped vpn /\ e = kpt_tlb_ent_b root vpn ad.
 
-Lemma kpt_tlb_ent_ad_b (adf : kpt_adf) (root : mword 44) (vpn : mword 27) :
-  kpt_tlb_ent_ad adf root vpn = kpt_tlb_ent_b root vpn (adf vpn).
-Proof. reflexivity. Qed.
 
 
 

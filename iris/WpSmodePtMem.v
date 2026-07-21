@@ -413,9 +413,6 @@ Local Lemma exec_mem_write_ea_1 (addr : mword 64) s :
 
 
 
-Local Lemma write_bytes_1 (mm : _) (pa : Arch.pa) (v : bv 8) :
-    write_bytes mm pa 1 v = <[pa := nth_byte v 0]> mm.
-  Proof. unfold write_bytes. change (N.to_nat 1) with 1%nat. cbn [seq foldr]. rewrite pa_add_0. reflexivity. Qed.
 
 
 (* ---- state-generic width-4/1 towers ---- *)

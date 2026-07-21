@@ -96,22 +96,7 @@ Section WpPushOffMem.
     apply exec_returnM.
   Qed.
 
-  Lemma exec_split_misaligned_aligned_4 (vaddr : virtaddr) s :
-    is_aligned_vaddr vaddr 4 = true ->
-    exec (split_misaligned vaddr 4) s = Some ((1, 4), s).
-  Proof.
-    intro H. unfold split_misaligned. rewrite H. cbn [orb]. apply exec_returnm.
-  Qed.
 
-  Lemma exec_mem_write_ea_4 (addr : mword 64) s :
-    exec (mem_write_ea (Physaddr addr) 4 false false false) s = Some (Ok tt, s).
-  Proof.
-    unfold mem_write_ea. cbn [orb andb].
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (write_kind_of_flags false false false) s = Some (rv64d_types.Write_plain, s))).
-    2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-    apply exec_returnM.
-  Qed.
 
   Lemma exec_checked_mem_write_ram_store_4_S (pbmt : page_based_mem_type) (addr : mword 64)
       (region : PMA_Region) (data : bv 32) s :
@@ -156,38 +141,6 @@ Section WpPushOffMem.
     apply exec_returnM.
   Qed.
 
-  Lemma exec_mem_write_value_4_S (pbmt : page_based_mem_type) (addr : mword 64)
-      (region : PMA_Region) (data : bv 32) (m : mword 64) s :
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
-    is_aligned_paddr (Physaddr addr) 4 = true ->
-    (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-    exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
-    exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
-    exec (within_htif_writable (Physaddr addr) 4) s = Some (false, s) ->
-    dev_addr addr = false ->
-    register_lookup mstatus s.(sregs) = m ->
-    eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    exec (mem_write_value (Physaddr addr) 4 data (Store Data) pbmt false false false) s
-      = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
-  Proof.
-    intros HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev Hms Hmprv Hpriv.
-    unfold mem_write_value, mem_write_value_meta.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-    rewrite Hpriv. rewrite Hms.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_store_S m s Hmprv)).
-    unfold mem_write_value_priv_meta. cbn [orb andb].
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_store_4_S pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hc Hsig Hh Hdev)).
-    cbn match. unfold mem_write_callback. apply exec_returnm.
-  Qed.
 
   (* ---- width-4 vmem_write_addr (HIT: state-preserving) ---- *)
   Section SWS4.
@@ -460,47 +413,6 @@ Section WpPushOffMem.
     apply exec_returnM.
   Qed.
 
-  Lemma exec_mem_read_load_4_S (pbmt : page_based_mem_type) (addr : mword 64)
-      (region : PMA_Region) (w : bv 32) (m : mword 64) s :
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-      (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-    matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
-    is_aligned_paddr (Physaddr addr) 4 = true ->
-    (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-    exec (within_clint (Physaddr addr) 4) s = Some (false, s) ->
-    exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
-    exec (within_htif_readable (Physaddr addr) 4) s = Some (false, s) ->
-    dev_addr addr = false ->
-    (forall j : nat, (N.of_nat j < 4)%N ->
-       s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-    register_lookup mstatus s.(sregs) = m ->
-    eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    exec (mem_read (Load Data) pbmt (Physaddr addr) 4 false false false)
-         s = Some (Ok w, s).
-  Proof.
-    intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes Hms Hmprv Hpriv.
-    unfold mem_read.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-    rewrite Hpriv.
-    rewrite Hms.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_load_S m s Hmprv)).
-    unfold mem_read_priv.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (mem_read_priv_meta _ _ _ _ 4 _ _ _ _) s = Some (Ok (w, default_meta), s))).
-    2:{ unfold mem_read_priv_meta. cbn [orb andb].
-        rewrite (exec_bind_Some _ _ _ _ _
-                  (_ : exec (checked_mem_read _ _ _ _ 4 _ _ _ _) s = Some (Ok (w, default_meta), s))).
-        2:{ cbn match. apply exec_checked_mem_read_ram_load_4_S with (region := region); assumption. }
-        cbn match. unfold mem_read_callback. apply exec_returnM. }
-    cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
-  Qed.
 
   (* ---- width-4 vmem_read_addr (HIT) ---- *)
   Section RWS4.
@@ -750,19 +662,6 @@ Section WpPushOffMem.
 
   (* ---- width-4 helper facts for the WP lemmas ---- *)
 
-  Lemma upd_window_bw {k : N} (mm : _) (pa : Arch.pa) (vnew vold : bv k)
-      (l : list nat) :
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ ([∗ list] j ∈ l, (pa_add pa j) ↦ₘ nth_byte vold j) ==∗
-    gen_heap_interp (hG:=riscv_memGS) (foldr (fun j acc => <[pa_add pa j := nth_byte vnew j]> acc) mm l)
-      ∗ ([∗ list] j ∈ l, (pa_add pa j) ↦ₘ nth_byte vnew j).
-  Proof.
-    iInduction l as [|x xs IH] "IH"; simpl.
-    - iIntros "Hm _". iModIntro. iFrame.
-    - iIntros "Hm [Ha Hrest]".
-      iMod ("IH" with "Hm Hrest") as "[Hm Hrest]".
-      iMod (mem_update _ (pa_add pa x) (nth_byte vold x) (nth_byte vnew x) with "Hm Ha") as "[Hm Ha]".
-      iModIntro. iFrame "Ha Hrest Hm".
-  Qed.
 
 
   (* ------------------------------------------------------------------- *)

@@ -84,65 +84,14 @@ Proof.
 Qed.
 
 (* helper: exec_BTYPE_cmp_BLTU *)
-Local Lemma exec_BTYPE_cmp_BLTU (rs2 rs1 : mword 5) s :
-  exec (Defs.bind (rX_bits (Regidx rs1))
-          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
-             (fun w3 => returnM (zopz0zI_u w2 w3)))) s
-    = Some (zopz0zI_u (rvv rs1 s) (rvv rs2 s), s).
-Proof.
-  unfold rvv.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_execute_BTYPE_BLTU_fall *)
 
 (* helper: exec_execute_BTYPE_BEQ_taken *)
-Local Lemma exec_execute_BTYPE_BEQ_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
-    eq_vec (rvv rs1 s) (rvv rs2 s) = true ->
-    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
-    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
-  Proof.
-    intros Htaken Halign Hbit1.
-    unfold execute. cbn match. unfold execute_BTYPE.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BEQ rs2 rs1 s)).
-    rewrite Htaken.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-    exact (exec_jump_to _ s Halign Hbit1).
-  Qed.
 
 (* helper: exec_execute_BTYPE_BGE_fall *)
-Local Lemma exec_execute_BTYPE_BGE_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
-  zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s) = false ->
-  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))) s
-    = Some (RETIRE_SUCCESS, s).
-Proof.
-  intro Hfall.
-  unfold execute. cbn match. unfold execute_BTYPE.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BGE rs2 rs1 s)).
-  rewrite Hfall. apply exec_returnM.
-Qed.
 
 (* helper: exec_execute_BTYPE_BNE_taken *)
-Local Lemma exec_execute_BTYPE_BNE_taken (imm : mword 13) (rs2 rs1 : mword 5) s :
-    neq_vec (rvv rs1 s) (rvv rs2 s) = true ->
-    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    bit_to_bool (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 1) = false ->
-    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
-  Proof.
-    intros Htaken Halign Hbit1.
-    unfold execute. cbn match. unfold execute_BTYPE.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BNE rs2 rs1 s)).
-    rewrite Htaken.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
-    exact (exec_jump_to _ s Halign Hbit1).
-  Qed.
 
 (* helper: exec_jump_to_zca *)
 Local Lemma exec_jump_to_zca (target : mword 64) s :

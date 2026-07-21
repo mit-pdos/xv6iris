@@ -1241,93 +1241,7 @@ Qed.
 (*    the (unpinned) reservability captures both total outcomes.          *)
 (* ===================================================================== *)
 
-Lemma exec_checked_mem_read_lr_4 (pbmt : page_based_mem_type) (addr : mword 64)
-    (region : PMA_Region) (w : mword 32) s :
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-    (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
-  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s) ->
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 4 false false true false) s
-    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
-Proof.
-  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
-  unfold checked_mem_read.
-  assert (Hrk : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))
-    by (unfold read_kind_of_flags; apply exec_returnM).
-  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s = Some (None, s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
-    rewrite (exec_bind_Some _ _ _ _ _ Hrk).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_4 addr w s Hdev Hbytes)).
-    apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s
-                   = Some (Some (E_Load_Access_Fault tt), s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    cbn match. apply exec_returnM.
-Qed.
 
-Lemma exec_checked_mem_read_lr_8 (pbmt : page_based_mem_type) (addr : mword 64)
-    (region : PMA_Region) (w : mword 64) s :
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-    (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
-  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
-  is_aligned_paddr (Physaddr addr) 8 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s) ->
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 8 false false true false) s
-    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
-Proof.
-  intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
-  unfold checked_mem_read.
-  assert (Hrk : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))
-    by (unfold read_kind_of_flags; apply exec_returnM).
-  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s = Some (None, s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
-    rewrite (exec_bind_Some _ _ _ _ _ Hrk).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_8 addr w s Hdev Hbytes)).
-    apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s
-                   = Some (Some (E_Load_Access_Fault tt), s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    cbn match. apply exec_returnM.
-Qed.
 
 (* ===================================================================== *)
 (* §5e The LR mem_read wrap (widths 4, 8): threads the mem_read-level      *)
@@ -1458,93 +1372,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma exec_checked_mem_write_sc_4 (pbmt : page_based_mem_type) (addr : mword 64)
-    (region : PMA_Region) (data : mword 32) s :
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-    (uint addr) (uint (to_bits 64 4)) = PMP_Match ->
-  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  exec (within_mmio_writable (Physaddr addr) 4) s = Some (false, s) ->
-  dev_addr addr = false ->
-  exec (checked_mem_write (Physaddr addr) 4 data (StoreConditional Data) pbmt User tt false false true) s
-    = Some (if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-            then (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev))
-            else (Err (E_SAMO_Access_Fault tt), s)).
-Proof.
-  intros HA Hord Hrange HW Hmatch Halign Hwrite Hmmio Hdev.
-  unfold checked_mem_write.
-  assert (Hwk : exec (write_kind_of_flags false false true) s = Some (rv64d_types.Write_RISCV_conditional, s))
-    by (unfold write_kind_of_flags; cbn match; apply exec_returnM).
-  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 4 true) s = Some (None, s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 4 s HA Hord Hrange HW)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_sc_g 4 addr pbmt region s Hmatch Halign Hwrite)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
-    rewrite (exec_bind_Some _ _ _ _ _ Hwk).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_4 addr data s Hdev)).
-    apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 4 true) s
-                   = Some (Some (E_SAMO_Access_Fault tt), s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 4 s HA Hord Hrange HW)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_sc_g 4 addr pbmt region s Hmatch Halign Hwrite)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    cbn match. apply exec_returnM.
-Qed.
 
-Lemma exec_checked_mem_write_sc_8 (pbmt : page_based_mem_type) (addr : mword 64)
-    (region : PMA_Region) (data : mword 64) s :
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
-  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
-    (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
-  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
-  is_aligned_paddr (Physaddr addr) 8 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  exec (within_mmio_writable (Physaddr addr) 8) s = Some (false, s) ->
-  dev_addr addr = false ->
-  exec (checked_mem_write (Physaddr addr) 8 data (StoreConditional Data) pbmt User tt false false true) s
-    = Some (if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-            then (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 8 data) s.(mdev))
-            else (Err (E_SAMO_Access_Fault tt), s)).
-Proof.
-  intros HA Hord Hrange HW Hmatch Halign Hwrite Hmmio Hdev.
-  unfold checked_mem_write.
-  assert (Hwk : exec (write_kind_of_flags false false true) s = Some (rv64d_types.Write_RISCV_conditional, s))
-    by (unfold write_kind_of_flags; cbn match; apply exec_returnM).
-  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 8 true) s = Some (None, s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 8 s HA Hord Hrange HW)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_sc_g 8 addr pbmt region s Hmatch Halign Hwrite)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
-    rewrite (exec_bind_Some _ _ _ _ _ Hwk).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_8 addr data s Hdev)).
-    apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 8 true) s
-                   = Some (Some (E_SAMO_Access_Fault tt), s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 8 s HA Hord Hrange HW)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_sc_g 8 addr pbmt region s Hmatch Halign Hwrite)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    cbn match. apply exec_returnM.
-Qed.
 
 (* ===================================================================== *)
 (* §5i The SC mem_write_value wrap (widths 4, 8): the write mirror of §5e  *)
@@ -1770,23 +1598,6 @@ Section SplitLoadBundle.
     eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false /\
     pma_allows_all (register_lookup pma_regions s.(sregs)).
 
-  Lemma config_ok_pres (s s' : mstate) :
-    (s'.(sregs) = s.(sregs) \/ exists tv, s'.(sregs) = register_set tlb tv s.(sregs)) ->
-    config_ok s -> config_ok s'.
-  Proof.
-    intros Hd (H1 & H2 & H3 & H4 & H5 & H6 & H7). unfold config_ok.
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r s'.(sregs) = register_lookup r s.(sregs)).
-    { intros r Hne. destruct Hd as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    rewrite (Tr misa ltac:(vm_compute; reflexivity)).
-    rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)).
-    rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)).
-    rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)).
-    rewrite (Tr mstatus ltac:(vm_compute; reflexivity)).
-    rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)).
-    repeat split; assumption.
-  Qed.
 
   Context (σ0 : mstate).
 
@@ -1801,11 +1612,6 @@ Section SplitLoadBundle.
     end.
 
   Definition spa (k : nat) : mword 64 := u_walk_pa w (cva k).
-  Definition sval (k : nat) : mword (8 * bytes) :=
-    match exec (mem_read (Load Data) PBMT_PMA (Physaddr (spa k)) bytes false false false) (sst (S k)) with
-    | Some (Ok v, _) => v
-    | _ => zeros' (8 * bytes)
-    end.
 
 
 
@@ -1852,23 +1658,6 @@ Section SplitStoreBundle.
     eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false /\
     pma_allows_all (register_lookup pma_regions s.(sregs)).
 
-  Lemma config_okS_pres (s s' : mstate) :
-    (s'.(sregs) = s.(sregs) \/ exists tv, s'.(sregs) = register_set tlb tv s.(sregs)) ->
-    config_okS s -> config_okS s'.
-  Proof.
-    intros Hd (H1 & H2 & H3 & H4 & H5 & H6 & H7). unfold config_okS.
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r s'.(sregs) = register_lookup r s.(sregs)).
-    { intros r Hne. destruct Hd as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    rewrite (Tr misa ltac:(vm_compute; reflexivity)).
-    rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)).
-    rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)).
-    rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)).
-    rewrite (Tr mstatus ltac:(vm_compute; reflexivity)).
-    rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)).
-    repeat split; assumption.
-  Qed.
 
   Context (σ0 : mstate).
 
@@ -1883,7 +1672,6 @@ Section SplitStoreBundle.
     | S k' => let s' := sttrS (sstS k') k' in
               MState s'.(sregs) (write_bytes s'.(mem) (spaS k') (Z.to_N bytes) (wv k')) s'.(mdev)
     end.
-  Definition sttS (k : nat) : mstate := sttrS (sstS k) k.
 
 
 
