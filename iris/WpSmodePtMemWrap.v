@@ -11,6 +11,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
+Require Import RegFile.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
 Require Import SRegime.
 Require Import SmodeCore.
@@ -25,7 +26,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_cldsp_gpr_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (v : mword 64)
+      (m : regfile) (v : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq dqm : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
@@ -71,7 +72,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_csdsp_gpr_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (vold : mword 64)
+      (m : regfile) (vold : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
@@ -115,7 +116,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_cld_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : bv 64) {dq dqm : dfrac} :
+      (m : regfile) (v : bv 64) {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -149,7 +150,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_cldsp_gpr_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (v : bv 64) {dq dqm : dfrac} :
+      (m : regfile) (v : bv 64) {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -183,7 +184,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_clw_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : mword 32) {dq dqm : dfrac} :
+      (m : regfile) (v : mword 32) {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -216,7 +217,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_lw_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : mword 32) {dq dqm : dfrac} :
+      (m : regfile) (v : mword 32) {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -249,7 +250,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_ld_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (v : bv 64) {dq dqm : dfrac} :
+      (m : regfile) (v : bv 64) {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -282,7 +283,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_csd_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
+      (m : regfile) (vold : bv 64) {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
@@ -312,7 +313,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_csdsp_gpr_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
+      (m : regfile) (vold : bv 64) {dq : dfrac} :
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
@@ -344,7 +345,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_csdsp_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
+      (m : regfile) (vold : bv 64) {dq : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     smode_config γ dq -∗ sr_inv R -∗
@@ -375,7 +376,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_csw_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 32) {dq : dfrac} :
+      (m : regfile) (vold : bv 32) {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
@@ -405,7 +406,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_sw_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 32) {dq : dfrac} :
+      (m : regfile) (vold : bv 32) {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
@@ -437,7 +438,7 @@ Section WpSmodePtMemWrap.
 
   Lemma wp_sd_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : bv 64) {dq : dfrac} :
+      (m : regfile) (vold : bv 64) {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗

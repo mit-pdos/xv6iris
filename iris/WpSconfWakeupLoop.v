@@ -21,6 +21,7 @@ From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
+Require Import RegFile.
 Require Import SRegime SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpGpr.
@@ -91,7 +92,7 @@ Section WpSconfWakeupLoop.
     (10 <= av)%nat ->
     procs_inv Rreg Φ γc bsie dq γs -∗
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x58]. *)
-    ( ∀ Mexit : gmap regidx (mword 64),
+    ( ∀ Mexit : regfile,
         ⌜ Mexit !!! Regidx csp_rs1 = spF
           /\ Mexit !!! Regidx (mword_of_int 4)  = rtp
           /\ Mexit !!! Regidx (mword_of_int 22) = vs6
@@ -100,14 +101,14 @@ Section WpSconfWakeupLoop.
           /\ Mexit !!! Regidx (mword_of_int 25) = vs9
           /\ Mexit !!! Regidx (mword_of_int 26) = vs10
           /\ Mexit !!! Regidx (mword_of_int 27) = vs11
-          /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
+          /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
         sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn Mexit av -∗
         intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗ gpr_file Mexit -∗
         wk_res_sconf γs spF a0f noffv -∗
         wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    ∀ (k : nat) (M : gmap regidx (mword 64)),
+    ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜wk_loop_regs M spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn M av -∗
       intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
@@ -119,10 +120,10 @@ Section WpSconfWakeupLoop.
     iIntros "#Hpinv Hqexit".
     (* BOUNDED loop: ordinary Coq induction on a [fuel] bounding the remaining
        iterations [NPROC - k] -- no Löb needed. *)
-    iAssert (∀ (fuel k : nat) (M : gmap regidx (mword 64)),
+    iAssert (∀ (fuel k : nat) (M : regfile),
                ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
                ⌜wk_loop_regs M spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-               ( ∀ Mexit : gmap regidx (mword 64),
+               ( ∀ Mexit : regfile,
                    ⌜ Mexit !!! Regidx csp_rs1 = spF
           /\ Mexit !!! Regidx (mword_of_int 4)  = rtp
           /\ Mexit !!! Regidx (mword_of_int 22) = vs6
@@ -131,7 +132,7 @@ Section WpSconfWakeupLoop.
           /\ Mexit !!! Regidx (mword_of_int 25) = vs9
           /\ Mexit !!! Regidx (mword_of_int 26) = vs10
           /\ Mexit !!! Regidx (mword_of_int 27) = vs11
-          /\ (forall r : regidx, r ∈ dom Mexit) ⌝ -∗
+          /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
                    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn Mexit av -∗
                    intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗ gpr_file Mexit -∗
@@ -152,7 +153,7 @@ Section WpSconfWakeupLoop.
          termination test (0x34 beq s1,s2): exit to the epilogue at wakeup+0x58,
          else recurse into iteration k+1.  Captured once, reached from both the
          skip-self path (0x3c taken) and the release-return path (0x2c). ---- *)
-      iAssert (∀ Mt : gmap regidx (mword 64),
+      iAssert (∀ Mt : regfile,
                  ⌜ wk_loop_regs Mt spF rtp chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn Mt av -∗
                  intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
@@ -176,9 +177,9 @@ Section WpSconfWakeupLoop.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp34) in "Hpc".
         assert (HMt30_9 : Mt30 !!! Regidx (mword_of_int 9 : mword 5) = proc_addr (S k)).
-        { rewrite /Mt30 lookup_total_insert. rewrite Ht1. apply (proc_addr_succ k). }
+        { rewrite /Mt30 upd_eq. rewrite Ht1. apply (proc_addr_succ k). }
         assert (HMt30_18 : Mt30 !!! Regidx (mword_of_int 18 : mword 5) = proc_addr NPROC).
-        { rewrite /Mt30 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Ht18. }
+        { rewrite /Mt30 upd_ne; [| vm_compute; discriminate]. exact Ht18. }
         (* 0x34 beq s1,s2 : exit iff &proc[k+1] = &proc[NPROC]. *)
         destruct (eq_vec (Mt30 !!! Regidx (mword_of_int 9 : mword 5))
                          (Mt30 !!! Regidx (mword_of_int 18 : mword 5))) eqn:Hcmp.
@@ -195,15 +196,15 @@ Section WpSconfWakeupLoop.
           iEval (rewrite Htgt58) in "Hpc".
           iApply ("Hqexit" $! Mt30 with "[] Hsc Hhs Hcap Hcnt Htlb Htext Hpc Hfile Hres Hframe").
           iPureIntro.
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Htsp | vm_compute; discriminate]|].
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Http | vm_compute; discriminate]|].
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht22 | vm_compute; discriminate]|].
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht23 | vm_compute; discriminate]|].
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht24 | vm_compute; discriminate]|].
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht25 | vm_compute; discriminate]|].
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht26 | vm_compute; discriminate]|].
-          split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht27 | vm_compute; discriminate]|].
-          intro r. rewrite /Mt30 dom_insert_L. apply elem_of_union_r. apply Htdom.
+          split; [rewrite /Mt30 upd_ne; [exact Htsp | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 upd_ne; [exact Http | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 upd_ne; [exact Ht22 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 upd_ne; [exact Ht23 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 upd_ne; [exact Ht24 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 upd_ne; [exact Ht25 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 upd_ne; [exact Ht26 | vm_compute; discriminate]|].
+          split; [rewrite /Mt30 upd_ne; [exact Ht27 | vm_compute; discriminate]|].
+          intro r. rewrite /Mt30 rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Htdom.
         + (* FALL: p < &proc[NPROC]; recurse into iteration k+1 *)
           iApply (wp_beq_fall_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.wakeup + 0x34))
                     (mword_of_int 36 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5)
@@ -226,19 +227,19 @@ Section WpSconfWakeupLoop.
           * exact HkS.
           * unfold wk_loop_regs.
             split; [exact HMt30_9|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Htsp | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Http | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Htsp | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Http | vm_compute; discriminate]|].
             split; [exact HMt30_18|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht19 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht20 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht21 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht22 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht23 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht24 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht25 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht26 | vm_compute; discriminate]|].
-            split; [rewrite /Mt30 lookup_total_insert_ne; [exact Ht27 | vm_compute; discriminate]|].
-            intro r. rewrite /Mt30 dom_insert_L. apply elem_of_union_r. apply Htdom. }
+            split; [rewrite /Mt30 upd_ne; [exact Ht19 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht20 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht21 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht22 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht23 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht24 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht25 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht26 | vm_compute; discriminate]|].
+            split; [rewrite /Mt30 upd_ne; [exact Ht27 | vm_compute; discriminate]|].
+            intro r. rewrite /Mt30 rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Htdom. }
       (* ==================== loop body [0x38 .. 0x30] ==================== *)
       iPoseProof (wki_38 with "Htext") as "Hi38".
       (* ---- 0x38: jal ra, myproc (base JAL, 2-aligned target) ---- *)
@@ -256,9 +257,9 @@ Section WpSconfWakeupLoop.
       iEval (rewrite Hjtgt) in "Hpc".
       assert (HMjra : Mj !!! Regidx (mword_of_int 1 : mword 5)
                       = add_vec_int (mword_of_int (KernelSyms.wakeup + 0x38) : mword 64) 4)
-        by (rewrite /Mj; apply lookup_total_insert).
+        by (rewrite /Mj; apply upd_eq).
       assert (HMjcsp : Mj !!! Regidx csp_rs1 = spF).
-      { rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hsp. }
+      { rewrite /Mj upd_ne; [| vm_compute; discriminate]. exact Hsp. }
       (* ---- myproc(): a0 = proc_addr j (j<NPROC), callee-saved preserved.  Lend
          the deep custody (K := 10); intr_count [lvl] unchanged. ---- *)
       iDestruct "Hres" as "(Hnoffc & Hintc & Hlockcells)".
@@ -275,7 +276,7 @@ Section WpSconfWakeupLoop.
       (* s1 preserved by myproc: mret!!!s1 = proc_addr k *)
       assert (Hmrets1 : mret !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k).
       { rewrite (callee_saved_lookup Hpres (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
-        rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hs1. }
+        rewrite /Mj upd_ne; [| vm_compute; discriminate]. exact Hs1. }
       (* ---- 0x3c: beq a0,s1 : skip-self test ---- *)
       iPoseProof (wki_3c with "Htext") as "Hi3c".
       destruct (eq_vec (mret !!! Regidx (mword_of_int 10 : mword 5))
@@ -297,27 +298,27 @@ Section WpSconfWakeupLoop.
           split; [exact Hmrets1|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 2 : mword 5) ltac:(vm_compute; reflexivity)); exact HMjcsp|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Htp | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Htp | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 18 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs2 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs2 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs3 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs3 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs4 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs4 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 21 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs5 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs5 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 22 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs6 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs6 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 23 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs7 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs7 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 24 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs8 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs8 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 25 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs9 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs9 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 26 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs10 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs10 | vm_compute; discriminate]|].
           split; [rewrite (callee_saved_lookup Hpres (mword_of_int 27 : mword 5) ltac:(vm_compute; reflexivity));
-                  rewrite /Mj lookup_total_insert_ne; [exact Hs11 | vm_compute; discriminate]|].
+                  rewrite /Mj upd_ne; [exact Hs11 | vm_compute; discriminate]|].
           exact Hdommret.
         + rewrite /wk_res_sconf. iFrame "Hnoffc Hintc Hlockcells".
       - (* FALL: a0 <> s1: acquire proc[k], check state/chan, maybe wake, release *)
@@ -339,7 +340,7 @@ Section WpSconfWakeupLoop.
         { rewrite (callee_saved_lookup Hpres (mword_of_int 2 : mword 5) ltac:(vm_compute; reflexivity)). exact HMjcsp. }
         assert (Hmret4 : mret !!! Regidx (mword_of_int 4 : mword 5) = rtp).
         { rewrite (callee_saved_lookup Hpres (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity)).
-          rewrite /Mj lookup_total_insert_ne; [| vm_compute; discriminate]. exact Htp. }
+          rewrite /Mj upd_ne; [| vm_compute; discriminate]. exact Htp. }
         iPoseProof (wki_40 with "Htext") as "Hi40".
         (* 0x40 c.mv a0,s1 : a0 := &proc[k] *)
         iApply (wp_cmv_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.wakeup + 0x40))
@@ -367,16 +368,16 @@ Section WpSconfWakeupLoop.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjtgt_aq) in "Hpc".
         assert (HM42ra : M42 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.wakeup + 0x42) : mword 64) 4)
-          by (rewrite /M42; apply lookup_total_insert).
+          by (rewrite /M42; apply upd_eq).
         assert (HM42a0 : M42 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr k).
-        { rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
-          rewrite /M40 lookup_total_insert. rewrite add_vec_zero_l. exact Hmrets1. }
+        { rewrite /M42 upd_ne; [| vm_compute; discriminate].
+          rewrite /M40 upd_eq. rewrite add_vec_zero_l. exact Hmrets1. }
         assert (HM42csp : M42 !!! Regidx csp_rs1 = spF).
-        { rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
-          rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmret2. }
+        { rewrite /M42 upd_ne; [| vm_compute; discriminate].
+          rewrite /M40 upd_ne; [| vm_compute; discriminate]. exact Hmret2. }
         assert (HM42tp : M42 !!! Regidx (mword_of_int 4 : mword 5) = rtp).
-        { rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
-          rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmret4. }
+        { rewrite /M42 upd_ne; [| vm_compute; discriminate].
+          rewrite /M40 upd_ne; [| vm_compute; discriminate]. exact Hmret4. }
         (* acquire(&proc[k]->lock): intr_count lvl -> S lvl; returns locked + proc_lock_res. *)
         iApply (wp_acquire_sconf γ root_ppn Φ γk (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) M42
                   (zero_reg : mword 64) noffv iv lvl av
@@ -404,14 +405,14 @@ Section WpSconfWakeupLoop.
         (* register-preservation through acquire (callee_saved M42 Macq). *)
         assert (HMacq9 : Macq !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k).
         { rewrite (callee_saved_lookup Hpins (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
-          rewrite /M42 lookup_total_insert_ne; [| vm_compute; discriminate].
-          rewrite /M40 lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hmrets1. }
+          rewrite /M42 upd_ne; [| vm_compute; discriminate].
+          rewrite /M40 upd_ne; [| vm_compute; discriminate]. exact Hmrets1. }
         (* =============================================================== *)
         (* shared release tail [Hrel], reached from all 3 exits (state !=   *)
         (* SLEEPING, chan mismatch, or after waking): 0x2a mv a0,s1;        *)
         (* 0x2c jal release (intr_count S lvl -> lvl); then p++ tail at 0x30.*)
         (* =============================================================== *)
-        iAssert (∀ (Mr : gmap regidx (mword 64)),
+        iAssert (∀ (Mr : regfile),
                    ⌜ Mr !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k /\
                      Mr !!! Regidx (mword_of_int 2 : mword 5) = spF /\
                      Mr !!! Regidx (mword_of_int 4 : mword 5) = rtp /\
@@ -425,7 +426,7 @@ Section WpSconfWakeupLoop.
                      Mr !!! Regidx (mword_of_int 25 : mword 5) = vs9 /\
                      Mr !!! Regidx (mword_of_int 26 : mword 5) = vs10 /\
                      Mr !!! Regidx (mword_of_int 27 : mword 5) = vs11 /\
-                     (forall r : regidx, r ∈ dom Mr) ⌝ -∗
+                     (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
                    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn Mr av -∗ tlb_inv_pt root_ppn -∗
                    pc_is (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗ gpr_file Mr -∗
                    locked γk -∗ proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k) -∗
@@ -461,16 +462,16 @@ Section WpSconfWakeupLoop.
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hjtgt_rl) in "Hpc".
           assert (HMr2c_ra : Mr2c !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.wakeup + 0x2c) : mword 64) 4)
-            by (rewrite /Mr2c; apply lookup_total_insert).
+            by (rewrite /Mr2c; apply upd_eq).
           assert (HMr2c_a0 : Mr2c !!! Regidx (mword_of_int 10 : mword 5) = proc_addr k).
-          { rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-            rewrite /Mr2a lookup_total_insert. rewrite add_vec_zero_l. exact Hr9. }
+          { rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a upd_eq. rewrite add_vec_zero_l. exact Hr9. }
           assert (HMr2c_csp : Mr2c !!! Regidx csp_rs1 = spF).
-          { rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr2. }
+          { rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr2. }
           assert (HMr2c_tp : Mr2c !!! Regidx (mword_of_int 4 : mword 5) = rtp).
-          { rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-            rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr4. }
+          { rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+            rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr4. }
           (* bind the noff/intena arguments to LOCAL names: passing the big
              unfolded terms straight into the [iApply] blows up unification
              (they get substituted into every derived [let] of the release spec),
@@ -518,50 +519,50 @@ Section WpSconfWakeupLoop.
             unfold wk_loop_regs.
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr9. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr9. }
             split; [rewrite (callee_saved_lookup Hpinsr (mword_of_int 2 : mword 5) ltac:(vm_compute; reflexivity)); exact HMr2c_csp|].
             split; [rewrite (callee_saved_lookup Hpinsr (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity)); exact HMr2c_tp|].
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 18 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr18. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr18. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr19. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr19. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr20. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr20. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 21 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr21. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr21. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 22 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr22. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr22. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 23 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr23. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr23. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 24 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr24. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr24. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 25 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr25. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr25. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 26 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr26. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr26. }
             split.
             { rewrite (callee_saved_lookup Hpinsr (mword_of_int 27 : mword 5) ltac:(vm_compute; reflexivity)).
-              rewrite /Mr2c lookup_total_insert_ne; [| vm_compute; discriminate].
-              rewrite /Mr2a lookup_total_insert_ne; [| vm_compute; discriminate]. exact Hr27. }
+              rewrite /Mr2c upd_ne; [| vm_compute; discriminate].
+              rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr27. }
             exact Hdommr.
           - (* wk_res_sconf: noff ∗ ∃intena ∗ lockcells *)
             rewrite /wk_res_sconf. iSplitL "Hnoff3".
@@ -629,35 +630,35 @@ Section WpSconfWakeupLoop.
                         = mword_of_int (KernelSyms.wakeup + 0x48)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc48) in "Hpc".
         assert (HM48a5 : M48 !!! Regidx (mword_of_int 15 : mword 5) = sign_extend' 64 st)
-          by (rewrite /M48 lookup_total_insert; reflexivity).
+          by (rewrite /M48 upd_eq; reflexivity).
         assert (HM48_9 : M48 !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq9 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq9 | vm_compute; discriminate]).
         assert (HM48_2 : M48 !!! Regidx (mword_of_int 2 : mword 5) = spF)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq2 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq2 | vm_compute; discriminate]).
         assert (HM48_4 : M48 !!! Regidx (mword_of_int 4 : mword 5) = rtp)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq4 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq4 | vm_compute; discriminate]).
         assert (HM48_18 : M48 !!! Regidx (mword_of_int 18 : mword 5) = proc_addr NPROC)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq18 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq18 | vm_compute; discriminate]).
         assert (HM48_19 : M48 !!! Regidx (mword_of_int 19 : mword 5) = (mword_of_int 2 : mword 64))
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq19 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq19 | vm_compute; discriminate]).
         assert (HM48_20 : M48 !!! Regidx (mword_of_int 20 : mword 5) = chan)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq20 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq20 | vm_compute; discriminate]).
         assert (HM48_21 : M48 !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64))
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq21 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq21 | vm_compute; discriminate]).
         assert (HM48_22 : M48 !!! Regidx (mword_of_int 22 : mword 5) = vs6)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq22 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq22 | vm_compute; discriminate]).
         assert (HM48_23 : M48 !!! Regidx (mword_of_int 23 : mword 5) = vs7)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq23 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq23 | vm_compute; discriminate]).
         assert (HM48_24 : M48 !!! Regidx (mword_of_int 24 : mword 5) = vs8)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq24 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq24 | vm_compute; discriminate]).
         assert (HM48_25 : M48 !!! Regidx (mword_of_int 25 : mword 5) = vs9)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq25 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq25 | vm_compute; discriminate]).
         assert (HM48_26 : M48 !!! Regidx (mword_of_int 26 : mword 5) = vs10)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq26 | vm_compute; discriminate]).
+          by (rewrite /M48 upd_ne; [exact HMacq26 | vm_compute; discriminate]).
         assert (HM48_27 : M48 !!! Regidx (mword_of_int 27 : mword 5) = vs11)
-          by (rewrite /M48 lookup_total_insert_ne; [exact HMacq27 | vm_compute; discriminate]).
-        assert (HdomM48 : forall r : regidx, r ∈ dom M48).
-        { intro r. rewrite /M48 dom_insert_L. apply elem_of_union_r. apply Hdomacq. }
+          by (rewrite /M48 upd_ne; [exact HMacq27 | vm_compute; discriminate]).
+        assert (HdomM48 : forall r : regidx, r ∈ dom (rf_to_gmap M48)).
+        { intro r. rewrite /M48 rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Hdomacq. }
         (* ---- 0x48 bne a5,s3 : if state != SLEEPING -> release ---- *)
         iPoseProof (wki_48 with "Htext") as "Hi48".
         destruct (neq_vec (M48 !!! Regidx (mword_of_int 15 : mword 5))
@@ -713,35 +714,35 @@ Section WpSconfWakeupLoop.
                           = mword_of_int (KernelSyms.wakeup + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpc4e) in "Hpc".
           assert (HM4e_a5 : M4e !!! Regidx (mword_of_int 15 : mword 5) = ch)
-            by (rewrite /M4e lookup_total_insert; reflexivity).
+            by (rewrite /M4e upd_eq; reflexivity).
           assert (HM4e_9 : M4e !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_9 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_9 | vm_compute; discriminate]).
           assert (HM4e_2 : M4e !!! Regidx (mword_of_int 2 : mword 5) = spF)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_2 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_2 | vm_compute; discriminate]).
           assert (HM4e_4 : M4e !!! Regidx (mword_of_int 4 : mword 5) = rtp)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_4 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_4 | vm_compute; discriminate]).
           assert (HM4e_18 : M4e !!! Regidx (mword_of_int 18 : mword 5) = proc_addr NPROC)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_18 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_18 | vm_compute; discriminate]).
           assert (HM4e_19 : M4e !!! Regidx (mword_of_int 19 : mword 5) = (mword_of_int 2 : mword 64))
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_19 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_19 | vm_compute; discriminate]).
           assert (HM4e_20 : M4e !!! Regidx (mword_of_int 20 : mword 5) = chan)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_20 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_20 | vm_compute; discriminate]).
           assert (HM4e_21 : M4e !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 3 : mword 64))
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_21 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_21 | vm_compute; discriminate]).
           assert (HM4e_22 : M4e !!! Regidx (mword_of_int 22 : mword 5) = vs6)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_22 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_22 | vm_compute; discriminate]).
           assert (HM4e_23 : M4e !!! Regidx (mword_of_int 23 : mword 5) = vs7)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_23 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_23 | vm_compute; discriminate]).
           assert (HM4e_24 : M4e !!! Regidx (mword_of_int 24 : mword 5) = vs8)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_24 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_24 | vm_compute; discriminate]).
           assert (HM4e_25 : M4e !!! Regidx (mword_of_int 25 : mword 5) = vs9)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_25 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_25 | vm_compute; discriminate]).
           assert (HM4e_26 : M4e !!! Regidx (mword_of_int 26 : mword 5) = vs10)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_26 | vm_compute; discriminate]).
+            by (rewrite /M4e upd_ne; [exact HM48_26 | vm_compute; discriminate]).
           assert (HM4e_27 : M4e !!! Regidx (mword_of_int 27 : mword 5) = vs11)
-            by (rewrite /M4e lookup_total_insert_ne; [exact HM48_27 | vm_compute; discriminate]).
-          assert (HdomM4e : forall r : regidx, r ∈ dom M4e).
-          { intro r. rewrite /M4e dom_insert_L. apply elem_of_union_r. apply HdomM48. }
+            by (rewrite /M4e upd_ne; [exact HM48_27 | vm_compute; discriminate]).
+          assert (HdomM4e : forall r : regidx, r ∈ dom (rf_to_gmap M4e)).
+          { intro r. rewrite /M4e rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply HdomM48. }
           (* ---- 0x4e bne a5,s4 : if chan != arg -> release ---- *)
           iPoseProof (wki_4e with "Htext") as "Hi4e".
           destruct (neq_vec (M4e !!! Regidx (mword_of_int 15 : mword 5))
@@ -833,13 +834,13 @@ Section WpSconfWakeupLoop.
       (γ : gname) (root_ppn : mword 44)
       (Rreg : s_regime) (γc : gname) (bsie : mword 1) (dq : dfrac)
       (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (γs : list gname) (a0f : mword 64)
+      (m : regfile) (γs : list gname) (a0f : mword 64)
       (noffv : mword 32) (lvl K : nat) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     let rettgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     (18 <= K)%nat ->
-    (forall r : regidx, r ∈ dom m) ->
+    (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
     length γs = NPROC ->
     mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
     eq_vec (zero_reg : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
@@ -852,8 +853,8 @@ Section WpSconfWakeupLoop.
     kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗ gpr_file m -∗
     wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
     wk_lockcells γs -∗ procs_inv Rreg Φ γc bsie dq γs -∗
-    ( ∀ Mf : gmap regidx (mword 64),
-        ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom Mf) ⌝ -∗
+    ( ∀ Mf : regfile,
+        ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
         sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn Mf K -∗
         intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
         kernel_text -∗ pc_is rettgt -∗ gpr_file Mf -∗

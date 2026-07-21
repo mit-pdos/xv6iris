@@ -10,6 +10,7 @@
 RiscvModelBytes.v
 DevModel.v
 RiscvLang.v
+RegFile.v
 RiscvPtsto.v
 RiscvExec.v
 MinstretInv.v

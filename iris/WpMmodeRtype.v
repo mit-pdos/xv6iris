@@ -8,6 +8,7 @@ From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvFetchExec WpGpr InstrBytes SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
+Require Import RegFile.
 Import Defs.
 Import Defs.
 
@@ -18,7 +19,7 @@ Section WpLogicRTypeGpr.
   Context {dqc : dfrac}.
 
   Lemma wp_or_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -39,12 +40,12 @@ Section WpLogicRTypeGpr.
               Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hm2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
@@ -86,12 +87,12 @@ Section WpLogicRTypeGpr.
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    { iPureIntro. intro r. apply rf_to_gmap_dom. }
+    rewrite rf_to_gmap_upd. iExact "Hfmap".
   Qed.
 
   Lemma wp_and_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -112,12 +113,12 @@ Section WpLogicRTypeGpr.
               Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hm2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
@@ -159,12 +160,12 @@ Section WpLogicRTypeGpr.
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    { iPureIntro. intro r. apply rf_to_gmap_dom. }
+    rewrite rf_to_gmap_upd. iExact "Hfmap".
   Qed.
 
   Lemma wp_xor_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 rd : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -185,12 +186,12 @@ Section WpLogicRTypeGpr.
               Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hm2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
@@ -232,14 +233,14 @@ Section WpLogicRTypeGpr.
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    { iPureIntro. intro r. apply rf_to_gmap_dom. }
+    rewrite rf_to_gmap_upd. iExact "Hfmap".
   Qed.
   (* wp_add_gpr -- the RTYPE ADD member of the family (the ExecuteAs target of
      c.mv / c.add, hence [is_rvc]-generic like its siblings).  Uses WpGpr's
      [exec_execute_RTYPE_ADD_gpr] / [gpr_rd_val]. *)
   Lemma wp_add_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -260,12 +261,12 @@ Section WpLogicRTypeGpr.
               Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hm2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
@@ -311,8 +312,8 @@ Section WpLogicRTypeGpr.
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    { iPureIntro. intro r. apply rf_to_gmap_dom. }
+    rewrite rf_to_gmap_upd. iExact "Hfmap".
   Qed.
 
 End WpLogicRTypeGpr.

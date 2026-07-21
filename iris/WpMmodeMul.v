@@ -5,7 +5,7 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr.
+Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr.
 Require Import InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
@@ -71,7 +71,7 @@ Section WpMulGpr.
      ([gpr_pt_value] reads them uniformly); [rd <> 0] is kept (write to x0 is a
      no-op, and [exec_execute_MUL_gpr] assumes it). *)
   Lemma wp_mul_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 rd : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -92,31 +92,24 @@ Section WpMulGpr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
     iApply (wp_instr Φ pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0
               Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    (* completeness gives the (total) lookups for rs1, rs2 and rd *)
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     (* tick nextPC first, so we read the sources against the execute state *)
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     (* read rs1 (x0 or a real register) -- borrow, read, return, so that
        reading rs2 (possibly = rs1) is an independent borrow *)
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1))
                  (set_reg σ nextPC (add_vec_int pc 4)) with "Hreg Hr1c") as %Hrv1.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
     (* read rs2 (independent borrow; rs1 = rs2 is fine) *)
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm2 with "Hfmap") as "[Hr2c Hfb2]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2)
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hr2c Hfb2]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2))
                  (set_reg σ nextPC (add_vec_int pc 4)) with "Hreg Hr2c") as %Hrv2.
-    iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
+    iDestruct ("Hfb2" with "Hr2c") as "Hfile".
     assert (Hmv : gpr_mul_val rs2 rs1 (set_reg σ nextPC (add_vec_int pc 4))
                   = mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
                       (mulop_mul.(mul_op_signed_rs2))
@@ -124,7 +117,13 @@ Section WpMulGpr.
                       (mulop_mul.(mul_op_result_part))).
     { unfold gpr_mul_val. rewrite Hrv1. rewrite Hrv2. reflexivity. }
     (* write rd (rd <> 0, so its entry is the real register points-to) *)
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd)
+                 (regval_into_reg
+                    (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
+                       (mulop_mul.(mul_op_signed_rs2))
+                       (m !!! Regidx rs1) (m !!! Regidx rs2)
+                       (mulop_mul.(mul_op_result_part))))
+                 with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg
@@ -133,12 +132,7 @@ Section WpMulGpr.
                   (m !!! Regidx rs1) (m !!! Regidx rs2)
                   (mulop_mul.(mul_op_result_part))))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg
-               (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
-                  (mulop_mul.(mul_op_signed_rs2))
-                  (m !!! Regidx rs1) (m !!! Regidx rs2)
-                  (mulop_mul.(mul_op_result_part))))
-                 with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
@@ -169,9 +163,6 @@ Section WpMulGpr.
     { unfold set_reg; cbn [sregs].
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
   Qed.
 End WpMulGpr.

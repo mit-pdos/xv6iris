@@ -25,6 +25,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RegFile.
 Require Import MinstretInv InstrBytes WpGpr WpGprCsrwCommon.
 Require Import SmodeCore WpMmodeLeafBase.
 Require Import KptTree.
@@ -49,7 +50,7 @@ Section WpSconfCsr.
 
   Lemma wp_csrr_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
@@ -82,7 +83,7 @@ Section WpSconfCsr.
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -92,8 +93,6 @@ Section WpSconfCsr.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
@@ -102,11 +101,11 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lms).
     assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
       by (unfold s_pc; tmig; exact Lmisa).
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (sstatus_read ms0)) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -128,7 +127,7 @@ Section WpSconfCsr.
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
                   = m !!! Regidx csp_rs1)
-      by (apply lookup_total_insert_ne; exact Hspne).
+      by (apply upd_ne; congruence).
     iAssert ( ghost_var γ (1/2) (_get_Mstatus_SIE ms0) ∗
               ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
                              !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
@@ -153,8 +152,6 @@ Section WpSconfCsr.
     { exact Hmsf. }
     { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
       iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
   Qed.
 
@@ -241,7 +238,7 @@ Section WpSconfCsr.
   (* ------------------------------------------------------------------- *)
   Lemma wp_csrci_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (k : nat)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
@@ -267,7 +264,7 @@ Section WpSconfCsr.
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
@@ -278,8 +275,6 @@ Section WpSconfCsr.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
@@ -293,17 +288,17 @@ Section WpSconfCsr.
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
                   = m !!! Regidx csp_rs1)
-      by (apply lookup_total_insert_ne; exact Hspne).
+      by (apply upd_ne; congruence).
     iDestruct "Hcap" as "[Hstk [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]]".
     - (* ---- '0' arm: the idempotent write; ghosts untouched ---- *)
       iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
       assert (Hcollapse : legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2)) = ms0)
         by (apply WpGprCsrwC.legalize_sie_clear_idem; assumption).
-      iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+      iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
       rewrite (gpr_pt_nz rd _ Hrd).
       iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
               (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
-      iDestruct ("Hfins" $! (regval_into_reg (sstatus_read ms0)) with "[Hrdc]") as "Hfmap".
+      iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
       { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
       iModIntro.
       iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -333,9 +328,7 @@ Section WpSconfCsr.
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
         iLeft. iExact "Hq0". }
       { iApply (intr_count_pack_S with "Hc0 Hres"). }
-      { iSplitR.
-        { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-        iExact "Hfmap". }
+      { iExact "Hfmap". }
     - (* ---- '1' arm: the real flip ---- *)
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
       iDestruct (intr_count_get_on γ root_ppn k with "Hq1 Hcnt") as "(%Hn0 & Hq1 & Hc1)".
@@ -359,11 +352,11 @@ Section WpSconfCsr.
         vm_compute in Hb. discriminate. }
       (* the machine write: mstatus := ms1, rd := old S-view *)
       iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
-      iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+      iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
       rewrite (gpr_pt_nz rd _ Hrd).
       iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
               (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
-      iDestruct ("Hfins" $! (regval_into_reg (sstatus_read ms0)) with "[Hrdc]") as "Hfmap".
+      iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
       { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
       iModIntro.
       iExists (set_reg (set_reg s_pc mstatus ms1)
@@ -403,9 +396,7 @@ Section WpSconfCsr.
           iSplit; [iPureIntro; exact Htvd |].
           iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
         iFrame "Hsepcx Hscausex Hstvalx". }
-      { iSplitR.
-        { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-        iExact "Hfmap". }
+      { iExact "Hfmap". }
   Qed.
 
 
@@ -536,7 +527,7 @@ Section WpSconfCsr.
      sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
   Lemma wp_csrsi_sstatus_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sconf γ -∗
@@ -564,7 +555,7 @@ Section WpSconfCsr.
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -574,8 +565,6 @@ Section WpSconfCsr.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
@@ -589,7 +578,7 @@ Section WpSconfCsr.
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
                   = m !!! Regidx csp_rs1)
-      by (apply lookup_total_insert_ne; exact Hspne).
+      by (apply upd_ne; congruence).
     iDestruct "Hcap" as "[Hstk [Hq0 | (Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx')]]".
     2:{ (* already enabled: impossible -- the payload's sepc cell and the
            '1' arm's sepc cell cannot coexist *)
@@ -609,11 +598,11 @@ Section WpSconfCsr.
     { iNext. iExists ('b"1" : mword 1). iFrame "Hqi Hstv".
       iModIntro. iIntros "%Hb". iExact "Hspec". }
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (sstatus_read ms0)) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg (set_reg s_pc mstatus ms1)
@@ -650,14 +639,12 @@ Section WpSconfCsr.
       iExists handler. iSplit; [iPureIntro; exact Htvd |].
       iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
     { iLeft. iExact "Hqcnt". }
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
   Qed.
 
   Lemma wp_csrsi_sstatus_x0_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m n -∗
@@ -682,7 +669,7 @@ Section WpSconfCsr.
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -751,7 +738,6 @@ Section WpSconfCsr.
       iExists handler. iSplit; [iPureIntro; exact Htvd |].
       iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
     { iLeft. iExact "Hqcnt". }
-    iSplitR; [iPureIntro; exact Hdom |].
     iExact "Hfmap".
   Qed.
 

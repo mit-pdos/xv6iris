@@ -35,6 +35,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode KernelText.
+Require Import RegFile.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
@@ -415,7 +416,7 @@ Section WpSwtchVc.
     ctx_cells_at c 0 vs.
 
   (* the callee-saved register image of a machine file, in field order. *)
-  Definition callee_img (m : gmap regidx (mword 64)) : list (mword 64) :=
+  Definition callee_img (m : regfile) : list (mword 64) :=
     map (fun r => m !!! Regidx r) ctx_regs.
 
   (* the pc a [ret] to saved return address [ra] lands on (low bit cleared);
@@ -476,7 +477,7 @@ Section WpSwtchVc.
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ctx_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
-      (∀ (m : gmap regidx (mword 64)),
+      (∀ (m : regfile),
          ⌜callee_img m = vs⌝ -∗ sc -∗
          pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
          (∃ cret : mword 64, ▷ rec cret ∗ P cret) -∗
@@ -535,7 +536,7 @@ Section WpSwtchVc.
     (* resumer [cret], both [▷ valid_context P cret] and [P cret].             *)
     (* ================================================================== *)
     Lemma wp_swtch (P : mword 64 -d> iPropO Σ) (oldc newc : mword 64)
-        (m0 : gmap regidx (mword 64)) (old_vs : list (mword 64)) :
+        (m0 : regfile) (old_vs : list (mword 64)) :
       length old_vs = 14%nat ->
       m0 !!! Regidx (mword_of_int 10) = oldc ->
       m0 !!! Regidx (mword_of_int 11) = newc ->
@@ -545,7 +546,7 @@ Section WpSwtchVc.
       ctx_cells oldc old_vs -∗
       valid_context sconf Phi P newc -∗
       P oldc -∗
-      (∀ (m : gmap regidx (mword 64)),
+      (∀ (m : regfile),
          ⌜callee_img m = callee_img m0⌝ -∗ sconf -∗
          pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
          (∃ cret : mword 64, ▷ valid_context sconf Phi P cret ∗ P cret) -∗
@@ -578,7 +579,7 @@ Section WpSwtchVc.
              else if (k <? 46)%nat then nth (k - 32) new_vs (mword_of_int 0)
              else nth (k - 46) old_vs (mword_of_int 0)).
       assert (Hden : vregs_den rho vregs_init = m0).
-      { apply (vregs_den_init_agree _ _ Hdom Hx0). intros k Hk.
+      { apply (vregs_den_init_agree _ _ Hx0). intros k Hk.
         unfold rho. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
       assert (Hrho10 : rho 10%nat = oldc) by (unfold rho; exact Holdc).
       assert (Hrho11 : rho 11%nat = newc) by (unfold rho; exact Hnewc).

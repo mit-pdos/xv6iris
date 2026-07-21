@@ -7,7 +7,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WpGpr UserBits.
+Require Import MinstretInv WpGpr UserBits RegFile.
 Require Import WpLeafCommon WpIntrCore SmodeCore.
 Require Import UserPtTree UserExec UserStep UserTrap UserCompute UserArms UserFetch UserFetchPt UserClassify.
 Local Open Scope Z_scope.
@@ -38,7 +38,7 @@ Section UserExecProducerU.
   (* 5-way BASE totality: decode w -> instr; execute (possibly one base
      ExecuteAs redirect, e.g. SINVAL_VMA) -> r with u_result_ok r. *)
   Definition base_exec_total_u (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) : iProp Σ :=
+      (g : regfile) : iProp Σ :=
     (∀ (w : mword 32) (σf : mstate),
        ⌜post_fetch_cfg σf va (register_lookup (R_bool minstret_increment) σ.(sregs))⌝ -∗
        hw_config -∗
@@ -46,7 +46,7 @@ Section UserExecProducerU.
        gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 4 -∗ user_pt_inv pt -∗ user_cfg C -∗
        |={E}=>
          ∃ (instr : instruction) (r : ExecutionResult) (s_x : mstate)
-           (g' : gmap regidx (mword 64)) (va' : mword 64),
+           (g' : regfile) (va' : mword 64),
            ⌜exec (ext_decode w) σf = Some (instr, σf)⌝ ∗
            ⌜is_lpad_instruction instr = false⌝ ∗
            ⌜exec (execute instr) (set_reg σf nextPC (add_vec_int va 4)) = Some (r, s_x)
@@ -66,7 +66,7 @@ Section UserExecProducerU.
      ExecuteAs redirect -> r with u_result_ok r.  Disjunction, mirroring
      base_exec_total_u. *)
   Definition rvc_exec_total_u (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) : iProp Σ :=
+      (g : regfile) : iProp Σ :=
     (∀ (h : mword 16) (σf : mstate),
        ⌜post_fetch_cfg σf va (register_lookup (R_bool minstret_increment) σ.(sregs))⌝ -∗
        hw_config -∗
@@ -74,7 +74,7 @@ Section UserExecProducerU.
        gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
        |={E}=>
          ∃ (instr : instruction) (r : ExecutionResult) (s_x : mstate)
-           (g' : gmap regidx (mword 64)) (va' : mword 64),
+           (g' : regfile) (va' : mword 64),
            ⌜exec (ext_decode_compressed h) σf = Some (instr, σf)⌝ ∗
            ⌜exec (currentlyEnabled Ext_Zca) σf = Some (true, σf)⌝ ∗
            ⌜exec (execute instr) (set_reg σf nextPC (add_vec_int va 2)) = Some (r, s_x)
@@ -91,7 +91,7 @@ Section UserExecProducerU.
 
   (* Lift a completed fetch to active_step_obligation (Step_Execute case). *)
   Lemma user_exec_step_from_fetch_u (E : coPset) (σ σf : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (iw : mword 32) :
+      (g : regfile) (iw : mword 32) :
     register_lookup cur_privilege σ.(sregs) = User ->
     exec (dispatchInterrupt User) σ = Some (None, σ) ->
     register_lookup PC σ.(sregs) = va ->
@@ -109,7 +109,7 @@ Section UserExecProducerU.
     base_exec_total_u E σ va g -∗ rvc_exec_total_u E σ va g -∗
     mstate_interp σf -∗ gpr_file g -∗ nextPC ↦ᵣ va -∗ user_pt_inv pt -∗ user_cfg C -∗
     |={E}=>
-      ∃ (st : Step) (s_x : mstate) (g' : gmap regidx (mword 64)) (va' : mword 64),
+      ∃ (st : Step) (s_x : mstate) (g' : regfile) (va' : mword 64),
         ⌜exec (run_hart_active 0) σ = Some (st, s_x)⌝ ∗
         ⌜u_step_outcome st⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
@@ -179,7 +179,7 @@ Section UserExecProducerU.
 
   (* The fetch-success producer for the unified obligation (4-aligned). *)
   Lemma user_exec_step_producer_u (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (w_leaf : mword 64) :
+      (g : regfile) (w_leaf : mword 64) :
     pt.(ud_um) !! svpn_of va = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
@@ -225,7 +225,7 @@ Section UserFetchFaultActive.
 
   (* Odd pc -> E_Fetch_Addr_Align, state unchanged. *)
   Lemma user_fetch_fault_active_align (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) :
+      (g : regfile) :
     neq_vec (access_vec_dec va 0) ('b"0") = true ->
     register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
     ⊢ active_step_obligation C pt E σ va g.
@@ -249,7 +249,7 @@ Section UserFetchFaultActive.
 
   (* 4-aligned walk fault -> E_Fetch_Page_Fault, state unchanged. *)
   Lemma user_fetch_fault_active (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) :
+      (g : regfile) :
     u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) va ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     register_lookup hart_state σ.(sregs) = HART_ACTIVE tt ->
@@ -280,7 +280,7 @@ Section UserFetchFaultActive.
 
   (* 2-aligned low-halfword fault -> E_Fetch_Page_Fault, state unchanged. *)
   Lemma user_fetch_fault_active_2_first (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) :
+      (g : regfile) :
     u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) va ->
     neq_vec (access_vec_dec va 0) ('b"0") = false ->
     neq_vec (access_vec_dec va 1) ('b"0") = true ->
@@ -317,7 +317,7 @@ Section UserFetchFaultActive.
      With the unified obligation BOTH land in u_step_outcome, so this is one
      active_step_obligation (no disjunction of obligation types). *)
   Lemma user_exec_or_fault_active_2_second (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (w_leaf : mword 64) :
+      (g : regfile) (w_leaf : mword 64) :
     pt.(ud_um) !! svpn_of va = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     u_fetch_fault_flavor pt.(ud_tfp) pt.(ud_um) (add_vec_int va 2) ->
@@ -388,7 +388,7 @@ Section UserExecProducer2U.
   Context (C : ucfg) (pt : uptd).
 
   Lemma user_exec_step_producer_2_u (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (w_leaf wh_leaf : mword 64) :
+      (g : regfile) (w_leaf wh_leaf : mword 64) :
     pt.(ud_um) !! svpn_of va = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     pt.(ud_um) !! svpn_of (add_vec_int va 2) = Some wh_leaf ->

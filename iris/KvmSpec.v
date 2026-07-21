@@ -81,7 +81,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes KernelText WpGpr WpMmodeLeafBase.
+Require Import InstrBytes KernelText WpGpr WpMmodeLeafBase RegFile.
 Require Import PtTree PtBuild.
 Require Import SmodeCore SRegime StackOwn CalleeSaved KallocInv WpLock WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -144,7 +144,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition walk_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (mm : gmap regidx (mword 64)) (t : ptree)
+       (mm : regfile) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let vpn := svpn_of va in
@@ -160,7 +160,7 @@ Section KvmSpecs.
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
-      ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree),
+      ( ∀ (mr : regfile) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
@@ -186,7 +186,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition mappages_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (mm : gmap regidx (mword 64)) (t : ptree)
+       (mm : regfile) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let pa := mm !!! Regidx (mword_of_int 13) in
@@ -211,7 +211,7 @@ Section KvmSpecs.
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
-      ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree) (k : nat),
+      ( ∀ (mr : regfile) (t' : ptree) (k : nat),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
@@ -233,7 +233,7 @@ Section KvmSpecs.
   (* loop; an axiom in the interim, like wp_myproc.)  a0 = message ptr.    *)
   (* ------------------------------------------------------------------- *)
   Definition panic_wp : iProp Σ :=
-    (□ ∀ (Φ : mval -> iProp Σ) (m : gmap regidx (mword 64)),
+    (□ ∀ (Φ : mval -> iProp Σ) (m : regfile),
        kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ gpr_file m -∗
        WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
@@ -243,7 +243,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition kvmmap_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (mm : gmap regidx (mword 64)) (t : ptree)
+       (mm : regfile) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let pa := mm !!! Regidx (mword_of_int 12) in
@@ -269,7 +269,7 @@ Section KvmSpecs.
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
-      ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree),
+      ( ∀ (mr : regfile) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗

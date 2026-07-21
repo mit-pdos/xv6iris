@@ -33,6 +33,7 @@ Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpInitlock.
 Require Import SRegime.
+Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -75,7 +76,7 @@ Section WpSconfInitlock.
   (* ================================================================== *)
   Local Lemma wp_sw_zero_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : bv 32) :
+      (m : regfile) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := (mword_of_int 0 : mword 32) in
     sconf γ -∗
@@ -136,8 +137,8 @@ Section WpSconfInitlock.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -286,7 +287,7 @@ Section WpSconfInitlock.
   (* stores / epilogue).  NO [intr_count] -- it does no locking.     *)
   (* ============================================================= *)
   Lemma wp_initlock_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (vlock : bv 32) (vname vcpu : bv 64)
       (K : nat) :
     let pcE : mword 64 := mword_of_int IL in
@@ -344,7 +345,7 @@ Section WpSconfInitlock.
     iIntros "Hhs Hsc Hcap Hframe Htlbinv Hpc Hfile".
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m) with R1.
-    assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 lookup_total_insert; reflexivity).
+    assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
     (* frame cells at [pa_stk sp0 1..2] *)
     iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
@@ -379,13 +380,13 @@ Section WpSconfInitlock.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
     set (R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> R1).
     assert (HR2a0 : R2 !!! Regidx (mword_of_int 10 : mword 5) = lk).
-    { rewrite /R2 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R1 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    { rewrite /R2 upd_ne; [| vm_compute; discriminate].
+      rewrite /R1 upd_ne; [| vm_compute; discriminate]. reflexivity. }
     assert (HR2a1 : R2 !!! Regidx (mword_of_int 11 : mword 5) = name).
-    { rewrite /R2 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R1 lookup_total_insert_ne; [| vm_compute; discriminate]. reflexivity. }
+    { rewrite /R2 upd_ne; [| vm_compute; discriminate].
+      rewrite /R1 upd_ne; [| vm_compute; discriminate]. reflexivity. }
     assert (HspR2 : R2 !!! Regidx csp_rs1 = spr).
-    { rewrite /R2 lookup_total_insert_ne; [| vm_compute; discriminate]. exact HspR1. }
+    { rewrite /R2 upd_ne; [| vm_compute; discriminate]. exact HspR1. }
     assert (Hpp08 : add_vec_int (mword_of_int (IL + 0x06) : mword 64) 2 = mword_of_int (IL + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     (* +0x08 c.sd a1,8(a0):  lk->name := a1 *)
@@ -432,7 +433,7 @@ Section WpSconfInitlock.
     iEval (rewrite HspR2) in "Hras".
     set (R3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (R1 !!! Regidx (mword_of_int 1 : mword 5))]> R2).
     assert (HspR3 : R3 !!! Regidx csp_rs1 = spr).
-    { rewrite /R3 lookup_total_insert_ne; [| vm_compute; discriminate]. exact HspR2. }
+    { rewrite /R3 upd_ne; [| vm_compute; discriminate]. exact HspR2. }
     assert (Hpp14 : add_vec_int (mword_of_int (IL + 0x12) : mword 64) 2 = mword_of_int (IL + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* +0x14 c.ldsp s0,0(sp) *)
@@ -445,7 +446,7 @@ Section WpSconfInitlock.
     iEval (rewrite HspR3) in "Hs0s".
     set (R4 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (R1 !!! Regidx (mword_of_int 8 : mword 5))]> R3).
     assert (HspR4 : R4 !!! Regidx csp_rs1 = spr).
-    { rewrite /R4 lookup_total_insert_ne; [| vm_compute; discriminate]. exact HspR3. }
+    { rewrite /R4 upd_ne; [| vm_compute; discriminate]. exact HspR3. }
     assert (Hpp16 : add_vec_int (mword_of_int (IL + 0x14) : mword 64) 2 = mword_of_int (IL + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
     (* rebuild the 2-slot frame from the restored cells *)
@@ -453,9 +454,9 @@ Section WpSconfInitlock.
     (* +0x16 c.addi sp,16 -- the frame trade back (move_up 2) *)
     set (R5 := <[Regidx csp_rs1 := regval_into_reg (add_vec (R4 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> R4).
     assert (HR5csp : R5 !!! Regidx csp_rs1 = sp0).
-    { rewrite /R5 lookup_total_insert. rewrite HspR4. unfold regval_into_reg, spr, sp0. apply initlock_sp_cancel. }
+    { rewrite /R5 upd_eq. rewrite HspR4. unfold regval_into_reg, spr, sp0. apply initlock_sp_cancel. }
     assert (Hwv : add_vec (R4 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0).
-    { rewrite -HR5csp /R5 lookup_total_insert. reflexivity. }
+    { rewrite -HR5csp /R5 upd_eq. reflexivity. }
     assert (Hpop : R4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (R4 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HspR4. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
@@ -475,11 +476,11 @@ Section WpSconfInitlock.
     iEval (rewrite Hpp18) in "Hpc".
     (* +0x18 c.ret *)
     assert (HR5ra : R5 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5)).
-    { rewrite /R5 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R4 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R3 lookup_total_insert.
+    { rewrite /R5 upd_ne; [| vm_compute; discriminate].
+      rewrite /R4 upd_ne; [| vm_compute; discriminate].
+      rewrite /R3 upd_eq.
       unfold regval_into_reg.
-      rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+      rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
     assert (Hretaligned : eq_vec (access_vec_dec (update_vec_dec (add_vec (R5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
       by (rewrite HR5ra; exact Hretm).
     iApply (wp_cret_s_sconf γ root_ppn Φ (mword_of_int (IL + 0x18)) (mword_of_int 1 : mword 5) R5 K
@@ -494,25 +495,25 @@ Section WpSconfInitlock.
     assert (Hthread : forall c : mword 5, c <> csp_rs1 -> c <> mword_of_int 8 -> c <> mword_of_int 1 ->
                 R5 !!! Regidx c = m !!! Regidx c).
     { intros c N2 N8 N1.
-      rewrite /R5 lookup_total_insert_ne; [| congruence].
-      rewrite /R4 lookup_total_insert_ne; [| congruence].
-      rewrite /R3 lookup_total_insert_ne; [| congruence].
-      rewrite /R2 lookup_total_insert_ne; [| congruence].
-      rewrite /R1 lookup_total_insert_ne; [| congruence].
+      rewrite /R5 upd_ne; [| congruence].
+      rewrite /R4 upd_ne; [| congruence].
+      rewrite /R3 upd_ne; [| congruence].
+      rewrite /R2 upd_ne; [| congruence].
+      rewrite /R1 upd_ne; [| congruence].
       reflexivity. }
     unfold callee_saved.
     split.
     { (* sp *)
-      rewrite /R5 lookup_total_insert. rewrite HspR4.
+      rewrite /R5 upd_eq. rewrite HspR4.
       unfold regval_into_reg, spr. apply initlock_sp_cancel. }
     split.
     { (* tp *) apply Hthread; vm_compute; first [reflexivity | discriminate]. }
     split.
     { (* s0 *)
-      rewrite /R5 lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite /R4 lookup_total_insert.
+      rewrite /R5 upd_ne; [| vm_compute; discriminate].
+      rewrite /R4 upd_eq.
       unfold regval_into_reg.
-      rewrite /R1 lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]. }
+      rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
     repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate].
   Qed.
 

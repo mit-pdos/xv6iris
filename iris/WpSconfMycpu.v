@@ -17,7 +17,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import RegFile WpGpr InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KptTree.
 Require Import StackOwn CalleeSaved KernelText.
@@ -33,7 +33,7 @@ Section WpSconfMycpu.
   Context `{CID : CpuId}.
 
   Lemma wp_mycpu_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (n : nat) :
+      (m0 : regfile) (n : nat) :
     let ra_idx : mword 5 := mword_of_int 1 in
     let tp_idx : mword 5 := mword_of_int 4 in
     let a0_idx : mword 5 := mword_of_int 10 in
@@ -48,7 +48,7 @@ Section WpSconfMycpu.
     sie_cap γ root_ppn m0 n -∗
     tlb_inv_pt root_ppn -∗
     kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
-    ( ∀ m' : gmap regidx (mword 64),
+    ( ∀ m' : regfile,
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
       sie_cap γ root_ppn m' n -∗
@@ -99,7 +99,7 @@ Section WpSconfMycpu.
     iPoseProof (myi_1c with "Htext") as "Hi1c".
     iPoseProof (myi_1e with "Htext") as "Hi1e".
     (* the sp geometry: sp' = pa_stk sp0 2; frame slot addresses *)
-    assert (Hcsp1 : m1 !!! Regidx csp_rs1 = sp') by (apply lookup_total_insert).
+    assert (Hcsp1 : m1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : sp' = pa_stk (m0 !!! Regidx csp_rs1) 2).
     { unfold sp', pa_stk, add_vec_int, imm_entry.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
@@ -196,16 +196,16 @@ Section WpSconfMycpu.
     (* ---- 0x18: c.ldsp ra,8(sp) ---- *)
     assert (Hm8sp : m8 !!! Regidx csp_rs1 = sp').
     { unfold m8, m7, m6, m5, m4, m3, m2;
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]);
-      unfold m1; rewrite lookup_total_insert; reflexivity. }
+      repeat (rewrite upd_ne; [| vm_compute; discriminate]);
+      unfold m1; rewrite upd_eq; reflexivity. }
     assert (Hpa1' : add_vec (m8 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { rewrite Hm8sp. rewrite -Hcsp1. exact Hpa1. }
     assert (Hpa2' : add_vec (m8 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
     { rewrite Hm8sp. rewrite -Hcsp1. exact Hpa2. }
     assert (Hra0v : m1 !!! Regidx ra_idx = ra0)
-      by (unfold m1; rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]).
+      by (unfold m1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     assert (Hs00v : m1 !!! Regidx s0_idx = s00)
-      by (unfold m1; rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]).
+      by (unfold m1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite Hpa1 -Hpa1' Hra0v) in "Hbra".
     iEval (rewrite Hpa2 -Hpa2' Hs00v) in "Hbs0".
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x18)) (mword_of_int 1 : mword 6) ra_idx m8 (n - 2)%nat ra0
@@ -217,7 +217,7 @@ Section WpSconfMycpu.
     change (<[Regidx ra_idx := regval_into_reg ra0]> m8) with m9.
     (* ---- 0x1a: c.ldsp s0,0(sp) ---- *)
     assert (Hm9sp : m9 !!! Regidx csp_rs1 = m8 !!! Regidx csp_rs1)
-      by (unfold m9; rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate]).
+      by (unfold m9; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite -Hm9sp) in "Hbs0".
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x1a)) (mword_of_int 0 : mword 6) s0_idx m9 (n - 2)%nat s00
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -228,7 +228,7 @@ Section WpSconfMycpu.
     change (<[Regidx s0_idx := regval_into_reg s00]> m9) with m10.
     (* ---- 0x1c: c.addi sp,16 -- the frame pop ---- *)
     assert (Hm10sp : m10 !!! Regidx csp_rs1 = sp').
-    { unfold m10, m9; repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+    { unfold m10, m9; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       exact Hcsp1. }
     assert (Hwv : add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = sp0).
     { rewrite Hm10sp. unfold sp', imm_dealloc, imm_entry, sp0. apply mycpu_frame_cancel. }
@@ -250,8 +250,8 @@ Section WpSconfMycpu.
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m10) with m11.
     (* ---- 0x1e: c.ret ---- *)
     assert (Hm11ra : m11 !!! Regidx ra_idx = ra0).
-    { unfold m11, m10; repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      unfold m9. rewrite lookup_total_insert. reflexivity. }
+    { unfold m11, m10; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
+      unfold m9. rewrite upd_eq. reflexivity. }
     assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (m11 !!! Regidx ra_idx) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
       by (rewrite Hm11ra; exact Hal0).
     iApply (wp_cret_s_sconf γ root_ppn Φ (mword_of_int (KernelSyms.mycpu + 0x1e)) ra_idx m11 n
@@ -285,8 +285,8 @@ Section WpSconfMycpu.
       unfold sp', imm_dealloc, imm_entry.
       apply mycpu_frame_cancel.
     - rewrite /m11 /m10 /m9 /m8 /m7 /m6 /m5 /m4 /m3 /m2 /m1 /s00 /ra0.
-      repeat first [ rewrite lookup_total_insert
-                   | rewrite lookup_total_insert_ne; [| vm_compute; discriminate] ].
+      repeat first [ rewrite upd_eq
+                   | rewrite upd_ne; [| vm_compute; discriminate] ].
       unfold mycpu_ret, mycpu_a5. reflexivity.
   Qed.
 
@@ -296,7 +296,7 @@ Section WpSconfMycpu.
      sp), and callee_saved composes across the ra write. *)
   Lemma wp_call_mycpu_sconf_cs (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     let ra_idx : mword 5 := mword_of_int 1 in
     let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
     let pcE := mword_of_int KernelSyms.mycpu in
@@ -338,8 +338,8 @@ Section WpSconfMycpu.
       assert (Hm0w : m0 = apply_writes
         [ ((mword_of_int 1 : mword 5), regval_into_reg (add_vec_int P 4)) ] m) by reflexivity.
       rewrite Hm0w. apply callee_saved_apply_writes. repeat constructor.
-    - rewrite Ha0. f_equal. unfold m0.
-      rewrite lookup_total_insert_ne; [reflexivity | vm_compute; discriminate].
+    - rewrite Ha0. f_equal.
+    all: reg_lookup.
   Qed.
 
 End WpSconfMycpu.

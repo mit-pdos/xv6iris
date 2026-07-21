@@ -23,6 +23,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import RegFile.
 Require Import WpGpr.
 Require Import UserPtTree UserExec.
 Local Open Scope Z_scope.
@@ -36,23 +37,22 @@ Section UserCompute.
   (* Peel the [rd] fragment out of an existential gpr file and hand back an
      insert-wand.  Value-agnostic: the caller reinserts whatever the
      post-state holds. *)
-  Lemma gpr_file_acc (g : gmap regidx (mword 64)) (rd : mword 5) :
-    (forall r : regidx, r ∈ dom g) ->
+  Lemma gpr_file_acc (g : regfile) (rd : mword 5) :
     uint rd <> 0 ->
     gpr_file g -∗
     (∃ v0 : mword 64, R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ v0) ∗
     (∀ v : mword 64, R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ v -∗
        gpr_file (<[Regidx rd := v]> g)).
   Proof.
-    iIntros (Hdom Hrd) "[_ Hfmap]".
-    assert (Hmd : g !! Regidx rd = Some (g !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iIntros (Hrd) "[_ Hfmap]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ (rf_to_gmap_lookup g (Regidx rd)) with "Hfmap")
+      as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iSplitL "Hrdc". { iExists _. iExact "Hrdc". }
     iIntros (v) "Hrdc".
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. apply rf_to_gmap_dom. }
+    rewrite rf_to_gmap_upd.
     iApply ("Hfins" $! v).
     rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc".
   Qed.
@@ -73,7 +73,7 @@ Section UserCompute.
      state the engine instantiates [σ] at); the arm keeps PC and the
      untouched CSR fragments.  [E] is the ambient mask. *)
   Definition retire_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) : iProp Σ :=
+      (g : regfile) : iProp Σ :=
     (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      gpr_file g -∗
@@ -81,7 +81,7 @@ Section UserCompute.
      user_pt_inv pt -∗
      user_cfg C -∗
      |={E}=>
-       ∃ (ib : mword 32) (s_x : mstate) (g' : gmap regidx (mword 64))
+       ∃ (ib : mword 32) (s_x : mstate) (g' : regfile)
          (va' : mword 64),
          ⌜exec (run_hart_active 0) σ = Some (Step_Execute (Retire_Success tt, ib), s_x)⌝ ∗
          ⌜register_lookup hart_state s_x.(sregs) = HART_ACTIVE tt⌝ ∗

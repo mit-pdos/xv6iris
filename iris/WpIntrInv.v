@@ -57,7 +57,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import WpGpr.
+Require Import WpGpr RegFile.
 Require Import SmodeCore WpSmodeSret.
 Require Import WpIntrBits WpIntrCore.
 Require Export IntrDefs.
@@ -247,7 +247,7 @@ Section WpIntrInv.
   (* =================================================================== *)
   Lemma wp_exec_step_intr (γ : gname) (handler pc0 : mword 64)
       (root_ppn : mword 44) (menvcfg0 : mword 64)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (Φ : mval -> iProp Σ) :
     sret_tgt pc0 = pc0 ->
     intr_inv γ handler root_ppn menvcfg0 -∗

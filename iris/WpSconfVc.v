@@ -42,6 +42,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import WpGpr InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
+Require Import RegFile.
 Require Import VcGen VcGenS.
 Require Import StackOwn.
 Require Import KptTree.
@@ -500,7 +501,7 @@ Section WpSconfVc.
   Lemma wp_vc_block_s_sconf_aux (γ : gname) (root_ppn : mword 44)
       (prog : list vop_s) (Φ : mval -> iProp Σ)
       (st st' : vsstate) (ρ : nat -> mword 64)
-      (m m0 : gmap regidx (mword 64)) (n : nat) :
+      (m m0 : regfile) (n : nat) :
     vc_block_sp_s st prog = Some st' ->
     (vsu st <= vsx st)%nat ->
     (vsx st' <= n)%nat ->
@@ -516,7 +517,7 @@ Section WpSconfVc.
     vheap_own ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
-    ( ∀ mf : gmap regidx (mword 64),
+    ( ∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m0 ⌝ -∗
       sconf γ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -1085,7 +1086,7 @@ Section WpSconfVc.
   Lemma wp_vc_block_s_sconf (γ : gname) (root_ppn : mword 44)
       (prog : list vop_s) (Φ : mval -> iProp Σ)
       (st st' : vsstate) (ρ : nat -> mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     vc_block_sp_s st prog = Some st' ->
     (vsu st <= vsx st)%nat ->
     (vsx st' <= n)%nat ->
@@ -1100,7 +1101,7 @@ Section WpSconfVc.
     vheap_own ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
-    ( ∀ mf : gmap regidx (mword 64),
+    ( ∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m ⌝ -∗
       sconf γ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗

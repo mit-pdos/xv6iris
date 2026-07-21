@@ -23,6 +23,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import InstrBytes.
 Require Import WpRvcBridge KernelText StackOwn.
 Require Import WpGpr.
+Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
 Require Import SmodeCore.
@@ -272,16 +273,15 @@ Section WpUartPutcSyncFull.
   (* [gpr_matches] from the [vregs_den] equality (the block runner's entry
      interface wants the former; my ρ setup proves the latter). *)
   Lemma gpr_matches_of_den (ρ : nat -> mword 64) (vr : gmap regidx sval)
-      (m : gmap regidx (mword 64)) :
+      (m : regfile) :
     vregs_den ρ vr = m -> gpr_matches ρ vr m.
   Proof.
-    intros <- r sv Hr. unfold vregs_den.
-    rewrite lookup_total_alt lookup_fmap Hr. reflexivity.
+    intros <- r sv Hr. exact (vregs_den_lookup ρ vr r sv Hr).
   Qed.
 
   Lemma wp_uartputc_r (Rg : s_regime) (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (n : nat) (q : Qp)
+      (m0 : regfile) (n : nat) (q : Qp)
       (l : list (bv 8)) (pv pkv : mword 32)
       {dqm dqm2 : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in
@@ -364,7 +364,7 @@ Section WpUartPutcSyncFull.
                 else if Nat.eqb k 34 then (s0old : mword 64)
                 else (s1old : mword 64)).
     assert (HdenA : vregs_den ρA vregs_init = m0).
-    { apply (vregs_den_init_agree _ _ Hdom0 Hx00). intros k Hk.
+    { apply (vregs_den_init_agree _ _ Hx00). intros k Hk.
       unfold ρA. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
     assert (HmA : gpr_matches ρA vregs_init m0) by (apply gpr_matches_of_den; exact HdenA).
     (* the three block cells ARE the three stack words *)
@@ -449,7 +449,7 @@ Section WpUartPutcSyncFull.
     set (m3 := <[Regidx s1_idx := regval_into_reg (add_vec zero_reg (M1 !!! Regidx a0_idx))]> M1).
     assert (HR9m3 : m3 !!! Regidx (mword_of_int 9) = add_vec zero_reg a00).
     { unfold m3. change (Regidx s1_idx) with (Regidx (mword_of_int 9)).
-      rewrite lookup_total_insert. unfold regval_into_reg. rewrite Ha0M1. reflexivity. }
+      rewrite upd_eq. unfold regval_into_reg. rewrite Ha0M1. reflexivity. }
     (* the body's store byte is about m3!!!s1 = add_vec zero_reg a00 = our sb *)
     assert (Hsbm3 : (autocast (T := mword)
                       (subrange_vec_dec (and_vec (m3 !!! Regidx (mword_of_int 9))
@@ -467,7 +467,7 @@ Section WpUartPutcSyncFull.
     assert (Hmf_sp : mf !!! Regidx (mword_of_int 2) = sp').
     { change (Regidx (mword_of_int 2)) with (Regidx csp_rs1).
       rewrite B2. unfold m3.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
       exact HspM1. }
     (* ------------------------------------------------------------------ *)
     (* SEAM 2: run the epilogue load block from [mf].                       *)
@@ -481,7 +481,7 @@ Section WpUartPutcSyncFull.
            else if Nat.eqb k 33 then ra0
                 else if Nat.eqb k 34 then s00 else s10).
     assert (HdenB : vregs_den ρB vregs_init = mf).
-    { apply (vregs_den_init_agree _ _ Hdomf Hxf0). intros k Hk.
+    { apply (vregs_den_init_agree _ _ Hxf0). intros k Hk.
       unfold ρB. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
     assert (HmB : gpr_matches ρB vregs_init mf) by (apply gpr_matches_of_den; exact HdenB).
     assert (HspB : ρB 2%nat = sp').
@@ -550,7 +550,7 @@ Section WpUartPutcSyncFull.
     iPoseProof (upi_4e with "Htext") as "Hi4e".
     assert (Hra_final : m_epi2 !!! Regidx (mword_of_int 1) = ra0).
     { unfold m_epi2.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
       exact HraM2. }
     assert (Hpc4e : add_vec_int (mword_of_int (UPS + 0x4c)) 2
                     = (mword_of_int (UPS + 0x4e) : mword 64))
@@ -600,9 +600,9 @@ Section WpUartPutcSyncFull.
               mf !!! Regidx r = m3 !!! Regidx r ->
               m_epi2 !!! Regidx r = m0 !!! Regidx r).
     { intros r He Hp Hne1 Hne2 Hbody.
-      unfold m_epi2. rewrite lookup_total_insert_ne; [| exact Hne1].
+      unfold m_epi2. rewrite upd_ne; [| apply not_eq_sym, Hne1].
       rewrite (Hagree_epi _ He) Hbody. unfold m3.
-      rewrite lookup_total_insert_ne; [| exact Hne2].
+      rewrite upd_ne; [| apply not_eq_sym, Hne2].
       exact (Hagree_pro _ Hp). }
     iApply ("Hcont" $! m_epi2 with "Hsm Htlbinv Hpc Hfile [%] Hstk Hpk Hpkd Hown Hsent").
     split; [| exact Hra_final].
@@ -616,25 +616,25 @@ Section WpUartPutcSyncFull.
                         | exact B25 | exact B26 | exact B27 ] ]).
     (* sp/s0/s1: spilled to the frame by the prologue, reloaded by the epilogue *)
     - (* sp: the -32/+32 frame adjustment cancels *)
-      unfold m_epi2. rewrite lookup_total_insert.
+      unfold m_epi2. rewrite upd_eq.
       unfold regval_into_reg. rewrite HspM2. unfold sp'.
       change (caddi16sp_imm (mword_of_int 2)) with (caddi16sp_imm (mword_of_int 2 : mword 6)).
       apply ups_frame_cancel.
     - (* s0: reloaded from the frame slot holding the entry s0 *)
       unfold m_epi2.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
       etransitivity; [ apply (HmM2 _ (SX 34 0)); vm_compute; reflexivity |].
       exact Hvs0B.
     - (* s1: likewise *)
       unfold m_epi2.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
       etransitivity; [ apply (HmM2 _ (SX 35 0)); vm_compute; reflexivity |].
       exact Hvs1B.
   Qed.
 
   Lemma wp_uartputc (root_ppn : mword 44) (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (n : nat) (q : Qp)
+      (m0 : regfile) (n : nat) (q : Qp)
       (l : list (bv 8)) (pv pkv : mword 32)
       {dqm dqm2 : dfrac} :
     let ra_idx : mword 5 := mword_of_int 1 in

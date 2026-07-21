@@ -20,6 +20,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec WpEntry WpGpr.
+Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import WpGprCsrwA WpGprCsrwB.
 Require Import WpGprMretWp.
@@ -34,7 +35,7 @@ Section WpKernelNew.
   Context `{CID : CpuId}.
 
   Lemma wp_kernel (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (v_stack0 : bv 64) (mhartid_in : mword 64)
+      (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
@@ -109,10 +110,10 @@ Section WpKernelNew.
     (* wp_start's entry-file lookups over _entry's output map *)
     assert (Hkra : (Regidx i_jal : regidx) = Regidx ti_ra) by (vm_compute; reflexivity).
     assert (HEra : m_jal m v_stack0 mhartid_in !!! Regidx ti_ra = add_vec_int pc_e7 4).
-    { unfold m_jal. rewrite Hkra. rewrite lookup_total_insert. reflexivity. }
+    { unfold m_jal. rewrite Hkra. rewrite upd_eq. reflexivity. }
     assert (HEs0 : m_jal m v_stack0 mhartid_in !!! Regidx ti_s0 = m !!! Regidx ti_s0).
     { unfold m_jal, m_cadd, m_mul, m_caddi, m_csrr, m_clui, m_ld, m_auipc.
-      repeat (rewrite lookup_total_insert_ne;
+      repeat (rewrite upd_ne;
               [ | let H := fresh in intro H;
                   apply (f_equal (fun r : regidx => uint (regidx_bits r))) in H;
                   vm_compute in H; discriminate H ]).

@@ -18,7 +18,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WireInv WpGpr UserBits.
+Require Import MinstretInv WireInv WpGpr UserBits RegFile.
 Require Import UserPtTree UserExec UserClassifyAsm.
 Require Import UserTotalU UserMemClassify UserActiveClass.
 Local Open Scope Z_scope.
@@ -32,7 +32,7 @@ Section UserExecClose.
   (* The base execute totality, closed by instantiating the 6 base memory
      Variables with their proven arms. *)
   Lemma base_exec_total_u_closed (E : coPset) (sigma : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) :
+      (g : regfile) :
     ⊢ base_exec_total_u C pt E sigma va g.
   Proof.
     apply (base_exec_total_u_holds C pt
@@ -43,7 +43,7 @@ Section UserExecClose.
   (* The compressed execute totality, closed by instantiating the 13
      compressed memory Variables with their proven arms. *)
   Lemma rvc_exec_total_u_closed (E : coPset) (sigma : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) :
+      (g : regfile) :
     ⊢ rvc_exec_total_u C pt E sigma va g.
   Proof.
     apply (rvc_exec_total_u_holds C pt

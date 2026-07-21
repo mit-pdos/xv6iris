@@ -28,6 +28,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import WpLoad.
 Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import RegFile.
 Require Import SmodePte PtTreeAdue.
 Require Import SmodeCore WpSmodeGpr.
 Require Import KptTree SmodeCorePt WpSmodePtLeaves WpSmodePtMem.
@@ -88,7 +89,7 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_cld_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (v : mword 64) {dqm : dfrac} :
+      (m : regfile) (n : nat) (v : mword 64) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
@@ -153,10 +154,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -281,6 +282,7 @@ Section WpSconfMem.
             with "Hreg Hrdc") as "[Hreg Hrdc]".
     iDestruct ("Hfins" $! (regval_into_reg v) with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
     iModIntro.
     iExists (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v)).
     iSplitR.
@@ -300,10 +302,10 @@ Section WpSconfMem.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (pa ↦₈{ dqm } v)%I with "[Hbytes]" as "Hbw".
     { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+    assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg v]> m !!! Regidx csp_rs1)
-      by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+      by (symmetry; apply upd_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
                  (<[Regidx rd := regval_into_reg v]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
@@ -313,7 +315,7 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. apply rf_to_gmap_dom. }
     iExact "Hfmap".
   Qed.
 
@@ -323,7 +325,7 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_csd_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
+      (m : regfile) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -383,10 +385,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hms2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hms2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (word_pointsto_bytes with "Hbytes") as "Hb".
       iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0".
@@ -537,7 +539,7 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_ld_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (v : mword 64) {dqm : dfrac} :
+      (m : regfile) (n : nat) (v : mword 64) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
@@ -602,10 +604,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -730,6 +732,7 @@ Section WpSconfMem.
             with "Hreg Hrdc") as "[Hreg Hrdc]".
     iDestruct ("Hfins" $! (regval_into_reg v) with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
     iModIntro.
     iExists (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v)).
     iSplitR.
@@ -749,10 +752,10 @@ Section WpSconfMem.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (pa ↦₈{ dqm } v)%I with "[Hbytes]" as "Hbw".
     { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+    assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg v]> m !!! Regidx csp_rs1)
-      by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+      by (symmetry; apply upd_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
                  (<[Regidx rd := regval_into_reg v]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
@@ -762,13 +765,13 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. apply rf_to_gmap_dom. }
     iExact "Hfmap".
   Qed.
 
   Lemma wp_sd_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
+      (m : regfile) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -828,10 +831,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hms2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hms2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (word_pointsto_bytes with "Hbytes") as "Hb".
       iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0".
@@ -982,7 +985,7 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_clw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (v : mword 32) {dqm : dfrac} :
+      (m : regfile) (n : nat) (v : mword 32) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
@@ -1047,10 +1050,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -1175,6 +1178,7 @@ Section WpSconfMem.
             with "Hreg Hrdc") as "[Hreg Hrdc]".
     iDestruct ("Hfins" $! (regval_into_reg (sign_extend' 64 v)) with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
     iModIntro.
     iExists (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (sign_extend' 64 v))).
     iSplitR.
@@ -1194,10 +1198,10 @@ Section WpSconfMem.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (pa ↦₄{ dqm } v)%I with "[Hbytes]" as "Hbw".
     { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+    assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
-      by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+      by (symmetry; apply upd_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
                  (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
@@ -1207,14 +1211,14 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. apply rf_to_gmap_dom. }
     iExact "Hfmap".
   Qed.
 
 
   Lemma wp_csw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : bv 32) :
+      (m : regfile) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (m !!! Regidx rs2) in
     sconf γ -∗
@@ -1275,10 +1279,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hms2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hms2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -1423,7 +1427,7 @@ Section WpSconfMem.
 
   Lemma wp_lw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (v : mword 32) {dqm : dfrac} :
+      (m : regfile) (n : nat) (v : mword 32) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
@@ -1488,10 +1492,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hmd : rf_to_gmap m !! Regidx rd = Some (m !!! Regidx rd))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -1616,6 +1620,7 @@ Section WpSconfMem.
             with "Hreg Hrdc") as "[Hreg Hrdc]".
     iDestruct ("Hfins" $! (regval_into_reg (sign_extend' 64 v)) with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
     iModIntro.
     iExists (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (sign_extend' 64 v))).
     iSplitR.
@@ -1635,10 +1640,10 @@ Section WpSconfMem.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (pa ↦₄{ dqm } v)%I with "[Hbytes]" as "Hbw".
     { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+    assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
-      by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+      by (symmetry; apply upd_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ root_ppn m
                  (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
     iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
@@ -1648,14 +1653,14 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. apply rf_to_gmap_dom. }
     iExact "Hfmap".
   Qed.
 
 
   Lemma wp_sw_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : bv 32) :
+      (m : regfile) (n : nat) (vold : bv 32) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (m !!! Regidx rs2) in
     sconf γ -∗
@@ -1716,10 +1721,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hms2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hms2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -1901,7 +1906,7 @@ Section WpSconfMem.
 
   Lemma wp_sb_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : bv 8) :
+      (m : regfile) (n : nat) (vold : bv 8) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := trunc8 (m !!! Regidx rs2) in
     sconf γ -∗
@@ -1961,10 +1966,10 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hms2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
+    assert (Hms2 : rf_to_gmap m !! Regidx rs2 = Some (m !!! Regidx rs2))
+      by (apply rf_to_gmap_lookup).
     assert (Hlo : (ram_base <= uint pa)%Z) by (destruct Hrampa as [Hl _]; exact Hl).
     assert (Hfit : (uint pa + 1 <= ram_base + ram_size)%Z)
       by (destruct Hrampa as [_ Hh]; unfold ram_base, ram_size in *; lia).
@@ -2102,7 +2107,7 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_cldsp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)
-      (m : gmap regidx (mword 64)) (n : nat) (v : mword 64) {dqm : dfrac} :
+      (m : regfile) (n : nat) (v : mword 64) {dqm : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     uint rd <> 0 ->
@@ -2130,7 +2135,7 @@ Section WpSconfMem.
 
   Lemma wp_csdsp_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
+      (m : regfile) (n : nat) (vold : mword 64) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -2159,7 +2164,7 @@ Section WpSconfMem.
   (* ------------------------------------------------------------------- *)
   Lemma wp_sd_zero_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (n : nat) (vold : mword 64) :
+      (m : regfile) (n : nat) (vold : mword 64) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let storeval := (zero_reg : mword 64) in
     sconf γ -∗
@@ -2220,8 +2225,8 @@ Section WpSconfMem.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hmsp : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (apply rf_to_gmap_lookup).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (word_pointsto_bytes with "Hbytes") as "Hb".
       iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0".

@@ -57,6 +57,7 @@ Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpRvcBridge.
 Require Import StackOwn.
+Require Import RegFile.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -436,37 +437,37 @@ Qed.
 (* The gpr-file after each register write, as nested-insert abbreviations *)
 (* over the abstract entry file [m] (WpEntryNew [m_jal] style).           *)
 (* ===================================================================== *)
-Definition ti_m1 (m : gmap regidx (mword 64)) (sp0 : mword 64) :=
+Definition ti_m1 (m : regfile) (sp0 : mword 64) :=
   <[Regidx csp_rs1 := regval_into_reg (ti_sp1 sp0)]> m.
-Definition ti_m12 (m : gmap regidx (mword 64)) (sp0 : mword 64) :=
+Definition ti_m12 (m : regfile) (sp0 : mword 64) :=
   <[Regidx ti_s0 := regval_into_reg (ti_s0v sp0)]> (ti_m1 m sp0).
-Definition ti_m13 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) :=
+Definition ti_m13 (m : regfile) (sp0 menv0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg menv0]> (ti_m12 m sp0).
-Definition ti_m14 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) :=
+Definition ti_m14 (m : regfile) (sp0 menv0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg (cli_wval i14)]> (ti_m13 m sp0 menv0).
-Definition ti_m15 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) :=
+Definition ti_m15 (m : regfile) (sp0 menv0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg ti_bit63]> (ti_m14 m sp0 menv0).
-Definition ti_m16 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) :=
+Definition ti_m16 (m : regfile) (sp0 menv0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (ti_menv1 menv0)]> (ti_m15 m sp0 menv0).
-Definition ti_m18 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) :=
+Definition ti_m18 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) :=
   <[Regidx ti_a5 := regval_into_reg (zero_extend' 64 mcen0)]> (ti_m16 m sp0 menv0).
-Definition ti_m19 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) :=
+Definition ti_m19 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) :=
   <[Regidx ti_a5 := regval_into_reg (ti_mcen1 mcen0)]> (ti_m18 m sp0 menv0 mcen0).
-Definition ti_m21 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
+Definition ti_m21 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg mtime0]> (ti_m19 m sp0 menv0 mcen0).
-Definition ti_m22 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
+Definition ti_m22 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg (luival i22)]> (ti_m21 m sp0 menv0 mcen0 mtime0).
-Definition ti_m23 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
+Definition ti_m23 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg ti_interval]> (ti_m22 m sp0 menv0 mcen0 mtime0).
-Definition ti_m24 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
+Definition ti_m24 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (ti_deadline mtime0)]> (ti_m23 m sp0 menv0 mcen0 mtime0).
-Definition ti_m26 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 ra0 : mword 64) :=
+Definition ti_m26 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 ra0 : mword 64) :=
   <[Regidx ti_ra := regval_into_reg ra0]> (ti_m24 m sp0 menv0 mcen0 mtime0).
-Definition ti_m27 (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 ra0 s00 : mword 64) :=
+Definition ti_m27 (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 ra0 s00 : mword 64) :=
   <[Regidx ti_s0 := regval_into_reg s00]> (ti_m26 m sp0 menv0 mcen0 mtime0 ra0).
 (* the FINAL file: sp/ra/s0 restored (sp1+16 = sp0), a4 = the interval
    1000000, a5 = the stimecmp deadline (mtime0 + 1000000). *)
-Definition ti_mout (m : gmap regidx (mword 64)) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 ra0 s00 : mword 64) :=
+Definition ti_mout (m : regfile) (sp0 menv0 : mword 64) (mcen0 : mword 32) (mtime0 ra0 s00 : mword 64) :=
   <[Regidx csp_rs1 := regval_into_reg sp0]> (ti_m27 m sp0 menv0 mcen0 mtime0 ra0 s00).
 
 (* concrete-register-key disequality (both keys literal). *)
@@ -477,8 +478,8 @@ Local Ltac ti_reg_neq :=
 
 (* drive a total lookup over the insert chain; bottoms out at a premise. *)
 Local Ltac ti_look :=
-  repeat first [ rewrite lookup_total_insert
-               | rewrite lookup_total_insert_ne; [ | ti_reg_neq ] ];
+  repeat first [ rewrite upd_eq
+               | rewrite upd_ne; [ | ti_reg_neq ] ];
   first [ reflexivity | assumption ].
 
 Local Ltac ti_unfold :=
@@ -489,27 +490,16 @@ Local Ltac ti_unfold :=
    and clobbers only the caller-saved temporaries a4/a5 -- every callee-saved
    register (sp, tp, s0, s1, s2..s11) holds its entry value on return. *)
 Lemma ti_mout_callee_saved
-    (m : gmap regidx (mword 64)) (sp0 menv0 mtime0 ra0 s00 : mword 64)
+    (m : regfile) (sp0 menv0 mtime0 ra0 s00 : mword 64)
     (mcen0 : mword 32) :
   m !!! Regidx csp_rs1 = sp0 ->
   m !!! Regidx ti_s0 = s00 ->
   callee_saved m (ti_mout m sp0 menv0 mcen0 mtime0 ra0 s00).
 Proof.
-  intros Hsp Hs0. unfold callee_saved. repeat split.
-  - rewrite Hsp. ti_unfold; ti_look.       (* x2  sp *)
-  - ti_unfold; ti_look.                     (* x4  tp *)
-  - rewrite Hs0. ti_unfold; ti_look.        (* x8  s0 *)
-  - ti_unfold; ti_look.                     (* x9  s1 *)
-  - ti_unfold; ti_look.                     (* x18 s2 *)
-  - ti_unfold; ti_look.                     (* x19 s3 *)
-  - ti_unfold; ti_look.                     (* x20 s4 *)
-  - ti_unfold; ti_look.                     (* x21 s5 *)
-  - ti_unfold; ti_look.                     (* x22 s6 *)
-  - ti_unfold; ti_look.                     (* x23 s7 *)
-  - ti_unfold; ti_look.                     (* x24 s8 *)
-  - ti_unfold; ti_look.                     (* x25 s9 *)
-  - ti_unfold; ti_look.                     (* x26 s10 *)
-  - ti_unfold; ti_look.                     (* x27 s11 *)
+  intros Hsp Hs0. unfold callee_saved. repeat split;
+    first [ rewrite Hsp; ti_unfold; ti_look
+          | rewrite Hs0; ti_unfold; ti_look
+          | ti_unfold; ti_look ].
 Qed.
 
 (* ===================================================================== *)
@@ -522,7 +512,7 @@ Section WpTimerinitThm.
 
   (* [wp_timerinit]: the whole-function spec over the [stack_own] abstraction. *)
   Lemma wp_timerinit (Φ : mval -> iProp Σ) (q : Qp)
-      (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)
+      (m : regfile) (sp0 ra0 s00 : mword 64)
       (menv0 stimecmp0 : mword 64) (mcen0 : mword 32)
       (pmpcfg1 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (n : nat) :

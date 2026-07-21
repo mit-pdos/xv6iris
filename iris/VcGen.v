@@ -60,14 +60,14 @@
        flavor to the heap.
      - no control flow: branches/jumps end a block (compose blocks with the
        existing jal/jalr/beq WPs). *)
-From Stdlib Require Import ZArith Lia List.
+From Stdlib Require Import ZArith Lia List FunctionalExtensionality.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExtras WpGpr.
+Require Import RiscvLang RegFile RiscvPtsto RiscvExtras WpGpr.
 Require Import InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
@@ -479,18 +479,32 @@ Qed.
 (* 4. Denotation of a symbolic state into resources.                       *)
 (* ====================================================================== *)
 
+(* The concrete register file is now a [regfile] (RegFile.v).  [vregs_den] turns
+   the symbolic map [m : gmap regidx sval] into the total concrete function; a
+   register absent from [m] denotes [sval_den ρ inhabitant] (never observed, as
+   the symbolic map is kept total where it feeds [gpr_file]). *)
+Global Instance sval_inhabited : Inhabited sval := populate (SC 0).
+
 Definition vregs_den (ρ : nat -> mword 64) (m : gmap regidx sval)
-    : gmap regidx (mword 64) := sval_den ρ <$> m.
+    : regfile := fun r => sval_den ρ (m !!! r).
 
 Lemma vregs_den_lookup (ρ : nat -> mword 64) (m : gmap regidx sval) r sv :
   m !! r = Some sv -> vregs_den ρ m !!! r = sval_den ρ sv.
 Proof.
-  intro H. unfold vregs_den. rewrite lookup_total_alt lookup_fmap H. reflexivity.
+  intro H. unfold vregs_den. rewrite rf_lookup. f_equal.
+  rewrite lookup_total_alt H. reflexivity.
 Qed.
 
 Lemma vregs_den_insert (ρ : nat -> mword 64) (m : gmap regidx sval) r sv :
   <[r := sval_den ρ sv]> (vregs_den ρ m) = vregs_den ρ (<[r := sv]> m).
-Proof. unfold vregs_den. by rewrite fmap_insert. Qed.
+Proof.
+  apply functional_extensionality; intro r'.
+  unfold vregs_den, insert, regfile_insert, rf_upd.
+  destruct (bool_decide (r' = r)) eqn:Hb.
+  - apply bool_decide_eq_true in Hb as ->. rewrite lookup_total_insert. reflexivity.
+  - apply bool_decide_eq_false in Hb.
+    rewrite lookup_total_insert_ne; [reflexivity | congruence].
+Qed.
 
 Section VcGenIris.
   Context `{!riscvGS Σ}.
@@ -563,19 +577,16 @@ Qed.
 (* the AGREEMENT form: any valuation that matches [m] on the 32 register
    variables denotes [vregs_init] to [m] -- variables >= 32 are free for the
    caller's heap-cell values, which is what mid-proof seams need. *)
-Lemma vregs_den_init_agree (ρ : nat -> mword 64) (m : gmap regidx (mword 64)) :
-  (forall r : regidx, r ∈ dom m) ->
+Lemma vregs_den_init_agree (ρ : nat -> mword 64) (m : regfile) :
   m !!! Regidx (mword_of_int 0 : mword 5) = zero_reg ->
   (forall k : nat, (k < 32)%nat ->
      ρ k = m !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)) ->
   vregs_den ρ vregs_init = m.
 Proof.
-  intros Hdom Hx0 Hagree. apply map_eq. intros r. destruct r as [i].
-  unfold vregs_den. rewrite lookup_fmap vregs_init_lookup. simpl.
-  assert (Hm : m !! Regidx i = Some (m !!! Regidx i))
-    by (apply lookup_lookup_total_dom; apply Hdom).
-  rewrite Hm.
-  destruct (Z.eqb (uint i) 0) eqn:Hz; simpl; f_equal.
+  intros Hx0 Hagree. apply functional_extensionality. intros r. destruct r as [i].
+  unfold vregs_den. rewrite (lookup_total_correct _ _ _ (vregs_init_lookup i)).
+  change (m (Regidx i)) with (m !!! Regidx i).
+  destruct (Z.eqb (uint i) 0) eqn:Hz; simpl.
   - (* x0: den (SC 0) = mword_of_int 0 = zero_reg = m !!! x0 *)
     apply Z.eqb_eq in Hz.
     assert (Ei : i = mword_of_int 0) by (rewrite -(mword5_of_uint i) Hz; reflexivity).

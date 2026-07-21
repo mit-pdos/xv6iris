@@ -33,6 +33,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SRegime.
 Require Import SmodeCore.
+Require Import RegFile.
 Require Import InstrBytes RiscvFetchExec WpGpr KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
@@ -431,14 +432,14 @@ Axiom wp_myproc :
   forall {Σ : gFunctors} {HR : riscvGS Σ} {HS : sieG Σ} {CID : CpuId}
     (R : s_regime) (Phi : mval -> iProp Σ)
     (γc : gname) (bsie : mword 1)
-    (m : gmap regidx (mword 64)),
+    (m : regfile),
     let ret_tgt :=
       update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
                         (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗ sr_inv R -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.myproc) -∗ gpr_file m -∗
-    (∀ (j : nat) (mret : gmap regidx (mword 64)),
+    (∀ (j : nat) (mret : regfile),
        ⌜(j < NPROC)%nat⌝ -∗
        ⌜mret !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j⌝ -∗
        ⌜forall r : mword 5,
@@ -624,8 +625,8 @@ Section ProcInv.
   (* peel nested [<[k:=v]>_ !!! j] map lookups down to the base map. *)
   Local Ltac wk_peel :=
     repeat first
-      [ rewrite lookup_total_insert
-      | (rewrite lookup_total_insert_ne; [ idtac | vm_compute; discriminate ]) ].
+      [ rewrite upd_eq
+      | (rewrite upd_ne; [ idtac | vm_compute; discriminate ]) ].
 
 
   (* ===================================================================== *)
@@ -637,7 +638,7 @@ Section ProcInv.
   (* register-map shape at the loop header [pc = wakeup+0x38] with counter [k].
      Same as [wk_regs] but WITHOUT the [ra] constraint: [ra] is dead at the
      header (immediately clobbered by the [jal myproc]). *)
-  Definition wk_loop_regs (M : gmap regidx (mword 64)) (spF rtp chan : mword 64)
+  Definition wk_loop_regs (M : regfile) (spF rtp chan : mword 64)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (k : nat) : Prop :=
     M !!! Regidx (mword_of_int 9)  = proc_addr k /\
     M !!! Regidx (mword_of_int 2)  = spF /\
@@ -652,7 +653,7 @@ Section ProcInv.
     M !!! Regidx (mword_of_int 25) = vs9 /\
     M !!! Regidx (mword_of_int 26) = vs10 /\
     M !!! Regidx (mword_of_int 27) = vs11 /\
-    (forall r : regidx, r ∈ dom M).
+    (forall r : regidx, r ∈ dom (rf_to_gmap M)).
 
   (* eq_vec is reflexive: used at the termination beq to derive that the last
      iteration index k+1 must be < NPROC (else proc_addr equal -> beq taken). *)

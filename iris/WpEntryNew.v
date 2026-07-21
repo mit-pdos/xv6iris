@@ -32,7 +32,7 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpDecode WpEntry WpGpr.
+Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvFetchExec WpDecode WpEntry WpGpr.
 Require Import WpAuipc WpMmodeMul WpMmodeJal.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeLoad.
@@ -176,26 +176,26 @@ Section WpEntryNew.
      corresponding WP.  (a1's C.ADDI and a0's MUL and sp's C.ADD read their
      inputs off the threaded map, so their written values are left as symbolic
      [!!!] reads over the running map -- exactly what the WPs produce.) *)
-  Definition m_auipc (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
+  Definition m_auipc (m : regfile) : regfile :=
     <[Regidx i_auipc := regval_into_reg entry_sp1]> m.
-  Definition m_ld (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
-      : gmap regidx (mword 64) :=
+  Definition m_ld (m : regfile) (v_stack0 : bv 64)
+      : regfile :=
     <[Regidx i_ld := regval_into_reg v_stack0]> (m_auipc m).
-  Definition m_clui (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
-      : gmap regidx (mword 64) :=
+  Definition m_clui (m : regfile) (v_stack0 : bv 64)
+      : regfile :=
     <[Regidx (regidx_bits rd_clui) :=
         regval_into_reg (luival (sign_extend' 20 imm_clui))]> (m_ld m v_stack0).
-  Definition m_csrr (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
-      (mhartid_in : mword 64) : gmap regidx (mword 64) :=
+  Definition m_csrr (m : regfile) (v_stack0 : bv 64)
+      (mhartid_in : mword 64) : regfile :=
     <[Regidx i_rd_csrr := regval_into_reg mhartid_in]> (m_clui m v_stack0).
-  Definition m_caddi (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
-      (mhartid_in : mword 64) : gmap regidx (mword 64) :=
+  Definition m_caddi (m : regfile) (v_stack0 : bv 64)
+      (mhartid_in : mword 64) : regfile :=
     <[Regidx (regidx_bits rsd_caddi) :=
         regval_into_reg
           (add_vec (m_csrr m v_stack0 mhartid_in !!! Regidx (regidx_bits rsd_caddi))
              (sign_extend' 64 imm_caddi))]> (m_csrr m v_stack0 mhartid_in).
-  Definition m_mul (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
-      (mhartid_in : mword 64) : gmap regidx (mword 64) :=
+  Definition m_mul (m : regfile) (v_stack0 : bv 64)
+      (mhartid_in : mword 64) : regfile :=
     <[Regidx i_mul_rd :=
         regval_into_reg
           (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
@@ -203,15 +203,15 @@ Section WpEntryNew.
              (m_caddi m v_stack0 mhartid_in !!! Regidx i_mul_rs1)
              (m_caddi m v_stack0 mhartid_in !!! Regidx i_mul_rs2)
              (mulop_mul.(mul_op_result_part)))]> (m_caddi m v_stack0 mhartid_in).
-  Definition m_cadd (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
-      (mhartid_in : mword 64) : gmap regidx (mword 64) :=
+  Definition m_cadd (m : regfile) (v_stack0 : bv 64)
+      (mhartid_in : mword 64) : regfile :=
     <[Regidx (regidx_bits rsd_cadd) :=
         regval_into_reg
           (add_vec (m_mul m v_stack0 mhartid_in !!! Regidx (regidx_bits rsd_cadd))
              (m_mul m v_stack0 mhartid_in !!! Regidx (regidx_bits rs2_cadd)))]>
       (m_mul m v_stack0 mhartid_in).
-  Definition m_jal (m : gmap regidx (mword 64)) (v_stack0 : bv 64)
-      (mhartid_in : mword 64) : gmap regidx (mword 64) :=
+  Definition m_jal (m : regfile) (v_stack0 : bv 64)
+      (mhartid_in : mword 64) : regfile :=
     <[Regidx i_jal := regval_into_reg (add_vec_int pc_e7 4)]>
       (m_cadd m v_stack0 mhartid_in).
 
@@ -219,7 +219,7 @@ Section WpEntryNew.
   (*  THE THEOREM: the whole [_entry] boot chain, one Qed.             *)
   (* ================================================================= *)
   Lemma wp_entry (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (v_stack0 : bv 64) (mhartid_in : mword 64)
+      (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
     (* [pmp_all_off] (not just unlocked): the chain contains an 8-byte load
        (`ld sp, ..`), whose PMP check needs the all-OFF form -- see the note
@@ -284,7 +284,7 @@ Section WpEntryNew.
                   = entry_ld_ea).
     { unfold entry_ld_ea, entry_sp1, m_auipc.
       rewrite reg_ld_auipc.
-      rewrite lookup_total_insert. reflexivity. }
+      rewrite upd_eq. reflexivity. }
     iApply (wp_ld_gpr Φ pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
               (dq := dq) Hpmp Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
     { rewrite Hea. iExact "Hbytes". }

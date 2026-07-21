@@ -7,7 +7,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
-Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
+Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpLeafCommon WpGpr RegFile RiscvModelBytes RiscvTryStep RiscvExtras WpLoad SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values WpAuipc WpDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -1439,14 +1439,13 @@ Section GprFileX0.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Lemma gpr_file_x0 (m : gmap regidx (mword 64)) (i : mword 5) :
+  Lemma gpr_file_x0 (m : regfile) (i : mword 5) :
     uint i = 0 ->
     gpr_file m -∗ ⌜ m !!! Regidx i = zero_reg ⌝ ∗ gpr_file m.
   Proof.
     iIntros (Hi) "[%Hdom Hmap]".
-    assert (Hm : m !! Regidx i = Some (m !!! Regidx i))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm with "Hmap") as "[Hpt Hcl]".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx i)) with "Hmap")
+      as "[Hpt Hcl]".
     iEval (unfold gpr_pt; rewrite Hi; simpl) in "Hpt".
     iDestruct "Hpt" as %Hz.
     iSplitR; [iPureIntro; exact Hz|].

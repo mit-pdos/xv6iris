@@ -24,7 +24,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon.
+Require Import InstrBytes WpDecode WpLeafCommon WpGpr WpGprCsrwCommon RegFile.
 Require Import SmodeCore.
 Require Import KptTree WpSmodePtCtl.
 Require Import WpMmodeLeafBase.
@@ -177,7 +177,7 @@ Section WpSconfCtl.
   (* priv/menvcfg side conditions.                                        *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_fence_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : gmap regidx (mword 64)) (n : nat) :
+      (pc : mword 64) (m : regfile) (n : nat) :
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
     sie_cap γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
@@ -225,7 +225,7 @@ Section WpSconfCtl.
   (* ------------------------------------------------------------------- *)
   Lemma wp_cj_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     let tgt := add_vec pc (sign_extend' 64 jimm) in
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -283,7 +283,7 @@ Section WpSconfCtl.
   (* ------------------------------------------------------------------- *)
   Lemma wp_jal_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -301,15 +301,13 @@ Section WpSconfCtl.
     iIntros (Hrd Hrdsp Hal0) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false (JAL (imm, Regidx rd))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     assert (Hpcv : register_lookup PC
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
@@ -323,13 +321,13 @@ Section WpSconfCtl.
       rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
             with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (add_vec_int pc 4))
+                 with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg (add_vec_int pc 4))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (add_vec_int pc 4))
-                 with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
@@ -359,13 +357,10 @@ Section WpSconfCtl.
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m !!! Regidx csp_rs1)
-      by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+      by (symmetry; apply upd_ne; congruence).
     iDestruct (sie_cap_retarget γ root_ppn m
                  (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n Hsp with "Hcap") as "Hcap".
-    iApply ("Hcont" with "Hhs' [$Hhw $Hsc2] Hcap Htlbinv [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hhs' [$Hhw $Hsc2] Hcap Htlbinv [$Hpc' $Hnpc] Hfile").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -374,7 +369,7 @@ Section WpSconfCtl.
   (* ------------------------------------------------------------------- *)
   Lemma wp_cret_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     uint ra <> 0 ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
@@ -391,7 +386,7 @@ Section WpSconfCtl.
     iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -400,13 +395,11 @@ Section WpSconfCtl.
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx ra = Some (m !!! Regidx ra))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfb]".
-    iDestruct (gpr_pt_value ra (m !!! Regidx ra) s_pc with "Hreg Hrac") as %Lra.
-    iDestruct ("Hfb" with "Hrac") as "Hfmap".
+    iDestruct (gpr_file_lookup_acc m (Regidx ra) with "Hfile") as "[Hrac Hfb]".
+    iDestruct (gpr_pt_value ra (m (Regidx ra)) s_pc with "Hreg Hrac") as %Lra.
+    iDestruct ("Hfb" with "Hrac") as "Hfile".
     assert (Lra' : register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs) = m !!! Regidx ra).
     { pose proof Lra as H.
       replace (Z.eqb (uint ra) 0) with false in H by (symmetry; apply Z.eqb_neq; exact Hra).
@@ -445,10 +438,9 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hhs' [Hpriv Hmsx Hmiex Hmenv] Hcap Htlbinv [$Hpc' $Hnpc] [Hfmap]").
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+    iApply ("Hcont" with "Hhs' [Hpriv Hmsx Hmiex Hmenv] Hcap Htlbinv [$Hpc' $Hnpc] Hfile").
+    iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
+    iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption.
   Qed.
 
 End WpSconfCtl.

@@ -19,7 +19,7 @@
      PRESERVED (loads restore stores; -256/+256 cancels on sp), ONE Qed
      modulo the two chunk lemmas.  Only kerneltrap_returns + platform
      externs are assumed. *)
-From Stdlib Require Import ZArith.
+From Stdlib Require Import ZArith FunctionalExtensionality.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
@@ -31,6 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import MinstretInv InstrBytes.
 Require Import WpLeafCommon.
 Require Import WpGpr.
+Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpSmodeSret KernelText WpKvInstr.
 Require Import VcGen VcGenS.
@@ -57,7 +58,7 @@ Ltac kv_regne :=
    concrete) or from a [r <> k] disequality already in context.  Stops when
    the next insert's key IS the looked-up key. *)
 Ltac kv_skipt :=
-  repeat (rewrite lookup_total_insert_ne; [ | first [ kv_regne | congruence ] ]).
+  repeat (rewrite upd_ne; [ | first [ kv_regne | congruence ] ]).
 Ltac kv_skipl :=
   repeat (rewrite lookup_insert_ne; [ | first [ kv_regne | congruence ] ]).
 
@@ -130,13 +131,13 @@ Qed.
 
 
 (* sp after the prologue c.addi16sp (the value the whole frame is based on). *)
-Definition kv_sp1 (m : gmap regidx (mword 64)) : mword 64 :=
+Definition kv_sp1 (m : regfile) : mword 64 :=
   regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm kv_imm1))).
 
 (* the gpr file after instr #1 / after the jal (#19). *)
-Definition kv_m1 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
+Definition kv_m1 (m : regfile) : regfile :=
   <[Regidx csp_rs1 := kv_sp1 m]> m.
-Definition kv_m2 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
+Definition kv_m2 (m : regfile) : regfile :=
   <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)]> (kv_m1 m).
 
 (* ===================================================================== *)
@@ -195,14 +196,14 @@ Definition kv_saved : gset regidx :=
 Axiom kerneltrap_returns :
   forall `{!riscvGS Σ} `{CpuId} `{!sieG Σ}
     (γ : gname) (dq : dfrac)
-    (m : gmap regidx (mword 64)) (spv rava : mword 64)
+    (m : regfile) (spv rava : mword 64)
     (satp0 : mword 64)
     (tlbvec : vec (option TLB_Entry) (2 ^ 6))
     (pa1 pa2 pa3 pa4 pa5 pa6 pa7 pa8 pa9 pa10 pa11 pa12 pa13 pa14 pa15 pa16 pa17 : mword 64)
     (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64)
     (Phi : mval -> iProp Σ),
-    m !! Regidx csp_rs1 = Some spv ->
-    m !! Regidx (mword_of_int 1 : mword 5) = Some rava ->
+    m !!! Regidx csp_rs1 = spv ->
+    m !!! Regidx (mword_of_int 1 : mword 5) = rava ->
     smode_config γ dq -∗
     satp ↦ᵣ satp0 -∗
     tlb ↦ᵣ tlbvec -∗
@@ -213,9 +214,8 @@ Axiom kerneltrap_returns :
     kv_cell pa9 v9 -∗ kv_cell pa10 v10 -∗ kv_cell pa11 v11 -∗ kv_cell pa12 v12 -∗
     kv_cell pa13 v13 -∗ kv_cell pa14 v14 -∗ kv_cell pa15 v15 -∗ kv_cell pa16 v16 -∗
     kv_cell pa17 v17 -∗
-    ▷ ( ∀ m' : gmap regidx (mword 64),
-        ⌜ dom m' = dom m ⌝ -∗
-        ⌜ ∀ r : regidx, r ∉ kt_clobbered → m' !! r = m !! r ⌝ -∗
+    ▷ ( ∀ m' : regfile,
+        ⌜ ∀ r : regidx, r ∉ kt_clobbered → m' !!! r = m !!! r ⌝ -∗
         smode_config γ dq -∗
         satp ↦ᵣ satp0 -∗
         tlb ↦ᵣ tlbvec -∗
@@ -350,7 +350,7 @@ Definition kv_load_regs1 : gmap regidx sval :=
    SAME nesting order as the epilogue target (innermost = x1, outermost = x31;
    csp/x2 is NOT written by the block).  [regval_into_reg] being the identity,
    the block's [wK] line up with the epilogue's [vK]. *)
-Definition kv_load_result (m : gmap regidx (mword 64)) (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : mword 64) : gmap regidx (mword 64) :=
+Definition kv_load_result (m : regfile) (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : mword 64) : regfile :=
   <[Regidx (mword_of_int 31 : mword 5) := w17]> (<[Regidx (mword_of_int 30 : mword 5) := w16]> (<[Regidx (mword_of_int 29 : mword 5) := w15]> (<[Regidx (mword_of_int 28 : mword 5) := w14]> (<[Regidx (mword_of_int 17 : mword 5) := w13]> (<[Regidx (mword_of_int 16 : mword 5) := w12]> (<[Regidx (mword_of_int 15 : mword 5) := w11]> (<[Regidx (mword_of_int 14 : mword 5) := w10]> (<[Regidx (mword_of_int 13 : mword 5) := w9]> (<[Regidx (mword_of_int 12 : mword 5) := w8]> (<[Regidx (mword_of_int 11 : mword 5) := w7]> (<[Regidx (mword_of_int 10 : mword 5) := w6]> (<[Regidx (mword_of_int 7 : mword 5) := w5]> (<[Regidx (mword_of_int 6 : mword 5) := w4]> (<[Regidx (mword_of_int 5 : mword 5) := w3]> (<[Regidx (mword_of_int 3 : mword 5) := w2]> (<[Regidx (mword_of_int 1 : mword 5) := w1]> m)))))))))))))))).
 
 Lemma kv_store_run :
@@ -368,27 +368,17 @@ Section WpKernelvecNew.
   Context `{CID : CpuId}.
 
   (* Congruence for [gpr_file]: two register files that agree on every
-     register total-lookup (and where the target has every register in its
-     domain) hold the SAME resource.  The block lemmas use this to convert
-     the abstract result map returned by [wp_vc_block_s] back to the
-     surrounding proof's concrete register file. *)
-  Lemma gpr_file_ext (m1 m2 : gmap regidx (mword 64)) :
-    (∀ r : regidx, r ∈ dom m2) ->
+     register total-lookup hold the SAME resource (regfile is a total
+     function, so pointwise agreement is functional extensionality).  The
+     block lemmas use this to convert the abstract result map returned by
+     [wp_vc_block_s] back to the surrounding proof's concrete register file. *)
+  Lemma gpr_file_ext (m1 m2 : regfile) :
     (∀ r : regidx, m1 !!! r = m2 !!! r) ->
     gpr_file m1 -∗ gpr_file m2.
   Proof.
-    iIntros (Hd2 Hpt) "(%Hd1 & Hmap)".
-    assert (Heq : m1 = m2).
-    { apply map_eq. intros i.
-      destruct (m1 !! i) as [a|] eqn:E1; destruct (m2 !! i) as [b|] eqn:E2.
-      - specialize (Hpt i). rewrite !lookup_total_alt E1 E2 /= in Hpt.
-        by rewrite Hpt.
-      - specialize (Hd2 i). apply elem_of_dom in Hd2. rewrite E2 in Hd2.
-        by destruct Hd2 as [? HC].
-      - specialize (Hd1 i). apply elem_of_dom in Hd1. rewrite E1 in Hd1.
-        by destruct Hd1 as [? HC].
-      - reflexivity. }
-    rewrite -Heq. rewrite /gpr_file. iSplit; [iPureIntro; exact Hd1 | iExact "Hmap"].
+    iIntros (Hpt) "Hfile".
+    assert (Heq : m1 = m2) by (apply functional_extensionality; intro r; exact (Hpt r)).
+    rewrite -Heq. iExact "Hfile".
   Qed.
 
   Lemma kv_store_instrs :
@@ -497,7 +487,7 @@ Section WpKernelvecNew.
   (* the 17-instruction register-save run, as ONE block; STRENGTHENED to
      return the CONCRETE input register file [m] (stores don't touch it). *)
   Lemma wp_kv_store_block_vc (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 : bv 64)
       {dq : dfrac} :
     smode_config γ dq -∗
@@ -655,14 +645,14 @@ Section WpKernelvecNew.
     { intro r. destruct (kv_store_regs0 !! r) as [sv|] eqn:Er.
       - rewrite (Hmf r sv Er). rewrite (HmS r sv Er). reflexivity.
       - exact (Hpres r Er). }
-    iDestruct (gpr_file_ext mf m Hdomm Hall with "Hfile") as "Hfile".
+    iDestruct (gpr_file_ext mf m Hall with "Hfile") as "Hfile".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
   Qed.
 
   (* the 17-instruction register-restore run, as ONE block; STRENGTHENED to
      return the CONCRETE result file [kv_load_result m w1..w17]. *)
   Lemma wp_kv_load_block_vc (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : bv 64)
       {dq : dfrac} :
     smode_config γ dq -∗
@@ -857,39 +847,39 @@ Section WpKernelvecNew.
     assert (Hall : ∀ r : regidx, mf !!! r = kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 !!! r).
     { intro r. unfold kv_load_result.
       destruct (decide (r = Regidx (mword_of_int 31 : mword 5))) as [->|];
-        [ rewrite F31; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F31; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 30 : mword 5))) as [->|];
-        [ rewrite F30; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F30; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 29 : mword 5))) as [->|];
-        [ rewrite F29; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F29; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 28 : mword 5))) as [->|];
-        [ rewrite F28; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F28; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 17 : mword 5))) as [->|];
-        [ rewrite F17; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F17; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 16 : mword 5))) as [->|];
-        [ rewrite F16; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F16; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 15 : mword 5))) as [->|];
-        [ rewrite F15; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F15; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 14 : mword 5))) as [->|];
-        [ rewrite F14; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F14; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 13 : mword 5))) as [->|];
-        [ rewrite F13; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F13; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 12 : mword 5))) as [->|];
-        [ rewrite F12; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F12; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 11 : mword 5))) as [->|];
-        [ rewrite F11; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F11; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 10 : mword 5))) as [->|];
-        [ rewrite F10; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F10; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 7 : mword 5))) as [->|];
-        [ rewrite F7; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F7; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 6 : mword 5))) as [->|];
-        [ rewrite F6; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F6; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 5 : mword 5))) as [->|];
-        [ rewrite F5; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F5; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 3 : mword 5))) as [->|];
-        [ rewrite F3; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F3; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx (mword_of_int 1 : mword 5))) as [->|];
-        [ rewrite F1; kv_skipt; rewrite lookup_total_insert; reflexivity |].
+        [ rewrite F1; kv_skipt; rewrite upd_eq; reflexivity |].
       destruct (decide (r = Regidx csp_rs1)) as [->|];
         [ rewrite F2; kv_skipt; reflexivity |].
       (* default: r is none of the 18 keys *)
@@ -898,10 +888,7 @@ Section WpKernelvecNew.
         kv_skipl. apply lookup_empty. }
       rewrite (Hpres r Hnone).
       kv_skipt. reflexivity. }
-    assert (Hdomt : ∀ r : regidx, r ∈ dom (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17)).
-    { intro r. unfold kv_load_result. rewrite !dom_insert_L.
-      repeat (apply elem_of_union_r). exact (Hdomm r). }
-    iDestruct (gpr_file_ext mf (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17) Hdomt Hall with "Hfile") as "Hfile".
+    iDestruct (gpr_file_ext mf (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17) Hall with "Hfile") as "Hfile".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
   Qed.
 
@@ -911,7 +898,7 @@ Section WpKernelvecNew.
   (* slot tlb_hash svpn; the rest hit), jal kerneltrap.                   *)
   (* =================================================================== *)
   Lemma wp_kv_prologue (root_ppn : mword 44) (γ : gname)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12
        vold13 vold14 vold15 vold16 vold17 : bv 64)
       (Φ : mval -> iProp Σ) :
@@ -976,41 +963,41 @@ Section WpKernelvecNew.
     iIntros "Hsm Htlbinv Hpc Hfile".
     (* the sp-lookup / clobbered-lookup facts over kv_m1 *)
     assert (Hm1sp : kv_m1 m !!! Regidx csp_rs1 = kv_sp1 m)
-      by (unfold kv_m1; rewrite lookup_total_insert; reflexivity).
+      by (unfold kv_m1; rewrite upd_eq; reflexivity).
     assert (Hmr1 : kv_m1 m !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr2 : kv_m1 m !!! Regidx (mword_of_int 3 : mword 5) = m !!! Regidx (mword_of_int 3 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr3 : kv_m1 m !!! Regidx (mword_of_int 5 : mword 5) = m !!! Regidx (mword_of_int 5 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr4 : kv_m1 m !!! Regidx (mword_of_int 6 : mword 5) = m !!! Regidx (mword_of_int 6 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr5 : kv_m1 m !!! Regidx (mword_of_int 7 : mword 5) = m !!! Regidx (mword_of_int 7 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr6 : kv_m1 m !!! Regidx (mword_of_int 10 : mword 5) = m !!! Regidx (mword_of_int 10 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr7 : kv_m1 m !!! Regidx (mword_of_int 11 : mword 5) = m !!! Regidx (mword_of_int 11 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr8 : kv_m1 m !!! Regidx (mword_of_int 12 : mword 5) = m !!! Regidx (mword_of_int 12 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr9 : kv_m1 m !!! Regidx (mword_of_int 13 : mword 5) = m !!! Regidx (mword_of_int 13 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr10 : kv_m1 m !!! Regidx (mword_of_int 14 : mword 5) = m !!! Regidx (mword_of_int 14 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr11 : kv_m1 m !!! Regidx (mword_of_int 15 : mword 5) = m !!! Regidx (mword_of_int 15 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr12 : kv_m1 m !!! Regidx (mword_of_int 16 : mword 5) = m !!! Regidx (mword_of_int 16 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr13 : kv_m1 m !!! Regidx (mword_of_int 17 : mword 5) = m !!! Regidx (mword_of_int 17 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr14 : kv_m1 m !!! Regidx (mword_of_int 28 : mword 5) = m !!! Regidx (mword_of_int 28 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr15 : kv_m1 m !!! Regidx (mword_of_int 29 : mword 5) = m !!! Regidx (mword_of_int 29 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr16 : kv_m1 m !!! Regidx (mword_of_int 30 : mword 5) = m !!! Regidx (mword_of_int 30 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     assert (Hmr17 : kv_m1 m !!! Regidx (mword_of_int 31 : mword 5) = m !!! Regidx (mword_of_int 31 : mword 5))
-      by (unfold kv_m1; rewrite lookup_total_insert_ne; [reflexivity | kv_regne]).
+      by (unfold kv_m1; rewrite upd_ne; [reflexivity | kv_regne]).
     (* ---- #2..#18: the 17 c.sdsp register saves, as ONE VCgen block ---- *)
     (* bridge each stack cell from the prologue's zero_extend'/concat address
        shape to the block's [add_vec (kv_m1 m !!! csp) (mword_of_int N)] shape. *)
@@ -1108,7 +1095,7 @@ Section WpKernelvecNew.
   (* c.addi16sp sp,+256, sret.                                            *)
   (* =================================================================== *)
   Lemma wp_kv_epilogue (root_ppn : mword 44) (γ : gname)
-      (mt : gmap regidx (mword 64)) (spv : mword 64)
+      (mt : regfile) (spv : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
 
       (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64)
@@ -1300,7 +1287,7 @@ Section WpKernelvecNew.
   (* sp).  Only [kerneltrap_returns] + platform externs are assumed.     *)
   (* =================================================================== *)
   Lemma wp_kernelvec (root_ppn : mword 44) (γ : gname)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12
@@ -1412,11 +1399,11 @@ Section WpKernelvecNew.
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     (* ---- the kerneltrap call (THE axiom) ---- *)
-    assert (Hsp_l : kv_m2 m !! Regidx csp_rs1 = Some (kv_sp1 m)).
-    { unfold kv_m2. rewrite lookup_insert_ne; [| kv_regne]. unfold kv_m1. apply lookup_insert. }
-    assert (Hra_l : kv_m2 m !! Regidx (mword_of_int 1 : mword 5)
-                    = Some (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))).
-    { unfold kv_m2. apply lookup_insert. }
+    assert (Hsp_l : kv_m2 m !!! Regidx csp_rs1 = kv_sp1 m).
+    { unfold kv_m2. rewrite upd_ne; [| kv_regne]. unfold kv_m1. apply upd_eq. }
+    assert (Hra_l : kv_m2 m !!! Regidx (mword_of_int 1 : mword 5)
+                    = regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)).
+    { unfold kv_m2. apply upd_eq. }
     iDestruct (tlb_inv_pt_open with "Htlbinv") as (satp0 tlbmid t0)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hokmid & %Hspec0 & %Hpmaw0 & Hpte & Hpmp)".
     iApply (kerneltrap_returns γ (DfracOwn (1/2)) (kv_m2 m) (kv_sp1 m)
@@ -1427,14 +1414,14 @@ Section WpKernelvecNew.
               Φ Hsp_l Hra_l
               with "Hsm Hsatp Htlb Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iNext.
-    iIntros (m') "%Hdom' %Hpres Hsm Hsatp Htlb Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
+    iIntros (m') "%Hpres Hsm Hsatp Htlb Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     iEval (rewrite kv_rvr) in "Hpc".
     (* sp is callee-saved: the post-kerneltrap file still maps sp to kv_sp1 m *)
     assert (Hsp_nc : Regidx csp_rs1 ∉ kt_clobbered).
     { apply (bool_decide_eq_false_1 (Regidx csp_rs1 ∈ kt_clobbered)).
       vm_compute. reflexivity. }
     assert (Hsp'' : m' !!! Regidx csp_rs1 = kv_sp1 m).
-    { apply lookup_total_correct. rewrite (Hpres _ Hsp_nc). exact Hsp_l. }
+    { rewrite (Hpres _ Hsp_nc). exact Hsp_l. }
     (* ---- instrs #20..#38: epilogue (restores + sp cancel + sret) ---- *)
     iDestruct (tlb_inv_pt_intro root_ppn satp0 tlbmid t0
                  Hmode Hasid Hppn Hokmid Hspec0 Hpmaw0
@@ -1449,8 +1436,9 @@ Section WpKernelvecNew.
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
     (* ---- the round-trip: the final file IS the entry file ---- *)
-    assert (Hbig : (<[Regidx csp_rs1 := regval_into_reg (add_vec (kv_sp1 m) (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> (<[Regidx (mword_of_int 31 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 31 : mword 5))]> (<[Regidx (mword_of_int 30 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 30 : mword 5))]> (<[Regidx (mword_of_int 29 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 29 : mword 5))]> (<[Regidx (mword_of_int 28 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 28 : mword 5))]> (<[Regidx (mword_of_int 17 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 17 : mword 5))]> (<[Regidx (mword_of_int 16 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 16 : mword 5))]> (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 15 : mword 5))]> (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 14 : mword 5))]> (<[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 13 : mword 5))]> (<[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 12 : mword 5))]> (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 11 : mword 5))]> (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 10 : mword 5))]> (<[Regidx (mword_of_int 7 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 7 : mword 5))]> (<[Regidx (mword_of_int 6 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 6 : mword 5))]> (<[Regidx (mword_of_int 5 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 5 : mword 5))]> (<[Regidx (mword_of_int 3 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 3 : mword 5))]> (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> (m'))))))))))))))))))) = m).
-    { clear - HdomM Hpres.
+    assert (Hbig : ∀ i : regidx,
+      (<[Regidx csp_rs1 := regval_into_reg (add_vec (kv_sp1 m) (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> (<[Regidx (mword_of_int 31 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 31 : mword 5))]> (<[Regidx (mword_of_int 30 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 30 : mword 5))]> (<[Regidx (mword_of_int 29 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 29 : mword 5))]> (<[Regidx (mword_of_int 28 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 28 : mword 5))]> (<[Regidx (mword_of_int 17 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 17 : mword 5))]> (<[Regidx (mword_of_int 16 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 16 : mword 5))]> (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 15 : mword 5))]> (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 14 : mword 5))]> (<[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 13 : mword 5))]> (<[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 12 : mword 5))]> (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 11 : mword 5))]> (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 10 : mword 5))]> (<[Regidx (mword_of_int 7 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 7 : mword 5))]> (<[Regidx (mword_of_int 6 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 6 : mword 5))]> (<[Regidx (mword_of_int 5 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 5 : mword 5))]> (<[Regidx (mword_of_int 3 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 3 : mword 5))]> (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> (m'))))))))))))))))))) !!! i = m !!! i).
+    { clear - Hpres.
       assert (Hspval : add_vec (kv_sp1 m) (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6)))
                        = m !!! Regidx csp_rs1).
       { unfold kv_sp1, regval_into_reg. rewrite kv_addv_assoc kv_cancel. apply kv_addv_zero. }
@@ -1493,62 +1481,61 @@ Section WpKernelvecNew.
       assert (Hsub : kt_clobbered ⊆ kv_saved)
         by (apply (bool_decide_eq_true_1 (kt_clobbered ⊆ kv_saved)); vm_compute; reflexivity).
       unfold regval_into_reg. rewrite Hspval.
-      apply map_eq. intros i.
+      intros i.
       destruct (decide (i ∈ kv_saved)) as [Hin|Hout].
       - unfold kv_saved in Hin.
         rewrite !elem_of_union !elem_of_singleton in Hin.
         repeat match goal with HH : _ ∨ _ |- _ => destruct HH end;
           subst i;
-          repeat (rewrite lookup_insert_ne; [| kv_regne]);
-          rewrite lookup_insert;
-          symmetry; apply lookup_lookup_total_dom; apply HdomM.
+          repeat (rewrite upd_ne; [| kv_regne]);
+          rewrite upd_eq; reflexivity.
       - (* i outside the written set: peel all 18 inserts, then the axiom's
            callee-saved preservation + the two prologue inserts. *)
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_sp ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_31 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_30 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_29 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_28 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_17 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_16 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_15 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_14 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_13 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_12 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_11 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_10 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_7 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_6 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_5 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_3 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_1 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_sp ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_31 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_30 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_29 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_28 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_17 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_16 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_15 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_14 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_13 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_12 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_11 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_10 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_7 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_6 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_5 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_3 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_1 ].
         rewrite (Hpres i);
           [| let HinC := fresh in intros HinC; apply Hout; exact (Hsub _ HinC) ].
         unfold kv_m2, kv_m1.
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_1 ].
-        rewrite lookup_insert_ne;
-          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite <- HeqK; exact Hin_sp ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_1 ].
+        rewrite upd_ne;
+          [| let HeqK := fresh in intros HeqK; apply Hout; rewrite HeqK; exact Hin_sp ].
         reflexivity. }
-    iEval (rewrite Hbig) in "Hfile".
+    iDestruct (gpr_file_ext _ m Hbig with "Hfile") as "Hfile".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
   Qed.
 

@@ -31,6 +31,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec WpGpr.
+Require Import RegFile.
 Require Import MinstretInv InstrBytes.
 Require Import WpMmodeLeafBase.
 Require Import SRegime.
@@ -250,16 +251,16 @@ Fixpoint vc_block_s (st : vstate) (prog : list vop_s) : option vstate :=
 (* it wants to observe across the block; [gpr_file m] is never rewritten.  *)
 (* ====================================================================== *)
 Definition gpr_matches (ρ : nat -> mword 64) (vr : gmap regidx sval)
-    (m : gmap regidx (mword 64)) : Prop :=
+    (m : regfile) : Prop :=
   forall r sv, vr !! r = Some sv -> m !!! r = sval_den ρ sv.
 
-Lemma gpr_matches_empty (ρ : nat -> mword 64) (m : gmap regidx (mword 64)) :
+Lemma gpr_matches_empty (ρ : nat -> mword 64) (m : regfile) :
   gpr_matches ρ ∅ m.
 Proof. intros r sv H. rewrite lookup_empty in H. discriminate. Qed.
 
 (* seed one register (client-side, at block entry). *)
 Lemma gpr_matches_ins (ρ : nat -> mword 64) (vr : gmap regidx sval)
-    (m : gmap regidx (mword 64)) (r : regidx) (sv : sval) :
+    (m : regfile) (r : regidx) (sv : sval) :
   m !!! r = sval_den ρ sv ->
   gpr_matches ρ vr m ->
   gpr_matches ρ (<[r := sv]> vr) m.
@@ -272,17 +273,17 @@ Qed.
 
 (* a register write preserves agreement (engine-side, per step). *)
 Lemma gpr_matches_insert (ρ : nat -> mword 64) (vr : gmap regidx sval)
-    (m : gmap regidx (mword 64)) (r : regidx) (sv : sval) (w : mword 64) :
+    (m : regfile) (r : regidx) (sv : sval) (w : mword 64) :
   w = sval_den ρ sv ->
   gpr_matches ρ vr m ->
   gpr_matches ρ (<[r := sv]> vr) (<[r := w]> m).
 Proof.
   intros -> Hm r' sv' H. destruct (decide (r' = r)) as [->|Hne].
-  - rewrite lookup_insert in H. injection H as <-. apply lookup_total_insert.
+  - rewrite lookup_insert in H. injection H as <-. apply upd_eq.
   - rewrite lookup_insert_ne in H;
       [|intro Heq; apply Hne; symmetry; exact Heq].
-    rewrite lookup_total_insert_ne;
-      [exact (Hm _ _ H)|intro Heq; apply Hne; symmetry; exact Heq].
+    rewrite upd_ne;
+      [exact (Hm _ _ H)|congruence].
 Qed.
 
 Section VcGenSIris.
@@ -314,8 +315,8 @@ Section VcGenSIris.
     end.
 
   (* expose gpr_file's dom-completeness fact without consuming it. *)
-  Lemma gpr_file_dom (m : gmap regidx (mword 64)) :
-    gpr_file m -∗ ⌜ forall r : regidx, r ∈ dom m ⌝ ∗ gpr_file m.
+  Lemma gpr_file_dom (m : regfile) :
+    gpr_file m -∗ ⌜ forall r : regidx, r ∈ dom (rf_to_gmap m) ⌝ ∗ gpr_file m.
   Proof.
     iIntros "[%Hdom Hmap]".
     iSplitR; [iPureIntro; exact Hdom|].
@@ -788,23 +789,23 @@ Section VcGenSIris.
      monotonically and any register never entered into [vr] keeps its
      entry value from [m0]. *)
   Definition agree_off (vr : gmap regidx sval)
-      (mf m0 : gmap regidx (mword 64)) : Prop :=
+      (mf m0 : regfile) : Prop :=
     forall r, vr !! r = None -> mf !!! r = m0 !!! r.
 
-  Lemma agree_off_step {vr : gmap regidx sval} {mf m0 : gmap regidx (mword 64)}
+  Lemma agree_off_step {vr : gmap regidx sval} {mf m0 : regfile}
       {r : regidx} {sv : sval} {w : mword 64} :
     agree_off vr mf m0 -> agree_off (<[r := sv]> vr) (<[r := w]> mf) m0.
   Proof.
     intros H r' Hr'. destruct (decide (r' = r)) as [->|Hne].
     - rewrite lookup_insert in Hr'. discriminate.
     - rewrite lookup_insert_ne in Hr'; [|congruence].
-      rewrite lookup_total_insert_ne; [|congruence]. exact (H _ Hr').
+      rewrite upd_ne; [|congruence]. exact (H _ Hr').
   Qed.
 
   Lemma wp_vc_block_s_aux_r (R : s_regime) (prog : list vop_s)
       (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
-      (m m0 : gmap regidx (mword 64))
+      (m m0 : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -828,7 +829,7 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
-    ( ∀ mf : gmap regidx (mword 64),
+    ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m0 ⌝ -∗
       hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1191,7 +1192,7 @@ Section VcGenSIris.
   Lemma wp_vc_block_s_aux (root_ppn : mword 44) (prog : list vop_s)
       (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
-      (m m0 : gmap regidx (mword 64))
+      (m m0 : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1215,7 +1216,7 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
-    ( ∀ mf : gmap regidx (mword 64),
+    ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m0 ⌝ -∗
       hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1239,7 +1240,7 @@ Section VcGenSIris.
   Lemma wp_vc_block_s_r (R : s_regime) (prog : list vop_s)
       (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (γ : gname) {dq : dfrac} :
     vc_block_s st prog = Some st' ->
     gpr_matches ρ st.(vregs) m ->
@@ -1250,7 +1251,7 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
-    ( ∀ mf : gmap regidx (mword 64),
+    ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m ⌝ -∗
       smode_config γ dq -∗
       sr_inv R -∗
@@ -1282,7 +1283,7 @@ Section VcGenSIris.
   Lemma wp_vc_block_s (root_ppn : mword 44) (prog : list vop_s)
       (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (γ : gname) {dq : dfrac} :
     vc_block_s st prog = Some st' ->
     gpr_matches ρ st.(vregs) m ->
@@ -1293,7 +1294,7 @@ Section VcGenSIris.
     block_instrs_s st.(vpc) prog -∗
     vheap_own ρ st.(vheap) -∗
     vheap4_own ρ st.(vheap4) -∗
-    ( ∀ mf : gmap regidx (mword 64),
+    ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m ⌝ -∗
       smode_config γ dq -∗
       tlb_inv_pt root_ppn -∗
@@ -1331,7 +1332,7 @@ Section VcGenSIris.
 
   Lemma wp_bne_split_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (γ : gname) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -1366,7 +1367,7 @@ Section VcGenSIris.
 
   Lemma wp_bne_split_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (γ : gname) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -1389,7 +1390,7 @@ Section VcGenSIris.
 
   Lemma wp_beq_split_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (γ : gname) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -1424,7 +1425,7 @@ Section VcGenSIris.
 
   Lemma wp_beq_split_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (γ : gname) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->

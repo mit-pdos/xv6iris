@@ -69,6 +69,7 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import StackOwn.
+Require Import RegFile.
 Require Import WpGprCsrwCommon.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode WpLeafCommon WpGpr.
@@ -1044,70 +1045,70 @@ Qed.
 (* The gpr-file after each register write, as nested-insert abbreviations *)
 (* over the abstract entry file [m] (WpTimerinit [ti_m*] style).          *)
 (* ===================================================================== *)
-Definition st_m30 (m : gmap regidx (mword 64)) (sp0 : mword 64) :=
+Definition st_m30 (m : regfile) (sp0 : mword 64) :=
   <[Regidx csp_rs1 := regval_into_reg (ti_sp1 sp0)]> m.
-Definition st_m33 (m : gmap regidx (mword 64)) (sp0 : mword 64) :=
+Definition st_m33 (m : regfile) (sp0 : mword 64) :=
   <[Regidx ti_s0 := regval_into_reg sp0]> (st_m30 m sp0).
-Definition st_m34 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m34 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg ms0]> (st_m33 m sp0).
-Definition st_m35 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m35 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si35))]> (st_m34 m sp0 ms0).
-Definition st_m36 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m36 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg st_mask_and]> (st_m35 m sp0 ms0).
-Definition st_m37 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m37 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (and_vec ms0 st_mask_and)]> (st_m36 m sp0 ms0).
-Definition st_m38 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m38 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si38))]> (st_m37 m sp0 ms0).
-Definition st_m39 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m39 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg st_mask_or]> (st_m38 m sp0 ms0).
-Definition st_m40 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m40 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (st_va5_40 ms0)]> (st_m39 m sp0 ms0).
-Definition st_m42 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m42 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg st_a42v]> (st_m40 m sp0 ms0).
-Definition st_m43 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m43 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg st_main]> (st_m42 m sp0 ms0).
-Definition st_m45 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m45 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (mword_of_int 0)]> (st_m43 m sp0 ms0).
-Definition st_m47 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m47 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (luival (sign_extend' 20 si47))]> (st_m45 m sp0 ms0).
-Definition st_m48 (m : gmap regidx (mword 64)) (sp0 ms0 : mword 64) :=
+Definition st_m48 (m : regfile) (sp0 ms0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg st_ffff]> (st_m47 m sp0 ms0).
-Definition st_m51 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+Definition st_m51 (m : regfile) (sp0 ms0 mie0 mdl0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (lower_mie mie0 (st_mdl1 mdl0))]> (st_m48 m sp0 ms0).
-Definition st_m52 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+Definition st_m52 (m : regfile) (sp0 ms0 mie0 mdl0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (st_va5_52 mie0 mdl0)]> (st_m51 m sp0 ms0 mie0 mdl0).
-Definition st_m54 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+Definition st_m54 (m : regfile) (sp0 ms0 mie0 mdl0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (cli_wval si54)]> (st_m52 m sp0 ms0 mie0 mdl0).
-Definition st_m55 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+Definition st_m55 (m : regfile) (sp0 ms0 mie0 mdl0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg st_pmpw]> (st_m54 m sp0 ms0 mie0 mdl0).
-Definition st_m57 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 : mword 64) :=
+Definition st_m57 (m : regfile) (sp0 ms0 mie0 mdl0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (mword_of_int 15)]> (st_m55 m sp0 ms0 mie0 mdl0).
 (* register state through the ADUE block (csrr a5,menvcfg; c.li a4,1;
    c.slli a4,0x3d; c.or a5,a4), staged like timerinit's ti_m13..16.  a4/a5 here
    are all overwritten by timerinit, so this feeds the pre-jal map only for the
    (untouched) sp/ra/s0 lookups. *)
-Definition st_m_ae0 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
+Definition st_m_ae0 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg menv0]> (st_m57 m sp0 ms0 mie0 mdl0).
-Definition st_m_ae1 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
+Definition st_m_ae1 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg (cli_wval sae_li)]> (st_m_ae0 m sp0 ms0 mie0 mdl0 menv0).
-Definition st_m_ae2 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
+Definition st_m_ae2 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
   <[Regidx ti_a4 := regval_into_reg st_adue_bit]> (st_m_ae1 m sp0 ms0 mie0 mdl0 menv0).
-Definition st_m_ae3 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
+Definition st_m_ae3 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (or_vec menv0 st_adue_bit)]> (st_m_ae2 m sp0 ms0 mie0 mdl0 menv0).
-Definition st_m59 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
+Definition st_m59 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64) :=
   <[Regidx ti_ra := regval_into_reg st_ra_link]> (st_m_ae3 m sp0 ms0 mie0 mdl0 menv0).
-Definition st_mti (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+Definition st_mti (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
     (mcen0 : mword 32) (mtime0 : mword 64) :=
   ti_mout (st_m59 m sp0 ms0 mie0 mdl0 menv0) (ti_sp1 sp0) (st_menv_adue menv0) mcen0 mtime0 st_ra_link sp0.
-Definition st_m60 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+Definition st_m60 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
     (mcen0 : mword 32) (mtime0 mh : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg mh]> (st_mti m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0).
-Definition st_m61 (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+Definition st_m61 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
     (mcen0 : mword 32) (mtime0 mh : mword 64) :=
   <[Regidx ti_a5 := regval_into_reg (st_tpv mh)]> (st_m60 m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh).
 (* the FINAL file: sp = sp0-16 (the still-open start frame), s0 = sp0,
    ra = 0x800000b4, a4 = timerinit's interval, a5 = tp = sext32(mhartid). *)
-Definition st_mout (m : gmap regidx (mword 64)) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+Definition st_mout (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
     (mcen0 : mword 32) (mtime0 mh : mword 64) :=
   <[Regidx st_tp := regval_into_reg (st_tpv mh)]> (st_m61 m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh).
 
@@ -1118,8 +1119,8 @@ Local Ltac st_reg_neq :=
   vm_compute in H; discriminate H.
 
 Local Ltac st_look :=
-  repeat first [ rewrite lookup_total_insert
-               | rewrite lookup_total_insert_ne; [ | st_reg_neq ] ];
+  repeat first [ rewrite upd_eq
+               | rewrite upd_ne; [ | st_reg_neq ] ];
   first [ reflexivity | assumption ].
 
 Local Ltac st_unfold :=
@@ -1151,7 +1152,7 @@ Section WpStartThm.
   (* [wp_start]: the whole-function spec over [stack_own sp0 n] (n >= 4 =
      start's own 2-slot frame plus timerinit's 2-slot child frame). *)
   Lemma wp_start (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (sp0 ra0 s00 : mword 64)
+      (m : regfile) (sp0 ra0 s00 : mword 64)
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 mhartid_in : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)

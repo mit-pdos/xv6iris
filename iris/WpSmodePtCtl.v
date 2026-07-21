@@ -15,6 +15,7 @@ Require Import SRegime.
 Require Import SmodeCore WpSpinNew WpMmodeLeafBase.
 Require Import WpSmodeSret.
 Require Import KptTree SmodeCorePt.
+Require Import RegFile.
 Import Defs.
 
 (* helper: exec_execute_JAL_gpr_zca *)
@@ -541,7 +542,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_fence_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -602,7 +603,7 @@ Section WpSmodePtCtl.
 
 
   Lemma wp_fence_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (pc : mword 64) (m : regfile) {dq : dfrac} :
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
@@ -634,7 +635,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_cj_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 jimm) in
@@ -708,7 +709,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_cj_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (jimm : mword 21)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 jimm) in
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -738,7 +739,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_jal_gpr_s_zca_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (q : Qp) :
     uint rd <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -776,8 +777,7 @@ Section WpSmodePtCtl.
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    pose proof (rf_to_gmap_lookup m (Regidx rd)) as Hmd.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     assert (Hpcv : register_lookup PC
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
@@ -825,13 +825,13 @@ Section WpSmodePtCtl.
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hsm' Htlbinv' [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    { iPureIntro. apply rf_to_gmap_dom. }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap". iExact "Hfmap".
   Qed.
 
   Lemma wp_jal_gpr_s_zca_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (q : Qp) :
     uint rd <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -854,7 +854,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_cret_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -904,12 +904,11 @@ Section WpSmodePtCtl.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
-    assert (Hma : m !! Regidx ra = Some (m !!! Regidx ra))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    pose proof (rf_to_gmap_lookup m (Regidx ra)) as Hma.
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfb]".
-    iDestruct (gpr_pt_value ra (m !!! Regidx ra) s_pc with "Hreg Hrac") as %Lra.
+    iDestruct (gpr_pt_value ra (m (Regidx ra)) s_pc with "Hreg Hrac") as %Lra.
     iDestruct ("Hfb" with "Hrac") as "Hfmap".
     assert (Lra' : register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs) = m !!! Regidx ra).
     { pose proof Lra as H.
@@ -952,7 +951,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_cret_s_zca_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -1005,12 +1004,11 @@ Section WpSmodePtCtl.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx ra = Some (m !!! Regidx ra))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    pose proof (rf_to_gmap_lookup m (Regidx ra)) as Hma.
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfb]".
-    iDestruct (gpr_pt_value ra (m !!! Regidx ra) s_pc with "Hreg Hrac") as %Lra.
+    iDestruct (gpr_pt_value ra (m (Regidx ra)) s_pc with "Hreg Hrac") as %Lra.
     iDestruct ("Hfb" with "Hrac") as "Hfmap".
     assert (Lra' : register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs) = m !!! Regidx ra).
     { pose proof Lra as H.
@@ -1057,7 +1055,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_cret_s_zca_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     uint ra <> 0 ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
@@ -1090,7 +1088,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_csrr_sstatus_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1134,8 +1132,7 @@ Section WpSmodePtCtl.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    pose proof (rf_to_gmap_lookup m (Regidx rd)) as Hmd.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
@@ -1170,14 +1167,14 @@ Section WpSmodePtCtl.
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    { iPureIntro. apply rf_to_gmap_dom. }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap". iExact "Hfmap".
   Qed.
 
 
   Lemma wp_csrr_sstatus_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗
     sr_inv R -∗
@@ -1211,7 +1208,7 @@ Section WpSmodePtCtl.
 
   Lemma wp_csrrci_sstatus_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd imm5 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1257,8 +1254,7 @@ Section WpSmodePtCtl.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    pose proof (rf_to_gmap_lookup m (Regidx rd)) as Hmd.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
@@ -1300,14 +1296,14 @@ Section WpSmodePtCtl.
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    { iPureIntro. apply rf_to_gmap_dom. }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap". iExact "Hfmap".
   Qed.
 
 
   Lemma wp_csrrci_sstatus_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗
     sr_inv R -∗
@@ -1345,7 +1341,7 @@ Section WpSmodePtCtl.
   Lemma wp_sret_gpr_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       :
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1480,7 +1476,7 @@ Section WpSmodePtCtl.
   Lemma wp_sret_gpr_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       :
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->

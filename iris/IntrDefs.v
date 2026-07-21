@@ -31,6 +31,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
+Require Import RegFile.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.
 Require Import WpSmodeSret WpIntrBits WpIntrCore.
@@ -233,7 +234,7 @@ Section IntrDefs.
   Definition kv_frame_slots : nat := 32.
 
   Definition intr_frame (root_ppn : mword 44) (menvcfg0 : mword 64)
-      (m : gmap regidx (mword 64)) : iProp Σ :=
+      (m : regfile) : iProp Σ :=
     (menvcfg ↦ᵣ menvcfg0 ∗
      tlb_inv_pt root_ppn ∗
      stack_own (m !!! Regidx csp_rs1) kv_frame_slots)%I.
@@ -242,7 +243,7 @@ Section IntrDefs.
      PRESERVES sp transports the frame to the new map.  (An sp-moving
      instruction instead re-carves its stack explicitly.) *)
   Lemma intr_frame_retarget (root_ppn : mword 44) (menvcfg0 : mword 64)
-      (m m' : gmap regidx (mword 64)) :
+      (m m' : regfile) :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
     intr_frame root_ppn menvcfg0 m -∗ intr_frame root_ppn menvcfg0 m'.
   Proof.
@@ -253,7 +254,7 @@ Section IntrDefs.
   Definition intr_handler_spec (handler : mword 64)
       (root_ppn : mword 44) (menvcfg0 : mword 64) : iProp Σ :=
     (□ ∀ (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
-         (m : gmap regidx (mword 64)) (Φ : mval -> iProp Σ),
+         (m : regfile) (Φ : mval -> iProp Σ),
         ⌜ intr_ms_facts ms ⌝ -∗
         ⌜ sret_tgt pc0 = pc0 ⌝ -∗
         ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗
@@ -401,14 +402,14 @@ Section IntrDefs.
       (∃ v : mword 64, stval ↦ᵣ v)))%I.
 
   Definition sie_cap (γ : gname) (root_ppn : mword 44)
-      (m : gmap regidx (mword 64)) (avail : nat) : iProp Σ :=
+      (m : regfile) (avail : nat) : iProp Σ :=
     (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
      sie_arm γ root_ppn)%I.
 
   (* the funnel's accessor: split off the exact reserved carve (the
      [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
   Lemma sie_cap_acc (γ : gname) (root_ppn : mword 44)
-      (m : gmap regidx (mword 64)) (avail : nat) :
+      (m : regfile) (avail : nat) :
     sie_cap γ root_ppn m avail ⊣⊢
     stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
@@ -421,7 +422,7 @@ Section IntrDefs.
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
   Lemma sie_cap_retarget (γ : gname) (root_ppn : mword 44)
-      (m m' : gmap regidx (mword 64)) (avail : nat) :
+      (m m' : regfile) (avail : nat) :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
     sie_cap γ root_ppn m avail -∗ sie_cap γ root_ppn m' avail.
   Proof.
@@ -434,7 +435,7 @@ Section IntrDefs.
      the top k slots, ABOVE the new sp and therefore trap-stable --
      comes OUT for the client. *)
   Lemma sie_cap_push (γ : gname) (root_ppn : mword 44)
-      (m m' : gmap regidx (mword 64)) (avail k : nat) :
+      (m m' : regfile) (avail k : nat) :
     (k <= avail)%nat ->
     m' !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) k ->
     sie_cap γ root_ppn m avail -∗
@@ -451,7 +452,7 @@ Section IntrDefs.
      release): the function's frame [sp, sp') = the top k slots at sp'
      is fed back IN and k returns to [avail]. *)
   Lemma sie_cap_pop (γ : gname) (root_ppn : mword 44)
-      (m m' : gmap regidx (mword 64)) (avail k : nat) :
+      (m m' : regfile) (avail k : nat) :
     m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
     stack_own (m' !!! Regidx csp_rs1) k -∗
     sie_cap γ root_ppn m avail -∗
@@ -466,7 +467,7 @@ Section IntrDefs.
   (* custody transfer at the DEEP end (no sp move): absorb k adjacent
      slots below the owned region into [avail]... *)
   Lemma sie_cap_grow (γ : gname) (root_ppn : mword 44)
-      (m : gmap regidx (mword 64)) (avail k : nat) :
+      (m : regfile) (avail k : nat) :
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
     sie_cap γ root_ppn m avail -∗
     sie_cap γ root_ppn m (avail + k).
@@ -477,7 +478,7 @@ Section IntrDefs.
 
   (* ... and release the k deepest slots back out. *)
   Lemma sie_cap_shrink (γ : gname) (root_ppn : mword 44)
-      (m : gmap regidx (mword 64)) (avail k : nat) :
+      (m : regfile) (avail k : nat) :
     (k <= avail)%nat ->
     sie_cap γ root_ppn m avail -∗
     sie_cap γ root_ppn m (avail - k) ∗

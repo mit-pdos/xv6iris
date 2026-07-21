@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras WpLeafCommon.
+Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvTryStep RiscvExtras WpLeafCommon.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
@@ -105,9 +105,35 @@ Section GprFile.
   (* [gpr_file m] holds the WHOLE register file, indexed by [regidx]: [m] has an
      entry for every register index (so any [Regidx i] can be looked up total),
      and each entry backs its register (x0's is just the value-zero fact). *)
-  Definition gpr_file (m : gmap regidx (mword 64)) : iProp Σ :=
-    (⌜ ∀ r : regidx, r ∈ dom m ⌝ ∗
-     [∗ map] r ↦ v ∈ m, gpr_pt r v)%I.
+  (* The register map is now a total function [regidx -> mword 64] (see
+     RegFile.v).  [gpr_file] still folds over a gmap, via the [rf_to_gmap]
+     bridge, so the existing [big_sepM_*] interface is reused unchanged; the
+     [dom] conjunct is kept (now always true) so callers' [ [%Hdom Hfmap] ]
+     destructuring survives. *)
+  Definition gpr_file (f : regfile) : iProp Σ :=
+    (⌜ ∀ r : regidx, r ∈ dom (rf_to_gmap f) ⌝ ∗
+     [∗ map] r ↦ v ∈ rf_to_gmap f, gpr_pt r v)%I.
+
+  Lemma gpr_file_dom (f : regfile) : ⊢@{iPropI Σ} ⌜ ∀ r : regidx, r ∈ dom (rf_to_gmap f) ⌝.
+  Proof. iPureIntro. apply rf_to_gmap_dom. Qed.
+
+  (* Read/write accessors over the function rep (the interface leaves use). *)
+  Lemma gpr_file_lookup_acc (f : regfile) (i : regidx) :
+    gpr_file f ⊢ gpr_pt i (f i) ∗ (gpr_pt i (f i) -∗ gpr_file f).
+  Proof.
+    unfold gpr_file. iIntros "[$ Hm]".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup f i) with "Hm") as "[$ Hcl]".
+    iIntros "Hpt". iApply "Hcl". done.
+  Qed.
+
+  Lemma gpr_file_insert_acc (f : regfile) (i : regidx) (w : mword 64) :
+    gpr_file f ⊢ gpr_pt i (f i) ∗ (gpr_pt i w -∗ gpr_file (<[i := w]> f)).
+  Proof.
+    unfold gpr_file. iIntros "[_ Hm]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ (rf_to_gmap_lookup f i) with "Hm") as "[$ Hcl]".
+    iIntros "Hpt". iSplitR; [iApply gpr_file_dom |].
+    rewrite rf_to_gmap_upd. iApply ("Hcl" with "Hpt").
+  Qed.
 
   (* Reading register index [i] off its [gpr_pt] entry, uniformly over x0 vs a
      real register: the value the model's [rX] would return equals the entry's

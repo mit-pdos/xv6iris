@@ -22,10 +22,11 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Import ListNotations.
 
-Definition callee_saved (m m' : gmap regidx (mword 64)) : Prop :=
+Definition callee_saved (m m' : regfile) : Prop :=
   m' !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\                            (* x2  sp  *)
   m' !!! Regidx (mword_of_int 4 : mword 5)  = m !!! Regidx (mword_of_int 4 : mword 5)  /\  (* x4  tp *)
   m' !!! Regidx (mword_of_int 8 : mword 5)  = m !!! Regidx (mword_of_int 8 : mword 5)  /\  (* x8  s0 *)
@@ -41,10 +42,10 @@ Definition callee_saved (m m' : gmap regidx (mword 64)) : Prop :=
   m' !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5) /\  (* x26 s10 *)
   m' !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5).     (* x27 s11 *)
 
-Lemma callee_saved_refl (m : gmap regidx (mword 64)) : callee_saved m m.
+Lemma callee_saved_refl (m : regfile) : callee_saved m m.
 Proof. unfold callee_saved. repeat split; reflexivity. Qed.
 
-Lemma callee_saved_trans (m1 m2 m3 : gmap regidx (mword 64)) :
+Lemma callee_saved_trans (m1 m2 m3 : regfile) :
   callee_saved m1 m2 -> callee_saved m2 m3 -> callee_saved m1 m3.
 Proof.
   unfold callee_saved.
@@ -71,7 +72,7 @@ Proof. intros H Heq. apply H. injection Heq as ->. reflexivity. Qed.
    H (mword_of_int c) …)] instead of picking the right conjunct out of a
    [first [rewrite H_tp | rewrite H_s3 | …]] alternation (O(#conjuncts) failed
    rewrites per hop). *)
-Lemma callee_saved_lookup {m m' : gmap regidx (mword 64)}
+Lemma callee_saved_lookup {m m' : regfile}
       (Hcs : callee_saved m m') (c : mword 5) :
   is_cs_idx c = true -> m' !!! Regidx c = m !!! Regidx c.
 Proof.
@@ -94,7 +95,7 @@ Qed.
    compose across sub-calls with [callee_saved_trans] on the callees' whole
    [callee_saved] facts rather than destructuring them. *)
 Lemma callee_saved_insert_r (k : mword 5) (v : mword 64)
-      (m m' : gmap regidx (mword 64)) :
+      (m m' : regfile) :
   is_cs_idx k = false ->
   callee_saved m m' ->
   callee_saved m (<[Regidx k := v]> m').
@@ -102,8 +103,8 @@ Proof.
   intros Hk Hcs. unfold callee_saved in *.
   destruct Hcs as (H&H0&H1&H2&H3&H4&H5&H6&H7&H8&H9&H10&H11&H12).
   repeat split;
-    (rewrite lookup_total_insert_ne
-       by (apply (is_cs_idx_true_neq _ _ Hk); vm_compute; reflexivity);
+    (rewrite upd_ne
+       by (apply not_eq_sym, (is_cs_idx_true_neq _ _ Hk); vm_compute; reflexivity);
      assumption).
 Qed.
 
@@ -119,8 +120,8 @@ Qed.
 (* (outermost first) and discharge one [Forall] whose 12 untouched registers    *)
 (* are [None] (decided by [vm_compute] on the key list, values irrelevant) and  *)
 (* whose few restored frame registers carry an explicit value obligation.       *)
-Definition apply_writes (ws : list (mword 5 * mword 64)) (m : gmap regidx (mword 64))
-  : gmap regidx (mword 64) :=
+Definition apply_writes (ws : list (mword 5 * mword 64)) (m : regfile)
+  : regfile :=
   foldr (fun kv M => <[Regidx (fst kv) := snd kv]> M) m ws.
 
 Fixpoint outer_write (c : mword 5) (ws : list (mword 5 * mword 64)) : option (mword 64) :=
@@ -158,12 +159,12 @@ Lemma apply_writes_lookup (ws : list (mword 5 * mword 64)) m (c : mword 5) :
 Proof.
   induction ws as [|[k v] ws IH]; [reflexivity|].
   simpl. destruct (bool_decide (k = c)) eqn:Hkc.
-  - apply bool_decide_eq_true in Hkc. subst k. by rewrite lookup_total_insert.
+  - apply bool_decide_eq_true in Hkc. subst k. by rewrite upd_eq.
   - apply bool_decide_eq_false in Hkc.
-    rewrite lookup_total_insert_ne; [exact IH | congruence].
+    rewrite upd_ne; [exact IH | congruence].
 Qed.
 
-Lemma callee_saved_apply_writes (m : gmap regidx (mword 64)) ws :
+Lemma callee_saved_apply_writes (m : regfile) ws :
   Forall (fun c => match outer_write (mword_of_int c : mword 5) ws with
                    | None => True
                    | Some v => v = m !!! Regidx (mword_of_int c : mword 5)

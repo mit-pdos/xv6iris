@@ -10,7 +10,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes WpLeafCommon WpGpr.
+Require Import MinstretInv InstrBytes WpLeafCommon WpGpr RegFile.
 Require Import SRegime.
 Require Import SmodeCore.
 Require Import KptTree SmodeCorePt.
@@ -228,7 +228,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_beq_fall_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -263,17 +263,13 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs2)) with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -292,7 +288,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_beq_fall_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -321,7 +317,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_beq_taken_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -364,20 +360,16 @@ Section WpSmodePtBtype.
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs2)) with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -406,7 +398,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_beq_taken_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -438,7 +430,7 @@ Section WpSmodePtBtype.
      catalog spells the rs2 slot [zreg] *)
   Lemma wp_beqz_x0_fall_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -473,12 +465,10 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -501,7 +491,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bge_x0_fall_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -536,12 +526,10 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs2)) with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -563,7 +551,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bge_x0_fall_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rs2 <> 0 ->
     zopz0zKzJ_s zero_reg (m !!! Regidx rs2) = false ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -592,7 +580,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bne_fall_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -627,17 +615,13 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs2)) with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -656,7 +640,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bne_fall_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -685,7 +669,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bltu_fall_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -720,17 +704,13 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs2)) with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -749,7 +729,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bne_taken_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -792,20 +772,16 @@ Section WpSmodePtBtype.
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs2)) with "Hfmap") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -834,7 +810,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bne_taken_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -864,7 +840,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_fall_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -900,12 +876,10 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -929,7 +903,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_fall_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
     eq_vec (m !!! Regidx rd1) zero_reg = false ->
@@ -959,7 +933,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_fall_s_raw_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -995,12 +969,10 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1024,7 +996,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_fall_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
     eq_vec (m !!! Regidx rd1) zero_reg = false ->
@@ -1054,7 +1026,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_taken_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
@@ -1093,15 +1065,13 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1132,7 +1102,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_taken_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let imm : mword 13 := sign_extend' 13 (concat_vec imm8 ('b"0")) in
@@ -1182,15 +1152,13 @@ Section WpSmodePtBtype.
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1225,7 +1193,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_taken_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     let imm : mword 13 := sign_extend' 13 (concat_vec imm8 ('b"0")) in
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
@@ -1261,7 +1229,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_taken_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
@@ -1295,7 +1263,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_taken_s_zca_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
@@ -1338,8 +1306,6 @@ Section WpSmodePtBtype.
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
@@ -1347,8 +1313,8 @@ Section WpSmodePtBtype.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0)
       by (unfold s_pc; tmig; exact Lmisa).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1379,7 +1345,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_taken_s_zca_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
@@ -1412,7 +1378,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbnez_fall_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1448,12 +1414,10 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1477,7 +1441,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbnez_fall_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
     neq_vec (m !!! Regidx rd1) zero_reg = false ->
@@ -1507,7 +1471,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbnez_taken_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
@@ -1548,15 +1512,13 @@ Section WpSmodePtBtype.
     iIntros (σ Hpceq)
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1589,7 +1551,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbnez_taken_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
@@ -1625,7 +1587,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbnez_taken_s_zca_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
@@ -1668,8 +1630,6 @@ Section WpSmodePtBtype.
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
@@ -1677,8 +1637,8 @@ Section WpSmodePtBtype.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0)
       by (unfold s_pc; tmig; exact Lmisa).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1709,7 +1669,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbnez_taken_s_zca_later_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
@@ -1752,8 +1712,6 @@ Section WpSmodePtBtype.
       "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma : m !! Regidx rd1 = Some (m !!! Regidx rd1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
@@ -1761,8 +1719,8 @@ Section WpSmodePtBtype.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     assert (Lmisa_pc : register_lookup misa s_pc.(sregs) = misa0)
       by (unfold s_pc; tmig; exact Lmisa).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rd1 (m !!! Regidx rd1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd1)) with "Hfmap") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iMod (reg_update _ nextPC _ tgt with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1794,7 +1752,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbnez_taken_s_zca_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     let tgt := add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) in
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
@@ -1827,7 +1785,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bne_fall_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
     smode_config γ dq -∗
@@ -1858,7 +1816,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_bne_taken_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
@@ -1890,7 +1848,7 @@ Section WpSmodePtBtype.
 
   Lemma wp_cbeqz_fall_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
     eq_vec (m !!! Regidx rd1) zero_reg = false ->

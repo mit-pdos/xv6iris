@@ -59,6 +59,11 @@ are working on that effort — the relevant `projects/` file.
   mappages / walk proofs (`KvmSpec.v`).
 - **[`user-mode-exec-v2.md`](projects/user-mode-exec-v2.md)** — arbitrary
   user-mode execution (v2: `UserPt.v` / `UserExec.v`).
+- **[`regfile-migration.md`](projects/regfile-migration.md)** — replacing the
+  register map `gmap regidx (mword 64)` with a function `regfile := regidx →
+  mword 64` (`RegFile.v`) to kill the funnel `iApply`s' lookup-peel cost (~17×
+  on the hot path). Foundation landed (`RegFile.v`, `WpGpr.v`); ~82-file sweep
+  remains, with the per-file recipe.
 
 ### `completed/` — finished projects, archived for reference
 

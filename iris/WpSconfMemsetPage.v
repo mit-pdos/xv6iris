@@ -21,6 +21,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import WpGpr.
+Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore KernelText WpMemsetS.
 Require Import WpMemsetInstr WpMemsetPage.
@@ -44,7 +45,7 @@ Section WpSconfMemsetPage.
   Context `{CID : CpuId}.
 
   Lemma wp_memset_page_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : gmap regidx (mword 64)) (n : nat) (cval : mword 64) :
+      (m0 : regfile) (n : nat) (cval : mword 64) :
     let a0_idx : mword 5 := mword_of_int 10 in
     let a1_idx : mword 5 := mword_of_int 11 in
     let a2_idx : mword 5 := mword_of_int 12 in
@@ -122,16 +123,16 @@ Section WpSconfMemsetPage.
     assert (Hvalue_add : add_vec (m5 !!! Regidx a2_idx) (m5 !!! Regidx a0_idx) = wval_add).
     { assert (HA : m5 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64)).
       { unfold m5, m4, m3.
-        rewrite lookup_total_insert.
-        rewrite lookup_total_insert.
+        rewrite upd_eq.
+        rewrite upd_eq.
         unfold m2, m1.
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+        rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite upd_ne; [| vm_compute; discriminate].
         rewrite Ha2. apply bv_eq; vm_compute; reflexivity. }
       assert (HB : m5 !!! Regidx a0_idx = p).
       { unfold m5, m4, m3, m2, m1.
-        repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+        repeat (rewrite upd_ne; [| vm_compute; discriminate]).
         reflexivity. }
       rewrite HA HB. reflexivity. }
     assert (Hsp' : sp' = pa_stk sp0 2).
@@ -150,20 +151,20 @@ Section WpSconfMemsetPage.
     (* loop-entry facts on m6 *)
     assert (Hcur : m6 !!! Regidx a5_idx = ms_addr p 0).
     { unfold m6, m5, m4, m3.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert.
+      rewrite upd_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
+      rewrite upd_eq.
       unfold regval_into_reg. rewrite add_vec_zero_l.
       unfold m2, m1.
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-      rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
+      rewrite upd_ne; [| vm_compute; discriminate].
       unfold ms_addr, p. change (Z.of_nat 0) with 0%Z. symmetry. exact (RiscvExtras.avi0 (m0 !!! Regidx a0_idx)). }
     assert (Hm4 : m6 !!! Regidx a4_idx = wval_add)
-      by (unfold m6; rewrite lookup_total_insert; unfold regval_into_reg; reflexivity).
+      by (unfold m6; rewrite upd_eq; unfold regval_into_reg; reflexivity).
     assert (Hm1 : m6 !!! Regidx a1_idx = cval).
     { unfold m6, m5, m4, m3, m2, m1.
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+      repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       rewrite -Hcval. reflexivity. }
     (* --- LOOP: 0x14..0x1a --- *)
     iApply (wp_memset_loop_sconf γ root_ppn Φ 4096 p wval_add cval a1_idx a4_idx a5_idx imm_bne
@@ -186,11 +187,11 @@ Section WpSconfMemsetPage.
     (* the suffix operates on m7; spd = m7!!!csp = sp' *)
     assert (Hsuf_sp : m7 !!! Regidx csp_rs1 = sp').
     { unfold m7, m6, m5, m4, m3, m2.
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
-      unfold m1. rewrite lookup_total_insert. reflexivity. }
+      repeat (rewrite upd_ne; [| vm_compute; discriminate]).
+      unfold m1. rewrite upd_eq. reflexivity. }
     assert (Hsuf_ra : m7 !!! Regidx (mword_of_int 1 : mword 5) = ra0).
     { unfold m7, m6, m5, m4, m3, m2, m1.
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]).
+      repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold ra0; reflexivity. }
     (* the suffix's ret target is built from ra0e := ra0, so [Hret0] IS its Hal0 *)
     iApply (wp_memset_suffix_sconf γ root_ppn Φ m7 (n - 2)%nat ra0 s00
@@ -213,72 +214,22 @@ Section WpSconfMemsetPage.
                 m7 !!! r = m0 !!! r).
       { intros r Hra Hs0 Hcsp Ha5 Ha2r Ha4.
         unfold m7, m6, m5, m4, m3, m2, m1.
-        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
-        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha4)].
-        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2r)].
-        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha2r)].
-        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Ha5)].
-        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hs0)].
-        rewrite lookup_total_insert_ne; [| exact (not_eq_sym Hcsp)].
+        rewrite upd_ne; [| exact Ha5].
+        rewrite upd_ne; [| exact Ha4].
+        rewrite upd_ne; [| exact Ha2r].
+        rewrite upd_ne; [| exact Ha2r].
+        rewrite upd_ne; [| exact Ha5].
+        rewrite upd_ne; [| exact Hs0].
+        rewrite upd_ne; [| exact Hcsp].
         reflexivity. }
       rewrite Hmeq.
       unfold callee_saved. repeat split.
-      + (* x2 sp: balanced frame *)
-        rewrite lookup_total_insert. rewrite Hsuf_sp.
-        unfold sp', imm_entry. apply Hframe.
-      + (* x4 tp *)
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        apply Hcatch; vm_compute; discriminate.
-      + (* x8 s0 *)
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-        rewrite lookup_total_insert.
-        unfold s00, s0_idx. reflexivity.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
-      + rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        rewrite lookup_total_insert_ne; [| vm_compute; discriminate];
-        apply Hcatch; vm_compute; discriminate.
+      (* [regfile] insert/lookup on concrete regidx keys reduces by
+         computation, so [repeat split] already discharges all the
+         genuinely-unchanged callee-saved fields; only [x2 sp] (whose
+         value really changes, via [Hframe]) survives as a goal. *)
+      rewrite upd_eq. rewrite Hsuf_sp.
+      unfold sp', imm_entry. apply Hframe.
   Qed.
 
 End WpSconfMemsetPage.

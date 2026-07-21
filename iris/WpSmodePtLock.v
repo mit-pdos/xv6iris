@@ -13,7 +13,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import WpLoad.
-Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
+Require Import WpGpr RegFile MinstretInv InstrBytes WpMmodeLeafBase.
 Require Import SmodePte PtTreeAdue.
 Require Import SmodeCore WpSmodeGpr WpPushOffMem WpAmo WpLock.
 Require Import KptTree SmodeCorePt SRegime WpSmodePtLeaves WpSmodePtMem.
@@ -159,7 +159,7 @@ Section WpSmodePtLock.
   Lemma wp_clw_lockinv_r (Rg : s_regime) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -203,7 +203,7 @@ Section WpSmodePtLock.
   Proof.
     intros ea a8 pa Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Hcont".
+             [Hpc Hnpc] Hfmap Hinstr #Hlock Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -227,10 +227,6 @@ Section WpSmodePtLock.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -250,8 +246,8 @@ Section WpSmodePtLock.
       by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value rs1 _ s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
       by (unfold s_pc; tmig; exact Lpriv).
@@ -338,11 +334,11 @@ Section WpSmodePtLock.
                ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; apply Hwh)
                ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; exact (addr_is_ram_not_dev _ Hrampa))
                ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; exact Hbytesf_tr)). }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sign_extend' 64 v)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (sign_extend' 64 v))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (sign_extend' 64 v)) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iMod ("Hclose" with "[Hbytes Hbr]") as "_".
     { iNext. iExists v. iSplitL "Hbytes".
@@ -366,17 +362,14 @@ Section WpSmodePtLock.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" $! v with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+                          [$Hpc' $Hnpc] Hfmap").
   Qed.
 
 
   Lemma wp_clw_lockinv_locked_r (Rg : s_regime) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -423,7 +416,7 @@ Section WpSmodePtLock.
   Proof.
     intros ea a8 pa Hpalk Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Htok Hcont".
+             [Hpc Hnpc] Hfmap Hinstr #Hlock Htok Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -449,10 +442,6 @@ Section WpSmodePtLock.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -472,8 +461,8 @@ Section WpSmodePtLock.
       by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value rs1 _ s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
       by (unfold s_pc; tmig; exact Lpriv).
@@ -560,11 +549,11 @@ Section WpSmodePtLock.
                ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; apply Hwh)
                ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; exact (addr_is_ram_not_dev _ Hrampa))
                ltac:(rewrite Lva zero_extend'_id avi0_mul4 subrange_id sign_extend'_id; exact Hbytesf_tr)). }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sign_extend' 64 v)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (sign_extend' 64 v))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (sign_extend' 64 v)) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iMod ("Hclose" with "[Hbytes]") as "_".
     { iNext. iExists v. iSplitL "Hbytes".
@@ -588,16 +577,13 @@ Section WpSmodePtLock.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" $! v with "[//] Htok Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+                          [$Hpc' $Hnpc] Hfmap").
   Qed.
 
 
   Lemma wp_sd_zero_s_r (Rg : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) (vold : mword 64)
+      (m : regfile) (vold : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -640,7 +626,7 @@ Section WpSmodePtLock.
   Proof.
     intros ea a8 pa storeval HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+             [Hpc Hnpc] Hfmap Hinstr Hbytes Hcont".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 8 = true) by exact Hpalign4.
     iPoseProof "Hhw" as "#Hhwc".
@@ -661,8 +647,6 @@ Section WpSmodePtLock.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (word_pointsto_bytes with "Hbytes") as "Hb".
       iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0".
@@ -682,8 +666,8 @@ Section WpSmodePtLock.
       unfold ram_base, ram_size in *. lia. }
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value rs1 _ s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
       by (unfold s_pc; tmig; exact Lpriv).
@@ -783,16 +767,14 @@ Section WpSmodePtLock.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          [$Hpc' $Hnpc] [Hfmap] Hbytes").
-    iSplitR; [iPureIntro; exact Hdom |].
-    iExact "Hfmap".
+                          [$Hpc' $Hnpc] Hfmap Hbytes").
   Qed.
 
 
   Lemma wp_sw_zero_lockinv_r (Rg : s_regime) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -837,7 +819,7 @@ Section WpSmodePtLock.
     intros ea a8 pa Hpalk HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     set (storeval := (mword_of_int 0 : mword 32)).
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Htok HRes Hcont".
+             [Hpc Hnpc] Hfmap Hinstr #Hlock Htok HRes Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -861,8 +843,6 @@ Section WpSmodePtLock.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -882,8 +862,8 @@ Section WpSmodePtLock.
       by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value rs1 _ s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
       by (unfold s_pc; tmig; exact Lpriv).
@@ -982,15 +962,14 @@ Section WpSmodePtLock.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR; [ iPureIntro; exact Hdom | iExact "Hfmap" ].
+                          [$Hpc' $Hnpc] Hfmap").
   Qed.
 
 
   Lemma wp_amoswap_lockinv_r (Rg : s_regime) (Φ : mval -> iProp Σ)
       (γ : gname) (lk : mword 64) (R : iProp Σ)
       (pc : mword 64) (rd rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (zeros' 64) in
@@ -1037,7 +1016,7 @@ Section WpSmodePtLock.
   Proof.
     intros ea a8 pa Hpalk Hstz Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-             [Hpc Hnpc] [%Hdom Hfmap] Hinstr #Hlock Hcont".
+             [Hpc Hnpc] Hfmap Hinstr #Hlock Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -1065,12 +1044,6 @@ Section WpSmodePtLock.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hmsp : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iAssert (⌜addr_is_ram pa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -1090,8 +1063,8 @@ Section WpSmodePtLock.
       by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value rs1 _ s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
       by (unfold s_pc; tmig; exact Lpriv).
@@ -1151,8 +1124,8 @@ Section WpSmodePtLock.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm2 with "Hfmap") as "[Hr2c Hfb2]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_tr with "Hreg Hr2c") as %Lv2_tr.
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfmap") as "[Hr2c Hfb2]".
+    iDestruct (gpr_pt_value rs2 _ s_tr with "Hreg Hr2c") as %Lv2_tr.
     iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
     iAssert (⌜forall j : nat, (N.of_nat j < 4)%N ->
               s_tr.(mem) !! (pa_add pa j) = Some (nth_byte w j)⌝)%I as %Hbytesf_tr.
@@ -1189,11 +1162,11 @@ Section WpSmodePtLock.
                  ltac:(rewrite Ha8_pc; exact Hbytesf_tr)).
       subst s_x. unfold amoswap_stored, amoswap_loaded.
       rewrite Ha8_pc. rewrite Lv2_tr. reflexivity. }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (amoswap_loaded w)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (amoswap_loaded w))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (amoswap_loaded w)) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iMod (upd_window_4 s_tr.(mem) pa (amoswap_stored (m !!! Regidx rs2)) w with "Hmem Hbytes") as "[Hmem Hbytes]".
     iMod ("Hclose" with "[Hbytes]") as "_".
@@ -1217,10 +1190,7 @@ Section WpSmodePtLock.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iApply ("Hcont" $! w with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                          [$Hpc' $Hnpc] [Hfmap] Hbr").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+                          [$Hpc' $Hnpc] Hfmap Hbr").
   Qed.
 
 

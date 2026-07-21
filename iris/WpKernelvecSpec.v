@@ -21,6 +21,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RegFile.
 Require Import MinstretInv.
 Require Import WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KernelText.
@@ -51,7 +52,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 (* kernelvec's sparse positive-offset save slots, re-addressed as [pa_stk]
    slots below the INTERRUPTED sp: kv_sp1 = sp - 256, so the window at
    kv_sp1 + 8j is stack slot 32 - j. *)
-Lemma kv_slot_addr (m : gmap regidx (mword 64)) (off : mword 64) (k : nat) :
+Lemma kv_slot_addr (m : regfile) (off : mword 64) (k : nat) :
   add_vec (sign_extend' 64 (caddi16sp_imm kv_imm1)) off
     = (mword_of_int (- (8 * Z.of_nat k)) : mword 64) ->
   add_vec (kv_sp1 m) off = pa_stk (m !!! Regidx csp_rs1) k.
@@ -63,7 +64,7 @@ Proof.
   rewrite Hr kv_addv_assoc H. unfold pa_stk, add_vec_int. reflexivity.
 Qed.
 
-Lemma kv_slot_addr0 (m : gmap regidx (mword 64)) :
+Lemma kv_slot_addr0 (m : regfile) :
   kv_sp1 m = pa_stk (m !!! Regidx csp_rs1) 32.
 Proof.
   assert (Hr : kv_sp1 m

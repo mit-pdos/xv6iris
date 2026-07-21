@@ -54,7 +54,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase StackOwn.
+Require Import RegFile WpGpr MinstretInv InstrBytes WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree SmodeCorePt.
 Require Import WpSmodeSret AlignBits.
 Require Import IntrDefs WpIntrInv.
@@ -72,7 +72,7 @@ Section WpSmodeIntr.
   (* shape over [wp_exec_step_intr].                                      *)
   (* =================================================================== *)
   Lemma wp_instr_s_intr (γ : gname) (handler : mword 64) (root_ppn : mword 44)
-      (menvcfg0 : mword 64) (m : gmap regidx (mword 64)) Φ
+      (menvcfg0 : mword 64) (m : regfile) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     sret_tgt pc = pc ->
     menvcfg0 = MENVCFG_S ->
@@ -201,7 +201,7 @@ Section WpSmodeIntr.
   (* picks the arm; both arms present the same σf-callback.               *)
   (* =================================================================== *)
   Lemma wp_instr_s_sconf (γ : gname) (root_ppn : mword 44)
-      (m : gmap regidx (mword 64)) (n : nat) Φ
+      (m : regfile) (n : nat) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -303,7 +303,7 @@ Section WpSmodeIntr.
   (* =================================================================== *)
   Lemma wp_gpr_write_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     (forall s_pc : mstate,
@@ -335,28 +335,22 @@ Section WpSmodeIntr.
       "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true base
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
-    assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rsb = Some (m !!! Regidx rsb))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rsa (m !!! Regidx rsa) s_pc with "Hreg Hrac") as %Lva0.
-    iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rsb (m !!! Regidx rsb) s_pc with "Hreg Hrbc") as %Lvb0.
-    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_lookup_acc m (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rsa (m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
+    iDestruct ("Hfba" with "Hrac") as "Hfile".
+    iDestruct (gpr_file_lookup_acc m (Regidx rsb) with "Hfile") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rsb (m (Regidx rsb)) s_pc with "Hreg Hrbc") as %Lvb0.
+    iDestruct ("Hfbb" with "Hrbc") as "Hfile".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg wval) with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg wval)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg wval) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
@@ -373,19 +367,16 @@ Section WpSmodeIntr.
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
-      by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+      by (symmetry; apply upd_ne; congruence).
     iDestruct (sie_cap_retarget γ root_ppn m
                  (<[Regidx rd := regval_into_reg wval]> m) n Hsp with "Hcap") as "Hcap".
-    iApply ("Hcont" with "Hhs' Hsc Hcap Htlbinv [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hhs' Hsc Hcap Htlbinv [$Hpc' $Hnpc] Hfile").
   Qed.
 
   (* the 4-byte (base-encoding) variant: pc advances by 4 *)
   Lemma wp_gpr_write_s_sconf_base (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     (forall s_pc : mstate,
@@ -417,28 +408,22 @@ Section WpSmodeIntr.
       "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false base
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv [%Hdom Hfmap] Hnpc [Hreg Hmem]".
-    assert (Hma : m !! Regidx rsa = Some (m !!! Regidx rsa))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmb : m !! Regidx rsb = Some (m !!! Regidx rsb))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rsa (m !!! Regidx rsa) s_pc with "Hreg Hrac") as %Lva0.
-    iDestruct ("Hfba" with "Hrac") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmb with "Hfmap") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rsb (m !!! Regidx rsb) s_pc with "Hreg Hrbc") as %Lvb0.
-    iDestruct ("Hfbb" with "Hrbc") as "Hfmap".
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_lookup_acc m (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rsa (m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
+    iDestruct ("Hfba" with "Hrac") as "Hfile".
+    iDestruct (gpr_file_lookup_acc m (Regidx rsb) with "Hfile") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rsb (m (Regidx rsb)) s_pc with "Hreg Hrbc") as %Lvb0.
+    iDestruct ("Hfbb" with "Hrbc") as "Hfile".
+    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg wval) with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg wval)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg wval) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
@@ -455,13 +440,10 @@ Section WpSmodeIntr.
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
-      by (symmetry; apply lookup_total_insert_ne; exact Hspne).
+      by (symmetry; apply upd_ne; congruence).
     iDestruct (sie_cap_retarget γ root_ppn m
                  (<[Regidx rd := regval_into_reg wval]> m) n Hsp with "Hcap") as "Hcap".
-    iApply ("Hcont" with "Hhs' Hsc Hcap Htlbinv [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hhs' Hsc Hcap Htlbinv [$Hpc' $Hnpc] Hfile").
   Qed.
 
   (* =================================================================== *)
@@ -472,7 +454,7 @@ Section WpSmodeIntr.
   (* =================================================================== *)
   Lemma wp_addi_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = wval ->
@@ -505,7 +487,7 @@ Section WpSmodeIntr.
 
   Lemma wp_cli_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6) (wval : mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) = wval ->
@@ -549,7 +531,7 @@ Section WpSmodeIntr.
      mention the mode. *)
   Lemma wp_sconf_pilot3 (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc pc2 pc3 : mword 64) (imm1 imm3 : mword 12) (imm2 : mword 6)
-      (w1 w2 w3 : mword 64) (m : gmap regidx (mword 64)) (n : nat) :
+      (w1 w2 w3 : mword 64) (m : regfile) (n : nat) :
     pc2 = add_vec_int pc 4 ->
     pc3 = add_vec_int pc2 2 ->
     add_vec (m !!! Regidx (mword_of_int 15)) (sign_extend' 64 imm1) = w1 ->
@@ -607,7 +589,7 @@ Section WpSmodeIntr.
               (mword_of_int 14) (mword_of_int 14) imm3 w3 _ n
               H14nz H14sp _
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi3").
-    { rewrite lookup_total_insert. exact Hw3. }
+    { rewrite upd_eq. exact Hw3. }
     iApply "Hcont".
   Qed.
 

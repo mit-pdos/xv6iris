@@ -21,6 +21,7 @@ Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree TrampPt.
 Require Import SmodeCore SmodeCorePt WpSmodeGpr KptTree UptTree.
 Require Import TrampStepPt.
 Require Import UserretDefs WpSmodeSret WpDecode WpGprMret.
+Require Import RegFile.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -321,7 +322,7 @@ Section WpUldPt.
   Lemma wp_uld_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (Φ : mval -> iProp Σ)
       (off immz : Z) (rd : mword 5) (is_rvc : bool)
-      (m : gmap regidx (mword 64)) (v : bv 64)
+      (m : regfile) (v : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq dqm : dfrac} :
     let va := uva off in
     let pa := upa off in
@@ -339,7 +340,7 @@ Section WpUldPt.
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
     (* GPR: a0 holds TRAPFRAME *)
-    m !! Regidx (mword_of_int 10) = Some (mword_of_int TRAPFRAME) ->
+    m !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME ->
     (* fetch va/pa geometry (vm_compute per instruction) *)
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -432,12 +433,8 @@ Section WpUldPt.
     iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    assert (Hma0v : m !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int TRAPFRAME)
-      by (apply lookup_total_correct; exact Ha0).
-    assert (Hmsp : m !! Regidx (mword_of_int 10 : mword 5) = Some (m !!! Regidx (mword_of_int 10 : mword 5)))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hma0v : m (Regidx (mword_of_int 10 : mword 5)) = mword_of_int TRAPFRAME)
+      by exact Ha0.
     iAssert (⌜addr_is_ram tfpa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -457,8 +454,8 @@ Section WpUldPt.
     pose proof (tfcat_aligned8 tfp _ Hmod8) as Hpalign8.
     iMod (reg_update _ nextPC _ (add_vec_int va (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int va (if is_rvc then 2 else 4))).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value (mword_of_int 10) (m !!! Regidx (mword_of_int 10 : mword 5)) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx (mword_of_int 10 : mword 5))) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value (mword_of_int 10) (m (Regidx (mword_of_int 10 : mword 5))) s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
       by (unfold s_pc; tmig; exact Lpriv).
@@ -546,12 +543,13 @@ Section WpUldPt.
                ltac:(apply Hwh)
                ltac:(exact (addr_is_ram_not_dev _ Hrampa))
                ltac:(exact Hbytesf_tr)). }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg v)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
     iDestruct ("Hfins" $! (regval_into_reg v) with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iEval (rewrite -(rf_to_gmap_upd m (Regidx rd) (regval_into_reg v))) in "Hfmap".
     iModIntro.
     iExists (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v)).
     iSplitR.
@@ -571,7 +569,7 @@ Section WpUldPt.
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hutlb
                           [$Hpc' $Hnpc] [Hfmap] Hbytes").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. apply rf_to_gmap_dom. }
     iExact "Hfmap".
   Qed.
 
@@ -798,7 +796,7 @@ Section WpUaluUsretPt.
 
   Lemma wp_ualu_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
       (off : Z) (is_rvc : bool) (ast : instruction)
-      (m : gmap regidx (mword 64)) (a0v vnew : mword 64)
+      (m : regfile) (a0v vnew : mword 64)
       (vf : mstate -> mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     let va := uva off in
@@ -822,7 +820,7 @@ Section WpUaluUsretPt.
        register_lookup (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5)))) s.(sregs) = a0v ->
        vf s = vnew) ->
     (* GPR: a0's current contents *)
-    m !! Regidx (mword_of_int 10) = Some a0v ->
+    m !!! Regidx (mword_of_int 10) = a0v ->
     (* fetch va/pa geometry (vm_compute per instruction) *)
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -878,15 +876,13 @@ Section WpUaluUsretPt.
       "Hpriv Hms Hmie Hmdl Hmenv Hutlb Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     assert (Hrd10 : uint (mword_of_int 10 : mword 5) <> 0) by (vm_compute; lia).
-    assert (Hma0v : m !!! Regidx (mword_of_int 10 : mword 5) = a0v)
-      by (apply lookup_total_correct; exact Ha0).
-    assert (Hmsp : m !! Regidx (mword_of_int 10 : mword 5) = Some (m !!! Regidx (mword_of_int 10 : mword 5)))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hma0v : m (Regidx (mword_of_int 10 : mword 5)) = a0v)
+      by exact Ha0.
     (* tick nextPC *)
     iMod (reg_update _ nextPC _ (add_vec_int va (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int va (if is_rvc then 2 else 4))).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value (mword_of_int 10) (m !!! Regidx (mword_of_int 10 : mword 5)) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx (mword_of_int 10 : mword 5))) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value (mword_of_int 10) (m (Regidx (mword_of_int 10 : mword 5))) s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false in Lva
       by (vm_compute; reflexivity).
@@ -903,12 +899,13 @@ Section WpUaluUsretPt.
         by (vm_compute; reflexivity).
       rewrite (Hval s_pc Lva). reflexivity. }
     (* a0 := vnew in the ghost gpr file *)
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmsp with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx (mword_of_int 10 : mword 5))) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz (mword_of_int 10) _ Hrd10).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5)))) _ (regval_into_reg vnew)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
     iDestruct ("Hfins" $! (regval_into_reg vnew) with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz (mword_of_int 10) _ Hrd10). iExact "Hrdc". }
+    iEval (rewrite -(rf_to_gmap_upd m (Regidx (mword_of_int 10 : mword 5)) (regval_into_reg vnew))) in "Hfmap".
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5))))
                (regval_into_reg vnew)).
@@ -927,12 +924,12 @@ Section WpUaluUsretPt.
                           Hutlb
                           [$Hpc' $Hnpc] [Hfmap]").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. apply rf_to_gmap_dom. }
     iExact "Hfmap".
   Qed.
 
   Lemma wp_usret_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64) :
     let va := uva 0x11c in
     let pa := upa 0x11c in

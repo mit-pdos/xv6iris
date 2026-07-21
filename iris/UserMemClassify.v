@@ -16,6 +16,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RegFile.
 Require Import MinstretInv WpGpr UserBits.
 Require Import WpLeafCommon WpIntrCore SmodeCore.
 Require Import UptTree UserPtTree UserExec UserStep UserTrap UserCompute UserArms UserFetch UserFetchPt UserClassify UserClassifyAsm.
@@ -1631,7 +1632,7 @@ Section MemReadTotal.
          exec (read_ram rv64d_types.Read_plain (Physaddr addr) k false) s = Some ((w, default_meta), s))
       (HkW : k = 2 \/ k = 4 \/ k = 8)
       (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool)
-      (g : gmap regidx (mword 64)) (s : mstate) :
+      (g : regfile) (s : mstate) :
     uint rd <> 0 ->
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
@@ -1679,9 +1680,7 @@ Section MemReadTotal.
         fold va. exact Hvr. }
       assert (Hkle : (k <=? xlen_bytes) = true) by (destruct HkW as [Hkv|[Hkv|Hkv]]; subst k; vm_compute; reflexivity).
       pose proof (exec_execute_LOAD_u_ok imm rs1 rd is_unsigned k dvv s sig' Hkle Hrd Hvread) as Hexec.
-      iDestruct "Hgpr" as "[%Hdom Hmap]".
-      iAssert (gpr_file g) with "[Hmap]" as "Hgpr". { iSplit; [iPureIntro; exact Hdom | iExact "Hmap"]. }
-      iDestruct (gpr_file_acc g rd Hdom Hrd with "Hgpr") as "[Hrdf Hins]".
+      iDestruct (gpr_file_acc g rd Hrd with "Hgpr") as "[Hrdf Hins]".
       iDestruct "Hrdf" as (v0) "Hrdf".
       set (nv := regval_into_reg (extend_value is_unsigned dvv)).
       iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) v0 nv with "Hreg Hrdf") as "[Hreg Hrdf]".
@@ -1720,7 +1719,7 @@ Section MemReadTotal.
 
   Lemma arm_C_LH_u (C : ucfg) (pt : uptd)
       (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+      (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
     post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
     exec (ext_decode_compressed h) sigma_f = Some (C_LH p, sigma_f) ->
     hw_config -∗
@@ -1795,7 +1794,7 @@ Section MemReadTotal.
 
   Lemma arm_C_LHU_u (C : ucfg) (pt : uptd)
       (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+      (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
     post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
     exec (ext_decode_compressed h) sigma_f = Some (C_LHU p, sigma_f) ->
     hw_config -∗
@@ -1869,7 +1868,7 @@ Section MemReadTotal.
 
   Lemma arm_C_LW_u (C : ucfg) (pt : uptd)
       (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+      (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
     post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
     exec (ext_decode_compressed h) sigma_f = Some (C_LW p, sigma_f) ->
     hw_config -∗
@@ -1943,7 +1942,7 @@ Section MemReadTotal.
 
   Lemma arm_C_LD_u (C : ucfg) (pt : uptd)
       (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+      (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
     post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
     exec (ext_decode_compressed h) sigma_f = Some (C_LD p, sigma_f) ->
     hw_config -∗
@@ -2052,7 +2051,7 @@ Section MemArmsU.
   Local Notation udat := (pt.(ud_data)).
 
   Lemma mem_exec_load_1 (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool)
-      (g : gmap regidx (mword 64)) (pc : mword 64) (s : mstate) :
+      (g : regfile) (pc : mword 64) (s : mstate) :
     uint rd <> 0 ->
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
@@ -2105,10 +2104,7 @@ Section MemArmsU.
       pose proof (exec_execute_LOAD_u_ok imm rs1 rd is_unsigned 1 dvv s sig'
                     eq_refl Hrd Hvread) as Hexec.
       (* gpr write *)
-      iDestruct "Hgpr" as "[%Hdom Hmap]".
-      iAssert (gpr_file g) with "[Hmap]" as "Hgpr".
-      { iSplit; [iPureIntro; exact Hdom | iExact "Hmap"]. }
-      iDestruct (gpr_file_acc g rd Hdom Hrd with "Hgpr") as "[Hrdf Hins]".
+      iDestruct (gpr_file_acc g rd Hrd with "Hgpr") as "[Hrdf Hins]".
       iDestruct "Hrdf" as (v0) "Hrdf".
       set (nv := regval_into_reg (extend_value is_unsigned dvv)).
       iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) v0 nv with "Hreg Hrdf") as "[Hreg Hrdf]".
@@ -2157,7 +2153,7 @@ Section MemArmsU.
   (* rd = 0 companion of mem_exec_load_1: the width-1 load with an x0
      destination retires without a gpr write (used by base LB/LBU x0). *)
   Lemma mem_exec_load_1_rd0 (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool)
-      (g : gmap regidx (mword 64)) (pc : mword 64) (s : mstate) :
+      (g : regfile) (pc : mword 64) (s : mstate) :
     uint rd = 0 ->
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
@@ -2239,7 +2235,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_LBU_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+    (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_LBU p, sigma_f) ->
   hw_config -∗
@@ -2314,7 +2310,7 @@ Section MemArmsU2.
   Context (pt : uptd).
 
   Lemma mem_exec_store_1 (imm : mword 12) (rs2 rs1 : mword 5)
-      (g : gmap regidx (mword 64)) (pc : mword 64) (s : mstate) :
+      (g : regfile) (pc : mword 64) (s : mstate) :
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
     register_lookup misa s.(sregs) = MISA_C ->
@@ -2407,7 +2403,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_SB_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+    (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_SB p, sigma_f) ->
   hw_config -∗
@@ -2795,7 +2791,7 @@ Section MemStoreEngine.
          = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) dd) s.(mdev)))
       (HkW : k = 2 \/ k = 4 \/ k = 8)
       (imm : mword 12) (rs2 rs1 : mword 5)
-      (g : gmap regidx (mword 64)) (s : mstate) :
+      (g : regfile) (s : mstate) :
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
     register_lookup misa s.(sregs) = MISA_C ->
@@ -2878,7 +2874,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_SW_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+    (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_SW p, sigma_f) ->
   hw_config -∗
@@ -2950,7 +2946,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_SD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+    (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_SD p, sigma_f) ->
   hw_config -∗
@@ -3022,7 +3018,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_SH_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+    (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_SH p, sigma_f) ->
   hw_config -∗
@@ -3094,7 +3090,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_SWSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 6 * regidx) :
+    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_SWSP p, sigma_f) ->
   hw_config -∗
@@ -3166,7 +3162,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_SDSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 6 * regidx) :
+    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_SDSP p, sigma_f) ->
   hw_config -∗
@@ -3249,7 +3245,7 @@ Section MemLoadRd0.
          exec (read_ram rv64d_types.Read_plain (Physaddr addr) k false) s = Some ((w, default_meta), s))
       (HkW : k = 2 \/ k = 4 \/ k = 8)
       (imm : mword 12) (rs1 rd : mword 5) (is_unsigned : bool)
-      (g : gmap regidx (mword 64)) (s : mstate) :
+      (g : regfile) (s : mstate) :
     uint rd = 0 ->
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
@@ -3325,7 +3321,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_LWSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 6 * regidx) :
+    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_LWSP p, sigma_f) ->
   hw_config -∗
@@ -3426,7 +3422,7 @@ Proof. apply exec_returnm. Qed.
 
 Lemma arm_C_LDSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (h : mword 16) (p : bits 6 * regidx) :
+    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode_compressed h) sigma_f = Some (C_LDSP p, sigma_f) ->
   hw_config -∗
@@ -3637,7 +3633,7 @@ Qed.
 (*      align / menvcfg / MiEq -- i.e. the task's contract:                  *)
 (*                                                                         *)
 (*        arm_LOAD_u (E : coPset) (sigma sigma_f : mstate) (va : mword 64)  *)
-(*            (g : gmap regidx (mword 64)) (w : mword 32)                    *)
+(*            (g : regfile) (w : mword 32)                    *)
 (*            (p : bits 12 * regidx * regidx * bool * word_width) :          *)
 (*          post_fetch_cfg sigma_f va                                        *)
 (*            (register_lookup (R_bool minstret_increment) sigma.(sregs)) -> *)
@@ -3702,7 +3698,7 @@ Section BaseMemArms.
   (* Shared closer: the engine's (retire | delegated trap) result -> base_post. *)
   Lemma base_finish_mem
       (E : coPset) (sigma sigma_f : mstate) (va : mword 64) (w : mword 32)
-      (g g' : gmap regidx (mword 64)) (instr : instruction) (r0 : ExecutionResult)
+      (g g' : regfile) (instr : instruction) (r0 : ExecutionResult)
       (s_x : mstate) :
     register_lookup (R_bool minstret_increment) sigma_f.(sregs)
        = register_lookup (R_bool minstret_increment) sigma.(sregs) ->
@@ -3743,7 +3739,7 @@ End BaseMemArms.
 
 Lemma arm_LOAD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (w : mword 32)
+    (g : regfile) (w : mword 32)
     (imm : bits 12) (rs1 rd : regidx) (is_unsigned : bool) (width : word_width) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   (width = 1 \/ width = 2 \/ width = 4 \/ width = 8) ->
@@ -3917,7 +3913,7 @@ Qed.
 
 Lemma arm_STORE_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (w : mword 32)
+    (g : regfile) (w : mword 32)
     (imm : bits 12) (rs2 rs1 : regidx) (width : word_width) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   (width = 1 \/ width = 2 \/ width = 4 \/ width = 8) ->
@@ -4693,7 +4689,7 @@ Section LRExecEngine.
               exists tv, σ0'.(sregs) = register_set tlb tv σ0.(sregs))%type⌝ ∗
             reg_interp σ0'.(sregs) ∗ gen_heap_interp σ0'.(mem) ∗
             utlb_inv_pt uroot0 tfp0 um0 ∗ udata_own data0)
-      (rs1 rd : mword 5) (g : gmap regidx (mword 64)) (s : mstate) :
+      (rs1 rd : mword 5) (g : regfile) (s : mstate) :
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
     register_lookup misa s.(sregs) = MISA_C ->
@@ -4702,7 +4698,7 @@ Section LRExecEngine.
     register_lookup htif_tohost_base s.(sregs) = None ->
     pma_allows_all (register_lookup pma_regions s.(sregs)) ->
     mstate_interp s -∗ gpr_file g -∗ user_pt_inv pt ==∗
-    ((∃ (g' : gmap regidx (mword 64)) (s_x : mstate),
+    ((∃ (g' : regfile) (s_x : mstate),
         ⌜exec (execute (LOADRES (aq, rl, Regidx rs1, k, Regidx rd))) s = Some (RETIRE_SUCCESS, s_x)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
         ⌜register_lookup nextPC s_x.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
@@ -4751,9 +4747,7 @@ Section LRExecEngine.
       + (* rd <> 0: write sign-extended value *)
         apply Z.eqb_neq in Hrd0.
         pose proof (exec_execute_LOADRES_u_ok aq rl rs1 rd k dvv s sig' Hkle Hrd0 Hvread) as Hexec.
-        iDestruct "Hgpr" as "[%Hdom Hmap]".
-        iAssert (gpr_file g) with "[Hmap]" as "Hgpr". { iSplit; [iPureIntro; exact Hdom | iExact "Hmap"]. }
-        iDestruct (gpr_file_acc g rd Hdom Hrd0 with "Hgpr") as "[Hrdf Hins]".
+        iDestruct (gpr_file_acc g rd Hrd0 with "Hgpr") as "[Hrdf Hins]".
         iDestruct "Hrdf" as (v0) "Hrdf".
         set (nv := regval_into_reg (sign_extend' 64 dvv)).
         iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) v0 nv with "Hreg Hrdf") as "[Hreg Hrdf]".
@@ -4788,7 +4782,7 @@ End LRExecEngine.
 (* ---- Part H: arm_LOADRES_u ---- *)
 Lemma arm_LOADRES_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (w : mword 32)
+    (g : regfile) (w : mword 32)
     (aq rl : bool) (rs1 : regidx) (width : word_width) (rd : regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   (width = 4 \/ width = 8) ->
@@ -5530,7 +5524,7 @@ Section SCEngine.
 
   Lemma mem_exec_sc_k (pt : uptd) (k : Z) (aq rl : bool)
       (HkW : k = 4 \/ k = 8) (Hsc_ok : sc_ok_contract k)
-      (rs2 rs1 rd : mword 5) (g : gmap regidx (mword 64)) (s : mstate) :
+      (rs2 rs1 rd : mword 5) (g : regfile) (s : mstate) :
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
     register_lookup misa s.(sregs) = MISA_C ->
@@ -5539,7 +5533,7 @@ Section SCEngine.
     register_lookup htif_tohost_base s.(sregs) = None ->
     pma_allows_all (register_lookup pma_regions s.(sregs)) ->
     mstate_interp s -∗ gpr_file g -∗ user_pt_inv pt ==∗
-    ((∃ (g' : gmap regidx (mword 64)) (s_x : mstate),
+    ((∃ (g' : regfile) (s_x : mstate),
         ⌜exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, k, Regidx rd))) s = Some (RETIRE_SUCCESS, s_x)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
         ⌜register_lookup nextPC s_x.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
@@ -5596,9 +5590,7 @@ Section SCEngine.
                 = Some (RETIRE_SUCCESS, set_reg sig' (R_bitvector_64 (gpr_of_Z (uint rd)))
                           (regval_into_reg (zero_extend' 64 (bool_bit_forwards (negb b)))))).
         { apply Hexec0. fold dat. exact Hvwrite. }
-        iDestruct "Hgpr" as "[%Hdom Hmap]".
-        iAssert (gpr_file g) with "[Hmap]" as "Hgpr". { iSplit; [iPureIntro; exact Hdom | iExact "Hmap"]. }
-        iDestruct (gpr_file_acc g rd Hdom Hrd0 with "Hgpr") as "[Hrdf Hins]".
+        iDestruct (gpr_file_acc g rd Hrd0 with "Hgpr") as "[Hrdf Hins]".
         iDestruct "Hrdf" as (v0) "Hrdf".
         set (nv := regval_into_reg (zero_extend' 64 (bool_bit_forwards (negb b)))).
         iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) v0 nv with "Hreg Hrdf") as "[Hreg Hrdf]".
@@ -5635,7 +5627,7 @@ End SCEngine.
 (* ---- Part H': arm_STORECON_u ---- *)
 Lemma arm_STORECON_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (w : mword 32)
+    (g : regfile) (w : mword 32)
     (aq rl : bool) (rs2 rs1 : regidx) (width : word_width) (rd : regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   (width = 4 \/ width = 8) ->
@@ -6366,7 +6358,7 @@ Section AmoEngine.
   Context `{CID : CpuId}.
 
   Lemma mem_exec_amo_k (pt : uptd) (op : amoop) (aq rl : bool)
-      (rs2 rs1 rd : mword 5) (g : gmap regidx (mword 64)) (s : mstate) :
+      (rs2 rs1 rd : mword 5) (g : regfile) (s : mstate) :
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
     register_lookup misa s.(sregs) = MISA_C ->
@@ -6375,7 +6367,7 @@ Section AmoEngine.
     register_lookup htif_tohost_base s.(sregs) = None ->
     pma_allows_all (register_lookup pma_regions s.(sregs)) ->
     mstate_interp s -∗ gpr_file g -∗ user_pt_inv pt ==∗
-    ((∃ (g' : gmap regidx (mword 64)) (s_x : mstate),
+    ((∃ (g' : regfile) (s_x : mstate),
         ⌜exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, k, Regidx rd))) s = Some (RETIRE_SUCCESS, s_x)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
         ⌜register_lookup nextPC s_x.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
@@ -6476,9 +6468,7 @@ Section AmoEngine.
           { exact (exec_execute_AMO_u_ok AMOSWAP aq rl rs2 rs1 rd k
                      (Physaddr (u_walk_pa w va)) PBMT_PMA dv Sv39 s sig' s2
                      Hkle Hkle2 Hrd0 Hopcas Lcp Heff Hpml Htm Hal Htr Hea Hrdm Hwv'). }
-          iDestruct "Hgpr" as "[%Hdom Hmap]".
-          iAssert (gpr_file g) with "[Hmap]" as "Hgpr". { iSplit; [iPureIntro; exact Hdom | iExact "Hmap"]. }
-          iDestruct (gpr_file_acc g rd Hdom Hrd0 with "Hgpr") as "[Hrdf Hins]".
+          iDestruct (gpr_file_acc g rd Hrd0 with "Hgpr") as "[Hrdf Hins]".
           iDestruct "Hrdf" as (v0) "Hrdf".
           iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) v0 nv with "Hreg Hrdf") as "[Hreg Hrdf]".
           iDestruct ("Hins" $! nv with "Hrdf") as "Hgpr".
@@ -6959,7 +6949,7 @@ Section AmoEngine16.
   Context `{CID : CpuId}.
 
   Lemma mem_exec_amo_16 (pt : uptd) (op : amoop) (aq rl : bool)
-      (rs2 rs1 rd : mword 5) (g : gmap regidx (mword 64)) (s : mstate) :
+      (rs2 rs1 rd : mword 5) (g : regfile) (s : mstate) :
     register_lookup cur_privilege s.(sregs) = User ->
     user_mstatus_ok (register_lookup mstatus s.(sregs)) ->
     register_lookup misa s.(sregs) = MISA_C ->
@@ -6968,7 +6958,7 @@ Section AmoEngine16.
     register_lookup htif_tohost_base s.(sregs) = None ->
     pma_allows_all (register_lookup pma_regions s.(sregs)) ->
     mstate_interp s -∗ gpr_file g -∗ user_pt_inv pt ==∗
-    ((∃ (g' : gmap regidx (mword 64)) (s_x : mstate),
+    ((∃ (g' : regfile) (s_x : mstate),
         ⌜exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, 16, Regidx rd))) s = Some (RETIRE_SUCCESS, s_x)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) s_x.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
         ⌜register_lookup nextPC s_x.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
@@ -7060,13 +7050,11 @@ Section AmoEngine16.
               apply Tr; exact Hne1
             | unfold s2; cbn [sregs]; apply Tr; exact Hne1 ]. }
         (* the register file after the pair write *)
-        iDestruct "Hgpr" as "[%Hdom Hmap]".
-        iAssert (gpr_file g) with "[Hmap]" as "Hgpr". { iSplit; [iPureIntro; exact Hdom | iExact "Hmap"]. }
         destruct (generic_neq (Regidx rd) zreg) eqn:Hz.
         * (* rd <> 0: rd (and maybe rd+1) written *)
           assert (Hrd0 : uint rd <> 0) by (apply Z.eqb_neq; apply neq_rd_zreg_uint; exact Hz).
           set (nvlo := regval_into_reg (subrange_vec_dec D (Z.sub xlen 1) 0)).
-          iDestruct (gpr_file_acc g rd Hdom Hrd0 with "Hgpr") as "[Hrdf Hins]".
+          iDestruct (gpr_file_acc g rd Hrd0 with "Hgpr") as "[Hrdf Hins]".
           iDestruct "Hrdf" as (v0) "Hrdf".
           iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) v0 nvlo with "Hreg Hrdf") as "[Hreg Hrdf]".
           iDestruct ("Hins" $! nvlo with "Hrdf") as "Hgpr".
@@ -7088,9 +7076,7 @@ Section AmoEngine16.
           -- (* rd+1 <> 0: both rd and rd+1 written *)
             apply Z.eqb_neq in Hrd1.
             set (nvhi := regval_into_reg (subrange_vec_dec D (Z.sub (Z.mul xlen 2) 1) xlen)).
-            assert (Hdom1 : forall r : regidx, r ∈ dom (<[Regidx rd := nvlo]> g)).
-            { intro r. rewrite dom_insert_L. apply elem_of_union_r. exact (Hdom r). }
-            iDestruct (gpr_file_acc (<[Regidx rd := nvlo]> g) (add_vec_int rd 1) Hdom1 Hrd1 with "Hgpr") as "[Hr1f Hins1]".
+            iDestruct (gpr_file_acc (<[Regidx rd := nvlo]> g) (add_vec_int rd 1) Hrd1 with "Hgpr") as "[Hr1f Hins1]".
             iDestruct "Hr1f" as (v1) "Hr1f".
             iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint (add_vec_int rd 1)))) v1 nvhi with "Hreg Hr1f") as "[Hreg Hr1f]".
             iDestruct ("Hins1" $! nvhi with "Hr1f") as "Hgpr".
@@ -7166,7 +7152,7 @@ End AmoEngine16.
 (* ===================================================================== *)
 Lemma arm_AMO_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (w : mword 32)
+    (g : regfile) (w : mword 32)
     (op : amoop) (aq rl : bool) (rs2 rs1 rd : regidx) (width : word_width_wide) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   (width = 1 \/ width = 2 \/ width = 4 \/ width = 8 \/ width = 16) ->
@@ -7681,7 +7667,7 @@ End ZicbopExec.
 
 Lemma arm_ZICBOP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : gmap regidx (mword 64)) (w : mword 32)
+    (g : regfile) (w : mword 32)
     (p : cbop_zicbop * regidx * bits 12) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
   exec (ext_decode w) sigma_f = Some (ZICBOP p, sigma_f) ->

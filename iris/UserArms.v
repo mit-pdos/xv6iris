@@ -61,7 +61,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import MinstretInv WpGpr.
+Require Import MinstretInv WpGpr RegFile.
 Require Import WpLeafCommon WpIntrCore.
 Require Import UserPtTree UserExec UserStep UserTrap UserCompute.
 Local Open Scope Z_scope.
@@ -82,7 +82,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Lemma retire_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
-      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+      (g : regfile) (mst : mword 64) (mi : bool) :
     user_mstatus_ok ms_v ->
     register_lookup cur_privilege σ.(sregs) = User ->
     register_lookup mstatus σ.(sregs) = ms_v ->
@@ -173,7 +173,7 @@ Section UserArms.
   (* trap tower overwrites it with the handler base).                       *)
   (* ------------------------------------------------------------------- *)
   Definition execute_trap_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) : iProp Σ :=
+      (g : regfile) : iProp Σ :=
     (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗
      gpr_file g -∗
@@ -181,7 +181,7 @@ Section UserArms.
      user_pt_inv pt -∗
      user_cfg C -∗
      |={E}=>
-       ∃ (ib : mword 32) (s_x : mstate) (g' : gmap regidx (mword 64))
+       ∃ (ib : mword 32) (s_x : mstate) (g' : regfile)
          (e : ExceptionType) (xv pcx va' : mword 64),
          ⌜exec (run_hart_active 0) σ
             = Some (Step_Execute
@@ -205,7 +205,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Lemma execute_trap_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
-      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+      (g : regfile) (mst : mword 64) (mi : bool) :
     user_mstatus_ok ms_v ->
     register_lookup cur_privilege σ.(sregs) = User ->
     register_lookup mstatus σ.(sregs) = ms_v ->
@@ -345,7 +345,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Lemma fetch_fault_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
-      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+      (g : regfile) (mst : mword 64) (mi : bool) :
     user_mstatus_ok ms_v ->
     register_lookup cur_privilege σ.(sregs) = User ->
     register_lookup mstatus σ.(sregs) = ms_v ->
@@ -481,7 +481,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Lemma illegal_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
-      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+      (g : regfile) (mst : mword 64) (mi : bool) :
     user_mstatus_ok ms_v ->
     register_lookup cur_privilege σ.(sregs) = User ->
     register_lookup mstatus σ.(sregs) = ms_v ->
@@ -614,7 +614,7 @@ Section UserArms.
   (* ------------------------------------------------------------------- *)
   Lemma enter_wait_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
-      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+      (g : regfile) (mst : mword 64) (mi : bool) :
     user_mstatus_ok ms_v ->
     register_lookup cur_privilege σ.(sregs) = User ->
     register_lookup mstatus σ.(sregs) = ms_v ->

@@ -18,7 +18,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WireInv WpGpr UserBits AlignBits.
+Require Import MinstretInv WireInv WpGpr RegFile UserBits AlignBits.
 Require Import WpLeafCommon WpIntrCore SmodeCore.
 Require Import TrampPt KptTree UptTree.
 Require Import UserPtTree UserExec UserStep UserStepFull UserTrap UserCompute UserArms.
@@ -155,7 +155,7 @@ Section UserActiveClass.
   (*     [active_step_obligation] by routing to the right producer.        *)
   (* ------------------------------------------------------------------- *)
   Lemma active_obligations (Ei : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) (ms_v : mword 64) :
+      (g : regfile) (ms_v : mword 64) :
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
     upt_acc_wf pt.(ud_um) ->

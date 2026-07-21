@@ -24,7 +24,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import MinstretInv WireInv WpGpr.
+Require Import MinstretInv WireInv WpGpr RegFile.
 Require Import WpIntrCore.
 Require Import UserPtTree UserExec UserStep UserTrap.
 Local Open Scope Z_scope.
@@ -43,7 +43,7 @@ Section UserStepFull.
   (* ------------------------------------------------------------------- *)
   Lemma interrupt_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (i : InterruptType)
-      (ms_v sc_v stval_v sepc_v va : mword 64) (g : gmap regidx (mword 64))
+      (ms_v sc_v stval_v sepc_v va : mword 64) (g : regfile)
       (mst : mword 64) (mi : bool) (misa0 : type_of_register misa) (elpv : mword 1)
       (meip seip : mword 1) :
     user_mstatus_ok ms_v ->
@@ -174,7 +174,7 @@ Section UserStepFull.
      the fetch-fault arms, UserArms.v) consume. *)
   Definition active_class (Ei : coPset) (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (∀ (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
-          (g : gmap regidx (mword 64)),
+          (g : regfile),
         ⌜user_mstatus_ok ms_v⌝ -∗
         ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
         ⌜register_lookup mstatus σ.(sregs) = ms_v⌝ -∗

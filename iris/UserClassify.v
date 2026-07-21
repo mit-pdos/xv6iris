@@ -7,7 +7,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import MinstretInv WpGpr.
+Require Import MinstretInv WpGpr RegFile.
 Require Import WpLeafCommon WpIntrCore.
 Require Import UserPtTree UserExec UserStep UserTrap.
 Local Open Scope Z_scope.
@@ -39,11 +39,11 @@ Section UserClassify.
   (* ONE obligation for the whole active step: run_hart_active produces a
      classified outcome, invariants + gpr + nextPC re-established. *)
   Definition active_step_obligation (E : coPset) (σ : mstate) (va : mword 64)
-      (g : gmap regidx (mword 64)) : iProp Σ :=
+      (g : regfile) : iProp Σ :=
     (⌜u_step_pre σ va⌝ -∗
      mstate_interp σ -∗ gpr_file g -∗ nextPC ↦ᵣ va -∗ user_pt_inv pt -∗ user_cfg C -∗
      |={E}=>
-       ∃ (st : Step) (s_x : mstate) (g' : gmap regidx (mword 64)) (va' : mword 64),
+       ∃ (st : Step) (s_x : mstate) (g' : regfile) (va' : mword 64),
          ⌜exec (run_hart_active 0) σ = Some (st, s_x)⌝ ∗
          ⌜u_step_outcome st⌝ ∗
          ⌜register_lookup (R_bool minstret_increment) s_x.(sregs)
@@ -57,7 +57,7 @@ Section UserClassify.
   Lemma deliver_user_trap (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ s_x : mstate) (c : TrapCause) (info : option (mword 64))
       (pcx ms_v sc_v stval_v sepc_v va va' : mword 64)
-      (elp0 : mword 1) (mst : mword 64) (b : bool) (g : gmap regidx (mword 64)) :
+      (elp0 : mword 1) (mst : mword 64) (b : bool) (g : regfile) :
     user_mstatus_ok ms_v ->
     register_lookup elp s_x.(sregs) = elp0 ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -110,7 +110,7 @@ Section UserClassify.
      trap-family outcomes share [deliver_user_trap]. *)
   Lemma active_step_branch (Ei : coPset) (Φ : mval -> iProp Σ)
       (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
-      (g : gmap regidx (mword 64)) (mst : mword 64) (mi : bool) :
+      (g : regfile) (mst : mword 64) (mi : bool) :
     user_mstatus_ok ms_v ->
     register_lookup cur_privilege σ.(sregs) = User ->
     register_lookup mstatus σ.(sregs) = ms_v ->

@@ -7,7 +7,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
-Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr InstrBytes RiscvModelBytes RiscvTryStep RiscvExtras SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
+Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr RegFile InstrBytes RiscvModelBytes RiscvTryStep RiscvExtras SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
 Import Defs.
 Import Defs.
 
@@ -25,7 +25,7 @@ Section WpLdGpr.
      config the load's translation / PMP checks read is recovered from the KEPT
      half of [mmode_config] + [hw_config].  [rs1<>0] (base) / [rd<>0] (dest). *)
   Lemma wp_ld_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
-      (imm : mword 12) (m : gmap regidx (mword 64)) (v : bv 64)
+      (imm : mword 12) (m : regfile) (v : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dq : dfrac} :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
@@ -71,11 +71,8 @@ Section WpLdGpr.
     iDestruct (reg_valid_dq with "Hreg Hmseccfg")  as %Lsec.
     iDestruct (reg_valid_dq with "Hreg Hpma")      as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif")     as %Lhtif.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hr1c Hfb1]".
+    iEval (rewrite -(rf_lookup m (Regidx rs1))) in "Hr1c".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) σ with "Hreg Hr1c") as %Lrs1v.
     iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
@@ -148,7 +145,7 @@ Section WpLdGpr.
       - rewrite Hpa. apply Hwh.
       - rewrite Hpa. exact (addr_is_ram_not_dev _ Hrampa).
       - intros j Hj. rewrite Hpa. exact (Hbytesf j Hj). }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg v) with "Hreg Hrdc")
@@ -156,6 +153,7 @@ Section WpLdGpr.
     iDestruct ("Hfins" $! (regval_into_reg v) with "[Hrdc]")
       as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg v)).
@@ -179,7 +177,7 @@ Section WpLdGpr.
     { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbw").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. intro r. rewrite rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
   Qed.
 
@@ -191,7 +189,7 @@ Section MmodeLoadTor.
   Context `{CID : CpuId}.
 
   Lemma wp_ld_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
-      (imm : mword 12) (m : gmap regidx (mword 64)) (v : bv 64)
+      (imm : mword 12) (m : regfile) (v : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) {dq : dfrac} :
     let offset := sign_extend' 64 imm in
@@ -238,11 +236,8 @@ Section MmodeLoadTor.
     iDestruct (reg_valid_dq with "Hreg Hmseccfg")  as %Lsec.
     iDestruct (reg_valid_dq with "Hreg Hpma")      as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif")     as %Lhtif.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
+    iDestruct (big_sepM_lookup_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rs1)) with "Hfmap") as "[Hr1c Hfb1]".
+    iEval (rewrite -(rf_lookup m (Regidx rs1))) in "Hr1c".
     iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) σ with "Hreg Hr1c") as %Lrs1v.
     iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
@@ -320,7 +315,7 @@ Section MmodeLoadTor.
       - rewrite Hpa. apply Hwh.
       - rewrite Hpa. exact (addr_is_ram_not_dev _ Hrampa).
       - intros j Hj. rewrite Hpa. exact (Hbytesf j Hj). }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (big_sepM_insert_acc _ _ _ _ (rf_to_gmap_lookup m (Regidx rd)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg v) with "Hreg Hrdc")
@@ -328,6 +323,7 @@ Section MmodeLoadTor.
     iDestruct ("Hfins" $! (regval_into_reg v) with "[Hrdc]")
       as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
                (regval_into_reg v)).
@@ -351,13 +347,13 @@ Section MmodeLoadTor.
     { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
     iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] [Hfmap] Hbw").
     iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
+    { iPureIntro. intro r. rewrite rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Hdom. }
     iExact "Hfmap".
   Qed.
 
 
   Lemma wp_cldsp_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 6)
-      (rd : mword 5) (m : gmap regidx (mword 64)) (v : bv 64)
+      (rd : mword 5) (m : regfile) (v : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) {dq : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in

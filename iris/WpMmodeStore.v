@@ -1,6 +1,7 @@
 (* M-mode Store leaf lemmas (mmode_config, decode family).
    Relocated from WpGpr*.v; helpers in WpMmodeLeafBase. *)
 Require Import WpMmodeLeafBase.
+Require Import RegFile.
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -28,7 +29,7 @@ Section WpStoreGpr.
      KEPT half of [mmode_config] + [hw_config].  No register is written ([gpr_file]
      is handed back UNCHANGED). *)
   Lemma wp_store_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
-      (imm : mword 12) (m : gmap regidx (mword 64)) (vold : bv 64)
+      (imm : mword 12) (m : regfile) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
@@ -52,7 +53,7 @@ Section WpStoreGpr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros offset ea Hpmp.
-    iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbw Hcont".
+    iIntros "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -73,20 +74,16 @@ Section WpStoreGpr.
     iDestruct (reg_valid_dq with "Hreg Hmseccfg")  as %Lsec.
     iDestruct (reg_valid_dq with "Hreg Hpma")      as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif")     as %Lhtif.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
     (* read rs1 (base) -- borrow, read, return *)
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hr1c") as %Lrs1v.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 _ s_pc with "Hreg Hr1c") as %Lrs1v.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
     (* read rs2 (data) -- independent borrow; rs1 = rs2 is fine *)
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm2 with "Hfmap") as "[Hr2c Hfb2]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hr2c") as %Lrs2v.
-    iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hr2c Hfb2]".
+    iDestruct (gpr_pt_value rs2 _ s_pc with "Hreg Hr2c") as %Lrs2v.
+    iDestruct ("Hfb2" with "Hr2c") as "Hfile".
     iAssert (⌜addr_is_ram ea⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -163,10 +160,7 @@ Section WpStoreGpr.
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iAssert (ea ↦₈ (m !!! Regidx rs2))%I with "[Hbytes]" as "Hbw".
     { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbw").
-    iSplitR.
-    { iPureIntro. exact Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfile Hbw").
   Qed.
 End WpStoreGpr.
 
@@ -176,7 +170,7 @@ Section MmodeStoreTor.
   Context `{CID : CpuId}.
 
   Lemma wp_store_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
-      (imm : mword 12) (m : gmap regidx (mword 64)) (vold : bv 64)
+      (imm : mword 12) (m : regfile) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) :
     let offset := sign_extend' 64 imm in
@@ -200,7 +194,7 @@ Section MmodeStoreTor.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros offset ea Hpmp Htor.
-    iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+    iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -222,18 +216,14 @@ Section MmodeStoreTor.
     iDestruct (reg_valid_dq with "Hreg Hmseccfg")  as %Lsec.
     iDestruct (reg_valid_dq with "Hreg Hpma")      as %Lpma.
     iDestruct (reg_valid_dq with "Hreg Hhtif")     as %Lhtif.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hm2 : m !! Regidx rs2 = Some (m !!! Regidx rs2))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hr1c") as %Lrs1v.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm2 with "Hfmap") as "[Hr2c Hfb2]".
-    iDestruct (gpr_pt_value rs2 (m !!! Regidx rs2) s_pc with "Hreg Hr2c") as %Lrs2v.
-    iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 _ s_pc with "Hreg Hr1c") as %Lrs1v.
+    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hr2c Hfb2]".
+    iDestruct (gpr_pt_value rs2 _ s_pc with "Hreg Hr2c") as %Lrs2v.
+    iDestruct ("Hfb2" with "Hr2c") as "Hfile".
     iAssert (⌜addr_is_ram ea⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
@@ -313,16 +303,13 @@ Section MmodeStoreTor.
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iAssert (ea ↦₈ (m !!! Regidx rs2))%I with "[Hbytes]" as "Hbw".
     { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
-    iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] [Hfmap] Hbw").
-    iSplitR.
-    { iPureIntro. exact Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] Hfile Hbw").
   Qed.
 
   (* ---- c.ldsp rd, uimm(sp), TOR-aware ---- *)
 
   Lemma wp_csdsp_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 6)
-      (rs2 : mword 5) (m : gmap regidx (mword 64)) (vold : bv 64)
+      (rs2 : mword 5) (m : regfile) (vold : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in

@@ -38,7 +38,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import InstrBytes WpGpr.
+Require Import InstrBytes WpGpr RegFile.
 Require Import WpSmodeSret WpIntrBits WpIntrCore.
 Require Import UptTree UserPtTree UserExec.
 Local Open Scope Z_scope.
@@ -83,7 +83,7 @@ Section UserKernelBridge.
       (stv medeleg_v mip_v : mword 64)
       (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (mstateen0v : mword 64) (sstateen0v : mword 32)
-      (g : gmap regidx (mword 64)) :
+      (g : regfile) :
     (* mstatus pins on the pre-sret value (FS/VS = Off: FP/vector disabled --
        the user machine runs with the FP and vector units off, an invariant
        [user_mstatus_ok] now carries and the kernel establishes) *)
@@ -182,7 +182,7 @@ Section UserKernelBridge.
   (* -------------------------------------------------------------------- *)
   Lemma user_trap_frame_open (C : ucfg) (pt : uptd) :
     user_trap_frame C pt -∗
-    ∃ (ms_v sc_v stval_v sepc_v : mword 64) (g : gmap regidx (mword 64)),
+    ∃ (ms_v sc_v stval_v sepc_v : mword 64) (g : regfile),
       ⌜trap_mstatus_ok ms_v⌝ ∗
       hart_state ↦ᵣ HART_ACTIVE tt ∗
       cur_privilege ↦ᵣ Supervisor ∗

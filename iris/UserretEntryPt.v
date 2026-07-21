@@ -25,6 +25,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
+Require Import RegFile.
 Require Import WpGpr WpGprCsrwB.
 Require Import SmodePte PtTree.
 Require Import SmodeCore KptTree UptTree.
@@ -41,7 +42,7 @@ Section UserretEntryPt.
 
   Lemma wp_userret_entry_pt (kroot uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (usatp : mword 64)
+      (m : regfile) (usatp : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     (* S-mode config *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -53,7 +54,7 @@ Section UserretEntryPt.
     menvcfg0 = MENVCFG_S ->
     upt_map_wf um ->
     (* a0 holds the USER satp value *)
-    m !! Regidx (mword_of_int 10) = Some usatp ->
+    m !!! Regidx (mword_of_int 10) = usatp ->
     _get_Satp64_Mode (Mk_Satp64 usatp) = ('b"1000" : mword 4) ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) usatp : mword 64)) = (mword_of_int 0 : mword 16) ->
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) usatp : mword 64)) = uroot ->
@@ -87,7 +88,7 @@ Section UserretEntryPt.
   Proof.
     intros HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ha0 HuMode Huasid Huppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hufr [Hpc Hnpc]
-             [%Hdom Hfmap] Hi1 Hi2 Hi3 Hcont".
+             Hfmap Hi1 Hi2 Hi3 Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -176,18 +177,13 @@ Section UserretEntryPt.
     assert (Lmisa2p : register_lookup misa s_pc2.(sregs) = misa0)
       by (unfold s_pc2; tmig; exact Lmisa2).
     (* a0's value at the executing state *)
-    assert (Hmsp : m !! Regidx (mword_of_int 10 : mword 5)
-                   = Some (m !!! Regidx (mword_of_int 10 : mword 5)))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hmsp with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value (mword_of_int 10) (m !!! Regidx (mword_of_int 10 : mword 5)) s_pc2
+    iDestruct (gpr_file_lookup_acc m (Regidx (mword_of_int 10 : mword 5)) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value (mword_of_int 10) (m (Regidx (mword_of_int 10 : mword 5))) s_pc2
                  with "Hreg Hspc") as %Lva2.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
-    assert (Hma0v : m !!! Regidx (mword_of_int 10 : mword 5) = usatp)
-      by (apply lookup_total_correct; exact Ha0).
     replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false in Lva2
       by (vm_compute; reflexivity).
-    rewrite Hma0v in Lva2.
+    rewrite -rf_lookup Ha0 in Lva2.
     pose proof (exec_execute_csrw_satp_S (mword_of_int 10) s_pc2
                   ltac:(vm_compute; lia) Lpriv2p
                   ltac:(rewrite Lms2p; exact HTVM)
@@ -269,9 +265,7 @@ Section UserretEntryPt.
     iEval (rewrite Lnpc3) in "Hpc".
     iNext.
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hkfr
-                          [$Hpc $Hnpc] [Hfmap]").
-    iSplitR; [iPureIntro; exact Hdom |].
-    iExact "Hfmap".
+                          [$Hpc $Hnpc] Hfmap").
   Qed.
 
 End UserretEntryPt.

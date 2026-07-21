@@ -5,7 +5,7 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr RegFile.
 Require Import InstrBytes.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
@@ -86,7 +86,7 @@ Section Wp_slli.
   Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_slli_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -104,32 +104,28 @@ Section Wp_slli.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
     iApply (wp_instr Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) pmpcfg0
               Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1))
                  (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))) with "Hreg Hr1c") as %Hrv.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
     assert (Hav : gpr_slli_val rs1 shamt (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                   = shift_bits_left (m !!! Regidx rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)).
     { unfold gpr_slli_val, gpr_src. rewrite Hrv. reflexivity. }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd)
+                 (regval_into_reg (shift_bits_left (m !!! Regidx rs1)
+                    (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))) with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg (shift_bits_left (m !!! Regidx rs1)
                (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (shift_bits_left (m !!! Regidx rs1)
-               (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))
-                 with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
@@ -152,10 +148,7 @@ Section Wp_slli.
              = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
   Qed.
 End Wp_slli.
 
@@ -165,7 +158,7 @@ Section Wp_srli.
   Context `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_srli_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -183,32 +176,28 @@ Section Wp_srli.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
+    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
     iApply (wp_instr Φ pc is_rvc (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) pmpcfg0
               Hpmp with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
-    assert (Hmd : m !! Regidx rd = Some (m !!! Regidx rd))
-      by (apply lookup_lookup_total_dom; apply Hdom).
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1)
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb1]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1))
                  (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))) with "Hreg Hr1c") as %Hrv.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
+    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
     assert (Hav : gpr_srli_val rs1 shamt (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                   = shift_bits_right (m !!! Regidx rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)).
     { unfold gpr_srli_val, gpr_src. rewrite Hrv. reflexivity. }
-    iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc m (Regidx rd)
+                 (regval_into_reg (shift_bits_right (m !!! Regidx rs1)
+                    (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))) with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg (shift_bits_right (m !!! Regidx rs1)
                (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg (shift_bits_right (m !!! Regidx rs1)
-               (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)))
-                 with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iModIntro.
     iExists (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
@@ -231,9 +220,6 @@ Section Wp_srli.
              = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold set_reg; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
-    iSplitR.
-    { iPureIntro. intro r. rewrite dom_insert_L. apply elem_of_union_r. apply Hdom. }
-    iExact "Hfmap".
+    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
   Qed.
 End Wp_srli.

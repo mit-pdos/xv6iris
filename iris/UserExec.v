@@ -59,6 +59,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpGpr.
+Require Import RegFile.
 Require Import WpIntrCore.
 Require Import UserPtTree.
 Local Open Scope Z_scope.
@@ -254,7 +255,7 @@ Section UserExec.
      [user_inv] and the unpacked step obligations) *)
   Definition user_regs (hs : HartState)
       (ms_v sc_v stval_v sepc_v va va' : mword 64)
-      (g : gmap regidx (mword 64)) : iProp Σ :=
+      (g : regfile) : iProp Σ :=
     (hart_state ↦ᵣ hs ∗
      cur_privilege ↦ᵣ User ∗
      mstatus ↦ᵣ ms_v ∗
@@ -267,7 +268,7 @@ Section UserExec.
 
   Definition user_inv : iProp Σ :=
     (∃ (hs : HartState) (ms_v sc_v stval_v sepc_v va va' : mword 64)
-       (g : gmap regidx (mword 64)),
+       (g : regfile),
       ⌜user_hart_ok hs⌝ ∗
       ⌜user_mstatus_ok ms_v⌝ ∗
       ⌜forall u, hs = HART_ACTIVE u -> va' = va⌝ ∗
@@ -285,7 +286,7 @@ Section UserExec.
   (* ------------------------------------------------------------------- *)
   Definition user_trap_frame : iProp Σ :=
     (∃ (ms_v sc_v stval_v sepc_v : mword 64)
-       (g : gmap regidx (mword 64)),
+       (g : regfile),
       ⌜trap_mstatus_ok ms_v⌝ ∗
       hart_state ↦ᵣ HART_ACTIVE tt ∗
       cur_privilege ↦ᵣ Supervisor ∗
@@ -301,7 +302,7 @@ Section UserExec.
   (* assemble the trapped frame from the delivered cells (shared by every
      trap arm -- the values differ, the shape never does) *)
   Lemma user_trap_frame_intro (ms' sc' stv' sep' : mword 64)
-      (g : gmap regidx (mword 64)) :
+      (g : regfile) :
     trap_mstatus_ok ms' ->
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -341,7 +342,7 @@ Section UserExec.
      left to prove) *)
   Definition user_step_obligation_active (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (∀ (ms_v sc_v stval_v sepc_v va : mword 64)
-          (g : gmap regidx (mword 64)),
+          (g : regfile),
         ⌜user_mstatus_ok ms_v⌝ -∗
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         user_pt_inv pt -∗

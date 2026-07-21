@@ -1,6 +1,7 @@
 (* M-mode Mret leaf lemmas (mmode_config, decode family).
    Relocated from WpGpr*.v; helpers in WpMmodeLeafBase. *)
 Require Import WpMmodeLeafBase.
+Require Import RegFile.
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -28,7 +29,7 @@ Section WpMretGpr.
   Lemma wp_mret_gpr (Φ : mval -> iProp Σ) (pc : mword 64)
       (newpriv : Privilege)
       (ms_cur mepc0 menvcfg1 : mword 64)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms_cur) ('b"1") = false ->

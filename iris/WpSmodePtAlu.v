@@ -16,6 +16,7 @@ Require Import SRegime.
 Require Import SmodeCore WpAuipc.
 Require Import WpMmodeLeafBase WpMmodeShiftiop.
 Require Import KptTree WpSmodePtLeaves.
+Require Import RegFile.
 Import Defs.
 
 Section WpSmodePtAlu.
@@ -26,7 +27,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_addi4_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -70,7 +71,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_addi4_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
@@ -100,7 +101,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddi4spn_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -145,7 +146,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddi4spn_gpr_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     creg2reg_idx rdc = Regidx rd ->
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -176,7 +177,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddi_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -223,7 +224,7 @@ Section WpSmodePtAlu.
      [wp_caddi_gpr_s_config_pt] with [rd := csp_rs1] and [caddi16sp_imm imm6]. *)
   Lemma wp_caddi16sp_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm6 : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -268,7 +269,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddi_gpr_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)) -∗
@@ -298,7 +299,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_candi_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -342,7 +343,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_candi_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ANDI)) -∗
@@ -372,7 +373,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cli_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -423,7 +424,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cli_gpr_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗
@@ -454,7 +455,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddi4spn_gpr_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     creg2reg_idx rdc = Regidx rd ->
     uint rd <> 0 ->
     smode_config γ dq -∗
@@ -487,7 +488,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddi_gpr_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗
     sr_inv R -∗
@@ -519,7 +520,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_sltiu_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     zero_extend' 64 (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (sign_extend' 64 imm))) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -546,7 +547,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cadd_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -592,7 +593,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cmv_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -639,7 +640,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cmv_gpr_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) -∗
@@ -668,7 +669,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cmv_gpr_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs2 : mword 5)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗
     sr_inv R -∗
@@ -699,7 +700,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_sltu_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     zero_extend' 64 (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2))) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -723,7 +724,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cor_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     or_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -747,7 +748,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_sub_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -774,7 +775,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_add_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     add_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -801,7 +802,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_or_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     or_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -829,7 +830,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_auipc_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -872,7 +873,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_auipc_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (UTYPE (imm, Regidx rd, AUIPC)) -∗
@@ -901,7 +902,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_clui_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     luival imm = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -928,7 +929,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddiw_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -974,7 +975,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_caddiw_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc true (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd)) -∗
@@ -1007,7 +1008,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cslli_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rsd : regidx) (rd : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1051,7 +1052,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cslli_gpr_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rsd : regidx) (rd : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     rsd = Regidx rd ->
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -1082,7 +1083,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_csrli_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (crsd : cregidx) (rd : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1126,7 +1127,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_csrli_gpr_s_config_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (crsd : cregidx) (rd : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     creg2reg_idx crsd = Regidx rd ->
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -1157,7 +1158,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_srli4_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -1201,7 +1202,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_srli4_s_scfg_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv R -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) -∗
@@ -1231,7 +1232,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_slli_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     shift_bits_left (m !!! Regidx rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -1259,7 +1260,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_srl_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     shift_bits_right (m !!! Regidx rs1)
       (subrange_vec_dec (m !!! Regidx rs2) (Z.sub log2_xlen 1) 0) = wval ->
@@ -1284,7 +1285,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_andi_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     and_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -1309,7 +1310,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_ori_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     or_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -1334,7 +1335,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_cslli_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (shamt : mword 6) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     shift_bits_left (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) = wval ->
     smode_config γ dq -∗ sr_inv R -∗
@@ -1359,7 +1360,7 @@ Section WpSmodePtAlu.
 
   Lemma wp_csrli_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (shamt : mword 6) (wval : mword 64)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     shift_bits_right (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) = wval ->
     smode_config γ dq -∗ sr_inv R -∗

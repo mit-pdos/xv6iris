@@ -21,7 +21,7 @@ From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec RegFile WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpGprCsrwCommon WpGprCsrwA.
 Local Open Scope Z_scope.
@@ -299,7 +299,7 @@ Section WpCsrwGprNewC.
      needing the old invariant fact here), no old-value MIE/MPRV fact is
      threaded through. ---- *)
   Lemma wp_csrw_mstatus_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
     mmode_config (DfracOwn 1) -∗
@@ -335,8 +335,8 @@ Section WpCsrwGprNewC.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
@@ -382,7 +382,7 @@ Section WpCsrwGprNewC.
      instructions that follow.  mstatus is unchanged, so the continuation gets
      an opaque REBUILT [mmode_config (DfracOwn 1)]. ---- *)
   Lemma wp_csrw_pmpcfg0_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
-      (m : gmap regidx (mword 64))
+      (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
     mmode_config (DfracOwn 1) -∗
@@ -407,8 +407,8 @@ Section WpCsrwGprNewC.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hpmpc") as %Lcfg.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
@@ -452,7 +452,7 @@ Section WpCsrwGprNewC.
      value -- no re-quantification over a hidden old value, so the chain
      keeps a single mstatus symbol end-to-end. ---- *)
   Lemma wp_csrw_mstatus_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
-      (m : gmap regidx (mword 64)) (ms0 : mword 64)
+      (m : regfile) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
@@ -487,8 +487,8 @@ Section WpCsrwGprNewC.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".
@@ -532,7 +532,7 @@ Section WpCsrwGprNewC.
      it without a fresh existential.  pmpcfg_n itself is FULL (it is the
      written cell); the continuation receives the concrete written value. ---- *)
   Lemma wp_csrw_pmpcfg0_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
-      (m : gmap regidx (mword 64)) (ms0 : mword 64)
+      (m : regfile) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
@@ -562,8 +562,8 @@ Section WpCsrwGprNewC.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hpmpc") as %Lcfg.
-    assert (Hm1 : m !! Regidx rs1 = Some (m !!! Regidx rs1))
-      by (apply lookup_lookup_total_dom; apply Hdom).
+    assert (Hm1 : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+      by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hm1 with "Hfmap") as "[Hr1c Hfb1]".

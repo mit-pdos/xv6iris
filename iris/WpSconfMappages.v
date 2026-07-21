@@ -16,6 +16,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SRegime SmodeCore.
 Require Import InstrBytes KernelText WpAuipc.
 Require Import WpGpr WpMycpu WpLock WpMmodeLeafBase.
+Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import KptTree.
 Require Import IntrDefs WpIntrInv WpSmodeIntr WpIntenaBits.
@@ -41,12 +42,15 @@ Section WpSconfMappages.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
+  (* upd_ne/upd_eg lemma peel (values stay opaque) — safe even for a symbolic
+     HIT like [F !!! csp = spr]; a bare reg_lookup/vm_compute would hang on the
+     add_vec.  Compact over the transparent rf_upd spine (~2.5x faster than gmap). *)
   Ltac peel_reg :=
     repeat first
-      [ rewrite lookup_total_insert
-      | rewrite lookup_total_insert_ne; [| reg_neq]
+      [ rewrite upd_eq
+      | rewrite upd_ne; [| reg_neq]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ];
-    first [ reflexivity | assumption ].
+    reflexivity.
 
   (* the -80/+80 c.addi16sp frame cancel *)
   Lemma mappages_sp_cancel (X : mword 64) :
@@ -69,7 +73,7 @@ Section WpSconfMappages.
   (* ---- Local base-width OR / ORI sconf leaves (missing from the library) ---- *)
   Lemma wp_or_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 -> rd <> csp_rs1 ->
     or_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -95,7 +99,7 @@ Section WpSconfMappages.
 
   Lemma wp_ori_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
-      (m : gmap regidx (mword 64)) (n : nat) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 -> rd <> csp_rs1 ->
     or_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = wval ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -125,7 +129,7 @@ Section WpSconfMappages.
   (* ================================================================= *)
   Lemma wp_mappages_epilogue_sconf (γ : gname) (root_ppn : mword 44) (γa : gname)
       (Φ : mval -> iProp Σ)
-      (mm Mf : gmap regidx (mword 64)) (t tf : ptree)
+      (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
@@ -161,7 +165,7 @@ Section WpSconfMappages.
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree) (k' : nat),
+    ( ∀ (mr : regfile) (t' : ptree) (k' : nat),
       sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
       sie_cap γ root_ppn mr K -∗ intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
@@ -237,7 +241,7 @@ Section WpSconfMappages.
     assert (Hpp9cn : add_vec_int (mword_of_int (MP + 0x9c) : mword 64) 2 = mword_of_int (MP + 0x9e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp9cn) in "Hpc".
     assert (HspE1 : E1 !!! Regidx csp_rs1 = spr).
-    { rewrite /E1. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE0. }
+    { rewrite /E1. rewrite upd_ne; [| reg_neq]. exact HspE0. }
     (* +0x9e c.ldsp x8,64(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x9e)) (mword_of_int 8 : mword 6) (mword_of_int 8 : mword 5)
               E1 (K - 10)%nat (mm !!! Regidx (mword_of_int 8 : mword 5))
@@ -250,7 +254,7 @@ Section WpSconfMappages.
     assert (Hpp9en : add_vec_int (mword_of_int (MP + 0x9e) : mword 64) 2 = mword_of_int (MP + 0xa0)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp9en) in "Hpc".
     assert (HspE2 : E2 !!! Regidx csp_rs1 = spr).
-    { rewrite /E2. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE1. }
+    { rewrite /E2. rewrite upd_ne; [| reg_neq]. exact HspE1. }
     (* +0xa0 c.ldsp x9,56(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0xa0)) (mword_of_int 7 : mword 6) (mword_of_int 9 : mword 5)
               E2 (K - 10)%nat (mm !!! Regidx (mword_of_int 9 : mword 5))
@@ -263,7 +267,7 @@ Section WpSconfMappages.
     assert (Hppa0n : add_vec_int (mword_of_int (MP + 0xa0) : mword 64) 2 = mword_of_int (MP + 0xa2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa0n) in "Hpc".
     assert (HspE3 : E3 !!! Regidx csp_rs1 = spr).
-    { rewrite /E3. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE2. }
+    { rewrite /E3. rewrite upd_ne; [| reg_neq]. exact HspE2. }
     (* +0xa2 c.ldsp x18,48(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0xa2)) (mword_of_int 6 : mword 6) (mword_of_int 18 : mword 5)
               E3 (K - 10)%nat (mm !!! Regidx (mword_of_int 18 : mword 5))
@@ -276,7 +280,7 @@ Section WpSconfMappages.
     assert (Hppa2n : add_vec_int (mword_of_int (MP + 0xa2) : mword 64) 2 = mword_of_int (MP + 0xa4)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa2n) in "Hpc".
     assert (HspE4 : E4 !!! Regidx csp_rs1 = spr).
-    { rewrite /E4. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE3. }
+    { rewrite /E4. rewrite upd_ne; [| reg_neq]. exact HspE3. }
     (* +0xa4 c.ldsp x19,40(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0xa4)) (mword_of_int 5 : mword 6) (mword_of_int 19 : mword 5)
               E4 (K - 10)%nat (mm !!! Regidx (mword_of_int 19 : mword 5))
@@ -289,7 +293,7 @@ Section WpSconfMappages.
     assert (Hppa4n : add_vec_int (mword_of_int (MP + 0xa4) : mword 64) 2 = mword_of_int (MP + 0xa6)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa4n) in "Hpc".
     assert (HspE5 : E5 !!! Regidx csp_rs1 = spr).
-    { rewrite /E5. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE4. }
+    { rewrite /E5. rewrite upd_ne; [| reg_neq]. exact HspE4. }
     (* +0xa6 c.ldsp x20,32(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0xa6)) (mword_of_int 4 : mword 6) (mword_of_int 20 : mword 5)
               E5 (K - 10)%nat (mm !!! Regidx (mword_of_int 20 : mword 5))
@@ -302,7 +306,7 @@ Section WpSconfMappages.
     assert (Hppa6n : add_vec_int (mword_of_int (MP + 0xa6) : mword 64) 2 = mword_of_int (MP + 0xa8)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa6n) in "Hpc".
     assert (HspE6 : E6 !!! Regidx csp_rs1 = spr).
-    { rewrite /E6. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE5. }
+    { rewrite /E6. rewrite upd_ne; [| reg_neq]. exact HspE5. }
     (* +0xa8 c.ldsp x21,24(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0xa8)) (mword_of_int 3 : mword 6) (mword_of_int 21 : mword 5)
               E6 (K - 10)%nat (mm !!! Regidx (mword_of_int 21 : mword 5))
@@ -315,7 +319,7 @@ Section WpSconfMappages.
     assert (Hppa8n : add_vec_int (mword_of_int (MP + 0xa8) : mword 64) 2 = mword_of_int (MP + 0xaa)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa8n) in "Hpc".
     assert (HspE7 : E7 !!! Regidx csp_rs1 = spr).
-    { rewrite /E7. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE6. }
+    { rewrite /E7. rewrite upd_ne; [| reg_neq]. exact HspE6. }
     (* +0xaa c.ldsp x22,16(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0xaa)) (mword_of_int 2 : mword 6) (mword_of_int 22 : mword 5)
               E7 (K - 10)%nat (mm !!! Regidx (mword_of_int 22 : mword 5))
@@ -328,7 +332,7 @@ Section WpSconfMappages.
     assert (Hppaan : add_vec_int (mword_of_int (MP + 0xaa) : mword 64) 2 = mword_of_int (MP + 0xac)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppaan) in "Hpc".
     assert (HspE8 : E8 !!! Regidx csp_rs1 = spr).
-    { rewrite /E8. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE7. }
+    { rewrite /E8. rewrite upd_ne; [| reg_neq]. exact HspE7. }
     (* +0xac c.ldsp x23,8(sp) *)
     iApply (wp_cldsp_s_sconf γ root_ppn Φ (mword_of_int (MP + 0xac)) (mword_of_int 1 : mword 6) (mword_of_int 23 : mword 5)
               E8 (K - 10)%nat (mm !!! Regidx (mword_of_int 23 : mword 5))
@@ -341,12 +345,12 @@ Section WpSconfMappages.
     assert (Hppacn : add_vec_int (mword_of_int (MP + 0xac) : mword 64) 2 = mword_of_int (MP + 0xae)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppacn) in "Hpc".
     assert (HspE9 : E9 !!! Regidx csp_rs1 = spr).
-    { rewrite /E9. rewrite lookup_total_insert_ne; [| reg_neq]. exact HspE8. }
+    { rewrite /E9. rewrite upd_ne; [| reg_neq]. exact HspE8. }
     (* +0xae c.addi16sp sp,+80 -- the frame pop (feed 10 slots back into avail) *)
     set (E10 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> E9).
     assert (HspE10 : E10 !!! Regidx csp_rs1 = sp0).
-    { rewrite /E10 lookup_total_insert. rewrite HspE9. unfold spr. apply mappages_sp_cancel. }
+    { rewrite /E10 upd_eq. rewrite HspE9. unfold spr. apply mappages_sp_cancel. }
     assert (Hwv : add_vec (E9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = sp0).
     { rewrite HspE9. unfold spr. apply mappages_sp_cancel. }
     assert (Hpop : E9 !!! Regidx csp_rs1
@@ -391,16 +395,16 @@ Section WpSconfMappages.
     iEval (rewrite Hrt) in "Hpc".
     assert (HE10a0 : E10 !!! Regidx (mword_of_int 10 : mword 5) = Mf !!! Regidx (mword_of_int 10 : mword 5)).
     { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     iApply ("Hcont" $! E10 tf k with "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hptree Henv [%] [%] [%] [%]").
     { (* callee_saved mm E10 *)
       unfold callee_saved.
       split.
-      { rewrite /E10 lookup_total_insert. rewrite HspE9. unfold spr. apply mappages_sp_cancel. }
+      { rewrite /E10 upd_eq. rewrite HspE9. unfold spr. apply mappages_sp_cancel. }
       split.
       { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite lookup_total_insert_ne; [| reg_neq]). exact Htp. }
+        repeat (rewrite upd_ne; [| reg_neq]). exact Htp. }
       split.
       { peel_reg. }
       split.
@@ -419,15 +423,15 @@ Section WpSconfMappages.
       { peel_reg. }
       split.
       { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite lookup_total_insert_ne; [| reg_neq]). exact Hx24. }
+        repeat (rewrite upd_ne; [| reg_neq]). exact Hx24. }
       split.
       { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite lookup_total_insert_ne; [| reg_neq]). exact Hx25. }
+        repeat (rewrite upd_ne; [| reg_neq]). exact Hx25. }
       split.
       { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite lookup_total_insert_ne; [| reg_neq]). exact Hx26. }
+        repeat (rewrite upd_ne; [| reg_neq]). exact Hx26. }
       { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite lookup_total_insert_ne; [| reg_neq]). exact Hx27. }
+        repeat (rewrite upd_ne; [| reg_neq]). exact Hx27. }
     }
     { exact Hbase. }
     { exact Hrep. }
@@ -439,10 +443,10 @@ Section WpSconfMappages.
   (* ================================================================= *)
   Lemma wp_mappages_loop_sconf (γ : gname) (root_ppn : mword 44) (γa : gname)
       (Φ : mval -> iProp Σ)
-      (mm : gmap regidx (mword 64)) (t : ptree)
+      (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
       (rem : nat) :
-    forall (k : nat) (Mk : gmap regidx (mword 64)) (tk : ptree),
+    forall (k : nat) (Mk : regfile) (tk : ptree),
     let va := mm !!! Regidx (mword_of_int 11) in
     let pa := mm !!! Regidx (mword_of_int 13) in
     let vpn0 := svpn_of va in
@@ -496,7 +500,7 @@ Section WpSconfMappages.
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
     kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree) (k' : nat),
+    ( ∀ (mr : regfile) (t' : ptree) (k' : nat),
       sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
       sie_cap γ root_ppn mr K -∗ intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
@@ -583,31 +587,31 @@ Section WpSconfMappages.
     (* facts on the call map *)
     assert (HW4a0 : W4 !!! Regidx (mword_of_int 10 : mword 5)
                     = zero_extend' 64 (concat_vec (pt_base tk) (zeros' 12 : mword 12))).
-    { rewrite /W4. rewrite lookup_total_insert_ne; [| reg_neq].
-      rewrite /W3 lookup_total_insert.
+    { rewrite /W4. rewrite upd_ne; [| reg_neq].
+      rewrite /W3 upd_eq.
       rewrite /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       rewrite add_vec_zero_l. rewrite Hs4. rewrite Hroot. rewrite Hbase. reflexivity. }
     assert (HW4a1 : W4 !!! Regidx (mword_of_int 11 : mword 5)
                     = add_vec va (mword_of_int (4096 * Z.of_nat k))).
     { rewrite /W4 /W3.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
-      rewrite /W2 lookup_total_insert.
+      repeat (rewrite upd_ne; [| reg_neq]).
+      rewrite /W2 upd_eq.
       rewrite /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       rewrite add_vec_zero_l. exact Hs1. }
     assert (HW4a2 : W4 !!! Regidx (mword_of_int 12 : mword 5) = mword_of_int 1).
     { rewrite /W4 /W3 /W2.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
-      rewrite /W1 lookup_total_insert.
+      repeat (rewrite upd_ne; [| reg_neq]).
+      rewrite /W1 upd_eq.
       rewrite add_vec_zero_l. rewrite Hs6. reflexivity. }
     assert (HW4tp : W4 !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Htp. }
     assert (HW4sp : W4 !!! Regidx csp_rs1 = spr).
     { rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hsp. }
     assert (Hvak_u : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat k)))
                      = bv_unsigned va + 4096 * Z.of_nat k)
@@ -626,7 +630,7 @@ Section WpSconfMappages.
     iEval (rewrite HW4tp) in "Henv".
     (* pc back at +0x48 *)
     assert (Hlink : W4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (MP + 0x44) : mword 64) 4).
-    { rewrite /W4 lookup_total_insert. reflexivity. }
+    { rewrite /W4 upd_eq. reflexivity. }
     assert (Hret48 : update_vec_dec (W4 !!! Regidx (mword_of_int 1 : mword 5)) 0 ('b"0" : mword 1) = mword_of_int (MP + 0x48)).
     { rewrite Hlink. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret48) in "Hpc".
@@ -635,38 +639,38 @@ Section WpSconfMappages.
                    = add_vec va (mword_of_int (4096 * Z.of_nat k))).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 9) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hs1. }
     assert (Hmr18 : mr !!! Regidx (mword_of_int 18 : mword 5)
                     = add_vec va (mword_of_int (4096 * Z.of_nat (npages - 1)))).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 18) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hs2. }
     assert (Hmr19 : mr !!! Regidx (mword_of_int 19 : mword 5) = sub_vec pa va).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 19) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hs3. }
     assert (Hmr20 : mr !!! Regidx (mword_of_int 20 : mword 5) = mm !!! Regidx (mword_of_int 10)).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 20) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hs4. }
     assert (Hmr21 : mr !!! Regidx (mword_of_int 21 : mword 5) = mm !!! Regidx (mword_of_int 14)).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 21) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hs5. }
     assert (Hmr22 : mr !!! Regidx (mword_of_int 22 : mword 5) = mword_of_int 1).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 22) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hs6. }
     assert (Hmr23 : bv_unsigned (mr !!! Regidx (mword_of_int 23 : mword 5)) = 4096).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 23) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hs7. }
     assert (Hmrsp : mr !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hkcs csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -677,22 +681,22 @@ Section WpSconfMappages.
     assert (Hmr24 : mr !!! Regidx (mword_of_int 24 : mword 5) = mm !!! Regidx (mword_of_int 24)).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 24) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hx24. }
     assert (Hmr25 : mr !!! Regidx (mword_of_int 25 : mword 5) = mm !!! Regidx (mword_of_int 25)).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 25) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hx25. }
     assert (Hmr26 : mr !!! Regidx (mword_of_int 26 : mword 5) = mm !!! Regidx (mword_of_int 26)).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 26) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hx26. }
     assert (Hmr27 : mr !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27)).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 27) ltac:(vm_compute; reflexivity)).
       rewrite /W4 /W3 /W2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hx27. }
     (* the walk-result facts *)
     assert (Hbase' : pt_base t' = pt_base t).
@@ -737,15 +741,15 @@ Section WpSconfMappages.
       assert (Hpp9c : add_vec_int (mword_of_int (MP + 0x9a) : mword 64) 2 = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp9c) in "Hpc".
       iApply (wp_mappages_epilogue_sconf γ root_ppn γa Φ mm F1 t t' m npages k perm K lvl HK
-                ltac:(rewrite /F1; rewrite lookup_total_insert_ne; [| reg_neq]; exact Hmrsp)
-                ltac:(rewrite /F1; rewrite lookup_total_insert_ne; [| reg_neq]; exact Hmrtp)
-                ltac:(rewrite /F1; rewrite lookup_total_insert_ne; [| reg_neq]; exact Hmr24)
-                ltac:(rewrite /F1; rewrite lookup_total_insert_ne; [| reg_neq]; exact Hmr25)
-                ltac:(rewrite /F1; rewrite lookup_total_insert_ne; [| reg_neq]; exact Hmr26)
-                ltac:(rewrite /F1; rewrite lookup_total_insert_ne; [| reg_neq]; exact Hmr27)
+                ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrsp)
+                ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrtp)
+                ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr24)
+                ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr25)
+                ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr26)
+                ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr27)
                 Hbase' Hrep'
                 ltac:(right; split; [lia |];
-                      rewrite /F1 lookup_total_insert;
+                      rewrite /F1 upd_eq;
                       apply bv_eq; vm_compute; reflexivity)
                 with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile
                       Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -802,7 +806,7 @@ Section WpSconfMappages.
               M6 (K - 10)%nat
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate)
-              ltac:(rewrite /M6 lookup_total_insert; rewrite /M5 lookup_total_insert;
+              ltac:(rewrite /M6 upd_eq; rewrite /M5 upd_eq;
                     rewrite Hw0z; vm_compute; reflexivity)
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi4e [-]").
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
@@ -812,11 +816,11 @@ Section WpSconfMappages.
     assert (HM6s1 : M6 !!! Regidx (mword_of_int 9 : mword 5)
                     = add_vec va (mword_of_int (4096 * Z.of_nat k))).
     { rewrite /M6 /M5.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hmr9. }
     assert (HM6s3 : M6 !!! Regidx (mword_of_int 19 : mword 5) = sub_vec pa va).
     { rewrite /M6 /M5.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hmr19. }
     iApply (wp_add_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x50)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 19 : mword 5)
               (add_vec pa (mword_of_int (4096 * Z.of_nat k)))
@@ -871,14 +875,14 @@ Section WpSconfMappages.
     iEval (rewrite Hpp60) in "Hpc".
     (* the computed word IS the run PTE *)
     assert (HPTE : M11 !!! Regidx (mword_of_int 15 : mword 5) = mappages_pte ppn0 perm k).
-    { rewrite /M11 lookup_total_insert.
-      rewrite {1}/M10 lookup_total_insert.
-      rewrite {1}/M9 lookup_total_insert.
-      rewrite {1}/M8 lookup_total_insert.
-      rewrite {1}/M7 lookup_total_insert.
+    { rewrite /M11 upd_eq.
+      rewrite {1}/M10 upd_eq.
+      rewrite {1}/M9 upd_eq.
+      rewrite {1}/M8 upd_eq.
+      rewrite {1}/M7 upd_eq.
       assert (HM9s5 : M9 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int perm).
       { rewrite /M9 /M8 /M7 /M6 /M5.
-        repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+        repeat (rewrite upd_ne; [| reg_neq]).
         rewrite Hmr21. exact Hpermreg. }
       rewrite HM9s5.
       destruct Hpok as (Hpr & _).
@@ -899,7 +903,7 @@ Section WpSconfMappages.
     (* +0x60 c.sd a5,0(a0) *)
     assert (HM11a0 : M11 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10 : mword 5)).
     { rewrite /M11 /M10 /M9 /M8 /M7 /M6 /M5.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     iApply (wp_csd_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x60)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
@@ -924,12 +928,12 @@ Section WpSconfMappages.
     assert (HM11s1 : M11 !!! Regidx (mword_of_int 9 : mword 5)
                      = add_vec va (mword_of_int (4096 * Z.of_nat k))).
     { rewrite /M11 /M10 /M9 /M8 /M7 /M6 /M5.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hmr9. }
     assert (HM11s2 : M11 !!! Regidx (mword_of_int 18 : mword 5)
                      = add_vec va (mword_of_int (4096 * Z.of_nat (npages - 1)))).
     { rewrite /M11 /M10 /M9 /M8 /M7 /M6 /M5.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hmr18. }
     destruct rem' as [| rem''].
     { (* ---- LAST page: k = npages - 1; the beq is TAKEN, ret 0 ---- *)
@@ -964,15 +968,21 @@ Section WpSconfMappages.
               = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt9c) in "Hpc".
       iApply (wp_mappages_epilogue_sconf γ root_ppn γa Φ mm F1 t tS m npages (S k) perm K lvl HK
-                ltac:(peel_reg)
-                ltac:(peel_reg)
-                ltac:(peel_reg)
-                ltac:(peel_reg)
-                ltac:(peel_reg)
-                ltac:(peel_reg)
+                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmrsp)
+                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmrtp)
+                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr24)
+                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr25)
+                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr26)
+                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr27)
                 HbaseS HrepS
                 ltac:(left; split; [lia |];
-                      rewrite /F1 lookup_total_insert;
+                      rewrite /F1 upd_eq;
                       apply bv_eq; vm_compute; reflexivity)
                 with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile
                       Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -1014,36 +1024,47 @@ Section WpSconfMappages.
     (* the stepped s1 *)
     assert (HM11s7 : M11 !!! Regidx (mword_of_int 23 : mword 5) = mr !!! Regidx (mword_of_int 23 : mword 5)).
     { rewrite /M11 /M10 /M9 /M8 /M7 /M6 /M5.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     assert (HM12s1 : M12 !!! Regidx (mword_of_int 9 : mword 5)
                      = add_vec va (mword_of_int (4096 * Z.of_nat (S k)))).
-    { rewrite /M12 lookup_total_insert.
+    { rewrite /M12 upd_eq.
       rewrite HM11s1 HM11s7.
       apply (mappages_va_step va k (mr !!! Regidx (mword_of_int 23 : mword 5)) Hmr23). }
     assert (HM12s7v : M12 !!! Regidx (mword_of_int 23 : mword 5)
                       = mr !!! Regidx (mword_of_int 23 : mword 5)).
     { rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     (* loop *)
     iApply (IH (S k) M12 tS
               Hlvl HK ltac:(lia) ltac:(lia) Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
-              ltac:(peel_reg)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmrsp)
               HM12s1
-              ltac:(peel_reg)
-              ltac:(peel_reg)
-              ltac:(peel_reg)
-              ltac:(peel_reg)
-              ltac:(peel_reg)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr18)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr19)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr20)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr21)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr22)
               ltac:(rewrite HM12s7v; exact Hmr23)
-              ltac:(peel_reg)
-              ltac:(peel_reg)
-              ltac:(peel_reg)
-              ltac:(peel_reg)
-              ltac:(peel_reg)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmrtp)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr24)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr25)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr26)
+              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
+                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr27)
               HbaseS HrepS
               with "Hsc Hhs Hcap Hcnt Htlbinv Htext Hpc Hfile
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -1053,7 +1074,7 @@ Section WpSconfMappages.
   Lemma wp_mappages_sconf
       (γ : gname) (root_ppn : mword 44) (γa : gname)
       (Φ : mval -> iProp Σ)
-      (mm : gmap regidx (mword 64)) (t : ptree)
+      (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let pa := mm !!! Regidx (mword_of_int 13) in
@@ -1081,7 +1102,7 @@ Section WpSconfMappages.
     gpr_file mm -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : gmap regidx (mword 64)) (t' : ptree) (k : nat),
+    ( ∀ (mr : regfile) (t' : ptree) (k : nat),
       sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap γ root_ppn mr K -∗
       intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
@@ -1103,7 +1124,7 @@ Section WpSconfMappages.
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> mm).
     assert (Hsp1 : W1 !!! Regidx csp_rs1 = pa_stk (mm !!! Regidx csp_rs1) 10).
-    { rewrite /W1 lookup_total_insert. unfold regval_into_reg, pa_stk, add_vec_int. apply f_equal.
+    { rewrite /W1 upd_eq. unfold regval_into_reg, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     iIntros "Hsc Hhs Hcap Hcnt Htlbinv #Htext Hpc Hfile Hptree Henv Hcont".
     pose proof (bv_unsigned_in_range _ va) as Hvarange.
@@ -1181,7 +1202,7 @@ Section WpSconfMappages.
     iDestruct "S7" as (v24) "Hc24". iDestruct "S8" as (v16) "Hc16".
     iDestruct "S9" as (v8) "Hc08".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = spr)
-      by (rewrite /W1; rewrite lookup_total_insert; reflexivity).
+      by (rewrite /W1; rewrite upd_eq; reflexivity).
     assert (Hpp02 : add_vec_int (mword_of_int MP : mword 64) 2 = mword_of_int (MP + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     (* +0x02 c.sdsp x1,72(sp) *)
@@ -1191,7 +1212,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc72".
     iEval (rewrite HspW1 Hb1) in "Hc72".
     assert (HW1r1 : W1 !!! Regidx (mword_of_int 1 : mword 5) = mm !!! Regidx (mword_of_int 1)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r1) in "Hc72".
     assert (Hpp04 : add_vec_int (mword_of_int (MP + 0x02) : mword 64) 2 = mword_of_int (MP + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
@@ -1202,7 +1223,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc64".
     iEval (rewrite HspW1 Hb2) in "Hc64".
     assert (HW1r8 : W1 !!! Regidx (mword_of_int 8 : mword 5) = mm !!! Regidx (mword_of_int 8)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r8) in "Hc64".
     assert (Hpp06 : add_vec_int (mword_of_int (MP + 0x04) : mword 64) 2 = mword_of_int (MP + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
@@ -1213,7 +1234,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc56".
     iEval (rewrite HspW1 Hb3) in "Hc56".
     assert (HW1r9 : W1 !!! Regidx (mword_of_int 9 : mword 5) = mm !!! Regidx (mword_of_int 9)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r9) in "Hc56".
     assert (Hpp08 : add_vec_int (mword_of_int (MP + 0x06) : mword 64) 2 = mword_of_int (MP + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
@@ -1224,7 +1245,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc48".
     iEval (rewrite HspW1 Hb4) in "Hc48".
     assert (HW1r18 : W1 !!! Regidx (mword_of_int 18 : mword 5) = mm !!! Regidx (mword_of_int 18)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r18) in "Hc48".
     assert (Hpp0a : add_vec_int (mword_of_int (MP + 0x08) : mword 64) 2 = mword_of_int (MP + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
@@ -1235,7 +1256,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc40".
     iEval (rewrite HspW1 Hb5) in "Hc40".
     assert (HW1r19 : W1 !!! Regidx (mword_of_int 19 : mword 5) = mm !!! Regidx (mword_of_int 19)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r19) in "Hc40".
     assert (Hpp0c : add_vec_int (mword_of_int (MP + 0x0a) : mword 64) 2 = mword_of_int (MP + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
@@ -1246,7 +1267,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc32".
     iEval (rewrite HspW1 Hb6) in "Hc32".
     assert (HW1r20 : W1 !!! Regidx (mword_of_int 20 : mword 5) = mm !!! Regidx (mword_of_int 20)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r20) in "Hc32".
     assert (Hpp0e : add_vec_int (mword_of_int (MP + 0x0c) : mword 64) 2 = mword_of_int (MP + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
@@ -1257,7 +1278,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc24".
     iEval (rewrite HspW1 Hb7) in "Hc24".
     assert (HW1r21 : W1 !!! Regidx (mword_of_int 21 : mword 5) = mm !!! Regidx (mword_of_int 21)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r21) in "Hc24".
     assert (Hpp10 : add_vec_int (mword_of_int (MP + 0x0e) : mword 64) 2 = mword_of_int (MP + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
@@ -1268,7 +1289,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc16".
     iEval (rewrite HspW1 Hb8) in "Hc16".
     assert (HW1r22 : W1 !!! Regidx (mword_of_int 22 : mword 5) = mm !!! Regidx (mword_of_int 22)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r22) in "Hc16".
     assert (Hpp12 : add_vec_int (mword_of_int (MP + 0x10) : mword 64) 2 = mword_of_int (MP + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
@@ -1279,7 +1300,7 @@ Section WpSconfMappages.
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hc08".
     iEval (rewrite HspW1 Hb9) in "Hc08".
     assert (HW1r23 : W1 !!! Regidx (mword_of_int 23 : mword 5) = mm !!! Regidx (mword_of_int 23)).
-    { rewrite /W1. rewrite lookup_total_insert_ne; [reflexivity | reg_neq]. }
+    { rewrite /W1. rewrite upd_ne; [reflexivity | reg_neq]. }
     iEval (rewrite HW1r23) in "Hc08".
     assert (Hpp14 : add_vec_int (mword_of_int (MP + 0x12) : mword 64) 2 = mword_of_int (MP + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
@@ -1296,7 +1317,7 @@ Section WpSconfMappages.
     (* +0x16 slli a5,a1,52 -- the va alignment probe *)
     assert (HP2a1 : P2 !!! Regidx (mword_of_int 11 : mword 5) = va).
     { rewrite /P2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     iApply (wp_slli_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 52 : mword 6)
               (mword_of_int 0 : mword 64)
@@ -1313,7 +1334,7 @@ Section WpSconfMappages.
               P3 (K - 10)%nat
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate)
-              ltac:(rewrite /P3 lookup_total_insert; vm_compute; reflexivity)
+              ltac:(rewrite /P3 upd_eq; vm_compute; reflexivity)
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi1a [-]").
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
     assert (Hpp1c : add_vec_int (mword_of_int (MP + 0x1a) : mword 64) 2 = mword_of_int (MP + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1338,7 +1359,7 @@ Section WpSconfMappages.
     assert (HP5a2 : P5 !!! Regidx (mword_of_int 12 : mword 5)
                     = mword_of_int (Z.of_nat npages * 4096)).
     { rewrite /P5 /P4 /P3 /P2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       exact Hsz. }
     iApply (wp_slli_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 52 : mword 6)
               (mword_of_int 0 : mword 64)
@@ -1357,7 +1378,7 @@ Section WpSconfMappages.
               P6 (K - 10)%nat
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate)
-              ltac:(rewrite /P6 lookup_total_insert; vm_compute; reflexivity)
+              ltac:(rewrite /P6 upd_eq; vm_compute; reflexivity)
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hi24 [-]").
     iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
     assert (Hpp26 : add_vec_int (mword_of_int (MP + 0x24) : mword 64) 2 = mword_of_int (MP + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1365,7 +1386,7 @@ Section WpSconfMappages.
     (* +0x26 c.beqz a2 FALLS: the size is nonzero *)
     assert (HP6a2 : P6 !!! Regidx (mword_of_int 12 : mword 5)
                     = mword_of_int (Z.of_nat npages * 4096)).
-    { rewrite /P6. rewrite lookup_total_insert_ne; [| reg_neq].
+    { rewrite /P6. rewrite upd_ne; [| reg_neq].
       exact HP5a2. }
     iApply (wp_cbeqz_fall_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x26)) (mword_of_int 46 : mword 8) (Cregidx (mword_of_int 4)) (mword_of_int 12 : mword 5)
               P6 (K - 10)%nat
@@ -1403,12 +1424,12 @@ Section WpSconfMappages.
                     = add_vec (add_vec (mword_of_int (Z.of_nat npages * 4096))
                                  (sign_extend' 64 (mword_of_int 2048 : mword 12)))
                         (sign_extend' 64 (mword_of_int 2048 : mword 12))).
-    { rewrite /P8 lookup_total_insert.
-      rewrite {1}/P7 lookup_total_insert.
+    { rewrite /P8 upd_eq.
+      rewrite {1}/P7 upd_eq.
       rewrite HP6a2. reflexivity. }
     assert (HP8a1 : P8 !!! Regidx (mword_of_int 11 : mword 5) = va).
     { rewrite /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     iApply (wp_add_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x30)) (mword_of_int 18 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 11 : mword 5)
               (add_vec va (mword_of_int (4096 * Z.of_nat (npages - 1))))
@@ -1442,11 +1463,11 @@ Section WpSconfMappages.
     (* +0x38 sub s3,a3,a1 *)
     assert (HP11a3 : P11 !!! Regidx (mword_of_int 13 : mword 5) = pa).
     { rewrite /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     assert (HP11a1 : P11 !!! Regidx (mword_of_int 11 : mword 5) = va).
     { rewrite /P11 /P10 /P9.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     iApply (wp_sub_s_sconf γ root_ppn Φ (mword_of_int (MP + 0x38)) (mword_of_int 19 : mword 5) (mword_of_int 13 : mword 5) (mword_of_int 11 : mword 5)
               (sub_vec pa va)
@@ -1471,10 +1492,10 @@ Section WpSconfMappages.
     assert (HP13s1 : P13 !!! Regidx (mword_of_int 9 : mword 5)
                      = add_vec va (mword_of_int (4096 * Z.of_nat 0))).
     { rewrite /P13 /P12 /P11.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
-      rewrite /P10 lookup_total_insert.
+      repeat (rewrite upd_ne; [| reg_neq]).
+      rewrite /P10 upd_eq.
       rewrite /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1.
-      repeat (rewrite lookup_total_insert_ne; [| reg_neq]).
+      repeat (rewrite upd_ne; [| reg_neq]).
       rewrite add_vec_zero_l.
       rewrite mappages_va0. reflexivity. }
     iApply (wp_mappages_loop_sconf γ root_ppn γa Φ mm t m npages perm K lvl npages 0%nat P13 t
@@ -1482,32 +1503,32 @@ Section WpSconfMappages.
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
               ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2;
-                    repeat (rewrite lookup_total_insert_ne; [| reg_neq]);
+                    repeat (rewrite upd_ne; [| reg_neq]);
                     exact HspW1)
               HP13s1
               ltac:(rewrite /P13 /P12 /P11 /P10;
-                    repeat (rewrite lookup_total_insert_ne; [| reg_neq]);
-                    rewrite /P9 lookup_total_insert; reflexivity)
+                    repeat (rewrite upd_ne; [| reg_neq]);
+                    rewrite /P9 upd_eq; reflexivity)
               ltac:(rewrite /P13;
-                    rewrite lookup_total_insert_ne; [| reg_neq];
-                    rewrite /P12 lookup_total_insert; reflexivity)
+                    rewrite upd_ne; [| reg_neq];
+                    rewrite /P12 upd_eq; reflexivity)
               ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5;
-                    repeat (rewrite lookup_total_insert_ne; [| reg_neq]);
-                    rewrite /P4 lookup_total_insert;
+                    repeat (rewrite upd_ne; [| reg_neq]);
+                    rewrite /P4 upd_eq;
                     rewrite /P3 /P2 /W1;
-                    repeat (rewrite lookup_total_insert_ne; [| reg_neq]);
+                    repeat (rewrite upd_ne; [| reg_neq]);
                     apply add_vec_zero_l)
               ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6;
-                    repeat (rewrite lookup_total_insert_ne; [| reg_neq]);
-                    rewrite /P5 lookup_total_insert;
+                    repeat (rewrite upd_ne; [| reg_neq]);
+                    rewrite /P5 upd_eq;
                     rewrite /P4 /P3 /P2 /W1;
-                    repeat (rewrite lookup_total_insert_ne; [| reg_neq]);
+                    repeat (rewrite upd_ne; [| reg_neq]);
                     apply add_vec_zero_l)
               ltac:(rewrite /P13 /P12;
-                    repeat (rewrite lookup_total_insert_ne; [| reg_neq]);
-                    rewrite /P11 lookup_total_insert;
+                    repeat (rewrite upd_ne; [| reg_neq]);
+                    rewrite /P11 upd_eq;
                     apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite /P13 lookup_total_insert; vm_compute; reflexivity)
+              ltac:(rewrite /P13 upd_eq; vm_compute; reflexivity)
               ltac:(peel_reg)
               ltac:(peel_reg)
               ltac:(peel_reg)

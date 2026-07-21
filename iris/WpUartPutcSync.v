@@ -23,6 +23,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecodeBridge WpRvcBridge KernelText.
 Require Import WpGpr.
+Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
@@ -233,7 +234,7 @@ Section WpUartPutcSync.
   (* ------------------------------------------------------------------- *)
   Lemma wp_lui_s_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 20)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv Rg -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
@@ -260,7 +261,7 @@ Section WpUartPutcSync.
 
   Lemma wp_andi_s_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : gmap regidx (mword 64)) {dq : dfrac} :
+      (m : regfile) {dq : dfrac} :
     uint rd <> 0 ->
     smode_config γ dq -∗ sr_inv Rg -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) -∗
@@ -338,7 +339,7 @@ Section WpUartPutcSync.
      ([uart_tx_ready_persists], WpUart.v). *)
   Lemma wp_uart_lsr_read_s_r (Rg : s_regime) (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
-      (m : gmap regidx (mword 64)) (l : list (bv 8)) {dq : dfrac} :
+      (m : regfile) (l : list (bv 8)) {dq : dfrac} :
     uint rd <> 0 ->
     m !!! Regidx rs1 = uart_pa 5 ->
     smode_config γ dq -∗ sr_inv Rg -∗
@@ -385,7 +386,7 @@ Section WpUartPutcSync.
 
   Lemma wp_uart_thr_write_s_r (Rg : s_regime) (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
-      (m : gmap regidx (mword 64)) (l : list (bv 8)) {dq : dfrac} :
+      (m : regfile) (l : list (bv 8)) {dq : dfrac} :
     m !!! Regidx rs1 = uart_pa 0 ->
     smode_config γ dq -∗ sr_inv Rg -∗
     pc_is pc -∗ gpr_file m -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
@@ -456,27 +457,27 @@ Section WpUartPutcSync.
 
   (* intermediate register files, one per device-core instruction that
      writes a GPR (named to keep the WP threading readable, WpMycpu-style). *)
-  Definition ppc_f1 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
+  Definition ppc_f1 (m : regfile) : regfile :=
     <[Regidx (mword_of_int 14) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> m.
-  Definition ppc_f2 (m : gmap regidx (mword 64)) : gmap regidx (mword 64) :=
+  Definition ppc_f2 (m : regfile) : regfile :=
     <[Regidx (mword_of_int 14) := regval_into_reg (add_vec (ppc_f1 m !!! Regidx (mword_of_int 14))
         (sign_extend' 64 (sign_extend' 12 (mword_of_int 5 : mword 6))))]> (ppc_f1 m).
-  Definition ppc_f3 (m : gmap regidx (mword 64)) (u : uart_state) : gmap regidx (mword 64) :=
+  Definition ppc_f3 (m : regfile) (u : uart_state) : regfile :=
     <[Regidx (mword_of_int 15) := regval_into_reg (uart_lsr_ldval u)]> (ppc_f2 m).
-  Definition ppc_f4 (m : gmap regidx (mword 64)) (u : uart_state) : gmap regidx (mword 64) :=
+  Definition ppc_f4 (m : regfile) (u : uart_state) : regfile :=
     <[Regidx (mword_of_int 15) := regval_into_reg (and_vec (ppc_f3 m u !!! Regidx (mword_of_int 15))
         (sign_extend' 64 (mword_of_int 32 : mword 12)))]> (ppc_f3 m u).
-  Definition ppc_f5 (m : gmap regidx (mword 64)) (u : uart_state) : gmap regidx (mword 64) :=
+  Definition ppc_f5 (m : regfile) (u : uart_state) : regfile :=
     <[Regidx (mword_of_int 10) := regval_into_reg (and_vec (ppc_f4 m u !!! Regidx (mword_of_int 9))
         (sign_extend' 64 (mword_of_int 255 : mword 12)))]> (ppc_f4 m u).
-  Definition ppc_f6 (m : gmap regidx (mword 64)) (u : uart_state) : gmap regidx (mword 64) :=
+  Definition ppc_f6 (m : regfile) (u : uart_state) : regfile :=
     <[Regidx (mword_of_int 15) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> (ppc_f5 m u).
 
   (* the three call-site register lookups the leaves need. *)
-  Lemma ppc_f2_a4 (m : gmap regidx (mword 64)) :
+  Lemma ppc_f2_a4 (m : regfile) :
     ppc_f2 m !!! Regidx (mword_of_int 14) = uart_pa 5.
   Proof.
-    unfold ppc_f2, ppc_f1. rewrite !lookup_total_insert.
+    unfold ppc_f2, ppc_f1. rewrite !upd_eq.
     apply bv_eq; vm_compute; reflexivity.
   Qed.
 
@@ -490,35 +491,35 @@ Section WpUartPutcSync.
        f4' : loop exit at 0x992, a5 = [andi]-masked LSR value
        f5' : after [zext.b a0,s1]     (0x992)
        f6' : after [lui a5,0x10000]   (0x996), the pre-THR-store map. *)
-  Definition ppc_f4' (m : gmap regidx (mword 64)) (b : bv 8) : gmap regidx (mword 64) :=
+  Definition ppc_f4' (m : regfile) (b : bv 8) : regfile :=
     <[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> (ppc_f2 m).
-  Definition ppc_f5' (m : gmap regidx (mword 64)) (b : bv 8) : gmap regidx (mword 64) :=
+  Definition ppc_f5' (m : regfile) (b : bv 8) : regfile :=
     <[Regidx (mword_of_int 10) := regval_into_reg (and_vec (ppc_f4' m b !!! Regidx (mword_of_int 9))
         (sign_extend' 64 (mword_of_int 255 : mword 12)))]> (ppc_f4' m b).
-  Definition ppc_f6' (m : gmap regidx (mword 64)) (b : bv 8) : gmap regidx (mword 64) :=
+  Definition ppc_f6' (m : regfile) (b : bv 8) : regfile :=
     <[Regidx (mword_of_int 15) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> (ppc_f5' m b).
 
-  Lemma ppc_f4'_s1 (m : gmap regidx (mword 64)) (b : bv 8) :
+  Lemma ppc_f4'_s1 (m : regfile) (b : bv 8) :
     ppc_f4' m b !!! Regidx (mword_of_int 9) = m !!! Regidx (mword_of_int 9).
   Proof.
     unfold ppc_f4', ppc_f2, ppc_f1.
-    do 3 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity.
+    do 3 (rewrite upd_ne; [| vm_compute; discriminate]). reflexivity.
   Qed.
 
-  Lemma ppc_f6'_a5 (m : gmap regidx (mword 64)) (b : bv 8) :
+  Lemma ppc_f6'_a5 (m : regfile) (b : bv 8) :
     ppc_f6' m b !!! Regidx (mword_of_int 15) = uart_pa 0.
   Proof.
-    unfold ppc_f6'. rewrite lookup_total_insert.
+    unfold ppc_f6'. rewrite upd_eq.
     apply bv_eq; vm_compute; reflexivity.
   Qed.
 
-  Lemma ppc_f6'_a0 (m : gmap regidx (mword 64)) (b : bv 8) :
+  Lemma ppc_f6'_a0 (m : regfile) (b : bv 8) :
     ppc_f6' m b !!! Regidx (mword_of_int 10)
     = and_vec (m !!! Regidx (mword_of_int 9)) (sign_extend' 64 (mword_of_int 255 : mword 12)).
   Proof.
     unfold ppc_f6', ppc_f5'.
-    rewrite lookup_total_insert_ne; [| vm_compute; discriminate].
-    rewrite lookup_total_insert. rewrite ppc_f4'_s1. reflexivity.
+    rewrite upd_ne; [| vm_compute; discriminate].
+    rewrite upd_eq. rewrite ppc_f4'_s1. reflexivity.
   Qed.
 
   (* ================================================================= *)
@@ -541,7 +542,7 @@ Section WpUartPutcSync.
   (*  is [<[a5 := lsr_masked b]> mentry] for whatever byte b was seen.  *)
   (* ================================================================= *)
   Lemma wp_uartputc_poll_r (Rg : s_regime) (γ : gname) (γd : uart_names)
-      (Φ : mval -> iProp Σ) (mentry : gmap regidx (mword 64)) (l : list (bv 8))
+      (Φ : mval -> iProp Σ) (mentry : regfile) (l : list (bv 8))
       {dq : dfrac} :
     mentry !!! Regidx (mword_of_int 14) = uart_pa 5 ->
     smode_config γ dq -∗
@@ -574,7 +575,7 @@ Section WpUartPutcSync.
        so each iteration receives a fresh copy (WpAcquireLock's spin idiom).
        Proved from the persistent context only (instruction facts + dev_inv),
        so the caller's own resources are free to feed it at [m := mentry]. *)
-    iAssert (∀ m : gmap regidx (mword 64),
+    iAssert (∀ m : regfile,
       ⌜ m !!! Regidx (mword_of_int 14) = uart_pa 5 ⌝ -∗
       ⌜ forall Y, <[Regidx (mword_of_int 15) := Y]> m
                 = <[Regidx (mword_of_int 15) := Y]> mentry ⌝ -∗
@@ -599,7 +600,7 @@ Section WpUartPutcSync.
  ltac:(vm_compute; discriminate)
                 with "Hsm Htlbinv Hpc Hfile Hi2a").
       iIntros "Hsm Htlbinv Hpc Hfile".
-      iEval (rewrite lookup_total_insert insert_insert) in "Hfile".
+      iEval (rewrite upd_eq upd_upd) in "Hfile".
       change (and_vec (lsr_ldval_of b) (sign_extend' 64 (mword_of_int 32 : mword 12)))
         with (lsr_masked b) in *.
       iEval (rewrite P2e) in "Hpc".
@@ -611,7 +612,7 @@ Section WpUartPutcSync.
                   (Cregidx (mword_of_int 7)) (mword_of_int 15)
                   (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> m) (dq:=dq)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-                  ltac:(rewrite lookup_total_insert; unfold regval_into_reg, lsr_masked;
+                  ltac:(rewrite upd_eq; unfold regval_into_reg, lsr_masked;
                         exact Hcase)
                   ltac:(vm_compute; reflexivity)
                   with "Hsm Htlbinv Hpc Hfile Hi2e").
@@ -620,14 +621,14 @@ Section WpUartPutcSync.
         iEval (rewrite Htgt) in "Hpc".
         iApply ("IH" $! (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> m)
                   with "[%] [%] Hsm Htlbinv Hpc Hfile Hown Hk").
-        + rewrite lookup_total_insert_ne; [exact Ha4m | vm_compute; discriminate].
-        + intro Y. rewrite insert_insert. exact (Hagm Y).
+        + rewrite upd_ne; [exact Ha4m | vm_compute; discriminate].
+        + intro Y. rewrite upd_upd. exact (Hagm Y).
       - (* THRE set: branch FALLS THROUGH to 0x992, exit with the out-bound *)
         iApply (wp_cbeqz_fall_s_config_scfg_r Rg γ Φ (mword_of_int (UPS + 0x2e)) (mword_of_int 252 : mword 8)
                   (Cregidx (mword_of_int 7)) (mword_of_int 15)
                   (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> m) (dq:=dq)
  ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-                  ltac:(rewrite lookup_total_insert; unfold regval_into_reg, lsr_masked;
+                  ltac:(rewrite upd_eq; unfold regval_into_reg, lsr_masked;
                         exact Hcase)
                   with "Hsm Htlbinv Hpc Hfile Hi2e").
         iIntros "Hsm Htlbinv Hpc Hfile".
@@ -643,7 +644,7 @@ Section WpUartPutcSync.
 
   Lemma wp_uartputc_devcore_r (Rg : s_regime) (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (l : list (bv 8)) {dq : dfrac} :
+      (m : regfile) (l : list (bv 8)) {dq : dfrac} :
     let sb : mword 8 := autocast (T := mword)
        (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
           (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
@@ -749,7 +750,7 @@ Section WpUartPutcSync.
   (*  so the branch falls through to the panicked check.                    *)
   (* =================================================================== *)
   Lemma wp_uartputc_panicking_check_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (pv : mword 32) {dq dqm : dfrac} :
+      (m : regfile) (pv : mword 32) {dq dqm : dfrac} :
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     smode_config γ dq -∗
     sr_inv Rg -∗ kernel_text -∗
@@ -783,7 +784,7 @@ Section WpUartPutcSync.
     set (g1 := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x0c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m).
     assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x8a8 : mword 12))
                   = (mword_of_int KernelSyms.panicking : mword 64)).
-    { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
+    { unfold g1. rewrite upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
     iApply (wp_lw_s_scfg_r Rg γ Φ (mword_of_int (UPS + 0x10)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x8a8 : mword 12)
               g1 pv (dq:=dq) (dqm:=dqm)
@@ -799,7 +800,7 @@ Section WpUartPutcSync.
               (dq:=dq)
 
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              ltac:(rewrite lookup_total_insert; exact Hpv)
+              ltac:(rewrite upd_eq; exact Hpv)
               with "Hsm Htlbinv Hpc Hfile Hi14").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P16) in "Hpc".
@@ -813,7 +814,7 @@ Section WpUartPutcSync.
   (*  device core.  [pkv] sign-extends to 0.                                *)
   (* =================================================================== *)
   Lemma wp_uartputc_panicked_check_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (pkv : mword 32) {dq dqm : dfrac} :
+      (m : regfile) (pkv : mword 32) {dq dqm : dfrac} :
     neq_vec (sign_extend' 64 pkv) zero_reg = false ->
     smode_config γ dq -∗
     sr_inv Rg -∗ kernel_text -∗
@@ -845,7 +846,7 @@ Section WpUartPutcSync.
     set (g1 := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x16)) (auipc_off (mword_of_int 0xa : mword 20)))]> m).
     assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x89a : mword 12))
                   = (mword_of_int KernelSyms.panicked : mword 64)).
-    { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
+    { unfold g1. rewrite upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
     iApply (wp_lw_s_scfg_r Rg γ Φ (mword_of_int (UPS + 0x1a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x89a : mword 12)
               g1 pkv (dq:=dq) (dqm:=dqm)
@@ -860,7 +861,7 @@ Section WpUartPutcSync.
               (dq:=dq)
 
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              ltac:(rewrite lookup_total_insert; exact Hpkv)
+              ltac:(rewrite upd_eq; exact Hpkv)
               with "Hsm Htlbinv Hpc Hfile Hi1e").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P20) in "Hpc".
@@ -874,7 +875,7 @@ Section WpUartPutcSync.
   (*  the [c.beqz] falls through to the epilogue.                            *)
   (* =================================================================== *)
   Lemma wp_uartputc_panicking_check2_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (pv : mword 32) {dq dqm : dfrac} :
+      (m : regfile) (pv : mword 32) {dq dqm : dfrac} :
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
     smode_config γ dq -∗
     sr_inv Rg -∗ kernel_text -∗
@@ -906,7 +907,7 @@ Section WpUartPutcSync.
     set (g1 := <[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x3c)) (auipc_off (mword_of_int 0xa : mword 20)))]> m).
     assert (Hea : add_vec (g1 !!! Regidx (mword_of_int 15)) (sign_extend' 64 (mword_of_int 0x878 : mword 12))
                   = (mword_of_int KernelSyms.panicking : mword 64)).
-    { unfold g1. rewrite lookup_total_insert. apply bv_eq; vm_compute; reflexivity. }
+    { unfold g1. rewrite upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite <- Hea) in "Hsnap".
     iApply (wp_lw_s_scfg_r Rg γ Φ (mword_of_int (UPS + 0x40)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 0x878 : mword 12)
               g1 pv (dq:=dq) (dqm:=dqm)
@@ -921,7 +922,7 @@ Section WpUartPutcSync.
               (dq:=dq)
 
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              ltac:(rewrite lookup_total_insert; exact Hpv)
+              ltac:(rewrite upd_eq; exact Hpv)
               with "Hsm Htlbinv Hpc Hfile Hi44").
     iIntros "Hsm Htlbinv Hpc Hfile".
     iEval (rewrite P46) in "Hpc".
@@ -936,7 +937,7 @@ Section WpUartPutcSync.
   (* =================================================================== *)
   Lemma wp_uartputc_body_r (Rg : s_regime) (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ)
-      (m : gmap regidx (mword 64)) (l : list (bv 8)) (pv pkv : mword 32)
+      (m : regfile) (l : list (bv 8)) (pv pkv : mword 32)
       {dq dqm dqm2 : dfrac} :
     let sb : mword 8 := autocast (T := mword)
        (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
@@ -979,7 +980,7 @@ Section WpUartPutcSync.
     set (f2 := <[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pkv)]>
                (<[Regidx (mword_of_int 15) := regval_into_reg (add_vec (mword_of_int (UPS + 0x16)) (auipc_off (mword_of_int 0xa : mword 20)))]> f1)).
     assert (HR9 : f2 !!! Regidx (mword_of_int 9) = m !!! Regidx (mword_of_int 9)).
-    { unfold f2, f1. do 4 (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]). reflexivity. }
+    { unfold f2, f1. do 4 (rewrite upd_ne; [| vm_compute; discriminate]). reflexivity. }
     (* the device core's store byte is about f2!!!s1, but that equals m!!!s1 *)
     assert (Hsbf2 : (autocast (T := mword)
                       (subrange_vec_dec (and_vec (f2 !!! Regidx (mword_of_int 9))
@@ -1001,7 +1002,7 @@ Section WpUartPutcSync.
     unfold callee_saved.
     repeat split;
       unfold ppc_f6', ppc_f5', ppc_f4', ppc_f2, ppc_f1, f2, f1;
-      repeat (rewrite lookup_total_insert_ne; [| vm_compute; discriminate]); reflexivity.
+      repeat (rewrite upd_ne; [| vm_compute; discriminate]); reflexivity.
   Qed.
 
 
