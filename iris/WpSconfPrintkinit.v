@@ -52,11 +52,13 @@ Section WpSconfPrintkinit.
     pose (name := (mword_of_int pr_name_str : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
     (* the "pr" string literal (2 chars + NUL), read out of the data image *)
-    iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl
-                  ltac:(intros j b Hj;
-                        do 3 (destruct j as [|j];
-                              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
-                        vm_compute in Hj; discriminate)
+    assert (Hpr : forall j b, cstring_bytes "pr"%string !! j = Some b ->
+                    KernelData.kernel_data !! (pr_name_str + Z.of_nat j)%Z = Some b).
+    { intros j b Hj.
+      do 3 (destruct j as [|j];
+            [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+      vm_compute in Hj; discriminate. }
+    iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl Hpr
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K PK
               (mword_of_int 6) (mword_of_int 18) (mword_of_int 1982) (mword_of_int 2694)

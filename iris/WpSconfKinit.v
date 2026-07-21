@@ -55,11 +55,13 @@ Section WpSconfKinit.
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hqnoff Hqint Hcont".
     (* the "kmem" string literal, read out of the kernel's data image *)
-    iPoseProof (kernel_data_string 0x80007040 "kmem"%string _ eq_refl
-                  ltac:(intros j b Hj;
-                        do 5 (destruct j as [|j];
-                              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
-                        vm_compute in Hj; discriminate)
+    assert (Hkmem : forall j b, cstring_bytes "kmem"%string !! j = Some b ->
+                      KernelData.kernel_data !! (0x80007040 + Z.of_nat j)%Z = Some b).
+    { intros j b Hj.
+      do 5 (destruct j as [|j];
+            [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+      vm_compute in Hj; discriminate. }
+    iPoseProof (kernel_data_string 0x80007040 "kmem"%string _ eq_refl Hkmem
                   with "Hkdata") as "#Hstr".
     assert (Hspr2 : spr = pa_stk sp0 2).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }

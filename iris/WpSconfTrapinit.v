@@ -51,11 +51,13 @@ Section WpSconfTrapinit.
     pose (name := (mword_of_int time_name_str : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
     (* the "time" string literal (4 chars + NUL), read out of the data image *)
-    iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl
-                  ltac:(intros j b Hj;
-                        do 5 (destruct j as [|j];
-                              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
-                        vm_compute in Hj; discriminate)
+    assert (Htime : forall j b, cstring_bytes "time"%string !! j = Some b ->
+                      KernelData.kernel_data !! (time_name_str + Z.of_nat j)%Z = Some b).
+    { intros j b Hj.
+      do 5 (destruct j as [|j];
+            [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+      vm_compute in Hj; discriminate. }
+    iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl Htime
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K TI
               (mword_of_int 5) (mword_of_int 22) (mword_of_int 3646) (mword_of_int 3430)
