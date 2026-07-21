@@ -1154,6 +1154,44 @@ Proof.
       apply ptree_blocks0_lvl2_blocks0; exact H.
 Qed.
 
+(* ---- level0-threading: the zipper's restore extends a level-[l]
+   [ptree_level0_lvl] fact up one level.  This is the second fact the walk
+   loop threads (besides same-rep): the walk's tail wants [ptree_level0]
+   for the exit page, and on the alloc path that comes from the freshly
+   grafted empty chain.  Two flavours -- descend (V=1, kid already there,
+   restore via [pt_upd_kid]) and graft (alloc, fresh ptr PTE + empty kid,
+   restore via [pt_upd_kid (pt_upd_ent ...)]) -- plus the empty terminal. *)
+Lemma ptree_level0_lvl_empty0 (b : mword 44) (vpn : mword 27) :
+  ptree_level0_lvl 0 (pt_empty_node b) vpn (mword_of_int 0).
+Proof. reflexivity. Qed.
+
+Lemma ptree_level0_lvl_upd_kid_intro (l : nat) (t : ptree) (i : mword 9)
+    (c' : ptree) (vpn : mword 27) (w : mword 64) :
+  vpn_idx (S l) vpn = i ->
+  pte_valid (pt_ents t i) -> pte_ptr (pt_ents t i) ->
+  u_next_base (pt_ents t i) = pt_base c' ->
+  ptree_level0_lvl l c' vpn w ->
+  ptree_level0_lvl (S l) (pt_upd_kid t i (Some c')) vpn w.
+Proof.
+  intros Ei Hv Hp Hu H0. exists c'.
+  rewrite !Ei pt_upd_kid_same pt_upd_kid_ents.
+  repeat split; first [ reflexivity | exact Hv | exact Hp | exact Hu | exact H0 ].
+Qed.
+
+Lemma ptree_level0_lvl_graft_intro (l : nat) (t : ptree) (i : mword 9)
+    (b : mword 44) (c' : ptree) (vpn : mword 27) (w : mword 64) :
+  vpn_idx (S l) vpn = i ->
+  pt_base c' = b ->
+  ptree_level0_lvl l c' vpn w ->
+  ptree_level0_lvl (S l) (pt_upd_kid (pt_upd_ent t i (pt_ptr_pte b)) i (Some c')) vpn w.
+Proof.
+  intros Ei Hb H0. exists c'.
+  rewrite !Ei pt_upd_kid_same !pt_upd_kid_ents !pt_upd_ent_same pt_ptr_pte_base Hb.
+  repeat split;
+    first [ reflexivity | exact (pt_ptr_pte_valid b) | exact (pt_ptr_pte_ptr b)
+          | exact H0 ].
+Qed.
+
 (* ===================================================================== *)
 (* §5 The Iris layer: a kalloc'd+memset ZEROED page becomes a description *)
 (*    node ([zero_page_to_node]); grafting it into an owned tree under a  *)
