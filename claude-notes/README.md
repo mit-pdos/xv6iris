@@ -64,16 +64,16 @@ are working on that effort — the relevant `projects/` file.
 - **[`yield-sched.md`](projects/yield-sched.md)** — yield/sched/myproc specs and
   proofs: the sconf-tier swtch port, the global scheduler-chain predicate
   `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.
-- **[`sleeplock.md`](projects/sleeplock.md)** — the sleeplock subsystem
-  (initsleeplock / acquiresleep / releasesleep / holdingsleep): the
-  `is_sleeplock`/`sl_res` lock abstraction over the inner spinlock, and the
-  assumed `sleep()` contract (`SpecSleep.v`).
-
 ### `completed/` — finished projects, archived for reference
 
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`sleeplock.md`](completed/sleeplock.md)** — the sleeplock subsystem, all
+  four functions proven (initsleeplock / acquiresleep / releasesleep /
+  holdingsleep): the `is_sleeplock`/`sl_res` lock abstraction over the inner
+  spinlock, the holder-carried pid cell, and acquiresleep's sleep-retry iLöb
+  loop over the proven `SLEEP` interface.
 - **[`sie-cap-avail.md`](completed/sie-cap-avail.md)** — folded the free stack
   into `sie_cap γ root m avail` (avail = slots available to kernel code); sp
   push/pop specs (`wp_caddi{,16}sp_{push,pop}_s_sconf`), the sp-aware VCgen

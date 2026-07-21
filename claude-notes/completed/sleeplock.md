@@ -1,9 +1,11 @@
 # Project: sleeplock (initsleeplock / acquiresleep / releasesleep / holdingsleep)
 
 Goal: whole-function sconf-tier specs+proofs for kernel/sleeplock.c, with a
-separation-logic lock interface mirroring the spinlock's (WpLock.v), plus a
-deliberately-ASSUMED `sleep()` contract (SpecSleep.v) — sleep's proof needs
-the scheduler end-to-end and stays future work (yield-sched.md).
+separation-logic lock interface mirroring the spinlock's (WpLock.v).
+`sleep()` was initially stated here as an ASSUMED contract; upstream then
+landed the PROVEN sleep (SpecSleep.v is now `Module Type SLEEP`, proof in
+WpSconfSleep.v, LinkSleep.v), so acquiresleep consumes it as an ordinary
+functor parameter — no sleeplock proof rests on a sleep axiom.
 
 ## The cast (image addresses from KernelSyms; disasm in xv6-riscv/kernel/kernel.asm)
 
@@ -48,15 +50,16 @@ ProcGeom.v).
 - The disjunct DECIDES every branch: free arm ⇒ beqz taken; held arm ⇒
   bnez taken.  No genuine branch splits anywhere in the four bodies.
 
-### SpecSleep.v — the assumed sleep(chan, lk) contract (Axiom wp_sleep_sconf)
+### SpecSleep.v — sleep(chan, lk), now upstream's PROVEN interface
 
-Condition-variable wait: consumes `is_lock γl lka s R ∗ locked γl ∗ R`, lk's
-cpu word at `mycpu_ret cid_word`, noff cell = 1, intr_count 1 (xv6's "sched
-locks" assertion — forced), ∃-intena, and the running-thread bundle
+Condition-variable wait: consumes `is_lock γk lka sk Rk ∗ locked γk ∗ Rk`,
+lk's cpu word at `mycpu_ret cid_word`, noff cell = 1, intr_count 1 (xv6's
+"sched locks" assertion — forced), ∃-intena, and the running-thread bundle
 (`cur_proc pj`, `p_lkcpu pj ↦₈ 0`, `procs_inv`, `own_ctx (p_context pj)`,
-`▷ sched_vc (a_cpu_ctx cid_word)`); returns everything, with a FRESH R
-(re-acquired).  tp = cid_word.  22 ≤ av.  Replace with Module Type + sealed
-functor when sleep() is proven; listed in the coverage manifest's assumed set.
+`▷ sched_vc (a_cpu_ctx cid_word)`); returns everything, with a FRESH Rk
+(re-acquired).  tp = cid_word.  22 ≤ av.  Extra binder vs the old assumed
+shape: `γl` = proc j's own lock gname with premise `γs !! j = Some γl` —
+a caller derives it from procs_inv's length fact + `lookup_lt_is_Some_2`.
 
 ### The four function specs (spec-module shape, all done)
 
@@ -109,17 +112,24 @@ word is caller-threaded pinned `zero_reg` pre/post.
 
 - [x] SleepLock.v, p_pid in ProcGeom.v, SpecSleep.v, the four Spec files;
       all in _CoqProject; tree rebuilt green.
-- [ ] WpSleeplockDecode.v — decode templates + instr facts for all four
-      functions (one shared file; prologue/epilogue bytes match the shared
-      podec_* templates where identical).
-- [ ] WpSconfInitsleeplock.v + LinkInitsleeplock.v.
-- [ ] WpSconfHoldingsleep.v + LinkHoldingsleep.v.
-- [ ] WpSconfReleasesleep.v + LinkReleasesleep.v.
-- [ ] WpSconfAcquiresleep.v + LinkAcquiresleep.v.
-- [ ] Full clean build; add `sleep` (wp_sleep_sconf) to
-      tools/proof_coverage.py's assumed manifest; lift durable lessons to
-      design/kernel-proofs.md.
+- [x] WpSleeplockDecode.v (shared templates reused from WpKallocDecode
+      kdc_* / WpFreerangeDecode fdc_*; fresh sldec_* templates.  Note:
+      exec_execute_C_LW / exec_execute_C_SW are defined here — promote to
+      WpMmodeLeafBase.v if another decode file needs them).
+- [x] WpSconfInitsleeplock.v + LinkInitsleeplock.v (functor over INITLOCK).
+- [x] WpSconfHoldingsleep.v + LinkHoldingsleep.v (ACQUIRE/RELEASE/MYPROC).
+- [x] WpSconfReleasesleep.v + LinkReleasesleep.v (ACQUIRE/RELEASE/
+      WAKEUPLOOP; the WAKEUPLOOP-typed link module is named `WakeupLoop`).
+- [x] Merged upstream's proven sleep/sched/yield; SpecSleep.v is upstream's
+      proven interface; the transient sleep MANIFEST_ASSUMED entry dropped.
+- [x] WpSconfAcquiresleep.v + LinkAcquiresleep.v (functor over ACQUIRE/
+      RELEASE/MYPROC/SLEEP; the sleep-retry loop is the worked iLöb example
+      for threading intr_count/▷sched_vc across a taken-leaf back edge —
+      see design/kernel-proofs.md).
+- [x] Full clean build; coverage: sleeplock.c 4/4 proven, 254/254 bytes.
+      (releasesleep carries wakeup's PRE-EXISTING debt — the
+      wp_myproc_sconf_any axiom and WpSconfWakeup.v's Admitted — inherited
+      via WAKEUPLOOP, out of this project's scope; see yield-sched.md.)
 
-Future (out of scope): proving sleep() (scheduler protocol end-to-end —
-see yield-sched.md), a non-holder holdingsleep variant (needs a pid
+Future (out of scope): a non-holder holdingsleep variant (needs a pid
 disequality resource; no xv6 call site wants it).
