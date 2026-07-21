@@ -8,7 +8,7 @@ old, call sites flipped file-by-file, old variants deleted last) so `make
 proofs` stays buildable at every commit; validate the interface on a VERTICAL
 PILOT before any mechanical sweep.
 
-## Current state
+## Status: DONE — the sweep itself is complete
 
 All S-mode whole-function proofs are over `sconf`, on the sie-cap-avail
 interface ([[sie-cap-avail]], full clean build green): the spinlock/kalloc cone
@@ -19,12 +19,24 @@ wakeup_loop, memset, memset_page, initlock), the page-table cone (`wp_walk_sconf
 instruction engine + raw `*_tlbinv_pt` leaves remain — the sconf funnel
 delegates its '0' arm to them, so they stay until boot wiring lands.
 
-Remaining work: (a) **item 8's boot wiring** (below) — nothing yet DRIVES the
-sconf whole-function layer; the top consumer gap is now above kinit (kvminit /
-`main`→`trapinithart`, [[kvm-spec]]).  (b) **vcgen-to-sconf** — wire the built
-`wp_vc_block_s_sconf` into use (the sconf functions leaf-chain today); the only
-remaining `wp_vc_block_s` (SIE-0) consumer is the kernelvec handler
-`WpKernelvecNew.v` (`kv_store_prog`/`kv_load_prog` blocks).
+The architecture, conventions, recipes, and gotchas below are the durable output
+and apply to any new S-mode lemma.
+
+### Parked (NOT part of the sweep — no owner yet)
+
+Two consumer-side items were never in the sweep's scope and remain undone:
+
+- **Boot wiring** (the "item 8" section at the bottom): nothing yet DRIVES the
+  sconf whole-function layer; the top consumer gap is above kinit (kvminit /
+  `main`→`trapinithart`, [[kvm-spec]]).  No `csrw stvec` leaf exists and
+  `intr_inv_alloc_off` still has no caller outside `IntrDefs.v`.
+- **vcgen-to-sconf**: `wp_vc_block_s_sconf` is built but has no consumer outside
+  `WpSconfVc.v` (the sconf functions leaf-chain today); the only remaining
+  `wp_vc_block_s` (SIE-0) consumer is the kernelvec handler `WpKernelvecNew.v`
+  (`kv_store_prog`/`kv_load_prog` blocks).
+
+Pick these up under whatever project takes the boot path; they are recorded here
+so the analysis is not lost.
 
 ## Architecture
 

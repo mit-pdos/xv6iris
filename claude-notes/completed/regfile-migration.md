@@ -10,7 +10,12 @@ is 2.5 %). A function rep resolves `M !!! Regidx j` in one `vm_compute` over the
 concrete-key if-chain. **Measured: one funnel's 9 lookups over a 20-deep chain:
 1.22 s (gmap peel) → 0.072 s (function rep), ~17×.** Uses funext (acceptable).
 
-## Status (branch `regfile-as-function`)
+## Status: DONE — the whole tree is on `regfile`
+
+The migration is complete: the only remaining mention of `gmap regidx (mword 64)`
+in the tree is `RegFile.v` itself (the `rf_to_gmap` bridge and its comments). The
+recipe and gotchas below are kept for reference — they apply to any new file that
+touches the register map.
 
 - **DONE — `RegFile.v`** (new base file, in `_CoqProject` after RiscvLang.v; builds).
   Defines `regfile`, `rf_upd`, `Insert`/`LookupTotal` instances (so `<[k:=v]> f`
@@ -32,11 +37,17 @@ concrete-key if-chain. **Measured: one funnel's 9 lookups over a 20-deep chain:
   notation races `LookupTotal` instance resolution against the accessor's
   application form; the two are definitionally equal so downstream closes fine.
   (Could be designed away by stating `gpr_file_lookup_acc` with `f !!! i`.)
-- **TODO — remaining port set** (~65 files), driven by `make -k`: it rebuilds the
-  non-port files and surfaces each next wave as compile errors. Hand the wave to
-  parallel Sonnet subagents; take `VcGenS` (gpr_matches + block lemmas) and the
+- **DONE — the remaining ~65-file sweep**, driven by `make -k`: it rebuilt the
+  non-port files and surfaced each next wave as compile errors. Waves went to
+  parallel Sonnet subagents; `VcGenS` (gpr_matches + block lemmas) and the
   whole-function threading proofs (`WpSconfWalk`, `WpKvmmap`, `WpMappages`,
-  user-mode) by hand.
+  user-mode) were done by hand.
+- **Surviving local `peel_reg`s** (`WpSconfWalk.v`, `WpSconfMappages.v`) are NOT
+  leftovers: they are re-defined post-migration to peel via the `upd_eq`/`upd_ne`
+  LEMMAS, keeping values opaque. Use that variant instead of `reg_lookup` where
+  the target is a symbolic HIT (e.g. `M !!! csp = spr` with `spr = add_vec sp0 …`)
+  — `reg_lookup`'s `vm_compute` would try to reduce the `add_vec` and hang. Over
+  the compact `rf_upd` spine it is still ~2.5× faster than the old gmap peel.
 
 ## CRITICAL: [rf_upd] TRANSPARENT + always discharge with [reg_lookup]
 

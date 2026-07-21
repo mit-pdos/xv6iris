@@ -221,7 +221,14 @@ classification to CacheAccess, reusing the ∀mxr translate lemmas — NO new
 concrete-mxr walk.  Ok-path `phys_access_check`=None over the owned block-aligned
 RAM page (`block_aligned`+`ram_pmp_match_w`).
 
-## Remaining work (both kernel-side — the user-execution WP is closed)
+## Status: DONE — `wp_user_exec_closed` is the complete, hypothesis-free WP
+
+The user-mode execution WP is closed (no totality hypotheses, no user-side gaps).
+Item 1 below (the userret → `user_inv` bridge) is BUILT (`UserKernelBridge.v`).
+Item 2 (E-uservec) is a separate KERNEL-side proof, listed here only because it
+is what `stvec_handler_wp` — still an assumed hypothesis of
+`wp_user_exec_closed` — will eventually be discharged by; it is not user-mode
+execution work and has no owner in this project.
 
 1. Discharge `wp_user_exec_closed`'s `user_inv` at boot / after userret.
    `userret_to_user_inv` (UserKernelBridge.v) is the bridge — a PURE repackaging

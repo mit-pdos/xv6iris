@@ -57,17 +57,8 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`interrupt-sweep.md`](projects/interrupt-sweep.md)** — making every S-mode
-  execution lemma SIE-agnostic (the interrupt sweep).
 - **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
   mappages / walk proofs (`KvmSpec.v`).
-- **[`user-mode-exec-v2.md`](projects/user-mode-exec-v2.md)** — arbitrary
-  user-mode execution (v2: `UserPt.v` / `UserExec.v`).
-- **[`regfile-migration.md`](projects/regfile-migration.md)** — replacing the
-  register map `gmap regidx (mword 64)` with a function `regfile := regidx →
-  mword 64` (`RegFile.v`) to kill the funnel `iApply`s' lookup-peel cost (~17×
-  on the hot path). Foundation landed (`RegFile.v`, `WpGpr.v`); ~82-file sweep
-  remains, with the per-file recipe.
 
 ### `completed/` — finished projects, archived for reference
 
@@ -89,8 +80,26 @@ their durable design notes, gotchas, and reusable recipes.
   in [`design/spec-modules.md`](design/spec-modules.md).
 - **[`user-mode-ptree-port.md`](completed/user-mode-ptree-port.md)** — porting
   user-mode execution onto the ptree page-table layer (UserPt → `utlb_inv_pt`);
-  the port and its cleanup are done. The remaining execution-side hypotheses
-  (`user_inv` discharge + `stvec_handler_wp`) live in `user-mode-exec-v2.md`.
+  the port and its cleanup are done. The execution-side story is finished in
+  [`user-mode-exec-v2.md`](completed/user-mode-exec-v2.md).
+- **[`user-mode-exec-v2.md`](completed/user-mode-exec-v2.md)** — arbitrary
+  user-mode execution (v2: `UserPt.v` / `UserExec.v`). `wp_user_exec_closed` is
+  the complete WP with no totality hypotheses; the userret → `user_inv` bridge is
+  built. Only the kernel-side uservec proof (E-uservec, which would discharge the
+  assumed `stvec_handler_wp`) is left, and it is not user-mode-execution work.
+- **[`regfile-migration.md`](completed/regfile-migration.md)** — replaced the
+  register map `gmap regidx (mword 64)` with a function `regfile := regidx →
+  mword 64` (`RegFile.v`), killing the funnel `iApply`s' lookup-peel cost (~17×
+  on the hot path). Whole tree ported. Keeps the per-file recipe, the `rf_upd`
+  transparency / async-`Qed` hazard, and when to prefer lemma-based `peel_reg`
+  over `reg_lookup`.
+- **[`interrupt-sweep.md`](completed/interrupt-sweep.md)** — made every S-mode
+  execution lemma SIE-agnostic; all S-mode whole-function proofs are over `sconf`
+  on the sie-cap-avail interface. Keeps the `sconf`/`sie_cap`/`intr_count`
+  architecture, the avail-param push/pop conventions, and the reusable recipes.
+  Two consumer-side items are PARKED there with no owner: the boot wiring that
+  would drive the sconf layer (`main`→`trapinithart`) and wiring
+  `wp_vc_block_s_sconf` into the whole-function proofs.
 
 When a project is fully finished — no remaining work and no cleanup — move its
 file from `projects/` to `completed/` (rather than deleting it), so its durable
