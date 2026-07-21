@@ -940,6 +940,220 @@ Proof.
                  (eq_sym (pt_graft1_ents t vpn b _)) Hb).
 Qed.
 
+(* ---- level-indexed same-representation, for the GENERIC walk loop ----- *)
+(* [ptree_same_rep0] is hard-wired to the 3-level walk, so the two graft
+   preservations above are depth-specific.  The generic loop instead works
+   with a subtree at an abstract level [lvl] and threads a level-indexed
+   relation.  To bridge back to the whole-tree relation (which exposes the
+   intermediate PTEs [p2 p1] as outputs) the fuel-generic maps predicate
+   must carry the whole path of PTEs, indexed by level via [P : nat -> _];
+   [ptree_maps_path_lvl 2 t v P p0] is exactly [ptree_maps t v (P 2) (P 1) p0].
+   The loop needs three facts, all uniform in [lvl]:
+     - grafting a fresh empty page at a stopped slot preserves it
+       ([ptree_same_rep0_lvl_graft]) -- the alloc arm's local step;
+     - replacing a child subtree by an equivalent one preserves it one
+       level up ([ptree_same_rep0_lvl_upd_kid]) -- the zipper's restore;
+     - at level 2 it coincides with the whole-tree [ptree_same_rep0]
+       ([ptree_same_rep0_lvl_2]) -- the final bridge. *)
+Fixpoint ptree_maps_path_lvl (lvl : nat) (t : ptree) (vpn : mword 27)
+    (P : nat -> mword 64) (p0 : mword 64) : Prop :=
+  match lvl with
+  | O => pt_ents t (vpn_idx 0 vpn) = p0
+         /\ pte_valid p0 /\ pte_leaf p0 /\ pte_no_napot p0 /\ pte_pbmt0 p0
+  | S l => exists c,
+      pt_kids t (vpn_idx (S l) vpn) = Some c
+      /\ pt_ents t (vpn_idx (S l) vpn) = P (S l)
+      /\ pte_valid (P (S l)) /\ pte_ptr (P (S l))
+      /\ u_next_base (P (S l)) = pt_base c
+      /\ ptree_maps_path_lvl l c vpn P p0
+  end.
+
+Definition ptree_same_rep0_lvl (lvl : nat) (t t' : ptree) : Prop :=
+  pt_base t' = pt_base t /\
+  (forall v P p0, ptree_maps_path_lvl lvl t v P p0 <-> ptree_maps_path_lvl lvl t' v P p0) /\
+  (forall v, ptree_blocks0_lvl lvl t v <-> ptree_blocks0_lvl lvl t' v).
+
+Lemma ptree_same_rep0_lvl_refl (lvl : nat) (t : ptree) :
+  ptree_same_rep0_lvl lvl t t.
+Proof. split; [reflexivity | split; [intros; tauto | intros; tauto]]. Qed.
+
+Lemma ptree_same_rep0_lvl_trans (lvl : nat) (t t' t'' : ptree) :
+  ptree_same_rep0_lvl lvl t t' -> ptree_same_rep0_lvl lvl t' t'' ->
+  ptree_same_rep0_lvl lvl t t''.
+Proof.
+  intros (Hb & Hm & Hbl) (Hb' & Hm' & Hbl').
+  split; [ rewrite Hb'; exact Hb | split ].
+  - intros v P p0. rewrite (Hm v P p0). exact (Hm' v P p0).
+  - intros v. rewrite (Hbl v). exact (Hbl' v).
+Qed.
+
+(* a freshly kalloc'd, zeroed page NEVER maps: every ent is the zero word *)
+Lemma ptree_maps_path_lvl_empty_False (lvl : nat) (b : mword 44)
+    (vpn : mword 27) (P : nat -> mword 64) (p0 : mword 64) :
+  ptree_maps_path_lvl lvl (pt_empty_node b) vpn P p0 -> False.
+Proof.
+  destruct lvl; cbn.
+  - intros (He & Hv & _). rewrite <- He in Hv.
+    exact (pte_valid_invalid_excl _ Hv pte_invalid_zero).
+  - intros (c & Hk & _). discriminate.
+Qed.
+
+(* the alloc arm's local step: grafting a fresh empty page at a stopped
+   slot (kids None, ent zero) leaves the represented map unchanged at
+   [S l] (the slot went from a dead end to a pointer into a page that maps
+   nothing).  Holds only above level 0 -- the walk never grafts at a leaf. *)
+Lemma ptree_same_rep0_lvl_graft (l : nat) (t : ptree) (i : mword 9) (b : mword 44) :
+  pt_kids t i = None ->
+  pt_ents t i = mword_of_int 0 ->
+  ptree_same_rep0_lvl (S l) t (pt_graft t i b).
+Proof.
+  intros Hk He. split; [ apply pt_graft_base | split ].
+  - (* maps: both sides refutable at slot i, transported elsewhere *)
+    intros v P p0. destruct (decide (vpn_idx (S l) v = i)) as [Ei | Ei].
+    + split.
+      * intros (c & H1 & _). rewrite Ei in H1. congruence.
+      * intros (c & H1 & _ & _ & _ & _ & H6). rewrite Ei pt_graft_kid in H1.
+        injection H1 as H1. subst c.
+        destruct (ptree_maps_path_lvl_empty_False l b v P p0 H6).
+    + pose proof (pt_graft_kids_other t i (vpn_idx (S l) v) b Ei) as Hko.
+      pose proof (pt_graft_ents_other t i (vpn_idx (S l) v) b Ei) as Heo.
+      split.
+      * intros (c & H1 & H2 & H3 & H4 & H5 & H6). exists c.
+        rewrite Hko Heo. repeat split; assumption.
+      * intros (c & H1 & H2 & H3 & H4 & H5 & H6). exists c.
+        rewrite Hko in H1. rewrite Heo in H2.
+        repeat split; assumption.
+  - (* blocks0: both sides hold at slot i (stop vs descend-into-empty) *)
+    intros v. destruct (decide (vpn_idx (S l) v = i)) as [Ei | Ei].
+    + split; intros _.
+      * right. exists (pt_empty_node b).
+        rewrite !Ei !pt_graft_kid !pt_graft_ent !pt_ptr_pte_base !pt_empty_node_base.
+        repeat split;
+          first [ reflexivity | exact (pt_ptr_pte_valid b)
+                | exact (pt_ptr_pte_ptr b) | apply ptree_blocks0_lvl_empty ].
+      * left. rewrite Ei. split; [ exact Hk | exact He ].
+    + pose proof (pt_graft_kids_other t i (vpn_idx (S l) v) b Ei) as Hko.
+      pose proof (pt_graft_ents_other t i (vpn_idx (S l) v) b Ei) as Heo.
+      split.
+      * intros [ (Hn & Hz) | (c & H1 & H2 & H3 & H4 & H5) ].
+        -- left. rewrite Hko Heo. split; [ exact Hn | exact Hz ].
+        -- right. exists c. rewrite Hko !Heo. repeat split; assumption.
+      * intros [ (Hn & Hz) | (c & H1 & H2 & H3 & H4 & H5) ].
+        -- left. rewrite Hko in Hn. rewrite Heo in Hz. split; [ exact Hn | exact Hz ].
+        -- right. exists c. rewrite Hko in H1. rewrite !Heo in H2 H3 H4.
+           repeat split; assumption.
+Qed.
+
+(* the zipper's restore step: replacing a child subtree by a level-[l]
+   equivalent one preserves the level-[S l] representation of the parent.
+   Iterated up the descent path, this lifts a local [ptree_same_rep0_lvl]
+   witness all the way to the root. *)
+Lemma ptree_same_rep0_lvl_upd_kid (l : nat) (t : ptree) (i : mword 9) (c c' : ptree) :
+  pt_kids t i = Some c ->
+  ptree_same_rep0_lvl l c c' ->
+  ptree_same_rep0_lvl (S l) t (pt_upd_kid t i (Some c')).
+Proof.
+  intros Hk (Hbase & Hmaps & Hblk). split; [ apply pt_upd_kid_base | split ].
+  - intros v P p0. destruct (decide (vpn_idx (S l) v = i)) as [Ei | Ei].
+    + split.
+      * intros (d & H1 & H2 & H3 & H4 & H5 & H6).
+        rewrite Ei in H1. assert (d = c) as -> by congruence.
+        exists c'. rewrite !Ei pt_upd_kid_same pt_upd_kid_ents.
+        rewrite Ei in H2.
+        repeat split; try reflexivity; try assumption;
+          [ rewrite Hbase; exact H5 | apply (proj1 (Hmaps v P p0)); exact H6 ].
+      * intros (d & H1 & H2 & H3 & H4 & H5 & H6).
+        rewrite Ei pt_upd_kid_same in H1. injection H1 as H1. subst d.
+        rewrite Ei pt_upd_kid_ents in H2.
+        exists c. rewrite !Ei.
+        repeat split; try reflexivity; try assumption;
+          [ rewrite <- Hbase; exact H5 | apply (proj2 (Hmaps v P p0)); exact H6 ].
+    + pose proof (pt_upd_kid_other t i (Some c') (vpn_idx (S l) v) Ei) as Hko.
+      pose proof (pt_upd_kid_ents t i (Some c') (vpn_idx (S l) v)) as Heo.
+      split.
+      * intros (d & H1 & H2 & H3 & H4 & H5 & H6). exists d.
+        rewrite Hko Heo. repeat split; assumption.
+      * intros (d & H1 & H2 & H3 & H4 & H5 & H6). exists d.
+        rewrite Hko in H1. rewrite Heo in H2.
+        repeat split; assumption.
+  - intros v. destruct (decide (vpn_idx (S l) v = i)) as [Ei | Ei].
+    + split.
+      * intros [ (Hn & _) | (d & H1 & H2 & H3 & H4 & H5) ].
+        -- rewrite Ei in Hn. congruence.
+        -- rewrite Ei in H1. assert (d = c) as -> by congruence.
+           right. exists c'. rewrite !Ei pt_upd_kid_same !pt_upd_kid_ents.
+           rewrite !Ei in H2 H3 H4.
+           repeat split; try reflexivity; try assumption;
+             [ rewrite Hbase; exact H4 | apply (proj1 (Hblk v)); exact H5 ].
+      * intros [ (Hn & _) | (d & H1 & H2 & H3 & H4 & H5) ].
+        -- rewrite Ei pt_upd_kid_same in Hn. discriminate.
+        -- rewrite Ei pt_upd_kid_same in H1. injection H1 as H1. subst d.
+           rewrite Ei !pt_upd_kid_ents in H2 H3 H4.
+           right. exists c. rewrite !Ei.
+           repeat split; try reflexivity; try assumption;
+             [ rewrite <- Hbase; exact H4 | apply (proj2 (Hblk v)); exact H5 ].
+    + pose proof (pt_upd_kid_other t i (Some c') (vpn_idx (S l) v) Ei) as Hko.
+      pose proof (pt_upd_kid_ents t i (Some c') (vpn_idx (S l) v)) as Heo.
+      split.
+      * intros [ (Hn & Hz) | (d & H1 & H2 & H3 & H4 & H5) ].
+        -- left. rewrite Hko Heo. split; [ exact Hn | exact Hz ].
+        -- right. exists d. rewrite Hko !Heo. repeat split; assumption.
+      * intros [ (Hn & Hz) | (d & H1 & H2 & H3 & H4 & H5) ].
+        -- left. rewrite Hko in Hn. rewrite Heo in Hz. split; [ exact Hn | exact Hz ].
+        -- right. exists d. rewrite Hko in H1. rewrite !Heo in H2 H3 H4.
+           repeat split; assumption.
+Qed.
+
+(* [ptree_maps_path_lvl 2] is exactly the whole-tree [ptree_maps], with the
+   two intermediate PTEs read off [P] at 2 and 1. *)
+Lemma ptree_maps_path_lvl2 (t : ptree) (v : mword 27) (P : nat -> mword 64) (p0 : mword 64) :
+  ptree_maps_path_lvl 2 t v P p0 <-> ptree_maps t v (P 2%nat) (P 1%nat) p0.
+Proof.
+  split.
+  - intros (c1 & Hk2 & He2 & Hv2 & Hp2 & Hu2 &
+            c0 & Hk1 & He1 & Hv1 & Hp1 & Hu1 & He0 & Hvl & Hlf & Hnn & Hpb).
+    exists c1, c0. repeat split; assumption.
+  - intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hu2 & Hu1 &
+            Hv2 & Hp2 & Hv1 & Hp1 & Hvl & Hlf & Hnn & Hpb).
+    exists c1. repeat split; try assumption.
+    exists c0. repeat split; assumption.
+Qed.
+
+(* the reverse of [ptree_blocks0_blocks0_lvl2]: flatten the fuel-nested
+   disjunction back into the whole-tree three-way one. *)
+Lemma ptree_blocks0_lvl2_blocks0 (t : ptree) (v : mword 27) :
+  ptree_blocks0_lvl 2 t v -> ptree_blocks0 t v.
+Proof.
+  intros [ (Hn & Hz) | (c1 & Hk2 & Hv2 & Hp2 & Hu2 & Hb1) ].
+  - left. split; assumption.
+  - destruct Hb1 as [ (Hn1 & Hz1) | (c0 & Hk1 & Hv1 & Hp1 & Hu1 & Hb0) ].
+    + right; left. exists c1. repeat split; assumption.
+    + right; right. exists c1, c0. repeat split; assumption.
+Qed.
+
+(* the bridge: at the root level the fuel-generic relation is exactly the
+   whole-tree [ptree_same_rep0] the walk's postcondition speaks. *)
+Lemma ptree_same_rep0_lvl_2 (t t' : ptree) :
+  ptree_same_rep0_lvl 2 t t' <-> ptree_same_rep0 t t'.
+Proof.
+  split; intros (Hb & Hm & Hbl); split; [ exact Hb | split | exact Hb | split ].
+  - intros v p2 p1 p0.
+    pose (P := fun k : nat => match k with 2%nat => p2 | _ => p1 end).
+    change (ptree_maps t v (P 2%nat) (P 1%nat) p0 <-> ptree_maps t' v (P 2%nat) (P 1%nat) p0).
+    rewrite <- !(ptree_maps_path_lvl2 _ v P p0). exact (Hm v P p0).
+  - intros v. split; intro H.
+    + apply ptree_blocks0_lvl2_blocks0. apply (Hbl v).
+      apply ptree_blocks0_blocks0_lvl2; exact H.
+    + apply ptree_blocks0_lvl2_blocks0. apply (Hbl v).
+      apply ptree_blocks0_blocks0_lvl2; exact H.
+  - intros v P p0. rewrite !(ptree_maps_path_lvl2 _ v P p0). exact (Hm v (P 2%nat) (P 1%nat) p0).
+  - intros v. split; intro H.
+    + apply ptree_blocks0_blocks0_lvl2. apply (Hbl v).
+      apply ptree_blocks0_lvl2_blocks0; exact H.
+    + apply ptree_blocks0_blocks0_lvl2. apply (Hbl v).
+      apply ptree_blocks0_lvl2_blocks0; exact H.
+Qed.
+
 (* ===================================================================== *)
 (* §5 The Iris layer: a kalloc'd+memset ZEROED page becomes a description *)
 (*    node ([zero_page_to_node]); grafting it into an owned tree under a  *)
