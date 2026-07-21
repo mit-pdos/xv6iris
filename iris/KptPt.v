@@ -353,7 +353,6 @@ End KptRamTranslate.
 (* ===================================================================== *)
 
 Definition kpt_adf : Type := mword 27 -> bool * bool.
-Definition kpt_adf1 : kpt_adf := fun _ => (true, true).
 
 (* flag byte: base perms (V|R|W[|X]) + A (bit 6) + D (bit 7) *)
 Definition kpt_ad_bits (ad : bool * bool) : Z :=
@@ -367,9 +366,6 @@ Definition kpt_lflags_ad (adf : kpt_adf) (vpn : mword 27) : Z :=
 Definition kpt_leaf_pte_ad (adf : kpt_adf) (vpn : mword 27) : mword 64 :=
   mk_pte (kpt_leaf_ppn vpn) (kpt_lflags_ad adf vpn).
 
-Definition kpt_tlb_ent_ad (adf : kpt_adf) (root : mword 44) (vpn : mword 27) : TLB_Entry :=
-  tlb4k_entry (mword_of_int 0) vpn (kpt_leaf_ppn vpn) (kpt_leaf_pte_ad adf vpn)
-    (kpt_slot0_pa root vpn).
 
 
 Definition kpt_mem_ad (adf : kpt_adf) (s : mstate) (root : mword 44) : Prop :=

@@ -29,25 +29,6 @@ Proof.
   rewrite H. rewrite andb_false_r. apply exec_returnm.
 Qed.
 
-Lemma run_read_ram_resacq_4_pin (addr : mword 64) (w : bv 32) s :
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  run (read_ram rv64d_types.Read_RISCV_reserved_acquire (Physaddr addr) 4 false) s (w, default_meta) s.
-Proof.
-  intros Hdev Hbytes.
-  unfold read_ram. cbn match.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  unfold Defs.sail_mem_read. cbn beta zeta.
-  eexists _, s. split.
-  - eapply run_MemRead_ram_intro.
-    + exact Hdev.
-    + intros j Hj. exact (Hbytes j Hj).
-    + apply run_returnM_fwd.
-  - cbn match beta. apply run_returnM_fwd.
-Qed.
 
 
 

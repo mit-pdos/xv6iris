@@ -280,14 +280,6 @@ Proof.
 Qed.
 
 (* helper: exec_legalize_sstatus *)
-Local Lemma exec_legalize_sstatus (m v : mword 64) s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (legalize_sstatus m v) s = Some (legalize_sstatus_val m v, s).
-Proof.
-  intros HS HU. unfold legalize_sstatus, legalize_sstatus_val.
-  apply (exec_legalize_mstatus m (lift_sstatus m (Mk_Sstatus (zero_extend' 64 v))) s HS HU).
-Qed.
 
 (* helper: exec_write_CSR_sstatus *)
 
@@ -306,26 +298,6 @@ Proof.
 Qed.
 
 (* helper: exec_check_CSR_sstatus_S *)
-Local Lemma exec_check_CSR_sstatus_S s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (check_CSR csr_sstatus Supervisor CSRReadWrite) s = Some (true, s).
-Proof.
-  intro HS. unfold check_CSR.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_check_CSR_priv_sstatus_S s)). cbn match.
-  assert (HA : exec (returnM (check_CSR_access csr_sstatus CSRReadWrite) : M bool) s
-               = Some (true, s)).
-  { rewrite exec_returnM.
-    replace (check_CSR_access csr_sstatus CSRReadWrite) with true by (vm_compute; reflexivity).
-    reflexivity. }
-  rewrite (exec_and_boolM_Some _ _ _ _ _ HA). cbn match.
-  assert (Hacc : exec (is_CSR_accessible csr_sstatus Supervisor CSRReadWrite) s = Some (true, s)).
-  { unfold is_CSR_accessible. skip_csr_false_clauses.
-    replace (eq_vec csr_sstatus (Ox"100")) with true by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity. }
-  rewrite (exec_and_boolM_Some _ _ _ _ _ Hacc). cbn match.
-  unfold stateen_allows_CSR_access. cbn match. skip_csr_false_clauses.
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_check_CSR_result_sstatus_S *)
 

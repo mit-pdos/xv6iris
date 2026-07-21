@@ -302,7 +302,6 @@ Section WpUartPutcSync.
     extend_value true (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b).
 
   (* the byte the [lbu] leaf writes back when the read returns [uart_lsr u] *)
-  Definition uart_lsr_ldval (u : uart_state) : mword 64 := lsr_ldval_of (uart_lsr u).
 
   (* THE POLL'S BRANCH TEST, as a function of the read byte: [andi a5,a5,32]
      then [c.beqz a5].  True = THRE clear = branch taken = spin again. *)

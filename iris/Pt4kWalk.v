@@ -605,13 +605,6 @@ Section TrampWalk.
   Qed.
 
   (* the whole 3-level walk. *)
-  Lemma exec_pt_walk_tramp3 :
-    exec (pt_walk 39 vpn access Supervisor mxr do_sum p2 2 false tt) s
-    = Some (Ok (tramp_walk_out, tt), s).
-  Proof.
-    unfold pt_walk.
-    apply exec_rec_pt_walk_l2.
-  Qed.
 
 End TrampWalk.
 
@@ -729,41 +722,6 @@ Definition tlb4k_entry (asid : mword 16) (vpn : mword 27) (pp : mword 44)
 |}.
 
 (* add_to_TLB at level 0 installs [tlb4k_entry] at the direct-mapped slot. *)
-Lemma exec_add_to_TLB_4k (asid : mword 16) (vpn : mword 27) (pp : mword 44)
-    (pte ptea : mword 64) s :
-  exec (add_to_TLB 39 asid vpn pp pte (Physaddr ptea) 0 false) s
-  = Some (tt, set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
-                               (tlb_hash (__id 39) vpn)
-                               (Some (tlb4k_entry asid vpn pp pte ptea)))).
-Proof.
-  unfold add_to_TLB. cbn zeta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
-  match goal with |- context[Defs.bind (Defs.bind0 (Defs.write_reg ?r ?v) ?n) ?k] =>
-    assert (Hwr : exec (Defs.bind0 (Defs.write_reg r v) n) s
-                  = Some (v, set_reg s r v)) end.
-  { rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg _ _ s)).
-    rewrite (exec_read_reg tlb _).
-    unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hwr).
-  cbv beta. rewrite exec_returnM.
-  unfold tlb_add_callback.
-  do 5 f_equal. unfold tlb4k_entry.
-  change (__id 39 - 12) with 27.
-  change (if __id 39 =? 32 then 22 else 44) with 44.
-  f_equal;
-  lazymatch goal with
-  | |- context[and_vec vpn _] =>
-      first [ apply and27_ones; vm_compute; reflexivity
-            | f_equal; first [ apply and27_ones; vm_compute; reflexivity
-                             | reflexivity ] ]
-  | |- context[and_vec pp _] =>
-      first [ apply zext44_and_ones; vm_compute; reflexivity
-            | f_equal; first [ apply zext44_and_ones; vm_compute; reflexivity
-                             | reflexivity ] ]
-  | |- context[zero_extend' 64 pte] => apply zero_extend64_id
-  | |- _ => apply bv_eq; vm_compute; reflexivity
-  end.
-Qed.
 
 (* ===================================================================== *)
 (* 5. 4K TLB lookup / translate (from TrampTlb).                          *)
@@ -826,30 +784,8 @@ Proof.
   exact Hx.
 Qed.
 
-Lemma tlb_get_ppn_4k (asid : mword 16) (vpn vpn' : mword 27) (pp : mword 44)
-    (pte ptea : mword 64) :
-  tlb_get_ppn 39 (tlb4k_entry asid vpn pp pte ptea) vpn' = pp.
-Proof.
-  unfold tlb_get_ppn, tlb4k_entry.
-  cbn [TLB_Entry_levelMask TLB_Entry_ppn].
-  match goal with |- context[and_vec ?x ?m] =>
-    replace (and_vec x m) with (zeros' 64 : mword 64);
-    [| symmetry; apply and64_zero_r; vm_compute; reflexivity] end.
-  rewrite or64_zeros_r.
-  apply trunc44_zext.
-Qed.
 
 (* [tlb_get_pte] on a 4K entry is the stored 64-bit PTE. *)
-Lemma tlb_get_pte_4k (asid : mword 16) (vpn : mword 27) (pp : mword 44)
-    (pte ptea : mword 64) :
-  tlb_get_pte 8 (tlb4k_entry asid vpn pp pte ptea) = autocast (T := mword) pte.
-Proof.
-  unfold tlb_get_pte, tlb4k_entry. cbn [TLB_Entry_pte].
-  f_equal.
-  match goal with |- @subrange_vec_dec ?w _ ?hi ?lo = _ =>
-    change hi with 63; change lo with 0 end.
-  apply subrange64_63_0_id.
-Qed.
 
 Lemma and45_ones (x m : mword 45) :
   bv_unsigned m = 2 ^ 45 - 1 -> and_vec x m = x.
@@ -943,8 +879,6 @@ Section TrampTranslate.
   Hypothesis Hupd0 : update_PTE_Bits (mk_pte lppn lflags) access = None.
 
   (* the entry the miss path installs (asid 0, user table's l0). *)
-  Definition tramp_tlb_ent : TLB_Entry :=
-    tlb4k_entry (mword_of_int 0) vpn lppn (mk_pte lppn lflags) a0.
 
 
   (* HIT on a same-shaped 4K entry (any pteAddr: phase B hits the KERNEL

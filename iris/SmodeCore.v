@@ -431,11 +431,8 @@ Qed.
 Definition kv_vpn : mword 27 := mword_of_int 0x80005.
 (* leaf PTE mapping [0x80000000,0xC0000000) identically: ppn field 0x80000
    (1GB-aligned), flags D A _ _ X W R V = 0xCF (U=0). *)
-Definition pte_super : mword 64 := mword_of_int (Z.lor (Z.shiftl 0x80000 10) 0xCF).
 (* The PTE physical address the Sv39 walk computes for a kernelvec-page vaddr
    at level 2: pte_paddr rp = (rp << 12) | (VPN[2] << 3). *)
-Definition pte_paddr (rp : mword 44) : mword 64 :=
-  zero_extend' 64 (concat_vec rp (concat_vec (subrange_vec_dec kv_vpn 26 18 : mword 9) (zeros' 3 : mword 3))).
 
 (* The superpage TLB entry the walk installs at hash index 5. *)
 

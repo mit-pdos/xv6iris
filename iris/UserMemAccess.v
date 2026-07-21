@@ -986,46 +986,8 @@ End MisalignedSplitWrite.
 (*    swaps the access-kind constructor (AV_exclusive vs AV_plain).       *)
 (* ===================================================================== *)
 
-Lemma run_read_ram_resv_4_pin (addr : mword 64) (w : bv 32) s :
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  run (read_ram Read_RISCV_reserved (Physaddr addr) 4 false) s (w, default_meta) s.
-Proof.
-  intros Hdev Hbytes.
-  unfold read_ram. cbn match.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  unfold Defs.sail_mem_read. cbn beta zeta.
-  eexists _, s. split.
-  - eapply run_MemRead_ram_intro.
-    + exact Hdev.
-    + intros j Hj. exact (Hbytes j Hj).
-    + apply run_returnM_fwd.
-  - cbn match beta. apply run_returnM_fwd.
-Qed.
 
 
-Lemma run_read_ram_resv_8_pin (addr : mword 64) (w : bv 64) s :
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 8)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  run (read_ram Read_RISCV_reserved (Physaddr addr) 8 false) s (w, default_meta) s.
-Proof.
-  intros Hdev Hbytes.
-  unfold read_ram. cbn match.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  eexists _, s. split; [ apply run_returnM_fwd | ]. cbn beta zeta.
-  apply (proj2 (run_bind _ _ _ _ _)).
-  unfold Defs.sail_mem_read. cbn beta zeta.
-  eexists _, s. split.
-  - eapply run_MemRead_ram_intro.
-    + exact Hdev.
-    + intros j Hj. exact (Hbytes j Hj).
-    + apply run_returnM_fwd.
-  - cbn match beta. apply run_returnM_fwd.
-Qed.
 
 
 (* ===================================================================== *)
@@ -1527,7 +1489,6 @@ Section SplitLoadBundle.
   Context (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
           (data : gset Arch.pa) (w va : mword 64).
 
-  Definition cva (k : nat) : mword 64 := add_vec_int va (Z.of_nat k * bytes).
 
 
 
@@ -1569,17 +1530,11 @@ Section SplitStoreBundle.
           (data : gset Arch.pa) (w va : mword 64) (wv : nat -> mword (8 * bytes)).
 
   Definition cvaS (k : nat) : mword 64 := add_vec_int va (Z.of_nat k * bytes).
-  Definition spaS (k : nat) : mword 64 := u_walk_pa w (cvaS k).
 
 
 
   Context (σ0 : mstate).
 
-  Definition sttrS (s : mstate) (k : nat) : mstate :=
-    match exec (translateAddr (Virtaddr (cvaS k)) (Store Data)) s with
-    | Some (Ok (Physaddr _, _, _), s') => s'
-    | _ => s
-    end.
 
 
 
