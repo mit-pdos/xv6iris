@@ -162,6 +162,89 @@ Proof.
   exists c1, c0. tauto.
 Qed.
 
+(* ===================================================================== *)
+(* FUEL-GENERIC descent relations (the walk-loop pure layer).  A node [t]  *)
+(* sitting at level [lvl] on [vpn]'s path either MAPS down to a valid leaf, *)
+(* reaches level 0 (any leaf word), or BLOCKS at a zero (V=0) word.  The    *)
+(* fixed-3-level [ptree_maps]/[ptree_level0]/[ptree_blocks0] are the [lvl=2] *)
+(* instances (bridges below).                                              *)
+(* ===================================================================== *)
+Fixpoint ptree_maps_lvl (lvl : nat) (t : ptree) (vpn : mword 27) (p0 : mword 64) : Prop :=
+  match lvl with
+  | O => pt_ents t (vpn_idx 0 vpn) = p0
+         /\ pte_valid p0 /\ pte_leaf p0 /\ pte_no_napot p0 /\ pte_pbmt0 p0
+  | S l => exists c,
+      pt_kids t (vpn_idx (S l) vpn) = Some c
+      /\ pte_valid (pt_ents t (vpn_idx (S l) vpn))
+      /\ pte_ptr (pt_ents t (vpn_idx (S l) vpn))
+      /\ u_next_base (pt_ents t (vpn_idx (S l) vpn)) = pt_base c
+      /\ ptree_maps_lvl l c vpn p0
+  end.
+
+Fixpoint ptree_level0_lvl (lvl : nat) (t : ptree) (vpn : mword 27) (w0 : mword 64) : Prop :=
+  match lvl with
+  | O => pt_ents t (vpn_idx 0 vpn) = w0
+  | S l => exists c,
+      pt_kids t (vpn_idx (S l) vpn) = Some c
+      /\ pte_valid (pt_ents t (vpn_idx (S l) vpn))
+      /\ pte_ptr (pt_ents t (vpn_idx (S l) vpn))
+      /\ u_next_base (pt_ents t (vpn_idx (S l) vpn)) = pt_base c
+      /\ ptree_level0_lvl l c vpn w0
+  end.
+
+Fixpoint ptree_blocks0_lvl (lvl : nat) (t : ptree) (vpn : mword 27) : Prop :=
+  match lvl with
+  | O => pt_ents t (vpn_idx 0 vpn) = mword_of_int 0
+  | S l => (pt_kids t (vpn_idx (S l) vpn) = None
+              /\ pt_ents t (vpn_idx (S l) vpn) = mword_of_int 0)
+           \/ (exists c,
+                 pt_kids t (vpn_idx (S l) vpn) = Some c
+                 /\ pte_valid (pt_ents t (vpn_idx (S l) vpn))
+                 /\ pte_ptr (pt_ents t (vpn_idx (S l) vpn))
+                 /\ u_next_base (pt_ents t (vpn_idx (S l) vpn)) = pt_base c
+                 /\ ptree_blocks0_lvl l c vpn)
+  end.
+
+(* every mapped walk reaches level 0 *)
+Lemma ptree_maps_lvl_level0_lvl (lvl : nat) (t : ptree) (vpn : mword 27) (p0 : mword 64) :
+  ptree_maps_lvl lvl t vpn p0 -> ptree_level0_lvl lvl t vpn p0.
+Proof.
+  revert t. induction lvl as [|l IH]; intros t; cbn.
+  - intros (He & _). exact He.
+  - intros (c & Hk & Hv & Hp & Hb & Hrec). exists c.
+    repeat split; try assumption. apply IH; exact Hrec.
+Qed.
+
+(* ---- level-2 bridges to the fixed-depth relations -------------------- *)
+Lemma ptree_maps_maps_lvl2 (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
+  ptree_maps t vpn p2 p1 p0 -> ptree_maps_lvl 2 t vpn p0.
+Proof.
+  intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb2 & Hb1 &
+          Hv2 & Hp2 & Hv1 & Hp1 & Hv0 & Hl0 & Hn0 & Hpb0).
+  cbn. exists c1. rewrite He2. repeat split; try assumption.
+  cbn. exists c0. rewrite He1. rewrite He0. repeat split; assumption.
+Qed.
+
+Lemma ptree_level0_lvl2_level0 (t : ptree) (vpn : mword 27) (w0 : mword 64) :
+  ptree_level0_lvl 2 t vpn w0 -> exists p2 p1, ptree_level0 t vpn p2 p1 w0.
+Proof.
+  cbn. intros (c1 & Hk2 & Hv2 & Hp2 & Hb2 & c0 & Hk1 & Hv1 & Hp1 & Hb1 & He0).
+  exists (pt_ents t (vpn_idx 2 vpn)), (pt_ents c1 (vpn_idx 1 vpn)).
+  exists c1, c0. repeat split; (assumption || reflexivity).
+Qed.
+
+Lemma ptree_blocks0_blocks0_lvl2 (t : ptree) (vpn : mword 27) :
+  ptree_blocks0 t vpn -> ptree_blocks0_lvl 2 t vpn.
+Proof.
+  intros [ [Hk He] | [ (c1 & Hk2 & Hk1 & Hv2 & Hp2 & Hb2 & He1) |
+                       (c1 & c0 & Hk2 & Hk1 & Hv2 & Hp2 & Hv1 & Hp1 & Hb2 & Hb1 & He0) ] ].
+  - left. split; assumption.
+  - right. exists c1. repeat split; try assumption.
+    left. split; assumption.
+  - right. exists c1. repeat split; try assumption.
+    right. exists c0. repeat split; assumption.
+Qed.
+
 (* the leaf word mappages writes for page [i] of a run starting at
    physical page [ppn0] with permission bits [perm]: PA2PTE(pa)|perm|V,
    A/D clear -- exactly the loop store *)
