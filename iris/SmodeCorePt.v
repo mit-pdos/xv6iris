@@ -681,27 +681,6 @@ Section SmodeCorePt.
       tlb_inv_pt root_ppn.
   Proof. exact (s_regime_fetch (kpt_regime root_ppn) σ pc r). Qed.
 
-  Lemma wp_instr_s_tlbinv_pt (root_ppn : mword 44) (γ : gname) Φ
-      (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
-    smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
-    PC ↦ᵣ pc -∗
-    instr pc is_rvc i -∗
-    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (s_exec : mstate),
-         ⌜ exec (execute i)
-                (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs))
-                                     (if is_rvc then 2 else 4)))
-             = Some (RETIRE_SUCCESS, s_exec) ⌝ ∗
-         mstate_interp s_exec ∗
-         (smode_config γ dq -∗
-          tlb_inv_pt root_ppn -∗
-          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof. exact (wp_instr_s_regime (kpt_regime root_ppn) γ Φ pc is_rvc i (dq:=dq)). Qed.
-
   Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :

@@ -510,44 +510,4 @@ Section UptTranslateIrisAcc.
              Heff Hss Hall).
   Qed.
 
-  Lemma utlb_inv_pt_translateAddr_tf_store (uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (va pa : mword 64) (σ : mstate) :
-    svpn_of va = tf_vpn ->
-    neq_vec (bits_of_virtaddr (Virtaddr va))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-    zero_extend' 64 (concat_vec tfp
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = Supervisor ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    exec (effectivePrivilege (Store Data) (register_lookup mstatus σ.(sregs)) Supervisor) σ
-      = Some (Supervisor, σ) ->
-    exec (is_shadow_stack_access (Store Data)) σ = Some (false, σ) ->
-    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ==∗
-    ∃ σ' : mstate,
-      ⌜ exec (translateAddr (Virtaddr va) (Store Data)) σ
-        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-      ⌜ (σ'.(sregs) = σ.(sregs) \/
-         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um.
-  Proof.
-    intros Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    assert (Hout : zero_extend' 64 (concat_vec
-        ((autocast (T := mword) ((autocast (T := mword)
-            (PPN_of_PTE (pte_tf tfp : mword 64))) : mword 44)) : mword 44)
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
-    { rewrite <- (tf_variant_ppn tfp ('b"1") ('b"1")) in Hid.
-      rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    apply (utlb_inv_pt_translateAddr (Store Data) Supervisor uroot tfp um (pte_tf tfp) va pa σ
-             (fun a d mxr do_sum => tf_variant_check_store tfp a d mxr do_sum)
-             (or_intror (or_introl (conj Hvpn eq_refl)))
-             Hcanon Hout Hmisa Hmenv Hhtif Hcp
-             (fun satp0 Hs Hm => exec_translationMode_S_sv39 satp0 σ HSXL Hs Hm)
-             Heff Hss Hall).
-  Qed.
-
 End UptTranslateIrisAcc.
