@@ -224,6 +224,7 @@ KernelDataInv.v
 WpUartPutcSync.v
 WpUartPutcSyncFull.v
 SpecUartPutc.v
+WpSconfUartAccess.v
 WpSconfUartPutc.v
 LinkUartPutc.v
 WpFreerangeDecode.v
@@ -248,3 +249,7 @@ WpFileinitDecode.v
 SpecFileinit.v
 WpSconfFileinit.v
 LinkFileinit.v
+WpUartinitDecode.v
+SpecUartinit.v
+WpSconfUartinit.v
+LinkUartinit.v

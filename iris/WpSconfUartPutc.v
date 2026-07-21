@@ -37,6 +37,7 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl SpecUart.
 Require Import WpUartPutcSync WpUartPutcSyncFull.
+Require Import WpSconfUartAccess.
 Require Import SpecUartPutc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -44,171 +45,19 @@ Local Open Scope Z_scope.
 
 Module UartPutcProof (Uart : UART) : UARTPUTC.
 
+(* The base ALU leaves ([wp_lui_s_sconf], [wp_andi_s_sconf]) live in
+   WpSconfAlu.v; the call-site-specialized UART device leaves
+   ([wp_uart_lsr_read_s_sconf], [wp_uart_thr_write_s_sconf]) live in the
+   WpSconfUartAccess.v leaf functor.  Instantiate the latter against this
+   proof's sealed [Uart]. *)
+Module UAcc := UartAccessProof Uart.
+
 Section WpSconfUartPutc.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation UPS := KernelSyms.uartputc_sync.
-
-  (* =================================================================== *)
-  (*  Two base leaves missing from the sconf ALU library: LUI and ANDI.   *)
-  (*  Both go through the base gpr-write engine + the register-generic     *)
-  (*  execute facts (WpMmodeLeafBase).                                     *)
-  (* =================================================================== *)
-  Lemma wp_lui_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 20)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (luival imm)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rd rd
-              (UTYPE (imm, Regidx rd, LUI)) (luival imm) m n
-              Hrd Hrdsp _
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    - intros s_pc Hnpc _ _.
-      rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      reflexivity.
-    - iIntros "Hhs' Hsc' Hcap' Htlbinv' Hpc' Hfile'".
-      iDestruct (sie_cap_gpr_join with "Hcap' Hfile'") as "Hcg'".
-      iApply ("Hcont" with "Hhs' Hsc' Hcg' Htlbinv' Hpc'").
-  Qed.
-
-  Lemma wp_andi_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg
-        (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm))]> m) n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    unshelve iApply (wp_gpr_write_s_sconf_base γ root_ppn Φ pc rd rs1 rs1
-              (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))
-              (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) m n
-              Hrd Hrdsp _
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    - intros s_pc Hnpc Hva _.
-      rewrite (exec_execute_ITYPE_ANDI_gpr rs1 rd imm s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_andi_val. rewrite Hva. reflexivity.
-    - iIntros "Hhs' Hsc' Hcap' Htlbinv' Hpc' Hfile'".
-      iDestruct (sie_cap_gpr_join with "Hcap' Hfile'") as "Hcg'".
-      iApply ("Hcont" with "Hhs' Hsc' Hcg' Htlbinv' Hpc'").
-  Qed.
-
-  (* =================================================================== *)
-  (*  Call-site-specialized device leaves over the sconf accessor forms.  *)
-  (* =================================================================== *)
-  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
-      (m : regfile) (n : nat) (l : list (bv 8)) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    m !!! Regidx rs1 = uart_pa 5 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗
-    ( ∀ b : bv 8,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      uart_tx_own γd l -∗
-      (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp Haddr) "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (Uart.wp_lb_uart_s_sconf γ root_ppn γd 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
-              m n (uart_tx_own γd l)
-              (fun b => uart_tx_own γd l ∗ (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l))%I
-              ltac:(unfold uart_size; lia) Hrd Hrdsp
-              ltac:(rewrite Haddr; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hdinv Hown [] [Hcont]").
-    - iIntros (u b u') "%Hread Hg Hown".
-      rewrite uart_read_lsr in Hread. injection Hread as <- <-.
-      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
-      destruct (uart_thre u) eqn:Hthre.
-      + iDestruct (uart_tx_poll_thre γd u l Hthre with "Hown Htx Hout")
-          as "(Hown & Htx & Hout & #Hlb & %Hfacts)".
-        iModIntro. iFrame "Hs Hout Htx Hdl Hown". iIntros (_). iExact "Hlb".
-      + iModIntro. iFrame "Hs Hout Htx Hdl Hown".
-        iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
-    - iIntros (b) "Hhs Hsc Hcg Htlbinv Hpc [Hown Hlb]".
-      iApply ("Hcont" $! b with "Hhs Hsc Hcg Htlbinv Hpc Hown Hlb").
-  Qed.
-
-  Lemma wp_uart_thr_write_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) (l : list (bv 8)) :
-    m !!! Regidx rs1 = uart_pa 0 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-      pc_is (add_vec_int pc 4) -∗
-      uart_tx_own γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
-      uart_sent γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Haddr) "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
-    set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
-    iApply (Uart.wp_sb_uart_s_sconf γ root_ppn γd 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
-              m n (uart_tx_own γd l)
-              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I
-              ltac:(unfold uart_size; lia)
-              ltac:(rewrite Haddr; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hdinv Hown [] [Hcont]").
-    - iIntros (u u') "%Hwrite Hg Hown".
-      iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
-      iDestruct (uart_tx_ready_persists γd u l with "Hown Hlb Hoff Htx Hout Hdl") as %[Hempty Hdlab].
-      iDestruct (uart_tx_own_agree with "Htx Hown") as %Haccu.
-      assert (Hroom : (length (u_tx u) < uart_fifo_depth)%nat).
-      { rewrite Hempty. cbn [length]. unfold uart_fifo_depth. lia. }
-      assert (Hacc' : uart_acc u' = l ++ [sb]).
-      { rewrite (uart_write_thr_acc u sb u' Hdlab Hroom Hwrite) Haccu. reflexivity. }
-      iMod (uart_tx_own_update γd u l u' with "Htx Hown") as "[Htx Hown]".
-      iMod (uart_sent_update γd u u' with "Hs") as "[Hs Hsent]".
-      { rewrite Haccu Hacc'. by apply prefix_app_r. }
-      iDestruct (uart_out_auth_stable γd u u' (uart_write_out _ _ _ _ Hwrite) with "Hout") as "Hout".
-      iDestruct (uart_dlab_auth_stable γd u u' (uart_write_dlab_0 _ _ _ Hwrite) with "Hdl") as "Hdl".
-      iEval (rewrite Hacc') in "Hown". iEval (rewrite Hacc') in "Hsent".
-      iModIntro. rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Hown Hsent".
-    - iIntros "Hhs Hsc Hcg Htlbinv Hpc [Hown Hsent]".
-      iApply ("Hcont" with "Hhs Hsc Hcg Htlbinv Hpc Hown Hsent").
-  Qed.
 
   (* =================================================================== *)
   (*  THE THRE POLL LOOP: 0x26 -> 0x30, run under [dev_inv] (Löb).         *)
@@ -255,15 +104,15 @@ Section WpSconfUartPutc.
       WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "Loop".
     { iLöb as "IH". iIntros (m Ha4m Hagm) "Hsc Hhs Hcg Htlbinv Hpc Hown Hk".
       (* 0x26  lbu a5,0(a4) *)
-      iApply (wp_uart_lsr_read_s_sconf γ root_ppn γd Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
+      iApply (UAcc.wp_uart_lsr_read_s_sconf γ root_ppn γd Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
                 m n l ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha4m
                 with "Hsc Hhs Hcg Htlbinv Hpc Hi26 Hdinv Hown").
       iIntros (b) "Hhs Hsc Hcg Htlbinv Hpc Hown Hlb".
       iEval (rewrite P2a) in "Hpc".
       (* 0x2a  andi a5,a5,32 *)
       iApply (wp_andi_s_sconf γ root_ppn Φ (mword_of_int (UPS + 0x2a)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 32 : mword 12)
-                (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_ldval_of b)]> m) n
-                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                _ (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_ldval_of b)]> m) n
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) eq_refl
                 with "Hsc Hhs Hcg Htlbinv Hpc Hi2a").
       iIntros "Hhs Hsc Hcg Htlbinv Hpc".
       iEval (rewrite upd_eq upd_upd) in "Hcg".
@@ -354,7 +203,7 @@ Section WpSconfUartPutc.
              with (ppc_f4' m b)) in "Hcg".
     (* 0x30  zext.b a0,s1  (andi a0,s1,255) *)
     iApply (wp_andi_s_sconf γ root_ppn Φ (mword_of_int (UPS + 0x30)) (mword_of_int 10) (mword_of_int 9) (mword_of_int 255 : mword 12)
-              (ppc_f4' m b) n ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              _ (ppc_f4' m b) n ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) eq_refl
               with "Hsc Hhs Hcg Htlbinv Hpc Hi30").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     iEval (change (<[Regidx (mword_of_int 10) := regval_into_reg (and_vec (ppc_f4' m b !!! Regidx (mword_of_int 9))
@@ -374,7 +223,7 @@ Section WpSconfUartPutc.
                       (subrange_vec_dec (ppc_f6' m b !!! Regidx (mword_of_int 10))
                          (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = sb).
     { unfold sb. rewrite ppc_f6'_a0. reflexivity. }
-    iApply (wp_uart_thr_write_s_sconf γ root_ppn γd Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
+    iApply (UAcc.wp_uart_thr_write_s_sconf γ root_ppn γd Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
               (ppc_f6' m b) n l (ppc_f6'_a5 m b)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi38 Hdinv Hown Hlb Hoff").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hown Hsent".
