@@ -1192,6 +1192,62 @@ Proof.
           | exact H0 ].
 Qed.
 
+(* ---- leaf-carrying descent: like ptree_level0_lvl but records the actual
+   level-0 page reached, so the walk's tail learns [u_next_base p1 = pt_base leaf]
+   (the returned slot address sits in exactly the page the walk descended to). *)
+Fixpoint ptree_leaf_lvl (lvl : nat) (t : ptree) (vpn : mword 27) (leaf : ptree) : Prop :=
+  match lvl with
+  | O => leaf = t
+  | S l => exists c,
+      pt_kids t (vpn_idx (S l) vpn) = Some c
+      /\ pte_valid (pt_ents t (vpn_idx (S l) vpn))
+      /\ pte_ptr (pt_ents t (vpn_idx (S l) vpn))
+      /\ u_next_base (pt_ents t (vpn_idx (S l) vpn)) = pt_base c
+      /\ ptree_leaf_lvl l c vpn leaf
+  end.
+
+Lemma ptree_leaf_lvl_upd_kid_intro (l : nat) (t : ptree) (i : mword 9)
+    (c' leaf : ptree) (vpn : mword 27) :
+  vpn_idx (S l) vpn = i ->
+  pte_valid (pt_ents t i) -> pte_ptr (pt_ents t i) ->
+  u_next_base (pt_ents t i) = pt_base c' ->
+  ptree_leaf_lvl l c' vpn leaf ->
+  ptree_leaf_lvl (S l) (pt_upd_kid t i (Some c')) vpn leaf.
+Proof.
+  intros Ei Hv Hp Hu H0. exists c'.
+  rewrite !Ei pt_upd_kid_same pt_upd_kid_ents.
+  repeat split; first [ reflexivity | exact Hv | exact Hp | exact Hu | exact H0 ].
+Qed.
+
+Lemma ptree_leaf_lvl_graft_intro (l : nat) (t : ptree) (i : mword 9)
+    (b : mword 44) (c' leaf : ptree) (vpn : mword 27) :
+  vpn_idx (S l) vpn = i ->
+  pt_base c' = b ->
+  ptree_leaf_lvl l c' vpn leaf ->
+  ptree_leaf_lvl (S l) (pt_upd_kid (pt_upd_ent t i (pt_ptr_pte b)) i (Some c')) vpn leaf.
+Proof.
+  intros Ei Hb H0. exists c'.
+  rewrite !Ei pt_upd_kid_same !pt_upd_kid_ents !pt_upd_ent_same pt_ptr_pte_base Hb.
+  repeat split;
+    first [ reflexivity | exact (pt_ptr_pte_valid b) | exact (pt_ptr_pte_ptr b)
+          | exact H0 ].
+Qed.
+
+(* the root-level bridge: reaching [leaf] gives the whole-tree [ptree_level0]
+   at [leaf]'s slot word, with the returned level-1 PTE pointing at [leaf]. *)
+Lemma ptree_leaf_lvl_2 (tf : ptree) (vpn : mword 27) (leaf : ptree) :
+  ptree_leaf_lvl 2 tf vpn leaf ->
+  exists p2 p1,
+    ptree_level0 tf vpn p2 p1 (pt_ents leaf (vpn_idx 0 vpn))
+    /\ u_next_base p1 = pt_base leaf.
+Proof.
+  intros (c1 & Hk2 & Hv2 & Hp2 & Hu2 & c0 & Hk1 & Hv1 & Hp1 & Hu1 & Hl0).
+  cbn in Hl0. subst c0.
+  exists (pt_ents tf (vpn_idx 2 vpn)), (pt_ents c1 (vpn_idx 1 vpn)).
+  split; [| exact Hu1].
+  exists c1, leaf. repeat split; assumption.
+Qed.
+
 (* ===================================================================== *)
 (* §5 The Iris layer: a kalloc'd+memset ZEROED page becomes a description *)
 (*    node ([zero_page_to_node]); grafting it into an owned tree under a  *)
