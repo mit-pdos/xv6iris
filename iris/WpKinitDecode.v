@@ -19,7 +19,7 @@ Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
-Require Import KernelRvcDecode.
+Require Import KernelRvcDecode KernelBaseDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -41,19 +41,9 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* ===================================================================== *)
 (* Base (32-bit) decode facts.                                            *)
 (* ===================================================================== *)
-Lemma fdb_00006597 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00006597 : mword 32)) s
-  = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma fdb_53e58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x53e58593 : mword 32)) s
   = Some (ITYPE (mword_of_int 1342 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
-Proof. decode_bridge_ms. Qed.
-
-Lemma fdb_00012517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00012517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma fdb_81e50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -105,7 +95,7 @@ Section WpKinitDecode.
 
   Lemma kii_08 : kernel_text -∗ instr (mword_of_int (KI + 0x08) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (KI + 0x08)%Z (mword_of_int 0x00006597 : mword 32)
-    (mword_of_int (KI + 0x08) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)) fdb_00006597. Qed.
+    (mword_of_int (KI + 0x08) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00006597. Qed.
 
   Lemma kii_0c : kernel_text -∗ instr (mword_of_int (KI + 0x0c) : mword 64) false (ITYPE (mword_of_int 1342 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (KI + 0x0c)%Z (mword_of_int 0x53e58593 : mword 32)
@@ -113,7 +103,7 @@ Section WpKinitDecode.
 
   Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KI + 0x10) : mword 64) false (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KI + 0x10)%Z (mword_of_int 0x00012517 : mword 32)
-    (mword_of_int (KI + 0x10) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) fdb_00012517. Qed.
+    (mword_of_int (KI + 0x10) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00012517. Qed.
 
   Lemma kii_14 : kernel_text -∗ instr (mword_of_int (KI + 0x14) : mword 64) false (ITYPE (mword_of_int 2078 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KI + 0x14)%Z (mword_of_int 0x81e50513 : mword 32)

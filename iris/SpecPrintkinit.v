@@ -1,0 +1,73 @@
+(* SpecPrintkinit.v -- the public interface of Printkinit, stated independently
+   of its proof.  Requires only the definitional layer -- never a whole-function
+   proof file -- so every function proof can be checked in parallel. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia List.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import excl.
+From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvLang RiscvPtsto.
+Require Import RegFile.
+Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import KptTree.
+Require Import StackOwn CalleeSaved.
+Require Import KernelText.
+Require Import IntrDefs WpSmodeIntr.
+Require Import SpecInitlock.
+From Kernel Require KernelSyms.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+
+Notation PK := KernelSyms.printkinit.
+
+(* The address of the string literal "pr" that printkinit passes as initlock's
+   [name] argument.  It sits in .rodata just past etext and has no ELF symbol of
+   its own, so it is spelled out here (see kernel.asm: 80007028 <etext+0x28>). *)
+Definition pr_name_str : Z := 0x80007028%Z.
+
+(* printkinit() = initlock(&pr.lock, "pr").  It takes no arguments and touches no
+   state beyond the three fields of the global [pr.lock]: the caller hands those
+   in raw and gets them back initialized (locked = 0, name = &"pr", cpu = 0).
+   Whether the lock then becomes an [is_lock] over some printk resource is the
+   caller's ghost step, not printkinit's -- so this spec stays at points-to. *)
+Definition wp_printkinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
+    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.printkinit in
+  let sp0 : mword 64 := m !!! Regidx csp_rs1 in
+  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let lk : mword 64 := mword_of_int KernelSyms.pr in
+  let c_name := add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)) in
+  let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
+  let name : mword 64 := mword_of_int pr_name_str in
+  (4 <= K)%nat ->
+  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  sconf γ -∗
+  hart_state ↦ᵣ HART_ACTIVE tt -∗
+  sie_cap_gpr γ root_ppn m K -∗
+  tlb_inv_pt root_ppn -∗
+  kernel_text -∗ pc_is pcE -∗
+  lk ↦₄ vlock -∗
+  c_name ↦₈ vname -∗
+  c_cpu ↦₈ vcpu -∗
+  ( ∀ mr,
+    sconf γ -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sie_cap_gpr γ root_ppn mr K -∗
+    tlb_inv_pt root_ppn -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    lk ↦₄ (mword_of_int 0 : mword 32) -∗
+    c_name ↦₈ name -∗
+    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type PRINTKINIT.
+  Parameter wp_printkinit_sconf :
+    forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
+      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64),
+      wp_printkinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
+End PRINTKINIT.

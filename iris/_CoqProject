@@ -193,6 +193,7 @@ WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
 KernelRvcDecode.v
+KernelBaseDecode.v
 WpPushOffTop.v
 WpAmo.v
 WpHolding.v
@@ -233,3 +234,7 @@ WpKinitDecode.v
 SpecKinit.v
 WpSconfKinit.v
 LinkKinit.v
+WpPrintkinitDecode.v
+SpecPrintkinit.v
+WpSconfPrintkinit.v
+LinkPrintkinit.v
