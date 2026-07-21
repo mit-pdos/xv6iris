@@ -31,21 +31,11 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WpLeafCommon.
 Require Import WpGprMret.
 Require Import SmodeCore.
+(* sret_ms1..5 / sret_newpriv / sret_tgt -- the post-execute CSR tower this
+   WP produces -- live with their bit theory in MstatusBits.v. *)
+Require Import MstatusBits.
 Local Open Scope Z_scope.
 Import Defs.
-
-(* ===================================================================== *)
-(* The SRET post-execute CSR tower, as functions of the initial mstatus / *)
-(* sepc (names as in the archived WpKvSret.v).                            *)
-(* ===================================================================== *)
-Definition sret_ms1 (ms0 : mword 64) := update_subrange_vec_dec ms0 1 1 (_get_Mstatus_SPIE ms0).
-Definition sret_ms2 (ms0 : mword 64) := update_subrange_vec_dec (sret_ms1 ms0) 5 5 ('b"1").
-Definition sret_newpriv (ms0 : mword 64) : Privilege :=
-  if eq_vec (_get_Mstatus_SPP (sret_ms2 ms0)) ('b"1") then Supervisor else User.
-Definition sret_ms3 (ms0 : mword 64) := update_subrange_vec_dec (sret_ms2 ms0) 8 8 ('b"0").
-Definition sret_ms4 (ms0 : mword 64) := update_subrange_vec_dec (sret_ms3 ms0) 17 17 ('b"0").
-Definition sret_ms5 (ms0 : mword 64) := update_subrange_vec_dec (sret_ms4 ms0) 23 23 (landing_pad_bits_backwards NO_LP_EXPECTED).
-Definition sret_tgt (sepc0 : mword 64) := update_vec_dec sepc0 0 ('b"0").
 
 (* ===================================================================== *)
 (* exec_execute_SRET_menv -- the SRET reduction (archived WpGprSret.v)    *)

@@ -105,7 +105,7 @@ WpKernelNew.v
 WpKvInstr.v
 WpMemsetInstr.v
 WpKernelvecNew.v
-WpIntrBits.v
+MstatusBits.v
 WpIntrCore.v
 PlicPlan.v
 WpUart.v

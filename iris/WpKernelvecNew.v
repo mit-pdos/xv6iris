@@ -32,7 +32,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeSret KernelText WpKvInstr.
+Require Import SmodeCore WpSmodeSret MstatusBits KernelText WpKvInstr.
 Require Import VcGen VcGenS.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -34,7 +34,7 @@ Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.
-Require Import WpSmodeSret WpIntrBits WpIntrCore.
+Require Import MstatusBits WpIntrCore.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
    namespace doesn't shadow anything here. *)
 Require WpGprCsrwCommon.

@@ -59,7 +59,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr RegFile.
 Require Import SmodeCore WpSmodeSret.
-Require Import WpIntrBits WpIntrCore.
+Require Import MstatusBits WpIntrCore.
 Require Export IntrDefs.
 Local Open Scope Z_scope.
 Import Defs.

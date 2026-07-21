@@ -21,7 +21,7 @@
    THE ONE PURE OBLIGATION is [user_mstatus_ok (sret_ms5 mstatus0)] -- the
    SXL=64 / MPRV=0 / MXR=0 pins survive the sret transform.  This is
    discharged from the pre-sret pins by the existing bit lemmas
-   [sret_ms5_SXL]/[sret_ms5_MXR]/[sret_ms5_MPRV] (WpIntrBits.v): sret
+   [sret_ms5_SXL]/[sret_ms5_MXR]/[sret_ms5_MPRV] (MstatusBits.v): sret
    clears MPRV (bit 17) and leaves SXL (bits 35:34) and MXR (bit 19)
    untouched.
 
@@ -39,7 +39,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import InstrBytes WpGpr RegFile.
-Require Import WpSmodeSret WpIntrBits WpIntrCore.
+Require Import MstatusBits WpIntrCore.
 Require Import UptTree UserPtTree UserExec.
 Local Open Scope Z_scope.
 Import Defs.
