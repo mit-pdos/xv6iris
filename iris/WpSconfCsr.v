@@ -421,61 +421,6 @@ Section WpSconfCsr.
     exact (irreflexivity (<)%Qp 1%Qp Hv).
   Qed.
 
-  Local Lemma exec_execute_csrsi_sstatus_gen (imm5 rd : mword 5) (m : mword 64) s :
-    register_lookup cur_privilege s.(sregs) = Supervisor ->
-    register_lookup mstatus s.(sregs) = m ->
-    eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-    eq_vec imm5 (zeros' 5) = false ->
-    uint rd <> 0 ->
-    exec (execute (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRS))) s
-      = Some (RETIRE_SUCCESS,
-              set_reg (set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))
-                      (R_bitvector_64 (gpr_of_Z (uint rd)))
-                      (regval_into_reg (sstatus_read m))).
-  Proof.
-    intros Hpriv Hm HS HU Himm Hrd.
-    change (execute (CSRImm (csr_sstatus, imm5, Regidx rd, CSRRS)))
-      with (execute_CSRImm csr_sstatus imm5 (Regidx rd) CSRRS).
-    unfold execute_CSRImm.
-    rewrite Himm.
-    cbn match.
-    unfold doCSR.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    unfold ext_check_CSR. cbn match.
-    replace (generic_neq CSRReadWrite CSRWrite) with true by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
-    replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
-    replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
-    replace (generic_eq CSRReadWrite CSRRead) with false by (vm_compute; reflexivity). cbn match.
-    assert (Hwrite : exec (write_CSR csr_sstatus (sstatus_write_set_val m imm5)) s
-                     = Some (Ok (subrange_vec_dec
-                                   (lower_mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))
-                                   (Z.sub xlen 1) 0),
-                             set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))).
-    { rewrite (exec_write_CSR_sstatus (sstatus_write_set_val m imm5) s HS HU).
-      rewrite Hm. reflexivity. }
-    change (or_vec (sstatus_read m) (zero_extend' 64 imm5))
-      with (sstatus_write_set_val m imm5).
-    rewrite (exec_bind_Some _ _ _ _ _ Hwrite). cbn beta match.
-    set (s1 := set_reg s mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5))).
-    assert (Hwc : exec (wX_bits (Regidx rd) (sstatus_read m) >>
-                        csr_id_write_callback csr_sstatus
-                          (subrange_vec_dec
-                             (lower_mstatus (legalize_sstatus_val m (sstatus_write_set_val m imm5)))
-                             (Z.sub xlen 1) 0)) s1
-                  = Some (tt, set_reg s1 (R_bitvector_64 (gpr_of_Z (uint rd)))
-                                (regval_into_reg (sstatus_read m)))).
-    { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd (sstatus_read m) s1)).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      apply (exec_csr_id_write_callback_sstatus _ _). }
-    rewrite (exec_bind0_Some _ _ _ _ _ Hwc).
-    apply exec_returnm.
-  Qed.
-
   Local Lemma exec_execute_csrsi_sstatus_x0 (imm5 : mword 5) (m : mword 64) s :
     register_lookup cur_privilege s.(sregs) = Supervisor ->
     register_lookup mstatus s.(sregs) = m ->

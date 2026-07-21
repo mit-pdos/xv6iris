@@ -113,15 +113,6 @@ Proof.
     destruct mxr, do_sum; vm_compute; reflexivity.
 Qed.
 
-Lemma tf_variant_check_store (tfp : mword 44) (a d : mword 1) (mxr do_sum : bool) :
-  pte_check_ok (Store Data) Supervisor mxr do_sum (pte_set_ad (pte_tf tfp) a d).
-Proof.
-  intros s. unfold Mk_PTE_Flags.
-  rewrite tf_variant_flags. rewrite tf_variant_ext.
-  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
-    destruct mxr, do_sum; vm_compute; reflexivity.
-Qed.
-
 (* vpn disequalities of the two top pages *)
 Lemma tf_vpn_ne_tramp : tf_vpn <> tramp_vpn.
 Proof.
