@@ -245,6 +245,27 @@ Proof.
     right. exists c0. repeat split; assumption.
 Qed.
 
+(* ---- existential-descent support (the alloc arm / kalloc's page) ----- *)
+
+(* one-step descend unfolds (named, for the loop body's V=1 arm) *)
+Lemma ptree_maps_lvl_S (l : nat) (t : ptree) (vpn : mword 27) (p0 : mword 64) :
+  ptree_maps_lvl (S l) t vpn p0 <->
+  exists c, pt_kids t (vpn_idx (S l) vpn) = Some c
+         /\ pte_valid (pt_ents t (vpn_idx (S l) vpn))
+         /\ pte_ptr (pt_ents t (vpn_idx (S l) vpn))
+         /\ u_next_base (pt_ents t (vpn_idx (S l) vpn)) = pt_base c
+         /\ ptree_maps_lvl l c vpn p0.
+Proof. reflexivity. Qed.
+Lemma ptree_blocks0_lvl_S (l : nat) (t : ptree) (vpn : mword 27) :
+  ptree_blocks0_lvl (S l) t vpn <->
+  (pt_kids t (vpn_idx (S l) vpn) = None /\ pt_ents t (vpn_idx (S l) vpn) = mword_of_int 0)
+  \/ (exists c, pt_kids t (vpn_idx (S l) vpn) = Some c
+         /\ pte_valid (pt_ents t (vpn_idx (S l) vpn))
+         /\ pte_ptr (pt_ents t (vpn_idx (S l) vpn))
+         /\ u_next_base (pt_ents t (vpn_idx (S l) vpn)) = pt_base c
+         /\ ptree_blocks0_lvl l c vpn).
+Proof. reflexivity. Qed.
+
 (* the leaf word mappages writes for page [i] of a run starting at
    physical page [ppn0] with permission bits [perm]: PA2PTE(pa)|perm|V,
    A/D clear -- exactly the loop store *)
@@ -279,6 +300,13 @@ Proof. reflexivity. Qed.
 Lemma ptree_blocks0_empty (b : mword 44) (vpn : mword 27) :
   ptree_blocks0 (pt_empty_node b) vpn.
 Proof. left. split; reflexivity. Qed.
+
+(* a freshly kalloc'd, zeroed page blocks EVERY vpn at EVERY level: this is
+   the verdict the loop carries for the subtree it just grafted, with the
+   page [b] the existential kalloc chose. *)
+Lemma ptree_blocks0_lvl_empty (lvl : nat) (b : mword 44) (vpn : mword 27) :
+  ptree_blocks0_lvl lvl (pt_empty_node b) vpn.
+Proof. destruct lvl; cbn; [ reflexivity | left; split; reflexivity ]. Qed.
 
 Lemma pt_rep0_empty (b : mword 44) : pt_rep0 (pt_empty_node b) ∅.
 Proof.
