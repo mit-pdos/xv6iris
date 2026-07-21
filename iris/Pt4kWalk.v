@@ -357,22 +357,6 @@ Proof.
   apply exec_returnM.
 Qed.
 
-Lemma exec_currentlyEnabled_Svnapot s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (currentlyEnabled Ext_Svnapot) s = Some (true, s).
-Proof.
-  intro HS. unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  change (Z.geb (currentlyEnabled_measure Ext_Svnapot) 0) with true. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)). cbn match.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Svnapot s)). cbn match.
-  match goal with |- context[_rec_currentlyEnabled Ext_Sv39 ?k ?a] => destruct a end.
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  match goal with |- context[Z.geb ?kk 0] => change (Z.geb kk 0) with true end.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)). cbn match.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Sv39 s)). cbn match.
-  crush_rec_cE_S s. rewrite HS. reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* 5. The three-level Sv39 page walk through [mk_pte] tables.             *)
@@ -458,8 +442,6 @@ Section TrampWalk.
   Hypothesis Hbytes0 : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a0 j) = Some (nth_byte pte0 j).
 
   (* the walk's leaf output *)
-  Definition tramp_walk_out : PTW_Output 39 :=
-    Build_PTW_Output 39 lppn (autocast (T := mword) pte0) (Physaddr a0) 0 PBMT_PMA false.
 
 
 
