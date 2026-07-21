@@ -378,6 +378,64 @@ Section WpSmodePtAlu.
   Qed.
 
 
+  (* ---- base LUI / ANDI gpr-write leaves (scfg form) ----
+     Both go through the base gpr-write engine + the register-generic
+     execute facts from WpMmodeLeafBase. *)
+  Lemma wp_lui_s_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 20)
+      (m : regfile) {dq : dfrac} :
+    uint rd <> 0 ->
+    smode_config γ dq -∗ sr_inv Rg -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
+    ( smode_config γ dq -∗ sr_inv Rg -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg_regime Rg γ Φ pc rd rd rd
+              (UTYPE (imm, Regidx rd, LUI))
+              (luival imm)
+              m (dq:=dq)
+ Hrd
+              _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc _ _.
+    rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    reflexivity.
+  Qed.
+
+
+  Lemma wp_andi_s_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) {dq : dfrac} :
+    uint rd <> 0 ->
+    smode_config γ dq -∗ sr_inv Rg -∗
+    pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) -∗
+    ( smode_config γ dq -∗ sr_inv Rg -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg
+        (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm))]> m) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_config_base_scfg_regime Rg γ Φ pc rd rs1 rs1
+              (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))
+              (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
+              m (dq:=dq)
+ Hrd
+              _
+              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    rewrite (exec_execute_ITYPE_ANDI_gpr rs1 rd imm s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_andi_val. rewrite Hva. reflexivity.
+  Qed.
+
+
 
 
   (* ---- from WpSmodeAddiw.v ---- *)

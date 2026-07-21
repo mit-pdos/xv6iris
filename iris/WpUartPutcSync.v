@@ -133,12 +133,8 @@ Lemma uprvc_cb91 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   = Some (C_BEQZ (mword_of_int 10, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* compressed BEQZ -> base BTYPE BEQ execute bridge (local copy: the shared
-   leaf base only exports the ADDI/LUI/etc. bridges, not C_BEQZ). *)
-Lemma exec_execute_C_BEQZ (imm : mword 8) (rs : cregidx) s :
-  exec (execute (C_BEQZ (imm, rs))) s
-  = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BEQ)), s).
-Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed.
+(* [exec_execute_C_BEQZ] (compressed BEQZ -> base BTYPE/BEQ bridge) now lives
+   in WpMmodeLeafBase.v alongside [exec_execute_C_BNEZ]. *)
 
 Section WpUartPutcSync.
   Context `{!riscvGS Σ}.
@@ -226,65 +222,8 @@ Section WpUartPutcSync.
   Proof. mk_rvc (UPS + 0x44)%Z (mword_of_int 0xcb91 : mword 16)
     (mword_of_int (UPS + 0x44) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) uprvc_cb91 exec_execute_C_BEQZ. Qed.
 
-  (* ------------------------------------------------------------------- *)
-  (* Two base leaves missing from the S-mode leaf library: LUI and ANDI.  *)
-  (* Both go through the base gpr-write engine + the register-generic      *)
-  (* execute facts from WpMmodeLeafBase.                                   *)
-  (* ------------------------------------------------------------------- *)
-  Lemma wp_lui_s_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 20)
-      (m : regfile) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗ sr_inv Rg -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false (UTYPE (imm, Regidx rd, LUI)) -∗
-    ( smode_config γ dq -∗ sr_inv Rg -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg_regime Rg γ Φ pc rd rd rd
-              (UTYPE (imm, Regidx rd, LUI))
-              (luival imm)
-              m (dq:=dq)
- Hrd
-              _
-              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc _ _.
-    rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    reflexivity.
-  Qed.
-
-
-  Lemma wp_andi_s_r (Rg : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) {dq : dfrac} :
-    uint rd <> 0 ->
-    smode_config γ dq -∗ sr_inv Rg -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) -∗
-    ( smode_config γ dq -∗ sr_inv Rg -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg
-        (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_scfg_regime Rg γ Φ pc rd rs1 rs1
-              (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))
-              (and_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
-              m (dq:=dq)
- Hrd
-              _
-              with "Hsm Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc Hva _.
-    rewrite (exec_execute_ITYPE_ANDI_gpr rs1 rd imm s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    unfold gpr_andi_val. rewrite Hva. reflexivity.
-  Qed.
-
+  (* [wp_lui_s_r] and [wp_andi_s_r] (the base LUI/ANDI S-mode gpr-write
+     leaves) now live in WpSmodePtAlu.v with the rest of the ALU leaves. *)
 
   (* ------------------------------------------------------------------- *)
   (* Two call-site-specialized device leaves: LSR read (off=5) and THR      *)

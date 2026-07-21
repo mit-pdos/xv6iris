@@ -1276,6 +1276,14 @@ Lemma exec_execute_C_BNEZ (imm : mword 8) (rs : cregidx) s :
     = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BNE)), s).
 Proof. unfold execute. cbn match. unfold execute_C_BNEZ. apply exec_returnM. Qed.
 
+(* c.beqz : the compressed branch-if-zero expands to a base BTYPE/BEQ
+   against x0.  Shared exec fact -- companion to [exec_execute_C_BNEZ],
+   used by spin loops that poll via a compressed branch. *)
+Lemma exec_execute_C_BEQZ (imm : mword 8) (rs : cregidx) s :
+  exec (execute (C_BEQZ (imm, rs))) s
+  = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BEQ)), s).
+Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed.
+
 (* ===================================================================== *)
 (* Helper facts shared by chains that step compressed instructions via     *)
 (* the (is_rvc-generalized) BASE-instruction WPs.                           *)
