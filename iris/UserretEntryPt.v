@@ -28,7 +28,7 @@ Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpGprCsrwB.
 Require Import SmodePte PtTree.
-Require Import SmodeCore KptTree UptTree.
+Require Import KptTree UptTree.
 Require Import TrampStepPt TransPt.
 Require Import UserretDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.

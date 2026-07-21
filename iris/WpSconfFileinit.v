@@ -51,11 +51,13 @@ Section WpSconfFileinit.
     pose (name := (mword_of_int ftable_name_str : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
     (* the "ftable" string literal (6 chars + NUL), read out of the data image *)
-    iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl
-                  ltac:(intros j b Hj;
-                        do 7 (destruct j as [|j];
-                              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
-                        vm_compute in Hj; discriminate)
+    assert (Hftable : forall j b, cstring_bytes "ftable"%string !! j = Some b ->
+                        KernelData.kernel_data !! (ftable_name_str + Z.of_nat j)%Z = Some b).
+    { intros j b Hj.
+      do 7 (destruct j as [|j];
+            [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+      vm_compute in Hj; discriminate. }
+    iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl Hftable
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K FI
               (mword_of_int 3) (mword_of_int 30) (mword_of_int 1468) (mword_of_int 1212)

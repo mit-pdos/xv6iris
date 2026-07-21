@@ -105,7 +105,7 @@ WpKernelNew.v
 WpKvInstr.v
 WpMemsetInstr.v
 WpKernelvecNew.v
-WpIntrBits.v
+MstatusBits.v
 WpIntrCore.v
 PlicPlan.v
 WpUart.v
@@ -224,7 +224,16 @@ WpSconfMyproc.v
 LinkMyproc.v
 SpecSched.v
 WpSchedDecode.v
+WpSconfSched.v
+LinkSched.v
 SpecYield.v
+WpYieldDecode.v
+WpSconfYield.v
+LinkYield.v
+SpecSleep.v
+WpSleepDecode.v
+WpSconfSleep.v
+LinkSleep.v
 WpWakeup.v
 SpecWakeupLoop.v
 WpSconfWakeupLoop.v
@@ -269,6 +278,7 @@ LinkUartinit.v
 SpecCpuid.v
 SpecPlicinit.v
 SpecPlicinithart.v
+PlicHart.v
 WpPlicExec.v
 WpSconfCpuid.v
 LinkCpuid.v
@@ -277,8 +287,13 @@ WpSconfPlicinit.v
 LinkPlicinit.v
 WpSconfPlicinithart.v
 LinkPlicinithart.v
+SpecPlicComplete.v
+SpecPlicClaim.v
+WpSconfPlicComplete.v
+LinkPlicComplete.v
+WpSconfPlicClaim.v
+LinkPlicClaim.v
 SleepLock.v
-SpecSleep.v
 SpecInitsleeplock.v
 SpecAcquiresleep.v
 SpecReleasesleep.v
@@ -288,3 +303,5 @@ WpSconfInitsleeplock.v
 LinkInitsleeplock.v
 WpSconfReleasesleep.v
 LinkReleasesleep.v
+WpSconfHoldingsleep.v
+LinkHoldingsleep.v

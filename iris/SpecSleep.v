@@ -1,28 +1,20 @@
-(* SpecSleep.v -- the ASSUMED contract of sleep(chan, lk), the classic
-   condition-variable wait over a held spinlock:
+(* SpecSleep.v -- the public interface of Sleep, stated independently of its
+   proof.  Requires only the definitional layer -- never a whole-function
+   proof file -- so every function proof can be checked in parallel.
 
-     { is_lock γl lk s R ∗ locked γl ∗ R ∗ <running-thread bundle> }
-       sleep(chan, lk)
-     { locked γl ∗ R ∗ <running-thread bundle> }
+   sleep(chan, lk) parks the current process on [chan]: entered holding the
+   caller's CONDITION LOCK lk (an arbitrary spinlock γk/Rk, so noff = 1 and
+   intr_count 1), it takes p->lock, releases lk (noff 1→2→1 -- p->lock is
+   the interlock that closes the missed-wakeup race), records chan, moves
+   the state to SLEEPING, and parks through sched().  When some scheduler
+   dispatches the process again (after a wakeup made it RUNNABLE), sleep
+   clears chan, releases p->lock, REACQUIRES lk, and returns.
 
-   sleep releases lk, parks the process (state SLEEPING, sched()), and
-   re-acquires lk before returning -- so the caller surrenders the lock's
-   resource R and receives a FRESH R back with the token.  Its proof is
-   future work (it needs the scheduler protocol end-to-end: it acquires
-   p->lock, parks through sched, and is redispatched); like the old myproc
-   axiom this contract is deliberately ASSUMED, stated at the shape the
-   eventual proof must have:
-
-   - entered holding EXACTLY the one spinlock lk (intr_count 1, noff cell 1,
-     lk's cpu word = this cpu) -- xv6's "sched locks" assertion forces this;
-   - the running-thread bundle of the scheduler protocol (SchedCtx.v /
-     SpecSched.v): cur_proc at proc j, proc j's own lock free (sleep
-     acquires it), the process's own context-field cells, and the parked
-     scheduler's ▷-guarded valid context, plus procs_inv;
-   - tp = cid_word (sleep calls myproc; the bundle's cells live at the
-     ambient hart id);
-   - everything comes back unchanged (callee_saved, the bundle re-formed,
-     lk re-held with a fresh R). *)
+   The postcondition is the precondition shape back -- lk held again with
+   its resource Rk, the running-thread bundle (cur_proc, ▷ sched_vc, own
+   context cells) refreshed, noff back at 1 -- plus full callee_saved.
+   Nothing in the spec promises the wakeup HAPPENS (liveness); it promises
+   what holds when sleep returns. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -46,25 +38,25 @@ Require Import SpecSched.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation SLP := KernelSyms.sleep.
+Notation SL := KernelSyms.sleep.
 
 Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-    (γs : list gname) (j : nat)
-    (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
+    (γs : list gname) (j : nat) (γl : gname)
+    (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
     (m : regfile) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
-  let lk0 := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let cpuv := mycpu_ret cid_word in
   let pj := proc_addr j in
+  (* a0 = the channel, a1 = the caller's condition lock *)
+  let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
+  let a_cpu_k := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
                    (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-  (* release's lock-word address form for the held lock lk0 = a1 *)
-  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (* the hart id is the ambient CpuId *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
   sconf γ -∗
@@ -73,47 +65,47 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   intr_count γ root_ppn 1 -∗
   tlb_inv_pt root_ppn -∗
   kernel_text -∗ pc_is pcE -∗
-  (* the held condition lock *)
-  is_lock γl lka s R -∗
-  locked γl -∗
-  R -∗
-  a_cpu ↦₈ cpuv -∗
-  (* per-cpu push_off cells: exactly one level outstanding *)
+  procs_inv γ root_ppn Φ γs -∗
+  (* the caller's condition lock, HELD (acquired on this cpu) *)
+  is_lock γk lka sk Rk -∗
+  locked γk -∗
+  Rk -∗
+  a_cpu_k ↦₈ mycpu_ret cid_word -∗
+  (* the running-thread bundle *)
+  cur_proc pj -∗
   a_cpu_noff cid_word ↦₄ (mword_of_int 1 : mword 32) -∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
-  (* the running-thread bundle of the scheduler protocol *)
-  cur_proc pj -∗
   p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
-  procs_inv γ root_ppn Φ γs -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ root_ppn Φ γs (a_cpu_ctx cid_word) -∗
   ( ∀ mf : regfile,
-      ⌜ callee_saved m mf ⌝ -∗
+      ⌜callee_saved m mf⌝ -∗
       sconf γ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sie_cap_gpr γ root_ppn mf av -∗
       intr_count γ root_ppn 1 -∗
       tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
-      locked γl -∗
-      R -∗
-      a_cpu ↦₈ cpuv -∗
+      (* lk reacquired, with its resource *)
+      locked γk -∗
+      Rk -∗
+      a_cpu_k ↦₈ mycpu_ret cid_word -∗
+      (* the running-thread bundle, refreshed *)
+      cur_proc pj -∗
       a_cpu_noff cid_word ↦₄ (mword_of_int 1 : mword 32) -∗
       (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
-      cur_proc pj -∗
       p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
       ▷ sched_vc γ root_ppn Φ γs (a_cpu_ctx cid_word) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
-(* the deliberately-assumed contract (tracked in the coverage manifest like
-   the old myproc axiom); replace with a Module Type + sealed functor when
-   sleep() is proven. *)
-Axiom wp_sleep_sconf :
-  forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-    (γs : list gname) (j : nat)
-    (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
-    (m : regfile) (av : nat),
-    wp_sleep_sconf_body γ root_ppn Φ γs j γl lka s R m av.
+Module Type SLEEP.
+  Parameter wp_sleep_sconf :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (γs : list gname) (j : nat) (γl : gname)
+      (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
+      (m : regfile) (av : nat),
+      wp_sleep_sconf_body γ root_ppn Φ γs j γl γk lka sk Rk m av.
+End SLEEP.

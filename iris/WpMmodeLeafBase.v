@@ -1200,6 +1200,20 @@ Lemma exec_execute_C_ADD (rsd rs2 : regidx) s :
   exec (execute (C_ADD (rsd, rs2))) s = Some (ExecuteAs (RTYPE (rs2, rsd, rsd, ADD)), s).
 Proof. unfold execute. cbn match. unfold execute_C_ADD. apply exec_returnM. Qed.
 
+(* the compressed word load/store: register-generic, so a function proof only
+   has to bridge its own concrete creg indices and offset. *)
+Lemma exec_execute_C_SW (uimm : mword 5) (rsc1 rsc2 : cregidx) s :
+  exec (execute (C_SW (uimm, rsc1, rsc2))) s
+  = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
+                            creg2reg_idx rsc2, creg2reg_idx rsc1, 4)), s).
+Proof. unfold execute. cbn match. unfold execute_C_SW. cbn zeta. apply exec_returnM. Qed.
+
+Lemma exec_execute_C_LW (uimm : mword 5) (rsc1 rdc : cregidx) s :
+  exec (execute (C_LW (uimm, rsc1, rdc))) s
+  = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
+                           creg2reg_idx rsc1, creg2reg_idx rdc, false, 4)), s).
+Proof. unfold execute. cbn match. unfold execute_C_LW. cbn zeta. apply exec_returnM. Qed.
+
 (* WpGprRvc.v : exec_execute_C_ADDI *)
 Lemma exec_execute_C_ADDI (imm : mword 6) (rsd : regidx) s :
   exec (execute (C_ADDI (imm, rsd))) s

@@ -26,7 +26,7 @@ Require Import MinstretInv.
 Require Import WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KernelText.
 Require Import WpKernelvecNew.
-Require Import WpIntrBits WpIntrCore.
+Require Import MstatusBits WpIntrCore.
 Require Import IntrDefs.
 Require Import IntrDefs.
 (* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the

@@ -27,7 +27,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 From iris.program_logic Require Import language lifting.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import UserExec.
-Require Import WpDecode WpLeafCommon WpIntrBits WpIntrCore.
+Require Import WpDecode WpLeafCommon MstatusBits WpIntrCore.
 Local Open Scope Z_scope.
 Import Defs.
 

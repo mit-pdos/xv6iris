@@ -68,11 +68,13 @@ Section WpSconfUartinit.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Huf Hlock Hname Hcpu Hcont".
     iDestruct (sie_cap_gpr_x0 with "Hcg") as %Hx0.
     (* the "uart" string literal, read out of the kernel's data image *)
-    iPoseProof (kernel_data_string 0x80007030 "uart"%string _ eq_refl
-                  ltac:(intros j b Hj;
-                        do 5 (destruct j as [|j];
-                              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
-                        vm_compute in Hj; discriminate)
+    assert (Huart : forall j b, cstring_bytes "uart"%string !! j = Some b ->
+                      KernelData.kernel_data !! (0x80007030 + Z.of_nat j)%Z = Some b).
+    { intros j b Hj.
+      do 5 (destruct j as [|j];
+            [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+      vm_compute in Hj; discriminate. }
+    iPoseProof (kernel_data_string 0x80007030 "uart"%string _ eq_refl Huart
                   with "Hkdata") as "#Hstr".
     (* pc-advance helper facts *)
     assert (Hspr2 : spr = pa_stk sp0 2).

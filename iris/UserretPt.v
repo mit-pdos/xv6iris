@@ -18,9 +18,9 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep Riscv
 Require Import MinstretInv InstrBytes.
 Require Import WpLoad WpLeafCommon WpGpr WpMmodeLeafBase.
 Require Import SmodePte Pt4kWalk TrampPt.
-Require Import SmodeCore SmodeCorePt WpSmodeGpr UptTree.
+Require Import SmodeCorePt WpSmodeGpr UptTree.
 Require Import TrampStepPt.
-Require Import UserretDefs WpSmodeSret WpDecode WpGprMret.
+Require Import UserretDefs MstatusBits WpDecode WpGprMret.
 Require Import RegFile.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.

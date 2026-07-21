@@ -51,181 +51,19 @@ Require Import KptTree KptPt.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpDecode WpLeafCommon WpDecodeBridge.
-Require Import KernelRvcDecode WpRvcBridge.
+Require Import KernelRvcDecode KernelBaseDecode WpRvcBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import DevModel PlicPlan WpUart WpPlic WpPlicExec SpecCpuid SpecPlicinithart.
+Require Import DevModel PlicPlan PlicHart WpUart WpPlic WpPlicExec SpecCpuid SpecPlicinithart.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-(* A closed [lo <= x < hi] bound over Z.  [lia] is unusable on these: the heavy
-   bitvector.tactics import installs a zify hook that answers "Cannot find
-   witness" even on ground literals (durable-notes), so decide each side
-   through the boolean reflection lemmas instead. *)
-Ltac zrange_vm := split; [ apply Z.leb_le | apply Z.ltb_lt ]; vm_compute; reflexivity.
+(* The hart-id case split, the two context base addresses, their geometry and
+   what an access at each does to the PLIC state all live in PlicHart.v -- they
+   are keyed by a hart id and a PLIC address, nothing plicinithart-specific,
+   and plic_claim / plic_complete reuse them. *)
 
-(* One [callee_saved] conjunct for a register that plicinithart itself never
-   writes: strip the local insert tower down to the callee's return map
-   [base], hop the callee's own [callee_saved], then strip the prologue's
-   tower.  Both strips are [reg_lookup] (a cheap vm-cast, never bare
-   conversion -- see RegFile.v on the async-Qed hazard); the register is a
-   MISS in both towers, so no symbolic value is ever reduced. *)
-Ltac cs_through Hcs base :=
-  match goal with
-  | |- _ !!! Regidx ?c = _ =>
-      transitivity (base !!! Regidx c);
-      [ reg_lookup
-      | rewrite (callee_saved_lookup Hcs c ltac:(vm_compute; reflexivity)); reg_lookup ]
-  end.
-
-(* plicinithart's balanced 16-byte frame: entry [addi sp,-16] and exit
-   [addi sp,+16] cancel (identical to cpuid_frame_cancel / plicinit_frame_cancel). *)
-Lemma plicinithart_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
-             = 18446744073709551600) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
-             = 16) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
-
-(* ===================================================================== *)
-(*  The hart id: eight concrete words, and what the code computes from it. *)
-(* ===================================================================== *)
-
-(* A legal hart id is one of the [dev_ncpu] = 8 concrete 64-bit words.  Every
-   address fact below is proved by this case split + [vm_compute]. *)
-(* [lia] cannot be used once a [bv] term is in the context (the
-   bitvector.tactics zify hook answers "Cannot find witness"), so the pure Z
-   case split is done here, where nothing bitvector-shaped is in scope. *)
-Lemma z_lt8_cases (z : Z) :
-  0 <= z -> z < 8 ->
-  z = 0 \/ z = 1 \/ z = 2 \/ z = 3 \/ z = 4 \/ z = 5 \/ z = 6 \/ z = 7.
-Proof. lia. Qed.
-
-Lemma hart_cases (tp : mword 64) :
-  bv_unsigned tp < Z.of_nat dev_ncpu ->
-  tp = (mword_of_int 0 : mword 64) \/ tp = (mword_of_int 1 : mword 64) \/
-  tp = (mword_of_int 2 : mword 64) \/ tp = (mword_of_int 3 : mword 64) \/
-  tp = (mword_of_int 4 : mword 64) \/ tp = (mword_of_int 5 : mword 64) \/
-  tp = (mword_of_int 6 : mword 64) \/ tp = (mword_of_int 7 : mword 64).
-Proof.
-  intro Hh.
-  change (Z.of_nat dev_ncpu) with 8%Z in Hh.
-  remember (bv_unsigned tp) as z eqn:Hz.
-  assert (Hu : bv_unsigned tp = z) by (symmetry; exact Hz).
-  assert (Hlo : 0 <= z).
-  { rewrite <- Hu. apply (proj1 (bv_unsigned_in_range _ tp)). }
-  destruct (z_lt8_cases z Hlo Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E in Hu;
-    [ left | right; left | right; right; left | right; right; right; left
-    | right; right; right; right; left | right; right; right; right; right; left
-    | right; right; right; right; right; right; left
-    | right; right; right; right; right; right; right ];
-    apply bv_eq; rewrite Hu; vm_compute; reflexivity.
-Qed.
-
-(* the SLLIW the code applies to the hart id (shift the low 32 bits, sign-extend) *)
-Definition ph_shl (tp : mword 64) (k : Z) : mword 64 :=
-  sign_extend' 64 (shift_bits_left (subrange_vec_dec tp 31 0 : mword 32) (mword_of_int k : mword 5)).
-
-(* the two [lui]+[add] bases, and the effective addresses of the two stores *)
-Definition ph_senb (tp : mword 64) : mword 64 :=
-  add_vec (mword_of_int 0x0c002000 : mword 64) (ph_shl tp 8).
-Definition ph_sthb (tp : mword 64) : mword 64 :=
-  add_vec (mword_of_int 0x0c201000 : mword 64) (ph_shl tp 13).
-
-Definition ph_a8 (base : mword 64) (imm : mword 12) : mword 64 :=
-  sign_extend' 64 (subrange_vec_dec (add_vec base (sign_extend' 64 imm)) (xlen - 0 - 1) 0).
-
-(* [cpuid] truncates its result to an [int]; for a legal hart id the top bits
-   are clear, so the truncation is the identity. *)
-Lemma cpuid_ret_hart (tp : mword 64) :
-  bv_unsigned tp < Z.of_nat dev_ncpu -> cpuid_ret tp = tp.
-Proof.
-  intro Hh. unfold cpuid_ret.
-  destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]];
-    rewrite E; apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-(* ---- the geometry of the two PLIC context addresses ------------------ *)
-(* Both bundles say: the address is inside the PLIC window, 4-aligned,
-   canonical, on a [kpt_dev_vpn] page, and identity-mapped by the kernel page
-   table -- exactly the five hypotheses [wp_sw_plic_s_sconf] takes. *)
-
-Lemma ph_senable_geom (tp : mword 64) :
-  bv_unsigned tp < Z.of_nat dev_ncpu ->
-  let a8 := ph_a8 (ph_senb tp) (mword_of_int 128 : mword 12) in
-  (plic_base <= uint a8 < plic_base + plic_size)%Z
-  /\ is_aligned_vaddr (Virtaddr a8) 4 = true
-  /\ neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false
-  /\ kpt_dev_vpn (svpn_of a8)
-  /\ zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8))
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8.
-Proof.
-  intro Hh. cbv zeta.
-  destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E;
-    (split; [ zrange_vm | ]); (split; [ vm_compute; reflexivity | ]);
-    (split; [ vm_compute; reflexivity | ]);
-    (split; [ unfold kpt_dev_vpn; zrange_vm | ]);
-    apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma ph_sthresh_geom (tp : mword 64) :
-  bv_unsigned tp < Z.of_nat dev_ncpu ->
-  let a8 := ph_a8 (ph_sthb tp) (mword_of_int 0 : mword 12) in
-  (plic_base <= uint a8 < plic_base + plic_size)%Z
-  /\ is_aligned_vaddr (Virtaddr a8) 4 = true
-  /\ neq_vec (bits_of_virtaddr (Virtaddr a8))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false
-  /\ kpt_dev_vpn (svpn_of a8)
-  /\ zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8))
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8.
-Proof.
-  intro Hh. cbv zeta.
-  destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E;
-    (split; [ zrange_vm | ]); (split; [ vm_compute; reflexivity | ]);
-    (split; [ vm_compute; reflexivity | ]);
-    (split; [ unfold kpt_dev_vpn; zrange_vm | ]);
-    apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-(* ---- what the two writes do to the PLIC state ------------------------ *)
-
-Lemma ph_senable_write (tp : mword 64) (p : plic_state) :
-  bv_unsigned tp < Z.of_nat dev_ncpu ->
-  plic_write p (uint (ph_a8 (ph_senb tp) (mword_of_int 128 : mword 12)) - plic_base)
-    plic_senable_word
-  = Some (PlicState (p_prio p) (p_pending p) (p_claimed p)
-            (hupd (p_enable p) (Z.to_nat (bv_unsigned tp)) plic_senable_word) (p_thresh p)).
-Proof.
-  intro Hh.
-  destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E;
-    vm_compute; reflexivity.
-Qed.
-
-Lemma ph_sthresh_write (tp : mword 64) (p : plic_state) :
-  bv_unsigned tp < Z.of_nat dev_ncpu ->
-  plic_write p (uint (ph_a8 (ph_sthb tp) (mword_of_int 0 : mword 12)) - plic_base)
-    (Z_to_bv 32 0)
-  = Some (PlicState (p_prio p) (p_pending p) (p_claimed p) (p_enable p)
-            (hupd (p_thresh p) (Z.to_nat (bv_unsigned tp)) (Z_to_bv 32 0))).
-Proof.
-  intro Hh.
-  destruct (hart_cases tp Hh) as [E|[E|[E|[E|[E|[E|[E|E]]]]]]]; rewrite E;
-    vm_compute; reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (*  Decodes for the ten instructions not shared with the frame templates. *)
@@ -249,12 +87,6 @@ Lemma phdec_lui_c002 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (UTYPE (mword_of_int 0xc002 : mword 20, Regidx (mword_of_int 15), LUI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x14  97ba  c.add a5,a5,a4 *)
-Lemma phdec_add_a5_a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x97ba : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x16  40200713  addi a4,zero,1026 *)
 Lemma phdec_li_1026 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x40200713 : mword 32)) s
@@ -266,24 +98,6 @@ Lemma phdec_sw_128 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x08e7a023 : mword 32)) s
   = Some (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4), s).
 Proof. decode_bridge_ms. Qed.
-
-(* +0x1e  00d5151b  slliw a0,a0,0xd *)
-Lemma phdec_slliw_a0 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00d5151b : mword 32)) s
-  = Some (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW), s).
-Proof. decode_bridge_ms. Qed.
-
-(* +0x22  0c2017b7  lui a5,0xc201 *)
-Lemma phdec_lui_c201 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0c2017b7 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0xc201 : mword 20, Regidx (mword_of_int 15), LUI), s).
-Proof. decode_bridge_ms. Qed.
-
-(* +0x26  97aa  c.add a5,a5,a0 *)
-Lemma phdec_add_a5_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x97aa : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x28  0007a023  sw zero,0(a5) *)
 Lemma phdec_sw_zero s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -333,7 +147,7 @@ Section WpSconfPlicinithart.
 
   Lemma phi_14 : kernel_text -∗ instr (mword_of_int (PH + 0x14) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (PH + 0x14)%Z (mword_of_int 0x97ba : mword 16)
-    (mword_of_int (PH + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) phdec_add_a5_a4 exec_execute_C_ADD. Qed.
+    (mword_of_int (PH + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) mdec_97ba exec_execute_C_ADD. Qed.
 
   Lemma phi_16 : kernel_text -∗ instr (mword_of_int (PH + 0x16) : mword 64) false (ITYPE (mword_of_int 1026 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_base (PH + 0x16)%Z (mword_of_int 0x40200713 : mword 32)
@@ -345,15 +159,15 @@ Section WpSconfPlicinithart.
 
   Lemma phi_1e : kernel_text -∗ instr (mword_of_int (PH + 0x1e) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)).
   Proof. mk_base (PH + 0x1e)%Z (mword_of_int 0x00d5151b : mword 32)
-    (mword_of_int (PH + 0x1e) : mword 64) (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)) phdec_slliw_a0. Qed.
+    (mword_of_int (PH + 0x1e) : mword 64) (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)) bdec_00d5151b. Qed.
 
   Lemma phi_22 : kernel_text -∗ instr (mword_of_int (PH + 0x22) : mword 64) false (UTYPE (mword_of_int 0xc201 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (PH + 0x22)%Z (mword_of_int 0x0c2017b7 : mword 32)
-    (mword_of_int (PH + 0x22) : mword 64) (UTYPE (mword_of_int 0xc201 : mword 20, Regidx (mword_of_int 15), LUI)) phdec_lui_c201. Qed.
+    (mword_of_int (PH + 0x22) : mword 64) (UTYPE (mword_of_int 0xc201 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_0c2017b7. Qed.
 
   Lemma phi_26 : kernel_text -∗ instr (mword_of_int (PH + 0x26) : mword 64) true (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (PH + 0x26)%Z (mword_of_int 0x97aa : mword 16)
-    (mword_of_int (PH + 0x26) : mword 64) (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) phdec_add_a5_a0 exec_execute_C_ADD. Qed.
+    (mword_of_int (PH + 0x26) : mword 64) (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) mdec_97aa exec_execute_C_ADD. Qed.
 
   Lemma phi_28 : kernel_text -∗ instr (mword_of_int (PH + 0x28) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 15), 4)).
   Proof. mk_base (PH + 0x28)%Z (mword_of_int 0x0007a023 : mword 32)
@@ -485,7 +299,7 @@ Section WpSconfPlicinithart.
     assert (Hmosp : mo !!! Regidx csp_rs1 = sp')
       by (rewrite (proj1 Hmo_cs); exact Hm2sp).
     assert (Hmoa0 : mo !!! Regidx a0_idx = m0 !!! Regidx tp_idx).
-    { unfold a0_idx. rewrite Hmo_a0 Hm2tp. apply cpuid_ret_hart. exact Hhart. }
+    { unfold a0_idx. rewrite Hmo_a0 Hm2tp. exact (sext32_id_hart _ Hhart). }
     (* ---- the post-call register-map chain ---- *)
     set (N2 := <[Regidx a4_idx := regval_into_reg (ph_shl (m0 !!! Regidx tp_idx) 8)]> mo).
     set (N3 := <[Regidx a5_idx := regval_into_reg (mword_of_int 0x0c002000 : mword 64)]> N2).
@@ -554,14 +368,14 @@ Section WpSconfPlicinithart.
     (* ---- 0x1a: sw a4,128(a5) -- PLIC_SENABLE(hart) = 1026 ---- *)
     iApply (wp_sw_plic_dev_s_sconf γ root_ppn γd Φ (mword_of_int (PH + 0x1a)) false a4_idx a5_idx
               (mword_of_int 128 : mword 12) N5 (n - 2)%nat
-              ltac:(rewrite HN5a5; exact (proj1 (ph_senable_geom _ Hhart)))
-              ltac:(rewrite HN5a5; exact (proj1 (proj2 (ph_senable_geom _ Hhart))))
-              ltac:(rewrite HN5a5; exact (proj1 (proj2 (proj2 (ph_senable_geom _ Hhart)))))
-              ltac:(rewrite HN5a5; exact (proj1 (proj2 (proj2 (proj2 (ph_senable_geom _ Hhart))))))
-              ltac:(rewrite HN5a5; exact (proj2 (proj2 (proj2 (proj2 (ph_senable_geom _ Hhart))))))
+              ltac:(rewrite HN5a5; exact (ph_geom_range _ (ph_senable_geom _ Hhart)))
+              ltac:(rewrite HN5a5; exact (ph_geom_align _ (ph_senable_geom _ Hhart)))
+              ltac:(rewrite HN5a5; exact (ph_geom_canon _ (ph_senable_geom _ Hhart)))
+              ltac:(rewrite HN5a5; exact (ph_geom_vpn   _ (ph_senable_geom _ Hhart)))
+              ltac:(rewrite HN5a5; exact (ph_geom_ident _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5sw HN5a5; intros pq Hpq;
                     eexists; split;
-                    [ exact (ph_senable_write _ pq Hhart)
+                    [ exact (ph_senable_write _ pq _ Hhart)
                     | apply plic_ok_hupd_enable;
                       [ exact Hpq | exact plic_senable_ok_mask ] ])
               with "Hsc Hhs Hcg Htlbinv Hpc Hi1a Hdinv").
@@ -615,14 +429,14 @@ Section WpSconfPlicinithart.
     (* ---- 0x28: sw zero,0(a5) -- PLIC_SPRIORITY(hart) = 0 ---- *)
     iApply (wp_sw_plic_dev_s_sconf γ root_ppn γd Φ (mword_of_int (PH + 0x28)) false z_idx a5_idx
               (mword_of_int 0 : mword 12) N8 (n - 2)%nat
-              ltac:(rewrite HN8a5; exact (proj1 (ph_sthresh_geom _ Hhart)))
-              ltac:(rewrite HN8a5; exact (proj1 (proj2 (ph_sthresh_geom _ Hhart))))
-              ltac:(rewrite HN8a5; exact (proj1 (proj2 (proj2 (ph_sthresh_geom _ Hhart)))))
-              ltac:(rewrite HN8a5; exact (proj1 (proj2 (proj2 (proj2 (ph_sthresh_geom _ Hhart))))))
-              ltac:(rewrite HN8a5; exact (proj2 (proj2 (proj2 (proj2 (ph_sthresh_geom _ Hhart))))))
+              ltac:(rewrite HN8a5; exact (ph_geom_range _ (ph_sthresh_geom _ Hhart)))
+              ltac:(rewrite HN8a5; exact (ph_geom_align _ (ph_sthresh_geom _ Hhart)))
+              ltac:(rewrite HN8a5; exact (ph_geom_canon _ (ph_sthresh_geom _ Hhart)))
+              ltac:(rewrite HN8a5; exact (ph_geom_vpn   _ (ph_sthresh_geom _ Hhart)))
+              ltac:(rewrite HN8a5; exact (ph_geom_ident _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8sw HN8a5; intros pq Hpq;
                     eexists; split;
-                    [ exact (ph_sthresh_write _ pq Hhart)
+                    [ exact (ph_sthresh_write _ pq _ Hhart)
                     | apply plic_ok_hupd_thresh; exact Hpq ])
               with "Hsc Hhs Hcg Htlbinv Hpc Hi28 Hdinv").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
@@ -664,7 +478,7 @@ Section WpSconfPlicinithart.
     assert (HN10sp : N10 !!! Regidx csp_rs1 = sp').
     { unfold N10, N9. repeat (rewrite upd_ne; [| vm_compute; discriminate]). exact HN8sp. }
     assert (Hwv : add_vec (N10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = sp0).
-    { rewrite HN10sp. unfold sp', imm_dealloc, imm_entry, sp0. apply plicinithart_frame_cancel. }
+    { rewrite HN10sp. unfold sp', imm_dealloc, imm_entry, sp0. apply frame_cancel_16. }
     assert (Hpop : N10 !!! Regidx csp_rs1
                    = pa_stk (add_vec (N10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc))) 2).
     { rewrite Hwv HN10sp. exact Hpush. }

@@ -4,7 +4,7 @@
    [pte_set_ad w a d] rewrites the A (bit 6) and D (bit 7) flag bits of a
    64-bit PTE word -- the EXACT update shape [update_PTE_Bits] produces
    on the Svadu/ADUE write-back path.  This file proves, by the
-   WpIntrBits testbit-chasing style (iris-FREE dialect so [rewrite ... by]
+   MstatusBits testbit-chasing style (iris-FREE dialect so [rewrite ... by]
    parses):
      - [update_PTE_Bits_set_ad] : the write-back word is a variant;
      - [pte_set_ad_refl]        : every word is a variant of itself;
@@ -42,7 +42,7 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* Testbit machinery (clone of WpIntrBits' mw_prep / zn_norm / tb_rw).    *)
+(* Testbit machinery (clone of MstatusBits' mw_prep / zn_norm / tb_rw).    *)
 (* ===================================================================== *)
 
 Ltac mw_prep :=

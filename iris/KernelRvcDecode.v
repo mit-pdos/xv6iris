@@ -204,3 +204,41 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma mdec_cf0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x8082 : mword 16)) s = Some (C_JR (Regidx (mword_of_int 1)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ---- shared PLIC per-hart context address arithmetic (plicinithart,
+   plic_claim, plic_complete all build their context address this way) ---- *)
+
+(* c.add a5,a5,a4 *)
+Lemma mdec_97ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x97ba : mword 16)) s
+  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.add a5,a5,a0 *)
+Lemma mdec_97aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x97aa : mword 16)) s
+  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* The standard 16-byte frame cancels: entry [c.addi sp,-16] and exit
+   [c.addi sp,+16] compose to the identity.  A pure bv fact keyed by the two
+   immediates, so it belongs here rather than in each function's proof. *)
+Lemma frame_cancel_16 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
+          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
+Proof.
+  assert (add_vec_unsigned : forall x y : mword 64,
+            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned. reflexivity. }
+  (* plain Stdlib [rewrite] in this file (no ssreflect): commas, no [!]. *)
+  apply bv_eq. repeat rewrite add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
+             = 18446744073709551600) by (vm_compute; reflexivity).
+  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
+             = 16) by (vm_compute; reflexivity).
+  rewrite HA, HB. rewrite <- Z.add_assoc.
+  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
+  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+Qed.

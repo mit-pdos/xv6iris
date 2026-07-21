@@ -170,3 +170,23 @@ Proof.
         destruct (outer_write c ws); [ exact H | reflexivity ]
     end.
 Qed.
+
+(* Discharging ONE [callee_saved m mF] conjunct for a register the function
+   itself never writes, when [mF] is an insert tower over the map a CALLEE
+   returned: strip the local tower down to that map, hop the callee's own
+   [callee_saved], then strip the tower the prologue built.  Both strips are
+   [reg_lookup] -- a cheap vm-cast, never bare conversion (see RegFile.v on the
+   async-Qed hazard) -- and the register is a MISS in both towers, so no
+   symbolic register value is ever reduced.
+
+   This is the shape every whole-function proof needs whose save/restore of a
+   frame register SPANS a call: mid-call that register holds the wrong value,
+   so the fact does not factor through [callee_saved m mo] / [callee_saved mo
+   mF] and each conjunct has to be discharged on its own. *)
+Ltac cs_through Hcs base :=
+  match goal with
+  | |- _ !!! Regidx ?c = _ =>
+      transitivity (base !!! Regidx c);
+      [ reg_lookup
+      | rewrite (callee_saved_lookup Hcs c ltac:(vm_compute; reflexivity)); reg_lookup ]
+  end.

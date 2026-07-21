@@ -16,7 +16,7 @@ Require Import RegFile.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr WpMmodeShiftiop.
 Require Import WpMmodeLeafBase.
-Require Import KernelText SmodeCore WpSmodeSret.
+Require Import KernelText MstatusBits.
 Require Import PtTree.
 Require Import TrampPt KptTree UptTree UserretDefs UserretPt UserretEntryPt.
 From Kernel Require Import KernelInstrs.

@@ -102,8 +102,6 @@ MANIFEST_PROVEN = {
 # Functions whose contract is *stated* but deliberately assumed (an Axiom, or a
 # hypothesis threaded through callers' specs) rather than proven.
 MANIFEST_ASSUMED = {
-    "sleep": ("SpecSleep.v", "wp_sleep_sconf",
-              "assumed as an Axiom (its proof needs the scheduler protocol end-to-end)"),
     "panic": ("KvmSpec.v", "panic_wp", "assumed as a hypothesis carried by callers"),
     "kerneltrap": ("WpKernelvecNew.v", "kerneltrap_returns",
                    "only 'it returns' is assumed, as an Axiom"),
