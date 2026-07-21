@@ -1,14 +1,13 @@
-(* WpSconfPrintkinit.v -- the whole-function WP for xv6's printkinit() over the
+(* WpSconfFileinit.v -- the whole-function WP for xv6's fileinit() over the
    SIE-agnostic sconf world.
 
-     void printkinit(void) { initlock(&pr.lock, "pr"); }
+     void fileinit(void) { initlock(&ftable.lock, "ftable"); }
 
-   printkinit is a thin initlock wrapper, so it is an INSTANCE of the shape
-   proved once in WpInitlockWrapper.v: all this file supplies is printkinit's
-   thirteen instructions (WpPrintkinitDecode.pki_code), the three relocations
-   -- a1 = &"pr" (auipc 0x6 / addi +1982), a0 = &pr (auipc 0x12 / addi -1402),
-   and the jal displacement to initlock -- and the "pr" literal itself, read out
-   of the kernel's data image. *)
+   fileinit is a thin initlock wrapper, so it is an INSTANCE of the shape proved
+   once in WpInitlockWrapper.v: all this file supplies is fileinit's thirteen
+   instructions (WpFileinitDecode.fii_code) and the three relocations -- a1 =
+   &"ftable" (auipc 0x3 / addi +1468), a0 = &ftable (auipc 0x1e / addi +1212),
+   and the jal displacement to initlock. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -25,50 +24,50 @@ Require Import KernelText KernelDataInv.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpLock.
 Require Import SpecInitlock SpecInitlockWrapper WpInitlockWrapper.
-Require Import WpPrintkinitDecode.
+Require Import WpFileinitDecode.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import SpecPrintkinit.
+Require Import SpecFileinit.
 Local Open Scope Z_scope.
 Import Defs.
 
-Module PrintkinitProof (Initlock : INITLOCK) : PRINTKINIT.
+Module FileinitProof (Initlock : INITLOCK) : FILEINIT.
 
 Module ILW := InitlockWrapperProof Initlock.
 
-Section WpSconfPrintkinit.
+Section WpSconfFileinit.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_printkinit_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_fileinit_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64)
-    : wp_printkinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
+    : wp_fileinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
   Proof.
-    cbv beta delta [wp_printkinit_sconf_body].
+    cbv beta delta [wp_fileinit_sconf_body].
     intros pcE ret_tgt lk c_name c_cpu HK Hretm.
-    (* &"pr" is proof-local: the spec speaks of the lock's NAME, not of the
+    (* &"ftable" is proof-local: the spec speaks of the lock's NAME, not of the
        address the image happens to keep the literal at. *)
-    pose (name := (mword_of_int pr_name_str : mword 64)).
+    pose (name := (mword_of_int ftable_name_str : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
-    (* the "pr" string literal (2 chars + NUL), read out of the data image *)
-    iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl
+    (* the "ftable" string literal (6 chars + NUL), read out of the data image *)
+    iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl
                   ltac:(intros j b Hj;
-                        do 3 (destruct j as [|j];
+                        do 7 (destruct j as [|j];
                               [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
                         vm_compute in Hj; discriminate)
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K PK
-              (mword_of_int 6) (mword_of_int 18) (mword_of_int 1982) (mword_of_int 2694)
-              (mword_of_int 782) lk name "pr"%string vlock vname vcpu HK Hretm
+    iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K FI
+              (mword_of_int 3) (mword_of_int 30) (mword_of_int 1468) (mword_of_int 1212)
+              (mword_of_int 2083804) lk name "ftable"%string vlock vname vcpu HK Hretm
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hsc Hhs Hcg Htlbinv Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
-    iApply (pki_code with "Htext").
+    iApply (fii_code with "Htext").
   Qed.
 
-End WpSconfPrintkinit.
+End WpSconfFileinit.
 
-End PrintkinitProof.
+End FileinitProof.

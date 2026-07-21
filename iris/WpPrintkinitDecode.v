@@ -22,6 +22,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 Require Import KernelRvcDecode KernelBaseDecode.
+Require Import SpecInitlockWrapper.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -55,9 +56,9 @@ Section WpPrintkinitDecode.
 
   Notation PK := KernelSyms.printkinit.
 
-  Lemma pki_00 : kernel_text -∗ instr (mword_of_int (PK + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc (PK + 0x00)%Z (mword_of_int 0x1141 : mword 16)
-    (mword_of_int (PK + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_ccc exec_execute_C_ADDI. Qed.
+  Lemma pki_00 : kernel_text -∗ instr (mword_of_int PK : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof. mk_rvc PK (mword_of_int 0x1141 : mword 16)
+    (mword_of_int PK : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_ccc exec_execute_C_ADDI. Qed.
 
   Lemma pki_02 : kernel_text -∗ instr (mword_of_int (PK + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
   Proof. mk_rvc (PK + 0x02)%Z (mword_of_int 0xe406 : mword 16)
@@ -106,5 +107,27 @@ Section WpPrintkinitDecode.
   Lemma pki_22 : kernel_text -∗ instr (mword_of_int (PK + 0x22) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (PK + 0x22)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (PK + 0x22) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+
+  (* printkinit's thirteen instructions, in the thin-initlock-wrapper pattern
+     (SpecInitlockWrapper.v) that its whole-function proof instantiates. *)
+  Lemma pki_code :
+    kernel_text -∗ ilw_code PK (mword_of_int 6) (mword_of_int 18)
+                            (mword_of_int 1982) (mword_of_int 2694) (mword_of_int 782).
+  Proof.
+    iIntros "#Ht". rewrite /ilw_code.
+    iSplitR; [iApply (pki_00 with "Ht")|].
+    iSplitR; [iApply (pki_02 with "Ht")|].
+    iSplitR; [iApply (pki_04 with "Ht")|].
+    iSplitR; [iApply (pki_06 with "Ht")|].
+    iSplitR; [iApply (pki_08 with "Ht")|].
+    iSplitR; [iApply (pki_0c with "Ht")|].
+    iSplitR; [iApply (pki_10 with "Ht")|].
+    iSplitR; [iApply (pki_14 with "Ht")|].
+    iSplitR; [iApply (pki_18 with "Ht")|].
+    iSplitR; [iApply (pki_1c with "Ht")|].
+    iSplitR; [iApply (pki_1e with "Ht")|].
+    iSplitR; [iApply (pki_20 with "Ht")|].
+    iApply (pki_22 with "Ht").
+  Qed.
 
 End WpPrintkinitDecode.

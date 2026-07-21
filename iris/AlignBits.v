@@ -97,3 +97,58 @@ Proof.
   rewrite Z.rem_mod_nonneg in Heven by lia.
   rewrite bv_wrap_small; [ lia | rewrite Hm64; lia ].
 Qed.
+
+(* The jalr/ret target computation [update_vec_dec (rs1 + imm) 0 0] is the
+   IDENTITY on an address whose low bit is already clear.  Every [ret] and
+   every return from a [jal]-ed callee lands on such an address, so a proof
+   over a SYMBOLIC function entry (which cannot [vm_compute] the target) gets
+   its "the callee returns to the next instruction" step from here, off one
+   2-byte-alignment premise.  Lives beside [align4_of_low_bits] for the same
+   reason: the unfold/rewrite chain only reduces predictably under this file's
+   minimal import set. *)
+Lemma jalr_ret_id (x : mword 64) :
+  eq_vec (access_vec_dec x 0) ('b"0") = true ->
+  update_vec_dec (add_vec x (sign_extend' 64 (zeros' 12))) 0 ('b"0") = x.
+Proof.
+  intro H.
+  assert (Hz : (sign_extend' 64 (zeros' 12) : mword 64) = mword_of_int 0)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hz, kv_addv_zero.
+  pose proof (bv_unsigned_in_range _ x) as Hrng.
+  unfold bv_modulus in Hrng.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64))%Z with 18446744073709551616%Z in Hrng.
+  apply eq_vec_true_iff in H.
+  apply (f_equal bv_unsigned) in H.
+  unfold access_vec_dec, access_mword_dec, MachineWord.slice, get_word in H.
+  rewrite bv_extract_unsigned in H.
+  assert (Hb0 : bv_unsigned (MachineWord.Z_idx 1 'b "0") = 0%Z)
+    by (vm_compute; reflexivity).
+  rewrite Hb0 in H.
+  change (MachineWord.Z_idx 1) with 1%N in H.
+  change (Z.of_N (MachineWord.Z_idx 0)) with 0%Z in H.
+  rewrite Z.shiftr_0_r in H.
+  unfold bv_wrap, bv_modulus in H. cbn in H.
+  apply bv_eq.
+  unfold update_vec_dec, update_mword_dec, MachineWord.update_slice,
+    MachineWord.slice, get_word, to_word.
+  rewrite !bv_concat_unsigned; [| reflexivity | reflexivity].
+  rewrite !bv_extract_unsigned, Hb0.
+  change (MachineWord.Z_idx 1) with 1%N.
+  change (MachineWord.Z_idx 0) with 0%N.
+  change (MachineWord.Z_idx 64) with 64%N.
+  unfold bv_wrap, bv_modulus.
+  change (Z.of_N (0 + 1)) with 1%Z.
+  change (Z.of_N 0) with 0%Z.
+  change (2 ^ Z.of_N (64 - 1 - 0))%Z with 9223372036854775808%Z.
+  change (2 ^ Z.of_N 0)%Z with 1%Z.
+  rewrite Z.shiftr_0_r, Z.mod_1_r, Z.shiftl_0_r, Z.lor_0_l, Z.lor_0_r.
+  rewrite Z.shiftr_div_pow2 by lia.
+  rewrite Z.shiftl_mul_pow2 by lia.
+  change (2 ^ 1)%Z with 2%Z.
+  destruct Hrng as [Hr1 Hr2].
+  rewrite Z.mod_small
+    by (split; [ apply Z.div_pos; [exact Hr1 | reflexivity]
+               | apply Z.div_lt_upper_bound; [reflexivity | exact Hr2] ]).
+  apply (Z.div_exact _ 2 ltac:(discriminate)) in H.
+  rewrite Z.mul_comm in H. symmetry. exact H.
+Qed.

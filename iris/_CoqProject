@@ -234,7 +234,17 @@ WpKinitDecode.v
 SpecKinit.v
 WpSconfKinit.v
 LinkKinit.v
+SpecInitlockWrapper.v
+WpInitlockWrapper.v
 WpPrintkinitDecode.v
 SpecPrintkinit.v
 WpSconfPrintkinit.v
 LinkPrintkinit.v
+WpTrapinitDecode.v
+SpecTrapinit.v
+WpSconfTrapinit.v
+LinkTrapinit.v
+WpFileinitDecode.v
+SpecFileinit.v
+WpSconfFileinit.v
+LinkFileinit.v

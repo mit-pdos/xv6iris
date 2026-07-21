@@ -92,6 +92,59 @@ Module Acquire := AcquireProof Mycpu Holding PushOff.
   does delta on that one constant plus beta, leaving the lets intact, so the
   original tactic script runs unchanged.
 
+## Thin initlock wrappers: one proof, one instance per function
+
+Three functions in the image have a body that is exactly `initlock(&L, "name")`:
+`printkinit` (0x80000862), `trapinit` (0x80002402) and `fileinit` (0x80003f94).
+gcc compiles all three to the SAME thirteen instructions (the standard 16-byte
+frame, two auipc/addi pairs materializing the two arguments, `jal initlock`, the
+epilogue), differing only in the entry address and the three relocated
+immediates. So there is ONE proof and each member instantiates it — do NOT clone
+the straight-line script. **All three are proved and the family is closed** —
+there is no fourth member to add, so a new function needing this shape would
+have to come from an upstream source change.
+
+`consoleinit` is a near-miss worth not chasing: its first nine instructions are
+this pattern, but it continues into `uartinit` and the `devsw[]` writes. The
+wrapper owns the epilogue and returns, so sharing with `consoleinit` would mean
+splitting prologue-through-jal into a separate piece — not what this shape is.
+The other nine callers of `initlock` (kinit, procinit, binit, iinit, initlog,
+initsleeplock, uartinit, pipealloc, virtio_disk_init) are unrelated.
+
+- **`SpecInitlockWrapper.v`** — `ilw_code F uname ulk iname ilk j` is that
+  thirteen-instruction pattern at entry `F`; `wp_initlock_wrapper_sconf_body` is
+  the spec: the usual sconf / `sie_cap_gpr` / `callee_saved` frame, the lock's
+  three struct fields in raw and back initialized, plus four pure premises —
+  `F+0x1c` is 2-byte aligned, and what the two auipc/addi pairs and the jal
+  resolve to (`… = name`, `… = lk`, `… = mword_of_int KernelSyms.initlock`).
+- **`WpInitlockWrapper.v`** — `InitlockWrapperProof (Initlock : INITLOCK)`.
+- A member `F` supplies only: its `Wp<F>Decode.v` (the shared `mdec_*`
+  compressed templates plus the five base words carrying its own immediates)
+  ending in an `<f>_code : kernel_text -∗ ilw_code …` bundle; a `Spec<F>.v` in
+  the usual shape; and a `WpSconf<F>.v` that is one `iApply` — `Module ILW :=
+  InitlockWrapperProof Initlock.` inside the function's own functor, four
+  `ltac:(apply bv_eq; vm_compute; reflexivity)` relocation discharges, and
+  `iApply (<f>_code with "Htext")`. ~60 lines instead of ~250.
+
+### Proving a whole function over a SYMBOLIC entry address
+
+The wrapper is the first whole-function proof whose entry `F` is a variable, so
+none of the usual `vm_compute` address steps apply. What replaces them:
+
+- **pc stepping** — `pc_step F a n b : a + n = b → add_vec_int (mword_of_int
+  (F+a)) n = mword_of_int (F+b)` (WpInitlockWrapper.v, over `avi_mword` in
+  RiscvExtras.v). The premise is `eq_refl` at every call site.
+- **returning from a call** — `jalr_ret_id` (AlignBits.v): jalr's mandatory
+  bit-0 clear is the identity on an address whose low bit is already clear, so
+  one 2-byte-alignment premise replaces the concrete proofs' `vm_compute`.
+- **Any leaf premise mentioning a computed ADDRESS must be discharged from a
+  relocation hypothesis, never by `vm_compute`** — `wp_jal_s_sconf`'s
+  target-alignment premise becomes `ltac:(rewrite Hjrel; vm_compute;
+  reflexivity)`. A `vm_compute` on a symbolic address does not fail fast, it
+  hangs (the symptom is a `coqc` that sits on one `iApply` for minutes).
+- The first instruction must sit at `mword_of_int F`, **not** `mword_of_int
+  (F + 0x00)`: `Z.add F 0` is stuck on a variable, so the two never unify.
+
 ## memset: one general spec, page/walk as instances
 
 `memset` has an extra layer because its whole-function spec is used at more than
@@ -159,3 +212,7 @@ Write `Spec<F>.v` first (interface + notation), then `WpSconf<F>.v` as a functor
 over the callees you need, then the one-line `Link<F>.v`, and add all three to
 `_CoqProject`. Only lemmas another file consumes belong in the `Module Type`;
 everything else stays hidden behind the seal.
+
+Before writing a straight-line body, check whether `F` is an instance of a shape
+that is already proved — a body that is just `initlock(&L, "name")` is a member
+of the thin-wrapper family above and needs no proof of its own.
