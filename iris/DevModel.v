@@ -288,16 +288,6 @@ Qed.
 
 (* Writes to IER/LCR and to the read-only/ignored offsets leave the accepted
    trace alone. *)
-Lemma uart_write_acc_quiet (u : uart_state) (off : Z) (b : bv 8) (u' : uart_state) :
-  off = 1 \/ off = 3 \/ off = 4 \/ off = 5 \/ off = 6 \/ off = 7 ->
-  uart_write u off b = Some u' -> uart_acc u' = uart_acc u.
-Proof.
-  unfold uart_write, uart_acc.
-  intros [-> | [-> | [-> | [-> | [-> | ->]]]]]; cbn [Z.eqb orb];
-    try (destruct (uart_dlab u));
-    intro H; injection H as <-; reflexivity.
-Qed.
-
 (* NOTE (deliberate, load-bearing): there is NO general monotonicity lemma for
    [uart_write].  An FCR write (offset 2) with bit 2 set CLEARS the tx FIFO,
    which SHRINKS [uart_acc] -- the queued bytes are discarded, never sent.  So

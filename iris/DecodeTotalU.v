@@ -292,12 +292,5 @@ Ltac dt_step :=
 (* §5 The single boolean fact, and decoder totality.                      *)
 (* ===================================================================== *)
 
-Lemma goodb_encdec_u (w : mword 32) :
-  goodb D_u (ext_decode w) dstateU = true.
-Proof.
-  unfold ext_decode, encdec_backwards. cbv beta zeta.
-  repeat dt_step.
-Qed.
-
 (* Every 32-bit word decodes -- to a SINGLE instruction shared by every
    state that agrees with the U-mode reference on the decode read set.    *)
