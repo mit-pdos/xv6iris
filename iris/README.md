@@ -174,7 +174,7 @@ for regenerating the Sail model.
 >   **…and peel in BATCHES.** Ltac profiling (2026-07-02) showed even the head-peel
 >   walk dominating its files (68 % of `WpGprCsrwB`): every `erewrite` re-types the
 >   O(#clauses) *tail* of the dispatch, so a per-clause walk is still O(n²) in
->   retyping. `exec_if_false_g16`/`_g4` (WpLeafCommon.v, plain-`if` form) and
+>   retyping. `exec_if_false_g16`/`_g4` (ExecCommon.v, plain-`if` form) and
 >   `skip_clause_head16`/`4` (WpDecode.v, decoder `bind`-form) collapse 16/4 clauses
 >   per rewrite; the wrappers `skip_csr_false_clauses` / `skip_pure_clauses` try
 >   16 → 4 → 1 (a batch whose window covers the TRUE guard just fails its side
@@ -278,7 +278,7 @@ for regenerating the Sail model.
 > `currentlyEnabled`/`hartSupports`/`and_boolM`/`or_boolM` stay folded and
 > untouched — selects the matching clause and lands on a goal that's
 > syntactically `RHS = RHS`, closed by a free `reflexivity`. Packaged as
-> `csr_dispatch_eq` (WpLeafCommon.v). Measured **~1.7 s → ~0.02 s per call**
+> `csr_dispatch_eq` (ExecCommon.v). Measured **~1.7 s → ~0.02 s per call**
 > (`WpGprCsrrA` 11.3 s → 7.4 s, `WpGprCsrrB` 12.9 s → 6.9 s). General lesson: a
 > positive `cbv delta [...]` whitelist is always safe (nothing outside the list
 > can be touched); the WRONG shape to reach for here is a *negative* `cbv
@@ -320,17 +320,17 @@ for regenerating the Sail model.
 > `iPureIntro. exact (conj HmIE (conj HMPRV HSXL))`. Applied to
 > `InstrBytes`, `WpGprCsrw`, `WpGprCsrr`, `WpGprRvc1`, `WpGprLoad`, `WpGprStore`,
 > `WpGprJalr`: clean-build wall time 168 s → 128 s (→ ~100 s together with the
-> `WpLeafCommon.v` split below).
+> `ExecCommon.v` split below).
 
 > **Build-perf note (keep slow files off the leaves' import path —
-> `WpLeafCommon.v`).** With 32 cores the clean build is *critical-path bound*
+> `ExecCommon.v`).** With 32 cores the clean build is *critical-path bound*
 > (wall ≈ the longest `Require` chain, everything else overlaps). The leaves all
 > imported `WpEntry.v` (30–40 s) for ~23 tiny helper lemmas
 > (`exec_if_false_g`, `exec_jump_to`, `exec_execute_JAL`, the csrr cluster, …),
 > which put `infra → WpEntry → WpGpr → leaf` on every leaf's path. Those helpers
-> now live in `WpLeafCommon.v` (~2 s); leaves and `WpGpr` import it instead, and
+> now live in `ExecCommon.v` (~2 s); leaves and `WpGpr` import it instead, and
 > `WpEntry` re-`Export`s it, so only `WpEntryNew` still waits for `WpEntry`.
-> When adding a leaf-shared helper, put it in `WpLeafCommon.v` (or another cheap
+> When adding a leaf-shared helper, put it in `ExecCommon.v` (or another cheap
 > early file), never in a file with expensive proofs. Three more instances of the
 > same rule: `decode_auipc`/`decode_ld` moved from `WpDecode.v` (every leaf's
 > prefix) to `KernelBoot.v` (their only user); `subrange_id`/

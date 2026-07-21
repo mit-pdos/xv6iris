@@ -14,7 +14,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvT
 Require Import InstrBytes.
 Require Import WpDecodeBridge WpRvcBridge.
 Require Import WpGprCsrwCommon WpGprCsrwB.
-Require Import WpLeafCommon WpGpr.
+Require Import ExecCommon WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import KernelText.
 Require Import SmodePte.

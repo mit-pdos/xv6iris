@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvTryStep RiscvExtras WpLeafCommon.
+Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvTryStep RiscvExtras ExecCommon.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 

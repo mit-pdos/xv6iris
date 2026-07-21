@@ -72,7 +72,7 @@ Require Import StackOwn.
 Require Import RegFile.
 Require Import WpGprCsrwCommon.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode WpLeafCommon WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode ExecCommon WpGpr.
 Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeUtype.
@@ -394,7 +394,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 Lemma st_decode60 s :
   register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode st_w60) s
-    = Some (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS), s).
+    = Some (CSRReg (ExecCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* idx 63 MRET: [decode_mret] (WpGprMretWp) applies verbatim (w_mret is the
@@ -592,8 +592,8 @@ Section WpStartInstr.
   Proof. mk_base (KernelSyms.start + 0x66) st_w59 st_pc59 (JAL (sjimm59, Regidx ti_ra)) st_decode59. Qed.
 
   Lemma st_instr60 :
-    kernel_text -∗ instr st_pc60 false (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)).
-  Proof. mk_base (KernelSyms.start + 0x6a) st_w60 st_pc60 (CSRReg (WpLeafCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)) st_decode60. Qed.
+    kernel_text -∗ instr st_pc60 false (CSRReg (ExecCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)).
+  Proof. mk_base (KernelSyms.start + 0x6a) st_w60 st_pc60 (CSRReg (ExecCommon.csr_csrr, zreg, Regidx ti_a5, CSRRS)) st_decode60. Qed.
 
   Lemma st_instr61 :
     kernel_text -∗ instr st_pc61 true (ADDIW (sign_extend' 12 si61, Regidx ti_a5, Regidx ti_a5)).

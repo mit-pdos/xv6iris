@@ -5,7 +5,7 @@ From iris.base_logic.lib Require Import ghost_map.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpLeafCommon.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras ExecCommon.
 Require Import InstrBytes.
 From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.

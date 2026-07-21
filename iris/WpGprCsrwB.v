@@ -6,7 +6,7 @@ From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpLeafCommon WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec ExecCommon WpGpr.
 Require Import RegFile.
 Require Import InstrBytes.
 Local Open Scope Z_scope.
@@ -303,20 +303,9 @@ Proof.
   crush_rec_cE_S s. rewrite HS. reflexivity.
 Qed.
 
-Lemma exec_architecture_Supervisor s :
-  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
-  exec (architecture Supervisor) s = Some (RV64, s).
-Proof.
-  intro HSXL. unfold architecture. cbn match.
-  match goal with |- exec (Defs.bind ?L _) s = _ =>
-    assert (Hin : exec L s = Some (_get_Mstatus_SXL (register_lookup mstatus s.(sregs)), s)) end.
-  { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hin).
-  unfold architecture_bits_backwards. rewrite HSXL.
-  replace (eq_vec ('b"10") ('b"01")) with false by (vm_compute; reflexivity). cbn match.
-  replace (eq_vec ('b"10") ('b"10")) with true by (vm_compute; reflexivity). cbn match.
-  apply exec_returnM.
-Qed.
+(* [exec_architecture_Supervisor] is a privilege-generic model fact, not a
+   CSRW one -- it lives in ExecCommon.v so the page-table files can reach
+   it without importing this whole family. *)
 
 Definition csr_satp : mword 12 := mword_of_int 0x180.
 
