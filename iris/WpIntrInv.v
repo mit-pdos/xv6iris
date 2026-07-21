@@ -64,31 +64,6 @@ Require Export IntrDefs.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* ===================================================================== *)
-(* §1 Pure layer: the mstatus fact set carried across the trap+SRET       *)
-(* round trip, and dispatch-outcome helpers.                              *)
-(* ===================================================================== *)
-
-(* SIE off ⇒ no dispatch (any pending set). *)
-Lemma s_dispatch_None_of_SIE_false (mip_v : mword 64) (meip seip : mword 1)
-    (mie_v mdv0 ms : mword 64) :
-  eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ->
-  s_dispatch mip_v meip seip mie_v mdv0 ms = None.
-Proof. intros H. unfold s_dispatch. rewrite H. reflexivity. Qed.
-
-(* empty pending set ⇒ no dispatch (any SIE) -- the "supervisor interrupt
-   pending register is zero" form a higher-level client may prefer. *)
-Lemma s_dispatch_None_of_pending_zero (mip_v : mword 64) (meip seip : mword 1)
-    (mie_v mdv0 ms : mword 64) :
-  s_pending mip_v meip seip mie_v mdv0 = zeros' 64 ->
-  s_dispatch mip_v meip seip mie_v mdv0 ms = None.
-Proof.
-  intros H. unfold s_dispatch. rewrite H.
-  replace (neq_vec (zeros' 64 : mword 64) (zeros' 64)) with false
-    by (vm_compute; reflexivity).
-  rewrite andb_false_r. reflexivity.
-Qed.
-
 Section WpIntrInv.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.

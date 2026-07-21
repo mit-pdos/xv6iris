@@ -127,18 +127,3 @@ Proof.
   change (0 + Z.of_N (MachineWord.Z_idx 1))%Z with 1%Z.
   destruct (Z.testbit (bv_unsigned (lower_mstatus ms)) 1); reflexivity.
 Qed.
-
-Lemma po_intena_val_zero (ms : mword 64) :
-  _get_Mstatus_SIE ms = ('b"0" : mword 1) ->
-  neq_vec (sign_extend' 64 (po_intena_val ms)) zero_reg = false.
-Proof.
-  intro H. rewrite po_intena_val_sie, H. vm_compute. reflexivity.
-Qed.
-
-Lemma po_intena_val_one (ms : mword 64) :
-  _get_Mstatus_SIE ms = ('b"1" : mword 1) ->
-  neq_vec (sign_extend' 64 (po_intena_val ms)) zero_reg = true.
-Proof.
-  intro H. rewrite po_intena_val_sie, H. vm_compute. reflexivity.
-Qed.
-
