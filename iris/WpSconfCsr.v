@@ -55,9 +55,9 @@ Section WpSconfCsr.
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m n -∗
+    sie_cap_gpr γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
+    pc_is pc -∗
     instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
     ( ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
@@ -79,7 +79,8 @@ Section WpSconfCsr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd Hrdsp) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
@@ -243,24 +244,24 @@ Section WpSconfCsr.
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m n -∗
+    sie_cap_gpr γ root_ppn m n -∗
     intr_count γ root_ppn k -∗
     tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
+    pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
     ( ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n -∗
+      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n -∗
       intr_count γ root_ppn (S k) -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp) "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd Hrdsp) "Hsc Hhs Hcg Hcnt Htlbinv Hpc Hinstr Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
               with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
@@ -320,15 +321,17 @@ Section WpSconfCsr.
       { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
       iDestruct (intr_count_get_off γ root_ppn k with "Hq0 Hcnt") as "(Hq0 & Hc0 & Hres)".
-      iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] [Hstk Hq0]
-                            [Hc0 Hres] Htlbinv [$Hpc' $Hnpc] [Hfmap]").
+      iAssert (sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n)
+        with "[Hstk Hq0]" as "Hcap".
+      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
+        iLeft. iExact "Hq0". }
+      iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
+      iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] Hcg
+                            [Hc0 Hres] Htlbinv [$Hpc' $Hnpc]").
       { exact Hmsf. }
       { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
         iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
-      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iLeft. iExact "Hq0". }
       { iApply (intr_count_pack_S with "Hc0 Hres"). }
-      { iExact "Hfmap". }
     - (* ---- '1' arm: the real flip ---- *)
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
       iDestruct (intr_count_get_on γ root_ppn k with "Hq1 Hcnt") as "(%Hn0 & Hq1 & Hc1)".
@@ -382,21 +385,23 @@ Section WpSconfCsr.
         unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
       iEval (rewrite -Hsie') in "Hhalf".
-      iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] [Hstk Hq]
+      iAssert (sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n)
+        with "[Hstk Hq]" as "Hcap".
+      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
+        iLeft. iExact "Hq". }
+      iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
+      iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] Hcg
                             [Htok Hsepcx Hscausex Hstvalx] Htlbinv
-                            [$Hpc' $Hnpc] [Hfmap]").
+                            [$Hpc' $Hnpc]").
       { exact Hmsf. }
       { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
         iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
-      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iLeft. iExact "Hq". }
       { iApply (intr_count_pack_S with "Htok [Hsepcx Hscausex Hstvalx]").
         iSplitR "Hsepcx Hscausex Hstvalx".
         { iExists handler. iSplit; [| iExact "Hspec"].
           iSplit; [iPureIntro; exact Htvd |].
           iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
         iFrame "Hsepcx Hscausex Hstvalx". }
-      { iExact "Hfmap". }
   Qed.
 
 
@@ -532,25 +537,25 @@ Section WpSconfCsr.
     rd <> csp_rs1 ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m n -∗
+    sie_cap_gpr γ root_ppn m n -∗
     intr_count γ root_ppn 1 -∗
     tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
+    pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRS)) -∗
     ( ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n -∗
+      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n -∗
       intr_count γ root_ppn 0 -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdsp)
-      "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hinstr Hcont".
+      "Hsc Hhs Hcg Hcnt Htlbinv Hpc Hinstr Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct "Hcnt" as "[Htok (Hhx & Hsepcx & Hscausex & Hstvalx)]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRS))
@@ -628,18 +633,20 @@ Section WpSconfCsr.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iEval (rewrite -Hsie') in "Hhalf".
-    iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx]
-                          [Hqcap Hsepcx Hscausex Hstvalx Hstk] [Hqcnt] Htlbinv
-                          [$Hpc' $Hnpc] [Hfmap]").
-    { exact Hmsf. }
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-      iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
+    iAssert (sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n)
+      with "[Hqcap Hsepcx Hscausex Hstvalx Hstk]" as "Hcap".
     { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
       iRight. iFrame "Hqcap Hsepcx Hscausex Hstvalx".
       iExists handler. iSplit; [iPureIntro; exact Htvd |].
       iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
+    iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
+    iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx]
+                          Hcg [Hqcnt] Htlbinv
+                          [$Hpc' $Hnpc]").
+    { exact Hmsf. }
+    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+      iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
     { iLeft. iExact "Hqcnt". }
-    iExact "Hfmap".
   Qed.
 
   Lemma wp_csrsi_sstatus_x0_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
@@ -647,24 +654,24 @@ Section WpSconfCsr.
       (m : regfile) (n : nat) :
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m n -∗
+    sie_cap_gpr γ root_ppn m n -∗
     intr_count γ root_ppn 1 -∗
     tlb_inv_pt root_ppn -∗
-    pc_is pc -∗ gpr_file m -∗
+    pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
     ( ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn m n -∗
+      sie_cap_gpr γ root_ppn m n -∗
       intr_count γ root_ppn 0 -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗
-      gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "Hsc Hhs Hcap Hcnt Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros "Hsc Hhs Hcg Hcnt Htlbinv Hpc Hinstr Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     iDestruct "Hcnt" as "[Htok (Hhx & Hsepcx & Hscausex & Hstvalx)]".
     iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
@@ -727,18 +734,20 @@ Section WpSconfCsr.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iEval (rewrite -Hsie') in "Hhalf".
-    iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx]
-                          [Hqcap Hsepcx Hscausex Hstvalx Hstk] [Hqcnt] Htlbinv
-                          [$Hpc' $Hnpc] [Hfmap]").
-    { exact Hmsf. }
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-      iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
+    iAssert (sie_cap γ root_ppn m n)
+      with "[Hqcap Hsepcx Hscausex Hstvalx Hstk]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
       iRight. iFrame "Hqcap Hsepcx Hscausex Hstvalx".
       iExists handler. iSplit; [iPureIntro; exact Htvd |].
       iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
+    iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
+    iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx]
+                          Hcg [Hqcnt] Htlbinv
+                          [$Hpc' $Hnpc]").
+    { exact Hmsf. }
+    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+      iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
     { iLeft. iExact "Hqcnt". }
-    iExact "Hfmap".
   Qed.
 
 End WpSconfCsr.

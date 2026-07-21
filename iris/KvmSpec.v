@@ -83,6 +83,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes KernelText WpGpr WpMmodeLeafBase RegFile.
 Require Import PtTree PtBuild.
+Require Import IntrDefs.
 Require Import SmodeCore SRegime StackOwn CalleeSaved KallocInv WpLock WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
@@ -233,8 +234,8 @@ Section KvmSpecs.
   (* loop; an axiom in the interim, like wp_myproc.)  a0 = message ptr.    *)
   (* ------------------------------------------------------------------- *)
   Definition panic_wp : iProp Σ :=
-    (□ ∀ (Φ : mval -> iProp Σ) (m : regfile),
-       kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ gpr_file m -∗
+    (□ ∀ (Φ : mval -> iProp Σ) (γ : gname) (root_ppn : mword 44) (m : regfile) (avail : nat),
+       kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ sie_cap_gpr γ root_ppn m avail -∗
        WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   (* ------------------------------------------------------------------- *)

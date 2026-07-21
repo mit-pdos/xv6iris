@@ -53,24 +53,25 @@ Lemma wp_sb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
   zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap γ root_ppn m n -∗
+  sie_cap_gpr γ root_ppn m n -∗
   tlb_inv_pt root_ppn -∗
-  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
+  pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
   dev_inv γd -∗
   R -∗
   (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
      uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
   ( hart_state ↦ᵣ HART_ACTIVE tt -∗
     sconf γ -∗
-    sie_cap γ root_ppn m n -∗
+    sie_cap_gpr γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
-    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗ gpr_file m -∗
+    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hident Hpa.
-  iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hdinv HR Hacc Hcont".
+  iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv HR Hacc Hcont".
+  iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
   assert (Ha8pa : a8 = uart_pa off).
   { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry. apply zero_extend'_id. }
   assert (Hdevvpn : kpt_dev_vpn (svpn_of a8)).
@@ -190,8 +191,9 @@ Proof.
     rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
     unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
   iEval (rewrite Lnpc) in "Hpc'".
-  iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
-                        [$Hpc' $Hnpc] Hfmap HS").
+  iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
+  iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcg Htlbinv
+                        [$Hpc' $Hnpc] HS").
   { iFrame "Hhw Hminv Hpriv Hmiex".
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
@@ -218,9 +220,9 @@ Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
   zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
   sconf γ -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap γ root_ppn m n -∗
+  sie_cap_gpr γ root_ppn m n -∗
   tlb_inv_pt root_ppn -∗
-  pc_is pc -∗ gpr_file m -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
+  pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
   dev_inv γd -∗
   R -∗
   (∀ u b u', ⌜ uart_read u off = Some (b, u') ⌝ -∗
@@ -228,16 +230,16 @@ Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
   ( ∀ b : bv 8,
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sconf γ -∗
-    sie_cap γ root_ppn (<[Regidx rd := regval_into_reg (ldval b)]> m) n -∗
+    sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (ldval b)]> m) n -∗
     tlb_inv_pt root_ppn -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    gpr_file (<[Regidx rd := regval_into_reg (ldval b)]> m) -∗
     S b -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
   intros ea a8 ldval lppn Hoff Hrd Hrdsp Hcanon Hvpn_def Hident Hpa.
-  iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr #Hdinv HR Hacc Hcont".
+  iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv HR Hacc Hcont".
+  iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
   assert (Ha8pa : a8 = uart_pa off).
   { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry. apply zero_extend'_id. }
   assert (Hdevvpn : kpt_dev_vpn (svpn_of a8)).
@@ -365,8 +367,9 @@ Proof.
     by (symmetry; apply upd_ne; congruence).
   iDestruct (sie_cap_retarget γ root_ppn m
                (<[Regidx rd := regval_into_reg (ldval b)]> m) n Hsp with "Hcap") as "Hcap".
-  iApply ("Hcont" $! b with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcap Htlbinv
-                        [$Hpc' $Hnpc] Hfmap HS").
+  iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
+  iApply ("Hcont" $! b with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcg Htlbinv
+                        [$Hpc' $Hnpc] HS").
   { iFrame "Hhw Hminv Hpriv Hmiex".
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }

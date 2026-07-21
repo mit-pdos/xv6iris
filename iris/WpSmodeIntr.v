@@ -461,26 +461,28 @@ Section WpSmodeIntr.
     add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) = wval ->
     sconf γ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m n -∗
+    sie_cap_gpr γ root_ppn m n -∗
     tlb_inv_pt root_ppn -∗
     pc_is pc -∗
-    gpr_file m -∗
     instr pc true (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       sconf γ -∗
-      sie_cap γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg wval]> m) n -∗
       tlb_inv_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Hwval) "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont".
+    iIntros (Hrd Hrdsp Hwval) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
     unshelve iApply (wp_gpr_write_s_sconf γ root_ppn Φ pc rd
               (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
               (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m n
               Hrd Hrdsp _
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr Hcont").
+              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr [Hcont]").
+    2:{ iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile".
+        iDestruct (sie_cap_gpr_join with "Hcap Hfile") as "Hcg".
+        iApply ("Hcont" with "Hhs Hsc Hcg Htlbinv Hpc"). }
     intros s_pc Hnpc Hva _.
     change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
     rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) rd (sign_extend' 12 imm) s_pc).

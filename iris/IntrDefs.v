@@ -406,6 +406,35 @@ Section IntrDefs.
     (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
      sie_arm γ root_ppn)%I.
 
+  (* [sie_cap_gpr] bundles [sie_cap] with the register file [gpr_file m], so a
+     caller threads ONE resource carrying the register file [m] once, instead of
+     [sie_cap] and [gpr_file] each re-carrying [m] separately.  Kept a FOLDED
+     [Definition] (not a notation): while threaded through a whole-function proof
+     the map [m] appears once (halving the per-instruction map unification /
+     [iEval rewrite]).  Leaves unfold it to read/update [gpr_file]; the
+     [IntoSep]/[FromSep] instances make [iDestruct "H" as "[Hcap Hfile]"] and
+     providing [$Hcap $Hfile] just work while it stays folded elsewhere. *)
+  Definition sie_cap_gpr (γ : gname) (root_ppn : mword 44)
+      (m : regfile) (avail : nat) : iProp Σ :=
+    (sie_cap γ root_ppn m avail ∗ gpr_file m)%I.
+
+  Global Instance sie_cap_gpr_into_sep γ root_ppn m avail :
+    IntoSep (sie_cap_gpr γ root_ppn m avail) (sie_cap γ root_ppn m avail) (gpr_file m).
+  Proof. rewrite /IntoSep /sie_cap_gpr. by iIntros "$". Qed.
+
+  Global Instance sie_cap_gpr_from_sep γ root_ppn m avail :
+    FromSep (sie_cap_gpr γ root_ppn m avail) (sie_cap γ root_ppn m avail) (gpr_file m).
+  Proof. rewrite /FromSep /sie_cap_gpr. by iIntros "[$ $]". Qed.
+
+  (* Foolproof split/join for the ports (no instance-resolution surprises). *)
+  Lemma sie_cap_gpr_split γ root_ppn m avail :
+    sie_cap_gpr γ root_ppn m avail -∗ sie_cap γ root_ppn m avail ∗ gpr_file m.
+  Proof. by iIntros "$". Qed.
+
+  Lemma sie_cap_gpr_join γ root_ppn m avail :
+    sie_cap γ root_ppn m avail -∗ gpr_file m -∗ sie_cap_gpr γ root_ppn m avail.
+  Proof. iIntros "Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
+
   (* the funnel's accessor: split off the exact reserved carve (the
      [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
   Lemma sie_cap_acc (γ : gname) (root_ppn : mword 44)

@@ -60,15 +60,14 @@ Section WpSconfMemsetPage.
     m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap γ root_ppn m0 n -∗ tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗ gpr_file m0 -∗
+    sie_cap_gpr γ root_ppn m0 n -∗ tlb_inv_pt root_ppn -∗
+    kernel_text -∗ pc_is pcE -∗
     page_own p -∗
     ( ∀ mfin,
       sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap γ root_ppn mfin n -∗ tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ root_ppn mfin n -∗ tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       page_own p -∗
-      gpr_file mfin -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -94,7 +93,7 @@ Section WpSconfMemsetPage.
     set (m5 := <[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4).
     set (m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5).
     pose proof (add_vec_frame_cancel) as Hframe.
-    iIntros "Hsc Hhs Hcap Htlbinv #Htext Hpc Hfile Hpage Hcont".
+    iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add p j) ↦ₘ b)%I) with "Hpage")
@@ -141,9 +140,9 @@ Section WpSconfMemsetPage.
     (* --- PREFIX: 0x00..0x10 --- *)
     iApply (wp_memset_prefix_sconf γ root_ppn Φ m0 n imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
               wval_add Hn Hsp' Hn0 Hvalue_add
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile
+              with "Hsc Hhs Hcg Htlbinv Hpc
                     Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 [-]").
-    iIntros "Hsc Hhs Hcap Htlbinv Hpc Hfile Hbra Hbs0".
+    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hbra Hbs0".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.
     (* pc at pcE+20 = memset+0x14 = loop top *)
     assert (Hpc1 : add_vec_int pcE 20 = mword_of_int (MS + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -177,8 +176,8 @@ Section WpSconfMemsetPage.
               ltac:(vm_compute; discriminate)
               minstr_cce minstr_cd2 minstr_cd4
               4096 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
-              with "Hsc Hhs Hcap Htlbinv Htext Hpc Hfile Hbuf [-]").
-    iIntros "Hhs Hsc Hcap Htlbinv Hpc Hfile Hbuf".
+              with "Hsc Hhs Hcg Htlbinv Htext Hpc Hbuf [-]").
+    iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbuf".
     set (m7 := <[Regidx a5_idx := regval_into_reg (ms_addr p 4096)]> m6).
     change (<[Regidx a5_idx := regval_into_reg (ms_addr p 4096)]> m6) with m7.
     assert (Hpc2 : add_vec_int (add_vec_int (mword_of_int (MS + 0x14) : mword 64) 6) 4 = (mword_of_int (MS + 0x1e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -196,14 +195,14 @@ Section WpSconfMemsetPage.
     (* the suffix's ret target is built from ra0e := ra0, so [Hret0] IS its Hal0 *)
     iApply (wp_memset_suffix_sconf γ root_ppn Φ m7 (n - 2)%nat ra0 s00
               Hret0
-              with "Hsc Hhs Hcap Htlbinv HiL0 HiL2 HiL4 HiL6 Hpc Hfile [Hbra] [Hbs0] [-]").
+              with "Hsc Hhs Hcg Htlbinv HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
-    iIntros (mfin) "Hhs Hsc Hcap Htlbinv Hpc Hfile %Hmeq".
+    iIntros (mfin) "Hhs Hsc Hcg Htlbinv Hpc %Hmeq".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
-    iEval (rewrite Hnk) in "Hcap".
+    iEval (rewrite Hnk) in "Hcg".
     (* rebuild page_own from the all-cbyte buffer *)
-    iApply ("Hcont" $! mfin with "Hsc Hhs Hcap Htlbinv Hpc [Hbuf] Hfile [%]").
+    iApply ("Hcont" $! mfin with "Hsc Hhs Hcg Htlbinv Hpc [Hbuf] [%]").
     - iEval (rewrite /page_own /byte_any).
       iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
       iEval (rewrite ms_pa_ms_addr) in "H". iExists _. iExact "H".
