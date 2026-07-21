@@ -1006,29 +1006,6 @@ Proof.
   - cbn match beta. apply run_returnM_fwd.
 Qed.
 
-Lemma exec_read_ram_resv_4 (addr : mword 64) (w : bv 32) s :
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (read_ram Read_RISCV_reserved (Physaddr addr) 4 false) s = Some ((w, default_meta), s).
-Proof.
-  intros Hdev Hbytes.
-  apply (run_to_exec _ _ _ _ (run_read_ram_resv_4_pin addr w s Hdev Hbytes)).
-  unfold read_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_read. cbn beta zeta.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  rewrite exec_MemRead; last exact Hdev.
-  cbn [Interface.ReadReq.pa].
-  case_match eqn:Hrb.
-  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
-  - exfalso.
-    refine (read_bytes_ne (mem s) addr (Z.to_N 4) w _ Hrb).
-    intros j Hj.
-    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
-    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
-    exact (Hbytes j Hj).
-Qed.
 
 Lemma run_read_ram_resv_8_pin (addr : mword 64) (w : bv 64) s :
   dev_addr addr = false ->
@@ -1050,29 +1027,6 @@ Proof.
   - cbn match beta. apply run_returnM_fwd.
 Qed.
 
-Lemma exec_read_ram_resv_8 (addr : mword 64) (w : bv 64) s :
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 8)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (read_ram Read_RISCV_reserved (Physaddr addr) 8 false) s = Some ((w, default_meta), s).
-Proof.
-  intros Hdev Hbytes.
-  apply (run_to_exec _ _ _ _ (run_read_ram_resv_8_pin addr w s Hdev Hbytes)).
-  unfold read_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_read. cbn beta zeta.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  rewrite exec_MemRead; last exact Hdev.
-  cbn [Interface.ReadReq.pa].
-  case_match eqn:Hrb.
-  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
-  - exfalso.
-    refine (read_bytes_ne (mem s) addr (Z.to_N 8) w _ Hrb).
-    intros j Hj.
-    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
-    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
-    exact (Hbytes j Hj).
-Qed.
 
 (* ===================================================================== *)
 (* §5b The reserved pmaCheck, branching on reservability.  On the RAM     *)
@@ -1357,20 +1311,6 @@ Qed.
 (*    extra [cbn [Mem_write_request_value]] + [iMon_bind] vs the width-4). *)
 (* ===================================================================== *)
 
-Lemma exec_write_ram_cond_8 (addr : mword 64) (data : bv 64) s :
-  dev_addr addr = false ->
-  exec (write_ram rv64d_types.Write_RISCV_conditional (Physaddr addr) 8 data tt) s
-  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 8 data) s.(mdev)).
-Proof.
-  intros Hdev.
-  unfold write_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_write. cbn beta zeta iota match.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  cbn [Mem_write_request_value]. cbn match. cbn [Interface.iMon_bind].
-  rewrite exec_MemWrite; last exact Hdev.
-  reflexivity.
-Qed.
 
 
 
@@ -1589,29 +1529,11 @@ Section SplitLoadBundle.
 
   Definition cva (k : nat) : mword 64 := add_vec_int va (Z.of_nat k * bytes).
 
-  Definition config_ok (s : mstate) : Prop :=
-    register_lookup misa s.(sregs) = MISA_C /\
-    register_lookup menvcfg s.(sregs) = MENVCFG_S /\
-    register_lookup htif_tohost_base s.(sregs) = None /\
-    register_lookup cur_privilege s.(sregs) = User /\
-    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" /\
-    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false /\
-    pma_allows_all (register_lookup pma_regions s.(sregs)).
 
 
   Context (σ0 : mstate).
 
-  Fixpoint sst (k : nat) : mstate :=
-    match k with
-    | O => σ0
-    | S k' =>
-      match exec (translateAddr (Virtaddr (cva k')) (Load Data)) (sst k') with
-      | Some (Ok (Physaddr _, _, _), s') => s'
-      | _ => sst k'
-      end
-    end.
 
-  Definition spa (k : nat) : mword 64 := u_walk_pa w (cva k).
 
 
 
@@ -1649,14 +1571,6 @@ Section SplitStoreBundle.
   Definition cvaS (k : nat) : mword 64 := add_vec_int va (Z.of_nat k * bytes).
   Definition spaS (k : nat) : mword 64 := u_walk_pa w (cvaS k).
 
-  Definition config_okS (s : mstate) : Prop :=
-    register_lookup misa s.(sregs) = MISA_C /\
-    register_lookup menvcfg s.(sregs) = MENVCFG_S /\
-    register_lookup htif_tohost_base s.(sregs) = None /\
-    register_lookup cur_privilege s.(sregs) = User /\
-    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" /\
-    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false /\
-    pma_allows_all (register_lookup pma_regions s.(sregs)).
 
 
   Context (σ0 : mstate).
@@ -1665,12 +1579,6 @@ Section SplitStoreBundle.
     match exec (translateAddr (Virtaddr (cvaS k)) (Store Data)) s with
     | Some (Ok (Physaddr _, _, _), s') => s'
     | _ => s
-    end.
-  Fixpoint sstS (k : nat) : mstate :=
-    match k with
-    | O => σ0
-    | S k' => let s' := sttrS (sstS k') k' in
-              MState s'.(sregs) (write_bytes s'.(mem) (spaS k') (Z.to_N bytes) (wv k')) s'.(mdev)
     end.
 
 

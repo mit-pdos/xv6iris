@@ -20,38 +20,6 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* pmaCheck for an aligned RAM AMO with atomic support (res_or_con = true). *)
-Lemma exec_pmaCheck_ram_amo_4 (op : amoop) (addr : mword 64) (pbmt : page_based_mem_type)
-    (region : PMA_Region) s :
-  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
-  is_aligned_paddr (Physaddr addr) 4 = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  pma_allows_atomic_op ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support))
-    op 4 = true ->
-  exec (pmaCheck (Physaddr addr) 4 (Atomic (op, Data, Data)) pbmt true) s = Some (None, s).
-Proof.
-  intros Hmatch Halign Hread Hwrite Hamo.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
-  destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hread, Hwrite, Hamo |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  destruct op; cbn match beta;
-    (match goal with |- exec (?m >>= ?k) s = _ =>
-       assert (Hass : exec m s
-               = Some (andb (PMA_readable (override_PMA rattr pbmt))
-                         (andb (PMA_writable (override_PMA rattr pbmt))
-                            (pma_allows_atomic_op (PMA_atomic_support (override_PMA rattr pbmt))
-                               _ 4)), s))
-         by (rewrite (exec_bind_Some _ _ _ _ _ (exec_returnm eq_refl s)); apply exec_returnM);
-       rewrite (exec_bind_Some _ _ _ _ _ Hass)
-     end;
-     cbn beta;
-     rewrite Hread Hwrite Hamo; cbn [andb]; cbn match;
-     apply exec_returnM).
-Qed.
 
 Lemma exec_effectivePrivilege_amo_nm (op : amoop) (m : mword 64) (pr : Privilege) s :
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
@@ -81,45 +49,7 @@ Proof.
   - cbn match beta. apply run_returnM_fwd.
 Qed.
 
-Lemma exec_read_ram_resacq_4 (addr : mword 64) (w : bv 32) s :
-  dev_addr addr = false ->
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (read_ram rv64d_types.Read_RISCV_reserved_acquire (Physaddr addr) 4 false) s
-  = Some ((w, default_meta), s).
-Proof.
-  intros Hdev Hbytes.
-  apply (run_to_exec _ _ _ _ (run_read_ram_resacq_4_pin addr w s Hdev Hbytes)).
-  unfold read_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_read. cbn beta zeta.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  rewrite exec_MemRead; last exact Hdev.
-  cbn [Interface.ReadReq.pa].
-  case_match eqn:Hrb.
-  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
-  - exfalso.
-    refine (read_bytes_ne (mem s) addr (Z.to_N 4) w _ Hrb).
-    intros j Hj.
-    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
-    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
-    exact (Hbytes j Hj).
-Qed.
 
-Lemma exec_write_ram_cond_4 (addr : mword 64) (data : bv 32) s :
-  dev_addr addr = false ->
-  exec (write_ram rv64d_types.Write_RISCV_conditional (Physaddr addr) 4 data tt) s
-  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
-Proof.
-  intros Hdev.
-  unfold write_ram. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
-  unfold Defs.sail_mem_write. cbn beta zeta iota match.
-  unfold Defs.bind. cbn [Interface.iMon_bind].
-  cbn match.
-  rewrite exec_MemWrite; last exact Hdev.
-  reflexivity.
-Qed.
 
 
 

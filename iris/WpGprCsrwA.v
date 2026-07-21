@@ -209,7 +209,6 @@ Qed.
 
 
 (* ===== mscratch (0x340): pure direct write, _pure check ===== *)
-Definition csr_mscratch : mword 12 := mword_of_int 0x340.
 
 Lemma exec_hartSupports_Sv32 s : exec (hartSupports Ext_Sv32) s = Some (false, s).
 Proof.

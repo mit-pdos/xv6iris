@@ -386,11 +386,6 @@ Definition kpt_mem_ad (adf : kpt_adf) (s : mstate) (root : mword 44) : Prop :=
 
 (* ---- preset bridges: the A/D=1 instance is the fixed-flag layer ---- *)
 
-Lemma kpt_lflags_adf1 (vpn : mword 27) : kpt_lflags_ad kpt_adf1 vpn = kpt_lflags vpn.
-Proof.
-  unfold kpt_lflags_ad, kpt_lflags, PTE_RAM_ad, PTE_DEV_ad, kpt_adf1, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn)); reflexivity.
-Qed.
 
 
 
@@ -546,8 +541,6 @@ End KptRamTranslateAD.
 (* ===================================================================== *)
 
 (* a single entry with explicit bits: the constant-map instance *)
-Definition kpt_tlb_ent_b (root : mword 44) (vpn : mword 27) (ad : bool * bool) : TLB_Entry :=
-  kpt_tlb_ent_ad (fun _ => ad) root vpn.
 
 (* per-entry existential legal set: any mapped vpn's leaf, ANY A/D bits *)
 

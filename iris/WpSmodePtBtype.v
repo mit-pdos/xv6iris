@@ -71,17 +71,6 @@ Local Lemma exec_execute_BTYPE_BEQ_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
   Qed.
 
 (* helper: exec_BTYPE_cmp_BGE *)
-Local Lemma exec_BTYPE_cmp_BGE (rs2 rs1 : mword 5) s :
-  exec (Defs.bind (rX_bits (Regidx rs1))
-          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
-             (fun w3 => returnM (zopz0zKzJ_s w2 w3)))) s
-    = Some (zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s), s).
-Proof.
-  unfold rvv.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_BTYPE_cmp_BLTU *)
 

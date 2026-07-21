@@ -138,20 +138,8 @@ Local Lemma exec_execute_JALR_ret_zca (imm : mword 12) (rs1 rdz : mword 5) s :
 
 (* ---- Local helpers copied from WpSmodeCsr.v ---- *)
 Local Definition csr_sstatus : mword 12 := Ox"100".
-Local Lemma exec_csr_id_read_callback_sstatus (d : mword 64) s :
-  exec (csr_id_read_callback csr_sstatus d) s = Some (tt, s).
-Proof.
-  assert (H : csr_id_read_callback csr_sstatus d = returnM tt) by (vm_compute; reflexivity).
-  rewrite H. apply exec_returnM.
-Qed.
 
 (* helper: exec_csr_id_write_callback_sstatus *)
-Local Lemma exec_csr_id_write_callback_sstatus (d : mword 64) s :
-  exec (csr_id_write_callback csr_sstatus d) s = Some (tt, s).
-Proof.
-  assert (H : csr_id_write_callback csr_sstatus d = returnM tt) by (vm_compute; reflexivity).
-  rewrite H. apply exec_returnM.
-Qed.
 
 (* helper: exec_hartSupports_H *)
 Local Lemma exec_hartSupports_H s : exec (hartSupports Ext_H) s = Some (false, s).
@@ -200,15 +188,6 @@ Proof.
 Qed.
 
 (* helper: exec_read_CSR_sstatus *)
-Local Lemma exec_read_CSR_sstatus s :
-  exec (read_CSR csr_sstatus) s
-    = Some (sstatus_read (register_lookup mstatus s.(sregs)), s).
-Proof.
-  unfold read_CSR. skip_csr_false_clauses.
-  replace (eq_vec csr_sstatus (Ox"100")) with true by (vm_compute; reflexivity). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
-  unfold sstatus_read. apply exec_returnM.
-Qed.
 
 (* helper: exec_virtual_memory_supported *)
 Local Lemma exec_virtual_memory_supported s :
@@ -257,15 +236,6 @@ Proof.
 Qed.
 
 (* helper: register_set_bv64_id *)
-Local Lemma register_set_bv64_id (r : register_bitvector_64) (rs : regstate) :
-  register_set (R_bitvector_64 r) (register_lookup (R_bitvector_64 r) rs) rs = rs.
-Proof.
-  destruct rs. unfold register_set, register_lookup. cbn.
-  f_equal. apply functional_extensionality. intro r'.
-  destruct (register_bitvector_64_beq r' r) eqn:E.
-  - apply register_bitvector_64_beq_iff in E. subst r'. reflexivity.
-  - reflexivity.
-Qed.
 
 (* helper: exec_currentlyEnabled_H_false *)
 Local Lemma exec_currentlyEnabled_H_false s : exec (currentlyEnabled Ext_H) s = Some (false, s).
@@ -320,25 +290,6 @@ Proof.
 Qed.
 
 (* helper: exec_write_CSR_sstatus *)
-Local Lemma exec_write_CSR_sstatus (v : mword 64) s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (write_CSR csr_sstatus v) s
-    = Some (Ok (subrange_vec_dec
-                  (lower_mstatus (legalize_sstatus_val (register_lookup mstatus s.(sregs)) v))
-                  (Z.sub xlen 1) 0),
-            set_reg s mstatus (legalize_sstatus_val (register_lookup mstatus s.(sregs)) v)).
-Proof.
-  intros HS HU. unfold write_CSR. skip_csr_false_clauses.
-  replace (eq_vec csr_sstatus (Ox"100")) with true by (vm_compute; reflexivity). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
-  rewrite (exec_bind_Some _ _ _ _ _
-             (exec_legalize_sstatus (register_lookup mstatus s.(sregs)) v s HS HU)).
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus _ s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus _)).
-  rewrite register_lookup_set.
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_check_CSR_priv_sstatus_S *)
 Local Lemma exec_check_CSR_priv_sstatus_S s :
@@ -377,14 +328,6 @@ Proof.
 Qed.
 
 (* helper: exec_check_CSR_result_sstatus_S *)
-Local Lemma exec_check_CSR_result_sstatus_S s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (check_CSR_result csr_sstatus Supervisor CSRReadWrite) s = Some (CSR_Check_OK tt, s).
-Proof.
-  intro HS. unfold check_CSR_result.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_sstatus_S s HS)). cbn match.
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_execute_csrr_sstatus *)
 

@@ -237,8 +237,6 @@ Section SDataTranslate.
 
   (* The (symbolic) Sv39 output ppn for a 1GB superpage leaf with PTE ppn
      0x80000: concat(0x80000[43:18], vpn[17:0]); identity in-region. *)
-  Definition sdata_ppn_out (vpn : mword 27) : mword 44 :=
-    concat_vec (subrange_vec_dec (mword_of_int 0x80000 : mword 44) 43 18) (subrange_vec_dec vpn 17 0).
 
 
   (* The masked superpage base for any in-region vpn equals 0x80000 -- taken
@@ -291,13 +289,6 @@ End SDataTranslate.
 (* ===================================================================== *)
 
 (* bv_swrap agrees with the argument modulo the modulus. *)
-Lemma bv_swrap_mod (n : N) (z : Z) :
-  (bv_swrap n z) mod (bv_modulus n) = z mod (bv_modulus n).
-Proof.
-  unfold bv_swrap, bv_wrap.
-  rewrite Zminus_mod_idemp_l.
-  f_equal. ring.
-Qed.
 
 (* testbit of bv_signed below the width = testbit of bv_unsigned. *)
 

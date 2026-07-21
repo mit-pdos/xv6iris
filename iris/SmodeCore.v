@@ -438,15 +438,6 @@ Definition pte_paddr (rp : mword 44) : mword 64 :=
   zero_extend' 64 (concat_vec rp (concat_vec (subrange_vec_dec kv_vpn 26 18 : mword 9) (zeros' 3 : mword 3))).
 
 (* The superpage TLB entry the walk installs at hash index 5. *)
-Definition pw_tlb_entry (rp : mword 44) (asid : mword 16) : TLB_Entry := {|
-  TLB_Entry_asid     := asid;
-  TLB_Entry_global   := false;
-  TLB_Entry_vpn      := mword_of_int 0x80000;
-  TLB_Entry_levelMask := mword_of_int 0x3FFFF;
-  TLB_Entry_ppn      := mword_of_int 0x80000;
-  TLB_Entry_pte      := pte_super;
-  TLB_Entry_pteAddr  := Physaddr (pte_paddr rp);
-|}.
 
 (* (Local copies of two bitvector helpers that live downstream in WpSmodeGpr.) *)
 

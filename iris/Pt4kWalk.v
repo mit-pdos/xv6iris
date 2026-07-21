@@ -773,21 +773,6 @@ Qed.
 (* 7. TLB lookup / translate through a 4K entry.                          *)
 (* ===================================================================== *)
 
-Lemma exec_lookup_TLB_nonmatch (vpn : mword 27) (asid : mword 16)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (ent : TLB_Entry) s :
-  register_lookup tlb s.(sregs) = tlbvec ->
-  vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = Some ent ->
-  match_TLB_Entry ent asid (sign_extend' (57 - 12) vpn) = false ->
-  exec (lookup_TLB 39 asid vpn) s = Some (None, s).
-Proof.
-  intros Htlb Hvec Hm.
-  unfold lookup_TLB.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
-  rewrite Htlb. rewrite Hvec.
-  match goal with |- context[match_TLB_Entry ?e ?a ?v] =>
-    replace (match_TLB_Entry e a v) with false by (symmetry; exact Hm) end.
-  apply exec_returnm.
-Qed.
 
 Lemma exec_lookup_TLB_hit_ent (vpn : mword 27) (asid : mword 16)
     (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (ent : TLB_Entry) s :
@@ -885,17 +870,6 @@ Proof.
 Qed.
 
 (* a 4K entry with asid 0 always matches its own vpn under asid 0. *)
-Lemma match_tlb4k_self (vpn : mword 27) (pp : mword 44) (pte ptea : mword 64) :
-  match_TLB_Entry (tlb4k_entry (mword_of_int 0) vpn pp pte ptea)
-    (mword_of_int 0) (sign_extend' (57 - 12) vpn) = true.
-Proof.
-  unfold match_TLB_Entry, tlb4k_entry.
-  cbn [TLB_Entry_asid TLB_Entry_global TLB_Entry_vpn TLB_Entry_levelMask].
-  apply andb_true_intro. split.
-  - vm_compute; reflexivity.
-  - unfold eq_vec. rewrite MachineWord.MachineWord.eqb_true_iff.
-    symmetry. apply and45_ones. vm_compute; reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* 7b. translate / translateAddr through the trampoline-style 4K mapping. *)
@@ -972,73 +946,9 @@ Section TrampTranslate.
   Definition tramp_tlb_ent : TLB_Entry :=
     tlb4k_entry (mword_of_int 0) vpn lppn (mk_pte lppn lflags) a0.
 
-  Lemma exec_translate_TLB_miss_4k (mxr do_sum : bool) :
-    exec (translate_TLB_miss 39 (mword_of_int 0) p2 vpn access Supervisor mxr do_sum tt) s
-    = Some (Ok (lppn, PBMT_PMA, tt),
-            set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs))
-                             (tlb_hash (__id 39) vpn) (Some tramp_tlb_ent))).
-  Proof.
-    unfold translate_TLB_miss. cbn zeta.
-    match goal with |- context[pt_walk 39 _ _ _ _ _ _ ?l false ?e] =>
-      change l with 2 end.
-    rewrite (exec_bind_Some _ _ _ _ _
-               (exec_pt_walk_tramp3 access mxr do_sum vpn p2 p1 p0 lppn lflags
-                  region2 region1 region0 menvcfg0 s
-                  Hlf Hinv0 Hnl0 (Hchk0 mxr do_sum) HextN0 HG0 HmisaS HA Hord HR Hmenv HPBMTE
-                  Hrange2 Hmatch2 Hpte2 Hc2 Hsig2 Hh2 Hdev2 Hbytes2
-                  Hrange1 Hmatch1 Hpte1 Hc1 Hsig1 Hh1 Hdev1 Hbytes1
-                  Hrange0 Hmatch0 Hpte0 Hc0 Hsig0 Hh0 Hdev0 Hbytes0)).
-    unfold tramp_walk_out. cbn match. cbn zeta.
-    match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
-      assert (Hupd : exec (update_and_write_pte a wd p ac) s = Some (Ok None, s)) end.
-    { unfold update_and_write_pte.
-      match goal with |- context[@update_PTE_Bits ?w ?p ?ac] =>
-        change w with 64 end.
-      rewrite !autocast_id.
-      rewrite Hupd0.
-      cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hupd). cbn match.
-    rewrite (exec_bind0_Some _ _ _ _ _ (exec_add_to_TLB_4k (mword_of_int 0) vpn lppn _ _ s)).
-    rewrite exec_returnM.
-    unfold tramp_tlb_ent. do 3 f_equal.
-  Qed.
 
   (* HIT on a same-shaped 4K entry (any pteAddr: phase B hits the KERNEL
      table's entry, phase C the user table's own). *)
-  Lemma exec_translate_TLB_hit_4k (mxr do_sum : bool) (asid : mword 16) (ptea : mword 64) (idx : Z) :
-    exec (translate_TLB_hit 39 asid vpn access Supervisor mxr do_sum tt idx
-            (tlb4k_entry (mword_of_int 0) vpn lppn (mk_pte lppn lflags) ptea)) s
-    = Some (Ok (lppn, PBMT_PMA, tt), s).
-  Proof.
-    unfold translate_TLB_hit. cbn zeta.
-    match goal with |- context[tlb_get_pte ?sz ?e] => change sz with 8 end.
-    rewrite (tlb_get_pte_4k (mword_of_int 0) vpn lppn (mk_pte lppn lflags) ptea).
-    rewrite autocast_id.
-    match goal with |- context[Mk_PTE_Flags (@subrange_vec_dec ?w _ 7 0)] =>
-      change w with 64 end.
-    rewrite (mk_pte_flags lppn lflags Hlf).
-    unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
-    rewrite (mk_pte_ext lppn lflags ltac:(lia)).
-    rewrite (exec_bind_Some _ _ _ _ _ (Hchk0 mxr do_sum s)). cbn match.
-    match goal with |- context[update_and_write_pte ?a ?wd ?p ?ac] =>
-      assert (Hupd : exec (update_and_write_pte a wd p ac) s = Some (Ok None, s)) end.
-    { unfold update_and_write_pte.
-      match goal with |- context[@update_PTE_Bits ?w ?p ?ac] =>
-        change w with 64 end.
-      try rewrite !autocast_id.
-      rewrite Hupd0.
-      cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hupd). cbn match.
-    match goal with |- context[tlb_get_pbmt ?e] =>
-      assert (Hpbmt : exec (tlb_get_pbmt e) s = Some (PBMT_PMA, s)) end.
-    { unfold tlb_get_pbmt, tlb4k_entry. cbn [TLB_Entry_pte].
-      unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
-      rewrite (mk_pte_ext lppn lflags ltac:(lia)).
-      vm_compute (page_based_mem_type_forwards _). apply exec_returnm. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpbmt).
-    rewrite (tlb_get_ppn_4k (mword_of_int 0) vpn vpn lppn (mk_pte lppn lflags) ptea).
-    apply exec_returnm.
-  Qed.
 
   (* combined hit-or-walk translate at asid 0 through base table p2. *)
 
