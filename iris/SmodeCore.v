@@ -428,7 +428,6 @@ Qed.
 (* [exec_translationMode_S_sv39]: MOVED to SmodePte.v. *)
 
 (* The kernelvec code-page VPN and the identity-superpage PTE. *)
-Definition kv_vpn : mword 27 := mword_of_int 0x80005.
 (* leaf PTE mapping [0x80000000,0xC0000000) identically: ppn field 0x80000
    (1GB-aligned), flags D A _ _ X W R V = 0xCF (U=0). *)
 (* The PTE physical address the Sv39 walk computes for a kernelvec-page vaddr

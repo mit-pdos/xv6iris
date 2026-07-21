@@ -561,48 +561,6 @@ Section TrampWalk.
     reflexivity.
   Qed.
 
-  Lemma exec_rec_pt_walk_l2 (acc : Acc (Zwf 0) 2) :
-    exec (_rec_pt_walk 39 vpn access Supervisor mxr do_sum p2 2 false tt 2 acc) s
-    = Some (Ok (tramp_walk_out, tt), s).
-  Proof.
-    destruct acc.
-    cbn [_rec_pt_walk].
-    rewrite exec_catch_early_return.
-    assert (Hae1 : exec (Defs.assert_exp' (2 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
-      by (unfold Defs.assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
-      by (unfold Defs.assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
-    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
-      replace a with a2 by reflexivity;
-      replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_liftR_seq _ _ _ _ _
-               (exec_read_pte_S a2 region2 pte2 s
-                  HA Hord Hrange2 HR Hmatch2 (pte_addr_at_aligned8 p2 idx2) Hpte2 Hc2 Hsig2 Hh2 Hdev2 Hbytes2)).
-    match goal with |- context[Mk_PTE_Flags (@subrange_vec_dec ?w _ 7 0)] =>
-      change w with 64 end.
-    rewrite (mk_pte_flags p1 PTE_PTR ltac:(unfold PTE_PTR; lia)).
-    unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
-    rewrite (mk_pte_ext p1 PTE_PTR ltac:(unfold PTE_PTR; lia)).
-    assert (Hinv : exec (pte_is_invalid (Mk_PTE_Flags (mword_of_int PTE_PTR)) (Mk_PTE_Ext (mword_of_int 0))) s = Some (false, s))
-      by (vm_compute; reflexivity).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hinv).
-    cbn match.
-    replace (pte_is_non_leaf (Mk_PTE_Flags (mword_of_int PTE_PTR : mword 8))) with true
-      by (vm_compute; reflexivity).
-    cbv iota beta.
-    change (Z.gtb 2 0) with true. cbv iota beta.
-    replace (orb false (eq_vec (_get_PTE_Flags_G (Mk_PTE_Flags (mword_of_int PTE_PTR : mword 8))) ('b"1"))) with false
-      by (vm_compute; reflexivity).
-    unfold PPN_of_PTE. change (Z.eqb 64 32) with false. cbv iota beta.
-    rewrite (mk_pte_ppn_field p1 PTE_PTR ltac:(unfold PTE_PTR; lia)).
-    rewrite !autocast_id.
-    change (Z.sub 2 1) with 1.
-    rewrite execR_liftR.
-    rewrite exec_rec_pt_walk_l1.
-    reflexivity.
-  Qed.
 
   (* the whole 3-level walk. *)
 
@@ -687,11 +645,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma zext44_and_ones (x m : mword 44) :
-  bv_unsigned m = 2 ^ 44 - 1 -> zero_extend' 44 (and_vec x m) = x.
-Proof.
-  intro Hm. rewrite (and44_ones x m Hm). apply zero_extend44_id.
-Qed.
 
 Lemma subrange64_63_0_id (x : mword 64) : subrange_vec_dec x 63 0 = x.
 Proof.
@@ -710,16 +663,6 @@ Proof.
 Qed.
 
 (* the 4K (level-0, non-global) TLB entry. *)
-Definition tlb4k_entry (asid : mword 16) (vpn : mword 27) (pp : mword 44)
-    (pte : mword 64) (ptea : mword 64) : TLB_Entry := {|
-  TLB_Entry_asid     := asid;
-  TLB_Entry_global   := false;
-  TLB_Entry_vpn      := sign_extend' 45 vpn;
-  TLB_Entry_levelMask := mword_of_int 0;
-  TLB_Entry_ppn      := pp;
-  TLB_Entry_pte      := pte;
-  TLB_Entry_pteAddr  := Physaddr ptea;
-|}.
 
 (* add_to_TLB at level 0 installs [tlb4k_entry] at the direct-mapped slot. *)
 

@@ -1529,7 +1529,6 @@ Section SplitStoreBundle.
   Context (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
           (data : gset Arch.pa) (w va : mword 64) (wv : nat -> mword (8 * bytes)).
 
-  Definition cvaS (k : nat) : mword 64 := add_vec_int va (Z.of_nat k * bytes).
 
 
 

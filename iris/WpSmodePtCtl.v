@@ -248,54 +248,12 @@ Proof.
 Qed.
 
 (* helper: exec_legalize_mstatus *)
-Local Lemma exec_legalize_mstatus (o v : mword 64) s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (legalize_mstatus o v) s = Some (mstatus_legalized o v, s).
-Proof.
-  intros HS HU. unfold legalize_mstatus, mstatus_legalized.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_hartSupports_Zicfilp s)). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_hartSupports_Zicfilp s)). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_S s)). rewrite HS. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_U s HU)). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_S s)). rewrite HS. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_S s)). rewrite HS. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_virtual_memory_supported s HS)). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_U s HU)). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _
-             (exec_have_nominal_privLevel (_get_Mstatus_MPP (Mk_Mstatus v)) s HU HS)).
-  match goal with |- exec (Defs.bind ?IF _) s = _ =>
-    assert (Hw18 : exec IF s
-                   = Some (if have_nom_val (_get_Mstatus_MPP (Mk_Mstatus v))
-                           then _get_Mstatus_MPP (Mk_Mstatus v) else privLevel_to_bits User, s)) end.
-  { destruct (have_nom_val (_get_Mstatus_MPP (Mk_Mstatus v))).
-    - cbn match. apply exec_returnM.
-    - cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_lowest_supported_privLevel s HU)).
-      apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hw18). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_S s)). rewrite HS. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_S s)). rewrite HS. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_S s)). rewrite HS. cbn match.
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_legalize_sstatus *)
 
 (* helper: exec_write_CSR_sstatus *)
 
 (* helper: exec_check_CSR_priv_sstatus_S *)
-Local Lemma exec_check_CSR_priv_sstatus_S s :
-  exec (check_CSR_priv csr_sstatus Supervisor) s = Some (true, s).
-Proof.
-  unfold check_CSR_priv.
-  assert (Hp : exec (privLevel_to_CSR_privbits Supervisor) s = Some ('b"01" : mword 2, s)).
-  { unfold privLevel_to_CSR_privbits.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_H_false s)). apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ Hp). rewrite exec_returnM.
-  replace (zopz0zKzJ_u ('b"01" : mword 2) (csrPriv csr_sstatus)) with true
-    by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
 
 (* helper: exec_check_CSR_sstatus_S *)
 
