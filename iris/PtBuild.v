@@ -1952,6 +1952,30 @@ Proof.
   apply Z.add_comm.
 Qed.
 
+(* LEVEL-GENERIC slot address: the walk loop's srl/andi/slli/add at level [L]
+   (shift amount [12 + 9*L] = the s4 counter's value) computes the
+   description's level-[L] slot address.  Subsumes walk_slot_addr{0,1,2} so
+   the fuel-generic loop body applies ONE lemma with its abstract level. *)
+Lemma walk_slot_addr_lvl (L : nat) (b : mword 44) (va : mword 64) :
+  (L <= 2)%nat ->
+  uint va < 274877906944 ->
+  add_vec
+    (shift_bits_left
+       (and_vec
+          (shift_bits_right va
+             (subrange_vec_dec (mword_of_int (12 + 9 * Z.of_nat L) : mword 64) (Z.sub log2_xlen 1) 0))
+          (sign_extend' 64 (mword_of_int 511 : mword 12)))
+       (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))
+    (zero_extend' 64 (concat_vec b (zeros' 12 : mword 12)))
+  = u_pte_addr b (vpn_idx L (svpn_of va)).
+Proof.
+  intros HL Hva. destruct L as [|[|[|L']]].
+  - change (12 + 9 * Z.of_nat 0)%Z with 12%Z. exact (walk_slot_addr0 b va Hva).
+  - change (12 + 9 * Z.of_nat 1)%Z with 21%Z. exact (walk_slot_addr1 b va Hva).
+  - change (12 + 9 * Z.of_nat 2)%Z with 30%Z. exact (walk_slot_addr2 b va Hva).
+  - exfalso. lia.
+Qed.
+
 (* the C walk's V-bit test: [andi a5, w, 1; beqz a5] branches exactly on
    bit 0 of the slot word *)
 Lemma walk_vbit_eq (w : mword 64) :
