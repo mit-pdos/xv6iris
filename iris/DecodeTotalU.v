@@ -301,14 +301,3 @@ Qed.
 
 (* Every 32-bit word decodes -- to a SINGLE instruction shared by every
    state that agrees with the U-mode reference on the decode read set.    *)
-Theorem decode_total_u (w : mword 32) :
-  exists i, forall s, agree_on D_u s dstateU ->
-    exec (ext_decode w) s = Some (i, s).
-Proof.
-  destruct (goodb_exec_total D_u (ext_decode w) dstateU (goodb_encdec_u w)) as [i Hi].
-  exists i. intros s Hag.
-  destruct (exec_goodb_congr D_u (ext_decode w) dstateU s
-              (fun r HD => eq_sym (Hag r HD)) (goodb_encdec_u w)) as (x & Hx & Hs).
-  assert (i = x) as -> by congruence.
-  exact Hs.
-Qed.

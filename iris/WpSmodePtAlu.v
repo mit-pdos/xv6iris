@@ -203,48 +203,6 @@ Section WpSmodePtAlu.
 
   (* ---- from WpSmodeUtype.v ---- *)
 
-  Lemma wp_auipc_s_r (R : s_regime) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd : mword 5) (imm : mword 20)
-      (m : regfile)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    uint rd <> 0 ->
-    hw_config -∗ minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    sr_inv R -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false (UTYPE (imm, Regidx rd, AUIPC)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      sr_inv R -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (add_vec pc (auipc_off imm))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
-      "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_base_pc_regime R Φ pc rd rd rd
-              (UTYPE (imm, Regidx rd, AUIPC))
-              (add_vec pc (auipc_off imm))
-              m mstatus0 mie_v mdv0 menvcfg0
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd
-              _
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont").
-    intros s_pc Hnpc HPCpc _ _.
-    rewrite (exec_execute_UTYPE_AUIPC_gpr rd imm s_pc).
-    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-    rewrite HPCpc. reflexivity.
-  Qed.
-
 
 
   (* ---- base LUI / ANDI gpr-write leaves (scfg form) ----

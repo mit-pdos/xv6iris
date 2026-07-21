@@ -234,43 +234,6 @@ Section WpSmodePtGprEngine.
   (* ---- [smode_config]-bundled wrappers ------------------------------- *)
 
 
-  Lemma wp_gpr_write_s_config_base_scfg_regime (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rsa rsb : mword 5) (i : instruction) (wval : mword 64)
-      (m : regfile) {dq : dfrac} :
-    uint rd <> 0 ->
-    (forall s_pc : mstate,
-       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
-       (if Z.eqb (uint rsa) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = m !!! Regidx rsa ->
-       (if Z.eqb (uint rsb) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = m !!! Regidx rsb ->
-       exec (execute i) s_pc
-       = Some (RETIRE_SUCCESS,
-               set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    smode_config γ dq -∗ sr_inv R -∗
-    pc_is pc -∗ gpr_file m -∗ instr pc false i -∗
-    ( smode_config γ dq -∗ sr_inv R -∗
-      pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hexec) "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
-    iDestruct (smode_config_unbundle with "Hsm") as
-      "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmieb & Hmenvb)".
-    iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-    iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-    iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_gpr_write_s_config_base_regime R Φ pc rd rsa rsb i wval m mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd Hexec
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    iDestruct (smode_config_rebuild γ dq mstatus0 mie_v mdv0 menvcfg0
-                 HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe Hfiom Hmenvval0
-                 with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-    iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile").
-  Qed.
-
 
 End WpSmodePtGprEngine.
 
