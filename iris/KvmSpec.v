@@ -60,7 +60,8 @@
       panic never returns (prints, then spins) -- a safety-only WP for it
       holds with ANY postcondition.  The specs thread a [panic_wp]
       hypothesis of that shape (an eventual lemma: uartputc + a Löb spin
-      loop; an axiom in the interim, like wp_myproc_sconf_any).  With the failure
+      loop; an axiom in the interim -- as myproc once was, now proven and
+      axiom-free in SpecMyproc/WpSconfMyproc).  With the failure
       arm absorbed by panic, kvmmap's and kvmmake's posts state FULL
       success -- no freelist-size preconditions anywhere; the only
       nonemptiness demand is kvmmake's root-page kalloc (whose null
@@ -231,7 +232,8 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   (* The panic contract: panic never returns, so a safety WP holds with    *)
   (* any postcondition.  (Eventually a lemma -- uartputc + a Löb spin      *)
-  (* loop; an axiom in the interim, like wp_myproc_sconf_any.)  a0 = msg.  *)
+  (* loop; an axiom in the interim -- as myproc once was, now proven.)      *)
+  (* a0 = msg.                                                              *)
   (* ------------------------------------------------------------------- *)
   Definition panic_wp : iProp Σ :=
     (□ ∀ (Φ : mval -> iProp Σ) (γ : gname) (root_ppn : mword 44) (m : regfile) (avail : nat),
