@@ -31,7 +31,6 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
   let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in

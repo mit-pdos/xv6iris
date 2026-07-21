@@ -29,7 +29,6 @@ Notation KI := KernelSyms.kinit.
 Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kinit in
-  let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in

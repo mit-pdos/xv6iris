@@ -534,7 +534,8 @@ Section WpSconfPushOff.
     : wp_push_off_sconf_body γ root_ppn Φ m av noff intena_old a0f n.
   Proof.
     cbv beta delta [wp_push_off_sconf_body].
-    intros sp0 noff_a5 noff_store a_noff a_intena caller_ret Hcret0 Ha0 Hav.
+    intros noff_a5 noff_store a_noff a_intena caller_ret Hcret0 Ha0 Hav.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (N0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
     set (N1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
@@ -1076,7 +1077,8 @@ Section WpSconfPushOff.
     : wp_pop_off_sconf_body γ root_ppn Φ m av noffv intenav n dqi.
   Proof.
     cbv beta delta [wp_pop_off_sconf_body].
-    intros pcE sp0 a0v a_noff a_int nv1 storeval ret_tgt Hcoup Hnoffpos Hal0 Hav.
+    intros pcE a0v a_noff a_int nv1 storeval ret_tgt Hcoup Hnoffpos Hal0 Hav.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     set (P0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
     set (P1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg

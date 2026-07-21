@@ -46,7 +46,7 @@ Section WpSconfMemsetPage.
     : wp_memset_page_sconf_body γ root_ppn Φ m0 n cval.
   Proof.
     cbv beta delta [wp_memset_page_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt Hn Hpv Hcval Ha2 Hret0.
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt Hn Hpv Hcval Ha2 Hret0.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
     iEval (rewrite /page_own /byte_any) in "Hpage".

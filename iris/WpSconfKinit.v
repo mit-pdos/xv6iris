@@ -49,8 +49,9 @@ Section WpSconfKinit.
     : wp_kinit_sconf_body γ root_ppn Φ m ps K ncnt vlock vname vcpu.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
-    intros pcE sp0 ret_tgt cpuv a_noff a_int lk fl c_name c_cpu endaddr phystop s1entry
+    intros pcE ret_tgt cpuv a_noff a_int lk fl c_name c_cpu endaddr phystop s1entry
       HK Hncnt Hmycpu Hretm Hprun.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc Hlock Hname Hcpu Hflw Hpages Hqnoff Hqint Hcont".
     assert (Hspr2 : spr = pa_stk sp0 2).

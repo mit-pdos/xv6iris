@@ -24,7 +24,6 @@ Notation PP := KernelSyms.pop_off.
 
 Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noff intena_old : mword 32) (a0f : mword 64) (n : nat) :=
-  let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
      unbundled mstatus0; the statement stays mstatus0-free. *)
@@ -63,7 +62,6 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noffv intenav : mword 32) (n : nat) (dqi : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
-  let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let a0v := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let a_noff := add_vec a0v (sign_extend' 64 (mword_of_int 120 : mword 12)) in
   let a_int := add_vec a0v (sign_extend' 64 (mword_of_int 124 : mword 12)) in

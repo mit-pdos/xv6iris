@@ -24,7 +24,6 @@ Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.mycpu in
-  let sp0 : mword 64 := m0 !!! Regidx csp_rs1 in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->

@@ -158,7 +158,8 @@ Section WpSconfAcquire.
     : wp_acquire_sconf_body γ root_ppn Φ γl R m cpuold noffv intena_old n av.
   Proof.
     cbv beta delta [wp_acquire_sconf_body].
-    intros pcE lk0 a_cpu sp0 cpuv a_noff a_int po_noff_a5 po_noff_store ret_tgt Hnotmine Hal0 Hav.
+    intros pcE lk0 a_cpu cpuv a_noff a_int po_noff_a5 po_noff_store ret_tgt Hnotmine Hal0 Hav.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc #Hlock Hcpu Hnoff Hint Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
     iPoseProof (aqi_02 with "Htext") as "Hi02".

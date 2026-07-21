@@ -31,7 +31,6 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   let pcE : mword 64 := mword_of_int KernelSyms.initlock in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let name := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let c_name := add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)) in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in

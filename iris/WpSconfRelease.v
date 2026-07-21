@@ -61,8 +61,9 @@ Section WpSconfRelease.
     : wp_release_sconf_body γ root_ppn Φ γl lka R m cpuold noffv intenav n av dqi.
   Proof.
     cbv beta delta [wp_release_sconf_body].
-    intros pcE lk0 a_cpu sp0 cpuv a_noff a_int nv1 storeval_noff ret_tgt
+    intros pcE lk0 a_cpu cpuv a_noff a_int nv1 storeval_noff ret_tgt
            Hlka Hmine Hcoup Hnoffpos Hal0 Hav.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc #Hlock Htoken HR Hcpu Hnoff Hint Hcnt Hcont".
     iPoseProof (rli_00 with "Htext") as "Hi00".
     iPoseProof (rli_02 with "Htext") as "Hi02".

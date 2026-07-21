@@ -1130,7 +1130,8 @@ Section WpSconfWalk.
     : wp_walk_sconf_body γ root_ppn γa Φ mm t m K lvl.
   Proof.
     cbv beta delta [wp_walk_sconf_body].
-    intros va vpn sp0 ret_tgt Hlvl HK Ha0 Ha2 Hva Hrep.
+    intros va vpn ret_tgt Hlvl HK Ha0 Ha2 Hva Hrep.
+    pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> mm).

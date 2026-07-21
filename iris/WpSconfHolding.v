@@ -59,7 +59,8 @@ Section WpSconfHolding.
     : wp_holding_lockinv_s_sconf_body γ root_ppn Φ γl lka R m n cpuold dqc.
   Proof.
     cbv beta delta [wp_holding_lockinv_s_sconf_body].
-    intros pcE lk a_cpu sp0 ret_tgt Hlka Hnotmine Hal0 Hn.
+    intros pcE lk a_cpu ret_tgt Hlka Hnotmine Hal0 Hn.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc #Hlock Hcpu Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
@@ -516,7 +517,8 @@ Section WpSconfHolding.
     : wp_holding_lockinv_locked_s_sconf_body γ root_ppn Φ γl lka R m n cpuold dqc.
   Proof.
     cbv beta delta [wp_holding_lockinv_locked_s_sconf_body].
-    intros pcE lk a_cpu sp0 ret_tgt Hlka Hmine Hal0 Hn.
+    intros pcE lk a_cpu ret_tgt Hlka Hmine Hal0 Hn.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc #Hlock Htok Hcpu Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".

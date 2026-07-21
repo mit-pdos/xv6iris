@@ -58,8 +58,9 @@ Section WpSconfKalloc.
     : wp_kalloc_sconf_body γ root_ppn Φ γl γk fl m cpuold noffv intena_old on n K.
   Proof.
     cbv beta delta [wp_kalloc_sconf_body].
-    intros pcE sp0 ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store noff_ret
+    intros pcE ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store noff_ret
       HK Hcpune Hretm Hfl Hnoff_lvl Hnoffpos Hintena0.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc #Hlock Havail Hqnoff Hqint Hqcpu Hcont".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (kai_00 with "Htext") as "Hi00".

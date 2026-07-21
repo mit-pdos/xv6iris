@@ -126,9 +126,14 @@ into the separately-compilable `WpMemsetArray`.
   … — because Rocq runs typeclass resolution as one search and reports all
   pending evars when it fails. Read past the noise: the culprit is the class you
   did not bind.
-- **An unused `let` in a `Definition` body needs a type annotation** (`let sp0 :
-  mword 64 := m !!! Regidx csp_rs1 in`). The same `let` in a `Lemma` statement
-  elaborates fine; a `Definition` body has no goal to pin the evar.
+- **Do not carry a `let` the statement never uses.** A `_body`'s let-chain is
+  part of how the spec reads, so a binding that no proposition mentions is noise
+  — delete it and `pose` it in the proof if the script wants the name. (The
+  `sp0 := m !!! Regidx csp_rs1` bindings were exactly this: fossils of the
+  pre-`sie_cap_gpr` shape, where the spec still carried an explicit
+  `stack_own (pa_stk sp0 kv_frame_slots) K` conjunct.) If a `let` *is* used but
+  its type cannot be inferred, annotate it (`let sp0 : mword 64 := …`) — a
+  `Definition` body, unlike a `Lemma` statement, has no goal to pin the evar.
 - **Arguments consumed from *inside* the statement still lose scope.** The
   `Parameter`'s binders only cover the header; a numeric argument that the
   statement itself quantifies needs an explicit mark (`4096%nat`). Two such

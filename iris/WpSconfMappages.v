@@ -1025,8 +1025,9 @@ Section WpSconfMappages.
     : wp_mappages_sconf_body γ root_ppn γa Φ mm t m npages perm lvl K.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
-    intros va pa vpn0 ppn0 sp0 ret_tgt
+    intros va pa vpn0 ppn0 ret_tgt
       Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone.
+    pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> mm).

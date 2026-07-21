@@ -546,7 +546,8 @@ Section WpSconfUartPutc.
     : wp_uartputc_sconf_body γ root_ppn γd Φ m0 K l pv pkv dqm dqm2.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
-    intros ra_idx a0_idx pcE sp0 ra0 a00 ret_tgt sb HK Hal0 Hpv Hpkv.
+    intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hal0 Hpv Hpkv.
+    pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hsc Hhs Hcg Htlbinv #Ht Hpc Hpk Hpkd #Hdinv Hown #Hoff Hcont".
     set (spr := add_vec (m0 !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (upi_00 with "Ht") as "Hi00".

@@ -34,7 +34,6 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
   let pcE := mword_of_int KernelSyms.memset in
-  let sp0 : mword 64 := m0 !!! Regidx csp_rs1 in
   let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
   let p := m0 !!! Regidx a0_idx in
   let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in

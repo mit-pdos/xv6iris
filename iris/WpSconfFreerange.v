@@ -234,8 +234,9 @@ Section WpSconfFreerange.
     : wp_freerange_sconf_body γ root_ppn Φ γl γk lk fl m ps K ncnt.
   Proof.
     cbv beta delta [wp_freerange_sconf_body].
-    intros pcE pa_start pa_end sp0 ret_tgt cpuv a_noff a_int a_cpu s1entry
+    intros pcE pa_start pa_end ret_tgt cpuv a_noff a_int a_cpu s1entry
       HK Hncnt Hmycpu Hretm Hlk Hfl Hprun.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc #Hkmem Hpages Hqnoff Hqint Hqcpu Havail Hcont".
     assert (Hspr6 : spr = pa_stk sp0 6).

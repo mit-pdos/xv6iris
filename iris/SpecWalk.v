@@ -42,7 +42,6 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
     (γ : gname) (root_ppn : mword 44) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
-  let sp0 : mword 64 := mm !!! Regidx csp_rs1 in
   let ret_tgt := update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0") in
   lvl = 0%nat ->
   (22 <= K)%nat ->

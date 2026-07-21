@@ -49,7 +49,6 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   let pcE : mword 64 := mword_of_int KernelSyms.freerange in
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in

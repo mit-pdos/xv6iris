@@ -40,7 +40,8 @@ Section WpSconfMycpu.
     : wp_mycpu_sconf_body γ root_ppn Φ m0 n.
   Proof.
     cbv beta delta [wp_mycpu_sconf_body].
-    intros ra_idx tp_idx a0_idx pcE sp0 ra0 ret_tgt Hal0 Hn.
+    intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hal0 Hn.
+    pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     (* the per-instruction register-map chain (private to the proof) *)
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a5_idx := (mword_of_int 15 : mword 5)).

@@ -122,7 +122,8 @@ Section WpMemsetArray.
     : wp_memset_sconf_body γ root_ppn Φ m0 n len cval olds.
   Proof.
     cbv beta delta [wp_memset_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt cbyte Hn Hlen0 Hlen32 Hnw Hcval Ha2 Hret0.
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen0 Hlen32 Hnw Hcval Ha2 Hret0.
+  pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     set (ra_idx := (mword_of_int 1 : mword 5)).
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a4_idx := (mword_of_int 14 : mword 5)).

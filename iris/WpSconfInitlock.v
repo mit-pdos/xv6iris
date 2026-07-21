@@ -62,7 +62,8 @@ Section WpSconfInitlock.
     : wp_initlock_sconf_body γ root_ppn Φ m vlock vname vcpu K.
   Proof.
     cbv beta delta [wp_initlock_sconf_body].
-    intros pcE lk name sp0 ret_tgt c_name c_cpu HK Hretm.
+    intros pcE lk name ret_tgt c_name c_cpu HK Hretm.
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hlock Hname Hcpu Hcont".
     iPoseProof (ini_00 with "Htext") as "Hi00".
