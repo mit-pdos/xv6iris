@@ -266,10 +266,20 @@ All three carry `m !!! Regidx x4 = cid_word`.
       scheduler-chain protocol, ▷-slot lock invariant, cur_proc/cid_word,
       set-chain peel + named-assert callee_saved discipline).
 
+- [x] S7: sleep(chan, lk) PROVEN (SpecSleep/WpSleepDecode/WpSconfSleep/
+      LinkSleep; no new axioms).  The condition lock (arbitrary γk/Rk)
+      enters held — locked γk ∗ Rk ∗ lk->cpu ↦ mycpu_ret cid_word — and
+      exits reacquired; noff runs 1→2→1 around the park (acquire(p->lock)
+      then release(lk)); st = SLEEPING; the chan cell is written from the
+      R elim and cleared after resume (sched's ∃ch' post is immediately
+      overwritten); all five call-boundary noff forms closed by vm_compute.
+
 Remaining cleanup (small, unowned): move `own_ctx` from SpecSched.v into
 SwtchCtx.v; consider a `wp_cret_s_zca_r_later_pt` wrapper and a
 swconf-across-iNext helper (see S2b notes); check SpecCpuid (landed
-upstream mid-project) against the tp = cid_word convention.
+upstream mid-project) against the tp = cid_word convention; lift the
+frame-bridge + addv arithmetic helpers duplicated across
+WpSconfSched/Yield/Sleep into a shared low-altitude home (StackOwn.v).
 
 Future (out of scope): the scheduler() loop proof (consumes p_sched's first
 disjunct / supplies the second), sleep(), wiring cur_proc through wakeup to

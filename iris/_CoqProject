@@ -230,6 +230,10 @@ SpecYield.v
 WpYieldDecode.v
 WpSconfYield.v
 LinkYield.v
+SpecSleep.v
+WpSleepDecode.v
+WpSconfSleep.v
+LinkSleep.v
 WpWakeup.v
 SpecWakeupLoop.v
 WpSconfWakeupLoop.v
