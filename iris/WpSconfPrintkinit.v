@@ -44,7 +44,11 @@ Section WpSconfPrintkinit.
     : wp_printkinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
   Proof.
     cbv beta delta [wp_printkinit_sconf_body].
-    intros pcE sp0 ret_tgt lk c_name c_cpu name HK Hretm.
+    intros pcE ret_tgt lk c_name c_cpu name HK Hretm.
+    (* [sp0] is proof-local shorthand, not spec vocabulary: the statement says
+       nothing about the incoming sp beyond what [sie_cap_gpr]/[callee_saved]
+       already say, so it has no business being a [let] in the spec. *)
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hlock Hname Hcpu Hcont".
     assert (Hspr2 : spr = pa_stk sp0 2).
